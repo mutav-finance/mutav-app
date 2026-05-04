@@ -1,15 +1,15 @@
 "use client";
 
-import { PrivyClientProvider } from "./privy";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConvexClientProvider } from "./convex";
 import { StellarProvider } from "./stellar";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <PrivyClientProvider>
-      <ConvexClientProvider>
-        <StellarProvider>{children}</StellarProvider>
-      </ConvexClientProvider>
-    </PrivyClientProvider>
+    <ConvexClientProvider>
+      <StellarProvider>
+        <TooltipProvider>{children}</TooltipProvider>
+      </StellarProvider>
+    </ConvexClientProvider>
   );
 }

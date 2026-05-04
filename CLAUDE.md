@@ -25,14 +25,13 @@ gh api repos/tga-protocol/sgr/contents/docs/whitepaper.md --jq '.content' | base
 ## Stack
 - Next.js 16 (App Router, src/ directory)
 - Tailwind CSS 4
-- shadcn/ui (base-nova style, neutral base color)
-- Privy — Solana wallet auth
+- shadcn/ui (radix-nova style, neutral base color, TGA tokens in `src/app/globals.css`)
 - StellarWalletsKit — Stellar wallet connection
 - Convex — backend (functions in convex/)
 - Railway — deployment
 
 ## Architecture
-- `src/providers/` — client providers (Privy, Convex, Stellar)
+- `src/providers/` — client providers (Convex, Stellar)
 - `src/components/ui/` — shadcn components
 - `src/app/` — Next.js app router pages
 - `convex/` — Convex backend functions
