@@ -16,5 +16,32 @@
   },
   "siteHeader": {
     "title": "Documentos"
+  },
+  "brand": { "name": "Acme Inc." },
+  "nav": {
+    "main": {
+      "quickCreate": "Criar Rápido",
+      "inbox": "Caixa de Entrada",
+      "dashboard": "Painel",
+      "lifecycle": "Ciclo de Vida",
+      "analytics": "Análises",
+      "projects": "Projetos",
+      "team": "Equipe"
+    },
+    "secondary": {
+      "settings": "Configurações",
+      "getHelp": "Obter Ajuda",
+      "search": "Buscar"
+    },
+    "documents": {
+      "groupLabel": "Documentos",
+      "dataLibrary": "Biblioteca de Dados",
+      "reports": "Relatórios",
+      "wordAssistant": "Assistente de Texto",
+      "more": "Mais",
+      "open": "Abrir",
+      "share": "Compartilhar",
+      "delete": "Excluir"
+    }
   }
 }
