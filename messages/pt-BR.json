@@ -43,5 +43,27 @@
       "share": "Compartilhar",
       "delete": "Excluir"
     }
+  },
+  "metrics": {
+    "totalRevenue": {
+      "label": "Receita Total",
+      "trend": "Em alta este mês",
+      "footer": "Visitantes nos últimos 6 meses"
+    },
+    "newCustomers": {
+      "label": "Novos Clientes",
+      "trend": "Queda de 20% no período",
+      "footer": "Aquisição precisa de atenção"
+    },
+    "activeAccounts": {
+      "label": "Contas Ativas",
+      "trend": "Forte retenção de usuários",
+      "footer": "Engajamento supera as metas"
+    },
+    "growthRate": {
+      "label": "Taxa de Crescimento",
+      "trend": "Aumento de desempenho constante",
+      "footer": "Atinge as projeções de crescimento"
+    }
   }
 }

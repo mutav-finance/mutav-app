@@ -43,5 +43,27 @@
       "share": "Share",
       "delete": "Delete"
     }
+  },
+  "metrics": {
+    "totalRevenue": {
+      "label": "Total Revenue",
+      "trend": "Trending up this month",
+      "footer": "Visitors for the last 6 months"
+    },
+    "newCustomers": {
+      "label": "New Customers",
+      "trend": "Down 20% this period",
+      "footer": "Acquisition needs attention"
+    },
+    "activeAccounts": {
+      "label": "Active Accounts",
+      "trend": "Strong user retention",
+      "footer": "Engagement exceed targets"
+    },
+    "growthRate": {
+      "label": "Growth Rate",
+      "trend": "Steady performance increase",
+      "footer": "Meets growth projections"
+    }
   }
 }
