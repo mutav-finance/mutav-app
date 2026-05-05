@@ -13,5 +13,8 @@
     "themeSystem": "Sistema",
     "language": "Idioma",
     "logOut": "Sair"
+  },
+  "siteHeader": {
+    "title": "Documentos"
   }
 }
