@@ -2,5 +2,16 @@
   "meta": {
     "title": "SGR — Sistema de Garantia Registrada",
     "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
+  },
+  "userMenu": {
+    "account": "Conta",
+    "billing": "Cobrança",
+    "notifications": "Notificações",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Escuro",
+    "themeSystem": "Sistema",
+    "language": "Idioma",
+    "logOut": "Sair"
   }
 }

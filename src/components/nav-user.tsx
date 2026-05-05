@@ -37,7 +37,7 @@ import {
   LanguagesIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
-import { useLocale } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { useRouter, usePathname } from "@/i18n/navigation"
 import { routing } from "@/i18n/routing"
 
@@ -61,6 +61,7 @@ export function NavUser({
   const locale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
+  const t = useTranslations("userMenu")
   const switchLocale = (next: string) => {
     router.replace(pathname, { locale: next as (typeof routing.locales)[number] })
   }
@@ -110,40 +111,37 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <CircleUserRoundIcon
-                />
-                Account
+                <CircleUserRoundIcon />
+                {t("account")}
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
+                <CreditCardIcon />
+                {t("billing")}
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <BellIcon
-                />
-                Notifications
+                <BellIcon />
+                {t("notifications")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <ThemeTriggerIcon />
-                Theme
+                {t("theme")}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
                   <DropdownMenuRadioItem value="light">
                     <SunIcon />
-                    Light
+                    {t("themeLight")}
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="dark">
                     <MoonIcon />
-                    Dark
+                    {t("themeDark")}
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="system">
                     <MonitorIcon />
-                    System
+                    {t("themeSystem")}
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
@@ -151,13 +149,10 @@ export function NavUser({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <LanguagesIcon />
-                Language
+                {t("language")}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup
-                  value={locale}
-                  onValueChange={switchLocale}
-                >
+                <DropdownMenuRadioGroup value={locale} onValueChange={switchLocale}>
                   {routing.locales.map((l) => (
                     <DropdownMenuRadioItem key={l} value={l}>
                       {LOCALE_LABELS[l]}
@@ -168,9 +163,8 @@ export function NavUser({
             </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
-              <LogOutIcon
-              />
-              Log out
+              <LogOutIcon />
+              {t("logOut")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
