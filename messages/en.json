@@ -44,6 +44,15 @@
       "delete": "Delete"
     }
   },
+  "chart": {
+    "totalVisitors": "Total Visitors",
+    "rangeLong": "Total for the last 3 months",
+    "rangeShort": "Last 3 months",
+    "last3Months": "Last 3 months",
+    "last30Days": "Last 30 days",
+    "last7Days": "Last 7 days",
+    "selectRangeAriaLabel": "Select a value"
+  },
   "metrics": {
     "totalRevenue": {
       "label": "Total Revenue",
