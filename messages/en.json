@@ -74,5 +74,46 @@
       "trend": "Steady performance increase",
       "footer": "Meets growth projections"
     }
+  },
+  "dataTable": {
+    "columns": {
+      "header": "Header",
+      "sectionType": "Section Type",
+      "status": "Status",
+      "target": "Target",
+      "limit": "Limit",
+      "reviewer": "Reviewer"
+    },
+    "status": {
+      "Done": "Done",
+      "In Progress": "In Progress",
+      "Not Started": "Not Started"
+    },
+    "sectionType": {
+      "Cover page": "Cover page",
+      "Table of contents": "Table of contents",
+      "Narrative": "Narrative",
+      "Technical content": "Technical content",
+      "Capabilities": "Capabilities",
+      "Focus Documents": "Focus Documents",
+      "Design": "Design",
+      "Executive Summary": "Executive Summary",
+      "Technical Approach": "Technical Approach",
+      "Cover Page": "Cover Page",
+      "Table of Contents": "Table of Contents"
+    },
+    "reviewerSelectPlaceholder": "Assign reviewer",
+    "actions": {
+      "openMenu": "Open menu",
+      "edit": "Edit",
+      "makeCopy": "Make a copy",
+      "favorite": "Favorite",
+      "delete": "Delete"
+    },
+    "toast": {
+      "saving": "Saving {header}",
+      "success": "Done",
+      "error": "Error"
+    }
   }
 }
