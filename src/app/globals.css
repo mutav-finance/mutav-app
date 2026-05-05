@@ -117,24 +117,8 @@
   --radius-4xl: 0px;
 }
 
-/* Investidor (dark) — default front */
+/* Imobiliárias (light) — default theme */
 :root {
-  --canvas:     #0E0F11;
-  --surface:    #16181C;
-  --surface-2:  #1E2126;
-  --surface-3:  #252830;
-  --border:     #2A2D33;
-  --text:       #F0F0EE;
-  --text-2:     #8A8F99;
-  --text-3:     #555B66;
-  --accent:     #E8A020;
-  --accent-dim: #9E6A10;
-  --success:    #3DAB72;
-  --error:      #C94040;
-}
-
-/* Imobiliárias (light) — opt-in via data-front attribute */
-[data-front="imobiliarias"] {
   --canvas:     #F7F6F3;
   --surface:    #FFFFFF;
   --surface-2:  #EEEDEA;
@@ -150,6 +134,25 @@
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1A1A1A;
   --color-primary-foreground: #1A1A1A;
+}
+
+/* Investidor (dark) — opt-in via .dark class */
+.dark {
+  --canvas:     #0E0F11;
+  --surface:    #16181C;
+  --surface-2:  #1E2126;
+  --surface-3:  #252830;
+  --border:     #2A2D33;
+  --text:       #F0F0EE;
+  --text-2:     #8A8F99;
+  --text-3:     #555B66;
+  --accent:     #E8A020;
+  --accent-dim: #9E6A10;
+  --success:    #3DAB72;
+  --error:      #C94040;
+  /* Restore canvas-on-accent for dark mode */
+  --color-accent-foreground: var(--canvas);
+  --color-primary-foreground: var(--canvas);
 }
 
 /* Live amber square pulse — only ambient animation in the system */
@@ -177,18 +180,17 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
   }
-  /* Investidor canvas — architectural grid texture at 3% opacity */
+  /* Imobiliárias canvas (default light) — clean, no texture */
   body {
     background-color: var(--canvas);
+    background-image: none;
+  }
+  /* Investidor canvas (dark) — architectural grid texture at 3% opacity */
+  .dark body {
     background-image:
       linear-gradient(to right,  rgba(240, 240, 238, 0.03) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(240, 240, 238, 0.03) 1px, transparent 1px);
     background-size: 24px 24px;
-  }
-  /* Imobiliárias scoped sections — no texture */
-  [data-front="imobiliarias"] {
-    background-color: var(--canvas);
-    background-image: none;
   }
   /* Tabular numerals — JetBrains Mono mandatory for all numeric data */
   .font-mono,
