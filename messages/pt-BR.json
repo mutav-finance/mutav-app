@@ -3,6 +3,11 @@
     "title": "SGR — Sistema de Garantia Registrada",
     "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
   },
+  "common": {
+    "a11y": {
+      "skipToMain": "Pular para o conteúdo principal"
+    }
+  },
   "userMenu": {
     "account": "Conta",
     "billing": "Cobrança",
@@ -176,7 +181,8 @@
     "promo": {
       "title": "Quita Loft",
       "body": "Evite inadimplências: ofereça ao inquilino a opção de pagar o aluguel no cartão e receba o valor à vista.",
-      "cta": "Saber mais"
+      "cta": "Saber mais",
+      "regionLabel": "Sugestão Quita Loft"
     },
     "summary": {
       "heading": "Solicitação",
@@ -186,7 +192,13 @@
       "guaranteeTooltip": "Este valor considera todas as inadimplências abertas, em análise, provisionadas e pagas.",
       "openDelinquency": "Abrir inadimplência",
       "trackDelinquencies": "Acompanhar inadimplências",
-      "cancelProposal": "Cancelar proposta"
+      "cancelProposal": "Cancelar proposta",
+      "idLabel": "ID do contrato",
+      "guaranteeTooltipLabel": "Detalhes da fiança disponível",
+      "copyId": "Copiar ID",
+      "cancelProposalHint": "Disponível apenas para contratos pendentes",
+      "openDelinquencyHint": "Registrar nova inadimplência",
+      "trackDelinquenciesHint": "Ver inadimplências deste contrato"
     },
     "status": {
       "ativo": "Ativo",
@@ -200,6 +212,7 @@
       "actionEdit": "Editar",
       "actionDuplicate": "Duplicar",
       "actionArchive": "Arquivar",
+      "actionDisabled": "Disponível em breve",
       "groups": {
         "contract": "Dados do Contrato",
         "property": "Dados do Imóvel",
@@ -236,6 +249,7 @@
     "documents": {
       "heading": "Documentos",
       "send": "Enviar",
+      "sendDisabled": "Disponível em breve",
       "labels": {
         "rentalContract": "Contrato de locação",
         "inspection": "Vistoria",
@@ -268,11 +282,22 @@
         "email": "E-mail",
         "phone": "Telefone Fixo/Celular"
       },
-      "termApproved": "Termo Aprovado"
+      "termApproved": "Termo Aprovado",
+      "approvalFailedHelp": "Reprovação registrada. Solicite documentação atualizada ao inquilino para reabrir a análise.",
+      "initialsLabel": "Iniciais do inquilino"
     },
     "notFound": {
       "title": "Contrato não encontrado",
       "body": "Não localizamos um contrato com este identificador."
+    },
+    "errors": {
+      "title": "Não foi possível carregar este contrato",
+      "body": "Algo deu errado ao buscar os dados. Tente novamente ou volte ao painel.",
+      "retry": "Tentar novamente",
+      "backToDashboard": "Voltar ao painel"
+    },
+    "loading": {
+      "label": "Carregando contrato"
     }
   }
 }

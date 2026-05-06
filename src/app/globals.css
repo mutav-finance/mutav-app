@@ -4,6 +4,13 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
 
+/* Exclude docs and skills dirs from Tailwind's content scan — they contain
+   literal class examples (e.g. `bg-[url(...)]`) that would otherwise compile
+   into broken CSS. Globs are relative to this file. */
+@source not "../../.claude";
+@source not "../../.design";
+@source not "../../docs";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

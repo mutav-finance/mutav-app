@@ -22,16 +22,25 @@ const approvalTone: Record<
   reprovado: "error",
 };
 
+function getInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "";
+  return (first + last).toUpperCase();
+}
+
 export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
   const t = useTranslations("contractDetails.tenant");
   const tFields = useTranslations("contractDetails.tenant.fields");
   const tApproval = useTranslations("contractDetails.tenant.approval");
+  const isRejected = tenant.approvalStatus === "reprovado";
 
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-3 border-b py-3">
         <div className="flex size-7 items-center justify-center bg-secondary text-muted-foreground">
-          <UserIcon className="size-4" strokeWidth={1.25} />
+          <UserIcon className="size-4" strokeWidth={1.25} aria-hidden />
         </div>
         <CardTitle className="font-mono text-xs font-medium tracking-[0.06em] uppercase text-muted-foreground">
           {t("heading")}
@@ -43,9 +52,15 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
         />
       </CardHeader>
       <CardContent className="grid gap-0 px-0 pb-0 lg:grid-cols-[auto_1fr]">
-        <div className="flex items-start justify-center border-b border-border px-6 py-6 lg:border-b-0 lg:border-r">
-          <div className="flex size-20 items-center justify-center bg-secondary text-muted-foreground">
-            <UserIcon className="size-10" strokeWidth={1.25} />
+        <div className="flex items-center justify-center border-b border-border px-6 py-3 sm:py-4 lg:py-6 lg:border-b-0 lg:border-r">
+          <div
+            className="flex size-12 shrink-0 items-center justify-center bg-secondary lg:size-20"
+            role="img"
+            aria-label={t("initialsLabel")}
+          >
+            <Mono className="text-base font-medium text-foreground lg:text-xl">
+              {getInitials(tenant.fullName)}
+            </Mono>
           </div>
         </div>
         <dl className="flex flex-col">
@@ -61,11 +76,16 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
           <FieldRow label={tFields("phone")} value={tenant.phone} mono />
         </dl>
       </CardContent>
-      {tenant.termApprovedAt && (
-        <CardFooter className="gap-2 text-2xs text-muted-foreground">
+      {isRejected && (
+        <CardFooter className="border-t border-border px-6 py-3 text-base-sm text-destructive">
+          {t("approvalFailedHelp")}
+        </CardFooter>
+      )}
+      {!isRejected && tenant.termApprovedAt && (
+        <CardFooter className="gap-2 px-6 py-3 text-2xs text-muted-foreground">
           <CheckIcon
             className="size-4 text-success"
-            strokeWidth={1.5}
+            strokeWidth={1.25}
             aria-hidden
           />
           <span className="font-medium uppercase tracking-[0.06em] font-mono">

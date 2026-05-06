@@ -1,12 +1,15 @@
+import { getTranslations } from "next-intl/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const tA11y = await getTranslations("common.a11y");
+
   return (
     <SidebarProvider
       style={
@@ -16,10 +19,15 @@ export default function AppLayout({
         } as React.CSSProperties
       }
     >
+      <a href="#main-content" className="skip-link">
+        {tA11y("skipToMain")}
+      </a>
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
-        {children}
+        <main id="main-content" data-front="imobiliarias">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -12,10 +12,12 @@ const toneClass: Record<Tone, string> = {
 export function StatusTag({
   tone,
   label,
+  pulse = false,
   className,
 }: {
   tone: Tone;
   label: string;
+  pulse?: boolean;
   className?: string;
 }) {
   return (
@@ -27,7 +29,11 @@ export function StatusTag({
     >
       <span
         aria-hidden
-        className={cn("size-[6px] shrink-0", toneClass[tone])}
+        className={cn(
+          "size-[6px] shrink-0",
+          toneClass[tone],
+          pulse && "tga-live-square",
+        )}
       />
       <span className="font-mono text-2xs font-medium tracking-[0.06em] uppercase text-foreground">
         {label}

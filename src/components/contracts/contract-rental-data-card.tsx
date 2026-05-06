@@ -31,15 +31,13 @@ export function ContractRentalDataCard({ contract }: { contract: Contract }) {
         </CardAction>
       </CardHeader>
       <CardContent className="grid gap-0 px-0 pb-0 lg:grid-cols-[auto_1fr]">
-        <div className="flex items-start justify-center border-b border-border px-6 py-6 lg:border-b-0 lg:border-r">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex size-20 items-center justify-center bg-secondary text-muted-foreground">
-              <HomeIcon className="size-10" strokeWidth={1.25} />
-            </div>
-            <span className="font-mono text-2xs font-medium tracking-[0.06em] uppercase text-muted-foreground">
-              {tKind(rental.propertyKind)}
-            </span>
+        <div className="flex items-center justify-center gap-3 border-b border-border px-6 py-3 sm:py-4 lg:flex-col lg:gap-2 lg:border-b-0 lg:border-r lg:py-6">
+          <div className="flex size-12 shrink-0 items-center justify-center bg-secondary text-muted-foreground lg:size-20">
+            <HomeIcon className="size-6 lg:size-10" strokeWidth={1.25} aria-hidden />
           </div>
+          <span className="font-mono text-2xs font-medium tracking-[0.06em] uppercase text-muted-foreground">
+            {tKind(rental.propertyKind)}
+          </span>
         </div>
         <dl className="flex flex-col">
           <FieldGroupHeader>{tGroups("contract")}</FieldGroupHeader>
@@ -108,8 +106,6 @@ export function ContractRentalDataCard({ contract }: { contract: Contract }) {
             label={tFields("description")}
             value={optional.description}
           />
-
-          <FieldGroupHeader>{tGroups("documents")}</FieldGroupHeader>
         </dl>
       </CardContent>
     </Card>

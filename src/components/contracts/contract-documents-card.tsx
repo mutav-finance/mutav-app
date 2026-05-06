@@ -2,6 +2,11 @@ import { FileTextIcon, UploadIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
   ContractDocument,
   ContractDocumentKey,
@@ -52,6 +57,7 @@ export function ContractDocumentsCard({
                   <FileTextIcon
                     className="mt-0.5 size-4 text-muted-foreground"
                     strokeWidth={1.25}
+                    aria-hidden
                   />
                   <span className="text-base-sm font-medium">
                     {tLabels(key)}
@@ -59,15 +65,26 @@ export function ContractDocumentsCard({
                 </div>
                 <StatusTag tone={statusTone[status]} label={tStatus(status)} />
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="self-start"
-                disabled
-              >
-                <UploadIcon data-icon="inline-start" strokeWidth={1.25} />
-                {t("send")}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="self-start border-primary text-primary bg-transparent hover:bg-accent-dim hover:text-primary"
+                      disabled
+                    >
+                      <UploadIcon
+                        data-icon="inline-start"
+                        strokeWidth={1.25}
+                        aria-hidden
+                      />
+                      {t("send")}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{t("sendDisabled")}</TooltipContent>
+              </Tooltip>
             </div>
           );
         })}

@@ -7,6 +7,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -15,12 +17,20 @@ export function ContractActionsMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-primary text-primary bg-transparent hover:bg-accent-dim hover:text-primary aria-expanded:bg-accent-dim aria-expanded:text-primary"
+        >
           {t("actions")}
-          <ChevronDownIcon data-icon="inline-end" />
+          <ChevronDownIcon data-icon="inline-end" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="min-w-44">
+        <DropdownMenuLabel className="font-mono text-2xs font-medium tracking-[0.06em] uppercase text-muted-foreground">
+          {t("actionDisabled")}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
         <DropdownMenuItem disabled>{t("actionEdit")}</DropdownMenuItem>
         <DropdownMenuItem disabled>{t("actionDuplicate")}</DropdownMenuItem>
         <DropdownMenuItem disabled>{t("actionArchive")}</DropdownMenuItem>

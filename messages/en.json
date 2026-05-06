@@ -3,6 +3,11 @@
     "title": "SGR — Registered Guarantee System",
     "description": "Dashboard for managing rental guarantees registered on-chain."
   },
+  "common": {
+    "a11y": {
+      "skipToMain": "Skip to main content"
+    }
+  },
   "userMenu": {
     "account": "Account",
     "billing": "Billing",
@@ -176,7 +181,8 @@
     "promo": {
       "title": "Quita Loft",
       "body": "Prevent defaults: offer your tenant the option to pay rent by card and receive the full amount upfront.",
-      "cta": "Learn more"
+      "cta": "Learn more",
+      "regionLabel": "Quita Loft suggestion"
     },
     "summary": {
       "heading": "Request",
@@ -186,7 +192,13 @@
       "guaranteeTooltip": "This value accounts for all open, under-review, provisioned, and paid delinquencies.",
       "openDelinquency": "Open delinquency",
       "trackDelinquencies": "Track delinquencies",
-      "cancelProposal": "Cancel proposal"
+      "cancelProposal": "Cancel proposal",
+      "idLabel": "Contract ID",
+      "guaranteeTooltipLabel": "Available guarantee details",
+      "copyId": "Copy ID",
+      "cancelProposalHint": "Available only for pending contracts",
+      "openDelinquencyHint": "Register a new delinquency",
+      "trackDelinquenciesHint": "View delinquencies for this contract"
     },
     "status": {
       "ativo": "Active",
@@ -200,6 +212,7 @@
       "actionEdit": "Edit",
       "actionDuplicate": "Duplicate",
       "actionArchive": "Archive",
+      "actionDisabled": "Coming soon",
       "groups": {
         "contract": "Contract Data",
         "property": "Property Data",
@@ -236,6 +249,7 @@
     "documents": {
       "heading": "Documents",
       "send": "Upload",
+      "sendDisabled": "Coming soon",
       "labels": {
         "rentalContract": "Rental contract",
         "inspection": "Inspection",
@@ -268,11 +282,22 @@
         "email": "E-mail",
         "phone": "Phone"
       },
-      "termApproved": "Term Approved"
+      "termApproved": "Term Approved",
+      "approvalFailedHelp": "Rejection on file. Request updated documentation from the tenant to reopen review.",
+      "initialsLabel": "Tenant initials"
     },
     "notFound": {
       "title": "Contract not found",
       "body": "We could not find a contract with this identifier."
+    },
+    "errors": {
+      "title": "We couldn't load this contract",
+      "body": "Something went wrong fetching the data. Try again or go back to the dashboard.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard"
+    },
+    "loading": {
+      "label": "Loading contract"
     }
   }
 }
