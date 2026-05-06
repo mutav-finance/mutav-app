@@ -23,6 +23,7 @@
       "quickCreate": "Criar Rápido",
       "inbox": "Caixa de Entrada",
       "dashboard": "Painel",
+      "contracts": "Contratos",
       "lifecycle": "Ciclo de Vida",
       "analytics": "Análises",
       "projects": "Projetos",
@@ -166,6 +167,112 @@
       "selectReviewerPlaceholder": "Selecione um revisor",
       "submit": "Enviar",
       "done": "Concluído"
+    }
+  },
+  "contractDetails": {
+    "backToDashboard": "Voltar",
+    "breadcrumb": "Detalhes do Contrato",
+    "heroTitle": "Contrato {status}",
+    "promo": {
+      "title": "Quita Loft",
+      "body": "Evite inadimplências: ofereça ao inquilino a opção de pagar o aluguel no cartão e receba o valor à vista.",
+      "cta": "Saber mais"
+    },
+    "summary": {
+      "heading": "Solicitação",
+      "currentStatus": "Situação atual:",
+      "nextRenewal": "Próxima Renovação estimada:",
+      "availableGuarantee": "Fiança disponível:",
+      "guaranteeTooltip": "Este valor considera todas as inadimplências abertas, em análise, provisionadas e pagas.",
+      "openDelinquency": "Abrir inadimplência",
+      "trackDelinquencies": "Acompanhar inadimplências",
+      "cancelProposal": "Cancelar proposta"
+    },
+    "status": {
+      "ativo": "Ativo",
+      "encerrado": "Encerrado",
+      "pendente": "Pendente",
+      "cancelado": "Cancelado"
+    },
+    "rentalData": {
+      "heading": "Dados da Locação",
+      "actions": "Ações",
+      "actionEdit": "Editar",
+      "actionDuplicate": "Duplicar",
+      "actionArchive": "Arquivar",
+      "groups": {
+        "contract": "Dados do Contrato",
+        "property": "Dados do Imóvel",
+        "optional": "Dados Opcionais",
+        "documents": "Documentos"
+      },
+      "fields": {
+        "propertyKind": "Tipo de Imóvel",
+        "rent": "Valor Aluguel",
+        "condo": "Valor Condomínio",
+        "otherFees": "Outras Taxas",
+        "totalRent": "Valor Locatício Total",
+        "fee": "Valor da Taxa",
+        "oneTimeActivationFee": "Taxa única de ativação",
+        "setupInstallments": "Parcelas Setup",
+        "exitCost": "Custo de saída",
+        "rentMultiplier": "Multiplicador locatício",
+        "payer": "Pagador",
+        "pviSchedule": "Agendamento para migração do PVI",
+        "cep": "CEP",
+        "addressNumber": "Endereço/Número",
+        "neighborhood": "Bairro",
+        "cityUF": "Cidade/UF",
+        "complement": "Complemento",
+        "tag": "Tag",
+        "description": "Descrição"
+      },
+      "propertyKind": {
+        "residencial": "Residencial",
+        "comercial": "Comercial"
+      },
+      "empty": "—"
+    },
+    "documents": {
+      "heading": "Documentos",
+      "send": "Enviar",
+      "labels": {
+        "rentalContract": "Contrato de locação",
+        "inspection": "Vistoria",
+        "policy": "Apólice"
+      },
+      "status": {
+        "pendente": "Pendente",
+        "enviado": "Enviado",
+        "aprovado": "Aprovado"
+      }
+    },
+    "history": {
+      "heading": "Histórico",
+      "expand": "Expandir histórico",
+      "collapse": "Recolher histórico",
+      "empty": "Sem registros."
+    },
+    "tenant": {
+      "heading": "Inquilino",
+      "personal": "Dados Pessoais",
+      "approval": {
+        "aprovado": "Aprovado",
+        "pendente": "Pendente",
+        "reprovado": "Reprovado"
+      },
+      "fields": {
+        "fullName": "Nome",
+        "cpf": "CPF",
+        "birthDate": "Data Nascimento",
+        "email": "E-mail",
+        "phone": "Telefone Fixo/Celular"
+      },
+      "termApproved": "Termo Aprovado"
+    },
+    "notFound": {
+      "title": "Contrato não encontrado",
+      "body": "Não localizamos um contrato com este identificador."
     }
   }
 }

@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon } from "lucide-react"
+import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, FileTextIcon } from "lucide-react"
 import { useTranslations } from "next-intl"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -25,11 +25,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const tDocs = useTranslations("nav.documents")
 
   const navMain = [
-    { title: tMain("dashboard"), url: "#", icon: <LayoutDashboardIcon /> },
-    { title: tMain("lifecycle"), url: "#", icon: <ListIcon /> },
-    { title: tMain("analytics"), url: "#", icon: <ChartBarIcon /> },
-    { title: tMain("projects"), url: "#", icon: <FolderIcon /> },
-    { title: tMain("team"), url: "#", icon: <UsersIcon /> },
+    { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
+    { title: tMain("contracts"), href: "/contracts/1000001", icon: <FileTextIcon /> },
+    { title: tMain("lifecycle"), icon: <ListIcon /> },
+    { title: tMain("analytics"), icon: <ChartBarIcon /> },
+    { title: tMain("projects"), icon: <FolderIcon /> },
+    { title: tMain("team"), icon: <UsersIcon /> },
   ]
   const navSecondary = [
     { title: tSecondary("settings"), url: "#", icon: <Settings2Icon /> },
