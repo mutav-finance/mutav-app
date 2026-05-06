@@ -86,7 +86,7 @@
     },
     "status": {
       "Done": "Concluído",
-      "In Progress": "Em Andamento",
+      "In Process": "Em Andamento",
       "Not Started": "Não Iniciado"
     },
     "sectionType": {
@@ -94,6 +94,12 @@
       "Table of contents": "Sumário",
       "Narrative": "Narrativa",
       "Technical content": "Conteúdo Técnico",
+      "Financial": "Financeiro",
+      "Legal": "Jurídico",
+      "Plain language": "Linguagem Simples",
+      "Planning": "Planejamento",
+      "Research": "Pesquisa",
+      "Visual": "Visual",
       "Capabilities": "Capacidades",
       "Focus Documents": "Documentos de Foco",
       "Design": "Design",

@@ -146,7 +146,10 @@ export function ChartAreaInteractive() {
   const isMobile = useIsMobile()
   const t = useTranslations("chart")
   const locale = useLocale()
-  const dateFormatter = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" })
+  const dateFormatter = React.useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }),
+    [locale]
+  )
   const [timeRange, setTimeRange] = React.useState("90d")
 
   React.useEffect(() => {

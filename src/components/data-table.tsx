@@ -451,6 +451,10 @@ export function DataTable({
                     column.getCanHide()
                 )
                 .map((column) => {
+                  const labelKey = column.id === "type" ? "sectionType" : column.id
+                  const label = t.has(`columns.${labelKey}` as never)
+                    ? t(`columns.${labelKey}` as never)
+                    : column.id
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
@@ -460,7 +464,7 @@ export function DataTable({
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id}
+                      {label}
                     </DropdownMenuCheckboxItem>
                   )
                 })}
@@ -763,7 +767,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                   <SelectContent>
                     <SelectGroup>
                       <SelectItem value="Done">{t("status.Done")}</SelectItem>
-                      <SelectItem value="In Progress">{t("status.In Progress")}</SelectItem>
+                      <SelectItem value="In Process">{t("status.In Process")}</SelectItem>
                       <SelectItem value="Not Started">{t("status.Not Started")}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
