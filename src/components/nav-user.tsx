@@ -34,8 +34,17 @@ import {
   SunIcon,
   MoonIcon,
   MonitorIcon,
+  LanguagesIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useLocale, useTranslations } from "next-intl"
+import { useRouter, usePathname } from "@/i18n/navigation"
+import { routing } from "@/i18n/routing"
+
+const LOCALE_LABELS: Record<(typeof routing.locales)[number], string> = {
+  "pt-BR": "Português",
+  en: "English",
+}
 
 export function NavUser({
   user,
@@ -49,6 +58,13 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const { theme, setTheme, resolvedTheme } = useTheme()
   const ThemeTriggerIcon = resolvedTheme === "dark" ? MoonIcon : SunIcon
+  const locale = useLocale()
+  const router = useRouter()
+  const pathname = usePathname()
+  const t = useTranslations("userMenu")
+  const switchLocale = (next: string) => {
+    router.replace(pathname, { locale: next as (typeof routing.locales)[number] })
+  }
 
   return (
     <SidebarMenu>
@@ -95,49 +111,60 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <CircleUserRoundIcon
-                />
-                Account
+                <CircleUserRoundIcon />
+                {t("account")}
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
+                <CreditCardIcon />
+                {t("billing")}
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <BellIcon
-                />
-                Notifications
+                <BellIcon />
+                {t("notifications")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <ThemeTriggerIcon />
-                Theme
+                {t("theme")}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
                   <DropdownMenuRadioItem value="light">
                     <SunIcon />
-                    Light
+                    {t("themeLight")}
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="dark">
                     <MoonIcon />
-                    Dark
+                    {t("themeDark")}
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="system">
                     <MonitorIcon />
-                    System
+                    {t("themeSystem")}
                   </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <LanguagesIcon />
+                {t("language")}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuRadioGroup value={locale} onValueChange={switchLocale}>
+                  {routing.locales.map((l) => (
+                    <DropdownMenuRadioItem key={l} value={l}>
+                      {LOCALE_LABELS[l]}
+                    </DropdownMenuRadioItem>
+                  ))}
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
-              <LogOutIcon
-              />
-              Log out
+              <LogOutIcon />
+              {t("logOut")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

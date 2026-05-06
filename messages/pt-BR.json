@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "title": "SGR — Sistema de Garantia Registrada",
+    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
+  },
+  "userMenu": {
+    "account": "Conta",
+    "billing": "Cobrança",
+    "notifications": "Notificações",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Escuro",
+    "themeSystem": "Sistema",
+    "language": "Idioma",
+    "logOut": "Sair"
+  },
+  "siteHeader": {
+    "title": "Documentos"
+  },
+  "brand": { "name": "Acme Inc." },
+  "nav": {
+    "main": {
+      "quickCreate": "Criar Rápido",
+      "inbox": "Caixa de Entrada",
+      "dashboard": "Painel",
+      "lifecycle": "Ciclo de Vida",
+      "analytics": "Análises",
+      "projects": "Projetos",
+      "team": "Equipe"
+    },
+    "secondary": {
+      "settings": "Configurações",
+      "getHelp": "Obter Ajuda",
+      "search": "Buscar"
+    },
+    "documents": {
+      "groupLabel": "Documentos",
+      "dataLibrary": "Biblioteca de Dados",
+      "reports": "Relatórios",
+      "wordAssistant": "Assistente de Texto",
+      "more": "Mais",
+      "open": "Abrir",
+      "share": "Compartilhar",
+      "delete": "Excluir"
+    }
+  },
+  "chart": {
+    "totalVisitors": "Total de Visitantes",
+    "rangeLong": "Total dos últimos 3 meses",
+    "rangeShort": "Últimos 3 meses",
+    "last3Months": "Últimos 3 meses",
+    "last30Days": "Últimos 30 dias",
+    "last7Days": "Últimos 7 dias",
+    "selectRangeAriaLabel": "Selecione um período",
+    "series": {
+      "visitors": "Visitantes",
+      "desktop": "Desktop",
+      "mobile": "Móvel"
+    }
+  },
+  "metrics": {
+    "totalRevenue": {
+      "label": "Receita Total",
+      "trend": "Em alta este mês",
+      "footer": "Visitantes nos últimos 6 meses"
+    },
+    "newCustomers": {
+      "label": "Novos Clientes",
+      "trend": "Queda de 20% no período",
+      "footer": "Aquisição precisa de atenção"
+    },
+    "activeAccounts": {
+      "label": "Contas Ativas",
+      "trend": "Forte retenção de usuários",
+      "footer": "Engajamento supera as metas"
+    },
+    "growthRate": {
+      "label": "Taxa de Crescimento",
+      "trend": "Aumento de desempenho constante",
+      "footer": "Atinge as projeções de crescimento"
+    }
+  },
+  "dataTable": {
+    "columns": {
+      "header": "Cabeçalho",
+      "sectionType": "Tipo de Seção",
+      "status": "Status",
+      "target": "Meta",
+      "limit": "Limite",
+      "reviewer": "Revisor"
+    },
+    "status": {
+      "Done": "Concluído",
+      "In Process": "Em Andamento",
+      "Not Started": "Não Iniciado"
+    },
+    "sectionType": {
+      "Cover page": "Capa",
+      "Table of contents": "Sumário",
+      "Narrative": "Narrativa",
+      "Technical content": "Conteúdo Técnico",
+      "Financial": "Financeiro",
+      "Legal": "Jurídico",
+      "Plain language": "Linguagem Simples",
+      "Planning": "Planejamento",
+      "Research": "Pesquisa",
+      "Visual": "Visual",
+      "Capabilities": "Capacidades",
+      "Focus Documents": "Documentos de Foco",
+      "Design": "Design",
+      "Executive Summary": "Resumo Executivo",
+      "Technical Approach": "Abordagem Técnica",
+      "Cover Page": "Capa",
+      "Table of Contents": "Sumário"
+    },
+    "reviewerSelectPlaceholder": "Atribuir revisor",
+    "actions": {
+      "openMenu": "Abrir menu",
+      "edit": "Editar",
+      "makeCopy": "Fazer uma cópia",
+      "favorite": "Favoritar",
+      "delete": "Excluir"
+    },
+    "a11y": {
+      "dragToReorder": "Arrastar para reordenar",
+      "selectAll": "Selecionar tudo",
+      "selectRow": "Selecionar linha"
+    },
+    "toast": {
+      "saving": "Salvando {header}",
+      "success": "Concluído",
+      "error": "Erro"
+    },
+    "viewSelectorAriaLabel": "Selecionar visualização",
+    "viewSelectorPlaceholder": "Selecione uma visualização",
+    "tabs": {
+      "outline": "Estrutura",
+      "pastPerformance": "Histórico",
+      "keyPersonnel": "Pessoal-chave",
+      "focusDocuments": "Documentos de foco"
+    },
+    "columnsButton": "Colunas",
+    "addSection": "Adicionar Seção",
+    "noResults": "Nenhum resultado.",
+    "pagination": {
+      "selected": "{selected} de {total} linha(s) selecionadas.",
+      "rowsPerPage": "Linhas por página",
+      "pageOf": "Página {current} de {total}",
+      "firstPage": "Ir para a primeira página",
+      "previousPage": "Ir para a página anterior",
+      "nextPage": "Ir para a próxima página",
+      "lastPage": "Ir para a última página"
+    },
+    "drawer": {
+      "description": "Mostrando o total de visitantes dos últimos 6 meses",
+      "trendingNote": "Em alta de 5,2% este mês",
+      "blurb": "Mostrando o total de visitantes dos últimos 6 meses. Este é apenas um texto aleatório para testar o layout. Ele se estende por várias linhas e deve quebrar.",
+      "headerLabel": "Cabeçalho",
+      "typeLabel": "Tipo",
+      "statusLabel": "Status",
+      "targetLabel": "Meta",
+      "limitLabel": "Limite",
+      "reviewerLabel": "Revisor",
+      "selectTypePlaceholder": "Selecione um tipo",
+      "selectStatusPlaceholder": "Selecione um status",
+      "selectReviewerPlaceholder": "Selecione um revisor",
+      "submit": "Enviar",
+      "done": "Concluído"
+    }
+  }
+}
