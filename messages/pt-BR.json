@@ -114,6 +114,26 @@
       "saving": "Salvando {header}",
       "success": "Concluído",
       "error": "Erro"
+    },
+    "viewSelectorAriaLabel": "Selecionar visualização",
+    "viewSelectorPlaceholder": "Selecione uma visualização",
+    "tabs": {
+      "outline": "Estrutura",
+      "pastPerformance": "Histórico",
+      "keyPersonnel": "Pessoal-chave",
+      "focusDocuments": "Documentos de foco"
+    },
+    "columnsButton": "Colunas",
+    "addSection": "Adicionar Seção",
+    "noResults": "Nenhum resultado.",
+    "pagination": {
+      "selected": "{selected} de {total} linha(s) selecionadas.",
+      "rowsPerPage": "Linhas por página",
+      "pageOf": "Página {current} de {total}",
+      "firstPage": "Ir para a primeira página",
+      "previousPage": "Ir para a página anterior",
+      "nextPage": "Ir para a próxima página",
+      "lastPage": "Ir para a última página"
     }
   }
 }

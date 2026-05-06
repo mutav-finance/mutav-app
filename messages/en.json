@@ -114,6 +114,26 @@
       "saving": "Saving {header}",
       "success": "Done",
       "error": "Error"
+    },
+    "viewSelectorAriaLabel": "View",
+    "viewSelectorPlaceholder": "Select a view",
+    "tabs": {
+      "outline": "Outline",
+      "pastPerformance": "Past Performance",
+      "keyPersonnel": "Key Personnel",
+      "focusDocuments": "Focus Documents"
+    },
+    "columnsButton": "Columns",
+    "addSection": "Add Section",
+    "noResults": "No results.",
+    "pagination": {
+      "selected": "{selected} of {total} row(s) selected.",
+      "rowsPerPage": "Rows per page",
+      "pageOf": "Page {current} of {total}",
+      "firstPage": "Go to first page",
+      "previousPage": "Go to previous page",
+      "nextPage": "Go to next page",
+      "lastPage": "Go to last page"
     }
   }
 }
