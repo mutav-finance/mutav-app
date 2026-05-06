@@ -3,6 +3,11 @@
     "title": "SGR — Registered Guarantee System",
     "description": "Dashboard for managing rental guarantees registered on-chain."
   },
+  "common": {
+    "a11y": {
+      "skipToMain": "Skip to main content"
+    }
+  },
   "userMenu": {
     "account": "Account",
     "billing": "Billing",
@@ -23,6 +28,7 @@
       "quickCreate": "Quick Create",
       "inbox": "Inbox",
       "dashboard": "Dashboard",
+      "contracts": "Contracts",
       "lifecycle": "Lifecycle",
       "analytics": "Analytics",
       "projects": "Projects",
@@ -166,6 +172,132 @@
       "selectReviewerPlaceholder": "Select a reviewer",
       "submit": "Submit",
       "done": "Done"
+    }
+  },
+  "contractDetails": {
+    "backToDashboard": "Back",
+    "breadcrumb": "Contract Details",
+    "heroTitle": "Contract {status}",
+    "promo": {
+      "title": "Quita Loft",
+      "body": "Prevent defaults: offer your tenant the option to pay rent by card and receive the full amount upfront.",
+      "cta": "Learn more",
+      "regionLabel": "Quita Loft suggestion"
+    },
+    "summary": {
+      "heading": "Request",
+      "currentStatus": "Current status:",
+      "nextRenewal": "Estimated next renewal:",
+      "availableGuarantee": "Available guarantee:",
+      "guaranteeTooltip": "This value accounts for all open, under-review, provisioned, and paid delinquencies.",
+      "openDelinquency": "Open delinquency",
+      "trackDelinquencies": "Track delinquencies",
+      "cancelProposal": "Cancel proposal",
+      "idLabel": "Contract ID",
+      "guaranteeTooltipLabel": "Available guarantee details",
+      "copyId": "Copy ID",
+      "cancelProposalHint": "Available only for pending contracts",
+      "openDelinquencyHint": "Register a new delinquency",
+      "trackDelinquenciesHint": "View delinquencies for this contract"
+    },
+    "status": {
+      "ativo": "Active",
+      "encerrado": "Ended",
+      "pendente": "Pending",
+      "cancelado": "Cancelled"
+    },
+    "rentalData": {
+      "heading": "Rental Data",
+      "actions": "Actions",
+      "actionEdit": "Edit",
+      "actionDuplicate": "Duplicate",
+      "actionArchive": "Archive",
+      "actionDisabled": "Coming soon",
+      "groups": {
+        "contract": "Contract Data",
+        "property": "Property Data",
+        "optional": "Optional Data",
+        "documents": "Documents"
+      },
+      "fields": {
+        "propertyKind": "Property Type",
+        "rent": "Rent",
+        "condo": "Condo Fee",
+        "otherFees": "Other Fees",
+        "totalRent": "Total Rent",
+        "fee": "Fee Amount",
+        "oneTimeActivationFee": "One-time activation fee",
+        "setupInstallments": "Setup Installments",
+        "exitCost": "Exit cost",
+        "rentMultiplier": "Rent multiplier",
+        "payer": "Payer",
+        "pviSchedule": "PVI migration schedule",
+        "cep": "ZIP",
+        "addressNumber": "Street/Number",
+        "neighborhood": "Neighborhood",
+        "cityUF": "City/State",
+        "complement": "Complement",
+        "tag": "Tag",
+        "description": "Description"
+      },
+      "propertyKind": {
+        "residencial": "Residential",
+        "comercial": "Commercial"
+      },
+      "empty": "—"
+    },
+    "documents": {
+      "heading": "Documents",
+      "send": "Upload",
+      "sendDisabled": "Coming soon",
+      "labels": {
+        "rentalContract": "Rental contract",
+        "inspection": "Inspection",
+        "policy": "Policy"
+      },
+      "status": {
+        "pendente": "Pending",
+        "enviado": "Uploaded",
+        "aprovado": "Approved"
+      }
+    },
+    "history": {
+      "heading": "History",
+      "expand": "Expand history",
+      "collapse": "Collapse history",
+      "empty": "No records."
+    },
+    "tenant": {
+      "heading": "Tenant",
+      "personal": "Personal Data",
+      "approval": {
+        "aprovado": "Approved",
+        "pendente": "Pending",
+        "reprovado": "Rejected"
+      },
+      "fields": {
+        "fullName": "Name",
+        "cpf": "CPF",
+        "birthDate": "Date of Birth",
+        "email": "E-mail",
+        "phone": "Phone"
+      },
+      "termApproved": "Term Approved",
+      "approvalFailedHelp": "Rejection on file. Request updated documentation from the tenant to reopen review.",
+      "initialsLabel": "Tenant initials"
+    },
+    "notFound": {
+      "title": "Contract not found",
+      "body": "We could not find a contract with this identifier."
+    },
+    "errors": {
+      "title": "We couldn't load this contract",
+      "body": "Something went wrong fetching the data. Try again or go back to the dashboard.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard"
+    },
+    "loading": {
+      "label": "Loading contract"
     }
   }
 }
