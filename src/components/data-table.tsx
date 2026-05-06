@@ -652,6 +652,8 @@ const chartConfig = {
 
 function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
   const isMobile = useIsMobile()
+  const t = useTranslations("dataTable")
+  const tDrawer = useTranslations("dataTable.drawer")
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
@@ -663,9 +665,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
       <DrawerContent>
         <DrawerHeader className="gap-1">
           <DrawerTitle>{item.header}</DrawerTitle>
-          <DrawerDescription>
-            Showing total visitors for the last 6 months
-          </DrawerDescription>
+          <DrawerDescription>{tDrawer("description")}</DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
           {!isMobile && (
@@ -713,63 +713,58 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
               <Separator />
               <div className="grid gap-2">
                 <div className="flex gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
-                  <TrendingUpIcon className="size-4" />
+                  {tDrawer("trendingNote")} <TrendingUpIcon className="size-4" />
                 </div>
-                <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
-                </div>
+                <div className="text-muted-foreground">{tDrawer("blurb")}</div>
               </div>
               <Separator />
             </>
           )}
           <form className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Header</Label>
+              <Label htmlFor="header">{tDrawer("headerLabel")}</Label>
               <Input id="header" defaultValue={item.header} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Type</Label>
+                <Label htmlFor="type">{tDrawer("typeLabel")}</Label>
                 <Select defaultValue={item.type}>
                   <SelectTrigger id="type" className="w-full">
-                    <SelectValue placeholder="Select a type" />
+                    <SelectValue placeholder={tDrawer("selectTypePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       <SelectItem value="Table of Contents">
-                        Table of Contents
+                        {t("sectionType.Table of Contents")}
                       </SelectItem>
                       <SelectItem value="Executive Summary">
-                        Executive Summary
+                        {t("sectionType.Executive Summary")}
                       </SelectItem>
                       <SelectItem value="Technical Approach">
-                        Technical Approach
+                        {t("sectionType.Technical Approach")}
                       </SelectItem>
-                      <SelectItem value="Design">Design</SelectItem>
-                      <SelectItem value="Capabilities">Capabilities</SelectItem>
+                      <SelectItem value="Design">{t("sectionType.Design")}</SelectItem>
+                      <SelectItem value="Capabilities">{t("sectionType.Capabilities")}</SelectItem>
                       <SelectItem value="Focus Documents">
-                        Focus Documents
+                        {t("sectionType.Focus Documents")}
                       </SelectItem>
-                      <SelectItem value="Narrative">Narrative</SelectItem>
-                      <SelectItem value="Cover Page">Cover Page</SelectItem>
+                      <SelectItem value="Narrative">{t("sectionType.Narrative")}</SelectItem>
+                      <SelectItem value="Cover Page">{t("sectionType.Cover Page")}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">{tDrawer("statusLabel")}</Label>
                 <Select defaultValue={item.status}>
                   <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="Select a status" />
+                    <SelectValue placeholder={tDrawer("selectStatusPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="Done">Done</SelectItem>
-                      <SelectItem value="In Progress">In Progress</SelectItem>
-                      <SelectItem value="Not Started">Not Started</SelectItem>
+                      <SelectItem value="Done">{t("status.Done")}</SelectItem>
+                      <SelectItem value="In Progress">{t("status.In Progress")}</SelectItem>
+                      <SelectItem value="Not Started">{t("status.Not Started")}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -777,19 +772,19 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
+                <Label htmlFor="target">{tDrawer("targetLabel")}</Label>
                 <Input id="target" defaultValue={item.target} />
               </div>
               <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
+                <Label htmlFor="limit">{tDrawer("limitLabel")}</Label>
                 <Input id="limit" defaultValue={item.limit} />
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Reviewer</Label>
+              <Label htmlFor="reviewer">{tDrawer("reviewerLabel")}</Label>
               <Select defaultValue={item.reviewer}>
                 <SelectTrigger id="reviewer" className="w-full">
-                  <SelectValue placeholder="Select a reviewer" />
+                  <SelectValue placeholder={tDrawer("selectReviewerPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -805,9 +800,9 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
           </form>
         </div>
         <DrawerFooter>
-          <Button>Submit</Button>
+          <Button>{tDrawer("submit")}</Button>
           <DrawerClose asChild>
-            <Button variant="outline">Done</Button>
+            <Button variant="outline">{tDrawer("done")}</Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>

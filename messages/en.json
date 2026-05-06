@@ -134,6 +134,22 @@
       "previousPage": "Go to previous page",
       "nextPage": "Go to next page",
       "lastPage": "Go to last page"
+    },
+    "drawer": {
+      "description": "Showing total visitors for the last 6 months",
+      "trendingNote": "Trending up by 5.2% this month",
+      "blurb": "Showing total visitors for the last 6 months. This is just some random text to test the layout. It spans multiple lines and should wrap around.",
+      "headerLabel": "Header",
+      "typeLabel": "Type",
+      "statusLabel": "Status",
+      "targetLabel": "Target",
+      "limitLabel": "Limit",
+      "reviewerLabel": "Reviewer",
+      "selectTypePlaceholder": "Select a type",
+      "selectStatusPlaceholder": "Select a status",
+      "selectReviewerPlaceholder": "Select a reviewer",
+      "submit": "Submit",
+      "done": "Done"
     }
   }
 }

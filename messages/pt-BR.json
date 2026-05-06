@@ -134,6 +134,22 @@
       "previousPage": "Ir para a página anterior",
       "nextPage": "Ir para a próxima página",
       "lastPage": "Ir para a última página"
+    },
+    "drawer": {
+      "description": "Mostrando o total de visitantes dos últimos 6 meses",
+      "trendingNote": "Em alta de 5,2% este mês",
+      "blurb": "Mostrando o total de visitantes dos últimos 6 meses. Este é apenas um texto aleatório para testar o layout. Ele se estende por várias linhas e deve quebrar.",
+      "headerLabel": "Cabeçalho",
+      "typeLabel": "Tipo",
+      "statusLabel": "Status",
+      "targetLabel": "Meta",
+      "limitLabel": "Limite",
+      "reviewerLabel": "Revisor",
+      "selectTypePlaceholder": "Selecione um tipo",
+      "selectStatusPlaceholder": "Selecione um status",
+      "selectReviewerPlaceholder": "Selecione um revisor",
+      "submit": "Enviar",
+      "done": "Concluído"
     }
   }
 }
