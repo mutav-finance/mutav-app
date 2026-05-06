@@ -43,3 +43,11 @@ next-env.d.ts
 
 # Superpowers session state — not for the repo
 .superpowers/
+
+# Local agent tooling — skills, hooks, settings live per-developer.
+# Track only what the team explicitly opts into via repo-level config.
+.claude/
+.agents/
+
+# Convex local dev artifacts
+.convex/
