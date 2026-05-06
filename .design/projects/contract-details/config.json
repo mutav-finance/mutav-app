@@ -1,0 +1,22 @@
+{
+  "version": "0.7.4",
+  "project_type": "design",
+  "project": {
+    "name": "contract-details",
+    "label": "Contract Details Page",
+    "created": "2026-05-06"
+  },
+  "brand": {
+    "ref": ".design/branding/tga",
+    "front": "imobiliarias"
+  },
+  "design_scope": "full",
+  "accessibility_level": "WCAG 2.2 AA",
+  "implementation_target": "Next.js 16 (App Router) + React 19 + Tailwind 4 + shadcn/ui + next-intl",
+  "implementation_status": "implemented",
+  "review_mode": "retroactive",
+  "system_config": {
+    "system_strategy": "use-existing"
+  },
+  "gsp_version": "0.7.4"
+}
