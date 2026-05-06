@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-type Translator = ReturnType<typeof useTranslations<"dataTable">>
 import {
   closestCenter,
   DndContext,
@@ -106,8 +105,18 @@ export const schema = z.object({
   reviewer: z.string(),
 })
 
+type Translator = ReturnType<typeof useTranslations<"dataTable">>
+
+function saveToast(t: Translator, header: string) {
+  toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
+    loading: t("toast.saving", { header }),
+    success: t("toast.success"),
+    error: t("toast.error"),
+  })
+}
+
 // Create a separate component for the drag handle
-function DragHandle({ id }: { id: number }) {
+function DragHandle({ id, label }: { id: number; label: string }) {
   const { attributes, listeners } = useSortable({
     id,
   })
@@ -121,7 +130,7 @@ function DragHandle({ id }: { id: number }) {
       className="size-7 text-muted-foreground hover:bg-transparent"
     >
       <GripVerticalIcon className="size-3 text-muted-foreground" />
-      <span className="sr-only">Drag to reorder</span>
+      <span className="sr-only">{label}</span>
     </Button>
   )
 }
@@ -131,7 +140,9 @@ function buildColumns(t: Translator): ColumnDef<z.infer<typeof schema>>[] {
     {
       id: "drag",
       header: () => null,
-      cell: ({ row }) => <DragHandle id={row.original.id} />,
+      cell: ({ row }) => (
+        <DragHandle id={row.original.id} label={t("a11y.dragToReorder")} />
+      ),
     },
     {
       id: "select",
@@ -143,7 +154,7 @@ function buildColumns(t: Translator): ColumnDef<z.infer<typeof schema>>[] {
               (table.getIsSomePageRowsSelected() && "indeterminate")
             }
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
+            aria-label={t("a11y.selectAll")}
           />
         </div>
       ),
@@ -152,7 +163,7 @@ function buildColumns(t: Translator): ColumnDef<z.infer<typeof schema>>[] {
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
+            aria-label={t("a11y.selectRow")}
           />
         </div>
       ),
@@ -199,11 +210,7 @@ function buildColumns(t: Translator): ColumnDef<z.infer<typeof schema>>[] {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-              loading: t("toast.saving", { header: row.original.header }),
-              success: t("toast.success"),
-              error: t("toast.error"),
-            })
+            saveToast(t, row.original.header)
           }}
         >
           <Label htmlFor={`${row.original.id}-target`} className="sr-only">
@@ -224,11 +231,7 @@ function buildColumns(t: Translator): ColumnDef<z.infer<typeof schema>>[] {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-              loading: t("toast.saving", { header: row.original.header }),
-              success: t("toast.success"),
-              error: t("toast.error"),
-            })
+            saveToast(t, row.original.header)
           }}
         >
           <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
@@ -643,20 +646,18 @@ const chartData = [
   { month: "June", desktop: 214, mobile: 140 },
 ]
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--primary)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--primary)",
-  },
-} satisfies ChartConfig
-
 function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
   const isMobile = useIsMobile()
   const t = useTranslations("dataTable")
+  const tChart = useTranslations("chart.series")
+  const chartConfig = React.useMemo(
+    () =>
+      ({
+        desktop: { label: tChart("desktop"), color: "var(--primary)" },
+        mobile: { label: tChart("mobile"), color: "var(--primary)" },
+      }) satisfies ChartConfig,
+    [tChart]
+  )
   const tDrawer = useTranslations("dataTable.drawer")
 
   return (

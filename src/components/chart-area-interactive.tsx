@@ -128,20 +128,6 @@ const chartData = [
   { date: "2024-06-30", desktop: 446, mobile: 400 },
 ]
 
-const chartConfig = {
-  visitors: {
-    label: "Visitors",
-  },
-  desktop: {
-    label: "Desktop",
-    color: "var(--primary)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--primary)",
-  },
-} satisfies ChartConfig
-
 export function ChartAreaInteractive() {
   const isMobile = useIsMobile()
   const t = useTranslations("chart")
@@ -149,6 +135,15 @@ export function ChartAreaInteractive() {
   const dateFormatter = React.useMemo(
     () => new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }),
     [locale]
+  )
+  const chartConfig = React.useMemo(
+    () =>
+      ({
+        visitors: { label: t("series.visitors") },
+        desktop: { label: t("series.desktop"), color: "var(--primary)" },
+        mobile: { label: t("series.mobile"), color: "var(--primary)" },
+      }) satisfies ChartConfig,
+    [t]
   )
   const [timeRange, setTimeRange] = React.useState("90d")
 

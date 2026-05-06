@@ -51,7 +51,12 @@
     "last3Months": "Últimos 3 meses",
     "last30Days": "Últimos 30 dias",
     "last7Days": "Últimos 7 dias",
-    "selectRangeAriaLabel": "Selecione um período"
+    "selectRangeAriaLabel": "Selecione um período",
+    "series": {
+      "visitors": "Visitantes",
+      "desktop": "Desktop",
+      "mobile": "Móvel"
+    }
   },
   "metrics": {
     "totalRevenue": {
@@ -115,6 +120,11 @@
       "makeCopy": "Fazer uma cópia",
       "favorite": "Favoritar",
       "delete": "Excluir"
+    },
+    "a11y": {
+      "dragToReorder": "Arrastar para reordenar",
+      "selectAll": "Selecionar tudo",
+      "selectRow": "Selecionar linha"
     },
     "toast": {
       "saving": "Salvando {header}",

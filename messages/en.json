@@ -51,7 +51,12 @@
     "last3Months": "Last 3 months",
     "last30Days": "Last 30 days",
     "last7Days": "Last 7 days",
-    "selectRangeAriaLabel": "Select a value"
+    "selectRangeAriaLabel": "Select a value",
+    "series": {
+      "visitors": "Visitors",
+      "desktop": "Desktop",
+      "mobile": "Mobile"
+    }
   },
   "metrics": {
     "totalRevenue": {
@@ -115,6 +120,11 @@
       "makeCopy": "Make a copy",
       "favorite": "Favorite",
       "delete": "Delete"
+    },
+    "a11y": {
+      "dragToReorder": "Drag to reorder",
+      "selectAll": "Select all",
+      "selectRow": "Select row"
     },
     "toast": {
       "saving": "Saving {header}",
