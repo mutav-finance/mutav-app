@@ -10,6 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
+# Lockfiles — bun.lock is canonical; ignore any others to prevent drift.
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
 # testing
 /coverage
 
@@ -43,3 +48,11 @@ next-env.d.ts
 
 # Superpowers session state — not for the repo
 .superpowers/
+
+# Local agent tooling — skills, hooks, settings live per-developer.
+# Track only what the team explicitly opts into via repo-level config.
+.claude/
+.agents/
+
+# Convex local dev artifacts
+.convex/

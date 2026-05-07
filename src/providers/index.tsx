@@ -2,7 +2,6 @@
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConvexClientProvider } from "./convex";
-import { StellarProvider } from "./stellar";
 import { ThemeProvider } from "./theme";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -14,9 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <ConvexClientProvider>
-        <StellarProvider>
-          <TooltipProvider>{children}</TooltipProvider>
-        </StellarProvider>
+        <TooltipProvider>{children}</TooltipProvider>
       </ConvexClientProvider>
     </ThemeProvider>
   );

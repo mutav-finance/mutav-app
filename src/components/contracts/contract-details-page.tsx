@@ -1,4 +1,8 @@
+"use client";
+
 import { useTranslations } from "next-intl";
+import { usePreloadedQuery, type Preloaded } from "convex/react";
+import { notFound } from "next/navigation";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,7 +13,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Mono } from "@/components/ui/mono";
 import { Link } from "@/i18n/navigation";
-import type { Contract } from "@/lib/contracts/types";
+import type { api } from "@convex/_generated/api";
 import { ContractDocumentsCard } from "./contract-documents-card";
 import { ContractHistoryCard } from "./contract-history-card";
 import { ContractPromoBanner } from "./contract-promo-banner";
@@ -17,7 +21,19 @@ import { ContractRentalDataCard } from "./contract-rental-data-card";
 import { ContractSummaryCard } from "./contract-summary-card";
 import { ContractTenantCard } from "./contract-tenant-card";
 
-export function ContractDetailsPage({ contract }: { contract: Contract }) {
+export function ContractDetailsPage({
+  preloaded,
+}: {
+  preloaded: Preloaded<typeof api.contracts.getByPublicId>;
+}) {
+  const contract = usePreloadedQuery(preloaded);
+  if (!contract) {
+    // Handles the rare case of the contract being deleted between SSR
+    // and client hydration. Server rendering already short-circuited via
+    // notFound() in page.tsx for the initial null case.
+    notFound();
+  }
+
   const t = useTranslations("contractDetails");
   const tNav = useTranslations("nav.main");
   const tStatus = useTranslations("contractDetails.status");

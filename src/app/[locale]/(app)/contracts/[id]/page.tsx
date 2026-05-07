@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
+import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
+import { api } from "@convex/_generated/api";
 import { ContractDetailsPage } from "@/components/contracts/contract-details-page";
-import { getContractById } from "@/lib/contracts/fixtures";
 
 export default async function ContractPage({
   params,
@@ -8,9 +9,12 @@ export default async function ContractPage({
   params: Promise<{ id: string; locale: string }>;
 }) {
   const { id } = await params;
-  const contract = getContractById(id);
+  const preloaded = await preloadQuery(api.contracts.getByPublicId, {
+    publicId: id,
+  });
+  const contract = preloadedQueryResult(preloaded);
   if (!contract) {
     notFound();
   }
-  return <ContractDetailsPage contract={contract} />;
+  return <ContractDetailsPage preloaded={preloaded} />;
 }
