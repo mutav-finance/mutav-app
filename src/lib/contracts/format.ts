@@ -1,8 +1,9 @@
-export function formatBRL(value: number): string {
+/** Format an integer-cents BRL value as a localized currency string. */
+export function formatBRLCents(cents: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format(value);
+  }).format(cents / 100);
 }
 
 export function formatDateBR(iso: string): string {

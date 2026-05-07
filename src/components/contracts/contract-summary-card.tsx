@@ -4,7 +4,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { Mono } from "@/components/ui/mono";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { formatBRL, formatDateBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import type { Contract, ContractStatus } from "@/lib/contracts/types";
 import { StatusTag } from "./status-tag";
 
@@ -99,7 +99,7 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
                     className="text-foreground hover:text-primary focus-visible:text-primary inline-flex items-baseline gap-1.5 transition-colors"
                   >
                     <Mono className="text-base font-medium">
-                      {formatBRL(contract.availableGuaranteeBRL)}
+                      {formatBRLCents(contract.availableGuaranteeCents)}
                     </Mono>
                     <span aria-hidden className="text-2xs text-muted-foreground">
                       ⓘ

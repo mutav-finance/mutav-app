@@ -24,7 +24,7 @@ import { ContractTenantCard } from "./contract-tenant-card";
 export function ContractDetailsPage({
   preloaded,
 }: {
-  preloaded: Preloaded<typeof api.contracts.getByPublicId>;
+  preloaded: Preloaded<typeof api.contracts.useCases.getByPublicId>;
 }) {
   const contract = usePreloadedQuery(preloaded);
   if (!contract) {

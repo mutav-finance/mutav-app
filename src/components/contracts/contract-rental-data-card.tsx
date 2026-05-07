@@ -1,7 +1,7 @@
 import { HomeIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatBRL } from "@/lib/contracts/format";
+import { formatBRLCents } from "@/lib/contracts/format";
 import type { Contract } from "@/lib/contracts/types";
 import { ContractActionsMenu } from "./contract-actions-menu";
 import { FieldGroupHeader, FieldRow } from "./field-row";
@@ -36,14 +36,22 @@ export function ContractRentalDataCard({ contract }: { contract: Contract }) {
         <dl className="flex flex-col">
           <FieldGroupHeader>{tGroups("contract")}</FieldGroupHeader>
           <FieldRow label={tFields("propertyKind")} value={tKind(rental.propertyKind)} />
-          <FieldRow label={tFields("rent")} value={formatBRL(rental.rentBRL)} mono />
-          <FieldRow label={tFields("condo")} value={formatBRL(rental.condoBRL)} mono />
-          <FieldRow label={tFields("otherFees")} value={formatBRL(rental.otherFeesBRL)} mono />
-          <FieldRow label={tFields("totalRent")} value={formatBRL(rental.totalRentBRL)} mono />
-          <FieldRow label={tFields("fee")} value={formatBRL(rental.feeBRL)} mono />
+          <FieldRow label={tFields("rent")} value={formatBRLCents(rental.rentCents)} mono />
+          <FieldRow label={tFields("condo")} value={formatBRLCents(rental.condoCents)} mono />
+          <FieldRow
+            label={tFields("otherFees")}
+            value={formatBRLCents(rental.otherFeesCents)}
+            mono
+          />
+          <FieldRow
+            label={tFields("totalRent")}
+            value={formatBRLCents(rental.totalRentCents)}
+            mono
+          />
+          <FieldRow label={tFields("fee")} value={formatBRLCents(rental.feeCents)} mono />
           <FieldRow
             label={tFields("oneTimeActivationFee")}
-            value={formatBRL(rental.oneTimeActivationFeeBRL)}
+            value={formatBRLCents(rental.oneTimeActivationFeeCents)}
             mono
           />
           <FieldRow

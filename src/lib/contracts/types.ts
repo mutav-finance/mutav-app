@@ -6,12 +6,12 @@ export type PropertyKind = "residencial" | "comercial";
 
 export type ContractRentalData = {
   propertyKind: PropertyKind;
-  rentBRL: number;
-  condoBRL: number;
-  otherFeesBRL: number;
-  totalRentBRL: number;
-  feeBRL: number;
-  oneTimeActivationFeeBRL: number;
+  rentCents: number;
+  condoCents: number;
+  otherFeesCents: number;
+  totalRentCents: number;
+  feeCents: number;
+  oneTimeActivationFeeCents: number;
   setupInstallments: number;
   exitCostMultiplier: string;
   rentMultiplier: string;
@@ -59,9 +59,10 @@ export type ContractTenant = {
 
 export type Contract = {
   id: string;
+  agencyId: string;
   status: ContractStatus;
   nextRenewalDate: string;
-  availableGuaranteeBRL: number;
+  availableGuaranteeCents: number;
   rental: ContractRentalData;
   property: ContractProperty;
   optional: ContractOptional;
