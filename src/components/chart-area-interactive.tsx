@@ -145,13 +145,12 @@ export function ChartAreaInteractive() {
       }) satisfies ChartConfig,
     [t]
   )
-  const [timeRange, setTimeRange] = React.useState("90d")
-
-  React.useEffect(() => {
-    if (isMobile) {
-      setTimeRange("7d")
-    }
-  }, [isMobile])
+  const [userTimeRange, setUserTimeRange] = React.useState<string | null>(null)
+  // Mobile forces 7d regardless of user pick; on desktop, fall back to
+  // the user's last selection or the 90d default. Computed during render
+  // so we don't need a setState-in-effect.
+  const timeRange = isMobile ? "7d" : (userTimeRange ?? "90d")
+  const setTimeRange = setUserTimeRange
 
   const filteredData = chartData.filter((item) => {
     const date = new Date(item.date)
