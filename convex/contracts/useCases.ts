@@ -80,6 +80,7 @@ function shapeContractSummary(doc: Contract) {
     nextRenewalDate: doc.nextRenewalDate,
     availableGuaranteeCents: doc.availableGuaranteeCents,
     tenantName: doc.tenant.fullName,
+    creationTime: doc._creationTime,
   };
 }
 
