@@ -13,9 +13,14 @@ Shared strategy, whitepaper, pitch deck, and brand assets live in [`tga-protocol
 - Next.js 16 (App Router)
 - Tailwind CSS 4 + shadcn/ui
 - Privy — Solana wallet auth
-- StellarWalletsKit — Stellar wallet connection
 - Convex — backend
 - Railway — deployment
+
+Stellar wallet connection is currently unwired. The previous
+`@creit.tech/stellar-wallets-kit` integration was removed pending a
+replacement with a smaller transitive surface (the kit shipped Trezor,
+Hot Wallet, and NEAR adapters we never invoked, all flagged critical by
+npm audit).
 
 ## Setup
 

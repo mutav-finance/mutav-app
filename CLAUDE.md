@@ -26,9 +26,12 @@ gh api repos/tga-protocol/sgr/contents/docs/whitepaper.md --jq '.content' | base
 - Next.js 16 (App Router, src/ directory)
 - Tailwind CSS 4
 - shadcn/ui (radix-nova style, neutral base color, TGA tokens in `src/app/globals.css`)
-- StellarWalletsKit — Stellar wallet connection
 - Convex — backend (functions in convex/)
 - Railway — deployment
+
+> Stellar wallet connection: removed pending a vetted, low-CVE replacement.
+> Earlier `@creit.tech/stellar-wallets-kit` pulled in 9 critical vulns via
+> Trezor/Hot/NEAR adapters we never invoked.
 
 ## Architecture
 - `src/providers/` — client providers (Convex, Stellar)
