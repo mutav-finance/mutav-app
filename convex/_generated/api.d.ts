@@ -8,8 +8,13 @@
  * @module
  */
 
-import type * as contracts from "../contracts.js";
+import type * as agencies_domain from "../agencies/domain.js";
+import type * as agencies_useCases from "../agencies/useCases.js";
+import type * as contracts_domain from "../contracts/domain.js";
+import type * as contracts_useCases from "../contracts/useCases.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as payments_domain from "../payments/domain.js";
+import type * as payments_useCases from "../payments/useCases.js";
 import type * as seed from "../seed.js";
 
 import type {
@@ -19,8 +24,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  contracts: typeof contracts;
+  "agencies/domain": typeof agencies_domain;
+  "agencies/useCases": typeof agencies_useCases;
+  "contracts/domain": typeof contracts_domain;
+  "contracts/useCases": typeof contracts_useCases;
   "lib/auth": typeof lib_auth;
+  "payments/domain": typeof payments_domain;
+  "payments/useCases": typeof payments_useCases;
   seed: typeof seed;
 }>;
 
