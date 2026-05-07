@@ -31,8 +31,8 @@ Prerequisites: [Bun ≥ 1.3](https://bun.sh).
 git clone https://github.com/tga-protocol/sgr-app.git
 cd sgr-app
 bun install
-git config core.hooksPath .githooks
-cp .env.example .env.local   # fill in Convex + Privy creds
+git config core.hooksPath .githooks   # enable pre-commit + pre-push hooks
+cp .env.example .env.local             # fill in Convex + Privy creds
 bun dev
 ```
 
@@ -50,6 +50,21 @@ so you never end up with half a dev environment.
 | `bun run build`    | Production build                              |
 | `bun run start`    | Serve the production build                    |
 | `bun run lint`     | ESLint                                        |
+| `bun run typecheck` | `tsc --noEmit`                               |
+
+## Git hooks
+
+Activated by the `git config core.hooksPath .githooks` line in Quick
+start. Native POSIX shell, zero devDeps.
+
+- **`pre-commit`** — runs `bun run typecheck` and `bun run lint` before a
+  commit lands. Skips silently when no `.ts/.tsx/.js/.jsx/.mjs/.cjs` files
+  are staged (markdown-only commits don't pay the typecheck cost). Falls
+  back to `npm` if Bun isn't installed.
+- **`pre-push`** — blocks direct pushes to `main`. Use a feature branch +
+  PR.
+
+Bypass in emergencies: `git commit --no-verify` / `git push --no-verify`.
 
 ## Environment
 
