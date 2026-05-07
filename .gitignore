@@ -10,6 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
+# Lockfiles — bun.lock is canonical; ignore any others to prevent drift.
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
 # testing
 /coverage
 
