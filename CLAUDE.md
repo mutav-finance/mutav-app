@@ -75,20 +75,37 @@ src/app/
 
 ### Convex backend organization
 
-The backend currently lives flat (`convex/contracts.ts`, `convex/schema.ts`). As features grow, organize by domain:
+The backend uses domain folders. Target shape:
 
 ```
 convex/
 ├── _generated/                 # codegen — never edit
 ├── schema.ts                   # all tables; validators used here are local
-├── lib/                        # cross-domain utilities (custom function wrappers, etc.)
+├── lib/                        # cross-domain utilities (custom function wrappers, env, etc.)
 └── {domain}/
     ├── domain.ts               # Doc<>/Id<> aliases, value objects, validators
     ├── useCases.ts             # queries + mutations + internal functions (V8)
     └── actions.ts              # 'use node' integrations (HTTP, Buffer, crypto)
 ```
 
+**Migration trigger:** the moment a flat file gains a second function (or the first non-trivial one), move it to a domain folder. Don't let `convex/contracts.ts` keep growing past 100 lines — promote to `convex/contracts/{domain.ts,useCases.ts}` immediately.
+
 The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outside the entity file — export aliases (e.g. `Contract`, `ContractId`) and import those everywhere else. See `convex-document-types` skill for the full rules.
+
+### Route segment files
+
+Each Next.js route segment can declare conventional files. Use them at the segment that defines the natural error/loading scope — not piled into the root.
+
+| File               | Purpose                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| `page.tsx`         | The route's UI                                                                             |
+| `layout.tsx`       | Shared shell that wraps `page.tsx` + child segments; persists across navigation            |
+| `loading.tsx`      | Suspense fallback while the segment loads — server component, no `"use client"`            |
+| `error.tsx`        | Catches errors thrown in the segment — must be `"use client"`, receives `{ error, reset }` |
+| `not-found.tsx`    | Renders when `notFound()` is called or a dynamic segment doesn't match                     |
+| `global-error.tsx` | Catches errors in the root `layout.tsx` itself — replaces the entire HTML                  |
+
+Co-locate the i18n keys these files use under a namespace that matches the segment (e.g. `contractDetails.errors` for `contracts/[id]/error.tsx`).
 
 ## Code style
 
@@ -100,6 +117,7 @@ Follow standard clean code principles, opinionated:
 - **Object parameters over long argument lists** — three or more args, switch to `{ ... }`. Self-documenting and reorderable.
 - **No boolean flag arguments** — split into named functions (`approveContract` / `rejectContract`, not `setContractStatus(id, approved)`).
 - **No barrel files** — every import references the actual file path (`./Foo`, never `.` or `./index`).
+- **No comments by default** — only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader. Don't explain WHAT (well-named identifiers do that) and don't reference the current task or PR (that belongs in the PR description, not the code — comments rot, PRs don't).
 - **TypeScript strict** — see Key Patterns / TypeScript escape hatches below.
 - **Branch workflow** — feature branches → squash merge PRs to main.
 
@@ -150,6 +168,24 @@ import { api } from "@/convex/_generated/api";
 Zero tolerance: never use `any`, `as Type`, `!` (non-null assertion), `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`. Use generics, type guards, `unknown` + Zod, discriminated unions, `?.`, `??`. **Boundary exception:** route params and external API responses may assert with a comment (`// route param validated by route shape`).
 
 `as const` (narrowing) is allowed and encouraged for value objects — distinct from `as Type` (cast).
+
+### Environment variables
+
+Never read `process.env` directly in domain code, components, or Convex functions. Centralize:
+
+- **Server (Convex):** `convex/lib/env.ts` exports an eager `getEnv()` for non-secret config and lazy getter functions (e.g. `getResendApiKey()`) for secrets. Lazy access prevents Convex from flagging vars as required during deploy when they aren't actually called.
+- **Client:** `src/lib/env.ts` exports typed getters for `NEXT_PUBLIC_*` vars. Anything not prefixed `NEXT_PUBLIC_` is invisible to the browser bundle — don't try to read it from client code.
+
+Boundary exception: `convex/lib/env.ts` and `src/lib/env.ts` are themselves the only files allowed to touch `process.env` directly. If a caller needs a new env var, add a getter there.
+
+### Validation at boundaries
+
+Two validator systems coexist:
+
+- **Convex `v.*` validators** — for `mutation` / `query` / `action` `args`. They live next to the entity (`convex/{domain}/domain.ts`) and pair with the Convex schema. Use `v.union(v.literal(...))` patterns for value objects.
+- **Zod schemas** — for client-side parsing: form input (with React Hook Form once adopted), URL search params, route params at the boundary, and external API responses parsed via `z.parse()` / `z.safeParse()`.
+
+The boundary: server-side speaks Convex `v`, client-side speaks Zod, generated types flow between them via `_generated/api`. Never reach for a third validator (joi, yup, ajv) — pick from these two.
 
 ### React 19 async patterns
 
@@ -207,7 +243,7 @@ Define error codes as `as const` value objects in the entity file (e.g. `CONTRAC
 
 SGR operates in Brazil. Convention choices:
 
-- **Money** — currently stored as `v.number()` in **reais** (the field name encodes the unit, e.g. `availableGuaranteeBRL`, `rentBRL`). Use `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })` for display. _Migration consideration: storage in cents (integer) is precision-safer for arithmetic — flag if a feature needs that before adding logic on top of `number`._
+- **Money** — store as **integer cents** (`v.number()` representing centavos). Field naming: suffix `Cents` (e.g. `rentCents`, `availableGuaranteeCents`). Float reais is a precision trap; cents is the industry-standard fix. Existing `*BRL: v.number()` fields predate this rule and need migration — see `.claude/notes/deferred-conventions.md`. Display via `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)`.
 - **CPF / CNPJ** — store as digits-only strings (CPF = 11 chars, CNPJ = 14 chars). Validate with proper checksum algorithms; never use regex alone. Format only at display time (`123.456.789-01`, `12.345.678/0001-90`).
 - **Phone** — digits-only string (`+55` country code optional based on source). Format at display.
 - **Dates** — stored as ISO 8601 strings (`v.string()`) when no time-zone arithmetic is needed (e.g. `nextRenewalDate`, `birthDate`). Use `v.number()` for unix timestamps when comparison/arithmetic matters. Don't store JS `Date` objects in Convex — they don't roundtrip.
@@ -215,7 +251,9 @@ SGR operates in Brazil. Convention choices:
 
 ## Skills
 
-Project skills live under `.claude/skills/`. Non-obvious trigger → skill mappings:
+### Project skills (`.claude/skills/`)
+
+Non-obvious trigger → skill mappings:
 
 - Defining entity types or value objects derived from Convex schema (`Doc<>`, `Id<>`), validators, schema discriminated unions, or choosing between `.filter()` and composite indexes → `convex-document-types`
 - Writing Convex queries/mutations/actions — pure-vs-impure separation, immutable updates, `Result<T>` returns → `convex-functional-programming`
@@ -224,9 +262,29 @@ Project skills live under `.claude/skills/`. Non-obvious trigger → skill mappi
 
 Plus the official Convex plugin skills (`convex-quickstart`, `convex-setup-auth`, `convex-create-component`, `convex-migration-helper`, `convex-performance-audit`) and Next.js skills (`next-best-practices`, `next-cache-components`, `next-upgrade`).
 
-**Progressive loading:** load `SKILL.md` first via the Skill tool. Skills currently ship without supplementary `examples.md`/`reference.md`/`template.md`; add them only when the patterns merit deeper material.
+### Workflow (`superpowers:*`)
 
-**Deferred conventions** (auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain providers, Convex workpool) are tracked in `.claude/notes/deferred-conventions.md` with adoption triggers.
+For any non-trivial change, lean on the `superpowers:*` skill family. These define _how_ to work, not _what_ to build:
+
+| Phase   | Skill                                        | When                                                                      |
+| ------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| Explore | `superpowers:brainstorming`                  | Before any creative work — new feature, component, or behavior change     |
+| Plan    | `superpowers:writing-plans`                  | Multi-step tasks where the path matters more than any single edit         |
+| Execute | `superpowers:executing-plans`                | Run a written plan in a fresh session with review checkpoints             |
+| Debug   | `superpowers:systematic-debugging`           | Any bug, test failure, or unexpected behavior — before proposing a fix    |
+| Verify  | `superpowers:verification-before-completion` | Before claiming work is complete — evidence (test runs, build) required   |
+| Review  | `superpowers:requesting-code-review`         | Before merging or after a major feature                                   |
+| Isolate | `superpowers:using-git-worktrees`            | When the work needs an isolated tree (long-running branches, experiments) |
+
+Default to invoking via the Skill tool rather than relying on memory of past patterns — skills evolve.
+
+### Progressive loading
+
+Load `SKILL.md` first via the Skill tool. Skills currently ship without supplementary `examples.md`/`reference.md`/`template.md`; add them only when the patterns merit deeper material.
+
+### Deferred conventions
+
+Auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain providers, and Convex workpool are tracked in `.claude/notes/deferred-conventions.md` with adoption triggers. Pending refactors (e.g. money → cents migration) live in the same file.
 
 <!-- convex-ai-start -->
 

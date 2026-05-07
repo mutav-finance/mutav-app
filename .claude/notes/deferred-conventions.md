@@ -103,3 +103,32 @@ convex/
 ## Self-improvement lessons file
 
 bwb keeps a `.self-improvement/lessons.md` updated after every user correction, and reviews it at session start. Worth adopting once the project has enough recurring corrections that the same mistakes show up twice. Until then, this `.claude/notes/` folder serves the same role.
+
+---
+
+# Pending refactors
+
+Code that predates a current convention and needs migrating.
+
+## Money fields → integer cents
+
+**Rule:** money is stored as integer cents (`*Cents: v.number()`). See CLAUDE.md → Domain conventions (Brazil) → Money.
+
+**Existing `*BRL: v.number()` fields to migrate** (in `convex/schema.ts`):
+
+- `contracts.availableGuaranteeBRL`
+- `contracts.rental.rentBRL`
+- `contracts.rental.condoBRL`
+- `contracts.rental.otherFeesBRL`
+- `contracts.rental.totalRentBRL`
+- `contracts.rental.feeBRL`
+- `contracts.rental.oneTimeActivationFeeBRL`
+
+**Migration approach** (widen → backfill → narrow):
+
+1. Add new `*Cents: v.number()` fields next to the existing `*BRL` fields (keep both during transition).
+2. Backfill via a Convex migration: `cents = Math.round(brl * 100)`.
+3. Update all reads to use the new fields, dividing by 100 only at the display layer.
+4. Drop the old `*BRL` fields once no readers remain. Use `@convex-dev/migrations` for the schema-shape change — see official `convex-migration-helper` skill.
+
+Defer until the schema has at least one production record or a feature actually performs money arithmetic on these values; until then, a simple rename + seed-data update suffices.
