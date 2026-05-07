@@ -50,9 +50,19 @@ next-env.d.ts
 .superpowers/
 docs/superpowers/
 
-# Local agent tooling — skills, hooks, settings live per-developer.
-# Track only what the team explicitly opts into via repo-level config.
-.claude/
+# Claude Code — share project-level config with the team; only personal
+# settings overrides and ephemeral worktrees stay local. Plugin-installed
+# Convex skills are symlinks into ~/.agents — exclude them; teammates
+# get them via `npx convex ai-files install`.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/skills/convex
+.claude/skills/convex-create-component
+.claude/skills/convex-migration-helper
+.claude/skills/convex-performance-audit
+.claude/skills/convex-quickstart
+.claude/skills/convex-setup-auth
+
 .agents/
 
 # Convex local dev artifacts
