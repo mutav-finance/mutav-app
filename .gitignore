@@ -46,10 +46,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Superpowers session state — not for the repo. Specs are tracked.
+# Superpowers session state — not for the repo. Specs and plans are tracked.
 .superpowers/
 docs/superpowers/*
 !docs/superpowers/specs/
+!docs/superpowers/plans/
 
 # Claude Code — share project-level config with the team; only personal
 # settings overrides and ephemeral worktrees stay local. Plugin-installed

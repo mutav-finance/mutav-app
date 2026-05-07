@@ -1,61 +1,58 @@
-import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 /**
- * Idempotent dev seed — inserts the fictional contract `1000001` plus its
- * two history entries.
+ * Idempotent dev seed — inserts two fictional imobiliárias, one contract
+ * each, contract history for the first, and one payment per agency.
+ * Wipes prior copies so re-runs produce a deterministic dataset.
  *
- * Registered as `internalMutation`, so it cannot be called from the client
- * over the public API. Invoke from the Convex dashboard or via the CLI:
+ *     bunx convex run seed:fictionalContract
  *
- *     npx convex run seed:fictionalContract
- *
- * Safe to re-run: each row is keyed by `publicId` / `(contractPublicId, at)`
- * and we delete-then-insert to keep the dataset deterministic across runs.
- *
- * This is dev-only seed data. Do NOT call this from production deployments.
+ * Dev-only. Do NOT call from production.
  */
 export const fictionalContract = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const PUBLIC_ID = "1000001";
-
-    // Delete any prior copy so re-runs produce a deterministic state.
-    const existing = await ctx.db
-      .query("contracts")
-      .withIndex("by_publicId", (q) => q.eq("publicId", PUBLIC_ID))
-      .unique();
-    if (existing) {
-      await ctx.db.delete(existing._id);
-    }
-
-    let priorHistory = await ctx.db
-      .query("contractHistory")
-      .withIndex("by_contract", (q) => q.eq("contractPublicId", PUBLIC_ID))
-      .take(100);
-    while (priorHistory.length > 0) {
-      for (const row of priorHistory) {
-        await ctx.db.delete(row._id);
+    // Wipe in dependency order: payments → history → contracts → agencies.
+    for (const table of ["payments", "contractHistory", "contracts", "agencies"] as const) {
+      let rows = await ctx.db.query(table).take(200);
+      while (rows.length > 0) {
+        for (const row of rows) {
+          await ctx.db.delete(row._id);
+        }
+        rows = await ctx.db.query(table).take(200);
       }
-      priorHistory = await ctx.db
-        .query("contractHistory")
-        .withIndex("by_contract", (q) => q.eq("contractPublicId", PUBLIC_ID))
-        .take(100);
     }
 
-    await ctx.db.insert("contracts", {
-      publicId: PUBLIC_ID,
+    const agencyPaulistaId: Id<"agencies"> = await ctx.db.insert("agencies", {
+      name: "Imobiliária Paulista",
+      cnpj: "00000000000100",
+      createdAt: "2026-01-15T00:00:00-03:00",
+    });
+
+    const agencyAtlanticaId: Id<"agencies"> = await ctx.db.insert("agencies", {
+      name: "Imobiliária Atlântica",
+      cnpj: "00000000000200",
+      createdAt: "2026-02-01T00:00:00-03:00",
+    });
+
+    const PUBLIC_ID_1 = "1000001";
+    const PUBLIC_ID_2 = "1000002";
+
+    const contract1Id: Id<"contracts"> = await ctx.db.insert("contracts", {
+      agencyId: agencyPaulistaId,
+      publicId: PUBLIC_ID_1,
       status: "ativo",
       nextRenewalDate: "2027-08-15",
-      availableGuaranteeBRL: 90_000,
+      availableGuaranteeCents: 9_000_000,
       rental: {
         propertyKind: "residencial",
-        rentBRL: 3_200,
-        condoBRL: 450,
-        otherFeesBRL: 0,
-        totalRentBRL: 3_650,
-        feeBRL: 5_120,
-        oneTimeActivationFeeBRL: 200,
+        rentCents: 320_000,
+        condoCents: 45_000,
+        otherFeesCents: 0,
+        totalRentCents: 365_000,
+        feeCents: 512_000,
+        oneTimeActivationFeeCents: 20_000,
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
@@ -81,16 +78,64 @@ export const fictionalContract = internalMutation({
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Maria Silva Santos",
-        cpf: "000.000.000-00",
+        cpf: "00000000000",
         birthDate: "1990-05-12",
         email: "maria.exemplo@example.com",
-        phone: "(11) 90000-0000",
+        phone: "11900000000",
         termApprovedAt: "2026-04-22T17:36:00-03:00",
       },
     });
 
+    await ctx.db.insert("contracts", {
+      agencyId: agencyAtlanticaId,
+      publicId: PUBLIC_ID_2,
+      status: "pendente",
+      nextRenewalDate: "2027-12-01",
+      availableGuaranteeCents: 12_000_000,
+      rental: {
+        propertyKind: "comercial",
+        rentCents: 580_000,
+        condoCents: 95_000,
+        otherFeesCents: 12_000,
+        totalRentCents: 687_000,
+        feeCents: 928_000,
+        oneTimeActivationFeeCents: 30_000,
+        setupInstallments: 2,
+        exitCostMultiplier: "8x",
+        rentMultiplier: "30x",
+        payer: "Recorrência via Imobiliária",
+        pviMigrationSchedule: null,
+      },
+      property: {
+        cep: "22250-040",
+        streetAndNumber: "Rua Visconde de Pirajá, 414",
+        neighborhood: "Ipanema",
+        cityUF: "Rio de Janeiro/RJ",
+      },
+      optional: {
+        complement: "Sala 808",
+        tag: "comercial-premium",
+        description: "Sala comercial em prédio histórico.",
+      },
+      documents: [
+        { key: "rentalContract", status: "enviado" },
+        { key: "inspection", status: "pendente" },
+        { key: "policy", status: "pendente" },
+      ],
+      tenant: {
+        approvalStatus: "pendente",
+        fullName: "João Pereira Almeida",
+        cpf: "00000000001",
+        birthDate: "1985-11-30",
+        email: "joao.exemplo@example.com",
+        phone: "21900000000",
+        termApprovedAt: null,
+      },
+    });
+
     await ctx.db.insert("contractHistory", {
-      contractPublicId: PUBLIC_ID,
+      agencyId: agencyPaulistaId,
+      contractPublicId: PUBLIC_ID_1,
       at: "2026-04-22T10:32:00-03:00",
       username: "usuario.exemplo",
       message:
@@ -98,43 +143,71 @@ export const fictionalContract = internalMutation({
     });
 
     await ctx.db.insert("contractHistory", {
-      contractPublicId: PUBLIC_ID,
+      agencyId: agencyPaulistaId,
+      contractPublicId: PUBLIC_ID_1,
       at: "2026-04-22T17:03:00-03:00",
       username: "usuario.exemplo",
       message:
         "Atualizado status do contrato: 1000001. | Para: Aprovado. | Por usuário: usuario.exemplo",
     });
 
-    return { publicId: PUBLIC_ID };
+    await ctx.db.insert("payments", {
+      agencyId: agencyPaulistaId,
+      publicId: "PAY-2026-04-PAU",
+      periodMonth: "2026-04",
+      issuedAt: "2026-04-01",
+      dueDate: "2026-04-10",
+      totalCents: 532_000,
+      status: "paid",
+      lineItems: [
+        {
+          contractId: contract1Id,
+          contractPublicId: PUBLIC_ID_1,
+          kind: "recurring",
+          amountCents: 512_000,
+          description: "Mensalidade contrato 1000001",
+        },
+        {
+          contractId: contract1Id,
+          contractPublicId: PUBLIC_ID_1,
+          kind: "activation",
+          amountCents: 20_000,
+          description: "Taxa de ativação contrato 1000001",
+        },
+      ],
+      barcode: null,
+      paidAt: "2026-04-08T14:21:00-03:00",
+    });
+
+    await ctx.db.insert("payments", {
+      agencyId: agencyAtlanticaId,
+      publicId: "PAY-2026-04-ATL",
+      periodMonth: "2026-04",
+      issuedAt: "2026-04-01",
+      dueDate: "2026-04-10",
+      totalCents: 0,
+      status: "pending",
+      lineItems: [],
+      barcode: null,
+      paidAt: null,
+    });
+
+    return { agencies: [agencyPaulistaId, agencyAtlanticaId], contracts: [contract1Id] };
   },
 });
 
-/**
- * Bulk wipe of seeded data — admin only.
- * Useful before re-running `fictionalContract` from a clean slate.
- */
-export const clearFictional = internalMutation({
-  args: { publicId: v.string() },
-  handler: async (ctx, args) => {
-    const contract = await ctx.db
-      .query("contracts")
-      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
-      .unique();
-    if (contract) {
-      await ctx.db.delete(contract._id);
-    }
-    let history = await ctx.db
-      .query("contractHistory")
-      .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
-      .take(100);
-    while (history.length > 0) {
-      for (const row of history) {
-        await ctx.db.delete(row._id);
+/** Bulk wipe — admin only. */
+export const clearAll = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    for (const table of ["payments", "contractHistory", "contracts", "agencies"] as const) {
+      let rows = await ctx.db.query(table).take(200);
+      while (rows.length > 0) {
+        for (const row of rows) {
+          await ctx.db.delete(row._id);
+        }
+        rows = await ctx.db.query(table).take(200);
       }
-      history = await ctx.db
-        .query("contractHistory")
-        .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
-        .take(100);
     }
     return null;
   },

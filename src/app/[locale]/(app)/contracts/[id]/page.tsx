@@ -9,7 +9,7 @@ export default async function ContractPage({
   params: Promise<{ id: string; locale: string }>;
 }) {
   const { id } = await params;
-  const preloaded = await preloadQuery(api.contracts.getByPublicId, {
+  const preloaded = await preloadQuery(api.contracts.useCases.getByPublicId, {
     publicId: id,
   });
   const contract = preloadedQueryResult(preloaded);
