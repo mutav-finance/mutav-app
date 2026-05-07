@@ -15,6 +15,8 @@
 // See the Convex auth guidelines (convex/_generated/ai/guidelines.md) and
 // https://docs.convex.dev/auth for provider setup.
 
-export default {
+const authConfig = {
   providers: [],
 };
+
+export default authConfig;
