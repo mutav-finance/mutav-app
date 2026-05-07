@@ -70,47 +70,47 @@
   --font-heading: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
 
   /* TGA typography scale — single source of truth, mirrors tga.yml#typography.scale */
-  --text-2xs: 0.6875rem;                                    /* 11px */
+  --text-2xs: 0.6875rem; /* 11px */
   --text-2xs--line-height: 1rem;
   --text-2xs--letter-spacing: 0.03em;
 
-  --text-xs: 0.75rem;                                       /* 12px */
+  --text-xs: 0.75rem; /* 12px */
   --text-xs--line-height: 1.125rem;
   --text-xs--letter-spacing: 0.01em;
 
-  --text-sm: 0.8125rem;                                     /* 13px (TGA-specific; ≠ Tailwind 14) */
+  --text-sm: 0.8125rem; /* 13px (TGA-specific; ≠ Tailwind 14) */
   --text-sm--line-height: 1.25rem;
   --text-sm--letter-spacing: 0.01em;
 
-  --text-base-sm: 0.875rem;                                 /* 14px */
+  --text-base-sm: 0.875rem; /* 14px */
   --text-base-sm--line-height: 1.25rem;
 
-  --text-base: 1rem;                                        /* 16px */
+  --text-base: 1rem; /* 16px */
   --text-base--line-height: 1.5rem;
 
-  --text-lg: 1.125rem;                                      /* 18px */
+  --text-lg: 1.125rem; /* 18px */
   --text-lg--line-height: 1.75rem;
 
-  --text-xl: 1.25rem;                                       /* 20px */
+  --text-xl: 1.25rem; /* 20px */
   --text-xl--line-height: 1.75rem;
 
-  --text-2xl: 1.5rem;                                       /* 24px */
+  --text-2xl: 1.5rem; /* 24px */
   --text-2xl--line-height: 2rem;
   --text-2xl--letter-spacing: -0.01em;
 
-  --text-3xl: 1.75rem;                                      /* 28px (TGA-specific; ≠ Tailwind 30) */
+  --text-3xl: 1.75rem; /* 28px (TGA-specific; ≠ Tailwind 30) */
   --text-3xl--line-height: 2rem;
   --text-3xl--letter-spacing: -0.01em;
 
-  --text-4xl: 2.25rem;                                      /* 36px */
+  --text-4xl: 2.25rem; /* 36px */
   --text-4xl--line-height: 2.5rem;
   --text-4xl--letter-spacing: -0.02em;
 
-  --text-5xl: clamp(2.25rem, 1.544rem + 1.127vw, 3rem);     /* 36→48px fluid */
+  --text-5xl: clamp(2.25rem, 1.544rem + 1.127vw, 3rem); /* 36→48px fluid */
   --text-5xl--line-height: 1.083;
   --text-5xl--letter-spacing: -0.02em;
 
-  --text-6xl: clamp(3rem, 2.056rem + 1.502vw, 4rem);        /* 48→64px fluid */
+  --text-6xl: clamp(3rem, 2.056rem + 1.502vw, 4rem); /* 48→64px fluid */
   --text-6xl--line-height: 1.0625;
   --text-6xl--letter-spacing: -0.03em;
 
@@ -126,37 +126,37 @@
 
 /* Imobiliárias (light) — default theme */
 :root {
-  --canvas:     #F7F6F3;
-  --surface:    #FFFFFF;
-  --surface-2:  #EEEDEA;
-  --surface-3:  #FFF8EE;
-  --border:     #D9D7D2;
-  --text:       #1A1A1A;
-  --text-2:     #6B6860;
-  --text-3:     #9E9C98;
-  --accent:     #C47E10;
-  --accent-dim: #FFF0D4;
-  --success:    #2E8B5A;
-  --error:      #B83232;
+  --canvas: #f7f6f3;
+  --surface: #ffffff;
+  --surface-2: #eeedea;
+  --surface-3: #fff8ee;
+  --border: #d9d7d2;
+  --text: #1a1a1a;
+  --text-2: #6b6860;
+  --text-3: #9e9c98;
+  --accent: #c47e10;
+  --accent-dim: #fff0d4;
+  --success: #2e8b5a;
+  --error: #b83232;
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
-  --color-accent-foreground: #1A1A1A;
-  --color-primary-foreground: #1A1A1A;
+  --color-accent-foreground: #1a1a1a;
+  --color-primary-foreground: #1a1a1a;
 }
 
 /* Investidor (dark) — opt-in via .dark class */
 .dark {
-  --canvas:     #0E0F11;
-  --surface:    #16181C;
-  --surface-2:  #1E2126;
-  --surface-3:  #252830;
-  --border:     #2A2D33;
-  --text:       #F0F0EE;
-  --text-2:     #8A8F99;
-  --text-3:     #555B66;
-  --accent:     #E8A020;
-  --accent-dim: #9E6A10;
-  --success:    #3DAB72;
-  --error:      #C94040;
+  --canvas: #0e0f11;
+  --surface: #16181c;
+  --surface-2: #1e2126;
+  --surface-3: #252830;
+  --border: #2a2d33;
+  --text: #f0f0ee;
+  --text-2: #8a8f99;
+  --text-3: #555b66;
+  --accent: #e8a020;
+  --accent-dim: #9e6a10;
+  --success: #3dab72;
+  --error: #c94040;
   /* Restore canvas-on-accent for dark mode */
   --color-accent-foreground: var(--canvas);
   --color-primary-foreground: var(--canvas);
@@ -164,15 +164,25 @@
 
 /* Live amber square pulse — only ambient animation in the system */
 @keyframes tga-live-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 .tga-live-square {
   animation: tga-live-pulse 2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .tga-live-square { animation: none; opacity: 1; }
-  html { scroll-behavior: auto !important; }
+  .tga-live-square {
+    animation: none;
+    opacity: 1;
+  }
+  html {
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer base {
@@ -195,7 +205,7 @@
   /* Investidor canvas (dark) — architectural grid texture at 3% opacity */
   .dark body {
     background-image:
-      linear-gradient(to right,  rgba(240, 240, 238, 0.03) 1px, transparent 1px),
+      linear-gradient(to right, rgba(240, 240, 238, 0.03) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(240, 240, 238, 0.03) 1px, transparent 1px);
     background-size: 24px 24px;
   }

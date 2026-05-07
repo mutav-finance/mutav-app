@@ -42,7 +42,7 @@ export function ContractDetailsPage({
     <div className="@container/main flex flex-1 flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 md:gap-6">
         <Breadcrumb>
-          <BreadcrumbList className="font-mono text-2xs tracking-[0.06em] uppercase">
+          <BreadcrumbList className="text-2xs font-mono tracking-[0.06em] uppercase">
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
                 <Link href="/">{tNav("dashboard")}</Link>
@@ -57,7 +57,7 @@ export function ContractDetailsPage({
           </BreadcrumbList>
         </Breadcrumb>
 
-        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="font-display text-foreground text-3xl font-bold tracking-tight">
           {t("heroTitle", { status: tStatus(contract.status) })}
         </h1>
 

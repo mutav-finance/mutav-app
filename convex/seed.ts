@@ -125,9 +125,7 @@ export const clearFictional = internalMutation({
     }
     let history = await ctx.db
       .query("contractHistory")
-      .withIndex("by_contract", (q) =>
-        q.eq("contractPublicId", args.publicId),
-      )
+      .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
       .take(100);
     while (history.length > 0) {
       for (const row of history) {
@@ -135,9 +133,7 @@ export const clearFictional = internalMutation({
       }
       history = await ctx.db
         .query("contractHistory")
-        .withIndex("by_contract", (q) =>
-          q.eq("contractPublicId", args.publicId),
-        )
+        .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
         .take(100);
     }
     return null;

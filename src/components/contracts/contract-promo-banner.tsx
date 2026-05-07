@@ -9,9 +9,7 @@ export function ContractPromoBanner() {
       <Card className="bg-accent-dim">
         <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-1">
-            <p className="text-base font-semibold text-foreground">
-              {t("title")}
-            </p>
+            <p className="text-foreground text-base font-semibold">{t("title")}</p>
             <p className="text-base-sm text-foreground/80">{t("body")}</p>
           </div>
           <Button className="self-start">{t("cta")}</Button>

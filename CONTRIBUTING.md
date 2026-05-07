@@ -33,9 +33,11 @@ bun run dev:convex   # Convex only
 ## Branch workflow
 
 1. Branch off `main`:
+
    ```bash
    git checkout -b feat/<short-description>
    ```
+
    Prefixes: `feat/`, `fix/`, `chore/`, `docs/`, `refactor/`.
 
 2. Commit early, commit often. Don't worry about a clean history yet —

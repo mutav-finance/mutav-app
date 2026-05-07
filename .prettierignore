@@ -1,0 +1,31 @@
+# Lockfiles — owned by the package manager, not formatters.
+bun.lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Build output and caches.
+.next/
+out/
+build/
+dist/
+coverage/
+
+# Auto-generated.
+convex/_generated/
+next-env.d.ts
+
+# i18n message catalogs — they ship as canonical JSON; reformatting them
+# can produce noisy diffs that obscure copy changes.
+messages/
+
+# Local agent tooling — not project source.
+.claude/
+.agents/
+.superpowers/
+docs/superpowers/
+
+# Brand assets — STYLE.md and tga.yml are the canonical source of truth
+# for design tokens. Reformatting can break the YAML structure that
+# downstream skills consume.
+.design/

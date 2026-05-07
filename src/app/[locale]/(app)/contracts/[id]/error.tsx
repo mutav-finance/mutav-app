@@ -19,14 +19,14 @@ export default function ContractError({
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 md:gap-6">
         <Card>
           <CardHeader className="border-b">
-            <CardTitle className="font-display text-xl font-bold tracking-tight text-foreground">
+            <CardTitle className="font-display text-foreground text-xl font-bold tracking-tight">
               {t("title")}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 py-4">
             <p className="text-base-sm text-muted-foreground">{t("body")}</p>
             {error.digest && (
-              <p className="font-mono text-2xs uppercase tracking-[0.06em] text-muted-foreground">
+              <p className="text-2xs text-muted-foreground font-mono tracking-[0.06em] uppercase">
                 ID · {error.digest}
               </p>
             )}
@@ -35,7 +35,7 @@ export default function ContractError({
               <Button
                 variant="outline"
                 asChild
-                className="border-primary text-primary bg-transparent hover:bg-accent-dim hover:text-primary"
+                className="border-primary text-primary hover:bg-accent-dim hover:text-primary bg-transparent"
               >
                 <Link href="/">{t("backToDashboard")}</Link>
               </Button>

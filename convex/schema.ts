@@ -8,11 +8,7 @@ const contractStatus = v.union(
   v.literal("cancelado"),
 );
 
-const documentStatus = v.union(
-  v.literal("pendente"),
-  v.literal("enviado"),
-  v.literal("aprovado"),
-);
+const documentStatus = v.union(v.literal("pendente"), v.literal("enviado"), v.literal("aprovado"));
 
 const documentKey = v.union(
   v.literal("rentalContract"),
@@ -20,10 +16,7 @@ const documentKey = v.union(
   v.literal("policy"),
 );
 
-const propertyKind = v.union(
-  v.literal("residencial"),
-  v.literal("comercial"),
-);
+const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
 
 const tenantApprovalStatus = v.union(
   v.literal("aprovado"),

@@ -1,8 +1,4 @@
-import type {
-  ActionCtx,
-  MutationCtx,
-  QueryCtx,
-} from "../_generated/server";
+import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 
 /**
  * Authenticated identity helpers.
