@@ -40,7 +40,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const navMain = [
     { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
-    { title: tMain("contracts"), href: "/contracts/1000001", icon: <FileTextIcon /> },
+    { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
     { title: tMain("lifecycle"), icon: <ListIcon /> },
     { title: tMain("analytics"), icon: <ChartBarIcon /> },
     { title: tMain("projects"), icon: <FolderIcon /> },
