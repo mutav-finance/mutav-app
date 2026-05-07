@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import * as React from "react";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 
-import { useLocale, useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl";
 
-import { useIsMobile } from "@/hooks/use-mobile"
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Card,
   CardAction,
@@ -13,26 +13,23 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart"
+} from "@/components/ui/chart";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
+} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-export const description = "An interactive area chart"
+export const description = "An interactive area chart";
 
 const chartData = [
   { date: "2024-04-01", desktop: 222, mobile: 150 },
@@ -126,16 +123,16 @@ const chartData = [
   { date: "2024-06-28", desktop: 149, mobile: 200 },
   { date: "2024-06-29", desktop: 103, mobile: 160 },
   { date: "2024-06-30", desktop: 446, mobile: 400 },
-]
+];
 
 export function ChartAreaInteractive() {
-  const isMobile = useIsMobile()
-  const t = useTranslations("chart")
-  const locale = useLocale()
+  const isMobile = useIsMobile();
+  const t = useTranslations("chart");
+  const locale = useLocale();
   const dateFormatter = React.useMemo(
     () => new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }),
-    [locale]
-  )
+    [locale],
+  );
   const chartConfig = React.useMemo(
     () =>
       ({
@@ -143,28 +140,28 @@ export function ChartAreaInteractive() {
         desktop: { label: t("series.desktop"), color: "var(--primary)" },
         mobile: { label: t("series.mobile"), color: "var(--primary)" },
       }) satisfies ChartConfig,
-    [t]
-  )
-  const [userTimeRange, setUserTimeRange] = React.useState<string | null>(null)
+    [t],
+  );
+  const [userTimeRange, setUserTimeRange] = React.useState<string | null>(null);
   // Mobile forces 7d regardless of user pick; on desktop, fall back to
   // the user's last selection or the 90d default. Computed during render
   // so we don't need a setState-in-effect.
-  const timeRange = isMobile ? "7d" : (userTimeRange ?? "90d")
-  const setTimeRange = setUserTimeRange
+  const timeRange = isMobile ? "7d" : (userTimeRange ?? "90d");
+  const setTimeRange = setUserTimeRange;
 
   const filteredData = chartData.filter((item) => {
-    const date = new Date(item.date)
-    const referenceDate = new Date("2024-06-30")
-    let daysToSubtract = 90
+    const date = new Date(item.date);
+    const referenceDate = new Date("2024-06-30");
+    let daysToSubtract = 90;
     if (timeRange === "30d") {
-      daysToSubtract = 30
+      daysToSubtract = 30;
     } else if (timeRange === "7d") {
-      daysToSubtract = 7
+      daysToSubtract = 7;
     }
-    const startDate = new Date(referenceDate)
-    startDate.setDate(startDate.getDate() - daysToSubtract)
-    return date >= startDate
-  })
+    const startDate = new Date(referenceDate);
+    startDate.setDate(startDate.getDate() - daysToSubtract);
+    return date >= startDate;
+  });
 
   return (
     <Card className="@container/card">
@@ -195,43 +192,30 @@ export function ChartAreaInteractive() {
               <SelectValue placeholder={t("last3Months")} />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              <SelectItem value="90d" className="rounded-lg">{t("last3Months")}</SelectItem>
-              <SelectItem value="30d" className="rounded-lg">{t("last30Days")}</SelectItem>
-              <SelectItem value="7d" className="rounded-lg">{t("last7Days")}</SelectItem>
+              <SelectItem value="90d" className="rounded-lg">
+                {t("last3Months")}
+              </SelectItem>
+              <SelectItem value="30d" className="rounded-lg">
+                {t("last30Days")}
+              </SelectItem>
+              <SelectItem value="7d" className="rounded-lg">
+                {t("last7Days")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </CardAction>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        <ChartContainer
-          config={chartConfig}
-          className="aspect-auto h-[250px] w-full"
-        >
+        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
           <AreaChart data={filteredData}>
             <defs>
               <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-desktop)"
-                  stopOpacity={1.0}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-desktop)"
-                  stopOpacity={0.1}
-                />
+                <stop offset="5%" stopColor="var(--color-desktop)" stopOpacity={1.0} />
+                <stop offset="95%" stopColor="var(--color-desktop)" stopOpacity={0.1} />
               </linearGradient>
               <linearGradient id="fillMobile" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-mobile)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-mobile)"
-                  stopOpacity={0.1}
-                />
+                <stop offset="5%" stopColor="var(--color-mobile)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="var(--color-mobile)" stopOpacity={0.1} />
               </linearGradient>
             </defs>
             <CartesianGrid vertical={false} />
@@ -270,5 +254,5 @@ export function ChartAreaInteractive() {
         </ChartContainer>
       </CardContent>
     </Card>
-  )
+  );
 }

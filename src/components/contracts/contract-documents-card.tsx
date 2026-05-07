@@ -2,23 +2,11 @@ import { FileTextIcon, UploadIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type {
-  ContractDocument,
-  ContractDocumentKey,
-  DocumentStatus,
-} from "@/lib/contracts/types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { ContractDocument, ContractDocumentKey, DocumentStatus } from "@/lib/contracts/types";
 import { StatusTag } from "./status-tag";
 
-const docKeys: ContractDocumentKey[] = [
-  "rentalContract",
-  "inspection",
-  "policy",
-];
+const docKeys: ContractDocumentKey[] = ["rentalContract", "inspection", "policy"];
 
 const statusTone: Record<DocumentStatus, "accent" | "neutral" | "success"> = {
   pendente: "accent",
@@ -26,11 +14,7 @@ const statusTone: Record<DocumentStatus, "accent" | "neutral" | "success"> = {
   aprovado: "success",
 };
 
-export function ContractDocumentsCard({
-  documents,
-}: {
-  documents: ContractDocument[];
-}) {
+export function ContractDocumentsCard({ documents }: { documents: ContractDocument[] }) {
   const t = useTranslations("contractDetails.documents");
   const tLabels = useTranslations("contractDetails.documents.labels");
   const tStatus = useTranslations("contractDetails.documents.status");
@@ -39,7 +23,7 @@ export function ContractDocumentsCard({
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle className="font-mono text-xs font-medium tracking-[0.06em] uppercase text-muted-foreground">
+        <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
           {t("heading")}
         </CardTitle>
       </CardHeader>
@@ -48,20 +32,15 @@ export function ContractDocumentsCard({
           const doc = byKey.get(key);
           const status = doc?.status ?? "pendente";
           return (
-            <div
-              key={key}
-              className="flex flex-col gap-3 border border-border p-4"
-            >
+            <div key={key} className="border-border flex flex-col gap-3 border p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2">
                   <FileTextIcon
-                    className="mt-0.5 size-4 text-muted-foreground"
+                    className="text-muted-foreground mt-0.5 size-4"
                     strokeWidth={1.25}
                     aria-hidden
                   />
-                  <span className="text-base-sm font-medium">
-                    {tLabels(key)}
-                  </span>
+                  <span className="text-base-sm font-medium">{tLabels(key)}</span>
                 </div>
                 <StatusTag tone={statusTone[status]} label={tStatus(status)} />
               </div>
@@ -71,14 +50,10 @@ export function ContractDocumentsCard({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="self-start border-primary text-primary bg-transparent hover:bg-accent-dim hover:text-primary"
+                      className="border-primary text-primary hover:bg-accent-dim hover:text-primary self-start bg-transparent"
                       disabled
                     >
-                      <UploadIcon
-                        data-icon="inline-start"
-                        strokeWidth={1.25}
-                        aria-hidden
-                      />
+                      <UploadIcon data-icon="inline-start" strokeWidth={1.25} aria-hidden />
                       {t("send")}
                     </Button>
                   </span>

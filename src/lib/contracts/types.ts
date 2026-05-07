@@ -32,10 +32,7 @@ export type ContractOptional = {
   description: string;
 };
 
-export type ContractDocumentKey =
-  | "rentalContract"
-  | "inspection"
-  | "policy";
+export type ContractDocumentKey = "rentalContract" | "inspection" | "policy";
 
 export type ContractDocument = {
   key: ContractDocumentKey;

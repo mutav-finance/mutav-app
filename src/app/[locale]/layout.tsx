@@ -44,12 +44,8 @@ export default async function RootLayout({
   setRequestLocale(locale);
 
   return (
-    <html
-      lang={locale}
-      className={`${geist.variable} h-full antialiased`}
-      suppressHydrationWarning
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang={locale} className={`${geist.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="flex min-h-full flex-col">
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>

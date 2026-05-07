@@ -5,20 +5,12 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Mono } from "@/components/ui/mono";
 import { formatDateTimeBR } from "@/lib/contracts/format";
 import type { ContractHistoryEntry } from "@/lib/contracts/types";
 
-export function ContractHistoryCard({
-  history,
-}: {
-  history: ContractHistoryEntry[];
-}) {
+export function ContractHistoryCard({ history }: { history: ContractHistoryEntry[] }) {
   const t = useTranslations("contractDetails.history");
   const [open, setOpen] = useState(true);
 
@@ -26,7 +18,7 @@ export function ContractHistoryCard({
     <Collapsible open={open} onOpenChange={setOpen} asChild>
       <Card>
         <CardHeader className="border-b">
-          <CardTitle className="font-mono text-xs font-medium tracking-[0.06em] uppercase text-muted-foreground">
+          <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
             {t("heading")}
           </CardTitle>
           <CollapsibleTrigger asChild>
@@ -49,11 +41,9 @@ export function ContractHistoryCard({
                 {history.map((entry, idx) => (
                   <li
                     key={`${entry.at}-${idx}`}
-                    className="border-b border-border pb-3 text-base-sm leading-relaxed last:border-b-0 last:pb-0"
+                    className="border-border text-base-sm border-b pb-3 leading-relaxed last:border-b-0 last:pb-0"
                   >
-                    <Mono className="mr-2 text-muted-foreground">
-                      {formatDateTimeBR(entry.at)}
-                    </Mono>
+                    <Mono className="text-muted-foreground mr-2">{formatDateTimeBR(entry.at)}</Mono>
                     {entry.message}
                   </li>
                 ))}

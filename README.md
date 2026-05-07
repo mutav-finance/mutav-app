@@ -2,7 +2,7 @@
 
 Web dashboard for managing rental guarantees across chains.
 
-> *Painel web para gestão de garantias locatícias multi-chain.*
+> _Painel web para gestão de garantias locatícias multi-chain._
 
 ## Docs
 
@@ -30,9 +30,8 @@ Prerequisites: [Bun ≥ 1.3](https://bun.sh).
 ```bash
 git clone https://github.com/tga-protocol/sgr-app.git
 cd sgr-app
-bun install
-git config core.hooksPath .githooks
-cp .env.example .env.local   # fill in Convex + Privy creds
+bun install                   # also installs git hooks via husky
+cp .env.example .env.local    # fill in Convex + Privy creds
 bun dev
 ```
 
@@ -42,14 +41,30 @@ so you never end up with half a dev environment.
 
 ## Scripts
 
-| Command            | What it does                                  |
-| ------------------ | --------------------------------------------- |
-| `bun dev`          | Run Next + Convex together (recommended)      |
-| `bun run dev:web`  | Just the Next.js app                          |
-| `bun run dev:convex` | Just the Convex dev backend                 |
-| `bun run build`    | Production build                              |
-| `bun run start`    | Serve the production build                    |
-| `bun run lint`     | ESLint                                        |
+| Command                | What it does                             |
+| ---------------------- | ---------------------------------------- |
+| `bun dev`              | Run Next + Convex together (recommended) |
+| `bun run dev:web`      | Just the Next.js app                     |
+| `bun run dev:convex`   | Just the Convex dev backend              |
+| `bun run build`        | Production build                         |
+| `bun run start`        | Serve the production build               |
+| `bun run lint`         | ESLint                                   |
+| `bun run lint:fix`     | ESLint with `--fix`                      |
+| `bun run typecheck`    | `tsc --noEmit`                           |
+| `bun run format`       | Prettier — write changes                 |
+| `bun run format:check` | Prettier — verify only                   |
+
+## Git hooks
+
+Hooks are managed by [Husky](https://typicode.github.io/husky/) and install automatically on `bun install` (via the `prepare` script). No manual setup needed.
+
+- **`pre-commit`** — runs `bun run typecheck` on the whole project, then `lint-staged` on staged files only:
+  - `*.{ts,tsx}` → `prettier --write` + `eslint --fix --max-warnings=0`
+  - `*.{js,jsx,mjs,cjs,json,md,yml,yaml,css}` → `prettier --write`
+- **`commit-msg`** — enforces [Conventional Commits](https://www.conventionalcommits.org/) via `commitlint` (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `build:`, `ci:`, `perf:`, `revert:`, optional scope, optional `!` for breaking).
+- **`pre-push`** — blocks direct pushes to `main`. Use a feature branch + PR.
+
+Bypass in emergencies: `git commit --no-verify` / `git push --no-verify`.
 
 ## Environment
 

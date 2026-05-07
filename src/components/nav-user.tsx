@@ -1,10 +1,6 @@
-"use client"
+"use client";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,13 +14,13 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 import {
   EllipsisVerticalIcon,
   CircleUserRoundIcon,
@@ -35,36 +31,36 @@ import {
   MoonIcon,
   MonitorIcon,
   LanguagesIcon,
-} from "lucide-react"
-import { useTheme } from "next-themes"
-import { useLocale, useTranslations } from "next-intl"
-import { useRouter, usePathname } from "@/i18n/navigation"
-import { routing } from "@/i18n/routing"
+} from "lucide-react";
+import { useTheme } from "next-themes";
+import { useLocale, useTranslations } from "next-intl";
+import { useRouter, usePathname } from "@/i18n/navigation";
+import { routing } from "@/i18n/routing";
 
 const LOCALE_LABELS: Record<(typeof routing.locales)[number], string> = {
   "pt-BR": "Português",
   en: "English",
-}
+};
 
 export function NavUser({
   user,
 }: {
   user: {
-    name: string
-    email: string
-    avatar: string
-  }
+    name: string;
+    email: string;
+    avatar: string;
+  };
 }) {
-  const { isMobile } = useSidebar()
-  const { theme, setTheme, resolvedTheme } = useTheme()
-  const ThemeTriggerIcon = resolvedTheme === "dark" ? MoonIcon : SunIcon
-  const locale = useLocale()
-  const router = useRouter()
-  const pathname = usePathname()
-  const t = useTranslations("userMenu")
+  const { isMobile } = useSidebar();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const ThemeTriggerIcon = resolvedTheme === "dark" ? MoonIcon : SunIcon;
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const t = useTranslations("userMenu");
   const switchLocale = (next: string) => {
-    router.replace(pathname, { locale: next as (typeof routing.locales)[number] })
-  }
+    router.replace(pathname, { locale: next as (typeof routing.locales)[number] });
+  };
 
   return (
     <SidebarMenu>
@@ -81,9 +77,7 @@ export function NavUser({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {user.email}
-                </span>
+                <span className="text-muted-foreground truncate text-xs">{user.email}</span>
               </div>
               <EllipsisVerticalIcon className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -102,9 +96,7 @@ export function NavUser({
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {user.email}
-                  </span>
+                  <span className="text-muted-foreground truncate text-xs">{user.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -170,5 +162,5 @@ export function NavUser({
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

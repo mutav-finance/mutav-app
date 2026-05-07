@@ -35,9 +35,7 @@ export const getByPublicId = query({
     // Append-only history table — bounded fetch protects the response payload.
     const history = await ctx.db
       .query("contractHistory")
-      .withIndex("by_contract", (q) =>
-        q.eq("contractPublicId", args.publicId),
-      )
+      .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
       .order("desc")
       .take(100);
 
@@ -54,10 +52,7 @@ export const getByPublicId = query({
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
-    const result = await ctx.db
-      .query("contracts")
-      .order("desc")
-      .paginate(args.paginationOpts);
+    const result = await ctx.db.query("contracts").order("desc").paginate(args.paginationOpts);
 
     return {
       ...result,
@@ -77,10 +72,7 @@ export const list = query({
  * `Contract` TS type used by the UI. Strips system fields (_id,
  * _creationTime) and renames publicId → id.
  */
-function shapeContract(
-  doc: Doc<"contracts">,
-  history: Doc<"contractHistory">[],
-) {
+function shapeContract(doc: Doc<"contracts">, history: Doc<"contractHistory">[]) {
   return {
     id: doc.publicId,
     status: doc.status,

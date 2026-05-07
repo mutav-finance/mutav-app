@@ -1,12 +1,8 @@
-#!/bin/sh
 #
 # Prevents direct pushes to main. Use a feature branch + PR instead.
 #
-# Setup (run once after cloning):
-#   git config core.hooksPath .githooks
 
 protected_branch="main"
-current_branch=$(git symbolic-ref HEAD 2>/dev/null | sed 's|refs/heads/||')
 
 while read local_ref local_sha remote_ref remote_sha; do
   if echo "$remote_ref" | grep -q "refs/heads/${protected_branch}$"; then

@@ -20,14 +20,14 @@ export function ContractActionsMenu() {
         <Button
           variant="outline"
           size="sm"
-          className="border-primary text-primary bg-transparent hover:bg-accent-dim hover:text-primary aria-expanded:bg-accent-dim aria-expanded:text-primary"
+          className="border-primary text-primary hover:bg-accent-dim hover:text-primary aria-expanded:bg-accent-dim aria-expanded:text-primary bg-transparent"
         >
           {t("actions")}
           <ChevronDownIcon data-icon="inline-end" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <DropdownMenuLabel className="font-mono text-2xs font-medium tracking-[0.06em] uppercase text-muted-foreground">
+        <DropdownMenuLabel className="text-2xs text-muted-foreground font-mono font-medium tracking-[0.06em] uppercase">
           {t("actionDisabled")}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
