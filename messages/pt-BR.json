@@ -299,5 +299,48 @@
     "loading": {
       "label": "Carregando contrato"
     }
+  },
+  "contractList": {
+    "meta": {
+      "title": "Contratos | SGR",
+      "description": "Lista de contratos da imobiliária"
+    },
+    "heading": "Contratos",
+    "subheading": "Acompanhe os contratos da sua imobiliária",
+    "tabs": {
+      "all": "Todos",
+      "ativo": "Ativos",
+      "pendente": "Pendentes",
+      "encerrado": "Encerrados",
+      "cancelado": "Cancelados"
+    },
+    "columns": {
+      "publicId": "ID",
+      "status": "Status",
+      "tenant": "Locatário",
+      "availableGuarantee": "Garantia disponível",
+      "nextRenewalDate": "Próxima renovação",
+      "creationTime": "Criado em"
+    },
+    "search": {
+      "placeholder": "Buscar por ID ou locatário"
+    },
+    "columnsButton": "Colunas",
+    "noResults": "Nenhum contrato encontrado",
+    "loading": "Carregando contratos…",
+    "errors": {
+      "title": "Erro ao carregar contratos",
+      "body": "Não foi possível carregar a lista. Tente novamente.",
+      "retry": "Tentar novamente",
+      "backToDashboard": "Voltar ao painel"
+    },
+    "pagination": {
+      "rowsPerPage": "Linhas por página",
+      "pageOf": "Página {current} de {total}",
+      "firstPage": "Primeira página",
+      "previousPage": "Página anterior",
+      "nextPage": "Próxima página",
+      "lastPage": "Última página"
+    }
   }
 }

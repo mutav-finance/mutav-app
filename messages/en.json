@@ -299,5 +299,48 @@
     "loading": {
       "label": "Loading contract"
     }
+  },
+  "contractList": {
+    "meta": {
+      "title": "Contracts | SGR",
+      "description": "Real estate agency contracts list"
+    },
+    "heading": "Contracts",
+    "subheading": "Track your agency's contracts",
+    "tabs": {
+      "all": "All",
+      "ativo": "Active",
+      "pendente": "Pending",
+      "encerrado": "Closed",
+      "cancelado": "Canceled"
+    },
+    "columns": {
+      "publicId": "ID",
+      "status": "Status",
+      "tenant": "Tenant",
+      "availableGuarantee": "Available guarantee",
+      "nextRenewalDate": "Next renewal",
+      "creationTime": "Created"
+    },
+    "search": {
+      "placeholder": "Search by ID or tenant"
+    },
+    "columnsButton": "Columns",
+    "noResults": "No contracts found",
+    "loading": "Loading contracts…",
+    "errors": {
+      "title": "Could not load contracts",
+      "body": "We couldn't load the list. Please try again.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard"
+    },
+    "pagination": {
+      "rowsPerPage": "Rows per page",
+      "pageOf": "Page {current} of {total}",
+      "firstPage": "First page",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "lastPage": "Last page"
+    }
   }
 }
