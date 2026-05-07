@@ -187,6 +187,18 @@ Two validator systems coexist:
 
 The boundary: server-side speaks Convex `v`, client-side speaks Zod, generated types flow between them via `_generated/api`. Never reach for a third validator (joi, yup, ajv) — pick from these two.
 
+### Server vs Client Components
+
+Default to server. Add `"use client"` only when you need state, effects, browser APIs, event handlers, or a hook that requires it (most shadcn primitives, Convex `useQuery`).
+
+Push the boundary down the tree — keep pages server-side, push interactivity to leaf components as client islands. The view-model pattern (`use{ComponentName}`) applies only inside client islands.
+
+For Convex data, use `preloadQuery` (server) + `usePreloadedQuery` (client) from `convex/nextjs` so the server prerenders initial state and the client subscribes to live updates on the same query. Plain `useQuery` is for views with no SSR path (modals, popovers, conditional sections).
+
+### Server Actions vs Convex mutations
+
+All backend writes go through Convex mutations. Don't use Next.js Server Actions (`"use server"`) — they fragment backend logic across two RPC systems, break Convex's reactive update model, and add a testing surface that `convex-test` doesn't cover.
+
 ### React 19 async patterns
 
 Never use the legacy promise-chain + `cancelled`-flag idiom inside `useEffect`. Two modern alternatives:
