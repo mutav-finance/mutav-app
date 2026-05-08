@@ -16,14 +16,18 @@ export default async function ContractsPage() {
   });
 
   return (
-    <div className="@container/main flex flex-1 flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="font-display text-foreground text-xl font-bold tracking-tight">
-          {t("heading")}
-        </h1>
-        <p className="text-base-sm text-muted-foreground">{t("subheading")}</p>
-      </header>
-      <ContractListTable preloaded={preloaded} />
+    <div className="flex flex-1 flex-col">
+      <div className="@container/main flex flex-1 flex-col gap-2">
+        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+          <header className="flex flex-col gap-1 px-4 lg:px-6">
+            <h1 className="font-display text-foreground text-xl font-bold tracking-tight">
+              {t("heading")}
+            </h1>
+            <p className="text-base-sm text-muted-foreground">{t("subheading")}</p>
+          </header>
+          <ContractListTable preloaded={preloaded} />
+        </div>
+      </div>
     </div>
   );
 }
