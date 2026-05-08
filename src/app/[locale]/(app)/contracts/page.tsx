@@ -2,6 +2,9 @@ import { getTranslations } from "next-intl/server";
 import { preloadQuery } from "convex/nextjs";
 import { api } from "@convex/_generated/api";
 import { ContractListTable } from "@/components/contracts/contract-list-table";
+import { PageContent } from "@/components/page/page-content";
+import { PageHeader } from "@/components/page/page-header";
+import { PageShell } from "@/components/page/page-shell";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -16,18 +19,11 @@ export default async function ContractsPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="@container/main flex flex-1 flex-col gap-2">
-        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-          <header className="flex flex-col gap-1 px-4 lg:px-6">
-            <h1 className="font-display text-foreground text-xl font-bold tracking-tight">
-              {t("heading")}
-            </h1>
-            <p className="text-base-sm text-muted-foreground">{t("subheading")}</p>
-          </header>
-          <ContractListTable preloaded={preloaded} />
-        </div>
-      </div>
-    </div>
+    <PageShell>
+      <PageHeader title={t("heading")} subtitle={t("subheading")} />
+      <PageContent variant="full">
+        <ContractListTable preloaded={preloaded} />
+      </PageContent>
+    </PageShell>
   );
 }
