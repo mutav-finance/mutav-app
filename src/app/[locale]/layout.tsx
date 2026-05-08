@@ -44,8 +44,12 @@ export default async function RootLayout({
   setRequestLocale(locale);
 
   return (
-    <html lang={locale} className={`${geist.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="flex min-h-full flex-col">
+    <html
+      lang={locale}
+      className={`${geist.variable} h-svh overflow-hidden antialiased`}
+      suppressHydrationWarning
+    >
+      <body className="flex h-svh flex-col overflow-hidden">
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>
