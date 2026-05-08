@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main
           id="main-content"
           data-front="imobiliarias"
-          className="flex min-h-0 flex-1 flex-col overflow-auto"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto"
         >
           {children}
         </main>

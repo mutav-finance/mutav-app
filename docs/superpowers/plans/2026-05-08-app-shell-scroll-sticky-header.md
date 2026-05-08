@@ -76,7 +76,25 @@ Add inside the existing reduced-motion block (around globals.css:183):
 
 ---
 
-### Task 4: Verification
+### Task 4: Lock html/body root (added during QA)
+
+**Files:**
+
+- Modify: `src/app/[locale]/layout.tsx`
+
+The Task 1 lock only covers the `(app)` subtree. `<html>` (`h-full`) and `<body>` (`min-h-full`) remain scrollable, so any rubber-band/overflow reveals the canvas color (`#f7f6f3`) underneath the inset variant's `bg-sidebar` (`#ffffff`). Visible as a brief white-on-off-white contrast strip when overscrolling on macOS.
+
+- [ ] **Step 1: Lock html and body to viewport**
+
+Set both `<html>` and `<body>` to `h-svh overflow-hidden`. `<main>` becomes the only scrolling element in the document.
+
+- [ ] **Step 2: Note the implication for future routes**
+
+This lock is shared by every route under `[locale]/`. When non-app route groups land (marketing, auth, public docs), push the lock down to `(app)/layout.tsx` so those routes regain native document scroll. Inline comment in `[locale]/layout.tsx` flags this.
+
+---
+
+### Task 5: Verification
 
 - [ ] **Step 1: Typecheck**
 
