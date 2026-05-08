@@ -43,9 +43,17 @@ export default async function RootLayout({
   }
   setRequestLocale(locale);
 
+  // App-shell viewport lock — every current route under [locale] is the
+  // dashboard shell, where <main> owns scroll. If a non-app route group
+  // (marketing, public docs, auth) lands here later, push this lock down
+  // to (app)/layout.tsx so those routes regain document scroll.
   return (
-    <html lang={locale} className={`${geist.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="flex min-h-full flex-col">
+    <html
+      lang={locale}
+      className={`${geist.variable} h-svh overflow-hidden antialiased`}
+      suppressHydrationWarning
+    >
+      <body className="flex h-svh flex-col overflow-hidden">
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>

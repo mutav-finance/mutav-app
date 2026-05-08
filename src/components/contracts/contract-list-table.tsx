@@ -263,7 +263,7 @@ export function ContractListTable({
       <TabsContent
         value={statusTab}
         forceMount
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
+        className="relative flex flex-col gap-4 overflow-x-auto px-4 lg:px-6"
       >
         <div className="overflow-hidden rounded-lg border">
           <Table>

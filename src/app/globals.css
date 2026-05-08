@@ -188,6 +188,13 @@
   html {
     scroll-behavior: auto !important;
   }
+  /* Sidebar width transitions are applied directly to the shadcn primitive
+     and aren't gated at the utility layer. Disable them here so we don't
+     have to fork the primitive. */
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-container"] {
+    transition: none !important;
+  }
 }
 
 @layer base {

@@ -471,7 +471,7 @@ export function DataTable({ data: initialData }: { data: z.infer<typeof schema>[
       </div>
       <TabsContent
         value="outline"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
+        className="relative flex flex-col gap-4 overflow-x-auto px-4 lg:px-6"
       >
         <div className="overflow-hidden rounded-lg border">
           <DndContext
