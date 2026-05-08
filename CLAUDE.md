@@ -92,6 +92,52 @@ convex/
 
 The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outside the entity file — export aliases (e.g. `Contract`, `ContractId`) and import those everywhere else. See `convex-document-types` skill for the full rules.
 
+### Layout primitives
+
+Every page wraps content in three composable primitives from `@/components/page/*`. **Don't roll a custom page wrapper** — extend the primitives if your case doesn't fit.
+
+- **`<PageShell>`** — outer 3-level wrapper. Provides `@container/main` and the project's vertical rhythm (`gap-4 md:gap-6`, `py-4 md:py-6`). Always wraps the entire page.
+- **`<PageHeader title subtitle? variant? width? breadcrumb? actions? />`** — title row with two typography variants:
+  - `variant="section"` (default, `text-xl`) — list / dashboard pages
+  - `variant="hero"` (`text-3xl`) — detail pages with a single primary subject
+  - `width="narrow"` aligns the header column with `<PageContent variant="narrow">` below it
+- **`<PageContent variant="full" | "narrow" | "wide">`** — content area with width policy:
+  - `full` (default) — no max-width, no horizontal padding; **children manage their own** (`px-4 lg:px-6`). For tables, dashboards, and other full-bleed-aware components.
+  - `narrow` — `max-w-(--page-content-max-width)` (4xl, 56rem) with `px-4 lg:px-6`. For cards, forms, prose, detail pages.
+  - `wide` — `max-w-(--page-wide-max-width)` (screen-2xl, 96rem) with `px-4 lg:px-6`. For wide tables that should still cap on ultra-wide screens.
+
+Width tokens live in `src/app/globals.css` alongside `--header-height` and `--sidebar-width`:
+
+```css
+--page-content-max-width: 56rem; /* 4xl — narrow content */
+--page-wide-max-width: 96rem; /* screen-2xl — wide content cap */
+```
+
+**Patterns by page type:**
+
+```tsx
+// List / dashboard — full-bleed-aware children
+<PageShell>
+  <PageHeader title="Contratos" subtitle="..." />
+  <PageContent variant="full">
+    <ContractListTable />
+  </PageContent>
+</PageShell>
+
+// Detail — narrow hero header + narrow card column
+<PageShell>
+  <PageHeader variant="hero" width="narrow" breadcrumb={<Breadcrumb />} title="..." />
+  <PageContent variant="narrow">
+    <SummaryCard />
+    <RentalCard />
+  </PageContent>
+</PageShell>
+
+// Loading / error mirror their page's variant inside <PageShell>.
+```
+
+If a new page doesn't fit any variant, that's a signal to add a variant — not to roll a one-off wrapper.
+
 ### Route segment files
 
 Each Next.js route segment can declare conventional files. Use them at the segment that defines the natural error/loading scope — not piled into the root.

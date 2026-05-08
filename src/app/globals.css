@@ -141,6 +141,11 @@
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1a1a1a;
   --color-primary-foreground: #1a1a1a;
+
+  /* Page layout — shared by <PageContent variant="narrow" | "wide"> and
+     <PageHeader width="narrow"> in src/components/page/. */
+  --page-content-max-width: 56rem; /* 4xl — narrow content (cards, forms, prose) */
+  --page-wide-max-width: 96rem; /* screen-2xl — wide content cap */
 }
 
 /* Investidor (dark) — opt-in via .dark class */

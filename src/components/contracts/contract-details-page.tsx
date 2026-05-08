@@ -3,6 +3,9 @@
 import { useTranslations } from "next-intl";
 import { usePreloadedQuery, type Preloaded } from "convex/react";
 import { notFound } from "next/navigation";
+import { PageContent } from "@/components/page/page-content";
+import { PageHeader } from "@/components/page/page-header";
+import { PageShell } from "@/components/page/page-shell";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -39,35 +42,37 @@ export function ContractDetailsPage({
   const tStatus = useTranslations("contractDetails.status");
 
   return (
-    <div className="@container/main flex flex-1 flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 md:gap-6">
-        <Breadcrumb>
-          <BreadcrumbList className="text-2xs font-mono tracking-[0.06em] uppercase">
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">{tNav("dashboard")}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>
-                <Mono>#{contract.id}</Mono>
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        <h1 className="font-display text-foreground text-3xl font-bold tracking-tight">
-          {t("heroTitle", { status: tStatus(contract.status) })}
-        </h1>
-
+    <PageShell>
+      <PageHeader
+        variant="hero"
+        width="narrow"
+        breadcrumb={
+          <Breadcrumb>
+            <BreadcrumbList className="text-2xs font-mono tracking-[0.06em] uppercase">
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/">{tNav("dashboard")}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>
+                  <Mono>#{contract.id}</Mono>
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        }
+        title={t("heroTitle", { status: tStatus(contract.status) })}
+      />
+      <PageContent variant="narrow">
         <ContractPromoBanner />
         <ContractSummaryCard contract={contract} />
         <ContractRentalDataCard contract={contract} />
         <ContractDocumentsCard documents={contract.documents} />
         <ContractHistoryCard history={contract.history} />
         <ContractTenantCard tenant={contract.tenant} />
-      </div>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }
