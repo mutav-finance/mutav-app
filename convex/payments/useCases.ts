@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query } from "../_generated/server";
-import { paymentStateKindValidator } from "./domain";
+import { paymentStateKindValidator, type Payment } from "./domain";
 
 export const listByAgency = query({
   args: {
@@ -31,6 +31,18 @@ export const listByStateKind = query({
   },
 });
 
+/** Public paginated list — same security caveat as contracts.useCases.list. */
+export const list = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const result = await ctx.db.query("payments").order("desc").paginate(args.paginationOpts);
+    return {
+      ...result,
+      page: result.page.map(shapePaymentSummary),
+    };
+  },
+});
+
 export const getById = query({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args) => {
@@ -47,3 +59,19 @@ export const getByPublicId = query({
       .unique();
   },
 });
+
+// ─── Shape helpers ────────────────────────────────────────────────────────────
+
+function shapePaymentSummary(doc: Payment) {
+  return {
+    id: doc.publicId,
+    agencyId: doc.agencyId,
+    periodMonth: doc.periodMonth,
+    issuedAt: doc.issuedAt,
+    dueDate: doc.dueDate,
+    totalCents: doc.totalCents,
+    state: doc.state,
+    method: doc.method,
+    lineItemCount: doc.lineItems.length,
+  };
+}

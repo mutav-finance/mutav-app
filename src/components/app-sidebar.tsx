@@ -29,6 +29,7 @@ import {
   FileIcon,
   CommandIcon,
   FileTextIcon,
+  ReceiptIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -41,6 +42,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navMain = [
     { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
     { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
+    { title: tMain("payments"), href: "/payments", icon: <ReceiptIcon /> },
     { title: tMain("lifecycle"), icon: <ListIcon /> },
     { title: tMain("analytics"), icon: <ChartBarIcon /> },
     { title: tMain("projects"), icon: <FolderIcon /> },

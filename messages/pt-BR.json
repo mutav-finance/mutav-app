@@ -29,6 +29,7 @@
       "inbox": "Caixa de Entrada",
       "dashboard": "Painel",
       "contracts": "Contratos",
+      "payments": "Faturas",
       "lifecycle": "Ciclo de Vida",
       "analytics": "Análises",
       "projects": "Projetos",
@@ -301,8 +302,7 @@
       "label": "Carregando contrato"
     }
   },
-  "contractList": {
-    "meta": {
+  "contractList": {    "meta": {
       "title": "Contratos | SGR",
       "description": "Lista de contratos da imobiliária"
     },
@@ -342,6 +342,114 @@
       "previousPage": "Página anterior",
       "nextPage": "Próxima página",
       "lastPage": "Última página"
+    }
+  },
+  "paymentList": {
+    "meta": {
+      "title": "Faturas | SGR",
+      "description": "Faturas mensais da imobiliária"
+    },
+    "heading": "Faturas",
+    "subheading": "Acompanhe as faturas mensais da sua imobiliária",
+    "tabs": {
+      "all": "Todas",
+      "pending": "Pendentes",
+      "overdue": "Vencidas",
+      "paid": "Pagas",
+      "canceled": "Canceladas"
+    },
+    "columns": {
+      "publicId": "ID",
+      "period": "Competência",
+      "dueDate": "Vencimento",
+      "total": "Total",
+      "state": "Status",
+      "contracts": "Contratos"
+    },
+    "search": {
+      "placeholder": "Buscar por ID ou competência"
+    },
+    "columnsButton": "Colunas",
+    "noResults": "Nenhuma fatura encontrada",
+    "pagination": {
+      "rowsPerPage": "Linhas por página",
+      "pageOf": "Página {current} de {total}",
+      "firstPage": "Primeira página",
+      "previousPage": "Página anterior",
+      "nextPage": "Próxima página",
+      "lastPage": "Última página"
+    }
+  },
+  "paymentDetails": {
+    "meta": {
+      "title": "Fatura {id} | SGR",
+      "description": "Detalhes da fatura"
+    },
+    "breadcrumb": "Detalhes da Fatura",
+    "heroTitle": "Fatura {state}",
+    "state": {
+      "pending": "Pendente",
+      "overdue": "Vencida",
+      "paid": "Paga",
+      "canceled": "Cancelada"
+    },
+    "method": {
+      "none": "Não definida",
+      "boleto": "Boleto",
+      "pix": "PIX",
+      "stellar": "Stellar"
+    },
+    "summary": {
+      "heading": "Resumo",
+      "idLabel": "ID da fatura",
+      "period": "Competência",
+      "issuedAt": "Emitida em",
+      "dueDate": "Vencimento",
+      "total": "Total",
+      "state": "Status",
+      "method": "Forma de pagamento",
+      "actionsMenu": "Ações da fatura"
+    },
+    "lineItems": {
+      "heading": "Detalhamento",
+      "columns": {
+        "contract": "Contrato",
+        "kind": "Tipo",
+        "amount": "Valor",
+        "description": "Descrição"
+      },
+      "kind": {
+        "recurring": "Mensalidade",
+        "activation": "Ativação"
+      },
+      "total": "Total",
+      "empty": "Sem itens."
+    },
+    "methodCard": {
+      "heading": "Forma de Pagamento",
+      "none": "Forma de pagamento não definida",
+      "noneHint": "O método de pagamento será definido pelo departamento financeiro.",
+      "barcode": "Código de barras",
+      "barcodeEmpty": "Aguardando geração do boleto",
+      "pixKey": "Chave PIX",
+      "txId": "ID da transação",
+      "txIdEmpty": "Aguardando pagamento",
+      "address": "Endereço de destino",
+      "txHash": "Hash da transação",
+      "txHashEmpty": "Aguardando confirmação on-chain"
+    },
+    "notFound": {
+      "title": "Fatura não encontrada",
+      "body": "Não localizamos uma fatura com este identificador."
+    },
+    "errors": {
+      "title": "Não foi possível carregar esta fatura",
+      "body": "Algo deu errado ao buscar os dados. Tente novamente ou volte ao painel.",
+      "retry": "Tentar novamente",
+      "backToDashboard": "Voltar ao painel"
+    },
+    "loading": {
+      "label": "Carregando fatura"
     }
   }
 }

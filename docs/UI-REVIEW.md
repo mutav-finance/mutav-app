@@ -201,4 +201,4 @@ Cross-referenced against:
 - `brand/branding/tga/patterns/STYLE.md`
 - `brand/branding/tga/identity/typography.md`
 - `brand/branding/tga/identity/color-system.md`
-- `sgr-app/src/app/globals.css`
+- `mutav-app/src/app/globals.css`

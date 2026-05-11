@@ -29,6 +29,7 @@
       "inbox": "Inbox",
       "dashboard": "Dashboard",
       "contracts": "Contracts",
+      "payments": "Invoices",
       "lifecycle": "Lifecycle",
       "analytics": "Analytics",
       "projects": "Projects",
@@ -342,6 +343,114 @@
       "previousPage": "Previous page",
       "nextPage": "Next page",
       "lastPage": "Last page"
+    }
+  },
+  "paymentList": {
+    "meta": {
+      "title": "Invoices | SGR",
+      "description": "Monthly invoices for the agency"
+    },
+    "heading": "Invoices",
+    "subheading": "Track your agency's monthly invoices",
+    "tabs": {
+      "all": "All",
+      "pending": "Pending",
+      "overdue": "Overdue",
+      "paid": "Paid",
+      "canceled": "Canceled"
+    },
+    "columns": {
+      "publicId": "ID",
+      "period": "Period",
+      "dueDate": "Due Date",
+      "total": "Total",
+      "state": "Status",
+      "contracts": "Contracts"
+    },
+    "search": {
+      "placeholder": "Search by ID or period"
+    },
+    "columnsButton": "Columns",
+    "noResults": "No invoices found",
+    "pagination": {
+      "rowsPerPage": "Rows per page",
+      "pageOf": "Page {current} of {total}",
+      "firstPage": "First page",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "lastPage": "Last page"
+    }
+  },
+  "paymentDetails": {
+    "meta": {
+      "title": "Invoice {id} | SGR",
+      "description": "Invoice details"
+    },
+    "breadcrumb": "Invoice Details",
+    "heroTitle": "Invoice {state}",
+    "state": {
+      "pending": "Pending",
+      "overdue": "Overdue",
+      "paid": "Paid",
+      "canceled": "Canceled"
+    },
+    "method": {
+      "none": "Not set",
+      "boleto": "Boleto",
+      "pix": "PIX",
+      "stellar": "Stellar"
+    },
+    "summary": {
+      "heading": "Summary",
+      "idLabel": "Invoice ID",
+      "period": "Period",
+      "issuedAt": "Issued on",
+      "dueDate": "Due date",
+      "total": "Total",
+      "state": "Status",
+      "method": "Payment method",
+      "actionsMenu": "Invoice actions"
+    },
+    "lineItems": {
+      "heading": "Line Items",
+      "columns": {
+        "contract": "Contract",
+        "kind": "Type",
+        "amount": "Amount",
+        "description": "Description"
+      },
+      "kind": {
+        "recurring": "Monthly fee",
+        "activation": "Activation"
+      },
+      "total": "Total",
+      "empty": "No items."
+    },
+    "methodCard": {
+      "heading": "Payment Method",
+      "none": "Payment method not defined",
+      "noneHint": "The payment method will be set by the finance team.",
+      "barcode": "Barcode",
+      "barcodeEmpty": "Awaiting boleto generation",
+      "pixKey": "PIX Key",
+      "txId": "Transaction ID",
+      "txIdEmpty": "Awaiting payment",
+      "address": "Destination address",
+      "txHash": "Transaction hash",
+      "txHashEmpty": "Awaiting on-chain confirmation"
+    },
+    "notFound": {
+      "title": "Invoice not found",
+      "body": "We could not find an invoice with this identifier."
+    },
+    "errors": {
+      "title": "Could not load this invoice",
+      "body": "Something went wrong fetching the data. Try again or go back to the dashboard.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard"
+    },
+    "loading": {
+      "label": "Loading invoice"
     }
   }
 }
