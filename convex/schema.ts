@@ -24,14 +24,44 @@ const tenantApprovalStatus = v.union(
   v.literal("reprovado"),
 );
 
-const paymentStatus = v.union(
-  v.literal("pending"),
-  v.literal("paid"),
-  v.literal("overdue"),
-  v.literal("canceled"),
+const paymentLineItemKind = v.union(v.literal("recurring"), v.literal("activation"));
+
+/**
+ * Discriminated union representing the lifecycle state of a payment.
+ * Each variant carries only the fields that are meaningful for that state.
+ */
+const paymentState = v.union(
+  v.object({ kind: v.literal("pending") }),
+  v.object({ kind: v.literal("paid"), paidAt: v.string() }),
+  v.object({ kind: v.literal("overdue") }),
+  v.object({ kind: v.literal("canceled") }),
 );
 
-const paymentLineItemKind = v.union(v.literal("recurring"), v.literal("activation"));
+/**
+ * Discriminated union representing the chosen payment method.
+ * null = agency has not yet selected a method (invoice issued, awaiting choice).
+ *
+ * - boleto:   traditional Brazilian bank slip; barcode null until PSP registers it.
+ * - stellar:  on-chain payment via Stellar network (XLM / USDC); txHash null until confirmed.
+ * - pix:      Brazilian instant payment; txId null until confirmed.
+ */
+const paymentMethod = v.union(
+  v.null(),
+  v.object({
+    kind: v.literal("boleto"),
+    barcode: v.union(v.string(), v.null()),
+  }),
+  v.object({
+    kind: v.literal("stellar"),
+    destinationAddress: v.string(),
+    txHash: v.union(v.string(), v.null()),
+  }),
+  v.object({
+    kind: v.literal("pix"),
+    pixKey: v.string(),
+    txId: v.union(v.string(), v.null()),
+  }),
+);
 
 export default defineSchema({
   agencies: defineTable({
@@ -111,7 +141,8 @@ export default defineSchema({
     issuedAt: v.string(),
     dueDate: v.string(),
     totalCents: v.number(),
-    status: paymentStatus,
+    state: paymentState,
+    method: paymentMethod,
     lineItems: v.array(
       v.object({
         contractId: v.id("contracts"),
@@ -121,10 +152,8 @@ export default defineSchema({
         description: v.string(),
       }),
     ),
-    barcode: v.union(v.string(), v.null()),
-    paidAt: v.union(v.string(), v.null()),
   })
     .index("by_agency_period", ["agencyId", "periodMonth"])
-    .index("by_status", ["status"])
+    .index("by_state_kind", ["state.kind"])
     .index("by_publicId", ["publicId"]),
 });
