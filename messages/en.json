@@ -198,7 +198,8 @@
       "copyId": "Copy ID",
       "cancelProposalHint": "Available only for pending contracts",
       "openDelinquencyHint": "Register a new delinquency",
-      "trackDelinquenciesHint": "View delinquencies for this contract"
+      "trackDelinquenciesHint": "View delinquencies for this contract",
+      "actionsMenu": "Contract actions"
     },
     "status": {
       "ativo": "Active",

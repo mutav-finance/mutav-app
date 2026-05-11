@@ -198,7 +198,8 @@
       "copyId": "Copiar ID",
       "cancelProposalHint": "Disponível apenas para contratos pendentes",
       "openDelinquencyHint": "Registrar nova inadimplência",
-      "trackDelinquenciesHint": "Ver inadimplências deste contrato"
+      "trackDelinquenciesHint": "Ver inadimplências deste contrato",
+      "actionsMenu": "Ações do contrato"
     },
     "status": {
       "ativo": "Ativo",

@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Mono } from "@/components/ui/mono";
 import { formatDateTimeBR } from "@/lib/contracts/format";
 import type { ContractTenant } from "@/lib/contracts/types";
-import { FieldGroupHeader, FieldRow } from "./field-row";
+import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";
 import { StatusTag } from "./status-tag";
 
 const approvalTone: Record<ContractTenant["approvalStatus"], "accent" | "success" | "error"> = {
@@ -42,26 +42,26 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
           className="ml-auto"
         />
       </CardHeader>
-      <CardContent className="grid gap-0 px-0 pb-0 lg:grid-cols-[auto_1fr]">
-        <div className="border-border flex items-center justify-center border-b px-6 py-3 sm:py-4 lg:border-r lg:border-b-0 lg:py-6">
+      <CardContent className="flex flex-col gap-0 px-0 pb-0">
+        <div className="border-border flex items-center justify-center border-b px-6 py-3 sm:py-4">
           <div
-            className="bg-secondary flex size-12 shrink-0 items-center justify-center lg:size-20"
+            className="bg-secondary flex size-12 shrink-0 items-center justify-center"
             role="img"
             aria-label={t("initialsLabel")}
           >
-            <Mono className="text-foreground text-base font-medium lg:text-xl">
+            <Mono className="text-foreground text-base font-medium">
               {getInitials(tenant.fullName)}
             </Mono>
           </div>
         </div>
-        <dl className="flex flex-col">
+        <FieldGroup className="gap-0">
           <FieldGroupHeader>{t("personal")}</FieldGroupHeader>
           <FieldRow label={tFields("fullName")} value={tenant.fullName} />
           <FieldRow label={tFields("cpf")} value={tenant.cpf} mono />
           <FieldRow label={tFields("birthDate")} value={tenant.birthDate} mono />
           <FieldRow label={tFields("email")} value={tenant.email} />
           <FieldRow label={tFields("phone")} value={tenant.phone} mono />
-        </dl>
+        </FieldGroup>
       </CardContent>
       {isRejected && (
         <CardFooter className="border-border text-base-sm text-destructive border-t px-6 py-3">

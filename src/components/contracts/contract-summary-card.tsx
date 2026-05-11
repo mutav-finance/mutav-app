@@ -1,6 +1,13 @@
+import { MoreHorizontalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Mono } from "@/components/ui/mono";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -29,42 +36,63 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
         <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
           {t("heading")}
         </CardTitle>
-        <CardAction className="flex flex-wrap items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="sm" className={imobOutline}>
-                {t("openDelinquency")}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("openDelinquencyHint")}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="sm" className={imobOutline}>
-                {t("trackDelinquencies")}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("trackDelinquenciesHint")}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className={cn(!isPending && "cursor-not-allowed")}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!isPending}
-                  className={imobOutline}
-                  aria-describedby="cancel-proposal-hint"
-                >
-                  {t("cancelProposal")}
+        <CardAction className="flex items-center gap-2">
+          {/* Desktop: show all buttons inline */}
+          <div className="hidden items-center gap-2 sm:flex">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" className={imobOutline}>
+                  {t("openDelinquency")}
                 </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent id="cancel-proposal-hint">{t("cancelProposalHint")}</TooltipContent>
-          </Tooltip>
+              </TooltipTrigger>
+              <TooltipContent>{t("openDelinquencyHint")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" className={imobOutline}>
+                  {t("trackDelinquencies")}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("trackDelinquenciesHint")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={cn(!isPending && "cursor-not-allowed")}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!isPending}
+                    className={imobOutline}
+                    aria-describedby="cancel-proposal-hint"
+                  >
+                    {t("cancelProposal")}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent id="cancel-proposal-hint">{t("cancelProposalHint")}</TooltipContent>
+            </Tooltip>
+          </div>
+          {/* Mobile: collapse into dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className={cn(imobOutline, "sm:hidden")}
+                aria-label={t("actionsMenu")}
+              >
+                <MoreHorizontalIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>{t("openDelinquency")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("trackDelinquencies")}</DropdownMenuItem>
+              <DropdownMenuItem disabled={!isPending}>{t("cancelProposal")}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardAction>
       </CardHeader>
-      <CardContent className="grid gap-4 py-2">
+      <CardContent className="grid gap-4 py-4">
         <div className="flex flex-col gap-1">
           <span className="text-2xs text-muted-foreground font-mono font-medium tracking-[0.06em] uppercase">
             {t("idLabel")}
