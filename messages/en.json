@@ -10,7 +10,6 @@
   },
   "userMenu": {
     "account": "Account",
-    "billing": "Billing",
     "notifications": "Notifications",
     "theme": "Theme",
     "themeLight": "Light",
@@ -25,30 +24,26 @@
   "brand": { "name": "Acme Inc." },
   "nav": {
     "main": {
-      "quickCreate": "Quick Create",
+      "createContract": "Create Contract",
       "inbox": "Inbox",
       "dashboard": "Dashboard",
       "contracts": "Contracts",
       "payments": "Invoices",
+      "tenants": "Tenants",
+      "properties": "Properties",
       "lifecycle": "Lifecycle",
-      "analytics": "Analytics",
-      "projects": "Projects",
+      "reports": "Reports",
       "team": "Team"
     },
     "secondary": {
       "settings": "Settings",
-      "getHelp": "Get Help",
-      "search": "Search"
+      "getHelp": "Get Help"
     },
     "documents": {
       "groupLabel": "Documents",
-      "dataLibrary": "Data Library",
-      "reports": "Reports",
-      "wordAssistant": "Word Assistant",
-      "more": "More",
-      "open": "Open",
-      "share": "Share",
-      "delete": "Delete"
+      "contractTemplates": "Contract Templates",
+      "guaranteePolicies": "Guarantee Policies",
+      "reports": "Reports"
     }
   },
   "chart": {

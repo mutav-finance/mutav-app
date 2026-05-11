@@ -10,7 +10,6 @@
   },
   "userMenu": {
     "account": "Conta",
-    "billing": "Cobrança",
     "notifications": "Notificações",
     "theme": "Tema",
     "themeLight": "Claro",
@@ -25,30 +24,26 @@
   "brand": { "name": "Acme Inc." },
   "nav": {
     "main": {
-      "quickCreate": "Criar Rápido",
+      "createContract": "Criar Contrato",
       "inbox": "Caixa de Entrada",
       "dashboard": "Painel",
       "contracts": "Contratos",
       "payments": "Faturas",
+      "tenants": "Inquilinos",
+      "properties": "Imóveis",
       "lifecycle": "Ciclo de Vida",
-      "analytics": "Análises",
-      "projects": "Projetos",
+      "reports": "Relatórios",
       "team": "Equipe"
     },
     "secondary": {
       "settings": "Configurações",
-      "getHelp": "Obter Ajuda",
-      "search": "Buscar"
+      "getHelp": "Obter Ajuda"
     },
     "documents": {
       "groupLabel": "Documentos",
-      "dataLibrary": "Biblioteca de Dados",
-      "reports": "Relatórios",
-      "wordAssistant": "Assistente de Texto",
-      "more": "Mais",
-      "open": "Abrir",
-      "share": "Compartilhar",
-      "delete": "Excluir"
+      "contractTemplates": "Modelos de Contrato",
+      "guaranteePolicies": "Apólices de Garantia",
+      "reports": "Relatórios"
     }
   },
   "chart": {
