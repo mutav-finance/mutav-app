@@ -1,4 +1,4 @@
-# SGR App — Dashboard
+# MUTAV App — Dashboard
 
 Web dashboard for managing rental guarantees across chains.
 
@@ -6,7 +6,7 @@ Web dashboard for managing rental guarantees across chains.
 
 ## Docs
 
-Shared strategy, whitepaper, pitch deck, and brand assets live in [`tga-protocol/sgr`](https://github.com/tga-protocol/sgr).
+Shared strategy, whitepaper, pitch deck, and brand assets live in [`mutav-finance/mutav`](https://github.com/mutav-finance/mutav).
 
 ## Stack
 
@@ -28,8 +28,8 @@ Shared strategy, whitepaper, pitch deck, and brand assets live in [`tga-protocol
 Prerequisites: [Bun ≥ 1.3](https://bun.sh).
 
 ```bash
-git clone https://github.com/tga-protocol/sgr-app.git
-cd sgr-app
+git clone https://github.com/mutav-finance/mutav-app.git
+cd mutav-app
 bun install                   # also installs git hooks via husky
 cp .env.example .env.local    # fill in Convex + Privy creds
 bun dev
