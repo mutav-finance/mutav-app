@@ -371,6 +371,7 @@
     },
     "columnsButton": "Colunas",
     "noResults": "Nenhuma fatura encontrada",
+    "loading": "Carregando faturas…",
     "pagination": {
       "rowsPerPage": "Linhas por página",
       "pageOf": "Página {current} de {total}",

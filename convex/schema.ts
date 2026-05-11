@@ -63,12 +63,33 @@ const paymentMethod = v.union(
   }),
 );
 
+const memberRole = v.union(v.literal("owner"), v.literal("admin"), v.literal("member"));
+
 export default defineSchema({
   agencies: defineTable({
     name: v.string(),
     cnpj: v.string(),
     createdAt: v.string(),
   }).index("by_cnpj", ["cnpj"]),
+
+  users: defineTable({
+    publicId: v.string(),
+    name: v.string(),
+    email: v.string(),
+    createdAt: v.string(),
+  })
+    .index("by_publicId", ["publicId"])
+    .index("by_email", ["email"]),
+
+  memberships: defineTable({
+    userId: v.id("users"),
+    agencyId: v.id("agencies"),
+    role: memberRole,
+    joinedAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_agency", ["agencyId"])
+    .index("by_user_agency", ["userId", "agencyId"]),
 
   contracts: defineTable({
     agencyId: v.id("agencies"),

@@ -23,7 +23,14 @@ export const fictionalContracts = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Wipe in dependency order.
-    for (const table of ["payments", "contractHistory", "contracts", "agencies"] as const) {
+    for (const table of [
+      "payments",
+      "contractHistory",
+      "contracts",
+      "memberships",
+      "users",
+      "agencies",
+    ] as const) {
       let rows = await ctx.db.query(table).take(200);
       while (rows.length > 0) {
         for (const row of rows) await ctx.db.delete(row._id);
@@ -51,8 +58,81 @@ export const fictionalContracts = internalMutation({
       createdAt: d("2025-01-10T00:00:00-03:00"),
     });
 
-    // ── Contracts — Imobiliária Paulista (15) ─────────────────────────────────
-    // 12 ativo, 2 pendente, 1 encerrado
+    // ── Users ──────────────────────────────────────────────────────────────────
+
+    // dev-user is a super-user member of all three agencies (useful for
+    // the workspace-switcher dev shortcut).
+    const devUserId = await ctx.db.insert("users", {
+      publicId: "dev-user",
+      name: "Dev User",
+      email: "dev@sgr.example.com",
+      createdAt: d("2024-01-01T00:00:00-03:00"),
+    });
+
+    const paulistaOwnerId = await ctx.db.insert("users", {
+      publicId: "admin-paulista",
+      name: "Admin Paulista",
+      email: "admin@paulista.example.com",
+      createdAt: d("2024-03-01T00:00:00-03:00"),
+    });
+
+    const atlanticaOwnerId = await ctx.db.insert("users", {
+      publicId: "admin-atlantica",
+      name: "Admin Atlântica",
+      email: "admin@atlantica.example.com",
+      createdAt: d("2024-06-15T00:00:00-03:00"),
+    });
+
+    const horizonteOwnerId = await ctx.db.insert("users", {
+      publicId: "admin-horizonte",
+      name: "Admin Horizonte",
+      email: "admin@horizonte.example.com",
+      createdAt: d("2025-01-10T00:00:00-03:00"),
+    });
+
+    // ── Memberships ───────────────────────────────────────────────────────────
+
+    // dev-user: owner of Paulista, admin of Atlântica, member of Horizonte
+    await ctx.db.insert("memberships", {
+      userId: devUserId,
+      agencyId: paulistaId,
+      role: "owner",
+      joinedAt: d("2024-03-01T00:00:00-03:00"),
+    });
+    await ctx.db.insert("memberships", {
+      userId: devUserId,
+      agencyId: atlanticaId,
+      role: "admin",
+      joinedAt: d("2024-06-15T00:00:00-03:00"),
+    });
+    await ctx.db.insert("memberships", {
+      userId: devUserId,
+      agencyId: horizonteId,
+      role: "member",
+      joinedAt: d("2025-01-10T00:00:00-03:00"),
+    });
+
+    // Each agency owner is owner of their own agency only
+    await ctx.db.insert("memberships", {
+      userId: paulistaOwnerId,
+      agencyId: paulistaId,
+      role: "owner",
+      joinedAt: d("2024-03-01T00:00:00-03:00"),
+    });
+    await ctx.db.insert("memberships", {
+      userId: atlanticaOwnerId,
+      agencyId: atlanticaId,
+      role: "owner",
+      joinedAt: d("2024-06-15T00:00:00-03:00"),
+    });
+    await ctx.db.insert("memberships", {
+      userId: horizonteOwnerId,
+      agencyId: horizonteId,
+      role: "owner",
+      joinedAt: d("2025-01-10T00:00:00-03:00"),
+    });
+
+    // ── Contracts — Imobiliária Paulista (15) ─────────────────────────────────    // 12 ativo, 2 pendente, 1 encerrado
 
     const p1 = await ctx.db.insert("contracts", {
       agencyId: paulistaId,
@@ -1448,21 +1528,268 @@ export const fictionalContracts = internalMutation({
       message: "Contrato 1000028 aprovado e ativado.",
     });
 
-    // ── Historical payments (last 2 months, Apr + Mar 2026) ───────────────────
-    // Paulista: 12 ativo in Apr → paid; Atlântica: 8 ativo → paid; Horizonte: 2 ativo → overdue
+    // ── Historical payments (6 months: Nov 2025 – Apr 2026) ──────────────────
+    // Paulista & Atlântica: all paid. Horizonte: paid Nov–Jan, overdue Feb–Apr.
 
-    const paulistaActiveApr = [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12];
-    const paulistaAprLineItems = paulistaActiveApr.map((cid, i) => ({
-      contractId: cid,
-      contractPublicId: pid(i + 1),
-      kind: "recurring" as const,
-      amountCents: [
-        512_000, 640_000, 880_000, 384_000, 1_120_000, 448_000, 288_000, 576_000, 240_000, 768_000,
-        320_000, 416_000,
-      ][i]!,
-      description: `Mensalidade contrato ${pid(i + 1)}`,
-    }));
+    // Helper to build line items for Paulista (12 ativo contracts)
+    const paulistaLineItems = (month: string) =>
+      [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12].map((cid, i) => ({
+        contractId: cid,
+        contractPublicId: pid(i + 1),
+        kind: "recurring" as const,
+        amountCents: [
+          512_000, 640_000, 880_000, 384_000, 1_120_000, 448_000, 288_000, 576_000, 240_000,
+          768_000, 320_000, 416_000,
+        ][i]!,
+        description: `Mensalidade contrato ${pid(i + 1)} — ${month}`,
+      }));
 
+    // Helper to build line items for Atlântica (8 ativo contracts)
+    const atlanticaLineItems = (month: string) =>
+      [a1, a2, a3, a4, a5, a6, a7, a8].map((cid, i) => ({
+        contractId: cid,
+        contractPublicId: pid(i + 16),
+        kind: "recurring" as const,
+        amountCents: [928_000, 1_200_000, 704_000, 352_000, 1_056_000, 480_000, 368_000, 1_360_000][
+          i
+        ]!,
+        description: `Mensalidade contrato ${pid(i + 16)} — ${month}`,
+      }));
+
+    // Helper to build line items for Horizonte (2 ativo contracts)
+    const horizonteLineItems = (month: string) =>
+      [h1, h2].map((cid, i) => ({
+        contractId: cid,
+        contractPublicId: pid(i + 28),
+        kind: "recurring" as const,
+        amountCents: [544_000, 800_000][i]!,
+        description: `Mensalidade contrato ${pid(i + 28)} — ${month}`,
+      }));
+
+    // ── Nov 2025 ──────────────────────────────────────────────────────────────
+
+    const p2025Nov = paulistaLineItems("2025-11");
+    await ctx.db.insert("payments", {
+      agencyId: paulistaId,
+      publicId: "PAY-2025-11-0100",
+      periodMonth: "2025-11",
+      issuedAt: "2025-11-01",
+      dueDate: "2025-11-10",
+      totalCents: p2025Nov.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2025-11-07T10:00:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: p2025Nov,
+    });
+
+    const a2025Nov = atlanticaLineItems("2025-11");
+    await ctx.db.insert("payments", {
+      agencyId: atlanticaId,
+      publicId: "PAY-2025-11-0200",
+      periodMonth: "2025-11",
+      issuedAt: "2025-11-01",
+      dueDate: "2025-11-10",
+      totalCents: a2025Nov.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2025-11-08T11:00:00-03:00")),
+      method: PaymentMethods.pix(
+        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
+        "E00038166202511081100abc001",
+      ),
+      lineItems: a2025Nov,
+    });
+
+    const h2025Nov = horizonteLineItems("2025-11");
+    await ctx.db.insert("payments", {
+      agencyId: horizonteId,
+      publicId: "PAY-2025-11-0300",
+      periodMonth: "2025-11",
+      issuedAt: "2025-11-01",
+      dueDate: "2025-11-10",
+      totalCents: h2025Nov.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2025-11-09T09:30:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: h2025Nov,
+    });
+
+    // ── Dec 2025 ──────────────────────────────────────────────────────────────
+
+    const p2025Dec = paulistaLineItems("2025-12");
+    await ctx.db.insert("payments", {
+      agencyId: paulistaId,
+      publicId: "PAY-2025-12-0100",
+      periodMonth: "2025-12",
+      issuedAt: "2025-12-01",
+      dueDate: "2025-12-10",
+      totalCents: p2025Dec.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2025-12-05T14:00:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: p2025Dec,
+    });
+
+    const a2025Dec = atlanticaLineItems("2025-12");
+    await ctx.db.insert("payments", {
+      agencyId: atlanticaId,
+      publicId: "PAY-2025-12-0200",
+      periodMonth: "2025-12",
+      issuedAt: "2025-12-01",
+      dueDate: "2025-12-10",
+      totalCents: a2025Dec.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2025-12-08T10:00:00-03:00")),
+      method: PaymentMethods.pix(
+        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
+        "E00038166202512081000abc002",
+      ),
+      lineItems: a2025Dec,
+    });
+
+    const h2025Dec = horizonteLineItems("2025-12");
+    await ctx.db.insert("payments", {
+      agencyId: horizonteId,
+      publicId: "PAY-2025-12-0300",
+      periodMonth: "2025-12",
+      issuedAt: "2025-12-01",
+      dueDate: "2025-12-10",
+      totalCents: h2025Dec.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2025-12-09T09:00:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: h2025Dec,
+    });
+
+    // ── Jan 2026 ──────────────────────────────────────────────────────────────
+
+    const p2026Jan = paulistaLineItems("2026-01");
+    await ctx.db.insert("payments", {
+      agencyId: paulistaId,
+      publicId: "PAY-2026-01-0100",
+      periodMonth: "2026-01",
+      issuedAt: "2026-01-02",
+      dueDate: "2026-01-12",
+      totalCents: p2026Jan.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2026-01-10T11:00:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: p2026Jan,
+    });
+
+    const a2026Jan = atlanticaLineItems("2026-01");
+    await ctx.db.insert("payments", {
+      agencyId: atlanticaId,
+      publicId: "PAY-2026-01-0200",
+      periodMonth: "2026-01",
+      issuedAt: "2026-01-02",
+      dueDate: "2026-01-12",
+      totalCents: a2026Jan.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2026-01-09T15:00:00-03:00")),
+      method: PaymentMethods.pix(
+        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
+        "E00038166202601091500abc003",
+      ),
+      lineItems: a2026Jan,
+    });
+
+    const h2026Jan = horizonteLineItems("2026-01");
+    await ctx.db.insert("payments", {
+      agencyId: horizonteId,
+      publicId: "PAY-2026-01-0300",
+      periodMonth: "2026-01",
+      issuedAt: "2026-01-02",
+      dueDate: "2026-01-12",
+      totalCents: h2026Jan.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2026-01-11T10:00:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: h2026Jan,
+    });
+
+    // ── Feb 2026 ──────────────────────────────────────────────────────────────
+
+    const p2026Feb = paulistaLineItems("2026-02");
+    await ctx.db.insert("payments", {
+      agencyId: paulistaId,
+      publicId: "PAY-2026-02-0100",
+      periodMonth: "2026-02",
+      issuedAt: "2026-02-02",
+      dueDate: "2026-02-10",
+      totalCents: p2026Feb.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2026-02-07T09:00:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: p2026Feb,
+    });
+
+    const a2026Feb = atlanticaLineItems("2026-02");
+    await ctx.db.insert("payments", {
+      agencyId: atlanticaId,
+      publicId: "PAY-2026-02-0200",
+      periodMonth: "2026-02",
+      issuedAt: "2026-02-02",
+      dueDate: "2026-02-10",
+      totalCents: a2026Feb.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2026-02-09T14:00:00-03:00")),
+      method: PaymentMethods.pix(
+        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
+        "E00038166202602091400abc004",
+      ),
+      lineItems: a2026Feb,
+    });
+
+    const h2026Feb = horizonteLineItems("2026-02");
+    await ctx.db.insert("payments", {
+      agencyId: horizonteId,
+      publicId: "PAY-2026-02-0300",
+      periodMonth: "2026-02",
+      issuedAt: "2026-02-02",
+      dueDate: "2026-02-10",
+      totalCents: h2026Feb.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.overdue(),
+      method: null,
+      lineItems: h2026Feb,
+    });
+
+    // ── Mar 2026 ──────────────────────────────────────────────────────────────
+
+    const p2026Mar = paulistaLineItems("2026-03");
+    await ctx.db.insert("payments", {
+      agencyId: paulistaId,
+      publicId: "PAY-2026-03-0100",
+      periodMonth: "2026-03",
+      issuedAt: "2026-03-02",
+      dueDate: "2026-03-10",
+      totalCents: p2026Mar.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2026-03-08T10:30:00-03:00")),
+      method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      lineItems: p2026Mar,
+    });
+
+    const a2026Mar = atlanticaLineItems("2026-03");
+    await ctx.db.insert("payments", {
+      agencyId: atlanticaId,
+      publicId: "PAY-2026-03-0200",
+      periodMonth: "2026-03",
+      issuedAt: "2026-03-02",
+      dueDate: "2026-03-10",
+      totalCents: a2026Mar.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.paid(d("2026-03-09T11:00:00-03:00")),
+      method: PaymentMethods.pix(
+        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
+        "E00038166202603091100abc005",
+      ),
+      lineItems: a2026Mar,
+    });
+
+    const h2026Mar = horizonteLineItems("2026-03");
+    await ctx.db.insert("payments", {
+      agencyId: horizonteId,
+      publicId: "PAY-2026-03-0300",
+      periodMonth: "2026-03",
+      issuedAt: "2026-03-02",
+      dueDate: "2026-03-10",
+      totalCents: h2026Mar.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.overdue(),
+      method: null,
+      lineItems: h2026Mar,
+    });
+
+    // ── Apr 2026 ──────────────────────────────────────────────────────────────
+    // ── Apr 2026 ──────────────────────────────────────────────────────────────
+
+    const paulistaAprLineItems = paulistaLineItems("2026-04");
     await ctx.db.insert("payments", {
       agencyId: paulistaId,
       publicId: "PAY-2026-04-0100",
@@ -1475,17 +1802,7 @@ export const fictionalContracts = internalMutation({
       lineItems: paulistaAprLineItems,
     });
 
-    const atlanticaActiveApr = [a1, a2, a3, a4, a5, a6, a7, a8];
-    const atlanticaAprLineItems = atlanticaActiveApr.map((cid, i) => ({
-      contractId: cid,
-      contractPublicId: pid(i + 16),
-      kind: "recurring" as const,
-      amountCents: [928_000, 1_200_000, 704_000, 352_000, 1_056_000, 480_000, 368_000, 1_360_000][
-        i
-      ]!,
-      description: `Mensalidade contrato ${pid(i + 16)}`,
-    }));
-
+    const atlanticaAprLineItems = atlanticaLineItems("2026-04");
     await ctx.db.insert("payments", {
       agencyId: atlanticaId,
       publicId: "PAY-2026-04-0200",
@@ -1501,14 +1818,7 @@ export const fictionalContracts = internalMutation({
       lineItems: atlanticaAprLineItems,
     });
 
-    const horizonteAprLineItems = [h1, h2].map((cid, i) => ({
-      contractId: cid,
-      contractPublicId: pid(i + 28),
-      kind: "recurring" as const,
-      amountCents: [544_000, 800_000][i]!,
-      description: `Mensalidade contrato ${pid(i + 28)}`,
-    }));
-
+    const horizonteAprLineItems = horizonteLineItems("2026-04");
     await ctx.db.insert("payments", {
       agencyId: horizonteId,
       publicId: "PAY-2026-04-0300",
@@ -1532,7 +1842,14 @@ export const fictionalContracts = internalMutation({
 export const clearAll = internalMutation({
   args: {},
   handler: async (ctx) => {
-    for (const table of ["payments", "contractHistory", "contracts", "agencies"] as const) {
+    for (const table of [
+      "payments",
+      "contractHistory",
+      "contracts",
+      "memberships",
+      "users",
+      "agencies",
+    ] as const) {
       let rows = await ctx.db.query(table).take(200);
       while (rows.length > 0) {
         for (const row of rows) await ctx.db.delete(row._id);

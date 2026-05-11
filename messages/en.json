@@ -372,6 +372,7 @@
     },
     "columnsButton": "Columns",
     "noResults": "No invoices found",
+    "loading": "Loading invoices…",
     "pagination": {
       "rowsPerPage": "Rows per page",
       "pageOf": "Page {current} of {total}",

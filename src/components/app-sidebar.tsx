@@ -6,15 +6,8 @@ import { NavDocuments } from "@/components/nav-documents";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { AgencySwitcher } from "@/components/agency-switcher";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import {
   LayoutDashboardIcon,
   ListIcon,
@@ -27,14 +20,12 @@ import {
   DatabaseIcon,
   FileChartColumnIcon,
   FileIcon,
-  CommandIcon,
   FileTextIcon,
   ReceiptIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const tBrand = useTranslations("brand");
   const tMain = useTranslations("nav.main");
   const tSecondary = useTranslations("nav.secondary");
   const tDocs = useTranslations("nav.documents");
@@ -67,16 +58,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:p-1.5!">
-              <a href="#">
-                <CommandIcon className="size-5!" />
-                <span className="text-base font-semibold">{tBrand("name")}</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <AgencySwitcher />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />

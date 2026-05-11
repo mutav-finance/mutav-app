@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { type Preloaded, usePreloadedQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import {
   flexRender,
   getCoreRowModel,
@@ -26,7 +26,9 @@ import {
   Columns3Icon,
 } from "lucide-react";
 
-import { type api } from "@convex/_generated/api";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useWorkspace } from "@/providers/workspace";
 import { Link } from "@/i18n/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -136,16 +138,20 @@ function buildColumns(
   ];
 }
 
-export function ContractListTable({
-  preloaded,
-}: {
-  preloaded: Preloaded<typeof api.contracts.useCases.list>;
-}) {
+export function ContractListTable() {
   const t = useTranslations("contractList");
   const tStatus = useTranslations("contractDetails.status");
 
-  const result = usePreloadedQuery(preloaded);
-  const data = result.page as ContractListItem[];
+  const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
+  const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
+
+  const result = useQuery(
+    api.contracts.useCases.listByAgency,
+    agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
+  );
+
+  const data = React.useMemo(() => (result?.page ?? []) as ContractListItem[], [result]);
+  const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
 
   const columns = React.useMemo(() => buildColumns(t, tStatus), [t, tStatus]);
 
@@ -210,6 +216,12 @@ export function ContractListTable({
     for (const row of data) c[row.status]++;
     return c;
   }, [data]);
+
+  if (isLoading) {
+    return (
+      <div className="text-muted-foreground px-4 py-8 text-center text-sm">{t("loading")}</div>
+    );
+  }
 
   return (
     <Tabs

@@ -18,6 +18,8 @@ import type * as payments_domain from "../payments/domain.js";
 import type * as payments_mutations from "../payments/mutations.js";
 import type * as payments_useCases from "../payments/useCases.js";
 import type * as seed from "../seed.js";
+import type * as users_domain from "../users/domain.js";
+import type * as users_useCases from "../users/useCases.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +38,8 @@ declare const fullApi: ApiFromModules<{
   "payments/mutations": typeof payments_mutations;
   "payments/useCases": typeof payments_useCases;
   seed: typeof seed;
+  "users/domain": typeof users_domain;
+  "users/useCases": typeof users_useCases;
 }>;
 
 /**
