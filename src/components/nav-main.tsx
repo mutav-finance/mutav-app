@@ -16,6 +16,7 @@ type NavMainItem = {
   title: string;
   href?: string;
   icon?: React.ReactNode;
+  disabled?: boolean;
 };
 
 export function NavMain({ items }: { items: NavMainItem[] }) {
@@ -27,16 +28,17 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
         <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
-              tooltip={t("quickCreate")}
+              tooltip={t("createContract")}
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
             >
               <CirclePlusIcon />
-              <span>{t("quickCreate")}</span>
+              <span>{t("createContract")}</span>
             </SidebarMenuButton>
             <Button
               size="icon"
               className="size-8 group-data-[collapsible=icon]:opacity-0"
               variant="outline"
+              disabled
             >
               <MailIcon />
               <span className="sr-only">{t("inbox")}</span>
@@ -46,13 +48,14 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
         <SidebarMenu>
           {items.map((item) => {
             const isActive =
+              !item.disabled &&
               item.href != null &&
               (item.href === "/"
                 ? pathname === "/"
                 : pathname === item.href || pathname.startsWith(`${item.href}/`));
             return (
               <SidebarMenuItem key={item.title}>
-                {item.href ? (
+                {item.href && !item.disabled ? (
                   <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
                     <Link href={item.href}>
                       {item.icon}
@@ -60,7 +63,11 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
                     </Link>
                   </SidebarMenuButton>
                 ) : (
-                  <SidebarMenuButton tooltip={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    disabled={item.disabled}
+                    className={item.disabled ? "cursor-not-allowed opacity-40" : undefined}
+                  >
                     {item.icon}
                     <span>{item.title}</span>
                   </SidebarMenuButton>

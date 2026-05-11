@@ -24,7 +24,14 @@ export type WorkspaceAgency = {
   role: "owner" | "admin" | "member";
 };
 
+export type WorkspaceUser = {
+  name: string;
+  email: string;
+};
+
 type WorkspaceContextValue = {
+  /** The currently authenticated user. */
+  currentUser: WorkspaceUser | null;
   /** All agencies the current user belongs to. */
   agencies: WorkspaceAgency[];
   /** Currently selected agency, or null while loading. */
@@ -79,9 +86,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const selectedAgency = agencies.find((a) => a._id === selectedAgencyId) ?? null;
   const isLoading = devUser === undefined || agenciesRaw === undefined;
+  const currentUser: WorkspaceUser | null = devUser
+    ? { name: devUser.name, email: devUser.email }
+    : null;
 
   return (
-    <WorkspaceContext.Provider value={{ agencies, selectedAgency, setSelectedAgency, isLoading }}>
+    <WorkspaceContext.Provider
+      value={{ currentUser, agencies, selectedAgency, setSelectedAgency, isLoading }}
+    >
       {children}
     </WorkspaceContext.Provider>
   );

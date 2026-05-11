@@ -29,21 +29,24 @@
       "dashboard": "Painel",
       "contracts": "Contratos",
       "payments": "Faturas",
-      "tenants": "Inquilinos",
-      "properties": "Imóveis",
       "lifecycle": "Ciclo de Vida",
-      "reports": "Relatórios",
-      "team": "Equipe"
+      "reports": "Relatórios"
     },
     "secondary": {
       "settings": "Configurações",
       "getHelp": "Obter Ajuda"
     },
     "documents": {
-      "groupLabel": "Documentos",
+      "groupLabel": "Cadastro",
+      "tenants": "Inquilinos",
+      "properties": "Imóveis",
       "contractTemplates": "Modelos de Contrato",
-      "guaranteePolicies": "Apólices de Garantia",
-      "reports": "Relatórios"
+      "guaranteePolicies": "Apólices de Garantia"
+    },
+    "agency": {
+      "groupLabel": "Agência",
+      "members": "Membros",
+      "agencySettings": "Configurações da Agência"
     }
   },
   "chart": {

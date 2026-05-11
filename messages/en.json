@@ -29,21 +29,24 @@
       "dashboard": "Dashboard",
       "contracts": "Contracts",
       "payments": "Invoices",
-      "tenants": "Tenants",
-      "properties": "Properties",
       "lifecycle": "Lifecycle",
-      "reports": "Reports",
-      "team": "Team"
+      "reports": "Reports"
     },
     "secondary": {
       "settings": "Settings",
       "getHelp": "Get Help"
     },
     "documents": {
-      "groupLabel": "Documents",
+      "groupLabel": "Cadastro",
+      "tenants": "Tenants",
+      "properties": "Properties",
       "contractTemplates": "Contract Templates",
-      "guaranteePolicies": "Guarantee Policies",
-      "reports": "Reports"
+      "guaranteePolicies": "Guarantee Policies"
+    },
+    "agency": {
+      "groupLabel": "Agency",
+      "members": "Members",
+      "agencySettings": "Agency Settings"
     }
   },
   "chart": {
