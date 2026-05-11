@@ -12,8 +12,10 @@ import type * as agencies_domain from "../agencies/domain.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
 import type * as contracts_domain from "../contracts/domain.js";
 import type * as contracts_useCases from "../contracts/useCases.js";
+import type * as crons from "../crons.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as payments_domain from "../payments/domain.js";
+import type * as payments_mutations from "../payments/mutations.js";
 import type * as payments_useCases from "../payments/useCases.js";
 import type * as seed from "../seed.js";
 
@@ -28,8 +30,10 @@ declare const fullApi: ApiFromModules<{
   "agencies/useCases": typeof agencies_useCases;
   "contracts/domain": typeof contracts_domain;
   "contracts/useCases": typeof contracts_useCases;
+  crons: typeof crons;
   "lib/auth": typeof lib_auth;
   "payments/domain": typeof payments_domain;
+  "payments/mutations": typeof payments_mutations;
   "payments/useCases": typeof payments_useCases;
   seed: typeof seed;
 }>;

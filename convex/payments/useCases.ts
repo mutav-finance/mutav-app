@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query } from "../_generated/server";
+import { paymentStateKindValidator } from "./domain";
 
 export const listByAgency = query({
   args: {
@@ -11,6 +12,20 @@ export const listByAgency = query({
     return ctx.db
       .query("payments")
       .withIndex("by_agency_period", (q) => q.eq("agencyId", args.agencyId))
+      .order("desc")
+      .paginate(args.paginationOpts);
+  },
+});
+
+export const listByStateKind = query({
+  args: {
+    stateKind: paymentStateKindValidator,
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("payments")
+      .withIndex("by_state_kind", (q) => q.eq("state.kind", args.stateKind))
       .order("desc")
       .paginate(args.paginationOpts);
   },
