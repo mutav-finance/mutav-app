@@ -1,3 +1,4 @@
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Mono } from "@/components/ui/mono";
 import { cn } from "@/lib/utils";
 
@@ -14,19 +15,25 @@ export function FieldRow({
 }) {
   const empty = value === "" || value == null;
   return (
-    <div
+    <Item
       className={cn(
-        "border-border grid grid-cols-1 gap-1 border-b px-6 py-3 last:border-b-0 sm:grid-cols-[minmax(180px,1fr)_2fr] sm:items-center sm:gap-4",
+        "border-border rounded-none border-x-0 border-t-0 px-6 py-3 last:border-b-0",
         className,
       )}
     >
-      <dt className="text-muted-foreground sm:text-base-sm font-sans text-xs font-medium tracking-[0.01em]">
-        {label}
-      </dt>
-      <dd className={cn("text-base-sm text-foreground", empty && "text-muted-foreground/60")}>
-        {empty ? "—" : mono ? <Mono>{value}</Mono> : value}
-      </dd>
-    </div>
+      <ItemContent>
+        <ItemTitle className="text-muted-foreground font-sans text-xs font-medium tracking-[0.01em]">
+          {label}
+        </ItemTitle>
+      </ItemContent>
+      <ItemContent>
+        <span
+          className={cn("text-base-sm", empty ? "text-muted-foreground/60" : "text-foreground")}
+        >
+          {empty ? "—" : mono ? <Mono>{value}</Mono> : value}
+        </span>
+      </ItemContent>
+    </Item>
   );
 }
 
@@ -37,3 +44,5 @@ export function FieldGroupHeader({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+export { ItemGroup as FieldGroup };

@@ -27,12 +27,12 @@ export function ContractDocumentsCard({ documents }: { documents: ContractDocume
           {t("heading")}
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-3">
+      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {docKeys.map((key) => {
           const doc = byKey.get(key);
           const status = doc?.status ?? "pendente";
           return (
-            <div key={key} className="border-border flex flex-col gap-3 border p-4">
+            <div key={key} className="border-border flex flex-col gap-3 rounded border p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2">
                   <FileTextIcon

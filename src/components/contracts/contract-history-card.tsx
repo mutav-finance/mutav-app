@@ -4,7 +4,7 @@ import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Mono } from "@/components/ui/mono";
 import { formatDateTimeBR } from "@/lib/contracts/format";
@@ -21,16 +21,17 @@ export function ContractHistoryCard({ history }: { history: ContractHistoryEntry
           <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
             {t("heading")}
           </CardTitle>
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={open ? t("collapse") : t("expand")}
-              className="col-start-2 row-span-2 row-start-1 self-start justify-self-end"
-            >
-              {open ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            </Button>
-          </CollapsibleTrigger>
+          <CardAction>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={open ? t("collapse") : t("expand")}
+              >
+                {open ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              </Button>
+            </CollapsibleTrigger>
+          </CardAction>
         </CardHeader>
         <CollapsibleContent>
           <CardContent>

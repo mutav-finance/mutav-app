@@ -66,12 +66,12 @@ export function ContractDetailsPage({
         title={t("heroTitle", { status: tStatus(contract.status) })}
       />
       <PageContent variant="narrow">
-        <ContractPromoBanner />
         <ContractSummaryCard contract={contract} />
+        <ContractTenantCard tenant={contract.tenant} />
         <ContractRentalDataCard contract={contract} />
         <ContractDocumentsCard documents={contract.documents} />
         <ContractHistoryCard history={contract.history} />
-        <ContractTenantCard tenant={contract.tenant} />
+        <ContractPromoBanner />
       </PageContent>
     </PageShell>
   );
