@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { getUrgencyTier, urgencySortKey, type UrgencyTier } from "@/lib/contracts/urgency";
 import { StatusTag } from "@/components/contracts/status-tag";
 import type { ContractStatus } from "@/lib/contracts/types";
 
@@ -68,6 +69,8 @@ type ContractListItem = {
   availableGuaranteeCents: number;
   tenantName: string;
   creationTime: number;
+  urgency: UrgencyTier;
+  urgencySortKey: number;
 };
 
 type StatusTab = "all" | ContractStatus;
@@ -79,6 +82,15 @@ const statusTone: Record<ContractStatus, "accent" | "success" | "error" | "neutr
   pendente: "accent",
   encerrado: "neutral",
   cancelado: "error",
+};
+
+const urgencyStyle: Record<UrgencyTier, string> = {
+  overdue: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  critical: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
+  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+  pendente: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  ok: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  inactive: "bg-muted text-muted-foreground",
 };
 
 function buildColumns(
@@ -97,6 +109,19 @@ function buildColumns(
         >
           {row.original.id}
         </Link>
+      ),
+    },
+    {
+      id: "urgency",
+      accessorKey: "urgencySortKey",
+      header: t("columns.urgency"),
+      sortingFn: "basic",
+      cell: ({ row }) => (
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${urgencyStyle[row.original.urgency]}`}
+        >
+          {t(`urgency.${row.original.urgency}`)}
+        </span>
       ),
     },
     {
@@ -138,7 +163,11 @@ function buildColumns(
   ];
 }
 
-export function ContractListTable() {
+type Props = {
+  defaultSort?: SortingState;
+};
+
+export function ContractListTable({ defaultSort }: Props) {
   const t = useTranslations("contractList");
   const tStatus = useTranslations("contractDetails.status");
 
@@ -150,7 +179,17 @@ export function ContractListTable() {
     agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
   );
 
-  const data = React.useMemo(() => (result?.page ?? []) as ContractListItem[], [result]);
+  const data = React.useMemo(
+    () =>
+      (result?.page ?? []).map((c) => ({
+        ...c,
+        urgency: getUrgencyTier(c.status as ContractStatus, c.nextRenewalDate),
+        urgencySortKey: urgencySortKey(
+          getUrgencyTier(c.status as ContractStatus, c.nextRenewalDate),
+        ),
+      })) as ContractListItem[],
+    [result],
+  );
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
 
   const columns = React.useMemo(() => buildColumns(t, tStatus), [t, tStatus]);
@@ -160,7 +199,9 @@ export function ContractListTable() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
     creationTime: false,
   });
-  const [sorting, setSorting] = React.useState<SortingState>([{ id: "creationTime", desc: true }]);
+  const [sorting, setSorting] = React.useState<SortingState>(
+    defaultSort ?? [{ id: "urgency", desc: false }],
+  );
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
   const [statusTab, setStatusTab] = React.useState<StatusTab>("all");
 

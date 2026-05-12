@@ -316,11 +316,20 @@
     },
     "columns": {
       "publicId": "ID",
+      "urgency": "Urgência",
       "status": "Status",
       "tenant": "Locatário",
       "availableGuarantee": "Garantia disponível",
       "nextRenewalDate": "Próxima renovação",
       "creationTime": "Criado em"
+    },
+    "urgency": {
+      "overdue": "Vencido",
+      "critical": "Crítico",
+      "warning": "Atenção",
+      "pendente": "Pendente",
+      "ok": "OK",
+      "inactive": "Inativo"
     },
     "search": {
       "placeholder": "Buscar por ID ou locatário"

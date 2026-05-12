@@ -317,11 +317,20 @@
     },
     "columns": {
       "publicId": "ID",
+      "urgency": "Urgency",
       "status": "Status",
       "tenant": "Tenant",
       "availableGuarantee": "Available guarantee",
       "nextRenewalDate": "Next renewal",
       "creationTime": "Created"
+    },
+    "urgency": {
+      "overdue": "Overdue",
+      "critical": "Critical",
+      "warning": "Warning",
+      "pendente": "Pending",
+      "ok": "OK",
+      "inactive": "Inactive"
     },
     "search": {
       "placeholder": "Search by ID or tenant"
