@@ -12,18 +12,18 @@ Strategy, whitepaper, pitch deck, and brand assets live in a sibling repo.
 Clone it for full context:
 
 ```bash
-git clone https://github.com/tga-protocol/sgr.git ../sgr
+git clone https://github.com/mutav-finance/mutav.git ../mutav
 ```
 
 Key files:
 
-- `../sgr/docs/whitepaper.md` — protocol design and architecture
-- `../sgr/docs/pitch-deck.md` — positioning and market context
+- `../mutav/docs/whitepaper.md` — protocol design and architecture
+- `../mutav/docs/pitch-deck.md` — positioning and market context
 
 If the sibling repo is not cloned locally, fetch files directly:
 
 ```bash
-gh api repos/tga-protocol/sgr/contents/docs/whitepaper.md --jq '.content' | base64 -d
+gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | base64 -d
 ```
 
 ## Stack
@@ -339,6 +339,40 @@ Default to invoking via the Skill tool rather than relying on memory of past pat
 ### Progressive loading
 
 Load `SKILL.md` first via the Skill tool. Skills currently ship without supplementary `examples.md`/`reference.md`/`template.md`; add them only when the patterns merit deeper material.
+
+### Domain design
+
+Each Convex domain folder (`convex/{domain}/`) is a bounded context. Keep the boundaries tight:
+
+**One concern per domain**
+
+| Domain       | Owns                                           | Does NOT own                       |
+| ------------ | ---------------------------------------------- | ---------------------------------- |
+| `users/`     | Identity, profile, user resolution             | Roles, org membership, auth tokens |
+| `agencies/`  | Organization data, membership, roles           | User profile fields, contract data |
+| `contracts/` | Rental lifecycle, documents, tenant, history   | Payment state, agency billing      |
+| `payments/`  | Invoice lifecycle, line items, payment methods | Contract status, tenant info       |
+
+When a query needs data from two domains (e.g. membership + user info), the enrichment belongs in the domain that drives the use case — `agencies/useCases.ts` enriches membership rows with user data because the agency domain drives the members list. The user domain does not reach into memberships.
+
+**`domain.ts` is the type source of truth**
+
+- Export `Doc<'tableName'>` and `Id<'tableName'>` aliases (`User`, `UserId`) — never use raw generics outside the entity file.
+- Export value-object constants (`MEMBER_ROLE`, `CONTRACT_STATUS`) as `as const satisfies Record<...>` — keyof safety with literal inference.
+- Export Convex `v.*` validators (`memberRoleValidator`) alongside the constants — one import gets both the type and the validator.
+- Export domain helpers that encode business rules (`hasRole`, `isActiveContract`) — single place, no duplication.
+
+**`useCases.ts` is the query/mutation anti-corruption layer**
+
+- Every function must use an index — no `.filter()` (full table scans in Convex).
+- `shape*` helpers inside `useCases.ts` define the projection between the DB schema and the UI. Name them `shapeContractSummary` / `shapeContract` etc. — not generic names like `toDTO`.
+- When real auth lands, the insertion point is: `requireIdentity(ctx)` at the top of each handler, then `getMembership(userId, agencyId)` + `hasRole()` check for agency-scoped operations. Domain boundaries make this mechanical.
+
+**Workspace / multi-tenancy**
+
+- Every resource table carries `agencyId` — all scoped queries use the `by_agency_*` composite index.
+- `WorkspaceContext` (`src/providers/workspace.tsx`) is the frontend's single source of `selectedAgencyId`. All list queries receive it as an argument — never read `localStorage` directly from a component.
+- Auth shortcut: `DEV_USER_PUBLIC_ID = "dev-user"` in `workspace.tsx` is the only hardcoded identity. When Convex Auth ships, replace it with `ctx.auth.getUserIdentity()` and derive `userId` from the JWT subject.
 
 ### Deferred conventions
 

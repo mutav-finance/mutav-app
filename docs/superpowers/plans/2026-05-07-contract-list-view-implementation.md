@@ -874,9 +874,9 @@ Expected: each row in `page` has a numeric `creationTime` field.
 - [ ] **Step 5: Boot the Next.js dev server in background and curl the page**
 
 ```bash
-bun run dev:web > /tmp/sgr-dev.log 2>&1 &
-echo $! > /tmp/sgr-dev.pid
-until grep -q "Ready" /tmp/sgr-dev.log; do sleep 0.5; done
+bun run dev:web > /tmp/mutav-dev.log 2>&1 &
+echo $! > /tmp/mutav-dev.pid
+until grep -q "Ready" /tmp/mutav-dev.log; do sleep 0.5; done
 
 curl -s -o /tmp/contracts-list.html -w "HTTP %{http_code} (%{size_download} bytes)\n" http://localhost:3000/contracts
 echo "Found markers:"
@@ -890,8 +890,8 @@ Expected: HTTP 200; both contract IDs (`1000001`, `1000002`) and tenant names vi
 - [ ] **Step 6: Stop the dev server**
 
 ```bash
-kill $(cat /tmp/sgr-dev.pid) 2>/dev/null
-rm -f /tmp/sgr-dev.pid /tmp/contracts-list.html /tmp/sgr-dev.log
+kill $(cat /tmp/mutav-dev.pid) 2>/dev/null
+rm -f /tmp/mutav-dev.pid /tmp/contracts-list.html /tmp/mutav-dev.log
 ```
 
 - [ ] **Step 7: Push branch**

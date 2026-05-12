@@ -28,6 +28,7 @@ import {
 
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { PaymentStateKind } from "@convex/payments/domain";
 import { useWorkspace } from "@/providers/workspace";
 import { Link } from "@/i18n/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -58,45 +59,30 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
-import { getUrgencyTier, urgencySortKey, type UrgencyTier } from "@/lib/contracts/urgency";
-import { StatusTag } from "@/components/contracts/status-tag";
-import type { ContractStatus } from "@/lib/contracts/types";
+import { formatPeriodMonth } from "@/lib/payments/format";
+import { PaymentStateTag } from "@/components/payments/payment-state-tag";
 
-type ContractListItem = {
+type StateTab = "all" | PaymentStateKind;
+
+const STATE_TABS: readonly StateTab[] = ["all", "pending", "overdue", "paid", "canceled"];
+
+type PaymentListItem = {
   id: string;
-  status: ContractStatus;
-  nextRenewalDate: string;
-  availableGuaranteeCents: number;
-  tenantName: string;
-  creationTime: number;
-  urgency: UrgencyTier;
-  urgencySortKey: number;
-};
-
-type StatusTab = "all" | ContractStatus;
-
-const STATUS_TABS: readonly StatusTab[] = ["all", "ativo", "pendente", "encerrado", "cancelado"];
-
-const statusTone: Record<ContractStatus, "accent" | "success" | "error" | "neutral"> = {
-  ativo: "success",
-  pendente: "accent",
-  encerrado: "neutral",
-  cancelado: "error",
-};
-
-const urgencyStyle: Record<UrgencyTier, string> = {
-  overdue: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-  critical: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
-  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
-  pendente: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  ok: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  inactive: "bg-muted text-muted-foreground",
+  agencyId: string;
+  periodMonth: string;
+  issuedAt: string;
+  dueDate: string;
+  totalCents: number;
+  state: { kind: PaymentStateKind } & Record<string, unknown>;
+  method: ({ kind: string } & Record<string, unknown>) | null;
+  lineItemCount: number;
 };
 
 function buildColumns(
-  t: ReturnType<typeof useTranslations<"contractList">>,
-  tStatus: ReturnType<typeof useTranslations<"contractDetails.status">>,
-): ColumnDef<ContractListItem>[] {
+  t: ReturnType<typeof useTranslations<"paymentList">>,
+  tState: ReturnType<typeof useTranslations<"paymentDetails.state">>,
+  tMethod: ReturnType<typeof useTranslations<"paymentDetails.method">>,
+): ColumnDef<PaymentListItem>[] {
   return [
     {
       id: "publicId",
@@ -104,7 +90,7 @@ function buildColumns(
       header: t("columns.publicId"),
       cell: ({ row }) => (
         <Link
-          href={`/contracts/${row.original.id}`}
+          href={`/payments/${row.original.id}`}
           className="text-foreground font-mono hover:underline"
         >
           {row.original.id}
@@ -112,109 +98,111 @@ function buildColumns(
       ),
     },
     {
-      id: "urgency",
-      accessorKey: "urgencySortKey",
-      header: t("columns.urgency"),
-      sortingFn: "basic",
+      id: "period",
+      accessorKey: "periodMonth",
+      header: t("columns.period"),
+      cell: ({ row }) => formatPeriodMonth(row.original.periodMonth),
+    },
+    {
+      id: "dueDate",
+      accessorKey: "dueDate",
+      header: t("columns.dueDate"),
+      cell: ({ row }) => formatDateBR(row.original.dueDate),
+    },
+    {
+      id: "total",
+      accessorKey: "totalCents",
+      header: () => <div className="w-full text-right">{t("columns.total")}</div>,
       cell: ({ row }) => (
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${urgencyStyle[row.original.urgency]}`}
-        >
-          {t(`urgency.${row.original.urgency}`)}
-        </span>
+        <div className="text-right font-mono">{formatBRLCents(row.original.totalCents)}</div>
       ),
     },
     {
-      id: "status",
-      accessorKey: "status",
-      header: t("columns.status"),
+      id: "state",
+      accessorKey: "state",
+      header: t("columns.state"),
       cell: ({ row }) => (
-        <StatusTag tone={statusTone[row.original.status]} label={tStatus(row.original.status)} />
+        <PaymentStateTag
+          stateKind={row.original.state.kind}
+          label={tState(row.original.state.kind)}
+          pulse={row.original.state.kind === "pending" || row.original.state.kind === "overdue"}
+        />
       ),
-      filterFn: (row, columnId, value) => row.getValue(columnId) === value,
+      filterFn: (row, _columnId, value) => row.original.state.kind === value,
     },
     {
-      id: "tenant",
-      accessorKey: "tenantName",
-      header: t("columns.tenant"),
-    },
-    {
-      id: "availableGuarantee",
-      accessorKey: "availableGuaranteeCents",
-      header: () => <div className="w-full text-right">{t("columns.availableGuarantee")}</div>,
+      id: "contracts",
+      accessorKey: "lineItemCount",
+      header: t("columns.contracts"),
       cell: ({ row }) => (
-        <div className="text-right font-mono">
-          {formatBRLCents(row.original.availableGuaranteeCents)}
-        </div>
+        <span className="text-muted-foreground tabular-nums">{row.original.lineItemCount}</span>
       ),
     },
     {
-      id: "nextRenewalDate",
-      accessorKey: "nextRenewalDate",
-      header: t("columns.nextRenewalDate"),
-      cell: ({ row }) => formatDateBR(row.original.nextRenewalDate),
-    },
-    {
-      id: "creationTime",
-      accessorKey: "creationTime",
-      header: t("columns.creationTime"),
-      cell: ({ row }) => formatDateBR(new Date(row.original.creationTime).toISOString()),
+      id: "method",
+      accessorKey: "method",
+      header: () => null,
+      enableHiding: true,
+      cell: ({ row }) => {
+        const method = row.original.method;
+        return (
+          <span className="text-muted-foreground text-xs">
+            {method ? tMethod(method.kind as "boleto" | "pix" | "stellar") : tMethod("none")}
+          </span>
+        );
+      },
     },
   ];
 }
 
-type Props = {
-  defaultSort?: SortingState;
-};
-
-export function ContractListTable({ defaultSort }: Props) {
-  const t = useTranslations("contractList");
-  const tStatus = useTranslations("contractDetails.status");
+export function PaymentListTable() {
+  const t = useTranslations("paymentList");
+  const tState = useTranslations("paymentDetails.state");
+  const tMethod = useTranslations("paymentDetails.method");
 
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
 
   const result = useQuery(
-    api.contracts.useCases.listByAgency,
+    api.payments.useCases.listByAgency,
     agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
   );
 
   const data = React.useMemo(
     () =>
-      (result?.page ?? []).map((c) => ({
-        ...c,
-        urgency: getUrgencyTier(c.status as ContractStatus, c.nextRenewalDate),
-        urgencySortKey: urgencySortKey(
-          getUrgencyTier(c.status as ContractStatus, c.nextRenewalDate),
-        ),
-      })) as ContractListItem[],
+      (result?.page ?? []).map((doc) => ({
+        id: doc.publicId,
+        agencyId: doc.agencyId,
+        periodMonth: doc.periodMonth,
+        issuedAt: doc.issuedAt,
+        dueDate: doc.dueDate,
+        totalCents: doc.totalCents,
+        state: doc.state,
+        method: doc.method,
+        lineItemCount: doc.lineItems.length,
+      })) as PaymentListItem[],
     [result],
   );
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
 
-  const columns = React.useMemo(() => buildColumns(t, tStatus), [t, tStatus]);
+  const columns = React.useMemo(() => buildColumns(t, tState, tMethod), [t, tState, tMethod]);
 
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    creationTime: false,
+    method: false,
   });
-  const [sorting, setSorting] = React.useState<SortingState>(
-    defaultSort ?? [{ id: "urgency", desc: false }],
-  );
+  const [sorting, setSorting] = React.useState<SortingState>([{ id: "dueDate", desc: true }]);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
-  const [statusTab, setStatusTab] = React.useState<StatusTab>("all");
+  const [stateTab, setStateTab] = React.useState<StateTab>("all");
 
   React.useEffect(() => {
     setColumnFilters((prev) => {
-      const without = prev.filter((f) => f.id !== "status");
-      return statusTab === "all" ? without : [...without, { id: "status", value: statusTab }];
+      const without = prev.filter((f) => f.id !== "state");
+      return stateTab === "all" ? without : [...without, { id: "state", value: stateTab }];
     });
-  }, [statusTab]);
+  }, [stateTab]);
 
-  // React Compiler skips memoizing this component because TanStack Table's
-  // useReactTable() returns non-memoizable functions. Acceptable — the table
-  // is small and fast.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
@@ -235,8 +223,8 @@ export function ContractListTable({ defaultSort }: Props) {
     globalFilterFn: (row, _columnId, filterValue: string) => {
       const q = String(filterValue).toLowerCase();
       const id = (row.original.id ?? "").toLowerCase();
-      const tenant = (row.original.tenantName ?? "").toLowerCase();
-      return id.includes(q) || tenant.includes(q);
+      const period = (row.original.periodMonth ?? "").toLowerCase();
+      return id.includes(q) || period.includes(q);
     },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -246,18 +234,17 @@ export function ContractListTable({ defaultSort }: Props) {
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  const counts = React.useMemo<Record<StatusTab, number>>(() => {
-    const c: Record<StatusTab, number> = {
+  const counts = React.useMemo<Record<StateTab, number>>(() => {
+    const c: Record<StateTab, number> = {
       all: data.length,
-      ativo: 0,
-      pendente: 0,
-      encerrado: 0,
-      cancelado: 0,
+      pending: 0,
+      overdue: 0,
+      paid: 0,
+      canceled: 0,
     };
-    for (const row of data) c[row.status]++;
+    for (const row of data) c[row.state.kind]++;
     return c;
   }, [data]);
-
   if (isLoading) {
     return (
       <div className="text-muted-foreground px-4 py-8 text-center text-sm">{t("loading")}</div>
@@ -266,13 +253,13 @@ export function ContractListTable({ defaultSort }: Props) {
 
   return (
     <Tabs
-      value={statusTab}
-      onValueChange={(v) => setStatusTab(v as StatusTab)}
+      value={stateTab}
+      onValueChange={(v) => setStateTab(v as StateTab)}
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 lg:px-6">
         <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1">
-          {STATUS_TABS.map((tab) => (
+          {STATE_TABS.map((tab) => (
             <TabsTrigger key={tab} value={tab}>
               {t(`tabs.${tab}`)} <Badge variant="secondary">{counts[tab]}</Badge>
             </TabsTrigger>
@@ -314,7 +301,7 @@ export function ContractListTable({ defaultSort }: Props) {
       </div>
 
       <TabsContent
-        value={statusTab}
+        value={stateTab}
         forceMount
         className="relative flex flex-col gap-4 overflow-x-auto px-4 lg:px-6"
       >
@@ -364,14 +351,14 @@ export function ContractListTable({ defaultSort }: Props) {
           </div>
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">
+              <Label htmlFor="pay-rows-per-page" className="text-sm font-medium">
                 {t("pagination.rowsPerPage")}
               </Label>
               <Select
                 value={`${table.getState().pagination.pageSize}`}
                 onValueChange={(value) => table.setPageSize(Number(value))}
               >
-                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
+                <SelectTrigger size="sm" className="w-20" id="pay-rows-per-page">
                   <SelectValue placeholder={table.getState().pagination.pageSize} />
                 </SelectTrigger>
                 <SelectContent side="top">

@@ -10,7 +10,6 @@
   },
   "userMenu": {
     "account": "Conta",
-    "billing": "Cobrança",
     "notifications": "Notificações",
     "theme": "Tema",
     "themeLight": "Claro",
@@ -25,65 +24,68 @@
   "brand": { "name": "Acme Inc." },
   "nav": {
     "main": {
-      "quickCreate": "Criar Rápido",
+      "createContract": "Criar Contrato",
       "inbox": "Caixa de Entrada",
       "dashboard": "Painel",
       "contracts": "Contratos",
+      "payments": "Faturas",
       "lifecycle": "Ciclo de Vida",
-      "analytics": "Análises",
-      "projects": "Projetos",
-      "team": "Equipe"
+      "reports": "Relatórios"
     },
     "secondary": {
       "settings": "Configurações",
-      "getHelp": "Obter Ajuda",
-      "search": "Buscar"
+      "getHelp": "Obter Ajuda"
     },
     "documents": {
-      "groupLabel": "Documentos",
-      "dataLibrary": "Biblioteca de Dados",
-      "reports": "Relatórios",
-      "wordAssistant": "Assistente de Texto",
-      "more": "Mais",
-      "open": "Abrir",
-      "share": "Compartilhar",
-      "delete": "Excluir"
+      "groupLabel": "Cadastro",
+      "tenants": "Inquilinos",
+      "properties": "Imóveis",
+      "contractTemplates": "Modelos de Contrato",
+      "guaranteePolicies": "Apólices de Garantia"
+    },
+    "agency": {
+      "groupLabel": "Agência",
+      "members": "Membros",
+      "agencySettings": "Configurações da Agência"
     }
   },
   "chart": {
-    "totalVisitors": "Total de Visitantes",
-    "rangeLong": "Total dos últimos 3 meses",
-    "rangeShort": "Últimos 3 meses",
-    "last3Months": "Últimos 3 meses",
-    "last30Days": "Últimos 30 dias",
-    "last7Days": "Últimos 7 dias",
+    "title": "Contratos sob Gestão",
+    "descriptionLong": "Total de contratos criados nos últimos meses",
+    "descriptionShort": "Contratos por mês",
+    "last6Months": "Últimos 6 meses",
+    "last12Months": "Últimos 12 meses",
     "selectRangeAriaLabel": "Selecione um período",
     "series": {
-      "visitors": "Visitantes",
+      "contracts": "Contratos",
       "desktop": "Desktop",
-      "mobile": "Móvel"
+      "mobile": "Mobile",
+      "newActivations": "Novas Ativações",
+      "cumulative": "Total Acumulado",
+      "netActive": "Contratos Ativos",
+      "activated": "Ativados",
+      "cancelled": "Cancelados",
+      "expired": "Encerrados"
     }
   },
   "metrics": {
-    "totalRevenue": {
-      "label": "Receita Total",
-      "trend": "Em alta este mês",
-      "footer": "Visitantes nos últimos 6 meses"
+    "ativo": {
+      "label": "Contratos Ativos",
+      "footer": "Contratos em vigor"
     },
-    "newCustomers": {
-      "label": "Novos Clientes",
-      "trend": "Queda de 20% no período",
-      "footer": "Aquisição precisa de atenção"
+    "pendente": {
+      "label": "Pendentes",
+      "footer": "Aguardando ativação"
     },
-    "activeAccounts": {
-      "label": "Contas Ativas",
-      "trend": "Forte retenção de usuários",
-      "footer": "Engajamento supera as metas"
+    "nextPayment": {
+      "label": "Próxima Fatura",
+      "footer": "Nenhuma fatura pendente",
+      "noneLabel": "Nenhuma",
+      "dueOn": "Vence em {date}"
     },
-    "growthRate": {
-      "label": "Taxa de Crescimento",
-      "trend": "Aumento de desempenho constante",
-      "footer": "Atinge as projeções de crescimento"
+    "delinquencies": {
+      "label": "Inadimplências",
+      "footer": "Em breve"
     }
   },
   "dataTable": {
@@ -301,8 +303,7 @@
       "label": "Carregando contrato"
     }
   },
-  "contractList": {
-    "meta": {
+  "contractList": {    "meta": {
       "title": "Contratos | SGR",
       "description": "Lista de contratos da imobiliária"
     },
@@ -317,11 +318,20 @@
     },
     "columns": {
       "publicId": "ID",
+      "urgency": "Urgência",
       "status": "Status",
       "tenant": "Locatário",
       "availableGuarantee": "Garantia disponível",
       "nextRenewalDate": "Próxima renovação",
       "creationTime": "Criado em"
+    },
+    "urgency": {
+      "overdue": "Vencido",
+      "critical": "Crítico",
+      "warning": "Atenção",
+      "pendente": "Pendente",
+      "ok": "OK",
+      "inactive": "Inativo"
     },
     "search": {
       "placeholder": "Buscar por ID ou locatário"
@@ -342,6 +352,115 @@
       "previousPage": "Página anterior",
       "nextPage": "Próxima página",
       "lastPage": "Última página"
+    }
+  },
+  "paymentList": {
+    "meta": {
+      "title": "Faturas | SGR",
+      "description": "Faturas mensais da imobiliária"
+    },
+    "heading": "Faturas",
+    "subheading": "Acompanhe as faturas mensais da sua imobiliária",
+    "tabs": {
+      "all": "Todas",
+      "pending": "Pendentes",
+      "overdue": "Vencidas",
+      "paid": "Pagas",
+      "canceled": "Canceladas"
+    },
+    "columns": {
+      "publicId": "ID",
+      "period": "Competência",
+      "dueDate": "Vencimento",
+      "total": "Total",
+      "state": "Status",
+      "contracts": "Contratos"
+    },
+    "search": {
+      "placeholder": "Buscar por ID ou competência"
+    },
+    "columnsButton": "Colunas",
+    "noResults": "Nenhuma fatura encontrada",
+    "loading": "Carregando faturas…",
+    "pagination": {
+      "rowsPerPage": "Linhas por página",
+      "pageOf": "Página {current} de {total}",
+      "firstPage": "Primeira página",
+      "previousPage": "Página anterior",
+      "nextPage": "Próxima página",
+      "lastPage": "Última página"
+    }
+  },
+  "paymentDetails": {
+    "meta": {
+      "title": "Fatura {id} | SGR",
+      "description": "Detalhes da fatura"
+    },
+    "breadcrumb": "Detalhes da Fatura",
+    "heroTitle": "Fatura {state}",
+    "state": {
+      "pending": "Pendente",
+      "overdue": "Vencida",
+      "paid": "Paga",
+      "canceled": "Cancelada"
+    },
+    "method": {
+      "none": "Não definida",
+      "boleto": "Boleto",
+      "pix": "PIX",
+      "stellar": "Stellar"
+    },
+    "summary": {
+      "heading": "Resumo",
+      "idLabel": "ID da fatura",
+      "period": "Competência",
+      "issuedAt": "Emitida em",
+      "dueDate": "Vencimento",
+      "total": "Total",
+      "state": "Status",
+      "method": "Forma de pagamento",
+      "actionsMenu": "Ações da fatura"
+    },
+    "lineItems": {
+      "heading": "Detalhamento",
+      "columns": {
+        "contract": "Contrato",
+        "kind": "Tipo",
+        "amount": "Valor",
+        "description": "Descrição"
+      },
+      "kind": {
+        "recurring": "Mensalidade",
+        "activation": "Ativação"
+      },
+      "total": "Total",
+      "empty": "Sem itens."
+    },
+    "methodCard": {
+      "heading": "Forma de Pagamento",
+      "none": "Forma de pagamento não definida",
+      "noneHint": "O método de pagamento será definido pelo departamento financeiro.",
+      "barcode": "Código de barras",
+      "barcodeEmpty": "Aguardando geração do boleto",
+      "pixKey": "Chave PIX",
+      "txId": "ID da transação",
+      "txIdEmpty": "Aguardando pagamento",
+      "address": "Endereço de destino",
+      "txHash": "Hash da transação",
+      "txHashEmpty": "Aguardando confirmação on-chain"
+    },
+    "notFound": {
+      "title": "Fatura não encontrada",
+      "body": "Não localizamos uma fatura com este identificador."
+    },
+    "errors": {
+      "title": "Não foi possível carregar esta fatura",
+      "body": "Algo deu errado ao buscar os dados. Tente novamente ou volte ao painel.",
+      "retry": "Tentar novamente",
+      "backToDashboard": "Voltar ao painel"
+    },
+    "loading": {
+      "label": "Carregando fatura"
     }
   }
 }

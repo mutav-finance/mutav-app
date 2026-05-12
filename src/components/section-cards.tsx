@@ -1,99 +1,100 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardAction,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { TrendingUpIcon, TrendingDownIcon } from "lucide-react";
+import { useQuery } from "convex/react";
+import { AlertTriangleIcon, CalendarIcon, FileTextIcon, ShieldAlertIcon } from "lucide-react";
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useWorkspace } from "@/providers/workspace";
+import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 
 export function SectionCards() {
   const t = useTranslations("metrics");
+  const { selectedAgency } = useWorkspace();
+  const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
+
+  const summary = useQuery(
+    api.contracts.useCases.getPipelineSummary,
+    agencyId ? { agencyId } : "skip",
+  );
+
+  const nextPayment = useQuery(
+    api.payments.useCases.getNextPendingPayment,
+    agencyId ? { agencyId } : "skip",
+  );
+
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      {/* Ativos */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>{t("totalRevenue.label")}</CardDescription>
+          <CardDescription className="flex items-center gap-1.5">
+            <FileTextIcon className="size-3.5" />
+            {t("ativo.label")}
+          </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            $1,250.00
+            {summary ? summary.ativo : "—"}
           </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon />
-              +12.5%
-            </Badge>
-          </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            {t("totalRevenue.trend")} <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">{t("totalRevenue.footer")}</div>
+          <div className="text-muted-foreground">{t("ativo.footer")}</div>
         </CardFooter>
       </Card>
+
+      {/* Pendentes */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>{t("newCustomers.label")}</CardDescription>
+          <CardDescription className="flex items-center gap-1.5">
+            <AlertTriangleIcon className="size-3.5" />
+            {t("pendente.label")}
+          </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1,234
+            {summary ? summary.pendente : "—"}
           </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingDownIcon />
-              -20%
-            </Badge>
-          </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            {t("newCustomers.trend")} <TrendingDownIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">{t("newCustomers.footer")}</div>
+          <div className="text-muted-foreground">{t("pendente.footer")}</div>
         </CardFooter>
       </Card>
+
+      {/* Próxima Fatura */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>{t("activeAccounts.label")}</CardDescription>
+          <CardDescription className="flex items-center gap-1.5">
+            <CalendarIcon className="size-3.5" />
+            {t("nextPayment.label")}
+          </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            45,678
+            {nextPayment === undefined
+              ? "—"
+              : nextPayment === null
+                ? t("nextPayment.noneLabel")
+                : formatBRLCents(nextPayment.totalCents)}
           </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon />
-              +12.5%
-            </Badge>
-          </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            {t("activeAccounts.trend")} <TrendingUpIcon className="size-4" />
+          <div className="text-muted-foreground">
+            {nextPayment
+              ? t("nextPayment.dueOn", { date: formatDateBR(nextPayment.dueDate) })
+              : t("nextPayment.footer")}
           </div>
-          <div className="text-muted-foreground">{t("activeAccounts.footer")}</div>
         </CardFooter>
       </Card>
+
+      {/* Inadimplências — placeholder until schema is defined */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>{t("growthRate.label")}</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            4.5%
+          <CardDescription className="flex items-center gap-1.5">
+            <ShieldAlertIcon className="size-3.5" />
+            {t("delinquencies.label")}
+          </CardDescription>
+          <CardTitle className="text-muted-foreground text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            —
           </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon />
-              +4.5%
-            </Badge>
-          </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            {t("growthRate.trend")} <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">{t("growthRate.footer")}</div>
+          <div className="text-muted-foreground">{t("delinquencies.footer")}</div>
         </CardFooter>
       </Card>
     </div>
