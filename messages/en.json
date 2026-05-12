@@ -77,13 +77,15 @@
       "label": "Pending",
       "footer": "Awaiting activation"
     },
-    "encerrado": {
-      "label": "Closed",
-      "footer": "Completed contracts"
+    "nextPayment": {
+      "label": "Next Invoice",
+      "footer": "No pending invoices",
+      "noneLabel": "None",
+      "dueOn": "Due on {date}"
     },
-    "cancelado": {
-      "label": "Cancelled",
-      "footer": "Cancelled contracts"
+    "delinquencies": {
+      "label": "Delinquencies",
+      "footer": "Coming soon"
     }
   },
   "dataTable": {

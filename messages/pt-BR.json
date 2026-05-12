@@ -77,13 +77,15 @@
       "label": "Pendentes",
       "footer": "Aguardando ativação"
     },
-    "encerrado": {
-      "label": "Encerrados",
-      "footer": "Contratos concluídos"
+    "nextPayment": {
+      "label": "Próxima Fatura",
+      "footer": "Nenhuma fatura pendente",
+      "noneLabel": "Nenhuma",
+      "dueOn": "Vence em {date}"
     },
-    "cancelado": {
-      "label": "Cancelados",
-      "footer": "Contratos cancelados"
+    "delinquencies": {
+      "label": "Inadimplências",
+      "footer": "Em breve"
     }
   },
   "dataTable": {

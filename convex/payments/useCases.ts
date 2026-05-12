@@ -60,6 +60,35 @@ export const getByPublicId = query({
   },
 });
 
+/**
+ * Returns the next pending or overdue payment for the agency, ordered by
+ * periodMonth ascending (earliest first).
+ *
+ * Uses the `by_agency_period` index — no full-table scan.
+ */
+export const getNextPendingPayment = query({
+  args: { agencyId: v.id("agencies") },
+  handler: async (ctx, { agencyId }) => {
+    // Walk forward through payments sorted by period (earliest first)
+    // and return the first one that is pending or overdue.
+    const page = await ctx.db
+      .query("payments")
+      .withIndex("by_agency_period", (q) => q.eq("agencyId", agencyId))
+      .order("asc")
+      .collect();
+
+    const next = page.find((p) => p.state.kind === "pending" || p.state.kind === "overdue");
+
+    if (!next) return null;
+    return {
+      publicId: next.publicId,
+      dueDate: next.dueDate,
+      totalCents: next.totalCents,
+      stateKind: next.state.kind as "pending" | "overdue",
+    };
+  },
+});
+
 // ─── Shape helpers ────────────────────────────────────────────────────────────
 
 function shapePaymentSummary(doc: Payment) {
