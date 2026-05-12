@@ -1,6 +1,7 @@
 import { internalMutation } from "./_generated/server";
 import { PaymentMethods, PaymentStates } from "./payments/domain";
 import type { Id } from "./_generated/dataModel";
+import { contractsByStatus } from "./contracts/aggregate";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(1),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-03-01",
       availableGuaranteeCents: 12_800_000,
       rental: {
@@ -181,6 +184,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(2),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-04-01",
       availableGuaranteeCents: 16_000_000,
       rental: {
@@ -224,6 +229,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(3),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-05-15",
       availableGuaranteeCents: 22_000_000,
       rental: {
@@ -271,6 +278,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(4),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-11-01",
       availableGuaranteeCents: 9_600_000,
       rental: {
@@ -314,6 +323,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(5),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-01-20",
       availableGuaranteeCents: 28_000_000,
       rental: {
@@ -361,6 +372,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(6),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-02-10",
       availableGuaranteeCents: 11_200_000,
       rental: {
@@ -404,6 +417,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(7),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-09-01",
       availableGuaranteeCents: 7_200_000,
       rental: {
@@ -447,6 +462,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(8),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-08-20",
       availableGuaranteeCents: 14_400_000,
       rental: {
@@ -490,6 +507,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(9),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-06-01",
       availableGuaranteeCents: 6_000_000,
       rental: {
@@ -533,6 +552,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(10),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-12-15",
       availableGuaranteeCents: 19_200_000,
       rental: {
@@ -580,6 +601,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(11),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-07-01",
       availableGuaranteeCents: 8_000_000,
       rental: {
@@ -623,6 +646,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(12),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-10-01",
       availableGuaranteeCents: 10_400_000,
       rental: {
@@ -666,6 +691,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(13),
       status: "pendente",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-08-01",
       availableGuaranteeCents: 13_200_000,
       rental: {
@@ -709,6 +736,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(14),
       status: "pendente",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-09-01",
       availableGuaranteeCents: 15_600_000,
       rental: {
@@ -752,6 +781,8 @@ export const fictionalContracts = internalMutation({
       agencyId: paulistaId,
       publicId: pid(15),
       status: "encerrado",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2025-02-01",
       availableGuaranteeCents: 0,
       rental: {
@@ -798,6 +829,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(16),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-03-15",
       availableGuaranteeCents: 23_200_000,
       rental: {
@@ -841,6 +874,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(17),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-05-01",
       availableGuaranteeCents: 30_000_000,
       rental: {
@@ -888,6 +923,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(18),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-11-20",
       availableGuaranteeCents: 17_600_000,
       rental: {
@@ -931,6 +968,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(19),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-01-10",
       availableGuaranteeCents: 8_800_000,
       rental: {
@@ -974,6 +1013,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(20),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-08-01",
       availableGuaranteeCents: 26_400_000,
       rental: {
@@ -1017,6 +1058,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(21),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-04-20",
       availableGuaranteeCents: 12_000_000,
       rental: {
@@ -1060,6 +1103,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(22),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-07-15",
       availableGuaranteeCents: 9_200_000,
       rental: {
@@ -1103,6 +1148,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(23),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-02-28",
       availableGuaranteeCents: 34_000_000,
       rental: {
@@ -1150,6 +1197,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(24),
       status: "pendente",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-09-01",
       availableGuaranteeCents: 14_000_000,
       rental: {
@@ -1193,6 +1242,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(25),
       status: "pendente",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-10-01",
       availableGuaranteeCents: 18_000_000,
       rental: {
@@ -1236,6 +1287,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(26),
       status: "encerrado",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2024-12-01",
       availableGuaranteeCents: 0,
       rental: {
@@ -1279,6 +1332,8 @@ export const fictionalContracts = internalMutation({
       agencyId: atlanticaId,
       publicId: pid(27),
       status: "cancelado",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-06-01",
       availableGuaranteeCents: 0,
       rental: {
@@ -1325,6 +1380,8 @@ export const fictionalContracts = internalMutation({
       agencyId: horizonteId,
       publicId: pid(28),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-04-01",
       availableGuaranteeCents: 13_600_000,
       rental: {
@@ -1368,6 +1425,8 @@ export const fictionalContracts = internalMutation({
       agencyId: horizonteId,
       publicId: pid(29),
       status: "ativo",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2026-10-15",
       availableGuaranteeCents: 20_000_000,
       rental: {
@@ -1415,6 +1474,8 @@ export const fictionalContracts = internalMutation({
       agencyId: horizonteId,
       publicId: pid(30),
       status: "pendente",
+      activatedAt: null,
+      deactivatedAt: null,
       nextRenewalDate: "2027-08-10",
       availableGuaranteeCents: 10_800_000,
       rental: {
@@ -1453,6 +1514,75 @@ export const fictionalContracts = internalMutation({
         termApprovedAt: null,
       },
     });
+
+    // ── Assign historical activatedAt dates ──────────────────────────────────
+    // Spread ativo/encerrado contracts across the last ~12 months so the
+    // monthly chart has meaningful data. pendente and cancelado stay null.
+    const activationMap: Record<string, string> = {
+      // Paulista — 1 per month Jun 2025 → May 2026
+      [pid(1)]: "2025-06-03",
+      [pid(2)]: "2025-07-08",
+      [pid(3)]: "2025-08-12",
+      [pid(4)]: "2025-09-05",
+      [pid(5)]: "2025-10-14",
+      [pid(6)]: "2025-11-20",
+      [pid(7)]: "2025-12-02",
+      [pid(8)]: "2026-01-09",
+      [pid(9)]: "2026-02-17",
+      [pid(10)]: "2026-03-21",
+      [pid(11)]: "2026-04-07",
+      [pid(12)]: "2026-05-02",
+      [pid(15)]: "2024-08-01", // encerrado — was once ativo
+      // Atlântica — spread Jun 2025 → Apr 2026
+      [pid(16)]: "2025-06-15",
+      [pid(17)]: "2025-07-22",
+      [pid(18)]: "2025-09-10",
+      [pid(19)]: "2025-11-03",
+      [pid(20)]: "2025-12-18",
+      [pid(21)]: "2026-01-25",
+      [pid(22)]: "2026-03-14",
+      [pid(23)]: "2026-04-20",
+      [pid(26)]: "2024-06-15", // encerrado
+      // Horizonte — sparse, newer agency
+      [pid(28)]: "2025-08-01",
+      [pid(29)]: "2026-02-15",
+    };
+    for (const [publicId, activatedAt] of Object.entries(activationMap)) {
+      const contract = await ctx.db
+        .query("contracts")
+        .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
+        .unique();
+      if (contract) await ctx.db.patch(contract._id, { activatedAt });
+    }
+
+    // ── Assign historical deactivatedAt dates ────────────────────────────────
+    // Only contracts that were once ativo and are now encerrado need this.
+    // pid(27) is cancelado but was never activated → no deactivatedAt.
+    const deactivationMap: Record<string, string> = {
+      [pid(15)]: "2025-03-10", // Paulista encerrado — active ~7 months
+      [pid(26)]: "2025-01-20", // Atlântica encerrado — active ~7 months
+    };
+    for (const [publicId, deactivatedAt] of Object.entries(deactivationMap)) {
+      const contract = await ctx.db
+        .query("contracts")
+        .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
+        .unique();
+      if (contract) await ctx.db.patch(contract._id, { deactivatedAt });
+    }
+
+    // ── Sync aggregate ────────────────────────────────────────────────────────
+    // Clear per-agency aggregate (wipe above deleted all rows, but the
+    // aggregate B-tree is separate and may have stale entries from a prior run).
+    // Then re-populate from the freshly inserted contracts.
+    for (const agencyId of [paulistaId, atlanticaId, horizonteId]) {
+      await contractsByStatus.clear(ctx, { namespace: agencyId });
+    }
+    {
+      const allContracts = await ctx.db.query("contracts").collect();
+      for (const doc of allContracts) {
+        await contractsByStatus.insert(ctx, doc);
+      }
+    }
 
     // ── Contract history ──────────────────────────────────────────────────────
 

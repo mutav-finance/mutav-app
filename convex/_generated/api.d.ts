@@ -10,7 +10,10 @@
 
 import type * as agencies_domain from "../agencies/domain.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
+import type * as contracts_aggregate from "../contracts/aggregate.js";
+import type * as contracts_backfill from "../contracts/backfill.js";
 import type * as contracts_domain from "../contracts/domain.js";
+import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_useCases from "../contracts/useCases.js";
 import type * as crons from "../crons.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -30,7 +33,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   "agencies/domain": typeof agencies_domain;
   "agencies/useCases": typeof agencies_useCases;
+  "contracts/aggregate": typeof contracts_aggregate;
+  "contracts/backfill": typeof contracts_backfill;
   "contracts/domain": typeof contracts_domain;
+  "contracts/mutations": typeof contracts_mutations;
   "contracts/useCases": typeof contracts_useCases;
   crons: typeof crons;
   "lib/auth": typeof lib_auth;
@@ -68,4 +74,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  contractsByStatus: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatus">;
+};

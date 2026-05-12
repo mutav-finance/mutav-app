@@ -50,39 +50,40 @@
     }
   },
   "chart": {
-    "totalVisitors": "Total Visitors",
-    "rangeLong": "Total for the last 3 months",
-    "rangeShort": "Last 3 months",
-    "last3Months": "Last 3 months",
-    "last30Days": "Last 30 days",
-    "last7Days": "Last 7 days",
-    "selectRangeAriaLabel": "Select a value",
+    "title": "Contracts under Management",
+    "descriptionLong": "Total contracts created over the last months",
+    "descriptionShort": "Contracts per month",
+    "last6Months": "Last 6 months",
+    "last12Months": "Last 12 months",
+    "selectRangeAriaLabel": "Select a range",
     "series": {
-      "visitors": "Visitors",
+      "contracts": "Contracts",
       "desktop": "Desktop",
-      "mobile": "Mobile"
+      "mobile": "Mobile",
+      "newActivations": "New Activations",
+      "cumulative": "Cumulative Total",
+      "netActive": "Active Contracts",
+      "activated": "Activated",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
     }
   },
   "metrics": {
-    "totalRevenue": {
-      "label": "Total Revenue",
-      "trend": "Trending up this month",
-      "footer": "Visitors for the last 6 months"
+    "ativo": {
+      "label": "Active Contracts",
+      "footer": "Currently active"
     },
-    "newCustomers": {
-      "label": "New Customers",
-      "trend": "Down 20% this period",
-      "footer": "Acquisition needs attention"
+    "pendente": {
+      "label": "Pending",
+      "footer": "Awaiting activation"
     },
-    "activeAccounts": {
-      "label": "Active Accounts",
-      "trend": "Strong user retention",
-      "footer": "Engagement exceed targets"
+    "encerrado": {
+      "label": "Closed",
+      "footer": "Completed contracts"
     },
-    "growthRate": {
-      "label": "Growth Rate",
-      "trend": "Steady performance increase",
-      "footer": "Meets growth projections"
+    "cancelado": {
+      "label": "Cancelled",
+      "footer": "Cancelled contracts"
     }
   },
   "dataTable": {

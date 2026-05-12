@@ -95,6 +95,8 @@ export default defineSchema({
     agencyId: v.id("agencies"),
     publicId: v.string(),
     status: contractStatus,
+    activatedAt: v.union(v.string(), v.null()),
+    deactivatedAt: v.optional(v.union(v.string(), v.null())),
     nextRenewalDate: v.string(),
     availableGuaranteeCents: v.number(),
 

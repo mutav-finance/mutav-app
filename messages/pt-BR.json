@@ -50,39 +50,40 @@
     }
   },
   "chart": {
-    "totalVisitors": "Total de Visitantes",
-    "rangeLong": "Total dos últimos 3 meses",
-    "rangeShort": "Últimos 3 meses",
-    "last3Months": "Últimos 3 meses",
-    "last30Days": "Últimos 30 dias",
-    "last7Days": "Últimos 7 dias",
+    "title": "Contratos sob Gestão",
+    "descriptionLong": "Total de contratos criados nos últimos meses",
+    "descriptionShort": "Contratos por mês",
+    "last6Months": "Últimos 6 meses",
+    "last12Months": "Últimos 12 meses",
     "selectRangeAriaLabel": "Selecione um período",
     "series": {
-      "visitors": "Visitantes",
+      "contracts": "Contratos",
       "desktop": "Desktop",
-      "mobile": "Móvel"
+      "mobile": "Mobile",
+      "newActivations": "Novas Ativações",
+      "cumulative": "Total Acumulado",
+      "netActive": "Contratos Ativos",
+      "activated": "Ativados",
+      "cancelled": "Cancelados",
+      "expired": "Encerrados"
     }
   },
   "metrics": {
-    "totalRevenue": {
-      "label": "Receita Total",
-      "trend": "Em alta este mês",
-      "footer": "Visitantes nos últimos 6 meses"
+    "ativo": {
+      "label": "Contratos Ativos",
+      "footer": "Contratos em vigor"
     },
-    "newCustomers": {
-      "label": "Novos Clientes",
-      "trend": "Queda de 20% no período",
-      "footer": "Aquisição precisa de atenção"
+    "pendente": {
+      "label": "Pendentes",
+      "footer": "Aguardando ativação"
     },
-    "activeAccounts": {
-      "label": "Contas Ativas",
-      "trend": "Forte retenção de usuários",
-      "footer": "Engajamento supera as metas"
+    "encerrado": {
+      "label": "Encerrados",
+      "footer": "Contratos concluídos"
     },
-    "growthRate": {
-      "label": "Taxa de Crescimento",
-      "trend": "Aumento de desempenho constante",
-      "footer": "Atinge as projeções de crescimento"
+    "cancelado": {
+      "label": "Cancelados",
+      "footer": "Contratos cancelados"
     }
   },
   "dataTable": {
