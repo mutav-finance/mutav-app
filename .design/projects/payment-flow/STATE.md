@@ -17,7 +17,7 @@
 | 2 | Research | complete | 2026-05-13 | 2026-05-13 |
 | 3 | Design | complete | 2026-05-13 | 2026-05-13 |
 | 4 | Critique | complete | 2026-05-13 | 2026-05-13 |
-| 5 | Build | pending | — | — |
+| 5 | Build | partial | 2026-05-13 | — |
 | 6 | Review | pending | — | — |
 
 ## Status Values

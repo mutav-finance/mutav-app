@@ -21,7 +21,9 @@
   "siteHeader": {
     "title": "Documentos"
   },
-  "brand": { "name": "Acme Inc." },
+  "brand": {
+    "name": "Acme Inc."
+  },
   "nav": {
     "main": {
       "createContract": "Criar Contrato",
@@ -303,7 +305,8 @@
       "label": "Carregando contrato"
     }
   },
-  "contractList": {    "meta": {
+  "contractList": {
+    "meta": {
       "title": "Contratos | SGR",
       "description": "Lista de contratos da imobiliária"
     },
@@ -447,7 +450,11 @@
       "txIdEmpty": "Aguardando pagamento",
       "address": "Endereço de destino",
       "txHash": "Hash da transação",
-      "txHashEmpty": "Aguardando confirmação on-chain"
+      "txHashEmpty": "Aguardando confirmação on-chain",
+      "generateStellar": "Pagar com Stellar",
+      "openPayPage": "Abrir página de pagamento",
+      "copyShareLink": "Copiar link",
+      "linkCopied": "Link copiado"
     },
     "notFound": {
       "title": "Fatura não encontrada",
@@ -461,6 +468,53 @@
     },
     "loading": {
       "label": "Carregando fatura"
+    }
+  },
+  "paymentFlow": {
+    "meta": {
+      "title": "Pagar com Stellar — {publicId}",
+      "description": "Pague a fatura TGA via rede Stellar."
+    },
+    "shell": {
+      "brand": "mutav",
+      "paymentLabel": "Fatura",
+      "footerBrand": "Mutav · Protocolo de Garantia de Aluguel"
+    },
+    "summary": {
+      "dueLabel": "Vence em",
+      "amountLabel": "Valor a pagar",
+      "paidAtLabel": "Pago em"
+    },
+    "copy": {
+      "toast": "Copiado"
+    },
+    "address": {
+      "cardLabel": "Endereço de pagamento",
+      "copyLabel": "Copiar endereço de pagamento",
+      "pollerLabel": "Aguardando pagamento na rede",
+      "qrTitle": "Código de pagamento Stellar — {amount}",
+      "qrDesc": "Use a câmera de uma carteira Stellar. Como alternativa, copie o endereço abaixo.",
+      "disclosureLabel": "Como pagar via Stellar",
+      "steps": {
+        "s1": "Abra um aplicativo de carteira Stellar.",
+        "s2": "Escaneie o código acima ou toque em \"Abrir em carteira\".",
+        "s3": "Confirme o valor e o destinatário na sua carteira.",
+        "s4": "Envie o pagamento.",
+        "s5": "Aguarde a confirmação nesta página — o status atualiza sozinho."
+      },
+      "pageTitle": "Pagar com Stellar",
+      "pageSubtitle": "Envie o valor abaixo para o endereço gerado para esta fatura.",
+      "copyPaymentLinkLabel": "Copiar link de pagamento {asset}",
+      "paymentLinkHint": "Cole este link em uma carteira Stellar — destino, valor e ativo já vão preenchidos.",
+      "paymentLinkLabel": "Link de pagamento ({asset})",
+      "addressFallbackLabel": "Endereço",
+      "copyAddressLabel": "Copiar endereço da fatura"
+    },
+    "receipt": {
+      "title": "Pagamento confirmado",
+      "subtitle": "Recebemos seu pagamento na rede Stellar. Você pode fechar esta página.",
+      "paidAtLabel": "Confirmado em",
+      "txHashLabel": "Transação"
     }
   }
 }

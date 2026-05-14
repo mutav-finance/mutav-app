@@ -47,4 +47,16 @@ crons.cron(
  */
 crons.cron("mark overdue payments", "5 0 * * *", internal.crons.runMarkOverdue, {});
 
+/**
+ * Every 30 seconds.
+ * Polls Stellar Horizon for incoming muxed payments to the Mutav treasury
+ * and marks matching invoices as paid.
+ */
+crons.interval(
+  "poll stellar treasury",
+  { seconds: 30 },
+  internal.payments.actions.checkMutavTreasuryPayments,
+  {},
+);
+
 export default crons;

@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { query } from "../_generated/server";
-import { paymentStateKindValidator, type Payment } from "./domain";
+import { internalQuery, query } from "../_generated/server";
+import { isChargeable, paymentStateKindValidator, type Payment } from "./domain";
+import { derivePaymentMuxedAddress } from "./lib/muxedAddress";
 
 export const listByAgency = query({
   args: {
@@ -61,6 +62,67 @@ export const getByPublicId = query({
 });
 
 /**
+ * Tenant-safe shape for the public payment portal. No auth required — the
+ * high-entropy `publicId` IS the bearer. Excludes agency-private fields,
+ * carries the derived Stellar `M…` destination address.
+ */
+export const getPublicByPublicId = query({
+  args: { publicId: v.string() },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
+      .unique();
+    if (!payment) return null;
+
+    const agency = await ctx.db.get(payment.agencyId);
+    if (!agency) return null;
+
+    const muxedAddress = payment.muxedId ? derivePaymentMuxedAddress(payment.muxedId) : null;
+
+    return {
+      publicId: payment.publicId,
+      agencyName: agency.name,
+      periodMonth: payment.periodMonth,
+      issuedAt: payment.issuedAt,
+      dueDate: payment.dueDate,
+      totalCents: payment.totalCents,
+      state: payment.state,
+      method: payment.method,
+      muxedAddress,
+    };
+  },
+});
+
+/**
+ * Internal — look up a payment by its Stellar muxed-id. O(1) via
+ * `by_muxedId` index. Used by the Horizon-polling reconciler.
+ */
+export const findByMuxedId = internalQuery({
+  args: { muxedId: v.string() },
+  handler: async (ctx, { muxedId }) => {
+    return ctx.db
+      .query("payments")
+      .withIndex("by_muxedId", (q) => q.eq("muxedId", muxedId))
+      .unique();
+  },
+});
+
+/**
+ * Internal — current Horizon cursor for a given treasury source account.
+ * Used by the polling action to resume from the last seen page.
+ */
+export const getStellarIndexState = internalQuery({
+  args: { sourceAccount: v.string() },
+  handler: async (ctx, { sourceAccount }) => {
+    return ctx.db
+      .query("stellarIndexState")
+      .withIndex("by_sourceAccount", (q) => q.eq("sourceAccount", sourceAccount))
+      .unique();
+  },
+});
+
+/**
  * Returns the next pending or overdue payment for the agency, ordered by
  * periodMonth ascending (earliest first).
  *
@@ -77,14 +139,16 @@ export const getNextPendingPayment = query({
       .order("asc")
       .collect();
 
-    const next = page.find((p) => p.state.kind === "pending" || p.state.kind === "overdue");
+    const next = page.find((p) => isChargeable(p.state));
 
     if (!next) return null;
+    const stateKind = next.state.kind;
+    if (stateKind !== "pending" && stateKind !== "overdue") return null;
     return {
       publicId: next.publicId,
       dueDate: next.dueDate,
       totalCents: next.totalCents,
-      stateKind: next.state.kind as "pending" | "overdue",
+      stateKind,
     };
   },
 });

@@ -99,7 +99,9 @@ This file is the entry point for coding agents consuming GSP design output.
 <!-- BEGIN:build -->
 | Section | File |
 |---------|------|
-| _(populated by /gsp-project-build)_ | |
+| Scaffold Log | [SCAFFOLD-LOG.md](../build/SCAFFOLD-LOG.md) |
+| Build Log | [BUILD-LOG.md](../build/BUILD-LOG.md) |
+| Manifest | [MANIFEST.md](../codebase/MANIFEST.md) |
 <!-- END:build -->
 
 ## QA Review

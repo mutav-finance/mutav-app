@@ -12,4 +12,4 @@ mode: new · `.design/branding/tga/`
 brand: tga · next: gsp-project-review · .design/projects/contract-details/
 
 ### payment-flow · in progress · 2026-05-13
-brand: tga · next: gsp-project-critique · .design/projects/payment-flow/
+brand: tga · next: gsp-project-review (or follow-up issues for receipt/expired/poller-live) · .design/projects/payment-flow/

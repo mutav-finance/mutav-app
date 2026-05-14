@@ -69,6 +69,13 @@ export const PaymentStates = {
 
 // ─── Method constructors (type-safe helpers) ──────────────────────────────────
 
+// ─── Predicates ───────────────────────────────────────────────────────────────
+
+/** A payment is chargeable while its state is awaiting (or past) the due date. */
+export function isChargeable(state: PaymentState): boolean {
+  return state.kind === PAYMENT_STATE_KIND.PENDING || state.kind === PAYMENT_STATE_KIND.OVERDUE;
+}
+
 export const PaymentMethods = {
   boleto: (barcode: string | null = null): Extract<PaymentMethod, { kind: "boleto" }> => ({
     kind: "boleto",
