@@ -1,7 +1,14 @@
+"use client";
+
 import { useTranslations } from "next-intl";
+import { ExternalLink, Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mono } from "@/components/ui/mono";
-import type { Payment } from "@convex/payments/domain";
+import { Link, getPathname } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { isChargeable, type Payment } from "@convex/payments/domain";
 
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -12,9 +19,61 @@ function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function ShareTenantLink({ publicId }: { publicId: string }) {
+  const t = useTranslations("paymentDetails.methodCard");
+  const locale = useLocale();
+  const { copied, copy } = useCopyToClipboard(t("linkCopied"));
+
+  const handleCopy = () => {
+    const path = getPathname({
+      href: `/pagar/${publicId}/endereco`,
+      locale: locale as "pt-BR" | "en",
+    });
+    copy(`${window.location.origin}${path}`);
+  };
+
+  return (
+    <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
+      {copied ? (
+        <Check className="size-4" strokeWidth={1.25} />
+      ) : (
+        <Copy className="size-4" strokeWidth={1.25} />
+      )}
+      {t("copyShareLink")}
+    </Button>
+  );
+}
+
+function ChargeableActions({
+  publicId,
+  variant,
+}: {
+  publicId: string;
+  variant: "primary" | "secondary";
+}) {
+  const t = useTranslations("paymentDetails.methodCard");
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        asChild
+        size="sm"
+        variant={variant === "primary" ? "default" : "outline"}
+        className="gap-2"
+      >
+        <Link href={`/pagar/${publicId}/endereco`} target="_blank" rel="noopener">
+          {variant === "primary" ? t("generateStellar") : t("openPayPage")}
+          <ExternalLink className="size-4" strokeWidth={1.25} />
+        </Link>
+      </Button>
+      <ShareTenantLink publicId={publicId} />
+    </div>
+  );
+}
+
 export function PaymentMethodCard({ payment }: { payment: Payment }) {
   const t = useTranslations("paymentDetails.methodCard");
   const method = payment.method;
+  const chargeable = isChargeable(payment.state);
 
   return (
     <Card>
@@ -25,9 +84,12 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
       </CardHeader>
       <CardContent className="py-4">
         {!method && (
-          <div className="flex flex-col gap-1">
-            <p className="text-foreground text-sm font-medium">{t("none")}</p>
-            <p className="text-muted-foreground text-xs">{t("noneHint")}</p>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <p className="text-foreground text-sm font-medium">{t("none")}</p>
+              <p className="text-muted-foreground text-xs">{t("noneHint")}</p>
+            </div>
+            {chargeable && <ChargeableActions publicId={payment.publicId} variant="primary" />}
           </div>
         )}
 
@@ -66,22 +128,25 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
         )}
 
         {method?.kind === "stellar" && (
-          <dl className="flex flex-col gap-3">
-            <FieldRow
-              label={t("address")}
-              value={<Mono className="text-xs break-all">{method.destinationAddress}</Mono>}
-            />
-            <FieldRow
-              label={t("txHash")}
-              value={
-                method.txHash ? (
-                  <Mono className="text-xs break-all">{method.txHash}</Mono>
-                ) : (
-                  <span className="text-muted-foreground text-xs italic">{t("txHashEmpty")}</span>
-                )
-              }
-            />
-          </dl>
+          <div className="flex flex-col gap-4">
+            <dl className="flex flex-col gap-3">
+              <FieldRow
+                label={t("address")}
+                value={<Mono className="text-xs break-all">{method.destinationAddress}</Mono>}
+              />
+              <FieldRow
+                label={t("txHash")}
+                value={
+                  method.txHash ? (
+                    <Mono className="text-xs break-all">{method.txHash}</Mono>
+                  ) : (
+                    <span className="text-muted-foreground text-xs italic">{t("txHashEmpty")}</span>
+                  )
+                }
+              />
+            </dl>
+            {chargeable && <ChargeableActions publicId={payment.publicId} variant="secondary" />}
+          </div>
         )}
       </CardContent>
     </Card>
