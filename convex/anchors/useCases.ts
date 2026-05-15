@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery, query } from "../_generated/server";
 import { PaymentMethods } from "../payments/domain";
 import { transactionStatusValidator, type TransactionStatus } from "./domain";
 
@@ -10,6 +10,18 @@ export const getOnRampTransactionById = internalQuery({
   handler: async (ctx, { id }) => {
     return ctx.db.get(id);
   },
+});
+
+// ─── Public queries ───────────────────────────────────────────────────────────
+
+/**
+ * Public-facing read of a single on-ramp row, so the `PaymentMethodCard`
+ * client component can subscribe to status changes (e.g. flips from
+ * `pending` → `completed` when the webhook in WC fires).
+ */
+export const getOnRampTransaction = query({
+  args: { id: v.id("anchorOnRampTransactions") },
+  handler: async (ctx, { id }) => ctx.db.get(id),
 });
 
 /** Look up an on-ramp row by `(provider, providerTransactionId)`. */
