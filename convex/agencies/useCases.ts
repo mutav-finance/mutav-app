@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query } from "../_generated/server";
+import { internalMutation, query } from "../_generated/server";
+import { etherfuseOnboardingStatusValidator } from "./domain";
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
 
@@ -79,5 +80,35 @@ export const getMembership = query({
       .query("memberships")
       .withIndex("by_user_agency", (q) => q.eq("userId", args.userId).eq("agencyId", args.agencyId))
       .unique();
+  },
+});
+
+// ─── Etherfuse onboarding mutations ───────────────────────────────────────────
+
+/**
+ * Patches an agency's Etherfuse onboarding state. Called by the webhook handler
+ * when Etherfuse fires kyc_updated events. `etherfuseOrgId` is optional so the
+ * caller can update only the status (e.g. pending → approved) without touching
+ * the org id, or set it (including to null) when the org is provisioned/cleared.
+ */
+export const updateEtherfuseStatus = internalMutation({
+  args: {
+    agencyId: v.id("agencies"),
+    status: etherfuseOnboardingStatusValidator,
+    etherfuseOrgId: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, { agencyId, status, etherfuseOrgId }) => {
+    const agency = await ctx.db.get(agencyId);
+    if (!agency) {
+      return { ok: false as const, reason: "agency_not_found" as const };
+    }
+    const patch: { etherfuseOnboardingStatus: typeof status; etherfuseOrgId?: string | null } = {
+      etherfuseOnboardingStatus: status,
+    };
+    if (etherfuseOrgId !== undefined) {
+      patch.etherfuseOrgId = etherfuseOrgId;
+    }
+    await ctx.db.patch(agencyId, patch);
+    return { ok: true as const };
   },
 });
