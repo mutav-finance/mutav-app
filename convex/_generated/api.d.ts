@@ -16,6 +16,7 @@ import type * as contracts_domain from "../contracts/domain.js";
 import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_useCases from "../contracts/useCases.js";
 import type * as crons from "../crons.js";
+import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_env from "../lib/env.js";
 import type * as payments_actions from "../payments/actions.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "contracts/mutations": typeof contracts_mutations;
   "contracts/useCases": typeof contracts_useCases;
   crons: typeof crons;
+  http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/env": typeof lib_env;
   "payments/actions": typeof payments_actions;
