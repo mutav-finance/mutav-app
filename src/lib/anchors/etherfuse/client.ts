@@ -54,6 +54,8 @@ import type {
     EtherfuseOrderStatus,
     EtherfuseKycIdentityRequest,
     EtherfuseKycDocumentRequest,
+    EtherfuseCreateOrganizationRequest,
+    EtherfuseCreateOrganizationResponse,
 } from './types';
 
 /**
@@ -347,13 +349,19 @@ export class EtherfuseClient implements Anchor {
     // =========================================================================
 
     /**
-     * Create a new customer via the Etherfuse onboarding flow.
+     * Create a new customer (or child organization) on Etherfuse.
      *
-     * Generates a partner-side UUID for the customer and requests a presigned
-     * onboarding URL. The URL is stored internally but not directly returned —
-     * use {@link getKycUrl} to retrieve it.
+     * Routing by `input.country`:
+     * - `"BR"` → creates a **business** child organization via
+     *   `POST /ramp/organization` with `accountType: "business"`. The Stellar
+     *   wallet is registered with the org and a partner-side UUID is used for
+     *   the organization ID. `userInfo` is omitted (the API rejects it for
+     *   business orgs). Pass `defaultPartnerFeeBps` on {@link EtherfuseConfig}
+     *   to apply a partner fee.
+     * - anything else (default `"MX"`) → personal KYC flow via
+     *   `POST /ramp/onboarding-url`, which generates a presigned onboarding URL.
      *
-     * @param input - Customer email and Stellar public key.
+     * @param input - Customer email, country, and Stellar public key.
      * @returns A {@link Customer} with `kycStatus` set to `"not_started"`.
      * @throws {AnchorError} If `publicKey` is missing or on API failure.
      */
@@ -372,6 +380,10 @@ export class EtherfuseClient implements Anchor {
                 'INVALID_PUBLIC_KEY',
                 400,
             );
+        }
+
+        if (input.country === 'BR') {
+            return this.createBusinessCustomer(input);
         }
 
         const customerId = crypto.randomUUID();
@@ -437,6 +449,51 @@ export class EtherfuseClient implements Anchor {
             }
             throw err;
         }
+    }
+
+    /**
+     * Create a Brazil-targeted business (KYB) child organization on Etherfuse.
+     *
+     * Internal helper invoked by {@link createCustomer} when `country === "BR"`.
+     * Sends `accountType: "business"` to `POST /ramp/organization` and registers
+     * the user's Stellar wallet at creation time. `userInfo` is intentionally
+     * omitted — the Etherfuse API rejects it for business account types.
+     *
+     * @param input - Customer details (Stellar public key required).
+     * @returns A {@link Customer} keyed by the new organization ID.
+     */
+    private async createBusinessCustomer(input: CreateCustomerInput): Promise<Customer> {
+        const organizationId = crypto.randomUUID();
+        const publicKey = input.publicKey as string;
+
+        const body: EtherfuseCreateOrganizationRequest = {
+            id: organizationId,
+            accountType: 'business',
+            wallets: [{ publicKey, blockchain: 'stellar' }],
+        };
+        if (input.name) {
+            body.displayName = input.name.slice(0, 200);
+        }
+        if (typeof this.config.defaultPartnerFeeBps === 'number') {
+            body.partnerFeeDefaultBps = this.config.defaultPartnerFeeBps;
+        }
+
+        const response = await this.request<EtherfuseCreateOrganizationResponse>(
+            'POST',
+            '/ramp/organization',
+            body,
+        );
+
+        const now = new Date().toISOString();
+        return {
+            id: response.organizationId,
+            email: input.email,
+            kycStatus: 'not_started',
+            country: input.country,
+            bankAccountId: response.bankAccount?.id,
+            createdAt: now,
+            updatedAt: now,
+        };
     }
 
     /**

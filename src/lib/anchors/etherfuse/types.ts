@@ -14,6 +14,12 @@ export interface EtherfuseConfig {
     baseUrl: string;
     /** Default blockchain for operations. Defaults to `"stellar"`. */
     defaultBlockchain?: string;
+    /**
+     * Optional default partner fee in basis points (0–500) applied when this
+     * client creates a business (KYB) child organization. Only used on the
+     * Brazil path that routes through `POST /ramp/organization`.
+     */
+    defaultPartnerFeeBps?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -30,6 +36,55 @@ export interface EtherfuseOnboardingRequest {
     publicKey: string;
     /** Blockchain identifier (e.g. `"stellar"`). */
     blockchain: string;
+}
+
+/**
+ * Request body for `POST /ramp/organization` when creating a business (KYB)
+ * child organization. `userInfo` is intentionally absent — the Etherfuse API
+ * rejects it for business account types.
+ */
+export interface EtherfuseCreateOrganizationRequest {
+    /** Optional UUID to use as the new organization's primary key. */
+    id?: string;
+    /** Optional display name for the organization (≤ 200 chars). */
+    displayName?: string;
+    /** Account type. Use `"business"` for KYB flows. */
+    accountType: 'personal' | 'business';
+    /** Optional wallets to register at creation time. */
+    wallets?: Array<{
+        /** Optional UUID for the wallet record. */
+        id?: string;
+        /** Public key of the wallet. */
+        publicKey: string;
+        /** Blockchain identifier. */
+        blockchain: 'solana' | 'stellar' | 'base' | 'polygon' | 'monad';
+    }>;
+    /** Optional default partner fee in basis points (0–500). */
+    partnerFeeDefaultBps?: number;
+}
+
+/** Response from `POST /ramp/organization`. */
+export interface EtherfuseCreateOrganizationResponse {
+    /** ID of the newly created organization. */
+    organizationId: string;
+    /** Display name of the organization. */
+    displayName: string;
+    /** Account type the organization was created with. */
+    accountType: 'personal' | 'business';
+    /** Default partner fee in basis points for this organization. */
+    partnerFeeDefaultBps?: number;
+    /** Wallets registered with the organization. */
+    wallets?: Array<{
+        id: string;
+        publicKey: string;
+        blockchain: string;
+    }>;
+    /** Bank account registered with the organization, if any. */
+    bankAccount?: {
+        id: string;
+        label: string | null;
+        status: string;
+    } | null;
 }
 
 /** Quote asset pair with ramp direction. */
