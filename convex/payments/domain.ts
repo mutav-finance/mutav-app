@@ -96,4 +96,14 @@ export const PaymentMethods = {
     pixKey,
     txId,
   }),
+  pixAnchor: (
+    anchorOnRampTransactionId: Id<"anchorOnRampTransactions">,
+    pixCode: string,
+    expiresAt: string,
+  ): Extract<PaymentMethod, { kind: "pix_anchor" }> => ({
+    kind: "pix_anchor",
+    anchorOnRampTransactionId,
+    pixCode,
+    expiresAt,
+  }),
 } as const;
