@@ -8,7 +8,17 @@ import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
 import { NavAgency } from "@/components/nav-agency";
 import { AgencySwitcher } from "@/components/agency-switcher";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import {
   LayoutDashboardIcon,
   ChartBarIcon,
@@ -22,13 +32,14 @@ import {
   ShieldCheckIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { useWorkspace } from "@/providers/workspace";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const tMain = useTranslations("nav.main");
   const tSecondary = useTranslations("nav.secondary");
   const tDocs = useTranslations("nav.documents");
-  const { currentUser } = useWorkspace();
+  const { currentUser, selectedAgency } = useWorkspace();
 
   const navMain = [
     { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
@@ -62,6 +73,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navMain} />
         <NavDocuments items={documents} />
         <NavAgency />
+        {selectedAgency?.role === "owner" && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Etherfuse admin">
+                    <Link href={`/admin/agencies/${selectedAgency._id}/etherfuse`}>
+                      <Settings2Icon />
+                      {/* TODO(i18n): add nav.adminEtherfuse to messages/{locale}.json */}
+                      <span>Etherfuse admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
