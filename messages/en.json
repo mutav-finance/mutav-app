@@ -24,6 +24,22 @@
   "brand": {
     "name": "Acme Inc."
   },
+  "admin": {
+    "etherfuse": {
+      "title": "Etherfuse integration",
+      "connect": "Connect Etherfuse",
+      "status": {
+        "not_started": "Not started",
+        "pending": "Pending KYB review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "update_required": "Update required"
+      },
+      "orgId": "Etherfuse org ID",
+      "onboardingSuccess": "Onboarding started",
+      "onboardingError": "Failed to start onboarding: {message}"
+    }
+  },
   "nav": {
     "main": {
       "createContract": "Create Contract",
@@ -411,7 +427,8 @@
       "none": "Not set",
       "boleto": "Boleto",
       "pix": "PIX",
-      "stellar": "Stellar"
+      "stellar": "Stellar",
+      "pix_anchor": "PIX-anchor (TESOURO)"
     },
     "summary": {
       "heading": "Summary",
@@ -454,7 +471,15 @@
       "generateStellar": "Pay with Stellar",
       "openPayPage": "Open payment page",
       "copyShareLink": "Copy link",
-      "linkCopied": "Link copied"
+      "linkCopied": "Link copied",
+      "pixAnchorCode": "PIX code",
+      "pixAnchorExpiresIn": "Expires in {seconds}s",
+      "pixAnchorExpired": "QR expired — regenerate",
+      "pixAnchorCopy": "Copy code",
+      "pixAnchorCopied": "Code copied",
+      "pixAnchorRegenerate": "Regenerate QR",
+      "pixAnchorNotEligible": "Agency not yet enabled for PIX-anchor",
+      "pixAnchorSettling": "Settling on-chain…"
     },
     "notFound": {
       "title": "Invoice not found",
