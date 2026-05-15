@@ -20,6 +20,11 @@ const eslintConfig = defineConfig([
       // Local agent tooling — not project source.
       ".claude/**",
       ".agents/**",
+      // Vendored anchor SDK from github.com/ElliotFriend/regional-starter-pack.
+      // Kept verbatim so we can pull upstream updates with a clean diff.
+      "src/lib/anchors/**",
+      // Operator-run sandbox smoke test — vendored shape, not production code.
+      "scripts/etherfuse-smoke.ts",
     ],
   },
   ...nextVitals,
