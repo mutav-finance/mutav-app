@@ -46,18 +46,24 @@ export const fictionalContracts = internalMutation({
       name: "Imobiliária Paulista",
       cnpj: "00000000000100",
       createdAt: d("2024-03-01T00:00:00-03:00"),
+      etherfuseOrgId: null,
+      etherfuseOnboardingStatus: "not_started",
     });
 
     const atlanticaId: Id<"agencies"> = await ctx.db.insert("agencies", {
       name: "Imobiliária Atlântica",
       cnpj: "00000000000200",
       createdAt: d("2024-06-15T00:00:00-03:00"),
+      etherfuseOrgId: null,
+      etherfuseOnboardingStatus: "not_started",
     });
 
     const horizonteId: Id<"agencies"> = await ctx.db.insert("agencies", {
       name: "Horizonte Imóveis",
       cnpj: "00000000000300",
       createdAt: d("2025-01-10T00:00:00-03:00"),
+      etherfuseOrgId: null,
+      etherfuseOnboardingStatus: "not_started",
     });
 
     // ── Users ──────────────────────────────────────────────────────────────────
