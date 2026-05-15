@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, query } from "../_generated/server";
+import { internalMutation, internalQuery, query } from "../_generated/server";
 import { etherfuseOnboardingStatusValidator } from "./domain";
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
@@ -80,6 +80,23 @@ export const getMembership = query({
       .query("memberships")
       .withIndex("by_user_agency", (q) => q.eq("userId", args.userId).eq("agencyId", args.agencyId))
       .unique();
+  },
+});
+
+// ─── Etherfuse lookups ────────────────────────────────────────────────────────
+
+/**
+ * Resolve an agency from an Etherfuse `customerId` (we store it as
+ * `etherfuseOrgId`). Used by the webhook handler to route `kyc_updated`
+ * events to the right agency. No dedicated index — agencies are a
+ * low-cardinality table (hundreds at most for the foreseeable future);
+ * add `by_etherfuseOrgId` if we ever scale to thousands.
+ */
+export const findAgencyByEtherfuseOrgId = internalQuery({
+  args: { etherfuseOrgId: v.string() },
+  handler: async (ctx, { etherfuseOrgId }) => {
+    const all = await ctx.db.query("agencies").collect();
+    return all.find((a) => a.etherfuseOrgId === etherfuseOrgId) ?? null;
   },
 });
 

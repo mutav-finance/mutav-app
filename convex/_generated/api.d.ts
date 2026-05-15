@@ -13,6 +13,7 @@ import type * as agencies_useCases from "../agencies/useCases.js";
 import type * as anchors_actions from "../anchors/actions.js";
 import type * as anchors_domain from "../anchors/domain.js";
 import type * as anchors_useCases from "../anchors/useCases.js";
+import type * as anchors_webhook from "../anchors/webhook.js";
 import type * as contracts_aggregate from "../contracts/aggregate.js";
 import type * as contracts_backfill from "../contracts/backfill.js";
 import type * as contracts_domain from "../contracts/domain.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "anchors/actions": typeof anchors_actions;
   "anchors/domain": typeof anchors_domain;
   "anchors/useCases": typeof anchors_useCases;
+  "anchors/webhook": typeof anchors_webhook;
   "contracts/aggregate": typeof contracts_aggregate;
   "contracts/backfill": typeof contracts_backfill;
   "contracts/domain": typeof contracts_domain;
