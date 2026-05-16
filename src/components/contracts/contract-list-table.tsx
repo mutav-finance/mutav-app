@@ -185,6 +185,7 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
     [result],
   );
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
+  const noAgency = !workspaceLoading && agencyId === undefined;
 
   const columns = React.useMemo(() => buildColumns(t, tStatus), [t, tStatus]);
 
@@ -268,6 +269,14 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
   if (isLoading) {
     return (
       <div className="text-muted-foreground px-4 py-8 text-center text-sm">{t("loading")}</div>
+    );
+  }
+
+  if (noAgency) {
+    return (
+      <div className="text-muted-foreground px-4 py-8 text-center text-sm">
+        {t("noAgencySelected")}
+      </div>
     );
   }
 

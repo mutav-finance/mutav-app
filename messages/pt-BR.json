@@ -281,9 +281,14 @@
       "cancelProposalHint": "Disponível apenas para contratos pendentes",
       "cancelDialog": {
         "title": "Cancelar proposta?",
-        "description": "Esta ação não pode ser desfeita. A proposta será removida permanentemente.",
+        "description": "O contrato será marcado como cancelado. O histórico será preservado.",
         "confirm": "Sim, cancelar",
+        "cancelling": "Cancelando…",
         "back": "Voltar"
+      },
+      "errors": {
+        "NOT_FOUND": "Proposta não encontrada.",
+        "NOT_PENDING": "Apenas propostas pendentes podem ser canceladas."
       },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",
@@ -432,6 +437,7 @@
     "emptyStateCta": "Criar seu primeiro contrato",
     "noResults": "Nenhum contrato encontrado",
     "loading": "Carregando contratos…",
+    "noAgencySelected": "Selecione uma imobiliária para ver os contratos.",
     "errors": {
       "title": "Erro ao carregar contratos",
       "body": "Não foi possível carregar a lista. Tente novamente.",

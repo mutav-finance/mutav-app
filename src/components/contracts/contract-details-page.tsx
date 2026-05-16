@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { usePreloadedQuery, type Preloaded } from "convex/react";
-import { useRouter } from "@/i18n/navigation";
+import { notFound } from "next/navigation";
 import { PageContent } from "@/components/page/page-content";
 import { PageHeader } from "@/components/page/page-header";
 import { PageShell } from "@/components/page/page-shell";
@@ -29,14 +29,12 @@ export function ContractDetailsPage({
   preloaded: Preloaded<typeof api.contracts.useCases.getByPublicId>;
 }) {
   const contract = usePreloadedQuery(preloaded);
-  const router = useRouter();
   const t = useTranslations("contractDetails");
   const tNav = useTranslations("nav.main");
   const tStatus = useTranslations("contractDetails.status");
 
   if (contract === null) {
-    router.replace("/contracts");
-    return null;
+    notFound();
   }
 
   return (

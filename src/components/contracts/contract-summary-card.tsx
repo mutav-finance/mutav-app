@@ -43,14 +43,21 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
   const t = useTranslations("contractDetails.summary");
   const tStatus = useTranslations("contractDetails.status");
   const isPending = contract.status === "pendente";
-  const deleteProposal = useMutation(api.contracts.useCases.deleteProposal);
+  const cancelProposal = useMutation(api.contracts.useCases.cancelProposal);
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [isCancelling, setIsCancelling] = React.useState(false);
 
   async function handleConfirmCancel() {
+    setIsCancelling(true);
     try {
-      await deleteProposal({ publicId: contract.id });
-    } catch {
-      toast.error("Erro ao cancelar proposta. Tente novamente.");
+      const result = await cancelProposal({ publicId: contract.id });
+      if (result.success) {
+        setCancelOpen(false);
+      } else {
+        toast.error(t(`errors.${result.error.code}`));
+      }
+    } finally {
+      setIsCancelling(false);
     }
   }
 
@@ -177,8 +184,8 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("cancelDialog.back")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmCancel}>
-              {t("cancelDialog.confirm")}
+            <AlertDialogAction onClick={handleConfirmCancel} disabled={isCancelling}>
+              {isCancelling ? t("cancelDialog.cancelling") : t("cancelDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

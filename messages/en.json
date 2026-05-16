@@ -281,9 +281,14 @@
       "cancelProposalHint": "Available only for pending contracts",
       "cancelDialog": {
         "title": "Cancel proposal?",
-        "description": "This action cannot be undone. The proposal will be permanently removed.",
+        "description": "The contract will be marked as cancelled. History will be preserved.",
         "confirm": "Yes, cancel",
+        "cancelling": "Cancelling…",
         "back": "Go back"
+      },
+      "errors": {
+        "NOT_FOUND": "Proposal not found.",
+        "NOT_PENDING": "Only pending proposals can be cancelled."
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this contract",
@@ -432,6 +437,7 @@
     "emptyStateCta": "Create your first contract",
     "noResults": "No contracts found",
     "loading": "Loading contracts…",
+    "noAgencySelected": "Select an agency to view contracts.",
     "errors": {
       "title": "Could not load contracts",
       "body": "We couldn't load the list. Please try again.",

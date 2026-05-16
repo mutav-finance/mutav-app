@@ -32,8 +32,8 @@ const URGENCY_ORDER: Record<UrgencyTier, number> = {
  *
  * Thresholds (for `ativo` contracts):
  *  - overdue:  nextRenewalDate is in the past
- *  - expiring: 1–20 days until renewal (needs renewal action)
- *  - critical: 21–60 days until renewal
+ *  - expiring: 1–30 days until renewal (needs renewal action)
+ *  - critical: 31–60 days until renewal
  *  - warning:  61–120 days until renewal
  *  - ok:       > 120 days until renewal
  */
@@ -44,6 +44,7 @@ export function getUrgencyTier(status: ContractStatus, nextRenewalDate: string):
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const renewal = new Date(nextRenewalDate);
+  if (Number.isNaN(renewal.getTime())) return "inactive";
   const daysUntil = Math.floor((renewal.getTime() - today.getTime()) / 86_400_000);
 
   if (daysUntil < 0) return "overdue";

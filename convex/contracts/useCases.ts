@@ -330,8 +330,7 @@ export const create = mutation({
   },
 });
 
-/** Permanently deletes a pending contract and its history. */
-export const deleteProposal = mutation({
+export const cancelProposal = mutation({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
     const contract = await ctx.db
@@ -339,16 +338,26 @@ export const deleteProposal = mutation({
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
 
-    if (!contract) return;
-    if (contract.status !== "pendente") throw new Error("Only pending proposals can be deleted");
+    if (!contract) {
+      return { success: false, error: { code: "NOT_FOUND" } } as const;
+    }
+    if (contract.status !== "pendente") {
+      return { success: false, error: { code: "NOT_PENDING" } } as const;
+    }
 
-    const history = await ctx.db
-      .query("contractHistory")
-      .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
-      .collect();
+    await ctx.db.patch(contract._id, { status: "cancelado" });
+    const after = await ctx.db.get(contract._id);
+    if (after) await contractsByStatus.replace(ctx, contract, after);
 
-    await Promise.all(history.map((h) => ctx.db.delete(h._id)));
-    await ctx.db.delete(contract._id);
+    await ctx.db.insert("contractHistory", {
+      agencyId: contract.agencyId,
+      contractPublicId: args.publicId,
+      at: new Date().toISOString(),
+      username: "Sistema",
+      message: "Proposta cancelada",
+    });
+
+    return { success: true, data: { cancelled: true } } as const;
   },
 });
 
