@@ -1,4 +1,3 @@
-import { HomeIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBRLCents } from "@/lib/contracts/format";
@@ -25,14 +24,6 @@ export function ContractRentalDataCard({ contract }: { contract: Contract }) {
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-0 px-0 pb-0">
-        <div className="border-border flex items-center justify-center gap-3 border-b px-6 py-3 sm:py-4">
-          <div className="bg-secondary text-muted-foreground flex size-12 shrink-0 items-center justify-center">
-            <HomeIcon className="size-6" strokeWidth={1.25} aria-hidden />
-          </div>
-          <span className="text-2xs text-muted-foreground font-mono font-medium tracking-[0.06em] uppercase">
-            {tKind(rental.propertyKind)}
-          </span>
-        </div>
         <FieldGroup className="gap-0">
           <FieldGroupHeader>{tGroups("contract")}</FieldGroupHeader>
           <FieldRow label={tFields("propertyKind")} value={tKind(rental.propertyKind)} />

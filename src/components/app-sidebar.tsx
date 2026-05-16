@@ -20,6 +20,7 @@ import {
   UserRoundIcon,
   CalendarClockIcon,
   ShieldCheckIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useWorkspace } from "@/providers/workspace";
@@ -34,6 +35,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
     { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
     { title: tMain("payments"), href: "/payments", icon: <ReceiptIcon /> },
+    { title: tMain("delinquencies"), icon: <TriangleAlertIcon />, disabled: true },
     { title: tMain("lifecycle"), icon: <CalendarClockIcon />, disabled: true },
     { title: tMain("reports"), icon: <ChartBarIcon />, disabled: true },
   ];

@@ -39,7 +39,7 @@ export default function ContractError({
                 asChild
                 className="border-primary text-primary hover:bg-accent-dim hover:text-primary bg-transparent"
               >
-                <Link href="/">{t("backToDashboard")}</Link>
+                <Link href="/contracts">{t("backToContracts")}</Link>
               </Button>
             </div>
           </CardContent>

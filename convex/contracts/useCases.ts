@@ -330,6 +330,28 @@ export const create = mutation({
   },
 });
 
+/** Permanently deletes a pending contract and its history. */
+export const deleteProposal = mutation({
+  args: { publicId: v.string() },
+  handler: async (ctx, args) => {
+    const contract = await ctx.db
+      .query("contracts")
+      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
+      .unique();
+
+    if (!contract) return;
+    if (contract.status !== "pendente") throw new Error("Only pending proposals can be deleted");
+
+    const history = await ctx.db
+      .query("contractHistory")
+      .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
+      .collect();
+
+    await Promise.all(history.map((h) => ctx.db.delete(h._id)));
+    await ctx.db.delete(contract._id);
+  },
+});
+
 /**
  * Reshape a Convex `contracts` doc + history into the UI Contract type.
  * Strips system fields (`_id`, `_creationTime`); renames publicId → id.

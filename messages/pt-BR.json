@@ -31,6 +31,7 @@
       "dashboard": "Painel",
       "contracts": "Contratos",
       "payments": "Faturas",
+      "delinquencies": "Inadimplências",
       "lifecycle": "Ciclo de Vida",
       "reports": "Relatórios"
     },
@@ -182,12 +183,6 @@
     "backToDashboard": "Voltar",
     "breadcrumb": "Detalhes do Contrato",
     "heroTitle": "Contrato {status}",
-    "promo": {
-      "title": "Quita Loft",
-      "body": "Evite inadimplências: ofereça ao inquilino a opção de pagar o aluguel no cartão e receba o valor à vista.",
-      "cta": "Saber mais",
-      "regionLabel": "Sugestão Quita Loft"
-    },
     "summary": {
       "heading": "Solicitação",
       "currentStatus": "Situação atual:",
@@ -201,6 +196,12 @@
       "guaranteeTooltipLabel": "Detalhes da fiança disponível",
       "copyId": "Copiar ID",
       "cancelProposalHint": "Disponível apenas para contratos pendentes",
+      "cancelDialog": {
+        "title": "Cancelar proposta?",
+        "description": "Esta ação não pode ser desfeita. A proposta será removida permanentemente.",
+        "confirm": "Sim, cancelar",
+        "back": "Voltar"
+      },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",
       "actionsMenu": "Ações do contrato"
@@ -255,6 +256,7 @@
       "heading": "Documentos",
       "send": "Enviar",
       "sendDisabled": "Disponível em breve",
+      "downloadTemplate": "Baixar modelo padrão",
       "labels": {
         "rentalContract": "Contrato de locação",
         "inspection": "Vistoria",
@@ -299,7 +301,8 @@
       "title": "Não foi possível carregar este contrato",
       "body": "Algo deu errado ao buscar os dados. Tente novamente ou volte ao painel.",
       "retry": "Tentar novamente",
-      "backToDashboard": "Voltar ao painel"
+      "backToDashboard": "Voltar ao painel",
+      "backToContracts": "Voltar aos contratos"
     },
     "loading": {
       "label": "Carregando contrato"

@@ -1,4 +1,4 @@
-import { FileTextIcon, UploadIcon } from "lucide-react";
+import { DownloadIcon, FileTextIcon, UploadIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import type { ContractDocument, ContractDocumentKey, DocumentStatus } from "@/li
 import { StatusTag } from "./status-tag";
 
 const docKeys: ContractDocumentKey[] = ["rentalContract", "inspection", "policy"];
+const keysWithTemplate = new Set<ContractDocumentKey>(["rentalContract", "inspection"]);
 
 const statusTone: Record<DocumentStatus, "accent" | "neutral" | "success"> = {
   pendente: "accent",
@@ -44,22 +45,42 @@ export function ContractDocumentsCard({ documents }: { documents: ContractDocume
                 </div>
                 <StatusTag tone={statusTone[status]} label={tStatus(status)} />
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-primary text-primary hover:bg-accent-dim hover:text-primary self-start bg-transparent"
-                      disabled
-                    >
-                      <UploadIcon data-icon="inline-start" strokeWidth={1.25} aria-hidden />
-                      {t("send")}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{t("sendDisabled")}</TooltipContent>
-              </Tooltip>
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-primary text-primary hover:bg-accent-dim hover:text-primary self-start bg-transparent"
+                        disabled
+                      >
+                        <UploadIcon data-icon="inline-start" strokeWidth={1.25} aria-hidden />
+                        {t("send")}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("sendDisabled")}</TooltipContent>
+                </Tooltip>
+                {keysWithTemplate.has(key) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground self-start"
+                        asChild
+                      >
+                        <a href={`/templates/${key}.pdf`} download>
+                          <DownloadIcon className="size-4" strokeWidth={1.25} aria-hidden />
+                          <span className="sr-only">{t("downloadTemplate")}</span>
+                        </a>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("downloadTemplate")}</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
           );
         })}
