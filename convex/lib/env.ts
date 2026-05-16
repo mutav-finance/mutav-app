@@ -5,11 +5,15 @@ export function getResendApiKey(): string {
 }
 
 export function getResendFromEmail(): string {
-  return process.env.RESEND_FROM_EMAIL ?? "SGR <noreply@sgr.com.br>";
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!from) throw new Error("RESEND_FROM_EMAIL is not set");
+  return from;
 }
 
 export function getAppUrl(): string {
-  return process.env.APP_URL ?? "http://localhost:3000";
+  const url = process.env.APP_URL;
+  if (!url) throw new Error("APP_URL is not set");
+  return url;
 }
 
 export function getWhatsAppApiUrl(): string | null {

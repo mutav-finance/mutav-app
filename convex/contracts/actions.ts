@@ -16,7 +16,6 @@ type NotificationArgs = {
   tenantName: string;
   tenantEmail: string;
   tenantPhone: string;
-  propertyAddress: string;
   rentCents: number;
   availableGuaranteeCents: number;
   feeCents: number;
@@ -28,17 +27,23 @@ export const sendProposalNotifications = internalAction({
     tenantName: v.string(),
     tenantEmail: v.string(),
     tenantPhone: v.string(),
-    propertyAddress: v.string(),
     rentCents: v.number(),
     availableGuaranteeCents: v.number(),
     feeCents: v.number(),
   },
   handler: async (_ctx, args) => {
-    await Promise.allSettled([sendEmail(args), sendWhatsApp(args)]);
+    const results = await Promise.allSettled([sendEmail(args), sendWhatsApp(args)]);
+    for (const result of results) {
+      if (result.status === "rejected") console.error("[notifications]", result.reason);
+    }
   },
 });
 
 async function sendEmail(args: NotificationArgs): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("[notifications] RESEND_API_KEY not set, skipping email");
+    return;
+  }
   const resend = new Resend(getResendApiKey());
   const activationLink = `${getAppUrl()}/contracts/${args.publicId}`;
 

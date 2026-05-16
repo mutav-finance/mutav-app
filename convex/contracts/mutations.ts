@@ -59,7 +59,7 @@ export const insert = internalMutation({
       email: v.string(),
       phone: v.string(),
       termApprovedAt: v.union(v.string(), v.null()),
-      score: v.number(),
+      score: v.optional(v.number()),
     }),
   },
   handler: async (ctx, args) => {

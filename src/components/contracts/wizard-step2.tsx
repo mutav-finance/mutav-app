@@ -4,7 +4,6 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +12,7 @@ import { useWorkspace } from "@/providers/workspace";
 import {
   calcFeePreview,
   formatBRLCentsDisplay,
+  lookupTenantScore,
   type WizardData,
   type RentMultiplier,
   type ExitCostMultiplier,
@@ -63,14 +63,14 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const t = useTranslations("contractNew");
   const [errors, setErrors] = React.useState<Step2Errors>({});
   const { selectedAgency } = useWorkspace();
-  const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
+  const agencyId = selectedAgency?._id;
 
   const cpfDigits = data.entityType === "pj" ? "" : data.cpf.replace(/\D/g, "");
   const docDigits = data.entityType === "pj" ? data.cnpj.replace(/\D/g, "") : cpfDigits;
 
-  const scoreResult = useQuery(
-    api.contracts.useCases.lookupTenantScore,
-    docDigits ? { document: docDigits } : "skip",
+  const scoreResult = React.useMemo(
+    () => (docDigits ? lookupTenantScore(docDigits) : null),
+    [docDigits],
   );
 
   const tenantLookup = useQuery(
@@ -78,31 +78,46 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
     agencyId && cpfDigits ? { agencyId, cpf: cpfDigits } : "skip",
   );
 
-  React.useEffect(() => {
-    if (scoreResult === undefined) return;
-    onChange({ score: scoreResult.score, scoreTier: scoreResult.tier });
-  }, [scoreResult, onChange]);
+  const applyScore = React.useEffectEvent((result: ReturnType<typeof lookupTenantScore> | null) => {
+    onChange({ score: result?.score ?? null, scoreTier: result?.tier ?? null });
+  });
+
+  const applyTenantLookup = React.useEffectEvent(
+    (lookup: { fullName: string; email: string } | null | undefined) => {
+      if (!lookup) return;
+      const patch: Partial<WizardData> = {};
+      if (!data.fullName) patch.fullName = lookup.fullName;
+      if (!data.email) patch.email = lookup.email;
+      if (Object.keys(patch).length > 0) onChange(patch);
+    },
+  );
 
   React.useEffect(() => {
-    if (!tenantLookup) return;
-    onChange({ fullName: tenantLookup.fullName, email: tenantLookup.email });
-  }, [tenantLookup, onChange]);
+    applyScore(scoreResult);
+  }, [scoreResult]);
 
-  const isLoading = scoreResult === undefined;
-  const isNegado = data.score !== null && data.score < 400;
+  React.useEffect(() => {
+    applyTenantLookup(tenantLookup);
+  }, [tenantLookup]);
+
+  const score = scoreResult?.score ?? null;
+  const scoreTier = scoreResult?.tier ?? null;
+
+  const isLoading = !docDigits;
+  const isNegado = score !== null && score < 400;
 
   const preview =
     !isNegado &&
     data.rentCents > 0 &&
     data.rentMultiplier &&
     data.exitCostMultiplier &&
-    data.score !== null
-      ? calcFeePreview(
-          data.rentCents,
-          data.score,
-          data.rentMultiplier as RentMultiplier,
-          data.exitCostMultiplier as ExitCostMultiplier,
-        )
+    score !== null
+      ? calcFeePreview({
+          rentCents: data.rentCents,
+          score,
+          rentMultiplier: data.rentMultiplier,
+          exitCostMultiplier: data.exitCostMultiplier,
+        })
       : null;
 
   const tierLabel: Record<ScoreTier, string> = {
@@ -130,7 +145,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
       <section
         className={cn(
           "flex flex-col gap-3 rounded-lg border-2 p-4 transition-colors md:p-6",
-          data.scoreTier ? TIER_CARD_STYLE[data.scoreTier] : "border-border",
+          scoreTier ? TIER_CARD_STYLE[scoreTier] : "border-border",
         )}
       >
         <div className="flex items-start justify-between gap-2">
@@ -159,15 +174,15 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <span className="font-mono text-3xl font-bold">{data.score}</span>
-                {data.scoreTier && (
+                <span className="font-mono text-3xl font-bold">{score}</span>
+                {scoreTier && (
                   <span
                     className={cn(
                       "rounded-full px-3 py-1 text-sm font-medium",
-                      TIER_STYLE[data.scoreTier],
+                      TIER_STYLE[scoreTier],
                     )}
                   >
-                    {tierLabel[data.scoreTier]}
+                    {tierLabel[scoreTier]}
                   </span>
                 )}
               </div>
@@ -246,9 +261,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
               label={t("coverage.summary.exitCost")}
               value={
                 data.exitCostMultiplier && data.rentCents > 0
-                  ? formatBRLCentsDisplay(
-                      EXIT_MONTHS[data.exitCostMultiplier as ExitCostMultiplier] * data.rentCents,
-                    )
+                  ? formatBRLCentsDisplay(EXIT_MONTHS[data.exitCostMultiplier] * data.rentCents)
                   : null
               }
             />

@@ -108,7 +108,7 @@ export function WizardStep3({ data, onChange, onNext, onBack }: Props) {
 
           {/* CPF/CNPJ — locked */}
           <LockedField
-            label={data.entityType === "pj" ? t("tenant.cnpj") : t("step1.cpfLabel")}
+            label={data.entityType === "pj" ? t("tenant.cnpj") : t("tenant.cpf")}
             value={data.entityType === "pj" ? data.cnpj : data.cpf}
           />
 

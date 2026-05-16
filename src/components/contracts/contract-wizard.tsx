@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import type { Id } from "@convex/_generated/dataModel";
 import { useWorkspace } from "@/providers/workspace";
 import { StepIndicator } from "@/components/contracts/step-indicator";
 import { WizardStep1 } from "@/components/contracts/wizard-step1";
@@ -18,7 +17,7 @@ export function ContractWizard() {
   });
 
   const { selectedAgency } = useWorkspace();
-  const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
+  const agencyId = selectedAgency?._id;
 
   const patch = React.useCallback((p: Partial<WizardData>) => {
     dispatch({ type: "PATCH", patch: p });

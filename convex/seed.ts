@@ -1,4 +1,4 @@
-﻿import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { PaymentMethods, PaymentStates } from "./payments/domain";
 import type { Id } from "./_generated/dataModel";
 import { contractsByStatus } from "./contracts/aggregate";

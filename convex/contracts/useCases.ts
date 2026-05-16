@@ -197,6 +197,7 @@ export const countByMonth = query({
 });
 
 /** Lookup tenant name by CPF from existing contracts in this agency. */
+// TODO(auth): requireIdentity + getMembership check before exposing tenant PII
 export const lookupTenantByCpf = query({
   args: { agencyId: v.id("agencies"), cpf: v.string() },
   handler: async (ctx, { agencyId, cpf }) => {
@@ -209,18 +210,8 @@ export const lookupTenantByCpf = query({
   },
 });
 
-/** Mock credit score lookup — CPF or CNPJ → deterministic score + tier. */
-export const lookupTenantScore = query({
-  args: { document: v.string() },
-  handler: async (_ctx, { document }) => {
-    const digits = document.replace(/\D/g, "");
-    const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
-    const tier = score >= 800 ? "bom" : score >= 600 ? "regular" : score >= 400 ? "ruim" : "negado";
-    return { score, tier } as const;
-  },
-});
-
 /** Create a new contract with server-side fee calculation. */
+// TODO(auth): requireIdentity + getMembership check before writing to any agencyId
 export const create = mutation({
   args: {
     agencyId: v.id("agencies"),
@@ -330,7 +321,6 @@ export const create = mutation({
       tenantName: args.tenant.fullName,
       tenantEmail: args.tenant.email,
       tenantPhone: args.tenant.phone,
-      propertyAddress: `${args.property.streetAndNumber} — ${args.property.cityUF}`,
       rentCents: args.rentCents,
       availableGuaranteeCents,
       feeCents,

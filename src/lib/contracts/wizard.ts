@@ -23,8 +23,8 @@ export type WizardData = {
   phone: string;
   score: number | null;
   scoreTier: ScoreTier | null;
-  rentMultiplier: RentMultiplier | "";
-  exitCostMultiplier: ExitCostMultiplier | "";
+  rentMultiplier: RentMultiplier | null;
+  exitCostMultiplier: ExitCostMultiplier | null;
 };
 
 export type WizardState = {
@@ -73,20 +73,25 @@ export const INITIAL_WIZARD_DATA: WizardData = {
   phone: "",
   score: null,
   scoreTier: null,
-  rentMultiplier: "",
-  exitCostMultiplier: "",
+  rentMultiplier: null,
+  exitCostMultiplier: null,
 };
 
 const COVERAGE_MULT: Record<RentMultiplier, number> = { "24x": 1.0, "36x": 1.05, "48x": 1.1 };
 const EXIT_MULT: Record<ExitCostMultiplier, number> = { "3x": 1.0, "5x": 1.02, "7x": 1.05 };
 const RENT_MULT_VALUE: Record<RentMultiplier, number> = { "24x": 24, "36x": 36, "48x": 48 };
 
-export function calcFeePreview(
-  rentCents: number,
-  score: number,
-  rentMultiplier: RentMultiplier,
-  exitCostMultiplier: ExitCostMultiplier,
-) {
+export function calcFeePreview({
+  rentCents,
+  score,
+  rentMultiplier,
+  exitCostMultiplier,
+}: {
+  rentCents: number;
+  score: number;
+  rentMultiplier: RentMultiplier;
+  exitCostMultiplier: ExitCostMultiplier;
+}) {
   const feeRate = score >= 800 ? 0.075 : score >= 600 ? 0.1 : 0.125;
   const feeCents = Math.round(
     rentCents * feeRate * COVERAGE_MULT[rentMultiplier] * EXIT_MULT[exitCostMultiplier],
@@ -96,6 +101,14 @@ export function calcFeePreview(
     oneTimeActivationFeeCents: 15_000,
     availableGuaranteeCents: rentCents * RENT_MULT_VALUE[rentMultiplier],
   };
+}
+
+export function lookupTenantScore(document: string): { score: number; tier: ScoreTier } {
+  const digits = document.replace(/\D/g, "");
+  const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
+  const tier: ScoreTier =
+    score >= 800 ? "bom" : score >= 600 ? "regular" : score >= 400 ? "ruim" : "negado";
+  return { score, tier };
 }
 
 export function formatBRLCentsDisplay(cents: number): string {

@@ -65,12 +65,12 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
 
   const preview =
     data.rentCents > 0 && data.rentMultiplier && data.exitCostMultiplier && data.score !== null
-      ? calcFeePreview(
-          data.rentCents,
-          data.score,
-          data.rentMultiplier as RentMultiplier,
-          data.exitCostMultiplier as ExitCostMultiplier,
-        )
+      ? calcFeePreview({
+          rentCents: data.rentCents,
+          score: data.score,
+          rentMultiplier: data.rentMultiplier,
+          exitCostMultiplier: data.exitCostMultiplier,
+        })
       : null;
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
@@ -124,8 +124,8 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         rentCents: data.rentCents,
         condoCents: data.condoCents,
         otherFeesCents: data.otherFeesCents,
-        rentMultiplier: data.rentMultiplier as RentMultiplier,
-        exitCostMultiplier: data.exitCostMultiplier as ExitCostMultiplier,
+        rentMultiplier: data.rentMultiplier,
+        exitCostMultiplier: data.exitCostMultiplier,
         tenant: {
           entityType: data.entityType,
           fullName: data.fullName,
@@ -489,13 +489,13 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             <div className="flex flex-1 flex-col gap-0.5">
               <ReviewRow
                 label={t("coverage.rentMultiplierLabel")}
-                value={data.rentMultiplier}
+                value={data.rentMultiplier ?? ""}
                 mono
                 missing={m.has("rentMultiplier")}
               />
               <ReviewRow
                 label={t("coverage.exitCostLabel")}
-                value={data.exitCostMultiplier}
+                value={data.exitCostMultiplier ?? ""}
                 mono
                 missing={m.has("exitCostMultiplier")}
               />
@@ -583,7 +583,7 @@ function Block({
       {editing && (
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="sm" onClick={onCancel}>
-            {t("nav.back")}
+            {t("review.cancelBlock")}
           </Button>
           <Button size="sm" onClick={onSave}>
             {t("review.saveBlock")}
