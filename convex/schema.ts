@@ -84,6 +84,30 @@ const anchorOrderStatus = v.union(
 
 const anchorOrderProvider = v.union(v.literal("testanchor"));
 
+/**
+ * Onboarding status of an agency with a single anchor provider. Normalized
+ * across providers (Etherfuse, Bitso, …) so the UI renders one status pill
+ * regardless of which anchor's KYC flow produced it.
+ */
+const anchorOnboardingStatus = v.union(
+  v.literal("not_started"),
+  v.literal("pending"),
+  v.literal("approved"),
+  v.literal("rejected"),
+);
+
+/**
+ * Provider-specific fields for an `anchorAccounts` row, discriminated by
+ * `provider`. Adding a new anchor = register its name in
+ * `src/lib/anchors/registry.ts` AND append a variant here. Testanchor needs
+ * no per-agency config — its variant exists for the union's default arm.
+ */
+const anchorAccountData = v.union(
+  v.object({
+    provider: v.literal("testanchor"),
+  }),
+);
+
 export default defineSchema({
   agencies: defineTable({
     name: v.string(),
@@ -250,4 +274,22 @@ export default defineSchema({
     .index("by_agency", ["agencyId"])
     .index("by_payment", ["paymentId"])
     .index("by_anchor_tx", ["anchorTxId"]),
+
+  // One row per (agency × anchor provider) onboarding relationship. Embeds
+  // provider-specific fields under the discriminated `data` block; common
+  // lifecycle fields (status, external id, timestamps) live at the top
+  // level. Webhook reconciliation resolves by `(provider, externalId)`.
+  anchorAccounts: defineTable({
+    agencyId: v.id("agencies"),
+    provider: anchorOrderProvider,
+    status: anchorOnboardingStatus,
+    /** Provider's own identifier (Etherfuse orgId, Bitso accountId, …). null until provisioned. */
+    externalId: v.union(v.string(), v.null()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+    data: anchorAccountData,
+  })
+    .index("by_agency", ["agencyId"])
+    .index("by_agency_provider", ["agencyId", "provider"])
+    .index("by_provider_externalId", ["provider", "externalId"]),
 });
