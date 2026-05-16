@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { QrCode } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { PixOnrampSheet } from "@/components/payments/pix-onramp-sheet";
+import { PixOnrampDrawer } from "@/components/payments/pix-onramp-drawer";
 import type { Id } from "@convex/_generated/dataModel";
 
 interface PixOnrampButtonProps {
@@ -23,7 +23,7 @@ export function PixOnrampButton({ paymentId, variant = "outline" }: PixOnrampBut
         <QrCode className="size-4" strokeWidth={1.25} />
         {t("button")}
       </Button>
-      <PixOnrampSheet open={open} onOpenChange={setOpen} paymentId={paymentId} />
+      <PixOnrampDrawer open={open} onOpenChange={setOpen} paymentId={paymentId} />
     </>
   );
 }

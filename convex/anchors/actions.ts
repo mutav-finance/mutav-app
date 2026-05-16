@@ -191,7 +191,6 @@ function brlToCents(value: string | undefined): number | undefined {
 
 interface StartPixOnrampResult {
   orderId: Id<"anchorOrders">;
-  hostedUrl: string;
   anchorTxId: string;
 }
 
@@ -202,21 +201,21 @@ interface PollPixOnrampResult {
 }
 
 /**
- * Initiate a SEP-24 deposit against the agency's configured anchor for the
- * given chargeable payment. Returns a hosted URL the UI opens in a popup —
- * the agency completes the anchor-side form and the deposit is reconciled
- * by `pollPixOnramp`.
+ * Initiate a SEP-6 (programmatic) deposit against the agency's configured
+ * anchor for the given chargeable payment. Returns the persisted order;
+ * the UI subscribes to it reactively and renders the deposit instructions
+ * (Pix QR + key/copy fields) in-app rather than handing off to the
+ * anchor's hosted page.
  *
- * Testanchor stages this end-to-end with a generic mock deposit form (not
- * a real Pix QR) — that's the staging UX while Etherfuse onboards. The
- * registry pattern means swapping to Etherfuse later is one config change
- * and the call sites here don't move.
+ * Why SEP-6 over SEP-24: testanchor's hosted form (and any anchor's
+ * hosted UI) is generic and not Pix-shaped. SEP-6 returns the raw
+ * instructions and lets Mutav own the UX. The same UI consumes Etherfuse
+ * instructions when that provider lands — registry pattern preserved.
  */
 export const startPixOnramp = action({
   args: { paymentId: v.id("payments") },
   returns: v.object({
     orderId: v.id("anchorOrders"),
-    hostedUrl: v.string(),
     anchorTxId: v.string(),
   }),
   handler: async (ctx, args): Promise<StartPixOnrampResult> => {
@@ -241,22 +240,31 @@ export const startPixOnramp = action({
     await client.authenticate(signer.publicKey, signer.sign);
 
     const amount = (payment.totalCents / 100).toFixed(2);
-    const response = await client.sep24.deposit({
+    const response = await client.sep6.deposit({
       asset_code: "USDC",
-      amount,
       account: signer.publicKey,
+      amount,
+      // SEP-6 lets the wallet name itself for the anchor's audit logs.
+      wallet_name: "Mutav",
     });
+
+    if (!response.id) {
+      throw new Error(
+        `Anchor "${providerName}" SEP-6 deposit response did not include a transaction id; cannot persist order.`,
+      );
+    }
 
     const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
       agencyId: payment.agencyId,
       paymentId: payment._id,
       provider: providerName,
       anchorTxId: response.id,
-      hostedUrl: response.url,
+      instructions: response.instructions,
+      how: response.how,
       status: ANCHOR_ORDER_STATUS.INCOMPLETE,
     });
 
-    return { orderId, hostedUrl: response.url, anchorTxId: response.id };
+    return { orderId, anchorTxId: response.id };
   },
 });
 
@@ -291,7 +299,7 @@ export const pollPixOnramp = action({
     const signer = getTreasurySigner();
     await client.authenticate(signer.publicKey, signer.sign);
 
-    const tx = await client.sep24.getTransaction(order.anchorTxId);
+    const tx = await client.sep6.getTransaction(order.anchorTxId);
     const status = normalizeSep24Status(tx.status);
 
     await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {

@@ -458,21 +458,21 @@
       "pix": {
         "button": "Pagar com PIX",
         "dialogTitle": "Pagamento via PIX",
-        "openHostedFlow": "Abrir pagamento PIX",
         "cancel": "Cancelar",
         "close": "Fechar",
+        "copyCode": "Pix copia e cola",
         "orderId": "Pedido",
         "status": {
           "starting": "Preparando pagamento...",
-          "awaitingPayment": "Abra o app do seu banco e pague o PIX",
+          "awaitingPayment": "Escaneie o QR ou copie o código no app do seu banco",
           "processing": "Pagamento recebido, processando...",
           "completed": "Pago!",
           "failed": "Falha no pagamento"
         },
         "description": {
-          "default": "Conclua o pagamento na janela que abriu. Esta tela atualiza automaticamente quando o anchor confirmar.",
+          "default": "Esta tela atualiza automaticamente assim que o pagamento for confirmado.",
           "completed": "Pagamento confirmado. A fatura foi marcada como paga.",
-          "failed": "O anchor não conseguiu concluir a operação."
+          "failed": "Não foi possível concluir a operação."
         }
       }
     },

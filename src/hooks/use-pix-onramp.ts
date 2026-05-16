@@ -28,7 +28,6 @@ export type PixOnrampPhase =
 interface UsePixOnrampResult {
   phase: PixOnrampPhase;
   order: AnchorOrder | null;
-  hostedUrl: string | null;
   error: string | null;
   start: () => Promise<void>;
   cancel: () => void;
@@ -44,13 +43,11 @@ interface UsePixOnrampResult {
  * UI without re-fetching, and manages the polling lifecycle (clears on
  * terminal status, cancel, or unmount).
  *
- * The hosted URL hand-off (popup vs new tab) is the consumer component's
- * call — this hook just exposes `hostedUrl`. Once a popup closes, polling
- * still runs and resolves to the final status the anchor reports.
+ * Deposit instructions live on `order.instructions` — the consumer renders
+ * a Pix QR + key-value panel inline (no hosted popup).
  */
 export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UsePixOnrampResult {
   const [orderId, setOrderId] = useState<Id<"anchorOrders"> | null>(null);
-  const [hostedUrl, setHostedUrl] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -69,7 +66,6 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
     }
   }, []);
 
-  // Drive the poll loop while an order exists and is not yet terminal.
   useEffect(() => {
     if (!orderId) return;
     if (order && TERMINAL_STATUSES.has(order.status)) {
@@ -77,13 +73,8 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
       return;
     }
 
-    // Fire once immediately, then on interval — gives the UI a first update
-    // without a 5s wait after the popup opens.
     const tick = () => {
       pollAction({ orderId }).catch((err: unknown) => {
-        // Transient poll failures don't tear down the loop; the next tick retries.
-        // Surfacing per-tick errors as the global error would flicker on minor
-        // network blips, so we just log.
         console.warn("[pix-onramp] poll failed", err);
       });
     };
@@ -93,7 +84,6 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
     return clearPolling;
   }, [orderId, order, pollAction, clearPolling]);
 
-  // Cleanup on unmount.
   useEffect(() => clearPolling, [clearPolling]);
 
   const start = useCallback(async () => {
@@ -102,7 +92,6 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
     try {
       const result = await startAction({ paymentId });
       setOrderId(result.orderId);
-      setHostedUrl(result.hostedUrl);
     } catch (err) {
       setStartError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -117,7 +106,6 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
   const reset = useCallback(() => {
     clearPolling();
     setOrderId(null);
-    setHostedUrl(null);
     setStartError(null);
   }, [clearPolling]);
 
@@ -130,7 +118,6 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
   return {
     phase,
     order,
-    hostedUrl,
     error: startError,
     start,
     cancel,

@@ -221,7 +221,17 @@ export default defineSchema({
     paymentId: v.id("payments"),
     provider: anchorOrderProvider,
     anchorTxId: v.string(),
-    hostedUrl: v.string(),
+    /**
+     * SEP-6 deposit instructions returned by the anchor: key-value pairs
+     * the user / our UI uses to make the payment (PIX key, QR string,
+     * bank account info, memo, etc.). Shape varies per provider; renderer
+     * detects known Pix-shaped fields (`pix_qr_code`, `pix_chave`) or
+     * falls back to a generic key-value panel. Optional because some
+     * anchors may return `how` instead of structured instructions.
+     */
+    instructions: v.optional(v.any()),
+    /** Free-form deposit summary text from SEP-6 `how` field. */
+    how: v.optional(v.string()),
     status: anchorOrderStatus,
     amountInCents: v.optional(v.number()),
     amountOutCents: v.optional(v.number()),

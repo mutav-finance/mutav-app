@@ -458,21 +458,21 @@
       "pix": {
         "button": "Pay with PIX",
         "dialogTitle": "PIX Payment",
-        "openHostedFlow": "Open PIX payment",
         "cancel": "Cancel",
         "close": "Close",
+        "copyCode": "PIX copy & paste",
         "orderId": "Order",
         "status": {
           "starting": "Preparing payment...",
-          "awaitingPayment": "Open your bank app and complete the PIX",
+          "awaitingPayment": "Scan the QR or copy the code in your bank app",
           "processing": "Payment received, processing...",
           "completed": "Paid!",
           "failed": "Payment failed"
         },
         "description": {
-          "default": "Complete the payment in the popup window. This screen updates automatically once the anchor confirms.",
+          "default": "This screen updates automatically once the payment is confirmed.",
           "completed": "Payment confirmed. The invoice has been marked paid.",
-          "failed": "The anchor could not complete the operation."
+          "failed": "Could not complete the operation."
         }
       }
     },
