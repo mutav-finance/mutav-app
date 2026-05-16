@@ -147,9 +147,7 @@ export default defineSchema({
       phone: v.string(),
       score: v.optional(v.number()),
       termApprovedAt: v.union(v.string(), v.null()),
-      score: v.optional(v.number()),
     }),
-    tenantCpf: v.optional(v.string()),
   })
     .index("by_publicId", ["publicId"])
     .index("by_status", ["status"])
