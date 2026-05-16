@@ -50,3 +50,19 @@ DEPLOY_NAME="${HOST%%.*}"
 echo "seed-preview: VERCEL_ENV=preview, deployment=${DEPLOY_NAME} — running seed:fictionalContracts"
 bunx convex run --deployment "${DEPLOY_NAME}" seed:fictionalContracts
 echo "✓ seed-preview: preview deployment populated"
+
+# Apply the disposable testnet treasury keypair to the preview's Convex env
+# so anchor on-ramp actions (SEP-10 signer) work out of the box. The keypair
+# is published in the repo by design (src/lib/stellar/testnet-wallet.md —
+# testnet-only, anyone watching the repo controls the account) so embedding
+# the secret here is intentional, not a leak. Set is idempotent — re-running
+# on every preview build is fine.
+PREVIEW_TREASURY_SECRET="SBDW2AG65ZSTXYTVIAGJGU7VOKBBQNNVN4KHCL5XAT65USJKYCQ72FW6"
+PREVIEW_TREASURY_ACCOUNT="GD7ZCGE3Z2KV7STAWXLTKZQP7IYZ2SSJ6VNOQ2CHK4YWRSLIYUECMNWV"
+
+echo "seed-preview: setting MUTAV_TREASURY_SECRET + STELLAR_MUTAV_SOURCE_ACCOUNT on ${DEPLOY_NAME}"
+bunx convex env set MUTAV_TREASURY_SECRET "$PREVIEW_TREASURY_SECRET" \
+  --deployment "${DEPLOY_NAME}" >/dev/null
+bunx convex env set STELLAR_MUTAV_SOURCE_ACCOUNT "$PREVIEW_TREASURY_ACCOUNT" \
+  --deployment "${DEPLOY_NAME}" >/dev/null
+echo "✓ seed-preview: anchor signer env vars configured"
