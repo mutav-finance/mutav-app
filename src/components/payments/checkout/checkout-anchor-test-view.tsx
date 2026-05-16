@@ -21,7 +21,6 @@ interface Props {
   totalCents: number;
 }
 
-const POPUP_WINDOW_FEATURES = "width=500,height=800,scrollbars=yes,resizable=yes";
 const POPUP_WINDOW_NAME = "mutav-anchor-deposit";
 
 /**
@@ -55,7 +54,10 @@ export function CheckoutAnchorTestView({ paymentId, totalCents }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (phase === "failed") return <FailedBlock message={error ?? t("status.failed")} />;
+  if (phase === "failed") {
+    const errorMessage = error ? t(`errors.${error.code}` as const) : t("status.failed");
+    return <FailedBlock message={errorMessage} />;
+  }
   if (phase === "completed") return <CompletedBlock message={t("status.completed")} />;
   if (phase === "idle" || phase === "starting" || !order || !order.hostedUrl)
     return <CheckoutSkeleton brl={formatBRLCents(totalCents)} message={t("status.preparing")} />;
@@ -80,7 +82,10 @@ function ActivePanel({
   const popupRef = useRef<Window | null>(null);
 
   const openPopup = useCallback(() => {
-    const win = window.open(hostedUrl, POPUP_WINDOW_NAME, POPUP_WINDOW_FEATURES);
+    // No window features → browser opens as a regular new tab/window,
+    // not a constrained popup. Reusing the same window name means
+    // re-clicking re-focuses the existing tab instead of spawning a new one.
+    const win = window.open(hostedUrl, POPUP_WINDOW_NAME);
     if (!win) {
       setPopupBlocked(true);
       return;

@@ -49,7 +49,10 @@ export function CheckoutPixView({ paymentId, totalCents }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (phase === "failed") return <FailedBlock message={error ?? t("status.failed")} />;
+  if (phase === "failed") {
+    const errorMessage = error ? t(`errors.${error.code}` as const) : t("status.failed");
+    return <FailedBlock message={errorMessage} />;
+  }
   if (phase === "completed") return <CompletedBlock message={t("status.completed")} />;
   if (phase === "idle" || phase === "starting" || !order)
     return <CheckoutSkeleton brl={formatBRLCents(totalCents)} message={t("status.preparing")} />;

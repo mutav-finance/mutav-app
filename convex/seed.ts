@@ -2026,35 +2026,34 @@ export const fictionalContracts = internalMutation({
     // Tiny amounts so a friendbot-funded sender (10k XLM) can complete a
     // real on-chain test against the Mutav treasury. One per agency.
 
-    const testInvoices: Array<{
-      publicId: string;
+    // Testnet-sized invoices in the testanchor USDC deposit range
+    // (1 ≤ USDC ≤ 10 at 5.0 BRL/USDC ⇒ R$5 to R$50). All three agencies
+    // get a spread of amounts so any agency can be selected and any
+    // anchor method (Pix sep-6 / AnchorTest sep-24) will pass validation.
+    const testAgencies: ReadonlyArray<{
       agencyId: Id<"agencies">;
       contractId: Id<"contracts">;
       contractPublicId: string;
-      amountCents: number;
     }> = [
-      {
-        publicId: "PAY-TEST-001",
-        agencyId: paulistaId,
-        contractId: p1,
-        contractPublicId: pid(1),
-        amountCents: 100, // R$ 1,00 → ~4.4 XLM
-      },
-      {
-        publicId: "PAY-TEST-010",
-        agencyId: atlanticaId,
-        contractId: a1,
-        contractPublicId: pid(16),
-        amountCents: 1_000, // R$ 10,00 → ~44 XLM
-      },
-      {
-        publicId: "PAY-TEST-100",
-        agencyId: horizonteId,
-        contractId: h1,
-        contractPublicId: pid(28),
-        amountCents: 10_000, // R$ 100,00 → ~440 XLM
-      },
+      { agencyId: paulistaId, contractId: p1, contractPublicId: pid(1) },
+      { agencyId: atlanticaId, contractId: a1, contractPublicId: pid(16) },
+      { agencyId: horizonteId, contractId: h1, contractPublicId: pid(28) },
     ];
+
+    // 12 amounts in the safe band (R$5–R$50), four per agency.
+    const testAmountsCents = [500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 4750, 5000];
+
+    const testInvoices = testAmountsCents.map((amountCents, idx) => {
+      const agency = testAgencies[idx % testAgencies.length];
+      const n = String(idx + 1).padStart(3, "0");
+      return {
+        publicId: `PAY-TEST-${n}`,
+        agencyId: agency.agencyId,
+        contractId: agency.contractId,
+        contractPublicId: agency.contractPublicId,
+        amountCents,
+      };
+    });
 
     for (const t of testInvoices) {
       await ctx.db.insert("payments", {

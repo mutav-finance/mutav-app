@@ -443,8 +443,8 @@
           "caption": "We'll open the form in a new window.",
           "popupOpen": "Form open. Complete the details in the popup window.",
           "popupBlocked": "Your browser blocked the popup. Use the button below.",
-          "open": "Open form",
-          "reopen": "Reopen form"
+          "open": "Open in new window",
+          "reopen": "Reopen window"
         },
         "awaiting": {
           "title": "Awaiting anchor confirmation",
@@ -458,6 +458,16 @@
         "preparing": "Preparing deposit",
         "completed": "Paid",
         "failed": "Payment failed"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Invoice not found.",
+        "NOT_CHARGEABLE": "This invoice cannot be paid right now.",
+        "AMOUNT_INVALID": "Invalid amount for the selected method.",
+        "AMOUNT_OUT_OF_RANGE": "Amount is outside the anchor's accepted range — use R$ 5.00–R$ 50.00 on the test environment.",
+        "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
+        "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
+        "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "INTERNAL": "Internal error. Please try again."
       }
     },
     "pix": {
@@ -474,6 +484,16 @@
         "processing": "Received, processing",
         "completed": "Paid",
         "failed": "Payment failed"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Invoice not found.",
+        "NOT_CHARGEABLE": "This invoice cannot be paid right now.",
+        "AMOUNT_INVALID": "Invalid amount for the selected method.",
+        "AMOUNT_OUT_OF_RANGE": "Amount is outside the anchor's accepted range — use R$ 5.00–R$ 50.00 on the test environment.",
+        "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
+        "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
+        "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "INTERNAL": "Internal error. Please try again."
       }
     },
     "pago": {
@@ -496,7 +516,8 @@
         "stellar": "Stellar",
         "boleto": "Boleto",
         "unknown": "—"
-      }
+      },
+      "backToDashboard": "Back to dashboard"
     }
   },
   "paymentDetails": {

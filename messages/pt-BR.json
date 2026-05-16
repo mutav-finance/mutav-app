@@ -443,8 +443,8 @@
           "caption": "Vamos abrir o formulário em uma nova janela.",
           "popupOpen": "Formulário aberto. Complete os dados na janela.",
           "popupBlocked": "Seu navegador bloqueou a nova janela. Use o botão abaixo.",
-          "open": "Abrir formulário",
-          "reopen": "Reabrir formulário"
+          "open": "Abrir em nova janela",
+          "reopen": "Reabrir janela"
         },
         "awaiting": {
           "title": "Aguardando confirmação da anchor",
@@ -458,6 +458,16 @@
         "preparing": "Preparando depósito",
         "completed": "Pago",
         "failed": "Falha no pagamento"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Fatura não encontrada.",
+        "NOT_CHARGEABLE": "Esta fatura não pode ser paga no momento.",
+        "AMOUNT_INVALID": "Valor inválido para o método selecionado.",
+        "AMOUNT_OUT_OF_RANGE": "Valor fora do limite aceito pela anchor — use o intervalo R$ 5,00–R$ 50,00 no ambiente de teste.",
+        "ASSET_UNSUPPORTED": "Ativo não suportado pela anchor.",
+        "ANCHOR_REJECTED": "A anchor recusou o depósito. Tente novamente em instantes.",
+        "ANCHOR_RESPONSE_INVALID": "Resposta inesperada da anchor.",
+        "INTERNAL": "Erro interno. Tente novamente."
       }
     },
     "pix": {
@@ -474,6 +484,16 @@
         "processing": "Recebido, processando",
         "completed": "Pago",
         "failed": "Falha no pagamento"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Fatura não encontrada.",
+        "NOT_CHARGEABLE": "Esta fatura não pode ser paga no momento.",
+        "AMOUNT_INVALID": "Valor inválido para o método selecionado.",
+        "AMOUNT_OUT_OF_RANGE": "Valor fora do limite aceito pela anchor — use o intervalo R$ 5,00–R$ 50,00 no ambiente de teste.",
+        "ASSET_UNSUPPORTED": "Ativo não suportado pela anchor.",
+        "ANCHOR_REJECTED": "A anchor recusou o depósito. Tente novamente em instantes.",
+        "ANCHOR_RESPONSE_INVALID": "Resposta inesperada da anchor.",
+        "INTERNAL": "Erro interno. Tente novamente."
       }
     },
     "pago": {
@@ -496,7 +516,8 @@
         "stellar": "Stellar",
         "boleto": "Boleto",
         "unknown": "—"
-      }
+      },
+      "backToDashboard": "Voltar ao painel"
     }
   },
   "paymentDetails": {

@@ -26,11 +26,20 @@ export type AnchorOnrampPhase =
   | "completed"
   | "failed";
 
+export interface AnchorStartErrorPayload {
+  code: string;
+  detail?: string;
+}
+
+type StartActionResult =
+  | { success: true; data: { orderId: Id<"anchorOrders">; anchorTxId: string; hostedUrl?: string } }
+  | { success: false; error: AnchorStartErrorPayload };
+
 type StartActionRef = FunctionReference<
   "action",
   "public",
   { paymentId: Id<"payments">; lang?: string },
-  { orderId: Id<"anchorOrders">; anchorTxId: string; hostedUrl?: string }
+  StartActionResult
 >;
 
 type PollActionRef = FunctionReference<
@@ -51,7 +60,8 @@ interface UseAnchorOnrampArgs {
 interface UseAnchorOnrampResult {
   phase: AnchorOnrampPhase;
   order: AnchorOrder | null;
-  error: string | null;
+  /** Structured error from the start action (code is stable, suitable for i18n lookup). */
+  error: AnchorStartErrorPayload | null;
   start: () => Promise<void>;
   cancel: () => void;
   /** Resets local state so the user can retry from `idle`. Does not refund or void anything anchor-side. */
@@ -71,7 +81,7 @@ export function useAnchorOnramp({
   lang,
 }: UseAnchorOnrampArgs): UseAnchorOnrampResult {
   const [orderId, setOrderId] = useState<Id<"anchorOrders"> | null>(null);
-  const [startError, setStartError] = useState<string | null>(null);
+  const [startError, setStartError] = useState<AnchorStartErrorPayload | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
   const startAction = useAction(startActionRef);
@@ -114,9 +124,16 @@ export function useAnchorOnramp({
     setIsStarting(true);
     try {
       const result = await startAction({ paymentId, lang });
-      setOrderId(result.orderId);
+      if (result.success) {
+        setOrderId(result.data.orderId);
+      } else {
+        setStartError(result.error);
+      }
     } catch (err) {
-      setStartError(err instanceof Error ? err.message : String(err));
+      setStartError({
+        code: "INTERNAL",
+        detail: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setIsStarting(false);
     }
@@ -154,7 +171,7 @@ function derivePhase({
   order,
 }: {
   isStarting: boolean;
-  startError: string | null;
+  startError: AnchorStartErrorPayload | null;
   order: AnchorOrder | null;
 }): AnchorOnrampPhase {
   if (startError) return "failed";

@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 
 import { Link, redirect } from "@/i18n/navigation";
+import { Button } from "@/components/ui/button";
 import { Mono } from "@/components/ui/mono";
 import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
@@ -108,7 +109,12 @@ export default async function CheckoutPagoPage({
         <p className="text-muted-foreground border-t pt-4 text-xs">{t("canceledRecovery")}</p>
       )}
 
-      <div className="border-t pt-4">
+      <div className="flex flex-col gap-3 border-t pt-4">
+        {isPaid && (
+          <Button asChild size="sm">
+            <Link href="/payments">{t("backToDashboard")}</Link>
+          </Button>
+        )}
         <Link
           href={`/pagar/${publicId}`}
           className="text-muted-foreground hover:text-foreground text-xs"

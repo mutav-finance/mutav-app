@@ -13,7 +13,7 @@ import {
   getAnchorProvider,
   STELLAR_NETWORK_PASSPHRASES,
 } from "../../src/lib/anchors/registry";
-import type { TransactionStatus } from "../../src/lib/anchors/sep/types";
+import { SepApiError, type TransactionStatus } from "../../src/lib/anchors/sep/types";
 import { ASSETS } from "../../src/lib/stellar/assets";
 import { getTreasurySigner } from "../lib/stellarSigner";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
@@ -254,10 +254,67 @@ function tenantPrefillToFields(p: TenantPrefill): Record<string, string> {
 
 const PUBLIC_APP_URL = "https://mutav.app";
 
-interface StartPixOnrampResult {
-  orderId: Id<"anchorOrders">;
-  anchorTxId: string;
+// ─── Error handling ──────────────────────────────────────────────────────────
+
+export const ANCHOR_START_ERROR_CODE = {
+  PAYMENT_NOT_FOUND: "PAYMENT_NOT_FOUND",
+  NOT_CHARGEABLE: "NOT_CHARGEABLE",
+  AMOUNT_INVALID: "AMOUNT_INVALID",
+  AMOUNT_OUT_OF_RANGE: "AMOUNT_OUT_OF_RANGE",
+  ASSET_UNSUPPORTED: "ASSET_UNSUPPORTED",
+  ANCHOR_REJECTED: "ANCHOR_REJECTED",
+  ANCHOR_RESPONSE_INVALID: "ANCHOR_RESPONSE_INVALID",
+  INTERNAL: "INTERNAL",
+} as const;
+
+type AnchorStartErrorCode = (typeof ANCHOR_START_ERROR_CODE)[keyof typeof ANCHOR_START_ERROR_CODE];
+
+const anchorStartErrorCodeValidator = v.union(
+  v.literal(ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND),
+  v.literal(ANCHOR_START_ERROR_CODE.NOT_CHARGEABLE),
+  v.literal(ANCHOR_START_ERROR_CODE.AMOUNT_INVALID),
+  v.literal(ANCHOR_START_ERROR_CODE.AMOUNT_OUT_OF_RANGE),
+  v.literal(ANCHOR_START_ERROR_CODE.ASSET_UNSUPPORTED),
+  v.literal(ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED),
+  v.literal(ANCHOR_START_ERROR_CODE.ANCHOR_RESPONSE_INVALID),
+  v.literal(ANCHOR_START_ERROR_CODE.INTERNAL),
+);
+
+interface AnchorStartError {
+  code: AnchorStartErrorCode;
+  /** Raw anchor message — useful for ops debugging, not for end-user display (UI maps from `code`). */
+  detail?: string;
 }
+
+/**
+ * Map a SepApiError thrown by the anchor library into a stable error code
+ * the UI can localize. Anchors don't expose machine codes for amount/asset
+ * errors — we string-match the human messages to bucket them.
+ */
+function classifySepError(err: SepApiError): AnchorStartError {
+  const msg = (err.response?.error ?? err.message).toLowerCase();
+  if (msg.includes("amount")) {
+    if (msg.includes("min") || msg.includes("max") || msg.includes("range")) {
+      return { code: ANCHOR_START_ERROR_CODE.AMOUNT_OUT_OF_RANGE, detail: err.message };
+    }
+    return { code: ANCHOR_START_ERROR_CODE.AMOUNT_INVALID, detail: err.message };
+  }
+  if (msg.includes("asset")) {
+    return { code: ANCHOR_START_ERROR_CODE.ASSET_UNSUPPORTED, detail: err.message };
+  }
+  return { code: ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED, detail: err.message };
+}
+
+type StartPixOnrampResult =
+  | { success: true; data: { orderId: Id<"anchorOrders">; anchorTxId: string } }
+  | { success: false; error: AnchorStartError };
+
+type StartAnchorTestOnrampResult =
+  | {
+      success: true;
+      data: { orderId: Id<"anchorOrders">; anchorTxId: string; hostedUrl: string };
+    }
+  | { success: false; error: AnchorStartError };
 
 interface PollPixOnrampResult {
   orderId: Id<"anchorOrders">;
@@ -282,19 +339,37 @@ export const startPixOnramp = action({
     paymentId: v.id("payments"),
     lang: v.optional(v.string()),
   },
-  returns: v.object({
-    orderId: v.id("anchorOrders"),
-    anchorTxId: v.string(),
-  }),
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      data: v.object({
+        orderId: v.id("anchorOrders"),
+        anchorTxId: v.string(),
+      }),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.object({
+        code: anchorStartErrorCodeValidator,
+        detail: v.optional(v.string()),
+      }),
+    }),
+  ),
   handler: async (ctx, args): Promise<StartPixOnrampResult> => {
     const payment = await ctx.runQuery(api.payments.useCases.getById, {
       paymentId: args.paymentId,
     });
-    if (!payment) throw new Error(`Payment ${args.paymentId} not found`);
+    if (!payment) {
+      return { success: false, error: { code: ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND } };
+    }
     if (!isChargeable(payment.state)) {
-      throw new Error(
-        `Payment ${args.paymentId} is in state "${payment.state.kind}" — cannot initiate on-ramp`,
-      );
+      return {
+        success: false,
+        error: {
+          code: ANCHOR_START_ERROR_CODE.NOT_CHARGEABLE,
+          detail: payment.state.kind,
+        },
+      };
     }
 
     const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
@@ -311,36 +386,44 @@ export const startPixOnramp = action({
     const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
     const tenant = await resolveTenantPrefill(ctx, payment.lineItems[0]?.contractPublicId);
 
-    const response = await client.sep6.deposit({
-      asset_code: "USDC",
-      account: signer.publicKey,
-      amount,
-      // Anchor-specific deposit method. Testanchor accepts SEPA/SWIFT (no
-      // real Pix simulation); real Brazilian anchors will accept "pix".
-      type: providerEntry.sep6DepositType,
-      wallet_name: "Mutav",
-      wallet_url: PUBLIC_APP_URL,
-      lang: args.lang,
-      ...tenantPrefillToFields(tenant),
-    });
+    try {
+      const response = await client.sep6.deposit({
+        asset_code: "USDC",
+        account: signer.publicKey,
+        amount,
+        // Anchor-specific deposit method. Testanchor accepts SEPA/SWIFT (no
+        // real Pix simulation); real Brazilian anchors will accept "pix".
+        type: providerEntry.sep6DepositType,
+        wallet_name: "Mutav",
+        wallet_url: PUBLIC_APP_URL,
+        lang: args.lang,
+        ...tenantPrefillToFields(tenant),
+      });
 
-    if (!response.id) {
-      throw new Error(
-        `Anchor "${providerName}" SEP-6 deposit response did not include a transaction id; cannot persist order.`,
-      );
+      if (!response.id) {
+        return {
+          success: false,
+          error: { code: ANCHOR_START_ERROR_CODE.ANCHOR_RESPONSE_INVALID },
+        };
+      }
+
+      const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+        agencyId: payment.agencyId,
+        paymentId: payment._id,
+        provider: providerName,
+        anchorTxId: response.id,
+        instructions: response.instructions,
+        how: response.how,
+        status: ANCHOR_ORDER_STATUS.INCOMPLETE,
+      });
+
+      return { success: true, data: { orderId, anchorTxId: response.id } };
+    } catch (err) {
+      if (err instanceof SepApiError) {
+        return { success: false, error: classifySepError(err) };
+      }
+      throw err;
     }
-
-    const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
-      agencyId: payment.agencyId,
-      paymentId: payment._id,
-      provider: providerName,
-      anchorTxId: response.id,
-      instructions: response.instructions,
-      how: response.how,
-      status: ANCHOR_ORDER_STATUS.INCOMPLETE,
-    });
-
-    return { orderId, anchorTxId: response.id };
   },
 });
 
@@ -405,12 +488,6 @@ export const pollPixOnramp = action({
 
 // ─── AnchorTest (SEP-24 interactive) ─────────────────────────────────────────
 
-interface StartAnchorTestOnrampResult {
-  orderId: Id<"anchorOrders">;
-  anchorTxId: string;
-  hostedUrl: string;
-}
-
 /**
  * Initiate a SEP-24 (interactive / hosted-UI) deposit against the agency's
  * configured anchor. Mirrors `startPixOnramp` but returns the anchor's hosted
@@ -426,20 +503,38 @@ export const startAnchorTestOnramp = action({
     paymentId: v.id("payments"),
     lang: v.optional(v.string()),
   },
-  returns: v.object({
-    orderId: v.id("anchorOrders"),
-    anchorTxId: v.string(),
-    hostedUrl: v.string(),
-  }),
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      data: v.object({
+        orderId: v.id("anchorOrders"),
+        anchorTxId: v.string(),
+        hostedUrl: v.string(),
+      }),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.object({
+        code: anchorStartErrorCodeValidator,
+        detail: v.optional(v.string()),
+      }),
+    }),
+  ),
   handler: async (ctx, args): Promise<StartAnchorTestOnrampResult> => {
     const payment = await ctx.runQuery(api.payments.useCases.getById, {
       paymentId: args.paymentId,
     });
-    if (!payment) throw new Error(`Payment ${args.paymentId} not found`);
+    if (!payment) {
+      return { success: false, error: { code: ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND } };
+    }
     if (!isChargeable(payment.state)) {
-      throw new Error(
-        `Payment ${args.paymentId} is in state "${payment.state.kind}" — cannot initiate on-ramp`,
-      );
+      return {
+        success: false,
+        error: {
+          code: ANCHOR_START_ERROR_CODE.NOT_CHARGEABLE,
+          detail: payment.state.kind,
+        },
+      };
     }
 
     const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
@@ -455,32 +550,43 @@ export const startAnchorTestOnramp = action({
     const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
     const tenant = await resolveTenantPrefill(ctx, payment.lineItems[0]?.contractPublicId);
 
-    const response = await client.sep24.deposit({
-      asset_code: "USDC",
-      account: signer.publicKey,
-      amount,
-      wallet_name: "Mutav",
-      wallet_url: PUBLIC_APP_URL,
-      lang: args.lang,
-      ...tenantPrefillToFields(tenant),
-    });
+    try {
+      const response = await client.sep24.deposit({
+        asset_code: "USDC",
+        account: signer.publicKey,
+        amount,
+        wallet_name: "Mutav",
+        wallet_url: PUBLIC_APP_URL,
+        lang: args.lang,
+        ...tenantPrefillToFields(tenant),
+      });
 
-    if (!response.id || !response.url) {
-      throw new Error(
-        `Anchor "${providerName}" SEP-24 deposit response missing id/url; cannot persist order.`,
-      );
+      if (!response.id || !response.url) {
+        return {
+          success: false,
+          error: { code: ANCHOR_START_ERROR_CODE.ANCHOR_RESPONSE_INVALID },
+        };
+      }
+
+      const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+        agencyId: payment.agencyId,
+        paymentId: payment._id,
+        provider: providerName,
+        anchorTxId: response.id,
+        hostedUrl: response.url,
+        status: ANCHOR_ORDER_STATUS.INCOMPLETE,
+      });
+
+      return {
+        success: true,
+        data: { orderId, anchorTxId: response.id, hostedUrl: response.url },
+      };
+    } catch (err) {
+      if (err instanceof SepApiError) {
+        return { success: false, error: classifySepError(err) };
+      }
+      throw err;
     }
-
-    const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
-      agencyId: payment.agencyId,
-      paymentId: payment._id,
-      provider: providerName,
-      anchorTxId: response.id,
-      hostedUrl: response.url,
-      status: ANCHOR_ORDER_STATUS.INCOMPLETE,
-    });
-
-    return { orderId, anchorTxId: response.id, hostedUrl: response.url };
   },
 });
 
