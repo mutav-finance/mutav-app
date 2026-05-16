@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
+import { formatBRLCents } from "@/lib/contracts/format";
 
 type CommissionRow = {
   contractId: string;
@@ -100,10 +101,6 @@ const MOCK_ROWS: CommissionRow[] = [
   },
 ];
 
-function formatBRL(cents: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
-}
-
 function formatMonth(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
 }
@@ -113,11 +110,16 @@ export function CommissionPage() {
   const [month, setMonth] = React.useState(() => new Date());
   const [search, setSearch] = React.useState("");
 
-  const filtered = MOCK_ROWS.filter(
-    (r) =>
+  const filtered = MOCK_ROWS.filter((r) => {
+    const [, mm, yyyy] = r.activatedAt.split("/");
+    const rowMonth = Number(mm) - 1;
+    const rowYear = Number(yyyy);
+    const matchesMonth = rowMonth === month.getMonth() && rowYear === month.getFullYear();
+    const matchesSearch =
       r.contractId.toLowerCase().includes(search.toLowerCase()) ||
-      r.tenantName.toLowerCase().includes(search.toLowerCase()),
-  );
+      r.tenantName.toLowerCase().includes(search.toLowerCase());
+    return matchesMonth && matchesSearch;
+  });
 
   const totalCommissionCents = filtered.reduce((sum, r) => sum + r.commissionCents, 0);
   const contractCount = filtered.length;
@@ -173,7 +175,7 @@ export function CommissionPage() {
               </div>
               <div className="flex flex-col gap-1">
                 <Mono className="text-foreground text-2xl font-semibold">
-                  {formatBRL(totalCommissionCents)}
+                  {formatBRLCents(totalCommissionCents)}
                 </Mono>
                 <span className="text-muted-foreground text-sm">
                   {t("kpi.contracts", { count: contractCount })}
@@ -271,11 +273,11 @@ export function CommissionPage() {
                     </TableCell>
                     <TableCell className="text-base-sm">{row.tenantName}</TableCell>
                     <TableCell className="text-right">
-                      <Mono className="text-sm">{formatBRL(row.rentCents)}</Mono>
+                      <Mono className="text-sm">{formatBRLCents(row.rentCents)}</Mono>
                     </TableCell>
                     <TableCell className="text-right">
                       <Mono className="text-sm font-semibold">
-                        {formatBRL(row.commissionCents)}
+                        {formatBRLCents(row.commissionCents)}
                       </Mono>
                     </TableCell>
                     <TableCell className="text-center">

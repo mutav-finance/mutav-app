@@ -27,6 +27,7 @@ import {
   DelinquencyStatusTag,
   type DelinquencyStatus,
 } from "@/components/delinquencies/delinquency-status-tag";
+import { formatBRLCents } from "@/lib/contracts/format";
 
 type DelinquencyRow = {
   propertyId: string;
@@ -60,8 +61,10 @@ const MOCK_ROWS: DelinquencyRow[] = [
   },
 ];
 
-function formatBRL(cents: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+function parseNoticeDate(noticeAt: string): string {
+  const [datePart] = noticeAt.split(" às ");
+  const [dd, mm, yyyy] = datePart.split("/");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function DelinquencyPage() {
@@ -129,16 +132,24 @@ export function DelinquencyPage() {
     if (e.key === "Enter") handleSearch();
   }
 
+  const amountFromCents = activeFilters.amountFrom ? Number(activeFilters.amountFrom) * 100 : null;
+  const amountToCents = activeFilters.amountTo ? Number(activeFilters.amountTo) * 100 : null;
+
   const filtered = MOCK_ROWS.filter((r) => {
     if (activeFilters.property && !r.propertyId.includes(activeFilters.property)) return false;
     if (activeFilters.status !== "all" && r.status !== activeFilters.status) return false;
+    const noticeDate = parseNoticeDate(r.noticeAt);
+    if (activeFilters.dateFrom && noticeDate < activeFilters.dateFrom) return false;
+    if (activeFilters.dateTo && noticeDate > activeFilters.dateTo) return false;
+    if (amountFromCents !== null && r.amountCents < amountFromCents) return false;
+    if (amountToCents !== null && r.amountCents > amountToCents) return false;
     return true;
   });
 
   const sorted = [...filtered].sort((a, b) => {
     if (activeFilters.order === "amount") return b.amountCents - a.amountCents;
     if (activeFilters.order === "status") return a.status.localeCompare(b.status);
-    return a.noticeAt.localeCompare(b.noticeAt);
+    return parseNoticeDate(a.noticeAt).localeCompare(parseNoticeDate(b.noticeAt));
   });
 
   return (
@@ -289,10 +300,12 @@ export function DelinquencyPage() {
                       <Mono className="text-muted-foreground text-sm">{row.noticeAt}</Mono>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Mono className="text-sm font-semibold">{formatBRL(row.amountCents)}</Mono>
+                      <Mono className="text-sm font-semibold">
+                        {formatBRLCents(row.amountCents)}
+                      </Mono>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Mono className="text-sm">{formatBRL(row.updatedAmountCents)}</Mono>
+                      <Mono className="text-sm">{formatBRLCents(row.updatedAmountCents)}</Mono>
                     </TableCell>
                     <TableCell className="text-center">
                       <Button variant="ghost" size="icon-sm" disabled aria-label={t("table.view")}>
