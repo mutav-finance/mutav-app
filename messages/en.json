@@ -460,26 +460,23 @@
         "stellar": {
           "button": "Pay with Stellar",
           "title": "Pay with Stellar",
-          "description": "You pay from your Stellar wallet. Pick the asset below.",
           "tabs": { "xlm": "XLM", "usdc": "USDC" },
-          "copyAddress": "Stellar address",
-          "copySep7": "SEP-7 link",
+          "copyLink": "Payment link",
           "status": {
             "preparing": "Preparing payment...",
-            "awaitingPayment": "Send {amount} {asset} to the address below from your Stellar wallet",
+            "awaitingPayment": "Waiting for on-chain payment...",
             "completed": "Paid!"
-          },
-          "hint": "Use any Stellar wallet (Freighter, Lobstr, xBull) to send {amount} {asset} to the address above."
+          }
         },
         "pix": {
           "button": "Pay with PIX",
           "title": "Pay with PIX",
-          "description": "You pay from your bank account via PIX. Scan the QR or copy the code in your bank app.",
           "copyCode": "PIX copy & paste",
           "orderId": "Order",
+          "details": "Details",
           "status": {
             "preparing": "Preparing payment...",
-            "awaitingPayment": "Scan the QR or copy the code in your bank app",
+            "awaitingPayment": "Waiting for payment...",
             "processing": "Payment received, processing...",
             "completed": "Paid!",
             "failed": "Payment failed"

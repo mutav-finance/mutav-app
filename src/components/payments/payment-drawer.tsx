@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import QRCode from "qrcode";
-import { CheckCircle2, AlertCircle, Loader2, Copy, Check } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Copy, Check, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
@@ -20,6 +20,7 @@ import { Mono } from "@/components/ui/mono";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { usePixOnramp, type PixOnrampPhase } from "@/hooks/use-pix-onramp";
+import { formatBRLCents } from "@/lib/contracts/format";
 import { brlCentsToAsset } from "@/lib/stellar/asset-format";
 import { getActiveAssets } from "@/lib/stellar/assets";
 import { getStellarNetwork } from "@/lib/stellar/network";
@@ -38,12 +39,6 @@ interface StellarPaymentDrawerProps {
   totalCents: number;
 }
 
-/**
- * Drawer for users paying from a Stellar wallet (XLM or USDC). The asset
- * tabs are an asset choice WITHIN the Stellar funding source, not a
- * separate payment method. SEP-7 QR + copy fields + reactive status
- * (driven by the existing Horizon indexer flipping payment.state).
- */
 export function StellarPaymentDrawer({
   open,
   onOpenChange,
@@ -51,18 +46,18 @@ export function StellarPaymentDrawer({
   totalCents,
 }: StellarPaymentDrawerProps) {
   const t = useTranslations("paymentDetails.methodCard.pay.stellar");
+  const tShared = useTranslations("paymentDetails.methodCard.pay");
   const [tab, setTab] = useState<StellarAsset>("XLM");
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
-        <div className="mx-auto w-full max-w-lg">
-          <DrawerHeader>
+        <div className="mx-auto flex w-full max-w-md flex-col">
+          <DrawerHeader className="pb-2">
             <DrawerTitle>{t("title")}</DrawerTitle>
-            <DrawerDescription>{t("description")}</DrawerDescription>
           </DrawerHeader>
 
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-2">
             <Tabs value={tab} onValueChange={(v) => setTab(v as StellarAsset)}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="XLM">{t("tabs.xlm")}</TabsTrigger>
@@ -83,10 +78,10 @@ export function StellarPaymentDrawer({
             </Tabs>
           </div>
 
-          <DrawerFooter>
+          <DrawerFooter className="pt-2">
             <DrawerClose asChild>
               <Button variant="outline" className="w-full">
-                {useTranslations("paymentDetails.methodCard.pay")("close")}
+                {tShared("close")}
               </Button>
             </DrawerClose>
           </DrawerFooter>
@@ -119,7 +114,6 @@ function StellarDirectPanel({
       ? (() => {
           const amount = brlCentsToAsset(totalCents, asset, locale);
           return {
-            amountCanonical: amount.canonical,
             amountDisplay: amount.display,
             sep7Uri: buildSep7PayUri({
               destination: payment.muxedAddress,
@@ -135,17 +129,11 @@ function StellarDirectPanel({
   if (!payment || !sep7) return <LoadingBlock message={t("status.preparing")} />;
 
   return (
-    <div className="flex flex-col gap-4 pt-4">
-      <StatusBanner
-        icon={<Loader2 className="text-foreground size-4 animate-spin" strokeWidth={1.25} />}
-        text={t("status.awaitingPayment", { amount: sep7.amountDisplay, asset: assetSymbol })}
-      />
+    <div className="flex flex-col gap-3 pt-4">
+      <AmountHero brl={formatBRLCents(totalCents)} asset={`${sep7.amountDisplay} ${assetSymbol}`} />
       <PaymentQrCode value={sep7.sep7Uri} />
-      <CopyField label={t("copyAddress")} value={payment.muxedAddress!} />
-      <CopyField label={t("copySep7")} value={sep7.sep7Uri} />
-      <p className="text-muted-foreground text-center text-xs">
-        {t("hint", { amount: sep7.amountDisplay, asset: assetSymbol })}
-      </p>
+      <CopyField label={t("copyLink")} value={sep7.sep7Uri} />
+      <AwaitingStatus message={t("status.awaitingPayment")} />
     </div>
   );
 }
@@ -158,16 +146,12 @@ interface PixPaymentDrawerProps {
   paymentId: Id<"payments">;
 }
 
-/**
- * Drawer for users paying via PIX from their bank app. Runs the SEP-6
- * anchor on-ramp (testanchor stages with SEPA-shaped mocks today;
- * Etherfuse will deliver real BR Code via the same flow once added to
- * the registry).
- */
 export function PixPaymentDrawer({ open, onOpenChange, paymentId }: PixPaymentDrawerProps) {
   const t = useTranslations("paymentDetails.methodCard.pay.pix");
   const tShared = useTranslations("paymentDetails.methodCard.pay");
   const { phase, order, error, start, cancel, reset } = usePixOnramp({ paymentId });
+
+  const payment = useQuery(api.payments.useCases.getById, { paymentId });
 
   const startedRef = useRef(false);
   useEffect(() => {
@@ -188,13 +172,12 @@ export function PixPaymentDrawer({ open, onOpenChange, paymentId }: PixPaymentDr
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
-        <div className="mx-auto w-full max-w-lg">
-          <DrawerHeader>
+        <div className="mx-auto flex w-full max-w-md flex-col">
+          <DrawerHeader className="pb-2">
             <DrawerTitle>{t("title")}</DrawerTitle>
-            <DrawerDescription>{t("description")}</DrawerDescription>
           </DrawerHeader>
 
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-2">
             {phase === "completed" ? (
               <CompletedBlock message={t("status.completed")} />
             ) : phase === "failed" ? (
@@ -202,38 +185,50 @@ export function PixPaymentDrawer({ open, onOpenChange, paymentId }: PixPaymentDr
             ) : phase === "idle" || phase === "starting" || !order ? (
               <LoadingBlock message={t("status.preparing")} />
             ) : (
-              <div className="flex flex-col gap-4 pt-2">
-                <StatusBanner
-                  icon={
-                    <Loader2 className="text-foreground size-4 animate-spin" strokeWidth={1.25} />
-                  }
-                  text={pixPhaseLabel(t, phase)}
-                />
+              <div className="flex flex-col gap-3">
+                {payment && <AmountHero brl={formatBRLCents(payment.totalCents)} />}
                 <PaymentQrCode value={pix.qrPayload} />
                 {pix.copyValue && <CopyField label={t("copyCode")} value={pix.copyValue} />}
-                {pix.fields.length > 0 && (
-                  <dl className="border-border flex flex-col gap-2 border-t pt-3">
-                    {pix.fields.map((field) => (
-                      <div key={field.key} className="flex items-start justify-between gap-3">
-                        <dt className="text-muted-foreground text-xs">
-                          {field.description ?? field.key}
-                        </dt>
-                        <dd className="text-foreground max-w-[60%] text-right text-xs break-all">
-                          <Mono>{field.value}</Mono>
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
+                <AwaitingStatus message={pixPhaseLabel(t, phase)} />
+                {(pix.fields.length > 0 || order.how) && (
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 pt-1 text-[11px]"
+                      >
+                        {t("details")} <ChevronDown className="size-3" strokeWidth={1.5} />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      {pix.fields.length > 0 && (
+                        <dl className="border-border flex flex-col gap-2 border-t pt-3">
+                          {pix.fields.map((field) => (
+                            <div key={field.key} className="flex items-start justify-between gap-3">
+                              <dt className="text-muted-foreground text-xs">
+                                {field.description ?? field.key}
+                              </dt>
+                              <dd className="text-foreground max-w-[60%] text-right text-xs break-all">
+                                <Mono>{field.value}</Mono>
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+                      {order.how && (
+                        <p className="text-muted-foreground mt-2 text-xs italic">{order.how}</p>
+                      )}
+                      <p className="text-muted-foreground mt-2 text-center font-mono text-[10px]">
+                        {t("orderId")}: {order._id.slice(-8)}
+                      </p>
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
-                {order.how && <p className="text-muted-foreground text-xs italic">{order.how}</p>}
-                <p className="text-muted-foreground text-center font-mono text-[10px]">
-                  {t("orderId")}: {order._id.slice(-8)}
-                </p>
               </div>
             )}
           </div>
 
-          <DrawerFooter>
+          <DrawerFooter className="pt-2">
             <DrawerClose asChild>
               <Button variant="outline" className="w-full">
                 {tShared("close")}
@@ -248,11 +243,20 @@ export function PixPaymentDrawer({ open, onOpenChange, paymentId }: PixPaymentDr
 
 // ─── Shared shell pieces (file-private) ───────────────────────────────────────
 
-function StatusBanner({ icon, text }: { icon: React.ReactNode; text: string }) {
+function AmountHero({ brl, asset }: { brl: string; asset?: string }) {
   return (
-    <div className="bg-muted/30 flex items-center justify-center gap-3 rounded-md border px-3 py-2">
-      {icon}
-      <p className="text-foreground text-xs font-medium">{text}</p>
+    <div className="flex flex-col items-center gap-0.5 pb-1">
+      <p className="text-foreground text-2xl font-medium tabular-nums">{brl}</p>
+      {asset && <p className="text-muted-foreground text-xs">≈ {asset}</p>}
+    </div>
+  );
+}
+
+function AwaitingStatus({ message }: { message: string }) {
+  return (
+    <div className="text-muted-foreground flex items-center justify-center gap-2 pt-1">
+      <Loader2 className="size-3 animate-spin" strokeWidth={1.5} />
+      <p className="text-[11px]">{message}</p>
     </div>
   );
 }
@@ -279,7 +283,7 @@ function FailedBlock({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-12">
       <AlertCircle className="text-destructive size-12" strokeWidth={1.25} />
-      <p className="text-foreground text-sm font-medium">{message}</p>
+      <p className="text-foreground max-w-prose text-center text-xs">{message}</p>
     </div>
   );
 }
@@ -292,7 +296,7 @@ function PaymentQrCode({ value }: { value: string }) {
       errorCorrectionLevel: "M",
       margin: 1,
       color: { dark: "#1A1A1A", light: "#FFFFFF" },
-      width: 240,
+      width: 200,
     })
       .then((url) => {
         if (!cancelled) setDataUrl(url);
@@ -307,12 +311,12 @@ function PaymentQrCode({ value }: { value: string }) {
 
   return (
     <div className="flex justify-center">
-      <div className="border-border bg-background inline-flex items-center justify-center border p-3">
+      <div className="border-border bg-background inline-flex items-center justify-center border p-2">
         {dataUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={dataUrl} alt="Payment QR" width={240} height={240} />
+          <img src={dataUrl} alt="Payment QR" width={200} height={200} />
         ) : (
-          <div className="bg-muted size-[240px] animate-pulse" />
+          <div className="bg-muted size-[200px] animate-pulse" />
         )}
       </div>
     </div>
@@ -322,24 +326,24 @@ function PaymentQrCode({ value }: { value: string }) {
 function CopyField({ label, value }: { label: string; value: string }) {
   const { copied, copy } = useCopyToClipboard("copied");
   return (
-    <div className="border-border flex flex-col gap-1 rounded-md border p-3">
-      <p className="text-muted-foreground text-[10px] tracking-wide uppercase">{label}</p>
-      <div className="flex items-center gap-2">
-        <Mono className="text-foreground flex-1 text-xs break-all">{value}</Mono>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="size-7 shrink-0 p-0"
-          onClick={() => copy(value)}
-          aria-label={label}
-        >
-          {copied ? (
-            <Check className="size-4" strokeWidth={1.25} />
-          ) : (
-            <Copy className="size-4" strokeWidth={1.25} />
-          )}
-        </Button>
+    <div className="border-border flex items-center gap-2 rounded-md border p-2">
+      <div className="min-w-0 flex-1">
+        <p className="text-muted-foreground text-[10px] tracking-wide uppercase">{label}</p>
+        <Mono className="text-foreground block truncate text-xs">{value}</Mono>
       </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="size-8 shrink-0 p-0"
+        onClick={() => copy(value)}
+        aria-label={label}
+      >
+        {copied ? (
+          <Check className="size-4" strokeWidth={1.25} />
+        ) : (
+          <Copy className="size-4" strokeWidth={1.25} />
+        )}
+      </Button>
     </div>
   );
 }
