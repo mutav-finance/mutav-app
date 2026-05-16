@@ -1,10 +1,10 @@
 @AGENTS.md
 
-# SGR App — Agent Context
+# Mutav — Agent Context
 
 ## Project
 
-SGR (Sistema de Garantia Registrada) — dashboard for managing rental guarantees across chains.
+Mutav — dashboard for managing rental guarantees across chains.
 
 ## Shared docs
 
@@ -25,6 +25,41 @@ If the sibling repo is not cloned locally, fetch files directly:
 ```bash
 gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | base64 -d
 ```
+
+## Stellar concepts
+
+Mutav settles guarantees on Stellar and moves BRL ↔ token via anchors. Before touching anchor code, read the in-repo docs:
+
+- [`docs/stellar-anchors.md`](docs/stellar-anchors.md) — what an anchor is, which SEPs Mutav uses (SEP-1, 10, 12, 6, 24, 31, 38), how a Pix on-ramp flows end-to-end
+- [`src/lib/anchors/README.md`](src/lib/anchors/README.md) — the foundation library: when to use the SEP modules vs the `Anchor` interface, how to implement a new provider client
+- [`src/lib/anchors/sep/README.md`](src/lib/anchors/sep/README.md) — per-SEP API reference for the framework-agnostic protocol modules
+- [`src/lib/anchors/testanchor/README.md`](src/lib/anchors/testanchor/README.md) — reference SEP client composed against `testanchor.stellar.org`; copy this as the starting point for a new SEP-compliant client
+
+### Installed expert skills
+
+The official [`stellar/stellar-dev-skill`](https://github.com/stellar/stellar-dev-skill) is installed at project scope. Seven sub-skills auto-trigger on Stellar prompts — invoke explicitly via the Skill tool when in doubt:
+
+| Skill              | Use for                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `standards`        | Picking the right SEP/CAP — anchor flows (SEP-1/6/10/12/24/31), token interfaces  |
+| `dapp`             | Frontend stellar-sdk, Freighter, Stellar Wallets Kit, smart accounts, signing     |
+| `data`             | Stellar RPC (preferred) and Horizon (legacy) for balances, transactions, indexing |
+| `assets`           | Stellar Assets, trustlines, SAC bridge — issuance, regulated assets               |
+| `soroban`          | Rust smart-contract dev, testing, security patterns                               |
+| `agentic-payments` | x402 + MPP for machine/agent payments                                             |
+| `zk-proofs`        | BLS12-381 / BN254 / Poseidon ZK verification                                      |
+
+### External references
+
+When the in-repo docs and skills aren't enough, consult:
+
+- [Stellar Developer Docs](https://developers.stellar.org) — canonical reference; the [`llms.txt`](https://developers.stellar.org/llms.txt) is a flat dump optimized for LLM context
+- [SEPs index](https://github.com/stellar/stellar-protocol/tree/master/ecosystem) — authoritative source of truth for protocol status (the skill is a routing map only)
+- [CAPs index](https://github.com/stellar/stellar-protocol/tree/master/core) — Core Advancement Proposals (Soroban runtime, cryptography)
+- [Stellar Anchor Directory](https://anchors.stellar.org/) — live list of operating anchors per region; check before committing to a provider
+- [Anchor Platform docs](https://developers.stellar.org/docs/platforms/anchor-platform) — SDF's reference implementation for running an anchor server (useful as a spec for what we consume)
+- [Building with AI](https://developers.stellar.org/docs/build/building-with-ai) — SDF's guide to AI-assisted Stellar dev; lists the skill, llms.txt, and Stella
+- **Stella AI** — yellow chat icon on developers.stellar.org for interactive Q&A; or `#stella-help` on the [Stellar Discord](https://discord.gg/stellar)
 
 ## Stack
 
@@ -299,7 +334,7 @@ Define error codes as `as const` value objects in the entity file (e.g. `CONTRAC
 
 ## Domain conventions (Brazil)
 
-SGR operates in Brazil. Convention choices:
+Mutav operates in Brazil. Convention choices:
 
 - **Money** — store as **integer cents** (`v.number()` representing centavos). Field naming: suffix `Cents` (e.g. `rentCents`, `availableGuaranteeCents`). Float reais is a precision trap; cents is the industry-standard fix. Existing `*BRL: v.number()` fields predate this rule and need migration — see `.claude/notes/deferred-conventions.md`. Display via `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)`.
 - **CPF / CNPJ** — store as digits-only strings (CPF = 11 chars, CNPJ = 14 chars). Validate with proper checksum algorithms; never use regex alone. Format only at display time (`123.456.789-01`, `12.345.678/0001-90`).

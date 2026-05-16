@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "SGR — Registered Guarantee System",
+    "title": "Mutav — Registered Guarantee System",
     "description": "Dashboard for managing rental guarantees registered on-chain."
   },
   "common": {
@@ -307,7 +307,7 @@
   },
   "contractList": {
     "meta": {
-      "title": "Contracts | SGR",
+      "title": "Contracts | Mutav",
       "description": "Real estate agency contracts list"
     },
     "heading": "Contracts",
@@ -359,7 +359,7 @@
   },
   "paymentList": {
     "meta": {
-      "title": "Invoices | SGR",
+      "title": "Invoices | Mutav",
       "description": "Monthly invoices for the agency"
     },
     "heading": "Invoices",
@@ -396,7 +396,7 @@
   },
   "paymentDetails": {
     "meta": {
-      "title": "Invoice {id} | SGR",
+      "title": "Invoice {id} | Mutav",
       "description": "Invoice details"
     },
     "breadcrumb": "Invoice Details",
