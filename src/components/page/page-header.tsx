@@ -2,15 +2,15 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "section" | "hero";
-type Width = "full" | "narrow";
+type Width = "full" | "narrow" | "wide";
 
 /**
  * Page header with title + optional subtitle / breadcrumb / actions.
  *
  * - `variant="section"` (default, `text-xl`) — list/dashboard pages
  * - `variant="hero"` (`text-3xl`) — detail pages with a single primary subject
- * - `width="narrow"` constrains the header column to align with
- *   <PageContent variant="narrow"> below it
+ * - `width="narrow"` aligns with <PageContent variant="narrow"> below it
+ * - `width="wide"` aligns with <PageContent variant="wide"> below it
  */
 export function PageHeader({
   title,
@@ -39,6 +39,7 @@ export function PageHeader({
       className={cn(
         "flex flex-col gap-2 px-4 lg:px-6",
         width === "narrow" && "mx-auto w-full max-w-(--page-content-max-width)",
+        width === "wide" && "mx-auto w-full max-w-(--page-wide-max-width)",
         className,
       )}
     >
