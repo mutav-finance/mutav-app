@@ -1,14 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mono } from "@/components/ui/mono";
-import { getPathname } from "@/i18n/navigation";
+import { Link, getPathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { PixPaymentButton, StellarPaymentButton } from "@/components/payments/payment-button";
 import { isChargeable, type Payment } from "@convex/payments/domain";
 
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -27,7 +26,7 @@ function ShareTenantLink({ publicId }: { publicId: string }) {
 
   const handleCopy = () => {
     const path = getPathname({
-      href: `/pagar/${publicId}/endereco`,
+      href: `/pagar/${publicId}`,
       locale: locale as "pt-BR" | "en",
     });
     copy(`${window.location.origin}${path}`);
@@ -52,15 +51,20 @@ function ChargeableActions({
   payment: Payment;
   variant: "primary" | "secondary";
 }) {
-  const stellarVariant = variant === "primary" ? "default" : "outline";
+  const t = useTranslations("paymentDetails.methodCard");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <StellarPaymentButton
-        publicId={payment.publicId}
-        totalCents={payment.totalCents}
-        variant={stellarVariant}
-      />
-      <PixPaymentButton paymentId={payment._id} variant="outline" />
+      <Button
+        asChild
+        size="sm"
+        variant={variant === "primary" ? "default" : "outline"}
+        className="gap-2"
+      >
+        <Link href={`/pagar/${payment.publicId}`} target="_blank" rel="noopener">
+          {t("openCheckout")}
+          <ExternalLink className="size-4" strokeWidth={1.25} />
+        </Link>
+      </Button>
       <ShareTenantLink publicId={payment.publicId} />
     </div>
   );

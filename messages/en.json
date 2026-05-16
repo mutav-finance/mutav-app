@@ -394,6 +394,76 @@
       "lastPage": "Last page"
     }
   },
+  "checkout": {
+    "common": {
+      "payee": "Pay to",
+      "dueDate": "Due on",
+      "back": "Back",
+      "backToCheckout": "Back to checkout",
+      "trust": "Payments settled via Stellar and regulated anchors. Invoice"
+    },
+    "picker": {
+      "meta": {
+        "title": "Pay invoice {publicId} | Mutav",
+        "description": "Choose how to pay your Mutav invoice."
+      },
+      "heading": "How do you want to pay?",
+      "pix": {
+        "title": "PIX",
+        "subtitle": "Direct from your bank account",
+        "duration": "~1 min"
+      },
+      "stellar": {
+        "title": "Crypto (Stellar)",
+        "subtitle": "XLM or USDC from your wallet",
+        "duration": "~10 s"
+      }
+    },
+    "stellar": {
+      "meta": {
+        "title": "Pay with Stellar — {publicId} | Mutav",
+        "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
+      }
+    },
+    "pix": {
+      "meta": {
+        "title": "Pay with PIX — {publicId} | Mutav",
+        "description": "Pay your Mutav invoice via PIX."
+      },
+      "copyCode": "PIX copy & paste",
+      "orderId": "Order",
+      "details": "Details",
+      "status": {
+        "preparing": "Preparing payment",
+        "awaitingPayment": "Awaiting payment",
+        "processing": "Received, processing",
+        "completed": "Paid",
+        "failed": "Payment failed"
+      }
+    },
+    "pago": {
+      "meta": {
+        "title": "Paid — {publicId} | Mutav",
+        "description": "Mutav payment receipt."
+      },
+      "badge": {
+        "paid": "Paid",
+        "canceled": "Canceled"
+      },
+      "paidVia": "via {method}",
+      "dueWas": "Was due on",
+      "invoiceId": "Invoice",
+      "txHash": "Transaction hash",
+      "txId": "Transaction ID",
+      "canceledRecovery": "This invoice was canceled. Request a new one from the agency.",
+      "methods": {
+        "pix": "PIX",
+        "stellar": "Stellar",
+        "boleto": "Boleto",
+        "unknown": "—"
+      }
+    }
+  },
   "paymentDetails": {
     "meta": {
       "title": "Invoice {id} | Mutav",
@@ -455,34 +525,7 @@
       "openPayPage": "Open payment page",
       "copyShareLink": "Copy link",
       "linkCopied": "Link copied",
-      "pay": {
-        "close": "Close",
-        "stellar": {
-          "button": "Pay with Stellar",
-          "title": "Pay with Stellar",
-          "tabs": { "xlm": "XLM", "usdc": "USDC" },
-          "copyLink": "Payment link",
-          "status": {
-            "preparing": "Preparing payment...",
-            "awaitingPayment": "Waiting for on-chain payment...",
-            "completed": "Paid!"
-          }
-        },
-        "pix": {
-          "button": "Pay with PIX",
-          "title": "Pay with PIX",
-          "copyCode": "PIX copy & paste",
-          "orderId": "Order",
-          "details": "Details",
-          "status": {
-            "preparing": "Preparing payment...",
-            "awaitingPayment": "Waiting for payment...",
-            "processing": "Payment received, processing...",
-            "completed": "Paid!",
-            "failed": "Payment failed"
-          }
-        }
-      }
+      "openCheckout": "Open checkout"
     },
     "notFound": {
       "title": "Invoice not found",

@@ -394,6 +394,76 @@
       "lastPage": "Última página"
     }
   },
+  "checkout": {
+    "common": {
+      "payee": "Pagar para",
+      "dueDate": "Vence em",
+      "back": "Voltar",
+      "backToCheckout": "Voltar ao checkout",
+      "trust": "Pagamentos liquidados via Stellar e anchors regulados. Fatura"
+    },
+    "picker": {
+      "meta": {
+        "title": "Pagar fatura {publicId} | Mutav",
+        "description": "Escolha como pagar sua fatura Mutav."
+      },
+      "heading": "Como você quer pagar?",
+      "pix": {
+        "title": "PIX",
+        "subtitle": "Direto da sua conta bancária",
+        "duration": "~1 min"
+      },
+      "stellar": {
+        "title": "Cripto (Stellar)",
+        "subtitle": "XLM ou USDC da sua carteira",
+        "duration": "~10 s"
+      }
+    },
+    "stellar": {
+      "meta": {
+        "title": "Pagar com Stellar — {publicId} | Mutav",
+        "description": "Pague sua fatura Mutav via Stellar (XLM ou USDC)."
+      }
+    },
+    "pix": {
+      "meta": {
+        "title": "Pagar com PIX — {publicId} | Mutav",
+        "description": "Pague sua fatura Mutav via PIX."
+      },
+      "copyCode": "PIX copia e cola",
+      "orderId": "Pedido",
+      "details": "Detalhes",
+      "status": {
+        "preparing": "Preparando pagamento",
+        "awaitingPayment": "Aguardando pagamento",
+        "processing": "Recebido, processando",
+        "completed": "Pago",
+        "failed": "Falha no pagamento"
+      }
+    },
+    "pago": {
+      "meta": {
+        "title": "Pago — {publicId} | Mutav",
+        "description": "Comprovante de pagamento Mutav."
+      },
+      "badge": {
+        "paid": "Pago",
+        "canceled": "Cancelado"
+      },
+      "paidVia": "via {method}",
+      "dueWas": "Venceu em",
+      "invoiceId": "Fatura",
+      "txHash": "Hash da transação",
+      "txId": "ID da transação",
+      "canceledRecovery": "Esta fatura foi cancelada. Solicite uma nova à imobiliária.",
+      "methods": {
+        "pix": "PIX",
+        "stellar": "Stellar",
+        "boleto": "Boleto",
+        "unknown": "—"
+      }
+    }
+  },
   "paymentDetails": {
     "meta": {
       "title": "Fatura {id} | Mutav",
@@ -455,34 +525,7 @@
       "openPayPage": "Abrir página de pagamento",
       "copyShareLink": "Copiar link",
       "linkCopied": "Link copiado",
-      "pay": {
-        "close": "Fechar",
-        "stellar": {
-          "button": "Pagar com Stellar",
-          "title": "Pagar com Stellar",
-          "tabs": { "xlm": "XLM", "usdc": "USDC" },
-          "copyLink": "Link de pagamento",
-          "status": {
-            "preparing": "Preparando pagamento...",
-            "awaitingPayment": "Aguardando pagamento on-chain...",
-            "completed": "Pago!"
-          }
-        },
-        "pix": {
-          "button": "Pagar com PIX",
-          "title": "Pagar com PIX",
-          "copyCode": "PIX copia e cola",
-          "orderId": "Pedido",
-          "details": "Detalhes",
-          "status": {
-            "preparing": "Preparando pagamento...",
-            "awaitingPayment": "Aguardando pagamento...",
-            "processing": "Pagamento recebido, processando...",
-            "completed": "Pago!",
-            "failed": "Falha no pagamento"
-          }
-        }
-      }
+      "openCheckout": "Abrir checkout"
     },
     "notFound": {
       "title": "Fatura não encontrada",
