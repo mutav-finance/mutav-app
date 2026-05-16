@@ -41,9 +41,12 @@ const paymentState = v.union(
  * Discriminated union representing the chosen payment method.
  * null = agency has not yet selected a method (invoice issued, awaiting choice).
  *
- * - boleto:   traditional Brazilian bank slip; barcode null until PSP registers it.
- * - stellar:  on-chain payment via Stellar network (XLM / USDC); txHash null until confirmed.
- * - pix:      Brazilian instant payment; txId null until confirmed.
+ * - boleto:     traditional Brazilian bank slip; barcode null until PSP registers it.
+ * - stellar:    on-chain payment via Stellar network (XLM / USDC); txHash null until confirmed.
+ * - pix:        Brazilian instant payment; txId null until confirmed.
+ * - pix_anchor: PIX collected by an anchor (e.g. Etherfuse) and bridged to
+ *               on-chain USDC on the agency's behalf. Carries a foreign key
+ *               into anchorOnRampTransactions for the full transaction state.
  */
 const paymentMethod = v.union(
   v.null(),
@@ -61,15 +64,58 @@ const paymentMethod = v.union(
     pixKey: v.string(),
     txId: v.union(v.string(), v.null()),
   }),
+  v.object({
+    kind: v.literal("pix_anchor"),
+    anchorOnRampTransactionId: v.id("anchorOnRampTransactions"),
+    pixCode: v.string(),
+    expiresAt: v.string(),
+  }),
 );
 
 const memberRole = v.union(v.literal("owner"), v.literal("admin"), v.literal("member"));
+
+/**
+ * Per-agency Etherfuse business-KYB onboarding status. Mirrors the KycStatus
+ * type from src/lib/anchors/types.ts but scoped to the agency (org) record
+ * since BR business KYB is performed once per agency, not per end-user.
+ */
+const etherfuseOnboardingStatusValidator = v.union(
+  v.literal("not_started"),
+  v.literal("pending"),
+  v.literal("approved"),
+  v.literal("rejected"),
+  v.literal("update_required"),
+);
+
+/**
+ * Lifecycle states for an anchor on/off-ramp transaction. Mirrors the
+ * TransactionStatus literal union from src/lib/anchors/types.ts so the
+ * vendored Anchor interface maps cleanly to persisted rows.
+ */
+const transactionStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("processing"),
+  v.literal("completed"),
+  v.literal("failed"),
+  v.literal("expired"),
+  v.literal("cancelled"),
+  v.literal("refunded"),
+);
 
 export default defineSchema({
   agencies: defineTable({
     name: v.string(),
     cnpj: v.string(),
     createdAt: v.string(),
+    // Etherfuse child-org identifier returned by /organization. Null until
+    // the agency completes the business-KYB onboarding flow.
+    etherfuseOrgId: v.union(v.string(), v.null()),
+    etherfuseOnboardingStatus: etherfuseOnboardingStatusValidator,
+    // Etherfuse bank-account identifier — required on every /ramp/order call.
+    // Registered once per agency via POST /ramp/customer/{id}/bank-account.
+    // Optional in the schema so pre-existing agency rows don't fail
+    // validation; the action layer treats `null` and `undefined` equivalently.
+    etherfuseBankAccountId: v.optional(v.union(v.string(), v.null())),
   }).index("by_cnpj", ["cnpj"]),
 
   users: defineTable({
@@ -183,6 +229,40 @@ export default defineSchema({
     .index("by_state_kind", ["state.kind"])
     .index("by_publicId", ["publicId"])
     .index("by_muxedId", ["muxedId"]),
+
+  // Anchor on-ramp orders (e.g. Etherfuse PIX → on-chain USDC). One row per
+  // collection attempt; lifecycle moves through transactionStatusValidator.
+  anchorOnRampTransactions: defineTable({
+    paymentId: v.id("payments"),
+    agencyId: v.id("agencies"),
+    provider: v.string(),
+    providerTransactionId: v.string(),
+    providerQuoteId: v.string(),
+    status: transactionStatusValidator,
+    fromAmount: v.string(),
+    fromCurrency: v.string(),
+    toAmount: v.string(),
+    toCurrency: v.string(),
+    stellarAddress: v.string(),
+    paymentInstructions: v.optional(v.any()),
+    feeBps: v.optional(v.number()),
+    stellarTxHash: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_payment", ["paymentId"])
+    .index("by_providerTransactionId", ["provider", "providerTransactionId"]),
+
+  // Inbound anchor webhook log. Dedupe on (provider, eventId); the real
+  // HMAC-verifying handler in workstream WC enforces idempotency via this
+  // index.
+  anchorWebhookEvents: defineTable({
+    provider: v.string(),
+    eventId: v.string(),
+    eventType: v.string(),
+    payload: v.any(),
+    receivedAt: v.string(),
+  }).index("by_provider_eventId", ["provider", "eventId"]),
 
   // Singleton row tracking the latest Horizon paging token seen by the
   // treasury polling action. Inserted lazily on first run.

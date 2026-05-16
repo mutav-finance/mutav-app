@@ -29,6 +29,7 @@ export const PAYMENT_METHOD_KIND = {
   BOLETO: "boleto",
   STELLAR: "stellar",
   PIX: "pix",
+  PIX_ANCHOR: "pix_anchor",
 } as const satisfies Record<Uppercase<PaymentMethodKind>, PaymentMethodKind>;
 
 // ─── Line item constants ──────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export const paymentMethodKindValidator = v.union(
   v.literal(PAYMENT_METHOD_KIND.BOLETO),
   v.literal(PAYMENT_METHOD_KIND.STELLAR),
   v.literal(PAYMENT_METHOD_KIND.PIX),
+  v.literal(PAYMENT_METHOD_KIND.PIX_ANCHOR),
 );
 
 export const paymentLineItemKindValidator = v.union(
@@ -93,5 +95,15 @@ export const PaymentMethods = {
     kind: "pix",
     pixKey,
     txId,
+  }),
+  pixAnchor: (
+    anchorOnRampTransactionId: Id<"anchorOnRampTransactions">,
+    pixCode: string,
+    expiresAt: string,
+  ): Extract<PaymentMethod, { kind: "pix_anchor" }> => ({
+    kind: "pix_anchor",
+    anchorOnRampTransactionId,
+    pixCode,
+    expiresAt,
   }),
 } as const;

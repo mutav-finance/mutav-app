@@ -30,3 +30,23 @@ export const MEMBER_ROLE_ORDER: MemberRole[] = ["member", "admin", "owner"];
 /** Returns true when `userRole` satisfies the `required` minimum. */
 export const hasRole = (userRole: MemberRole, required: MemberRole): boolean =>
   MEMBER_ROLE_ORDER.indexOf(userRole) >= MEMBER_ROLE_ORDER.indexOf(required);
+
+// ─── Etherfuse onboarding ─────────────────────────────────────────────────────
+
+export type EtherfuseOnboardingStatus = Agency["etherfuseOnboardingStatus"];
+
+export const ETHERFUSE_ONBOARDING_STATUS = {
+  NOT_STARTED: "not_started",
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  UPDATE_REQUIRED: "update_required",
+} as const satisfies Record<Uppercase<EtherfuseOnboardingStatus>, EtherfuseOnboardingStatus>;
+
+export const etherfuseOnboardingStatusValidator = v.union(
+  v.literal(ETHERFUSE_ONBOARDING_STATUS.NOT_STARTED),
+  v.literal(ETHERFUSE_ONBOARDING_STATUS.PENDING),
+  v.literal(ETHERFUSE_ONBOARDING_STATUS.APPROVED),
+  v.literal(ETHERFUSE_ONBOARDING_STATUS.REJECTED),
+  v.literal(ETHERFUSE_ONBOARDING_STATUS.UPDATE_REQUIRED),
+);

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query } from "../_generated/server";
+import { internalMutation, internalQuery, query } from "../_generated/server";
+import { etherfuseOnboardingStatusValidator } from "./domain";
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
 
@@ -79,5 +80,60 @@ export const getMembership = query({
       .query("memberships")
       .withIndex("by_user_agency", (q) => q.eq("userId", args.userId).eq("agencyId", args.agencyId))
       .unique();
+  },
+});
+
+// ─── Etherfuse lookups ────────────────────────────────────────────────────────
+
+/**
+ * Resolve an agency from an Etherfuse `customerId` (we store it as
+ * `etherfuseOrgId`). Used by the webhook handler to route `kyc_updated`
+ * events to the right agency. No dedicated index — agencies are a
+ * low-cardinality table (hundreds at most for the foreseeable future);
+ * add `by_etherfuseOrgId` if we ever scale to thousands.
+ */
+export const findAgencyByEtherfuseOrgId = internalQuery({
+  args: { etherfuseOrgId: v.string() },
+  handler: async (ctx, { etherfuseOrgId }) => {
+    const all = await ctx.db.query("agencies").collect();
+    return all.find((a) => a.etherfuseOrgId === etherfuseOrgId) ?? null;
+  },
+});
+
+// ─── Etherfuse onboarding mutations ───────────────────────────────────────────
+
+/**
+ * Patches an agency's Etherfuse onboarding state. Called by the webhook handler
+ * when Etherfuse fires kyc_updated events. `etherfuseOrgId` is optional so the
+ * caller can update only the status (e.g. pending → approved) without touching
+ * the org id, or set it (including to null) when the org is provisioned/cleared.
+ */
+export const updateEtherfuseStatus = internalMutation({
+  args: {
+    agencyId: v.id("agencies"),
+    status: etherfuseOnboardingStatusValidator,
+    etherfuseOrgId: v.optional(v.union(v.string(), v.null())),
+    etherfuseBankAccountId: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, { agencyId, status, etherfuseOrgId, etherfuseBankAccountId }) => {
+    const agency = await ctx.db.get(agencyId);
+    if (!agency) {
+      return { ok: false as const, reason: "agency_not_found" as const };
+    }
+    const patch: {
+      etherfuseOnboardingStatus: typeof status;
+      etherfuseOrgId?: string | null;
+      etherfuseBankAccountId?: string | null;
+    } = {
+      etherfuseOnboardingStatus: status,
+    };
+    if (etherfuseOrgId !== undefined) {
+      patch.etherfuseOrgId = etherfuseOrgId;
+    }
+    if (etherfuseBankAccountId !== undefined) {
+      patch.etherfuseBankAccountId = etherfuseBankAccountId;
+    }
+    await ctx.db.patch(agencyId, patch);
+    return { ok: true as const };
   },
 });
