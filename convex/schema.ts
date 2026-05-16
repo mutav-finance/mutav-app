@@ -65,6 +65,49 @@ const paymentMethod = v.union(
 
 const memberRole = v.union(v.literal("owner"), v.literal("admin"), v.literal("member"));
 
+/**
+ * Anchor on-ramp lifecycle, normalized across providers. Mirrors SEP-24
+ * status values; non-SEP providers (Etherfuse later) map their states to
+ * this same set. Terminal states: `completed`, `refunded`, `expired`, `error`.
+ */
+const anchorOrderStatus = v.union(
+  v.literal("incomplete"),
+  v.literal("pending_user_transfer_start"),
+  v.literal("pending_user_transfer_complete"),
+  v.literal("pending_anchor"),
+  v.literal("pending_stellar"),
+  v.literal("completed"),
+  v.literal("refunded"),
+  v.literal("expired"),
+  v.literal("error"),
+);
+
+const anchorOrderProvider = v.union(v.literal("testanchor"));
+
+/**
+ * Onboarding status of an agency with a single anchor provider. Normalized
+ * across providers (Etherfuse, Bitso, …) so the UI renders one status pill
+ * regardless of which anchor's KYC flow produced it.
+ */
+const anchorOnboardingStatus = v.union(
+  v.literal("not_started"),
+  v.literal("pending"),
+  v.literal("approved"),
+  v.literal("rejected"),
+);
+
+/**
+ * Provider-specific fields for an `anchorAccounts` row, discriminated by
+ * `provider`. Adding a new anchor = register its name in
+ * `src/lib/anchors/registry.ts` AND append a variant here. Testanchor needs
+ * no per-agency config — its variant exists for the union's default arm.
+ */
+const anchorAccountData = v.union(
+  v.object({
+    provider: v.literal("testanchor"),
+  }),
+);
+
 export default defineSchema({
   agencies: defineTable({
     name: v.string(),
@@ -196,4 +239,62 @@ export default defineSchema({
     cursor: v.string(),
     lastRunAt: v.string(),
   }).index("by_sourceAccount", ["sourceAccount"]),
+
+  // One row per anchor-mediated on-ramp attempt against a `payments` row.
+  // 1:N from payments (retries create new rows). On terminal `completed`,
+  // the parent payment's state flips to `paid` via `markPaidByAnchor`.
+  // `rawPayload` retains the last full anchor-side transaction object for
+  // debugging / audit.
+  anchorOrders: defineTable({
+    agencyId: v.id("agencies"),
+    paymentId: v.id("payments"),
+    provider: anchorOrderProvider,
+    anchorTxId: v.string(),
+    /**
+     * SEP-6 deposit instructions returned by the anchor: key-value pairs
+     * the user / our UI uses to make the payment (PIX key, QR string,
+     * bank account info, memo, etc.). Shape varies per provider; renderer
+     * detects known Pix-shaped fields (`pix_qr_code`, `pix_chave`) or
+     * falls back to a generic key-value panel. Optional because some
+     * anchors may return `how` instead of structured instructions.
+     */
+    instructions: v.optional(v.any()),
+    /** Free-form deposit summary text from SEP-6 `how` field. */
+    how: v.optional(v.string()),
+    /**
+     * SEP-24 interactive deposit URL. Present only for orders kicked off via
+     * the hosted-UI path (`startAnchorTestOnramp`). The client either iframes
+     * this or opens it in a popup; status updates still come from the
+     * `anchors:poll*` action loop.
+     */
+    hostedUrl: v.optional(v.string()),
+    status: anchorOrderStatus,
+    amountInCents: v.optional(v.number()),
+    amountOutCents: v.optional(v.number()),
+    feeCents: v.optional(v.number()),
+    createdAt: v.string(),
+    completedAt: v.optional(v.string()),
+    rawPayload: v.optional(v.any()),
+  })
+    .index("by_agency", ["agencyId"])
+    .index("by_payment", ["paymentId"])
+    .index("by_anchor_tx", ["anchorTxId"]),
+
+  // One row per (agency × anchor provider) onboarding relationship. Embeds
+  // provider-specific fields under the discriminated `data` block; common
+  // lifecycle fields (status, external id, timestamps) live at the top
+  // level. Webhook reconciliation resolves by `(provider, externalId)`.
+  anchorAccounts: defineTable({
+    agencyId: v.id("agencies"),
+    provider: anchorOrderProvider,
+    status: anchorOnboardingStatus,
+    /** Provider's own identifier (Etherfuse orgId, Bitso accountId, …). null until provisioned. */
+    externalId: v.union(v.string(), v.null()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+    data: anchorAccountData,
+  })
+    .index("by_agency", ["agencyId"])
+    .index("by_agency_provider", ["agencyId", "provider"])
+    .index("by_provider_externalId", ["provider", "externalId"]),
 });

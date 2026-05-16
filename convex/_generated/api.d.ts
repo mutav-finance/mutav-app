@@ -10,8 +10,12 @@
 
 import type * as agencies_domain from "../agencies/domain.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
+import type * as anchors_accountDomain from "../anchors/accountDomain.js";
+import type * as anchors_accountUseCases from "../anchors/accountUseCases.js";
 import type * as anchors_actions from "../anchors/actions.js";
 import type * as anchors_domain from "../anchors/domain.js";
+import type * as anchors_orderDomain from "../anchors/orderDomain.js";
+import type * as anchors_orderUseCases from "../anchors/orderUseCases.js";
 import type * as anchors_useCases from "../anchors/useCases.js";
 import type * as contracts_actions from "../contracts/actions.js";
 import type * as contracts_aggregate from "../contracts/aggregate.js";
@@ -22,6 +26,7 @@ import type * as contracts_useCases from "../contracts/useCases.js";
 import type * as crons from "../crons.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_env from "../lib/env.js";
+import type * as lib_stellarSigner from "../lib/stellarSigner.js";
 import type * as payments_actions from "../payments/actions.js";
 import type * as payments_domain from "../payments/domain.js";
 import type * as payments_lib_muxedAddress from "../payments/lib/muxedAddress.js";
@@ -41,8 +46,12 @@ import type {
 declare const fullApi: ApiFromModules<{
   "agencies/domain": typeof agencies_domain;
   "agencies/useCases": typeof agencies_useCases;
+  "anchors/accountDomain": typeof anchors_accountDomain;
+  "anchors/accountUseCases": typeof anchors_accountUseCases;
   "anchors/actions": typeof anchors_actions;
   "anchors/domain": typeof anchors_domain;
+  "anchors/orderDomain": typeof anchors_orderDomain;
+  "anchors/orderUseCases": typeof anchors_orderUseCases;
   "anchors/useCases": typeof anchors_useCases;
   "contracts/actions": typeof contracts_actions;
   "contracts/aggregate": typeof contracts_aggregate;
@@ -53,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   "lib/auth": typeof lib_auth;
   "lib/env": typeof lib_env;
+  "lib/stellarSigner": typeof lib_stellarSigner;
   "payments/actions": typeof payments_actions;
   "payments/domain": typeof payments_domain;
   "payments/lib/muxedAddress": typeof payments_lib_muxedAddress;

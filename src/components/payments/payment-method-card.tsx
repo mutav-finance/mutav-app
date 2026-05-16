@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ExternalLink, Copy, Check } from "lucide-react";
+import { Copy, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mono } from "@/components/ui/mono";
@@ -26,7 +26,7 @@ function ShareTenantLink({ publicId }: { publicId: string }) {
 
   const handleCopy = () => {
     const path = getPathname({
-      href: `/pagar/${publicId}/endereco`,
+      href: `/pagar/${publicId}`,
       locale: locale as "pt-BR" | "en",
     });
     copy(`${window.location.origin}${path}`);
@@ -45,10 +45,10 @@ function ShareTenantLink({ publicId }: { publicId: string }) {
 }
 
 function ChargeableActions({
-  publicId,
+  payment,
   variant,
 }: {
-  publicId: string;
+  payment: Payment;
   variant: "primary" | "secondary";
 }) {
   const t = useTranslations("paymentDetails.methodCard");
@@ -60,12 +60,12 @@ function ChargeableActions({
         variant={variant === "primary" ? "default" : "outline"}
         className="gap-2"
       >
-        <Link href={`/pagar/${publicId}/endereco`} target="_blank" rel="noopener">
-          {variant === "primary" ? t("generateStellar") : t("openPayPage")}
+        <Link href={`/pagar/${payment.publicId}`} target="_blank" rel="noopener">
+          {t("openCheckout")}
           <ExternalLink className="size-4" strokeWidth={1.25} />
         </Link>
       </Button>
-      <ShareTenantLink publicId={publicId} />
+      <ShareTenantLink publicId={payment.publicId} />
     </div>
   );
 }
@@ -89,7 +89,7 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
               <p className="text-foreground text-sm font-medium">{t("none")}</p>
               <p className="text-muted-foreground text-xs">{t("noneHint")}</p>
             </div>
-            {chargeable && <ChargeableActions publicId={payment.publicId} variant="primary" />}
+            {chargeable && <ChargeableActions payment={payment} variant="primary" />}
           </div>
         )}
 
@@ -145,7 +145,7 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
                 }
               />
             </dl>
-            {chargeable && <ChargeableActions publicId={payment.publicId} variant="secondary" />}
+            {chargeable && <ChargeableActions payment={payment} variant="secondary" />}
           </div>
         )}
       </CardContent>

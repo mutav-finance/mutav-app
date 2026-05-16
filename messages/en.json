@@ -396,6 +396,132 @@
       "lastPage": "Last page"
     }
   },
+  "checkout": {
+    "common": {
+      "payee": "Pay to",
+      "dueDate": "Due on",
+      "back": "Back",
+      "backToCheckout": "Back to checkout",
+      "trust": "Payments settled via Stellar and regulated anchors. Invoice"
+    },
+    "picker": {
+      "meta": {
+        "title": "Pay invoice {publicId} | Mutav",
+        "description": "Choose how to pay your Mutav invoice."
+      },
+      "heading": "How do you want to pay?",
+      "pix": {
+        "title": "PIX",
+        "subtitle": "Direct from your bank account",
+        "duration": "~1 min"
+      },
+      "stellar": {
+        "title": "Crypto (Stellar)",
+        "subtitle": "XLM or USDC from your wallet",
+        "duration": "~10 s"
+      },
+      "anchortest": {
+        "title": "AnchorTest",
+        "subtitle": "Anchor hosted UI (SEP-24)",
+        "duration": "demo"
+      }
+    },
+    "stellar": {
+      "meta": {
+        "title": "Pay with Stellar — {publicId} | Mutav",
+        "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
+      }
+    },
+    "anchortest": {
+      "meta": {
+        "title": "AnchorTest — {publicId} | Mutav",
+        "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
+      },
+      "orderId": "Order",
+      "stepsHeading": "Steps",
+      "steps": {
+        "openForm": {
+          "title": "Open the anchor's form",
+          "caption": "We'll open the form in a new window.",
+          "popupOpen": "Form open. Complete the details in the popup window.",
+          "popupBlocked": "Your browser blocked the popup. Use the button below.",
+          "open": "Open in new window",
+          "reopen": "Reopen window"
+        },
+        "awaiting": {
+          "title": "Awaiting anchor confirmation",
+          "caption": "We're polling the anchor — you can close the window once you're done."
+        },
+        "done": {
+          "title": "Payment settled"
+        }
+      },
+      "status": {
+        "preparing": "Preparing deposit",
+        "completed": "Paid",
+        "failed": "Payment failed"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Invoice not found.",
+        "NOT_CHARGEABLE": "This invoice cannot be paid right now.",
+        "AMOUNT_INVALID": "Invalid amount for the selected method.",
+        "AMOUNT_OUT_OF_RANGE": "Amount is outside the anchor's accepted range — use R$ 5.00–R$ 50.00 on the test environment.",
+        "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
+        "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
+        "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "INTERNAL": "Internal error. Please try again."
+      }
+    },
+    "pix": {
+      "meta": {
+        "title": "Pay with PIX — {publicId} | Mutav",
+        "description": "Pay your Mutav invoice via PIX."
+      },
+      "copyCode": "PIX copy & paste",
+      "orderId": "Order",
+      "details": "Details",
+      "status": {
+        "preparing": "Preparing payment",
+        "awaitingPayment": "Awaiting payment",
+        "processing": "Received, processing",
+        "completed": "Paid",
+        "failed": "Payment failed"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Invoice not found.",
+        "NOT_CHARGEABLE": "This invoice cannot be paid right now.",
+        "AMOUNT_INVALID": "Invalid amount for the selected method.",
+        "AMOUNT_OUT_OF_RANGE": "Amount is outside the anchor's accepted range — use R$ 5.00–R$ 50.00 on the test environment.",
+        "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
+        "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
+        "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "INTERNAL": "Internal error. Please try again."
+      }
+    },
+    "pago": {
+      "meta": {
+        "title": "Paid — {publicId} | Mutav",
+        "description": "Mutav payment receipt."
+      },
+      "badge": {
+        "paid": "Paid",
+        "canceled": "Canceled"
+      },
+      "paidVia": "via {method}",
+      "dueWas": "Was due on",
+      "invoiceId": "Invoice",
+      "txHash": "Transaction hash",
+      "txId": "Transaction ID",
+      "canceledRecovery": "This invoice was canceled. Request a new one from the agency.",
+      "methods": {
+        "pix": "PIX",
+        "stellar": "Stellar",
+        "boleto": "Boleto",
+        "unknown": "—"
+      },
+      "backToDashboard": "Back to dashboard"
+    }
+  },
   "paymentDetails": {
     "meta": {
       "title": "Invoice {id} | Mutav",
@@ -456,7 +582,8 @@
       "generateStellar": "Pay with Stellar",
       "openPayPage": "Open payment page",
       "copyShareLink": "Copy link",
-      "linkCopied": "Link copied"
+      "linkCopied": "Link copied",
+      "openCheckout": "Open checkout"
     },
     "notFound": {
       "title": "Invoice not found",

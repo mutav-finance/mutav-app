@@ -396,6 +396,132 @@
       "lastPage": "Última página"
     }
   },
+  "checkout": {
+    "common": {
+      "payee": "Pagar para",
+      "dueDate": "Vence em",
+      "back": "Voltar",
+      "backToCheckout": "Voltar ao checkout",
+      "trust": "Pagamentos liquidados via Stellar e anchors regulados. Fatura"
+    },
+    "picker": {
+      "meta": {
+        "title": "Pagar fatura {publicId} | Mutav",
+        "description": "Escolha como pagar sua fatura Mutav."
+      },
+      "heading": "Como você quer pagar?",
+      "pix": {
+        "title": "PIX",
+        "subtitle": "Direto da sua conta bancária",
+        "duration": "~1 min"
+      },
+      "stellar": {
+        "title": "Cripto (Stellar)",
+        "subtitle": "XLM ou USDC da sua carteira",
+        "duration": "~10 s"
+      },
+      "anchortest": {
+        "title": "AnchorTest",
+        "subtitle": "Fluxo via UI da anchor (SEP-24)",
+        "duration": "demo"
+      }
+    },
+    "stellar": {
+      "meta": {
+        "title": "Pagar com Stellar — {publicId} | Mutav",
+        "description": "Pague sua fatura Mutav via Stellar (XLM ou USDC)."
+      }
+    },
+    "anchortest": {
+      "meta": {
+        "title": "AnchorTest — {publicId} | Mutav",
+        "description": "Pague via interface da anchor (SEP-24 — demo)."
+      },
+      "orderId": "Pedido",
+      "stepsHeading": "Passos",
+      "steps": {
+        "openForm": {
+          "title": "Abra o formulário da anchor",
+          "caption": "Vamos abrir o formulário em uma nova janela.",
+          "popupOpen": "Formulário aberto. Complete os dados na janela.",
+          "popupBlocked": "Seu navegador bloqueou a nova janela. Use o botão abaixo.",
+          "open": "Abrir em nova janela",
+          "reopen": "Reabrir janela"
+        },
+        "awaiting": {
+          "title": "Aguardando confirmação da anchor",
+          "caption": "Estamos monitorando a anchor — você pode fechar a janela quando terminar."
+        },
+        "done": {
+          "title": "Pagamento liquidado"
+        }
+      },
+      "status": {
+        "preparing": "Preparando depósito",
+        "completed": "Pago",
+        "failed": "Falha no pagamento"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Fatura não encontrada.",
+        "NOT_CHARGEABLE": "Esta fatura não pode ser paga no momento.",
+        "AMOUNT_INVALID": "Valor inválido para o método selecionado.",
+        "AMOUNT_OUT_OF_RANGE": "Valor fora do limite aceito pela anchor — use o intervalo R$ 5,00–R$ 50,00 no ambiente de teste.",
+        "ASSET_UNSUPPORTED": "Ativo não suportado pela anchor.",
+        "ANCHOR_REJECTED": "A anchor recusou o depósito. Tente novamente em instantes.",
+        "ANCHOR_RESPONSE_INVALID": "Resposta inesperada da anchor.",
+        "INTERNAL": "Erro interno. Tente novamente."
+      }
+    },
+    "pix": {
+      "meta": {
+        "title": "Pagar com PIX — {publicId} | Mutav",
+        "description": "Pague sua fatura Mutav via PIX."
+      },
+      "copyCode": "PIX copia e cola",
+      "orderId": "Pedido",
+      "details": "Detalhes",
+      "status": {
+        "preparing": "Preparando pagamento",
+        "awaitingPayment": "Aguardando pagamento",
+        "processing": "Recebido, processando",
+        "completed": "Pago",
+        "failed": "Falha no pagamento"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Fatura não encontrada.",
+        "NOT_CHARGEABLE": "Esta fatura não pode ser paga no momento.",
+        "AMOUNT_INVALID": "Valor inválido para o método selecionado.",
+        "AMOUNT_OUT_OF_RANGE": "Valor fora do limite aceito pela anchor — use o intervalo R$ 5,00–R$ 50,00 no ambiente de teste.",
+        "ASSET_UNSUPPORTED": "Ativo não suportado pela anchor.",
+        "ANCHOR_REJECTED": "A anchor recusou o depósito. Tente novamente em instantes.",
+        "ANCHOR_RESPONSE_INVALID": "Resposta inesperada da anchor.",
+        "INTERNAL": "Erro interno. Tente novamente."
+      }
+    },
+    "pago": {
+      "meta": {
+        "title": "Pago — {publicId} | Mutav",
+        "description": "Comprovante de pagamento Mutav."
+      },
+      "badge": {
+        "paid": "Pago",
+        "canceled": "Cancelado"
+      },
+      "paidVia": "via {method}",
+      "dueWas": "Venceu em",
+      "invoiceId": "Fatura",
+      "txHash": "Hash da transação",
+      "txId": "ID da transação",
+      "canceledRecovery": "Esta fatura foi cancelada. Solicite uma nova à imobiliária.",
+      "methods": {
+        "pix": "PIX",
+        "stellar": "Stellar",
+        "boleto": "Boleto",
+        "unknown": "—"
+      },
+      "backToDashboard": "Voltar ao painel"
+    }
+  },
   "paymentDetails": {
     "meta": {
       "title": "Fatura {id} | Mutav",
@@ -456,7 +582,8 @@
       "generateStellar": "Pagar com Stellar",
       "openPayPage": "Abrir página de pagamento",
       "copyShareLink": "Copiar link",
-      "linkCopied": "Link copiado"
+      "linkCopied": "Link copiado",
+      "openCheckout": "Abrir checkout"
     },
     "notFound": {
       "title": "Fatura não encontrada",
