@@ -24,6 +24,88 @@
   "brand": {
     "name": "Acme Inc."
   },
+  "commission": {
+    "meta": {
+      "title": "Comissão — MUTAV",
+      "description": "Acompanhe o saldo de comissão mensal e o histórico de contratos ativos."
+    },
+    "heading": "Comissão",
+    "subheading": "Valores liberados para sua imobiliária no período selecionado",
+    "prevMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "kpi": {
+      "monthCommission": "Comissão do mês",
+      "contracts": "{count} contratos ativos",
+      "invoice": "Nota fiscal",
+      "invoiceEmpty": "Nenhuma nota emitida",
+      "invoiceEmptyHint": "A nota fiscal será habilitada quando a comissão do mês for fechada.",
+      "invoiceDownload": "Baixar nota fiscal"
+    },
+    "table": {
+      "heading": "Detalhamento do mês",
+      "export": "Exportar como PDF",
+      "search": "Buscar contrato ou inquilino",
+      "empty": "Nenhum resultado encontrado.",
+      "total": "{count} contratos",
+      "col": {
+        "contract": "Contrato",
+        "tenant": "Inquilino",
+        "rent": "Valor Locatício",
+        "commission": "Comissão",
+        "installment": "Parcela",
+        "activatedAt": "Ativação"
+      }
+    }
+  },
+  "delinquencies": {
+    "meta": {
+      "title": "Inadimplências — MUTAV",
+      "description": "Acompanhe e gerencie os acionamentos de inadimplência dos contratos da sua imobiliária."
+    },
+    "heading": "Acionamentos de Inadimplência",
+    "subheading": "Acompanhe e gerencie as inadimplências abertas dos seus contratos",
+    "actions": {
+      "report": "Gerar relatório",
+      "statement": "Extrato de pagamento"
+    },
+    "status": {
+      "pendencia_aberta": "Pendência Aberta",
+      "entregue": "Entregue",
+      "cancelado": "Cancelado"
+    },
+    "filter": {
+      "property": "Imóvel",
+      "propertyPlaceholder": "ID do imóvel",
+      "tenantName": "Nome do inquilino",
+      "tenantNamePlaceholder": "Nome completo",
+      "tenantCpf": "CPF do inquilino",
+      "status": "Status",
+      "statusAll": "Todos",
+      "order": "Ordem",
+      "orderDate": "Data",
+      "orderAmount": "Valor",
+      "orderStatus": "Status",
+      "dateFrom": "Data aviso — de",
+      "dateTo": "Data aviso — até",
+      "amountFrom": "Valor inadimplência — de",
+      "amountTo": "Valor inadimplência — até",
+      "search": "Pesquisar",
+      "clear": "Limpar"
+    },
+    "table": {
+      "heading": "Resultados",
+      "empty": "Nenhum acionamento encontrado.",
+      "view": "Ver inadimplência",
+      "col": {
+        "property": "Imóvel",
+        "status": "Status",
+        "noticeAt": "Data Aviso",
+        "amount": "Valor Inadimplência",
+        "updatedAmount": "Valor Atualizado",
+        "action": "Ação"
+      }
+    }
+  },
   "nav": {
     "main": {
       "createContract": "Criar Contrato",
@@ -31,6 +113,7 @@
       "dashboard": "Painel",
       "contracts": "Contratos",
       "payments": "Faturas",
+      "delinquencies": "Inadimplências",
       "lifecycle": "Ciclo de Vida",
       "reports": "Relatórios"
     },
@@ -48,6 +131,7 @@
     "agency": {
       "groupLabel": "Agência",
       "members": "Membros",
+      "commission": "Comissão",
       "agencySettings": "Configurações da Agência"
     }
   },
@@ -182,12 +266,6 @@
     "backToDashboard": "Voltar",
     "breadcrumb": "Detalhes do Contrato",
     "heroTitle": "Contrato {status}",
-    "promo": {
-      "title": "Quita Loft",
-      "body": "Evite inadimplências: ofereça ao inquilino a opção de pagar o aluguel no cartão e receba o valor à vista.",
-      "cta": "Saber mais",
-      "regionLabel": "Sugestão Quita Loft"
-    },
     "summary": {
       "heading": "Solicitação",
       "currentStatus": "Situação atual:",
@@ -201,6 +279,17 @@
       "guaranteeTooltipLabel": "Detalhes da fiança disponível",
       "copyId": "Copiar ID",
       "cancelProposalHint": "Disponível apenas para contratos pendentes",
+      "cancelDialog": {
+        "title": "Cancelar proposta?",
+        "description": "O contrato será marcado como cancelado. O histórico será preservado.",
+        "confirm": "Sim, cancelar",
+        "cancelling": "Cancelando…",
+        "back": "Voltar"
+      },
+      "errors": {
+        "NOT_FOUND": "Proposta não encontrada.",
+        "NOT_PENDING": "Apenas propostas pendentes podem ser canceladas."
+      },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",
       "actionsMenu": "Ações do contrato"
@@ -255,6 +344,7 @@
       "heading": "Documentos",
       "send": "Enviar",
       "sendDisabled": "Disponível em breve",
+      "downloadTemplate": "Baixar modelo padrão",
       "labels": {
         "rentalContract": "Contrato de locação",
         "inspection": "Vistoria",
@@ -299,7 +389,8 @@
       "title": "Não foi possível carregar este contrato",
       "body": "Algo deu errado ao buscar os dados. Tente novamente ou volte ao painel.",
       "retry": "Tentar novamente",
-      "backToDashboard": "Voltar ao painel"
+      "backToDashboard": "Voltar ao painel",
+      "backToContracts": "Voltar aos contratos"
     },
     "loading": {
       "label": "Carregando contrato"
@@ -314,6 +405,7 @@
     "subheading": "Acompanhe os contratos da sua imobiliária",
     "tabs": {
       "all": "Todos",
+      "expiring": "A vencer",
       "ativo": "Ativos",
       "pendente": "Pendentes",
       "encerrado": "Encerrados",
@@ -330,8 +422,9 @@
     },
     "urgency": {
       "overdue": "Vencido",
-      "critical": "Crítico",
-      "warning": "Atenção",
+      "expiring": "A vencer",
+      "critical": "Atenção",
+      "warning": "Em dia",
       "pendente": "Pendente",
       "ok": "OK",
       "inactive": "Inativo"
@@ -344,6 +437,7 @@
     "emptyStateCta": "Criar seu primeiro contrato",
     "noResults": "Nenhum contrato encontrado",
     "loading": "Carregando contratos…",
+    "noAgencySelected": "Selecione uma imobiliária para ver os contratos.",
     "errors": {
       "title": "Erro ao carregar contratos",
       "body": "Não foi possível carregar a lista. Tente novamente.",

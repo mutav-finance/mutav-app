@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useTranslations } from "next-intl";
 import { usePreloadedQuery, type Preloaded } from "convex/react";
 import { notFound } from "next/navigation";
@@ -19,10 +20,8 @@ import { Link } from "@/i18n/navigation";
 import type { api } from "@convex/_generated/api";
 import { ContractDocumentsCard } from "./contract-documents-card";
 import { ContractHistoryCard } from "./contract-history-card";
-import { ContractPromoBanner } from "./contract-promo-banner";
 import { ContractRentalDataCard } from "./contract-rental-data-card";
 import { ContractSummaryCard } from "./contract-summary-card";
-import { ContractTenantCard } from "./contract-tenant-card";
 
 export function ContractDetailsPage({
   preloaded,
@@ -30,16 +29,13 @@ export function ContractDetailsPage({
   preloaded: Preloaded<typeof api.contracts.useCases.getByPublicId>;
 }) {
   const contract = usePreloadedQuery(preloaded);
-  if (!contract) {
-    // Handles the rare case of the contract being deleted between SSR
-    // and client hydration. Server rendering already short-circuited via
-    // notFound() in page.tsx for the initial null case.
-    notFound();
-  }
-
   const t = useTranslations("contractDetails");
   const tNav = useTranslations("nav.main");
   const tStatus = useTranslations("contractDetails.status");
+
+  if (contract === null) {
+    notFound();
+  }
 
   return (
     <PageShell>
@@ -67,11 +63,9 @@ export function ContractDetailsPage({
       />
       <PageContent variant="narrow">
         <ContractSummaryCard contract={contract} />
-        <ContractTenantCard tenant={contract.tenant} />
         <ContractRentalDataCard contract={contract} />
         <ContractDocumentsCard documents={contract.documents} />
         <ContractHistoryCard history={contract.history} />
-        <ContractPromoBanner />
       </PageContent>
     </PageShell>
   );

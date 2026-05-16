@@ -330,6 +330,37 @@ export const create = mutation({
   },
 });
 
+export const cancelProposal = mutation({
+  args: { publicId: v.string() },
+  handler: async (ctx, args) => {
+    const contract = await ctx.db
+      .query("contracts")
+      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
+      .unique();
+
+    if (!contract) {
+      return { success: false, error: { code: "NOT_FOUND" } } as const;
+    }
+    if (contract.status !== "pendente") {
+      return { success: false, error: { code: "NOT_PENDING" } } as const;
+    }
+
+    await ctx.db.patch(contract._id, { status: "cancelado" });
+    const after = await ctx.db.get(contract._id);
+    if (after) await contractsByStatus.replace(ctx, contract, after);
+
+    await ctx.db.insert("contractHistory", {
+      agencyId: contract.agencyId,
+      contractPublicId: args.publicId,
+      at: new Date().toISOString(),
+      username: "Sistema",
+      message: "Proposta cancelada",
+    });
+
+    return { success: true, data: { cancelled: true } } as const;
+  },
+});
+
 /**
  * Reshape a Convex `contracts` doc + history into the UI Contract type.
  * Strips system fields (`_id`, `_creationTime`); renames publicId → id.

@@ -188,8 +188,8 @@ export default defineSchema({
       birthDate: v.string(),
       email: v.string(),
       phone: v.string(),
-      termApprovedAt: v.union(v.string(), v.null()),
       score: v.optional(v.number()),
+      termApprovedAt: v.union(v.string(), v.null()),
     }),
   })
     .index("by_publicId", ["publicId"])
