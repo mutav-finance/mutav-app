@@ -34,6 +34,8 @@ Mutav settles guarantees on Stellar and moves BRL ↔ token via anchors. Before 
 - [`src/lib/anchors/README.md`](src/lib/anchors/README.md) — the foundation library: when to use the SEP modules vs the `Anchor` interface, how to implement a new provider client
 - [`src/lib/anchors/sep/README.md`](src/lib/anchors/sep/README.md) — per-SEP API reference for the framework-agnostic protocol modules
 - [`src/lib/anchors/testanchor/README.md`](src/lib/anchors/testanchor/README.md) — reference SEP client composed against `testanchor.stellar.org`; copy this as the starting point for a new SEP-compliant client
+- [`src/lib/anchors/registry.ts`](src/lib/anchors/registry.ts) — single source of truth for which providers Mutav supports; **always resolve anchor clients through here**, never import a provider client directly outside the library
+- [`convex/anchors/`](convex/anchors/) — Convex domain that wraps the registry: `getProviderForAgency` (per-agency provider lookup, currently a stub) + `discoverCapabilities` action (uses the registry end-to-end)
 
 ### Installed expert skills
 

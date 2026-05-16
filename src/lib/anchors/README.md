@@ -1,9 +1,10 @@
 # Stellar Anchor Integration Library
 
-Framework-agnostic TypeScript library for integrating Stellar anchors. Two layers:
+Framework-agnostic TypeScript library for integrating Stellar anchors. Three layers:
 
 1. **`sep/`** — composable [SEP](https://github.com/stellar/stellar-protocol/tree/master/ecosystem) protocol modules (`sep1`, `sep6`, `sep10`, `sep12`, `sep24`, `sep31`, `sep38`). Use these to talk to any SEP-compliant anchor.
 2. **`types.ts`** — a shared `Anchor` interface that provider-specific clients implement. Use this when an anchor exposes its own API instead of the SEPs.
+3. **`registry.ts`** — single source of truth for which providers Mutav supports. The Convex layer goes through here so adding a new provider is one entry + one client file.
 
 A reference SEP client lives at `testanchor/`, wired against `testanchor.stellar.org`. Copy that directory as the starting point for a new SEP-compliant client.
 
@@ -13,6 +14,28 @@ For protocol-level background — what an anchor is, which SEPs Mutav uses, and 
 
 - **SEP-compliant anchor** (recommended path) → use `sep/` directly, or compose a stateful client like `testanchor/client.ts`.
 - **Provider with a proprietary API** → write a client under `src/lib/anchors/<provider>/` that implements `Anchor` from `types.ts`. The interface keeps the rest of the app rail-agnostic.
+- **Anywhere outside the library** (Convex actions, UI lookups) → resolve providers via `registry.ts`, never import a client directly.
+
+## Registry
+
+```typescript
+import { createAnchorClient, listAnchorProviders } from "@/lib/anchors/registry";
+
+// List what Mutav supports
+listAnchorProviders();
+// → [{ name: "testanchor", displayName: "Stellar Test Anchor", sandbox: true, ... }]
+
+// Instantiate for a specific provider — return type is discriminated on the name
+const client = createAnchorClient("testanchor");
+await client.initialize();
+```
+
+Adding a new provider is two steps:
+
+1. Write the client under `src/lib/anchors/<provider>/` (compose SEP modules, or implement `Anchor` from `types.ts`).
+2. Add a case to the `switch` in `registry.ts` and an entry to `ANCHOR_PROVIDER_NAMES`. The Convex `anchorProviderValidator` picks up the new literal automatically.
+
+The registry intentionally returns a discriminated union rather than forcing every provider through a single adapter interface. With one provider, the adapter is premature; with 2+ providers in distinct shapes we'll add the unification layer here.
 
 ## The `Anchor` interface
 
