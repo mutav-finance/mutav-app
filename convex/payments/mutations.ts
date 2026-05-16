@@ -1,6 +1,13 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
-import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./domain";
+import {
+  PAYMENT_LINE_ITEM_KIND,
+  PAYMENT_STATE_KIND,
+  PaymentMethods,
+  PaymentStates,
+  isChargeable,
+} from "./domain";
+import { generatePaymentMuxedId } from "./lib/muxedId";
 
 /**
  * Generate one `payments` record per agency for the given billing period.
@@ -105,6 +112,7 @@ export const generateMonthlyPayments = internalMutation({
         totalCents,
         state: PaymentStates.pending(),
         method: null,
+        muxedId: generatePaymentMuxedId(),
         lineItems,
       });
 
@@ -133,7 +141,7 @@ export const markOverduePayments = internalMutation({
 
     const pending = await ctx.db
       .query("payments")
-      .withIndex("by_state_kind", (q) => q.eq("state.kind", "pending"))
+      .withIndex("by_state_kind", (q) => q.eq("state.kind", PAYMENT_STATE_KIND.PENDING))
       .take(200);
 
     let count = 0;
@@ -165,9 +173,8 @@ export const setPaymentMethod = internalMutation({
     const payment = await ctx.db.get(paymentId);
     if (!payment) throw new Error(`Payment ${paymentId} not found`);
 
-    const stateKind = payment.state.kind;
-    if (stateKind !== "pending" && stateKind !== "overdue") {
-      throw new Error(`Cannot change method on a payment in state "${stateKind}"`);
+    if (!isChargeable(payment.state)) {
+      throw new Error(`Cannot change method on a payment in state "${payment.state.kind}"`);
     }
 
     let newMethod: NonNullable<(typeof payment)["method"]>;
@@ -186,5 +193,83 @@ export const setPaymentMethod = internalMutation({
 
     await ctx.db.patch(paymentId, { method: newMethod });
     return { paymentId, method: newMethod };
+  },
+});
+
+/**
+ * Idempotent mark-as-paid. Called by the Horizon reconciler when an
+ * incoming Stellar payment matches a pending invoice's muxed-id.
+ *
+ * No-ops if the payment is already paid with the same txHash (re-runs
+ * after restart are safe). Records the muxed `M…` destination + tx hash
+ * on `method` and moves state to `paid` with the observed timestamp.
+ */
+export const markPaidByTx = internalMutation({
+  args: {
+    paymentId: v.id("payments"),
+    txHash: v.string(),
+    paidAt: v.string(),
+    muxedAddress: v.string(),
+  },
+  handler: async (ctx, { paymentId, txHash, paidAt, muxedAddress }) => {
+    const payment = await ctx.db.get(paymentId);
+    if (!payment) return { paymentId, status: "not_found" as const };
+
+    if (payment.state.kind === "paid") {
+      const existingTx = payment.method?.kind === "stellar" ? payment.method.txHash : null;
+      if (existingTx === txHash) return { paymentId, status: "already_paid" as const };
+      return { paymentId, status: "duplicate_inbound" as const };
+    }
+
+    await ctx.db.patch(paymentId, {
+      state: PaymentStates.paid(paidAt),
+      method: PaymentMethods.stellar(muxedAddress, txHash),
+    });
+    return { paymentId, status: "paid" as const };
+  },
+});
+
+/**
+ * Dev-only: flip a payment back to `pending` and clear `method`. Used to
+ * rerun the demo flow against an already-paid invoice. The Horizon cursor
+ * is not rewound, so the original tx is NOT re-discovered — only NEW
+ * incoming payments to the muxed address re-mark this payment paid.
+ *
+ *   bunx convex run payments/mutations:resetPaymentToPending '{"publicId":"PAY-TEST-001"}'
+ */
+export const resetPaymentToPending = internalMutation({
+  args: { publicId: v.string() },
+  handler: async (ctx, { publicId }) => {
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
+      .unique();
+    if (!payment) throw new Error(`Payment ${publicId} not found`);
+    const previousState = payment.state.kind;
+    await ctx.db.patch(payment._id, {
+      state: PaymentStates.pending(),
+      method: null,
+    });
+    return { publicId, previousState };
+  },
+});
+
+/**
+ * Persist the latest Horizon paging token for a treasury account, so the
+ * next polling tick resumes after the last processed record.
+ */
+export const setStellarIndexCursor = internalMutation({
+  args: { sourceAccount: v.string(), cursor: v.string() },
+  handler: async (ctx, { sourceAccount, cursor }) => {
+    const lastRunAt = new Date().toISOString();
+    const existing = await ctx.db
+      .query("stellarIndexState")
+      .withIndex("by_sourceAccount", (q) => q.eq("sourceAccount", sourceAccount))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, { cursor, lastRunAt });
+      return existing._id;
+    }
+    return ctx.db.insert("stellarIndexState", { sourceAccount, cursor, lastRunAt });
   },
 });

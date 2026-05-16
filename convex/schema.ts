@@ -171,6 +171,9 @@ export default defineSchema({
     totalCents: v.number(),
     state: paymentState,
     method: paymentMethod,
+    // 63-bit unsigned int as digit string; derives the per-payment `M…`
+    // address. Optional for rows created before this field existed.
+    muxedId: v.optional(v.string()),
     lineItems: v.array(
       v.object({
         contractId: v.id("contracts"),
@@ -183,5 +186,14 @@ export default defineSchema({
   })
     .index("by_agency_period", ["agencyId", "periodMonth"])
     .index("by_state_kind", ["state.kind"])
-    .index("by_publicId", ["publicId"]),
+    .index("by_publicId", ["publicId"])
+    .index("by_muxedId", ["muxedId"]),
+
+  // Singleton row tracking the latest Horizon paging token seen by the
+  // treasury polling action. Inserted lazily on first run.
+  stellarIndexState: defineTable({
+    sourceAccount: v.string(),
+    cursor: v.string(),
+    lastRunAt: v.string(),
+  }).index("by_sourceAccount", ["sourceAccount"]),
 });

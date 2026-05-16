@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "SGR — Registered Guarantee System",
+    "title": "Mutav — Registered Guarantee System",
     "description": "Dashboard for managing rental guarantees registered on-chain."
   },
   "common": {
@@ -21,7 +21,9 @@
   "siteHeader": {
     "title": "Documents"
   },
-  "brand": { "name": "Acme Inc." },
+  "brand": {
+    "name": "Acme Inc."
+  },
   "nav": {
     "main": {
       "createContract": "Create Contract",
@@ -305,7 +307,7 @@
   },
   "contractList": {
     "meta": {
-      "title": "Contracts | SGR",
+      "title": "Contracts | Mutav",
       "description": "Real estate agency contracts list"
     },
     "heading": "Contracts",
@@ -359,7 +361,7 @@
   },
   "paymentList": {
     "meta": {
-      "title": "Invoices | SGR",
+      "title": "Invoices | Mutav",
       "description": "Monthly invoices for the agency"
     },
     "heading": "Invoices",
@@ -396,7 +398,7 @@
   },
   "paymentDetails": {
     "meta": {
-      "title": "Invoice {id} | SGR",
+      "title": "Invoice {id} | Mutav",
       "description": "Invoice details"
     },
     "breadcrumb": "Invoice Details",
@@ -450,7 +452,11 @@
       "txIdEmpty": "Awaiting payment",
       "address": "Destination address",
       "txHash": "Transaction hash",
-      "txHashEmpty": "Awaiting on-chain confirmation"
+      "txHashEmpty": "Awaiting on-chain confirmation",
+      "generateStellar": "Pay with Stellar",
+      "openPayPage": "Open payment page",
+      "copyShareLink": "Copy link",
+      "linkCopied": "Link copied"
     },
     "notFound": {
       "title": "Invoice not found",
@@ -603,6 +609,51 @@
       "emailInvalid": "Invalid e-mail",
       "coverageRequired": "Select a coverage option",
       "exitRequired": "Select an exit cost option"
+  "paymentFlow": {
+    "meta": {
+      "title": "Pay with Stellar — {publicId}",
+      "description": "Pay your TGA invoice via the Stellar network."
+    },
+    "shell": {
+      "brand": "mutav",
+      "paymentLabel": "Invoice",
+      "footerBrand": "Mutav · Rental Guarantee Protocol"
+    },
+    "summary": {
+      "dueLabel": "Due",
+      "amountLabel": "Amount due",
+      "paidAtLabel": "Paid at"
+    },
+    "copy": {
+      "toast": "Copied"
+    },
+    "address": {
+      "cardLabel": "Payment address",
+      "copyLabel": "Copy payment address",
+      "pollerLabel": "Waiting for payment on network",
+      "qrTitle": "Stellar payment code — {amount}",
+      "qrDesc": "Use a Stellar wallet's camera. Alternatively, copy the address below.",
+      "disclosureLabel": "How to pay via Stellar",
+      "steps": {
+        "s1": "Open a Stellar wallet app.",
+        "s2": "Scan the code above or tap \"Open in wallet\".",
+        "s3": "Confirm the amount and destination in your wallet.",
+        "s4": "Send the payment.",
+        "s5": "Wait for confirmation here — the status updates automatically."
+      },
+      "pageTitle": "Pay with Stellar",
+      "pageSubtitle": "Send the amount below to the address generated for this invoice.",
+      "copyPaymentLinkLabel": "Copy {asset} payment link",
+      "paymentLinkHint": "Paste this link in a Stellar wallet — destination, amount, and asset come pre-filled.",
+      "paymentLinkLabel": "Payment link ({asset})",
+      "addressFallbackLabel": "Address",
+      "copyAddressLabel": "Copy invoice address"
+    },
+    "receipt": {
+      "title": "Payment confirmed",
+      "subtitle": "Your payment was received on the Stellar network. You can close this page.",
+      "paidAtLabel": "Confirmed at",
+      "txHashLabel": "Transaction"
     }
   }
 }

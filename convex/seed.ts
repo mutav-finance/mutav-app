@@ -1,5 +1,6 @@
 import { internalMutation } from "./_generated/server";
-import { PaymentMethods, PaymentStates } from "./payments/domain";
+import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./payments/domain";
+import { generatePaymentMuxedId } from "./payments/lib/muxedId";
 import type { Id } from "./_generated/dataModel";
 import { contractsByStatus } from "./contracts/aggregate";
 
@@ -1738,6 +1739,7 @@ export const fictionalContracts = internalMutation({
       totalCents: p2025Nov.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2025-11-07T10:00:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: p2025Nov,
     });
 
@@ -1754,6 +1756,7 @@ export const fictionalContracts = internalMutation({
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202511081100abc001",
       ),
+      muxedId: generatePaymentMuxedId(),
       lineItems: a2025Nov,
     });
 
@@ -1767,6 +1770,7 @@ export const fictionalContracts = internalMutation({
       totalCents: h2025Nov.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2025-11-09T09:30:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: h2025Nov,
     });
 
@@ -1782,6 +1786,7 @@ export const fictionalContracts = internalMutation({
       totalCents: p2025Dec.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2025-12-05T14:00:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: p2025Dec,
     });
 
@@ -1798,6 +1803,7 @@ export const fictionalContracts = internalMutation({
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202512081000abc002",
       ),
+      muxedId: generatePaymentMuxedId(),
       lineItems: a2025Dec,
     });
 
@@ -1811,6 +1817,7 @@ export const fictionalContracts = internalMutation({
       totalCents: h2025Dec.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2025-12-09T09:00:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: h2025Dec,
     });
 
@@ -1826,6 +1833,7 @@ export const fictionalContracts = internalMutation({
       totalCents: p2026Jan.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2026-01-10T11:00:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: p2026Jan,
     });
 
@@ -1842,6 +1850,7 @@ export const fictionalContracts = internalMutation({
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202601091500abc003",
       ),
+      muxedId: generatePaymentMuxedId(),
       lineItems: a2026Jan,
     });
 
@@ -1855,6 +1864,7 @@ export const fictionalContracts = internalMutation({
       totalCents: h2026Jan.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2026-01-11T10:00:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: h2026Jan,
     });
 
@@ -1870,6 +1880,7 @@ export const fictionalContracts = internalMutation({
       totalCents: p2026Feb.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2026-02-07T09:00:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: p2026Feb,
     });
 
@@ -1886,6 +1897,7 @@ export const fictionalContracts = internalMutation({
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202602091400abc004",
       ),
+      muxedId: generatePaymentMuxedId(),
       lineItems: a2026Feb,
     });
 
@@ -1899,6 +1911,7 @@ export const fictionalContracts = internalMutation({
       totalCents: h2026Feb.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.overdue(),
       method: null,
+      muxedId: generatePaymentMuxedId(),
       lineItems: h2026Feb,
     });
 
@@ -1914,6 +1927,7 @@ export const fictionalContracts = internalMutation({
       totalCents: p2026Mar.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2026-03-08T10:30:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: p2026Mar,
     });
 
@@ -1930,6 +1944,7 @@ export const fictionalContracts = internalMutation({
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202603091100abc005",
       ),
+      muxedId: generatePaymentMuxedId(),
       lineItems: a2026Mar,
     });
 
@@ -1943,6 +1958,7 @@ export const fictionalContracts = internalMutation({
       totalCents: h2026Mar.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.overdue(),
       method: null,
+      muxedId: generatePaymentMuxedId(),
       lineItems: h2026Mar,
     });
 
@@ -1959,6 +1975,7 @@ export const fictionalContracts = internalMutation({
       totalCents: paulistaAprLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.paid(d("2026-04-08T14:21:00-03:00")),
       method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      muxedId: generatePaymentMuxedId(),
       lineItems: paulistaAprLineItems,
     });
 
@@ -1975,6 +1992,7 @@ export const fictionalContracts = internalMutation({
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202404091000abc123",
       ),
+      muxedId: generatePaymentMuxedId(),
       lineItems: atlanticaAprLineItems,
     });
 
@@ -1988,8 +2006,108 @@ export const fictionalContracts = internalMutation({
       totalCents: horizonteAprLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: PaymentStates.overdue(),
       method: null,
+      muxedId: generatePaymentMuxedId(),
       lineItems: horizonteAprLineItems,
     });
+
+    const paulistaMayLineItems = paulistaLineItems("2026-05");
+    await ctx.db.insert("payments", {
+      agencyId: paulistaId,
+      publicId: "PAY-2026-05-0100",
+      periodMonth: "2026-05",
+      issuedAt: "2026-05-01",
+      dueDate: "2026-05-10",
+      totalCents: paulistaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.pending(),
+      method: null,
+      muxedId: generatePaymentMuxedId(),
+      lineItems: paulistaMayLineItems,
+    });
+
+    const atlanticaMayLineItems = atlanticaLineItems("2026-05");
+    await ctx.db.insert("payments", {
+      agencyId: atlanticaId,
+      publicId: "PAY-2026-05-0200",
+      periodMonth: "2026-05",
+      issuedAt: "2026-05-01",
+      dueDate: "2026-05-10",
+      totalCents: atlanticaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.pending(),
+      method: null,
+      muxedId: generatePaymentMuxedId(),
+      lineItems: atlanticaMayLineItems,
+    });
+
+    const horizonteMayLineItems = horizonteLineItems("2026-05");
+    await ctx.db.insert("payments", {
+      agencyId: horizonteId,
+      publicId: "PAY-2026-05-0300",
+      periodMonth: "2026-05",
+      issuedAt: "2026-05-01",
+      dueDate: "2026-05-10",
+      totalCents: horizonteMayLineItems.reduce((s, x) => s + x.amountCents, 0),
+      state: PaymentStates.pending(),
+      method: null,
+      muxedId: generatePaymentMuxedId(),
+      lineItems: horizonteMayLineItems,
+    });
+
+    // ── Testnet-sized invoices ────────────────────────────────────────────────
+    // Tiny amounts so a friendbot-funded sender (10k XLM) can complete a
+    // real on-chain test against the Mutav treasury. One per agency.
+
+    const testInvoices: Array<{
+      publicId: string;
+      agencyId: Id<"agencies">;
+      contractId: Id<"contracts">;
+      contractPublicId: string;
+      amountCents: number;
+    }> = [
+      {
+        publicId: "PAY-TEST-001",
+        agencyId: paulistaId,
+        contractId: p1,
+        contractPublicId: pid(1),
+        amountCents: 100, // R$ 1,00 → ~4.4 XLM
+      },
+      {
+        publicId: "PAY-TEST-010",
+        agencyId: atlanticaId,
+        contractId: a1,
+        contractPublicId: pid(16),
+        amountCents: 1_000, // R$ 10,00 → ~44 XLM
+      },
+      {
+        publicId: "PAY-TEST-100",
+        agencyId: horizonteId,
+        contractId: h1,
+        contractPublicId: pid(28),
+        amountCents: 10_000, // R$ 100,00 → ~440 XLM
+      },
+    ];
+
+    for (const t of testInvoices) {
+      await ctx.db.insert("payments", {
+        agencyId: t.agencyId,
+        publicId: t.publicId,
+        periodMonth: "2026-05",
+        issuedAt: "2026-05-13",
+        dueDate: "2026-05-20",
+        totalCents: t.amountCents,
+        state: PaymentStates.pending(),
+        method: null,
+        muxedId: generatePaymentMuxedId(),
+        lineItems: [
+          {
+            contractId: t.contractId,
+            contractPublicId: t.contractPublicId,
+            kind: PAYMENT_LINE_ITEM_KIND.RECURRING,
+            amountCents: t.amountCents,
+            description: `Testnet invoice — ${t.publicId}`,
+          },
+        ],
+      });
+    }
 
     return {
       agencies: { paulistaId, atlanticaId, horizonteId },

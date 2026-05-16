@@ -69,3 +69,4 @@ docs/superpowers/*
 
 # Convex local dev artifacts
 .convex/
+.convex-preview-url
