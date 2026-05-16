@@ -337,6 +337,8 @@
       "placeholder": "Buscar por ID ou locatário"
     },
     "columnsButton": "Colunas",
+    "createButton": "Criar contrato",
+    "emptyStateCta": "Criar seu primeiro contrato",
     "noResults": "Nenhum contrato encontrado",
     "loading": "Carregando contratos…",
     "errors": {
@@ -461,6 +463,97 @@
     },
     "loading": {
       "label": "Carregando fatura"
+    }
+  },
+  "contractNew": {
+    "meta": {
+      "title": "Novo Contrato | SGR"
+    },
+    "heading": "Novo Contrato",
+    "subheading": "Preencha os dados para criar uma nova garantia",
+    "stepLabel": "Passo {current} de {total}",
+    "steps": {
+      "1": "Imóvel e Inquilino",
+      "2": "Cobertura",
+      "3": "Revisão"
+    },
+    "property": {
+      "heading": "Dados do Imóvel",
+      "kindLabel": "Tipo de imóvel",
+      "residencial": "Residencial",
+      "comercial": "Comercial",
+      "cep": "CEP",
+      "streetAndNumber": "Endereço e número",
+      "neighborhood": "Bairro",
+      "cityUF": "Cidade / UF",
+      "complement": "Complemento (opcional)"
+    },
+    "rent": {
+      "heading": "Dados do Aluguel",
+      "rent": "Aluguel mensal",
+      "condo": "Condomínio",
+      "otherFees": "Outras taxas",
+      "total": "Total locatício",
+      "placeholder": "0,00",
+      "prefix": "R$"
+    },
+    "tenant": {
+      "heading": "Dados do Inquilino",
+      "fullName": "Nome completo",
+      "cpf": "CPF",
+      "cpfPlaceholder": "000.000.000-00",
+      "birthDate": "Data de nascimento",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "scoreLoading": "Consultando score...",
+      "scoreBom": "Bom",
+      "scoreRegular": "Regular",
+      "scoreRuim": "Ruim",
+      "scoreLabel": "Score de crédito"
+    },
+    "coverage": {
+      "heading": "Configuração de Cobertura",
+      "rentMultiplierLabel": "Cobertura total",
+      "exitCostLabel": "Custo de saída",
+      "coverageDesc": "{x} meses de aluguel cobertos em caso de inadimplência",
+      "exitDesc": "{x} vezes o aluguel em caso de rescisão",
+      "preview": {
+        "heading": "Prévia dos Valores",
+        "fee": "Taxa mensal",
+        "activationFee": "Taxa de ativação",
+        "guarantee": "Garantia disponível"
+      }
+    },
+    "review": {
+      "heading": "Revisão",
+      "propertySection": "Imóvel",
+      "rentSection": "Aluguel",
+      "tenantSection": "Inquilino",
+      "coverageSection": "Cobertura",
+      "valuesSection": "Valores calculados",
+      "score": "Score",
+      "fee": "Taxa mensal",
+      "activationFee": "Taxa de ativação",
+      "guarantee": "Garantia disponível",
+      "submit": "Criar contrato",
+      "submitting": "Criando...",
+      "errorToast": "Erro ao criar contrato. Tente novamente."
+    },
+    "nav": {
+      "back": "Voltar",
+      "nextStep2": "Configurar cobertura",
+      "nextStep3": "Revisar contrato"
+    },
+    "validation": {
+      "required": "Campo obrigatório",
+      "cpfInvalid": "CPF inválido",
+      "cepInvalid": "CEP deve ter 8 dígitos",
+      "rentRequired": "Aluguel deve ser maior que zero",
+      "birthDateFuture": "Data de nascimento não pode ser futura",
+      "birthDateInvalid": "Data inválida",
+      "emailInvalid": "E-mail inválido",
+      "coverageRequired": "Selecione uma cobertura",
+      "exitRequired": "Selecione um custo de saída"
     }
   }
 }

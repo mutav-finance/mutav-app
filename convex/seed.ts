@@ -1,9 +1,9 @@
-import { internalMutation } from "./_generated/server";
+﻿import { internalMutation } from "./_generated/server";
 import { PaymentMethods, PaymentStates } from "./payments/domain";
 import type { Id } from "./_generated/dataModel";
 import { contractsByStatus } from "./contracts/aggregate";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Zero-padded public contract ID, e.g. "1000007" */
 const pid = (n: number) => String(1_000_000 + n);
@@ -12,7 +12,7 @@ const pid = (n: number) => String(1_000_000 + n);
 const d = (s: string) => s;
 
 /**
- * Idempotent dev seed — 3 agencies, 30 contracts, contract history, and
+ * Idempotent dev seed â€” 3 agencies, 30 contracts, contract history, and
  * historical payments covering the last two months.
  *
  * Run with:
@@ -39,27 +39,27 @@ export const fictionalContracts = internalMutation({
       }
     }
 
-    // ── Agencies ──────────────────────────────────────────────────────────────
+    // â”€â”€ Agencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const paulistaId: Id<"agencies"> = await ctx.db.insert("agencies", {
-      name: "Imobiliária Paulista",
+      name: "ImobiliÃ¡ria Paulista",
       cnpj: "00000000000100",
       createdAt: d("2024-03-01T00:00:00-03:00"),
     });
 
     const atlanticaId: Id<"agencies"> = await ctx.db.insert("agencies", {
-      name: "Imobiliária Atlântica",
+      name: "ImobiliÃ¡ria AtlÃ¢ntica",
       cnpj: "00000000000200",
       createdAt: d("2024-06-15T00:00:00-03:00"),
     });
 
     const horizonteId: Id<"agencies"> = await ctx.db.insert("agencies", {
-      name: "Horizonte Imóveis",
+      name: "Horizonte ImÃ³veis",
       cnpj: "00000000000300",
       createdAt: d("2025-01-10T00:00:00-03:00"),
     });
 
-    // ── Users ──────────────────────────────────────────────────────────────────
+    // â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     // dev-user is a super-user member of all three agencies (useful for
     // the workspace-switcher dev shortcut).
@@ -79,7 +79,7 @@ export const fictionalContracts = internalMutation({
 
     const atlanticaOwnerId = await ctx.db.insert("users", {
       publicId: "admin-atlantica",
-      name: "Admin Atlântica",
+      name: "Admin AtlÃ¢ntica",
       email: "admin@atlantica.example.com",
       createdAt: d("2024-06-15T00:00:00-03:00"),
     });
@@ -91,9 +91,9 @@ export const fictionalContracts = internalMutation({
       createdAt: d("2025-01-10T00:00:00-03:00"),
     });
 
-    // ── Memberships ───────────────────────────────────────────────────────────
+    // â”€â”€ Memberships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    // dev-user: owner of Paulista, admin of Atlântica, member of Horizonte
+    // dev-user: owner of Paulista, admin of AtlÃ¢ntica, member of Horizonte
     await ctx.db.insert("memberships", {
       userId: devUserId,
       agencyId: paulistaId,
@@ -133,7 +133,7 @@ export const fictionalContracts = internalMutation({
       joinedAt: d("2025-01-10T00:00:00-03:00"),
     });
 
-    // ── Contracts — Imobiliária Paulista (15) ─────────────────────────────────    // 12 ativo, 2 pendente, 1 encerrado
+    // â”€â”€ Contracts â€” ImobiliÃ¡ria Paulista (15) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€    // 12 ativo, 2 pendente, 1 encerrado
 
     const p1 = await ctx.db.insert("contracts", {
       agencyId: paulistaId,
@@ -154,14 +154,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "01310-100",
         streetAndNumber: "Av. Paulista, 1500",
         neighborhood: "Bela Vista",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 204", tag: "", description: "" },
       documents: [
@@ -177,6 +177,7 @@ export const fictionalContracts = internalMutation({
         email: "maria.silva@example.com",
         phone: "11900000001",
         termApprovedAt: d("2025-03-01T10:00:00-03:00"),
+        score: 750,
       },
     });
 
@@ -199,14 +200,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "01402-000",
         streetAndNumber: "Rua Augusta, 800",
-        neighborhood: "Consolação",
-        cityUF: "São Paulo/SP",
+        neighborhood: "ConsolaÃ§Ã£o",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 101", tag: "", description: "" },
       documents: [
@@ -222,6 +223,7 @@ export const fictionalContracts = internalMutation({
         email: "carlos.ferreira@example.com",
         phone: "11900000002",
         termApprovedAt: d("2025-04-01T09:30:00-03:00"),
+        score: 780,
       },
     });
 
@@ -244,19 +246,19 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 2,
         exitCostMultiplier: "8x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "01310-200",
         streetAndNumber: "Av. Paulista, 900",
         neighborhood: "Bela Vista",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: {
         complement: "Sala 305",
         tag: "comercial",
-        description: "Escritório para startups.",
+        description: "EscritÃ³rio para startups.",
       },
       documents: [
         { key: "rentalContract", status: "aprovado" },
@@ -271,6 +273,7 @@ export const fictionalContracts = internalMutation({
         email: "contato@techsolutions.example.com",
         phone: "11900000003",
         termApprovedAt: d("2025-05-15T14:00:00-03:00"),
+        score: 650,
       },
     });
 
@@ -293,14 +296,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "04571-010",
-        streetAndNumber: "Av. das Nações Unidas, 12000",
+        streetAndNumber: "Av. das NaÃ§Ãµes Unidas, 12000",
         neighborhood: "Brooklin",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 802", tag: "", description: "" },
       documents: [
@@ -316,6 +319,7 @@ export const fictionalContracts = internalMutation({
         email: "ana.rodrigues@example.com",
         phone: "11900000004",
         termApprovedAt: d("2024-11-01T11:00:00-03:00"),
+        score: 720,
       },
     });
 
@@ -338,14 +342,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 3,
         exitCostMultiplier: "10x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "04538-133",
         streetAndNumber: "Rua Funchal, 418",
-        neighborhood: "Vila Olímpia",
-        cityUF: "São Paulo/SP",
+        neighborhood: "Vila OlÃ­mpia",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: {
         complement: "Andar 8 completo",
@@ -365,6 +369,7 @@ export const fictionalContracts = internalMutation({
         email: "financeiro@globalfinance.example.com",
         phone: "11900000005",
         termApprovedAt: d("2025-01-20T09:00:00-03:00"),
+        score: 800,
       },
     });
 
@@ -387,14 +392,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "05422-010",
         streetAndNumber: "Rua dos Pinheiros, 330",
         neighborhood: "Pinheiros",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 52", tag: "", description: "" },
       documents: [
@@ -410,6 +415,7 @@ export const fictionalContracts = internalMutation({
         email: "bruno.lima@example.com",
         phone: "11900000006",
         termApprovedAt: d("2025-02-10T15:00:00-03:00"),
+        score: 670,
       },
     });
 
@@ -432,14 +438,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "03301-000",
         streetAndNumber: "Av. Radial Leste, 1200",
-        neighborhood: "Tatuapé",
-        cityUF: "São Paulo/SP",
+        neighborhood: "TatuapÃ©",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 12", tag: "", description: "" },
       documents: [
@@ -455,6 +461,7 @@ export const fictionalContracts = internalMutation({
         email: "fernanda.oliveira@example.com",
         phone: "11900000007",
         termApprovedAt: d("2024-09-01T10:30:00-03:00"),
+        score: 760,
       },
     });
 
@@ -477,14 +484,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "01423-001",
         streetAndNumber: "Rua Oscar Freire, 500",
         neighborhood: "Jardim Paulista",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Cobertura 1", tag: "premium", description: "" },
       documents: [
@@ -500,6 +507,7 @@ export const fictionalContracts = internalMutation({
         email: "ricardo.braga@example.com",
         phone: "11900000008",
         termApprovedAt: d("2024-08-20T08:00:00-03:00"),
+        score: 720,
       },
     });
 
@@ -522,14 +530,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "02040-000",
         streetAndNumber: "Av. Nova Cantareira, 600",
         neighborhood: "Mandaqui",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 31", tag: "", description: "" },
       documents: [
@@ -545,6 +553,7 @@ export const fictionalContracts = internalMutation({
         email: "juliana.souza@example.com",
         phone: "11900000009",
         termApprovedAt: d("2025-06-01T16:00:00-03:00"),
+        score: 690,
       },
     });
 
@@ -567,19 +576,19 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 2,
         exitCostMultiplier: "8x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "04547-130",
         streetAndNumber: "Av. Brigadeiro Faria Lima, 3400",
         neighborhood: "Itaim Bibi",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: {
         complement: "Sala 1201",
         tag: "comercial-premium",
-        description: "Escritório em torre AAA.",
+        description: "EscritÃ³rio em torre AAA.",
       },
       documents: [
         { key: "rentalContract", status: "aprovado" },
@@ -588,12 +597,13 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "aprovado",
-        fullName: "Inovação Digital Ltda",
+        fullName: "InovaÃ§Ã£o Digital Ltda",
         cpf: "10.101.010/0001-10",
         birthDate: "2015-03-01",
         email: "admin@inovacaodigital.example.com",
         phone: "11900000010",
         termApprovedAt: d("2024-12-15T13:00:00-03:00"),
+        score: 580,
       },
     });
 
@@ -616,14 +626,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "05051-000",
         streetAndNumber: "Av. Queiroz Filho, 1200",
         neighborhood: "Vila Hamburguesa",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 73", tag: "", description: "" },
       documents: [
@@ -639,6 +649,7 @@ export const fictionalContracts = internalMutation({
         email: "lucas.pereira@example.com",
         phone: "11900000011",
         termApprovedAt: d("2025-07-01T09:00:00-03:00"),
+        score: 750,
       },
     });
 
@@ -661,14 +672,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "04040-001",
         streetAndNumber: "Rua Domingos de Morais, 2000",
         neighborhood: "Vila Mariana",
-        cityUF: "São Paulo/SP",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 45", tag: "", description: "" },
       documents: [
@@ -678,12 +689,13 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "aprovado",
-        fullName: "Patrícia Gomes Tavares",
+        fullName: "PatrÃ­cia Gomes Tavares",
         cpf: "12.121.212-12",
         birthDate: "1991-07-30",
         email: "patricia.tavares@example.com",
         phone: "11900000012",
         termApprovedAt: d("2024-10-01T10:00:00-03:00"),
+        score: 710,
       },
     });
 
@@ -706,14 +718,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "01530-001",
-        streetAndNumber: "Rua da Consolação, 1500",
-        neighborhood: "Consolação",
-        cityUF: "São Paulo/SP",
+        streetAndNumber: "Rua da ConsolaÃ§Ã£o, 1500",
+        neighborhood: "ConsolaÃ§Ã£o",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 88", tag: "", description: "" },
       documents: [
@@ -729,6 +741,7 @@ export const fictionalContracts = internalMutation({
         email: "roberto.neto@example.com",
         phone: "11900000013",
         termApprovedAt: null,
+        score: 550,
       },
     });
 
@@ -751,14 +764,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 2,
         exitCostMultiplier: "8x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "04578-000",
         streetAndNumber: "Rua Verbo Divino, 1488",
-        neighborhood: "Chácara Santo Antônio",
-        cityUF: "São Paulo/SP",
+        neighborhood: "ChÃ¡cara Santo AntÃ´nio",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Sala 402", tag: "comercial", description: "" },
       documents: [
@@ -768,12 +781,13 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "pendente",
-        fullName: "Soluções Web S.A.",
+        fullName: "SoluÃ§Ãµes Web S.A.",
         cpf: "14.141.414/0001-14",
         birthDate: "2018-05-10",
         email: "contato@solucoesweb.example.com",
         phone: "11900000014",
         termApprovedAt: null,
+        score: 490,
       },
     });
 
@@ -796,14 +810,14 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "01301-001",
-        streetAndNumber: "Av. São João, 300",
-        neighborhood: "República",
-        cityUF: "São Paulo/SP",
+        streetAndNumber: "Av. SÃ£o JoÃ£o, 300",
+        neighborhood: "RepÃºblica",
+        cityUF: "SÃ£o Paulo/SP",
       },
       optional: { complement: "Apto 3", tag: "", description: "" },
       documents: [
@@ -819,10 +833,11 @@ export const fictionalContracts = internalMutation({
         email: "silvia.rocha@example.com",
         phone: "11900000015",
         termApprovedAt: d("2023-02-01T10:00:00-03:00"),
+        score: 680,
       },
     });
 
-    // ── Contracts — Imobiliária Atlântica (12) ────────────────────────────────
+    // â”€â”€ Contracts â€” ImobiliÃ¡ria AtlÃ¢ntica (12) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 8 ativo, 2 pendente, 1 encerrado, 1 cancelado
 
     const a1 = await ctx.db.insert("contracts", {
@@ -844,12 +859,12 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 2,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "22250-040",
-        streetAndNumber: "Rua Visconde de Pirajá, 414",
+        streetAndNumber: "Rua Visconde de PirajÃ¡, 414",
         neighborhood: "Ipanema",
         cityUF: "Rio de Janeiro/RJ",
       },
@@ -867,6 +882,7 @@ export const fictionalContracts = internalMutation({
         email: "mariana.costa@example.com",
         phone: "21900000001",
         termApprovedAt: d("2025-03-15T11:00:00-03:00"),
+        score: 760,
       },
     });
 
@@ -889,7 +905,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 3,
         exitCostMultiplier: "10x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -910,12 +926,13 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "aprovado",
-        fullName: "Atlântico Negócios S.A.",
+        fullName: "AtlÃ¢ntico NegÃ³cios S.A.",
         cpf: "17.171.717/0001-17",
         birthDate: "2005-08-01",
         email: "financeiro@atlanticonegocios.example.com",
         phone: "21900000002",
         termApprovedAt: d("2025-05-01T09:00:00-03:00"),
+        score: 710,
       },
     });
 
@@ -938,7 +955,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -961,6 +978,7 @@ export const fictionalContracts = internalMutation({
         email: "eduardo.bastos@example.com",
         phone: "21900000003",
         termApprovedAt: d("2024-11-20T14:00:00-03:00"),
+        score: 730,
       },
     });
 
@@ -983,7 +1001,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1006,6 +1024,7 @@ export const fictionalContracts = internalMutation({
         email: "tatiana.mendes@example.com",
         phone: "21900000004",
         termApprovedAt: d("2025-01-10T10:30:00-03:00"),
+        score: 790,
       },
     });
 
@@ -1028,12 +1047,12 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 3,
         exitCostMultiplier: "10x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "22640-101",
-        streetAndNumber: "Av. das Américas, 3434",
+        streetAndNumber: "Av. das AmÃ©ricas, 3434",
         neighborhood: "Barra da Tijuca",
         cityUF: "Rio de Janeiro/RJ",
       },
@@ -1051,6 +1070,7 @@ export const fictionalContracts = internalMutation({
         email: "obras@construtorabarra.example.com",
         phone: "21900000005",
         termApprovedAt: d("2024-08-01T08:00:00-03:00"),
+        score: 640,
       },
     });
 
@@ -1073,13 +1093,13 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "20521-180",
-        streetAndNumber: "Rua São Francisco Xavier, 524",
-        neighborhood: "Maracanã",
+        streetAndNumber: "Rua SÃ£o Francisco Xavier, 524",
+        neighborhood: "MaracanÃ£",
         cityUF: "Rio de Janeiro/RJ",
       },
       optional: { complement: "Apto 1104", tag: "", description: "" },
@@ -1096,6 +1116,7 @@ export const fictionalContracts = internalMutation({
         email: "gustavo.leal@example.com",
         phone: "21900000006",
         termApprovedAt: d("2025-04-20T09:30:00-03:00"),
+        score: 710,
       },
     });
 
@@ -1118,12 +1139,12 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "20240-000",
-        streetAndNumber: "Rua Mem de Sá, 90",
+        streetAndNumber: "Rua Mem de SÃ¡, 90",
         neighborhood: "Lapa",
         cityUF: "Rio de Janeiro/RJ",
       },
@@ -1141,6 +1162,7 @@ export const fictionalContracts = internalMutation({
         email: "camila.barros@example.com",
         phone: "21900000007",
         termApprovedAt: d("2024-07-15T11:00:00-03:00"),
+        score: 750,
       },
     });
 
@@ -1163,7 +1185,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 4,
         exitCostMultiplier: "12x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1190,6 +1212,7 @@ export const fictionalContracts = internalMutation({
         email: "corp@petroenergy.example.com",
         phone: "21900000008",
         termApprovedAt: d("2025-02-28T08:00:00-03:00"),
+        score: 800,
       },
     });
 
@@ -1212,7 +1235,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1229,12 +1252,13 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "pendente",
-        fullName: "Diego Mendonça Freitas",
+        fullName: "Diego MendonÃ§a Freitas",
         cpf: "24.242.424-24",
         birthDate: "1993-08-17",
         email: "diego.freitas@example.com",
         phone: "21900000009",
         termApprovedAt: null,
+        score: 520,
       },
     });
 
@@ -1257,7 +1281,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 2,
         exitCostMultiplier: "8x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1274,12 +1298,13 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "pendente",
-        fullName: "Logística Carioca Ltda",
+        fullName: "LogÃ­stica Carioca Ltda",
         cpf: "25.252.525/0001-25",
         birthDate: "2012-04-01",
         email: "ops@logisticacarioca.example.com",
         phone: "21900000010",
         termApprovedAt: null,
+        score: 480,
       },
     });
 
@@ -1302,7 +1327,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1325,6 +1350,7 @@ export const fictionalContracts = internalMutation({
         email: "isabela.viana@example.com",
         phone: "21900000011",
         termApprovedAt: d("2022-12-01T10:00:00-03:00"),
+        score: 700,
       },
     });
 
@@ -1347,7 +1373,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1364,16 +1390,17 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "reprovado",
-        fullName: "Marcos Vinícius Santos",
+        fullName: "Marcos VinÃ­cius Santos",
         cpf: "27.272.727-27",
         birthDate: "1990-06-20",
         email: "marcos.santos@example.com",
         phone: "21900000012",
         termApprovedAt: null,
+        score: 420,
       },
     });
 
-    // ── Contracts — Horizonte Imóveis (3) ─────────────────────────────────────
+    // â”€â”€ Contracts â€” Horizonte ImÃ³veis (3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // 2 ativo, 1 pendente
 
     const h1 = await ctx.db.insert("contracts", {
@@ -1395,7 +1422,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1418,6 +1445,7 @@ export const fictionalContracts = internalMutation({
         email: "renata.drumond@example.com",
         phone: "31900000001",
         termApprovedAt: d("2025-04-01T10:00:00-03:00"),
+        score: 760,
       },
     });
 
@@ -1440,19 +1468,19 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 2,
         exitCostMultiplier: "8x",
         rentMultiplier: "30x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
         cep: "30140-110",
         streetAndNumber: "Rua da Bahia, 1148",
-        neighborhood: "Funcionários",
+        neighborhood: "FuncionÃ¡rios",
         cityUF: "Belo Horizonte/MG",
       },
       optional: {
         complement: "Sala 601",
         tag: "comercial",
-        description: "Escritório em edifício A+",
+        description: "EscritÃ³rio em edifÃ­cio A+",
       },
       documents: [
         { key: "rentalContract", status: "aprovado" },
@@ -1467,6 +1495,7 @@ export const fictionalContracts = internalMutation({
         email: "financeiro@mineiradist.example.com",
         phone: "31900000002",
         termApprovedAt: d("2024-10-15T09:00:00-03:00"),
+        score: 620,
       },
     });
 
@@ -1489,7 +1518,7 @@ export const fictionalContracts = internalMutation({
         setupInstallments: 1,
         exitCostMultiplier: "6x",
         rentMultiplier: "40x",
-        payer: "Recorrência via Imobiliária",
+        payer: "RecorrÃªncia via ImobiliÃ¡ria",
         pviMigrationSchedule: null,
       },
       property: {
@@ -1506,20 +1535,21 @@ export const fictionalContracts = internalMutation({
       ],
       tenant: {
         approvalStatus: "pendente",
-        fullName: "Felipe Augusto Corrêa",
+        fullName: "Felipe Augusto CorrÃªa",
         cpf: "30.303.030-30",
         birthDate: "1998-01-25",
         email: "felipe.correa@example.com",
         phone: "31900000003",
         termApprovedAt: null,
+        score: 540,
       },
     });
 
-    // ── Assign historical activatedAt dates ──────────────────────────────────
+    // â”€â”€ Assign historical activatedAt dates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Spread ativo/encerrado contracts across the last ~12 months so the
     // monthly chart has meaningful data. pendente and cancelado stay null.
     const activationMap: Record<string, string> = {
-      // Paulista — 1 per month Jun 2025 → May 2026
+      // Paulista â€” 1 per month Jun 2025 â†’ May 2026
       [pid(1)]: "2025-06-03",
       [pid(2)]: "2025-07-08",
       [pid(3)]: "2025-08-12",
@@ -1532,8 +1562,8 @@ export const fictionalContracts = internalMutation({
       [pid(10)]: "2026-03-21",
       [pid(11)]: "2026-04-07",
       [pid(12)]: "2026-05-02",
-      [pid(15)]: "2024-08-01", // encerrado — was once ativo
-      // Atlântica — spread Jun 2025 → Apr 2026
+      [pid(15)]: "2024-08-01", // encerrado â€” was once ativo
+      // AtlÃ¢ntica â€” spread Jun 2025 â†’ Apr 2026
       [pid(16)]: "2025-06-15",
       [pid(17)]: "2025-07-22",
       [pid(18)]: "2025-09-10",
@@ -1543,7 +1573,7 @@ export const fictionalContracts = internalMutation({
       [pid(22)]: "2026-03-14",
       [pid(23)]: "2026-04-20",
       [pid(26)]: "2024-06-15", // encerrado
-      // Horizonte — sparse, newer agency
+      // Horizonte â€” sparse, newer agency
       [pid(28)]: "2025-08-01",
       [pid(29)]: "2026-02-15",
     };
@@ -1555,12 +1585,12 @@ export const fictionalContracts = internalMutation({
       if (contract) await ctx.db.patch(contract._id, { activatedAt });
     }
 
-    // ── Assign historical deactivatedAt dates ────────────────────────────────
+    // â”€â”€ Assign historical deactivatedAt dates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Only contracts that were once ativo and are now encerrado need this.
-    // pid(27) is cancelado but was never activated → no deactivatedAt.
+    // pid(27) is cancelado but was never activated â†’ no deactivatedAt.
     const deactivationMap: Record<string, string> = {
-      [pid(15)]: "2025-03-10", // Paulista encerrado — active ~7 months
-      [pid(26)]: "2025-01-20", // Atlântica encerrado — active ~7 months
+      [pid(15)]: "2025-03-10", // Paulista encerrado â€” active ~7 months
+      [pid(26)]: "2025-01-20", // AtlÃ¢ntica encerrado â€” active ~7 months
     };
     for (const [publicId, deactivatedAt] of Object.entries(deactivationMap)) {
       const contract = await ctx.db
@@ -1570,7 +1600,7 @@ export const fictionalContracts = internalMutation({
       if (contract) await ctx.db.patch(contract._id, { deactivatedAt });
     }
 
-    // ── Sync aggregate ────────────────────────────────────────────────────────
+    // â”€â”€ Sync aggregate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Clear per-agency aggregate (wipe above deleted all rows, but the
     // aggregate B-tree is separate and may have stale entries from a prior run).
     // Then re-populate from the freshly inserted contracts.
@@ -1584,7 +1614,7 @@ export const fictionalContracts = internalMutation({
       }
     }
 
-    // ── Contract history ──────────────────────────────────────────────────────
+    // â”€â”€ Contract history â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     await ctx.db.insert("contractHistory", {
       agencyId: paulistaId,
@@ -1592,7 +1622,7 @@ export const fictionalContracts = internalMutation({
       at: d("2025-03-01T09:00:00-03:00"),
       username: "admin.paulista",
       message:
-        "Criada Solicitação #1000001 — residencial Bela Vista, inquilino Maria Silva Santos, aluguel R$ 3.200,00.",
+        "Criada SolicitaÃ§Ã£o #1000001 â€” residencial Bela Vista, inquilino Maria Silva Santos, aluguel R$ 3.200,00.",
     });
     await ctx.db.insert("contractHistory", {
       agencyId: paulistaId,
@@ -1608,7 +1638,7 @@ export const fictionalContracts = internalMutation({
       at: d("2025-01-20T10:00:00-03:00"),
       username: "admin.paulista",
       message:
-        "Criada Solicitação #1000005 — comercial Vila Olímpia, inquilino Global Finance S.A.",
+        "Criada SolicitaÃ§Ã£o #1000005 â€” comercial Vila OlÃ­mpia, inquilino Global Finance S.A.",
     });
     await ctx.db.insert("contractHistory", {
       agencyId: paulistaId,
@@ -1624,7 +1654,7 @@ export const fictionalContracts = internalMutation({
       at: d("2025-03-15T09:00:00-03:00"),
       username: "admin.atlantica",
       message:
-        "Criada Solicitação #1000016 — residencial Ipanema, inquilina Mariana Figueiredo Costa.",
+        "Criada SolicitaÃ§Ã£o #1000016 â€” residencial Ipanema, inquilina Mariana Figueiredo Costa.",
     });
     await ctx.db.insert("contractHistory", {
       agencyId: atlanticaId,
@@ -1639,7 +1669,7 @@ export const fictionalContracts = internalMutation({
       contractPublicId: pid(27),
       at: d("2026-05-01T09:00:00-03:00"),
       username: "admin.atlantica",
-      message: "Contrato 1000027 cancelado — inquilino reprovado na análise de crédito.",
+      message: "Contrato 1000027 cancelado â€” inquilino reprovado na anÃ¡lise de crÃ©dito.",
     });
 
     await ctx.db.insert("contractHistory", {
@@ -1648,7 +1678,7 @@ export const fictionalContracts = internalMutation({
       at: d("2025-04-01T10:00:00-03:00"),
       username: "admin.horizonte",
       message:
-        "Criada Solicitação #1000028 — residencial Centro BH, inquilina Renata Campos Drumond.",
+        "Criada SolicitaÃ§Ã£o #1000028 â€” residencial Centro BH, inquilina Renata Campos Drumond.",
     });
     await ctx.db.insert("contractHistory", {
       agencyId: horizonteId,
@@ -1658,8 +1688,8 @@ export const fictionalContracts = internalMutation({
       message: "Contrato 1000028 aprovado e ativado.",
     });
 
-    // ── Historical payments (6 months: Nov 2025 – Apr 2026) ──────────────────
-    // Paulista & Atlântica: all paid. Horizonte: paid Nov–Jan, overdue Feb–Apr.
+    // â”€â”€ Historical payments (6 months: Nov 2025 â€“ Apr 2026) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Paulista & AtlÃ¢ntica: all paid. Horizonte: paid Novâ€“Jan, overdue Febâ€“Apr.
 
     // Helper to build line items for Paulista (12 ativo contracts)
     const paulistaLineItems = (month: string) =>
@@ -1671,10 +1701,10 @@ export const fictionalContracts = internalMutation({
           512_000, 640_000, 880_000, 384_000, 1_120_000, 448_000, 288_000, 576_000, 240_000,
           768_000, 320_000, 416_000,
         ][i]!,
-        description: `Mensalidade contrato ${pid(i + 1)} — ${month}`,
+        description: `Mensalidade contrato ${pid(i + 1)} â€” ${month}`,
       }));
 
-    // Helper to build line items for Atlântica (8 ativo contracts)
+    // Helper to build line items for AtlÃ¢ntica (8 ativo contracts)
     const atlanticaLineItems = (month: string) =>
       [a1, a2, a3, a4, a5, a6, a7, a8].map((cid, i) => ({
         contractId: cid,
@@ -1683,7 +1713,7 @@ export const fictionalContracts = internalMutation({
         amountCents: [928_000, 1_200_000, 704_000, 352_000, 1_056_000, 480_000, 368_000, 1_360_000][
           i
         ]!,
-        description: `Mensalidade contrato ${pid(i + 16)} — ${month}`,
+        description: `Mensalidade contrato ${pid(i + 16)} â€” ${month}`,
       }));
 
     // Helper to build line items for Horizonte (2 ativo contracts)
@@ -1693,10 +1723,10 @@ export const fictionalContracts = internalMutation({
         contractPublicId: pid(i + 28),
         kind: "recurring" as const,
         amountCents: [544_000, 800_000][i]!,
-        description: `Mensalidade contrato ${pid(i + 28)} — ${month}`,
+        description: `Mensalidade contrato ${pid(i + 28)} â€” ${month}`,
       }));
 
-    // ── Nov 2025 ──────────────────────────────────────────────────────────────
+    // â”€â”€ Nov 2025 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const p2025Nov = paulistaLineItems("2025-11");
     await ctx.db.insert("payments", {
@@ -1740,7 +1770,7 @@ export const fictionalContracts = internalMutation({
       lineItems: h2025Nov,
     });
 
-    // ── Dec 2025 ──────────────────────────────────────────────────────────────
+    // â”€â”€ Dec 2025 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const p2025Dec = paulistaLineItems("2025-12");
     await ctx.db.insert("payments", {
@@ -1784,7 +1814,7 @@ export const fictionalContracts = internalMutation({
       lineItems: h2025Dec,
     });
 
-    // ── Jan 2026 ──────────────────────────────────────────────────────────────
+    // â”€â”€ Jan 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const p2026Jan = paulistaLineItems("2026-01");
     await ctx.db.insert("payments", {
@@ -1828,7 +1858,7 @@ export const fictionalContracts = internalMutation({
       lineItems: h2026Jan,
     });
 
-    // ── Feb 2026 ──────────────────────────────────────────────────────────────
+    // â”€â”€ Feb 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const p2026Feb = paulistaLineItems("2026-02");
     await ctx.db.insert("payments", {
@@ -1872,7 +1902,7 @@ export const fictionalContracts = internalMutation({
       lineItems: h2026Feb,
     });
 
-    // ── Mar 2026 ──────────────────────────────────────────────────────────────
+    // â”€â”€ Mar 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const p2026Mar = paulistaLineItems("2026-03");
     await ctx.db.insert("payments", {
@@ -1916,8 +1946,8 @@ export const fictionalContracts = internalMutation({
       lineItems: h2026Mar,
     });
 
-    // ── Apr 2026 ──────────────────────────────────────────────────────────────
-    // ── Apr 2026 ──────────────────────────────────────────────────────────────
+    // â”€â”€ Apr 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€ Apr 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const paulistaAprLineItems = paulistaLineItems("2026-04");
     await ctx.db.insert("payments", {
@@ -1968,7 +1998,7 @@ export const fictionalContracts = internalMutation({
   },
 });
 
-/** Bulk wipe — admin only. */
+/** Bulk wipe â€” admin only. */
 export const clearAll = internalMutation({
   args: {},
   handler: async (ctx) => {

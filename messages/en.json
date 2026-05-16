@@ -338,6 +338,8 @@
       "placeholder": "Search by ID or tenant"
     },
     "columnsButton": "Columns",
+    "createButton": "Create contract",
+    "emptyStateCta": "Create your first contract",
     "noResults": "No contracts found",
     "loading": "Loading contracts…",
     "errors": {
@@ -462,6 +464,97 @@
     },
     "loading": {
       "label": "Loading invoice"
+    }
+  },
+  "contractNew": {
+    "meta": {
+      "title": "New Contract | SGR"
+    },
+    "heading": "New Contract",
+    "subheading": "Fill in the details to create a new guarantee",
+    "stepLabel": "Step {current} of {total}",
+    "steps": {
+      "1": "Property & Tenant",
+      "2": "Coverage",
+      "3": "Review"
+    },
+    "property": {
+      "heading": "Property Details",
+      "kindLabel": "Property type",
+      "residencial": "Residential",
+      "comercial": "Commercial",
+      "cep": "ZIP code",
+      "streetAndNumber": "Street and number",
+      "neighborhood": "Neighborhood",
+      "cityUF": "City / State",
+      "complement": "Complement (optional)"
+    },
+    "rent": {
+      "heading": "Rental Details",
+      "rent": "Monthly rent",
+      "condo": "Condo fee",
+      "otherFees": "Other fees",
+      "total": "Total rent",
+      "placeholder": "0.00",
+      "prefix": "R$"
+    },
+    "tenant": {
+      "heading": "Tenant Details",
+      "fullName": "Full name",
+      "cpf": "CPF",
+      "cpfPlaceholder": "000.000.000-00",
+      "birthDate": "Date of birth",
+      "email": "E-mail",
+      "phone": "Phone",
+      "scoreLoading": "Looking up score...",
+      "scoreBom": "Good",
+      "scoreRegular": "Regular",
+      "scoreRuim": "Poor",
+      "scoreLabel": "Credit score"
+    },
+    "coverage": {
+      "heading": "Coverage Configuration",
+      "rentMultiplierLabel": "Total coverage",
+      "exitCostLabel": "Exit cost",
+      "coverageDesc": "{x} months of rent covered in case of default",
+      "exitDesc": "{x} times the rent in case of early termination",
+      "preview": {
+        "heading": "Estimated Values",
+        "fee": "Monthly fee",
+        "activationFee": "Activation fee",
+        "guarantee": "Available guarantee"
+      }
+    },
+    "review": {
+      "heading": "Review",
+      "propertySection": "Property",
+      "rentSection": "Rent",
+      "tenantSection": "Tenant",
+      "coverageSection": "Coverage",
+      "valuesSection": "Calculated values",
+      "score": "Score",
+      "fee": "Monthly fee",
+      "activationFee": "Activation fee",
+      "guarantee": "Available guarantee",
+      "submit": "Create contract",
+      "submitting": "Creating...",
+      "errorToast": "Failed to create contract. Please try again."
+    },
+    "nav": {
+      "back": "Back",
+      "nextStep2": "Configure coverage",
+      "nextStep3": "Review contract"
+    },
+    "validation": {
+      "required": "Required field",
+      "cpfInvalid": "Invalid CPF",
+      "cepInvalid": "ZIP must have 8 digits",
+      "rentRequired": "Rent must be greater than zero",
+      "birthDateFuture": "Date of birth cannot be in the future",
+      "birthDateInvalid": "Invalid date",
+      "emailInvalid": "Invalid e-mail",
+      "coverageRequired": "Select a coverage option",
+      "exitRequired": "Select an exit cost option"
     }
   }
 }

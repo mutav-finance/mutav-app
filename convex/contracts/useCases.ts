@@ -1,9 +1,34 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { query } from "../_generated/server";
+import { query, mutation } from "../_generated/server";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
 import { CONTRACT_STATUS } from "./domain";
+
+const COVERAGE_MULT: { "20x": number; "30x": number; "40x": number } = {
+  "20x": 1.0,
+  "30x": 1.35,
+  "40x": 1.75,
+};
+const EXIT_MULT: { "3x": number; "5x": number; "7x": number } = {
+  "3x": 1.0,
+  "5x": 1.25,
+  "7x": 1.55,
+};
+const RENT_MULT_VALUE: { "20x": number; "30x": number; "40x": number } = {
+  "20x": 20,
+  "30x": 30,
+  "40x": 40,
+};
+
+function generatePublicId(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let id = "CTR-";
+  for (let i = 0; i < 8; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
+}
 
 /**
  * Public read of one contract by its human-facing public id.
@@ -167,6 +192,127 @@ export const countByMonth = query({
 
       return { month, netActive, activated, cancelled, expired };
     });
+  },
+});
+
+/** Mock credit score lookup — CPF → deterministic score + tier. */
+export const lookupTenantScore = query({
+  args: { cpf: v.string() },
+  handler: async (_ctx, { cpf }) => {
+    const digits = cpf.replace(/\D/g, "");
+    const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
+    const tier = score >= 700 ? "bom" : score >= 500 ? "regular" : "ruim";
+    return { score, tier } as const;
+  },
+});
+
+/** Create a new contract with server-side fee calculation. */
+export const create = mutation({
+  args: {
+    agencyId: v.id("agencies"),
+    property: v.object({
+      cep: v.string(),
+      streetAndNumber: v.string(),
+      neighborhood: v.string(),
+      cityUF: v.string(),
+    }),
+    optional: v.object({
+      complement: v.string(),
+      tag: v.string(),
+      description: v.string(),
+    }),
+    propertyKind: v.union(v.literal("residencial"), v.literal("comercial")),
+    rentCents: v.number(),
+    condoCents: v.number(),
+    otherFeesCents: v.number(),
+    rentMultiplier: v.union(v.literal("20x"), v.literal("30x"), v.literal("40x")),
+    exitCostMultiplier: v.union(v.literal("3x"), v.literal("5x"), v.literal("7x")),
+    tenant: v.object({
+      fullName: v.string(),
+      cpf: v.string(),
+      birthDate: v.string(),
+      email: v.string(),
+      phone: v.string(),
+      score: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const totalRentCents = args.rentCents + args.condoCents + args.otherFeesCents;
+    const scoreFactor =
+      args.tenant.score >= 700 ? 0.9 : args.tenant.score >= 500 ? 1.0 : 1.3;
+    const feeCents = Math.round(
+      args.rentCents *
+        0.08 *
+        COVERAGE_MULT[args.rentMultiplier] *
+        EXIT_MULT[args.exitCostMultiplier] *
+        scoreFactor,
+    );
+    const oneTimeActivationFeeCents = feeCents * 2;
+    const availableGuaranteeCents = args.rentCents * RENT_MULT_VALUE[args.rentMultiplier];
+
+    const publicId = generatePublicId();
+    const today = new Date();
+    const nextRenewalDate = new Date(
+      today.getFullYear() + 1,
+      today.getMonth(),
+      today.getDate(),
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    const contractId = await ctx.db.insert("contracts", {
+      agencyId: args.agencyId,
+      publicId,
+      status: "pendente",
+      activatedAt: null,
+      nextRenewalDate,
+      availableGuaranteeCents,
+      rental: {
+        propertyKind: args.propertyKind,
+        rentCents: args.rentCents,
+        condoCents: args.condoCents,
+        otherFeesCents: args.otherFeesCents,
+        totalRentCents,
+        feeCents,
+        oneTimeActivationFeeCents,
+        setupInstallments: 1,
+        exitCostMultiplier: args.exitCostMultiplier,
+        rentMultiplier: args.rentMultiplier,
+        payer: "inquilino",
+        pviMigrationSchedule: null,
+      },
+      property: args.property,
+      optional: args.optional,
+      documents: [
+        { key: "rentalContract", status: "pendente" },
+        { key: "inspection", status: "pendente" },
+        { key: "policy", status: "pendente" },
+      ],
+      tenant: {
+        approvalStatus: "pendente",
+        fullName: args.tenant.fullName,
+        cpf: args.tenant.cpf,
+        birthDate: args.tenant.birthDate,
+        email: args.tenant.email,
+        phone: args.tenant.phone,
+        score: args.tenant.score,
+        termApprovedAt: null,
+      },
+    });
+
+    const doc = await ctx.db.get(contractId);
+    if (!doc) throw new Error("Contract insert failed");
+    await contractsByStatus.insert(ctx, doc);
+
+    await ctx.db.insert("contractHistory", {
+      agencyId: args.agencyId,
+      contractPublicId: publicId,
+      at: new Date().toISOString(),
+      username: "Sistema",
+      message: "Contrato criado",
+    });
+
+    return { publicId };
   },
 });
 

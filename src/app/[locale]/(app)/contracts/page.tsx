@@ -3,6 +3,7 @@ import { ContractListTable } from "@/components/contracts/contract-list-table";
 import { PageContent } from "@/components/page/page-content";
 import { PageHeader } from "@/components/page/page-header";
 import { PageShell } from "@/components/page/page-shell";
+import { CreateContractButton } from "@/components/contracts/create-contract-button";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -15,9 +16,13 @@ export default async function ContractsPage() {
 
   return (
     <PageShell>
-      <PageHeader title={t("heading")} subtitle={t("subheading")} />
+      <PageHeader
+        title={t("heading")}
+        subtitle={t("subheading")}
+        actions={<CreateContractButton label={t("createButton")} />}
+      />
       <PageContent variant="full">
-        <ContractListTable />
+        <ContractListTable emptyStateCta={t("emptyStateCta")} />
       </PageContent>
     </PageShell>
   );

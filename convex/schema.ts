@@ -143,6 +143,7 @@ export default defineSchema({
       email: v.string(),
       phone: v.string(),
       termApprovedAt: v.union(v.string(), v.null()),
+      score: v.number(),
     }),
   })
     .index("by_publicId", ["publicId"])
