@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for working on SGR. This file is the short, actionable version —
+Thanks for working on Mutav. This file is the short, actionable version —
 keep it open in a tab, follow it, ship.
 
 ## Prerequisites

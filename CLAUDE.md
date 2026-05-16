@@ -1,10 +1,10 @@
 @AGENTS.md
 
-# SGR App — Agent Context
+# Mutav — Agent Context
 
 ## Project
 
-SGR (Sistema de Garantia Registrada) — dashboard for managing rental guarantees across chains.
+Mutav — dashboard for managing rental guarantees across chains.
 
 ## Shared docs
 
@@ -299,7 +299,7 @@ Define error codes as `as const` value objects in the entity file (e.g. `CONTRAC
 
 ## Domain conventions (Brazil)
 
-SGR operates in Brazil. Convention choices:
+Mutav operates in Brazil. Convention choices:
 
 - **Money** — store as **integer cents** (`v.number()` representing centavos). Field naming: suffix `Cents` (e.g. `rentCents`, `availableGuaranteeCents`). Float reais is a precision trap; cents is the industry-standard fix. Existing `*BRL: v.number()` fields predate this rule and need migration — see `.claude/notes/deferred-conventions.md`. Display via `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)`.
 - **CPF / CNPJ** — store as digits-only strings (CPF = 11 chars, CNPJ = 14 chars). Validate with proper checksum algorithms; never use regex alone. Format only at display time (`123.456.789-01`, `12.345.678/0001-90`).

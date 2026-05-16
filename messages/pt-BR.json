@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "SGR — Sistema de Garantia Registrada",
+    "title": "Mutav — Sistema de Garantia Registrada",
     "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
   },
   "common": {
@@ -307,7 +307,7 @@
   },
   "contractList": {
     "meta": {
-      "title": "Contratos | SGR",
+      "title": "Contratos | Mutav",
       "description": "Lista de contratos da imobiliária"
     },
     "heading": "Contratos",
@@ -359,7 +359,7 @@
   },
   "paymentList": {
     "meta": {
-      "title": "Faturas | SGR",
+      "title": "Faturas | Mutav",
       "description": "Faturas mensais da imobiliária"
     },
     "heading": "Faturas",
@@ -396,7 +396,7 @@
   },
   "paymentDetails": {
     "meta": {
-      "title": "Fatura {id} | SGR",
+      "title": "Fatura {id} | Mutav",
       "description": "Detalhes da fatura"
     },
     "breadcrumb": "Detalhes da Fatura",
