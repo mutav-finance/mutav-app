@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./payments/domain";
 import { generatePaymentMuxedId } from "./payments/lib/muxedId";
@@ -46,18 +47,27 @@ export const fictionalContracts = internalMutation({
       name: "Imobiliária Paulista",
       cnpj: "00000000000100",
       createdAt: d("2024-03-01T00:00:00-03:00"),
+      etherfuseOrgId: null,
+      etherfuseOnboardingStatus: "not_started",
+      etherfuseBankAccountId: null,
     });
 
     const atlanticaId: Id<"agencies"> = await ctx.db.insert("agencies", {
       name: "Imobiliária Atlântica",
       cnpj: "00000000000200",
       createdAt: d("2024-06-15T00:00:00-03:00"),
+      etherfuseOrgId: null,
+      etherfuseOnboardingStatus: "not_started",
+      etherfuseBankAccountId: null,
     });
 
     const horizonteId: Id<"agencies"> = await ctx.db.insert("agencies", {
       name: "Horizonte Imóveis",
       cnpj: "00000000000300",
       createdAt: d("2025-01-10T00:00:00-03:00"),
+      etherfuseOrgId: null,
+      etherfuseOnboardingStatus: "not_started",
+      etherfuseBankAccountId: null,
     });
 
     // ── Users ──────────────────────────────────────────────────────────────────
@@ -2083,6 +2093,217 @@ export const fictionalContracts = internalMutation({
       agencies: { paulistaId, atlanticaId, horizonteId },
       contractCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
     };
+  },
+});
+
+/**
+ * Adds a few extra low-value pending invoices on the two approved agencies
+ * (Paulista + Atlântica) for testing the Pix-anchor flow. Idempotent: skips
+ * any publicId that already exists.
+ *
+ * Usage:
+ *   bunx convex run seed:seedExtraTestPayments
+ */
+export const seedExtraTestPayments = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("agencies").collect();
+    const paulista = all.find((a) => a.cnpj === "00000000000100");
+    const atlantica = all.find((a) => a.cnpj === "00000000000200");
+    if (!paulista || !atlantica) throw new Error("Seed agencies missing");
+
+    const firstContractFor = async (agencyId: Id<"agencies">) =>
+      ctx.db
+        .query("contracts")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId))
+        .first();
+
+    const pContract = await firstContractFor(paulista._id);
+    const aContract = await firstContractFor(atlantica._id);
+    if (!pContract || !aContract) throw new Error("No contracts seeded for approved agencies");
+
+    const extras: Array<{
+      publicId: string;
+      agency: typeof paulista;
+      contract: typeof pContract;
+      amountCents: number;
+    }> = [
+      { publicId: "PAY-TEST-005", agency: paulista, contract: pContract, amountCents: 500 },
+      { publicId: "PAY-TEST-020", agency: paulista, contract: pContract, amountCents: 2_000 },
+      { publicId: "PAY-TEST-050", agency: atlantica, contract: aContract, amountCents: 5_000 },
+      { publicId: "PAY-TEST-250", agency: atlantica, contract: aContract, amountCents: 25_000 },
+    ];
+
+    let inserted = 0;
+    for (const t of extras) {
+      const exists = await ctx.db
+        .query("payments")
+        .withIndex("by_publicId", (q) => q.eq("publicId", t.publicId))
+        .unique();
+      if (exists) continue;
+      await ctx.db.insert("payments", {
+        agencyId: t.agency._id,
+        publicId: t.publicId,
+        periodMonth: "2026-05",
+        issuedAt: "2026-05-15",
+        dueDate: "2026-05-25",
+        totalCents: t.amountCents,
+        state: PaymentStates.pending(),
+        method: null,
+        muxedId: generatePaymentMuxedId(),
+        lineItems: [
+          {
+            contractId: t.contract._id,
+            contractPublicId: t.contract.publicId,
+            kind: PAYMENT_LINE_ITEM_KIND.RECURRING,
+            amountCents: t.amountCents,
+            description: `Pix-anchor test — ${t.publicId}`,
+          },
+        ],
+      });
+      inserted++;
+    }
+    return { inserted, total: extras.length };
+  },
+});
+
+/**
+ * Creates a real test agency with dev-user as owner, one stub contract,
+ * and one low-value pending invoice. Idempotent on CNPJ.
+ *
+ * Usage:
+ *   bunx convex run seed:seedRealTestAgency '{"name":"Jubs Studio","cnpj":"60409970000177"}'
+ */
+export const seedRealTestAgency = internalMutation({
+  args: {
+    name: v.string(),
+    cnpj: v.string(),
+    paymentAmountCents: v.optional(v.number()),
+  },
+  handler: async (ctx, { name, cnpj, paymentAmountCents = 500 }) => {
+    const existing = await ctx.db
+      .query("agencies")
+      .withIndex("by_cnpj", (q) => q.eq("cnpj", cnpj))
+      .unique();
+    if (existing) {
+      return { ok: true, agencyId: existing._id, skipped: "agency already exists" };
+    }
+
+    const devUser = await ctx.db
+      .query("users")
+      .withIndex("by_publicId", (q) => q.eq("publicId", "dev-user"))
+      .unique();
+    if (!devUser) throw new Error("dev-user not found; seed first");
+
+    const agencyId = await ctx.db.insert("agencies", {
+      name,
+      cnpj,
+      createdAt: new Date().toISOString(),
+      etherfuseOrgId: null,
+      etherfuseOnboardingStatus: "not_started",
+      etherfuseBankAccountId: null,
+    });
+
+    await ctx.db.insert("memberships", {
+      userId: devUser._id,
+      agencyId,
+      role: "owner",
+      joinedAt: new Date().toISOString(),
+    });
+
+    // Stub contract so test payments have something to reference
+    const contractPublicId = `REAL-${cnpj.slice(-6)}-001`;
+    const contractId = await ctx.db.insert("contracts", {
+      agencyId,
+      publicId: contractPublicId,
+      status: "ativo",
+      activatedAt: new Date().toISOString().slice(0, 10),
+      deactivatedAt: null,
+      nextRenewalDate: "2027-01-01",
+      availableGuaranteeCents: 1_000_000,
+      rental: {
+        propertyKind: "residencial",
+        rentCents: 200_000,
+        condoCents: 0,
+        otherFeesCents: 0,
+        totalRentCents: 200_000,
+        feeCents: paymentAmountCents,
+        oneTimeActivationFeeCents: 0,
+        setupInstallments: 1,
+        exitCostMultiplier: "6x",
+        rentMultiplier: "40x",
+        payer: "Recorrência via Imobiliária",
+        pviMigrationSchedule: null,
+      },
+      property: {
+        cep: "88010-000",
+        streetAndNumber: "Rua Conselheiro Mafra, 1",
+        neighborhood: "Centro",
+        cityUF: "Florianópolis/SC",
+      },
+      optional: {
+        complement: "",
+        tag: "Test",
+        description: "Stub contract for integration testing",
+      },
+      documents: [{ key: "rentalContract", status: "aprovado" }],
+      tenant: {
+        approvalStatus: "aprovado",
+        fullName: "Test Tenant",
+        cpf: "00000000000",
+        birthDate: "1990-01-01",
+        email: "test@example.com",
+        phone: "48900000000",
+        termApprovedAt: new Date().toISOString(),
+      },
+    });
+
+    const paymentId = await ctx.db.insert("payments", {
+      agencyId,
+      publicId: `PAY-${cnpj.slice(-4)}-TEST`,
+      periodMonth: "2026-05",
+      issuedAt: new Date().toISOString().slice(0, 10),
+      dueDate: "2026-05-30",
+      totalCents: paymentAmountCents,
+      state: PaymentStates.pending(),
+      method: null,
+      muxedId: generatePaymentMuxedId(),
+      lineItems: [
+        {
+          contractId,
+          contractPublicId,
+          kind: PAYMENT_LINE_ITEM_KIND.RECURRING,
+          amountCents: paymentAmountCents,
+          description: `Pix-anchor real-CNPJ test — ${name}`,
+        },
+      ],
+    });
+
+    return { ok: true, agencyId, contractId, paymentId };
+  },
+});
+
+/**
+ * One-off backfill: sets etherfuseBankAccountId=null on agency rows that
+ * predate the schema field. Run once after the migration; convex stops
+ * rejecting the deploy.
+ *
+ *   bunx convex run seed:backfillEtherfuseBankAccountId
+ */
+export const backfillEtherfuseBankAccountId = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("agencies").collect();
+    let patched = 0;
+    for (const a of all) {
+      if (
+        (a as unknown as { etherfuseBankAccountId?: unknown }).etherfuseBankAccountId === undefined
+      ) {
+        await ctx.db.patch(a._id, { etherfuseBankAccountId: null });
+        patched++;
+      }
+    }
+    return { patched, total: all.length };
   },
 });
 
