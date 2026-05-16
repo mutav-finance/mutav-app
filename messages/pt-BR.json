@@ -24,6 +24,22 @@
   "brand": {
     "name": "Acme Inc."
   },
+  "admin": {
+    "etherfuse": {
+      "title": "Integração Etherfuse",
+      "connect": "Conectar Etherfuse",
+      "status": {
+        "not_started": "Não iniciado",
+        "pending": "Em análise (KYB)",
+        "approved": "Aprovado",
+        "rejected": "Rejeitado",
+        "update_required": "Atualização exigida"
+      },
+      "orgId": "Org ID Etherfuse",
+      "onboardingSuccess": "Cadastro iniciado",
+      "onboardingError": "Falha ao iniciar cadastro: {message}"
+    }
+  },
   "nav": {
     "main": {
       "createContract": "Criar Contrato",
@@ -411,7 +427,8 @@
       "none": "Não definida",
       "boleto": "Boleto",
       "pix": "PIX",
-      "stellar": "Stellar"
+      "stellar": "Stellar",
+      "pix_anchor": "PIX-anchor (TESOURO)"
     },
     "summary": {
       "heading": "Resumo",
@@ -454,7 +471,15 @@
       "generateStellar": "Pagar com Stellar",
       "openPayPage": "Abrir página de pagamento",
       "copyShareLink": "Copiar link",
-      "linkCopied": "Link copiado"
+      "linkCopied": "Link copiado",
+      "pixAnchorCode": "Código PIX",
+      "pixAnchorExpiresIn": "Expira em {seconds}s",
+      "pixAnchorExpired": "QR expirado — gerar novo",
+      "pixAnchorCopy": "Copiar código",
+      "pixAnchorCopied": "Código copiado",
+      "pixAnchorRegenerate": "Gerar novo QR",
+      "pixAnchorNotEligible": "Agência ainda não habilitada para PIX-anchor",
+      "pixAnchorSettling": "Liquidando on-chain…"
     },
     "notFound": {
       "title": "Fatura não encontrada",
