@@ -54,17 +54,19 @@ const usdc = sep1.getCurrencyByCode(toml, "USDC");
 
 ### Authenticate (SEP-10)
 
-Most SEP operations require a JWT token obtained through SEP-10. The `authenticate()` function handles the full challenge-response flow (get challenge, validate, sign, submit):
+Most SEP operations require a JWT token obtained through SEP-10. The `authenticate()` function handles the full challenge-response flow (get challenge, validate, sign, submit). Challenge validation is mandatory and delegates to `WebAuth.readChallengeTx` from the SDK — it verifies the server's signature, the home-domain manage_data op, the web_auth_domain op, sequence, and time bounds:
 
 ```typescript
 import { sep1, sep10 } from "./anchors/sep";
 
 const toml = await sep1.fetchStellarToml("testanchor.stellar.org");
+const signingKey = sep1.getSigningKey(toml);
+if (!signingKey) throw new Error("Anchor toml missing SIGNING_KEY — refusing to authenticate");
 
 const token = await sep10.authenticate(
   {
     authEndpoint: sep1.getSep10Endpoint(toml)!,
-    serverSigningKey: sep1.getSigningKey(toml)!,
+    serverSigningKey: signingKey,
     networkPassphrase: "Test SDF Network ; September 2015",
     homeDomain: "testanchor.stellar.org",
   },
@@ -73,12 +75,11 @@ const token = await sep10.authenticate(
   async (xdr, networkPassphrase) => {
     return await freighter.signTransaction(xdr, { networkPassphrase });
   },
-  { validateChallenge: true },
 );
 
 // Check token status later
 sep10.isTokenExpired(token); // false
-sep10.decodeToken(token); // { iss, sub, iat, exp, jti, ... }
+sep10.decodeToken(token); // { iss, sub, iat, exp, jti, ... }  — does NOT verify signature
 sep10.createAuthHeaders(token); // { Authorization: 'Bearer ...' }
 ```
 
@@ -86,15 +87,10 @@ If you need more control, use the individual steps instead of `authenticate()`:
 
 ```typescript
 const challenge = await sep10.getChallenge(config, account);
-const validation = sep10.validateChallenge(
-  challenge.transaction,
-  serverKey,
-  passphrase,
-  domain,
-  account,
-);
-const signedXdr = await sep10.signChallenge(challenge.transaction, passphrase, signer);
-const { token } = await sep10.submitChallenge(authEndpoint, signedXdr);
+// Throws SepApiError if signature is invalid or any SEP-10 invariant is violated.
+sep10.validateChallenge(challenge.transaction, config, account);
+const signedXdr = await signer(challenge.transaction, challenge.network_passphrase);
+const { token } = await sep10.submitChallenge(config.authEndpoint, signedXdr);
 ```
 
 ### Interactive Deposit/Withdrawal (SEP-24)
@@ -123,8 +119,11 @@ window.open(response.url, "_blank");
 sep24.openPopup(response.url);
 sep24.createIframe(response.url, document.getElementById("container")!);
 
-// Poll for completion
+// Poll for completion. Pass an AbortSignal to cancel (e.g. user closes the modal),
+// and the poller will retry up to 3 transient 5xx errors before giving up.
+const controller = new AbortController();
 const tx = await sep24.pollTransaction(sep24Server, token, response.id, {
+  signal: controller.signal,
   onStatusChange: (tx) => console.log("Status:", tx.status),
 });
 ```

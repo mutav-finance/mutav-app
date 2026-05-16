@@ -293,10 +293,23 @@ To build a client for a different anchor using the same pattern:
 
 ```typescript
 import { sep1, sep10, sep24 } from "../sep";
+import { SepApiError } from "../sep/types";
+
+type Sep = 6 | 10 | 12 | 24 | 31 | 38;
+
+const ENDPOINT_GETTERS: Record<Sep, (toml: sep1.StellarTomlRecord) => string | undefined> = {
+  6: sep1.getSep6Endpoint,
+  10: sep1.getSep10Endpoint,
+  12: sep1.getSep12Endpoint,
+  24: sep1.getSep24Endpoint,
+  31: sep1.getSep31Endpoint,
+  38: sep1.getSep38Endpoint,
+};
 
 export class MyAnchorClient {
   private toml: sep1.StellarTomlRecord | null = null;
   private token: string | null = null;
+  private endpointCache: Partial<Record<Sep, string>> = {};
 
   constructor(
     private domain: string,
@@ -308,19 +321,23 @@ export class MyAnchorClient {
     return this.toml;
   }
 
-  // ... authenticate(), getToml(), etc.
+  // Memoized endpoint lookup — fetches the toml once, then caches each
+  // resolved endpoint. Throws SepApiError if the anchor doesn't support
+  // the requested SEP.
+  private async resolveEndpoint(sep: Sep): Promise<string> {
+    if (this.endpointCache[sep]) return this.endpointCache[sep]!;
+    if (!this.toml) await this.initialize();
+    const ep = ENDPOINT_GETTERS[sep](this.toml!);
+    if (!ep) throw new SepApiError(`Anchor does not support SEP-${sep}`, 0);
+    return (this.endpointCache[sep] = ep);
+  }
+
+  // ... authenticate(), etc.
 
   readonly sep24 = {
-    getInfo: async () => {
-      const toml = await this.getToml();
-      const ep = sep1.getSep24Endpoint(toml)!;
-      return sep24.getInfo(ep, this.fetchFn);
-    },
-    deposit: async (request) => {
-      const toml = await this.getToml();
-      const ep = sep1.getSep24Endpoint(toml)!;
-      return sep24.deposit(ep, this.token!, request, this.fetchFn);
-    },
+    getInfo: async () => sep24.getInfo(await this.resolveEndpoint(24), this.fetchFn),
+    deposit: async (request) =>
+      sep24.deposit(await this.resolveEndpoint(24), this.token!, request, this.fetchFn),
   };
 }
 ```
