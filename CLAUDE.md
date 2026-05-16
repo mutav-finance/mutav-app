@@ -35,6 +35,32 @@ Mutav settles guarantees on Stellar and moves BRL ↔ token via anchors. Before 
 - [`src/lib/anchors/sep/README.md`](src/lib/anchors/sep/README.md) — per-SEP API reference for the framework-agnostic protocol modules
 - [`src/lib/anchors/testanchor/README.md`](src/lib/anchors/testanchor/README.md) — reference SEP client composed against `testanchor.stellar.org`; copy this as the starting point for a new SEP-compliant client
 
+### Installed expert skills
+
+The official [`stellar/stellar-dev-skill`](https://github.com/stellar/stellar-dev-skill) is installed at project scope. Seven sub-skills auto-trigger on Stellar prompts — invoke explicitly via the Skill tool when in doubt:
+
+| Skill              | Use for                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `standards`        | Picking the right SEP/CAP — anchor flows (SEP-1/6/10/12/24/31), token interfaces  |
+| `dapp`             | Frontend stellar-sdk, Freighter, Stellar Wallets Kit, smart accounts, signing     |
+| `data`             | Stellar RPC (preferred) and Horizon (legacy) for balances, transactions, indexing |
+| `assets`           | Stellar Assets, trustlines, SAC bridge — issuance, regulated assets               |
+| `soroban`          | Rust smart-contract dev, testing, security patterns                               |
+| `agentic-payments` | x402 + MPP for machine/agent payments                                             |
+| `zk-proofs`        | BLS12-381 / BN254 / Poseidon ZK verification                                      |
+
+### External references
+
+When the in-repo docs and skills aren't enough, consult:
+
+- [Stellar Developer Docs](https://developers.stellar.org) — canonical reference; the [`llms.txt`](https://developers.stellar.org/llms.txt) is a flat dump optimized for LLM context
+- [SEPs index](https://github.com/stellar/stellar-protocol/tree/master/ecosystem) — authoritative source of truth for protocol status (the skill is a routing map only)
+- [CAPs index](https://github.com/stellar/stellar-protocol/tree/master/core) — Core Advancement Proposals (Soroban runtime, cryptography)
+- [Stellar Anchor Directory](https://anchors.stellar.org/) — live list of operating anchors per region; check before committing to a provider
+- [Anchor Platform docs](https://developers.stellar.org/docs/platforms/anchor-platform) — SDF's reference implementation for running an anchor server (useful as a spec for what we consume)
+- [Building with AI](https://developers.stellar.org/docs/build/building-with-ai) — SDF's guide to AI-assisted Stellar dev; lists the skill, llms.txt, and Stella
+- **Stella AI** — yellow chat icon on developers.stellar.org for interactive Q&A; or `#stella-help` on the [Stellar Discord](https://discord.gg/stellar)
+
 ## Stack
 
 - Next.js 16 (App Router, src/ directory)
