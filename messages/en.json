@@ -24,6 +24,88 @@
   "brand": {
     "name": "Acme Inc."
   },
+  "commission": {
+    "meta": {
+      "title": "Commission — MUTAV",
+      "description": "Track your agency's monthly commission balance and active contract history."
+    },
+    "heading": "Commission",
+    "subheading": "Amounts released to your agency for the selected period",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "kpi": {
+      "monthCommission": "Month commission",
+      "contracts": "{count} active contracts",
+      "invoice": "Invoice",
+      "invoiceEmpty": "No invoice issued",
+      "invoiceEmptyHint": "The invoice will be available once the monthly commission is closed.",
+      "invoiceDownload": "Download invoice"
+    },
+    "table": {
+      "heading": "Month breakdown",
+      "export": "Export as PDF",
+      "search": "Search contract or tenant",
+      "empty": "No results found.",
+      "total": "{count} contracts",
+      "col": {
+        "contract": "Contract",
+        "tenant": "Tenant",
+        "rent": "Rent Value",
+        "commission": "Commission",
+        "installment": "Installment",
+        "activatedAt": "Activation"
+      }
+    }
+  },
+  "delinquencies": {
+    "meta": {
+      "title": "Delinquencies — MUTAV",
+      "description": "Track and manage delinquency actions for your agency's contracts."
+    },
+    "heading": "Delinquency Actions",
+    "subheading": "Track and manage open delinquencies for your contracts",
+    "actions": {
+      "report": "Generate report",
+      "statement": "Payment statement"
+    },
+    "status": {
+      "pendencia_aberta": "Open",
+      "entregue": "Delivered",
+      "cancelado": "Cancelled"
+    },
+    "filter": {
+      "property": "Property",
+      "propertyPlaceholder": "Property ID",
+      "tenantName": "Tenant name",
+      "tenantNamePlaceholder": "Full name",
+      "tenantCpf": "Tenant CPF",
+      "status": "Status",
+      "statusAll": "All",
+      "order": "Order",
+      "orderDate": "Date",
+      "orderAmount": "Amount",
+      "orderStatus": "Status",
+      "dateFrom": "Notice date — from",
+      "dateTo": "Notice date — to",
+      "amountFrom": "Amount — from",
+      "amountTo": "Amount — to",
+      "search": "Search",
+      "clear": "Clear"
+    },
+    "table": {
+      "heading": "Results",
+      "empty": "No delinquencies found.",
+      "view": "View delinquency",
+      "col": {
+        "property": "Property",
+        "status": "Status",
+        "noticeAt": "Notice date",
+        "amount": "Amount",
+        "updatedAmount": "Updated amount",
+        "action": "Action"
+      }
+    }
+  },
   "nav": {
     "main": {
       "createContract": "Create Contract",
@@ -49,6 +131,7 @@
     "agency": {
       "groupLabel": "Agency",
       "members": "Members",
+      "commission": "Commission",
       "agencySettings": "Agency Settings"
     }
   },
@@ -317,6 +400,7 @@
     "subheading": "Track your agency's contracts",
     "tabs": {
       "all": "All",
+      "expiring": "Expiring",
       "ativo": "Active",
       "pendente": "Pending",
       "encerrado": "Closed",
@@ -333,8 +417,9 @@
     },
     "urgency": {
       "overdue": "Overdue",
-      "critical": "Critical",
-      "warning": "Warning",
+      "expiring": "Expiring",
+      "critical": "Caution",
+      "warning": "On track",
       "pendente": "Pending",
       "ok": "OK",
       "inactive": "Inactive"

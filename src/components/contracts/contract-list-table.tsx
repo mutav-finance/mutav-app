@@ -73,24 +73,22 @@ type ContractListItem = {
   urgencySortKey: number;
 };
 
-type StatusTab = "all" | ContractStatus;
+type StatusTab = "all" | ContractStatus | "expiring";
 
-const STATUS_TABS: readonly StatusTab[] = ["all", "ativo", "pendente", "encerrado", "cancelado"];
+const STATUS_TABS: readonly StatusTab[] = [
+  "all",
+  "expiring",
+  "ativo",
+  "pendente",
+  "encerrado",
+  "cancelado",
+];
 
 const statusTone: Record<ContractStatus, "accent" | "success" | "error" | "neutral"> = {
   ativo: "success",
   pendente: "accent",
   encerrado: "neutral",
   cancelado: "error",
-};
-
-const urgencyStyle: Record<UrgencyTier, string> = {
-  overdue: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-  critical: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
-  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
-  pendente: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  ok: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  inactive: "bg-muted text-muted-foreground",
 };
 
 function buildColumns(
@@ -112,25 +110,20 @@ function buildColumns(
       ),
     },
     {
-      id: "urgency",
-      accessorKey: "urgencySortKey",
-      header: t("columns.urgency"),
-      sortingFn: "basic",
-      cell: ({ row }) => (
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${urgencyStyle[row.original.urgency]}`}
-        >
-          {t(`urgency.${row.original.urgency}`)}
-        </span>
-      ),
-    },
-    {
       id: "status",
       accessorKey: "status",
       header: t("columns.status"),
-      cell: ({ row }) => (
-        <StatusTag tone={statusTone[row.original.status]} label={tStatus(row.original.status)} />
-      ),
+      cell: ({ row }) => {
+        const { status, urgency } = row.original;
+        if (status === "ativo") {
+          if (urgency === "overdue") return <StatusTag tone="error" label={t("urgency.overdue")} />;
+          if (urgency === "expiring")
+            return <StatusTag tone="expiring" label={t("urgency.expiring")} />;
+          if (urgency === "critical")
+            return <StatusTag tone="caution" label={t("urgency.critical")} />;
+        }
+        return <StatusTag tone={statusTone[status]} label={tStatus(status)} />;
+      },
       filterFn: (row, columnId, value) => row.getValue(columnId) === value,
     },
     {
@@ -201,7 +194,7 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
     creationTime: false,
   });
   const [sorting, setSorting] = React.useState<SortingState>(
-    defaultSort ?? [{ id: "urgency", desc: false }],
+    defaultSort ?? [{ id: "nextRenewalDate", desc: false }],
   );
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
   const [statusTab, setStatusTab] = React.useState<StatusTab>("all");
@@ -209,16 +202,25 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
   React.useEffect(() => {
     setColumnFilters((prev) => {
       const without = prev.filter((f) => f.id !== "status");
-      return statusTab === "all" ? without : [...without, { id: "status", value: statusTab }];
+      if (statusTab === "all" || statusTab === "expiring") return without;
+      return [...without, { id: "status", value: statusTab }];
     });
   }, [statusTab]);
+
+  const tableData = React.useMemo(
+    () =>
+      statusTab === "expiring"
+        ? data.filter((r) => r.urgency === "expiring" || r.urgency === "critical")
+        : data,
+    [data, statusTab],
+  );
 
   // React Compiler skips memoizing this component because TanStack Table's
   // useReactTable() returns non-memoizable functions. Acceptable — the table
   // is small and fast.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
-    data,
+    data: tableData,
     columns,
     state: {
       sorting,
@@ -250,12 +252,16 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
   const counts = React.useMemo<Record<StatusTab, number>>(() => {
     const c: Record<StatusTab, number> = {
       all: data.length,
+      expiring: 0,
       ativo: 0,
       pendente: 0,
       encerrado: 0,
       cancelado: 0,
     };
-    for (const row of data) c[row.status]++;
+    for (const row of data) {
+      c[row.status]++;
+      if (row.urgency === "expiring" || row.urgency === "critical") c.expiring++;
+    }
     return c;
   }, [data]);
 

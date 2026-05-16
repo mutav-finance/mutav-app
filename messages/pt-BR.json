@@ -24,6 +24,88 @@
   "brand": {
     "name": "Acme Inc."
   },
+  "commission": {
+    "meta": {
+      "title": "Comissão — MUTAV",
+      "description": "Acompanhe o saldo de comissão mensal e o histórico de contratos ativos."
+    },
+    "heading": "Comissão",
+    "subheading": "Valores liberados para sua imobiliária no período selecionado",
+    "prevMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "kpi": {
+      "monthCommission": "Comissão do mês",
+      "contracts": "{count} contratos ativos",
+      "invoice": "Nota fiscal",
+      "invoiceEmpty": "Nenhuma nota emitida",
+      "invoiceEmptyHint": "A nota fiscal será habilitada quando a comissão do mês for fechada.",
+      "invoiceDownload": "Baixar nota fiscal"
+    },
+    "table": {
+      "heading": "Detalhamento do mês",
+      "export": "Exportar como PDF",
+      "search": "Buscar contrato ou inquilino",
+      "empty": "Nenhum resultado encontrado.",
+      "total": "{count} contratos",
+      "col": {
+        "contract": "Contrato",
+        "tenant": "Inquilino",
+        "rent": "Valor Locatício",
+        "commission": "Comissão",
+        "installment": "Parcela",
+        "activatedAt": "Ativação"
+      }
+    }
+  },
+  "delinquencies": {
+    "meta": {
+      "title": "Inadimplências — MUTAV",
+      "description": "Acompanhe e gerencie os acionamentos de inadimplência dos contratos da sua imobiliária."
+    },
+    "heading": "Acionamentos de Inadimplência",
+    "subheading": "Acompanhe e gerencie as inadimplências abertas dos seus contratos",
+    "actions": {
+      "report": "Gerar relatório",
+      "statement": "Extrato de pagamento"
+    },
+    "status": {
+      "pendencia_aberta": "Pendência Aberta",
+      "entregue": "Entregue",
+      "cancelado": "Cancelado"
+    },
+    "filter": {
+      "property": "Imóvel",
+      "propertyPlaceholder": "ID do imóvel",
+      "tenantName": "Nome do inquilino",
+      "tenantNamePlaceholder": "Nome completo",
+      "tenantCpf": "CPF do inquilino",
+      "status": "Status",
+      "statusAll": "Todos",
+      "order": "Ordem",
+      "orderDate": "Data",
+      "orderAmount": "Valor",
+      "orderStatus": "Status",
+      "dateFrom": "Data aviso — de",
+      "dateTo": "Data aviso — até",
+      "amountFrom": "Valor inadimplência — de",
+      "amountTo": "Valor inadimplência — até",
+      "search": "Pesquisar",
+      "clear": "Limpar"
+    },
+    "table": {
+      "heading": "Resultados",
+      "empty": "Nenhum acionamento encontrado.",
+      "view": "Ver inadimplência",
+      "col": {
+        "property": "Imóvel",
+        "status": "Status",
+        "noticeAt": "Data Aviso",
+        "amount": "Valor Inadimplência",
+        "updatedAmount": "Valor Atualizado",
+        "action": "Ação"
+      }
+    }
+  },
   "nav": {
     "main": {
       "createContract": "Criar Contrato",
@@ -49,6 +131,7 @@
     "agency": {
       "groupLabel": "Agência",
       "members": "Membros",
+      "commission": "Comissão",
       "agencySettings": "Configurações da Agência"
     }
   },
@@ -317,6 +400,7 @@
     "subheading": "Acompanhe os contratos da sua imobiliária",
     "tabs": {
       "all": "Todos",
+      "expiring": "A vencer",
       "ativo": "Ativos",
       "pendente": "Pendentes",
       "encerrado": "Encerrados",
@@ -333,8 +417,9 @@
     },
     "urgency": {
       "overdue": "Vencido",
-      "critical": "Crítico",
-      "warning": "Atenção",
+      "expiring": "A vencer",
+      "critical": "Atenção",
+      "warning": "Em dia",
       "pendente": "Pendente",
       "ok": "OK",
       "inactive": "Inativo"

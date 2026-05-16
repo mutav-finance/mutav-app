@@ -34,52 +34,52 @@ export function ContractDocumentsCard({ documents }: { documents: ContractDocume
           const status = doc?.status ?? "pendente";
           return (
             <div key={key} className="border-border flex flex-col gap-3 rounded border p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2">
-                  <FileTextIcon
-                    className="text-muted-foreground mt-0.5 size-4"
-                    strokeWidth={1.25}
-                    aria-hidden
-                  />
-                  <span className="text-base-sm font-medium">{tLabels(key)}</span>
-                </div>
-                <StatusTag tone={statusTone[status]} label={tStatus(status)} />
+              <div className="flex items-start gap-2">
+                <FileTextIcon
+                  className="text-muted-foreground mt-0.5 size-4"
+                  strokeWidth={1.25}
+                  aria-hidden
+                />
+                <span className="text-base-sm font-medium">{tLabels(key)}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-primary text-primary hover:bg-accent-dim hover:text-primary self-start bg-transparent"
-                        disabled
-                      >
-                        <UploadIcon data-icon="inline-start" strokeWidth={1.25} aria-hidden />
-                        {t("send")}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("sendDisabled")}</TooltipContent>
-                </Tooltip>
-                {keysWithTemplate.has(key) && (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground self-start"
-                        asChild
-                      >
-                        <a href={`/templates/${key}.pdf`} download>
-                          <DownloadIcon className="size-4" strokeWidth={1.25} aria-hidden />
-                          <span className="sr-only">{t("downloadTemplate")}</span>
-                        </a>
-                      </Button>
+                      <span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-primary text-primary hover:bg-accent-dim hover:text-primary self-start bg-transparent"
+                          disabled
+                        >
+                          <UploadIcon data-icon="inline-start" strokeWidth={1.25} aria-hidden />
+                          {t("send")}
+                        </Button>
+                      </span>
                     </TooltipTrigger>
-                    <TooltipContent>{t("downloadTemplate")}</TooltipContent>
+                    <TooltipContent>{t("sendDisabled")}</TooltipContent>
                   </Tooltip>
-                )}
+                  {keysWithTemplate.has(key) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-foreground self-start"
+                          asChild
+                        >
+                          <a href={`/templates/${key}.pdf`} download>
+                            <DownloadIcon className="size-4" strokeWidth={1.25} aria-hidden />
+                            <span className="sr-only">{t("downloadTemplate")}</span>
+                          </a>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("downloadTemplate")}</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+                <StatusTag tone={statusTone[status]} label={tStatus(status)} />
               </div>
             </div>
           );

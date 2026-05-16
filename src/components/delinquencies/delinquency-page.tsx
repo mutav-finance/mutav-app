@@ -1,0 +1,327 @@
+"use client";
+
+import * as React from "react";
+import { useTranslations } from "next-intl";
+import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Mono } from "@/components/ui/mono";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DelinquencyStatusTag,
+  type DelinquencyStatus,
+} from "@/components/delinquencies/delinquency-status-tag";
+
+type DelinquencyRow = {
+  propertyId: string;
+  status: DelinquencyStatus;
+  noticeAt: string;
+  amountCents: number;
+  updatedAmountCents: number;
+};
+
+const MOCK_ROWS: DelinquencyRow[] = [
+  {
+    propertyId: "2014489",
+    status: "pendencia_aberta",
+    noticeAt: "26/11/2026 às 09:19",
+    amountCents: 345862,
+    updatedAmountCents: 345862,
+  },
+  {
+    propertyId: "2052106",
+    status: "pendencia_aberta",
+    noticeAt: "24/03/2026 às 18:14",
+    amountCents: 1381556,
+    updatedAmountCents: 1430784,
+  },
+  {
+    propertyId: "3871005",
+    status: "entregue",
+    noticeAt: "30/03/2026 às 23:09",
+    amountCents: 489250,
+    updatedAmountCents: 545111,
+  },
+];
+
+function formatBRL(cents: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
+
+export function DelinquencyPage() {
+  const t = useTranslations("delinquencies");
+
+  const [property, setProperty] = React.useState("");
+  const [tenantName, setTenantName] = React.useState("");
+  const [tenantCpf, setTenantCpf] = React.useState("");
+  const [status, setStatus] = React.useState("all");
+  const [order, setOrder] = React.useState("date");
+  const [dateFrom, setDateFrom] = React.useState("");
+  const [dateTo, setDateTo] = React.useState("");
+  const [amountFrom, setAmountFrom] = React.useState("");
+  const [amountTo, setAmountTo] = React.useState("");
+  const [activeFilters, setActiveFilters] = React.useState({
+    property: "",
+    tenantName: "",
+    tenantCpf: "",
+    status: "all",
+    order: "date",
+    dateFrom: "",
+    dateTo: "",
+    amountFrom: "",
+    amountTo: "",
+  });
+
+  function handleSearch() {
+    setActiveFilters({
+      property,
+      tenantName,
+      tenantCpf,
+      status,
+      order,
+      dateFrom,
+      dateTo,
+      amountFrom,
+      amountTo,
+    });
+  }
+
+  function handleClear() {
+    setProperty("");
+    setTenantName("");
+    setTenantCpf("");
+    setStatus("all");
+    setOrder("date");
+    setDateFrom("");
+    setDateTo("");
+    setAmountFrom("");
+    setAmountTo("");
+    setActiveFilters({
+      property: "",
+      tenantName: "",
+      tenantCpf: "",
+      status: "all",
+      order: "date",
+      dateFrom: "",
+      dateTo: "",
+      amountFrom: "",
+      amountTo: "",
+    });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleSearch();
+  }
+
+  const filtered = MOCK_ROWS.filter((r) => {
+    if (activeFilters.property && !r.propertyId.includes(activeFilters.property)) return false;
+    if (activeFilters.status !== "all" && r.status !== activeFilters.status) return false;
+    return true;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (activeFilters.order === "amount") return b.amountCents - a.amountCents;
+    if (activeFilters.order === "status") return a.status.localeCompare(b.status);
+    return a.noticeAt.localeCompare(b.noticeAt);
+  });
+
+  return (
+    <div className="flex flex-col gap-6 px-4 py-4 lg:px-6">
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-col gap-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.property")}</Label>
+                <Input
+                  placeholder={t("filter.propertyPlaceholder")}
+                  value={property}
+                  onChange={(e) => setProperty(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.tenantName")}</Label>
+                <Input
+                  placeholder={t("filter.tenantNamePlaceholder")}
+                  value={tenantName}
+                  onChange={(e) => setTenantName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.tenantCpf")}</Label>
+                <Input
+                  placeholder="000.000.000-00"
+                  value={tenantCpf}
+                  onChange={(e) => setTenantCpf(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.status")}</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("filter.statusAll")}</SelectItem>
+                    <SelectItem value="pendencia_aberta">{t("status.pendencia_aberta")}</SelectItem>
+                    <SelectItem value="entregue">{t("status.entregue")}</SelectItem>
+                    <SelectItem value="cancelado">{t("status.cancelado")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.order")}</Label>
+                <Select value={order} onValueChange={setOrder}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">{t("filter.orderDate")}</SelectItem>
+                    <SelectItem value="amount">{t("filter.orderAmount")}</SelectItem>
+                    <SelectItem value="status">{t("filter.orderStatus")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.dateFrom")}</Label>
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.dateTo")}</Label>
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.amountFrom")}</Label>
+                <Input
+                  type="number"
+                  placeholder="R$ 0,00"
+                  value={amountFrom}
+                  onChange={(e) => setAmountFrom(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">{t("filter.amountTo")}</Label>
+                <Input
+                  type="number"
+                  placeholder="R$ 0,00"
+                  value={amountTo}
+                  onChange={(e) => setAmountTo(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={handleClear}>
+                {t("filter.clear")}
+              </Button>
+              <Button onClick={handleSearch} className="gap-2">
+                <SearchIcon className="size-4" strokeWidth={1.5} />
+                {t("filter.search")}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <div className="flex flex-col gap-3">
+        <h2 className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+          {t("table.heading")}
+        </h2>
+
+        <div className="border-border rounded border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("table.col.property")}</TableHead>
+                <TableHead>{t("table.col.status")}</TableHead>
+                <TableHead>{t("table.col.noticeAt")}</TableHead>
+                <TableHead className="text-right">{t("table.col.amount")}</TableHead>
+                <TableHead className="text-right">{t("table.col.updatedAmount")}</TableHead>
+                <TableHead className="text-center">{t("table.col.action")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sorted.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-muted-foreground py-10 text-center text-sm"
+                  >
+                    {t("table.empty")}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sorted.map((row) => (
+                  <TableRow key={`${row.propertyId}-${row.noticeAt}`}>
+                    <TableCell>
+                      <Mono className="text-sm font-medium">{row.propertyId}</Mono>
+                    </TableCell>
+                    <TableCell>
+                      <DelinquencyStatusTag status={row.status} label={t(`status.${row.status}`)} />
+                    </TableCell>
+                    <TableCell>
+                      <Mono className="text-muted-foreground text-sm">{row.noticeAt}</Mono>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Mono className="text-sm font-semibold">{formatBRL(row.amountCents)}</Mono>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Mono className="text-sm">{formatBRL(row.updatedAmountCents)}</Mono>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button variant="ghost" size="icon-sm" disabled aria-label={t("table.view")}>
+                        <EyeIcon className="size-4" strokeWidth={1.25} />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DelinquencyPageActions() {
+  const t = useTranslations("delinquencies");
+  return (
+    <>
+      <Button variant="outline" size="sm" disabled className="gap-2">
+        <FileTextIcon className="size-4" strokeWidth={1.25} />
+        {t("actions.report")}
+      </Button>
+      <Button variant="outline" size="sm" disabled className="gap-2">
+        <ReceiptTextIcon className="size-4" strokeWidth={1.25} />
+        {t("actions.statement")}
+      </Button>
+    </>
+  );
+}

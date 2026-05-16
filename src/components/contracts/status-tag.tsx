@@ -1,12 +1,14 @@
 import { cn } from "@/lib/utils";
 
-type Tone = "accent" | "success" | "error" | "neutral";
+type Tone = "accent" | "success" | "error" | "neutral" | "expiring" | "caution";
 
 const toneClass: Record<Tone, string> = {
   accent: "bg-accent",
   success: "bg-success",
   error: "bg-destructive",
   neutral: "bg-muted-foreground",
+  expiring: "bg-amber-500",
+  caution: "bg-orange-500",
 };
 
 export function StatusTag({
