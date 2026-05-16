@@ -578,8 +578,9 @@
       "cancelBlock": "Cancel"
     },
     "success": {
-      "heading": "Contract created!",
-      "message": "The contract has been registered successfully and is awaiting activation.",
+      "heading": "CONTRACT PROPOSAL CREATED",
+      "subtitle": "The proposal has been successfully sent and is awaiting activation by the tenant.",
+      "description": "The contract will be activated upon the tenant's acceptance of the terms and payment of the activation fee. The proposal has been sent to the tenant via email and WhatsApp.",
       "viewContract": "View contract",
       "createAnother": "Create another contract"
     },

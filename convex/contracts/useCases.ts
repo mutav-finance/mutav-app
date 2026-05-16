@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query, mutation } from "../_generated/server";
+import { internal } from "../_generated/api";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
 import { CONTRACT_STATUS } from "./domain";
@@ -322,6 +323,17 @@ export const create = mutation({
       at: new Date().toISOString(),
       username: "Sistema",
       message: "Contrato criado",
+    });
+
+    await ctx.scheduler.runAfter(0, internal.contracts.actions.sendProposalNotifications, {
+      publicId,
+      tenantName: args.tenant.fullName,
+      tenantEmail: args.tenant.email,
+      tenantPhone: args.tenant.phone,
+      propertyAddress: `${args.property.streetAndNumber} — ${args.property.cityUF}`,
+      rentCents: args.rentCents,
+      availableGuaranteeCents,
+      feeCents,
     });
 
     return { publicId };

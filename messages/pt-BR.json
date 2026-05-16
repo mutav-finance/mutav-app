@@ -577,8 +577,9 @@
       "cancelBlock": "Cancelar"
     },
     "success": {
-      "heading": "Contrato criado!",
-      "message": "O contrato foi registrado com sucesso e está aguardando ativação.",
+      "heading": "PROPOSTA DE CONTRATO CRIADA",
+      "subtitle": "A proposta foi enviada com sucesso e aguarda ativação pelo inquilino.",
+      "description": "O contrato será efetivado mediante o aceite dos termos e o pagamento da taxa de ativação pelo inquilino. A proposta foi enviada por e-mail e WhatsApp para o inquilino.",
       "viewContract": "Ver contrato",
       "createAnother": "Criar outro contrato"
     },
