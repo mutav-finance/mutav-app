@@ -165,9 +165,10 @@ function buildColumns(
 
 type Props = {
   defaultSort?: SortingState;
+  emptyStateCta?: string;
 };
 
-export function ContractListTable({ defaultSort }: Props) {
+export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
   const t = useTranslations("contractList");
   const tStatus = useTranslations("contractDetails.status");
 
@@ -347,7 +348,17 @@ export function ContractListTable({ defaultSort }: Props) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
-                    {t("noResults")}
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-muted-foreground text-sm">{t("noResults")}</span>
+                      {emptyStateCta && data.length === 0 && statusTab === "all" && (
+                        <Link
+                          href="/contracts/new"
+                          className="text-primary text-sm font-medium hover:underline"
+                        >
+                          {emptyStateCta} →
+                        </Link>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               )}

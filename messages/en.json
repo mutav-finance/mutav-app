@@ -340,6 +340,8 @@
       "placeholder": "Search by ID or tenant"
     },
     "columnsButton": "Columns",
+    "createButton": "Create contract",
+    "emptyStateCta": "Create your first contract",
     "noResults": "No contracts found",
     "loading": "Loading contracts…",
     "errors": {
@@ -468,6 +470,145 @@
     },
     "loading": {
       "label": "Loading invoice"
+    }
+  },
+  "contractNew": {
+    "meta": {
+      "title": "New Contract | Mutav"
+    },
+    "heading": "New Contract",
+    "subheading": "Fill in the details to create a new guarantee",
+    "stepLabel": "Step {current} of {total}",
+    "steps": {
+      "1": "Basic Details",
+      "2": "Simulation",
+      "3": "Additional Details",
+      "4": "Review",
+      "5": "Confirmation"
+    },
+    "step1": {
+      "entityTypeLabel": "Entity type",
+      "pf": "Individual",
+      "pj": "Company",
+      "cnpjPlaceholder": "00.000.000/0001-00"
+    },
+    "property": {
+      "heading": "Property Details",
+      "kindLabel": "Property type",
+      "residencial": "Residential",
+      "comercial": "Commercial",
+      "cep": "ZIP code",
+      "street": "Street",
+      "addressNumber": "Number",
+      "neighborhood": "Neighborhood",
+      "city": "City",
+      "uf": "State",
+      "complement": "Complement (optional)",
+      "lockedField": "Auto-filled"
+    },
+    "rent": {
+      "heading": "Values",
+      "rent": "Monthly rent",
+      "condo": "Condo fee",
+      "otherFees": "Other fees",
+      "total": "Total rent",
+      "placeholder": "0.00",
+      "prefix": "R$"
+    },
+    "tenant": {
+      "heading": "Tenant Details",
+      "fullName": "Full name",
+      "companyName": "Company name",
+      "cpf": "CPF",
+      "cpfPlaceholder": "000.000.000-00",
+      "cnpj": "CNPJ",
+      "birthDate": "Date of birth",
+      "email": "E-mail",
+      "phone": "Phone",
+      "scoreLoading": "Looking up score...",
+      "scoreBom": "Good",
+      "scoreRegular": "Regular",
+      "scoreRuim": "Poor",
+      "scoreNegado": "Denied",
+      "scoreLabel": "Credit score"
+    },
+    "simulation": {
+      "heading": "Simulation Result",
+      "scoreLabel": "Score",
+      "approvedValueLabel": "Approved rental value",
+      "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
+      "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
+      "closeButton": "Back to home"
+    },
+    "coverage": {
+      "heading": "Coverage Configuration",
+      "rentMultiplierLabel": "Define total coverage",
+      "exitCostLabel": "Define exit cost",
+      "coverageDesc": "{x} months of rent covered in case of default",
+      "exitDesc": "{x} times the rent in case of early termination",
+      "preview": {
+        "heading": "Estimated Values",
+        "fee": "Monthly fee",
+        "activationFee": "Activation fee",
+        "guarantee": "Available guarantee"
+      },
+      "summary": {
+        "heading": "Summary",
+        "exitCost": "Exit cost",
+        "fee": "Fee value",
+        "commission": "Commission (1.5%)",
+        "guarantee": "Guarantee value"
+      }
+    },
+    "complementary": {
+      "heading": "Additional Details",
+      "tenantSection": "Tenant Details",
+      "addressSection": "Property Address"
+    },
+    "review": {
+      "heading": "Review",
+      "propertySection": "Property Details",
+      "rentalSection": "Rental Details",
+      "tenantSection": "Tenant Details",
+      "planSection": "Plan Details",
+      "score": "Score",
+      "fee": "Monthly fee",
+      "activationFee": "Activation fee",
+      "guarantee": "Available guarantee",
+      "submit": "Create contract",
+      "submitting": "Creating...",
+      "missingFields": "Fill in all required fields before confirming.",
+      "errorToast": "Failed to create contract. Please try again.",
+      "editBlock": "Edit",
+      "saveBlock": "Save",
+      "cancelBlock": "Cancel"
+    },
+    "success": {
+      "heading": "CONTRACT PROPOSAL CREATED",
+      "subtitle": "The proposal has been successfully sent and is awaiting activation by the tenant.",
+      "description": "The contract will be activated upon the tenant's acceptance of the terms and payment of the activation fee. The proposal has been sent to the tenant via email and WhatsApp.",
+      "viewContract": "View contract",
+      "createAnother": "Create another contract"
+    },
+    "nav": {
+      "back": "Back",
+      "nextStep2": "Simulate credit",
+      "nextStep3": "Continue",
+      "nextStep4": "Review",
+      "nextStep5": "Create contract"
+    },
+    "validation": {
+      "required": "Required field",
+      "cpfInvalid": "Invalid CPF",
+      "cnpjInvalid": "Invalid CNPJ",
+      "cepInvalid": "ZIP must have 8 digits",
+      "rentRequired": "Rent must be greater than zero",
+      "scoreRequired": "Waiting for score result",
+      "birthDateFuture": "Date of birth cannot be in the future",
+      "birthDateInvalid": "Invalid date",
+      "emailInvalid": "Invalid e-mail",
+      "coverageRequired": "Select a coverage option",
+      "exitRequired": "Select an exit cost option"
     }
   },
   "paymentFlow": {
