@@ -456,29 +456,34 @@
       "copyShareLink": "Copiar link",
       "linkCopied": "Link copiado",
       "pay": {
-        "button": "Pagar",
-        "title": "Pagar fatura",
-        "description": "Escolha o ativo e siga as instruções. A fatura atualiza automaticamente quando o pagamento for confirmado.",
         "close": "Fechar",
-        "orderId": "Pedido",
-        "copyAddress": "Endereço Stellar",
-        "copySep7": "Link SEP-7",
-        "copyPixCode": "PIX copia e cola",
-        "tabs": {
-          "xlm": "XLM",
-          "usdc": "USDC",
-          "tesouro": "TESOURO"
+        "stellar": {
+          "button": "Pagar com Stellar",
+          "title": "Pagar com Stellar",
+          "description": "Você paga a partir da sua carteira Stellar. Escolha o ativo abaixo.",
+          "tabs": { "xlm": "XLM", "usdc": "USDC" },
+          "copyAddress": "Endereço Stellar",
+          "copySep7": "Link SEP-7",
+          "status": {
+            "preparing": "Preparando pagamento...",
+            "awaitingPayment": "Envie {amount} {asset} para o endereço abaixo a partir da sua carteira Stellar",
+            "completed": "Pago!"
+          },
+          "hint": "Use qualquer carteira Stellar (Freighter, Lobstr, xBull) para enviar {amount} {asset} ao endereço acima."
         },
-        "status": {
-          "preparing": "Preparando pagamento...",
-          "awaitingStellar": "Envie {amount} {asset} para o endereço abaixo a partir da sua carteira Stellar",
-          "awaitingPix": "Escaneie o QR ou copie o código no app do seu banco",
-          "processing": "Pagamento recebido, processando...",
-          "completed": "Pago!",
-          "failed": "Falha no pagamento"
-        },
-        "hint": {
-          "stellar": "Use qualquer carteira Stellar (Freighter, Lobstr, xBull) para enviar {amount} {asset} ao endereço acima."
+        "pix": {
+          "button": "Pagar com PIX",
+          "title": "Pagar com PIX",
+          "description": "Você paga a partir da sua conta bancária via PIX. Escaneie o QR ou copie o código no app do seu banco.",
+          "copyCode": "PIX copia e cola",
+          "orderId": "Pedido",
+          "status": {
+            "preparing": "Preparando pagamento...",
+            "awaitingPayment": "Escaneie o QR ou copie o código no app do seu banco",
+            "processing": "Pagamento recebido, processando...",
+            "completed": "Pago!",
+            "failed": "Falha no pagamento"
+          }
         }
       }
     },

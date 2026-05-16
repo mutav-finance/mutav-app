@@ -8,7 +8,7 @@ import { Mono } from "@/components/ui/mono";
 import { getPathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { PaymentButton } from "@/components/payments/payment-button";
+import { PixPaymentButton, StellarPaymentButton } from "@/components/payments/payment-button";
 import { isChargeable, type Payment } from "@convex/payments/domain";
 
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -52,14 +52,15 @@ function ChargeableActions({
   payment: Payment;
   variant: "primary" | "secondary";
 }) {
+  const stellarVariant = variant === "primary" ? "default" : "outline";
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <PaymentButton
-        paymentId={payment._id}
+      <StellarPaymentButton
         publicId={payment.publicId}
         totalCents={payment.totalCents}
-        variant={variant === "primary" ? "default" : "outline"}
+        variant={stellarVariant}
       />
+      <PixPaymentButton paymentId={payment._id} variant="outline" />
       <ShareTenantLink publicId={payment.publicId} />
     </div>
   );

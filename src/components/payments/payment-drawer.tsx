@@ -27,38 +27,31 @@ import { buildSep7PayUri } from "@/lib/stellar/sep7";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 
-type AssetTab = "XLM" | "USDC" | "TESOURO";
+type StellarAsset = "XLM" | "USDC";
 
-interface PaymentDrawerProps {
+// ─── Stellar drawer (user has funds on a Stellar wallet) ──────────────────────
+
+interface StellarPaymentDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  paymentId: Id<"payments">;
   publicId: string;
   totalCents: number;
 }
 
 /**
- * Unified payment drawer. Three tabs:
- *   - XLM: SEP-7 direct payment to the per-invoice muxed M-address; status
- *     resolves via the existing Horizon indexer flipping payment.state.
- *   - USDC: same SEP-7 flow with the USDC issuer.
- *   - TESOURO: SEP-6 anchor on-ramp; the QR + copy field render whatever
- *     the anchor returns (testanchor gives mock SEPA fields today, real
- *     BR Code via Etherfuse once that provider lands).
- *
- * One button, three flows, identical visual shape — so the UX doesn't
- * shift when an agency switches between paying directly with crypto and
- * paying via Pix.
+ * Drawer for users paying from a Stellar wallet (XLM or USDC). The asset
+ * tabs are an asset choice WITHIN the Stellar funding source, not a
+ * separate payment method. SEP-7 QR + copy fields + reactive status
+ * (driven by the existing Horizon indexer flipping payment.state).
  */
-export function PaymentDrawer({
+export function StellarPaymentDrawer({
   open,
   onOpenChange,
-  paymentId,
   publicId,
   totalCents,
-}: PaymentDrawerProps) {
-  const t = useTranslations("paymentDetails.methodCard.pay");
-  const [tab, setTab] = useState<AssetTab>("XLM");
+}: StellarPaymentDrawerProps) {
+  const t = useTranslations("paymentDetails.methodCard.pay.stellar");
+  const [tab, setTab] = useState<StellarAsset>("XLM");
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -70,11 +63,10 @@ export function PaymentDrawer({
           </DrawerHeader>
 
           <div className="px-4 pb-4">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as AssetTab)}>
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as StellarAsset)}>
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="XLM">{t("tabs.xlm")}</TabsTrigger>
                 <TabsTrigger value="USDC">{t("tabs.usdc")}</TabsTrigger>
-                <TabsTrigger value="TESOURO">{t("tabs.tesouro")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="XLM">
@@ -88,17 +80,13 @@ export function PaymentDrawer({
                   assetSymbol="USDC"
                 />
               </TabsContent>
-
-              <TabsContent value="TESOURO">
-                <AnchorOnrampPanel paymentId={paymentId} isActive={tab === "TESOURO"} />
-              </TabsContent>
             </Tabs>
           </div>
 
           <DrawerFooter>
             <DrawerClose asChild>
               <Button variant="outline" className="w-full">
-                {t("close")}
+                {useTranslations("paymentDetails.methodCard.pay")("close")}
               </Button>
             </DrawerClose>
           </DrawerFooter>
@@ -108,8 +96,6 @@ export function PaymentDrawer({
   );
 }
 
-// ─── Stellar direct (SEP-7) tab ───────────────────────────────────────────────
-
 function StellarDirectPanel({
   publicId,
   totalCents,
@@ -117,9 +103,9 @@ function StellarDirectPanel({
 }: {
   publicId: string;
   totalCents: number;
-  assetSymbol: "XLM" | "USDC";
+  assetSymbol: StellarAsset;
 }) {
-  const t = useTranslations("paymentDetails.methodCard.pay");
+  const t = useTranslations("paymentDetails.methodCard.pay.stellar");
   const locale = useLocale();
 
   const payment = useQuery(api.payments.useCases.getPublicByPublicId, { publicId });
@@ -152,90 +138,115 @@ function StellarDirectPanel({
     <div className="flex flex-col gap-4 pt-4">
       <StatusBanner
         icon={<Loader2 className="text-foreground size-4 animate-spin" strokeWidth={1.25} />}
-        text={t("status.awaitingStellar", { amount: sep7.amountDisplay, asset: assetSymbol })}
+        text={t("status.awaitingPayment", { amount: sep7.amountDisplay, asset: assetSymbol })}
       />
-
       <PaymentQrCode value={sep7.sep7Uri} />
-
       <CopyField label={t("copyAddress")} value={payment.muxedAddress!} />
       <CopyField label={t("copySep7")} value={sep7.sep7Uri} />
-
       <p className="text-muted-foreground text-center text-xs">
-        {t("hint.stellar", { amount: sep7.amountDisplay, asset: assetSymbol })}
+        {t("hint", { amount: sep7.amountDisplay, asset: assetSymbol })}
       </p>
     </div>
   );
 }
 
-// ─── Anchor on-ramp (SEP-6) tab — TESOURO label, testanchor under the hood ───
+// ─── Pix drawer (user has BRL in a bank account) ──────────────────────────────
 
-function AnchorOnrampPanel({
-  paymentId,
-  isActive,
-}: {
+interface PixPaymentDrawerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   paymentId: Id<"payments">;
-  isActive: boolean;
-}) {
-  const t = useTranslations("paymentDetails.methodCard.pay");
+}
+
+/**
+ * Drawer for users paying via PIX from their bank app. Runs the SEP-6
+ * anchor on-ramp (testanchor stages with SEPA-shaped mocks today;
+ * Etherfuse will deliver real BR Code via the same flow once added to
+ * the registry).
+ */
+export function PixPaymentDrawer({ open, onOpenChange, paymentId }: PixPaymentDrawerProps) {
+  const t = useTranslations("paymentDetails.methodCard.pay.pix");
+  const tShared = useTranslations("paymentDetails.methodCard.pay");
   const { phase, order, error, start, cancel, reset } = usePixOnramp({ paymentId });
 
-  // Auto-start once when the tab becomes active; tear down polling when it
-  // de-activates (user switched away or drawer closed).
   const startedRef = useRef(false);
   useEffect(() => {
-    if (isActive && !startedRef.current) {
+    if (open && !startedRef.current) {
       startedRef.current = true;
       void start();
     }
-    if (!isActive) {
+    if (!open) {
       startedRef.current = false;
       cancel();
       const id = setTimeout(reset, 300);
       return () => clearTimeout(id);
     }
-  }, [isActive, start, cancel, reset]);
+  }, [open, start, cancel, reset]);
 
-  if (phase === "completed") return <CompletedBlock message={t("status.completed")} />;
-  if (phase === "failed") return <FailedBlock message={error ?? t("status.failed")} />;
-  if (phase === "idle" || phase === "starting" || !order)
-    return <LoadingBlock message={t("status.preparing")} />;
-
-  const pix = parsePixInstructions(order.instructions);
+  const pix = parsePixInstructions(order?.instructions);
 
   return (
-    <div className="flex flex-col gap-4 pt-4">
-      <StatusBanner
-        icon={<Loader2 className="text-foreground size-4 animate-spin" strokeWidth={1.25} />}
-        text={phaseToText(t, phase)}
-      />
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <div className="mx-auto w-full max-w-lg">
+          <DrawerHeader>
+            <DrawerTitle>{t("title")}</DrawerTitle>
+            <DrawerDescription>{t("description")}</DrawerDescription>
+          </DrawerHeader>
 
-      <PaymentQrCode value={pix.qrPayload} />
+          <div className="px-4 pb-4">
+            {phase === "completed" ? (
+              <CompletedBlock message={t("status.completed")} />
+            ) : phase === "failed" ? (
+              <FailedBlock message={error ?? t("status.failed")} />
+            ) : phase === "idle" || phase === "starting" || !order ? (
+              <LoadingBlock message={t("status.preparing")} />
+            ) : (
+              <div className="flex flex-col gap-4 pt-2">
+                <StatusBanner
+                  icon={
+                    <Loader2 className="text-foreground size-4 animate-spin" strokeWidth={1.25} />
+                  }
+                  text={pixPhaseLabel(t, phase)}
+                />
+                <PaymentQrCode value={pix.qrPayload} />
+                {pix.copyValue && <CopyField label={t("copyCode")} value={pix.copyValue} />}
+                {pix.fields.length > 0 && (
+                  <dl className="border-border flex flex-col gap-2 border-t pt-3">
+                    {pix.fields.map((field) => (
+                      <div key={field.key} className="flex items-start justify-between gap-3">
+                        <dt className="text-muted-foreground text-xs">
+                          {field.description ?? field.key}
+                        </dt>
+                        <dd className="text-foreground max-w-[60%] text-right text-xs break-all">
+                          <Mono>{field.value}</Mono>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {order.how && <p className="text-muted-foreground text-xs italic">{order.how}</p>}
+                <p className="text-muted-foreground text-center font-mono text-[10px]">
+                  {t("orderId")}: {order._id.slice(-8)}
+                </p>
+              </div>
+            )}
+          </div>
 
-      {pix.copyValue && <CopyField label={t("copyPixCode")} value={pix.copyValue} />}
-
-      {pix.fields.length > 0 && (
-        <dl className="border-border flex flex-col gap-2 border-t pt-3">
-          {pix.fields.map((field) => (
-            <div key={field.key} className="flex items-start justify-between gap-3">
-              <dt className="text-muted-foreground text-xs">{field.description ?? field.key}</dt>
-              <dd className="text-foreground max-w-[60%] text-right text-xs break-all">
-                <Mono>{field.value}</Mono>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-
-      {order.how && <p className="text-muted-foreground text-xs italic">{order.how}</p>}
-
-      <p className="text-muted-foreground text-center font-mono text-[10px]">
-        {t("orderId")}: {order._id.slice(-8)}
-      </p>
-    </div>
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button variant="outline" className="w-full">
+                {tShared("close")}
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
-// ─── Shared shell pieces ──────────────────────────────────────────────────────
+// ─── Shared shell pieces (file-private) ───────────────────────────────────────
 
 function StatusBanner({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
@@ -333,14 +344,11 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ─── Pix instructions parser ──────────────────────────────────────────────────
+// ─── Pix instructions parsing (file-private) ──────────────────────────────────
 
 interface ParsedPixInstructions {
-  /** What the QR encodes. Real Pix anchors fill `pix_qr_code`; testanchor falls back to JSON of the whole instructions blob. */
   qrPayload: string;
-  /** Copia-e-cola payload, or null if none. */
   copyValue: string | null;
-  /** Remaining instruction fields as key/description/value triples. */
   fields: Array<{ key: string; value: string; description: string }>;
 }
 
@@ -375,10 +383,10 @@ function parsePixInstructions(
   return { qrPayload, copyValue, fields: remaining };
 }
 
-function phaseToText(t: ReturnType<typeof useTranslations>, phase: PixOnrampPhase): string {
+function pixPhaseLabel(t: ReturnType<typeof useTranslations>, phase: PixOnrampPhase): string {
   switch (phase) {
     case "awaiting_payment":
-      return t("status.awaitingPix");
+      return t("status.awaitingPayment");
     case "processing":
       return t("status.processing");
     default:

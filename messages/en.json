@@ -456,29 +456,34 @@
       "copyShareLink": "Copy link",
       "linkCopied": "Link copied",
       "pay": {
-        "button": "Pay",
-        "title": "Pay invoice",
-        "description": "Pick the asset and follow the instructions. The invoice updates automatically once the payment is confirmed.",
         "close": "Close",
-        "orderId": "Order",
-        "copyAddress": "Stellar address",
-        "copySep7": "SEP-7 link",
-        "copyPixCode": "PIX copy & paste",
-        "tabs": {
-          "xlm": "XLM",
-          "usdc": "USDC",
-          "tesouro": "TESOURO"
+        "stellar": {
+          "button": "Pay with Stellar",
+          "title": "Pay with Stellar",
+          "description": "You pay from your Stellar wallet. Pick the asset below.",
+          "tabs": { "xlm": "XLM", "usdc": "USDC" },
+          "copyAddress": "Stellar address",
+          "copySep7": "SEP-7 link",
+          "status": {
+            "preparing": "Preparing payment...",
+            "awaitingPayment": "Send {amount} {asset} to the address below from your Stellar wallet",
+            "completed": "Paid!"
+          },
+          "hint": "Use any Stellar wallet (Freighter, Lobstr, xBull) to send {amount} {asset} to the address above."
         },
-        "status": {
-          "preparing": "Preparing payment...",
-          "awaitingStellar": "Send {amount} {asset} to the address below from your Stellar wallet",
-          "awaitingPix": "Scan the QR or copy the code in your bank app",
-          "processing": "Payment received, processing...",
-          "completed": "Paid!",
-          "failed": "Payment failed"
-        },
-        "hint": {
-          "stellar": "Use any Stellar wallet (Freighter, Lobstr, xBull) to send {amount} {asset} to the address above."
+        "pix": {
+          "button": "Pay with PIX",
+          "title": "Pay with PIX",
+          "description": "You pay from your bank account via PIX. Scan the QR or copy the code in your bank app.",
+          "copyCode": "PIX copy & paste",
+          "orderId": "Order",
+          "status": {
+            "preparing": "Preparing payment...",
+            "awaitingPayment": "Scan the QR or copy the code in your bank app",
+            "processing": "Payment received, processing...",
+            "completed": "Paid!",
+            "failed": "Payment failed"
+          }
         }
       }
     },
