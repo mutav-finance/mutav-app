@@ -609,6 +609,8 @@
       "emailInvalid": "Invalid e-mail",
       "coverageRequired": "Select a coverage option",
       "exitRequired": "Select an exit cost option"
+    }
+  },
   "paymentFlow": {
     "meta": {
       "title": "Pay with Stellar — {publicId}",
