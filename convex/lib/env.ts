@@ -22,6 +22,8 @@ export function getWhatsAppApiUrl(): string | null {
 
 export function getWhatsAppApiKey(): string | null {
   return process.env.WHATSAPP_API_KEY ?? null;
+}
+
 /**
  * Dev-only fallback. Production must set `STELLAR_MUTAV_SOURCE_ACCOUNT`.
  * Generated once for the demo so muxed-address derivation works out of the
