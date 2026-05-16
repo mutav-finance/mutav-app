@@ -94,14 +94,21 @@ export function getCurrencyByCode(toml: StellarTomlRecord, code: string): TomlCu
 }
 
 /**
- * Checks if the anchor supports a specific SEP based on endpoint presence
+ * Checks if the anchor supports a specific SEP based on the fields its
+ * `stellar.toml` declares.
+ *
+ * SEP-10 requires BOTH `WEB_AUTH_ENDPOINT` and `SIGNING_KEY` — the endpoint
+ * issues the challenge transaction, but `WebAuth.readChallengeTx` needs the
+ * signing key to verify the server's signature. An anchor publishing only
+ * the endpoint is broken; returning `true` here would mislead callers into
+ * starting an auth flow that fails at the validation step.
  */
 export function supportsSep(toml: StellarTomlRecord, sep: 6 | 10 | 12 | 24 | 31 | 38): boolean {
   switch (sep) {
     case 6:
       return !!toml.TRANSFER_SERVER;
     case 10:
-      return !!toml.WEB_AUTH_ENDPOINT;
+      return !!toml.WEB_AUTH_ENDPOINT && !!toml.SIGNING_KEY;
     case 12:
       return !!toml.KYC_SERVER;
     case 24:
