@@ -17,6 +17,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Mono } from "@/components/ui/mono";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { usePixOnramp, type PixOnrampPhase } from "@/hooks/use-pix-onramp";
@@ -126,7 +127,7 @@ function StellarDirectPanel({
       : null;
 
   if (isPaid) return <CompletedBlock message={t("status.completed")} />;
-  if (!payment || !sep7) return <LoadingBlock message={t("status.preparing")} />;
+  if (!payment || !sep7) return <PaymentSkeleton message={t("status.preparing")} />;
 
   return (
     <div className="flex flex-col gap-3 pt-4">
@@ -183,7 +184,7 @@ export function PixPaymentDrawer({ open, onOpenChange, paymentId }: PixPaymentDr
             ) : phase === "failed" ? (
               <FailedBlock message={error ?? t("status.failed")} />
             ) : phase === "idle" || phase === "starting" || !order ? (
-              <LoadingBlock message={t("status.preparing")} />
+              <PaymentSkeleton message={t("status.preparing")} />
             ) : (
               <div className="flex flex-col gap-3">
                 {payment && <AmountHero brl={formatBRLCents(payment.totalCents)} />}
@@ -261,11 +262,32 @@ function AwaitingStatus({ message }: { message: string }) {
   );
 }
 
-function LoadingBlock({ message }: { message: string }) {
+/**
+ * Layout-matched skeleton — placeholders for each block in the loaded
+ * drawer (amount + QR + copy field) so the drawer doesn't visibly jump
+ * when the async data arrives. The status footer below the skeleton
+ * stays real (spinner + live status message) so the user knows
+ * something is happening rather than seeing a frozen placeholder.
+ */
+function PaymentSkeleton({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-12">
-      <Loader2 className="text-foreground size-12 animate-spin" strokeWidth={1.25} />
-      <p className="text-foreground text-sm font-medium">{message}</p>
+    <div className="flex flex-col gap-3 pt-4">
+      <div className="flex flex-col items-center gap-0.5 pb-1">
+        <Skeleton className="h-8 w-28" />
+      </div>
+      <div className="flex justify-center">
+        <div className="border-border bg-background inline-flex items-center justify-center border p-2">
+          <Skeleton className="size-[200px] rounded-none" />
+        </div>
+      </div>
+      <div className="border-border flex items-center gap-2 rounded-md border p-2">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Skeleton className="h-2.5 w-24" />
+          <Skeleton className="h-3 w-full" />
+        </div>
+        <Skeleton className="size-8" />
+      </div>
+      <AwaitingStatus message={message} />
     </div>
   );
 }
