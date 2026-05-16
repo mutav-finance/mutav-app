@@ -94,6 +94,7 @@ export default defineSchema({
   contracts: defineTable({
     agencyId: v.id("agencies"),
     publicId: v.string(),
+    tenantCpf: v.optional(v.string()),
     status: contractStatus,
     activatedAt: v.union(v.string(), v.null()),
     deactivatedAt: v.optional(v.union(v.string(), v.null())),
@@ -137,18 +138,21 @@ export default defineSchema({
 
     tenant: v.object({
       approvalStatus: tenantApprovalStatus,
+      entityType: v.optional(v.union(v.literal("pf"), v.literal("pj"))),
       fullName: v.string(),
       cpf: v.string(),
+      cnpj: v.optional(v.string()),
       birthDate: v.string(),
       email: v.string(),
       phone: v.string(),
       termApprovedAt: v.union(v.string(), v.null()),
-      score: v.number(),
+      score: v.optional(v.number()),
     }),
   })
     .index("by_publicId", ["publicId"])
     .index("by_status", ["status"])
-    .index("by_agency_status", ["agencyId", "status"]),
+    .index("by_agency_status", ["agencyId", "status"])
+    .index("by_agency_tenant_cpf", ["agencyId", "tenantCpf"]),
 
   contractHistory: defineTable({
     agencyId: v.id("agencies"),

@@ -2,211 +2,249 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useMutation } from "convex/react";
-import { toast } from "sonner";
-import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import { z } from "zod";
+import { LockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { useRouter } from "@/i18n/navigation";
-import { calcFeePreview, formatBRLCentsDisplay, type WizardData } from "@/lib/contracts/wizard";
-import type { RentMultiplier, ExitCostMultiplier } from "@/lib/contracts/wizard";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { type WizardData } from "@/lib/contracts/wizard";
 
 type Props = {
   data: WizardData;
-  agencyId: Id<"agencies">;
+  onChange: (patch: Partial<WizardData>) => void;
+  onNext: () => void;
   onBack: () => void;
 };
 
-export function WizardStep3({ data, agencyId, onBack }: Props) {
+type ErrorCode =
+  | "required"
+  | "emailInvalid"
+  | "birthDateInvalid"
+  | "birthDateFuture"
+  | "fullNameRequired";
+
+type Errors = Partial<Record<string, ErrorCode>>;
+
+export function WizardStep3({ data, onChange, onNext, onBack }: Props) {
   const t = useTranslations("contractNew");
-  const router = useRouter();
-  const createContract = useMutation(api.contracts.useCases.create);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [errors, setErrors] = React.useState<Errors>({});
+  const [nameFromLookup] = React.useState(!!data.fullName);
 
-  const preview =
-    data.rentCents > 0 &&
-    data.rentMultiplier &&
-    data.exitCostMultiplier &&
-    data.score !== null
-      ? calcFeePreview(
-          data.rentCents,
-          data.score,
-          data.rentMultiplier as RentMultiplier,
-          data.exitCostMultiplier as ExitCostMultiplier,
-        )
-      : null;
+  function resolveError(code: ErrorCode | undefined): string | undefined {
+    if (!code) return undefined;
+    switch (code) {
+      case "required":
+        return t("validation.required");
+      case "fullNameRequired":
+        return t("validation.required");
+      case "emailInvalid":
+        return t("validation.emailInvalid");
+      case "birthDateInvalid":
+        return t("validation.birthDateInvalid");
+      case "birthDateFuture":
+        return t("validation.birthDateFuture");
+    }
+  }
 
-  const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
+  const handleNext = () => {
+    const errs: Errors = {};
 
-  const handleSubmit = async () => {
-    if (
-      !data.propertyKind ||
-      !data.rentMultiplier ||
-      !data.exitCostMultiplier ||
-      data.score === null
-    ) {
+    if (!data.fullName.trim()) errs.fullName = "fullNameRequired";
+
+    if (data.entityType === "pf") {
+      if (!data.birthDate) {
+        errs.birthDate = "required";
+      } else if (isNaN(Date.parse(data.birthDate))) {
+        errs.birthDate = "birthDateInvalid";
+      } else if (new Date(data.birthDate) > new Date()) {
+        errs.birthDate = "birthDateFuture";
+      }
+    }
+
+    if (!z.string().email().safeParse(data.email).success) errs.email = "emailInvalid";
+    if (!data.phone.trim()) errs.phone = "required";
+    if (!data.cep.trim()) errs.cep = "required";
+    if (!data.street.trim()) errs.street = "required";
+    if (!data.addressNumber.trim()) errs.addressNumber = "required";
+    if (!data.neighborhood.trim()) errs.neighborhood = "required";
+    if (!data.city.trim()) errs.city = "required";
+    if (!data.uf.trim()) errs.uf = "required";
+
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
       return;
     }
-
-    setIsSubmitting(true);
-    try {
-      const result = await createContract({
-        agencyId,
-        property: {
-          cep: data.cep.replace(/\D/g, ""),
-          streetAndNumber: data.streetAndNumber,
-          neighborhood: data.neighborhood,
-          cityUF: data.cityUF,
-        },
-        optional: {
-          complement: data.complement,
-          tag: "",
-          description: "",
-        },
-        propertyKind: data.propertyKind,
-        rentCents: data.rentCents,
-        condoCents: data.condoCents,
-        otherFeesCents: data.otherFeesCents,
-        rentMultiplier: data.rentMultiplier as RentMultiplier,
-        exitCostMultiplier: data.exitCostMultiplier as ExitCostMultiplier,
-        tenant: {
-          fullName: data.fullName,
-          cpf: data.cpf,
-          birthDate: data.birthDate,
-          email: data.email,
-          phone: data.phone,
-          score: data.score,
-        },
-      });
-
-      router.push(`/contracts/${result.publicId}`);
-    } catch {
-      toast.error(t("review.errorToast"));
-      setIsSubmitting(false);
-    }
+    setErrors({});
+    onNext();
   };
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Tenant complementary data */}
       <section className="flex flex-col gap-4 rounded-lg border p-4 md:p-6">
-        <h2 className="text-base font-semibold">{t("review.heading")}</h2>
+        <h2 className="text-base font-semibold">{t("complementary.tenantSection")}</h2>
 
-        <ReviewGroup title={t("review.propertySection")}>
-          <ReviewRow
-            label={t("property.kindLabel")}
-            value={data.propertyKind === "residencial" ? t("property.residencial") : t("property.comercial")}
-          />
-          <ReviewRow label={t("property.cep")} value={data.cep} />
-          <ReviewRow label={t("property.streetAndNumber")} value={data.streetAndNumber} />
-          <ReviewRow label={t("property.neighborhood")} value={data.neighborhood} />
-          <ReviewRow label={t("property.cityUF")} value={data.cityUF} />
-          {data.complement && (
-            <ReviewRow label={t("property.complement")} value={data.complement} />
-          )}
-        </ReviewGroup>
-
-        <Separator />
-
-        <ReviewGroup title={t("review.rentSection")}>
-          <ReviewRow label={t("rent.rent")} value={formatBRLCentsDisplay(data.rentCents)} />
-          {data.condoCents > 0 && (
-            <ReviewRow label={t("rent.condo")} value={formatBRLCentsDisplay(data.condoCents)} />
-          )}
-          {data.otherFeesCents > 0 && (
-            <ReviewRow
-              label={t("rent.otherFees")}
-              value={formatBRLCentsDisplay(data.otherFeesCents)}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Name — locked when populated from CPF lookup, editable otherwise */}
+          {nameFromLookup ? (
+            <LockedField
+              label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
+              value={data.fullName}
+              className="sm:col-span-2"
             />
+          ) : (
+            <Field
+              label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
+              error={resolveError(errors.fullName)}
+              className="sm:col-span-2"
+            >
+              <Input
+                value={data.fullName}
+                onChange={(e) => onChange({ fullName: e.target.value })}
+              />
+            </Field>
           )}
-          <ReviewRow
-            label={t("rent.total")}
-            value={formatBRLCentsDisplay(totalRentCents)}
-            highlight
+
+          {/* CPF/CNPJ — locked */}
+          <LockedField
+            label={data.entityType === "pj" ? t("tenant.cnpj") : t("step1.cpfLabel")}
+            value={data.entityType === "pj" ? data.cnpj : data.cpf}
           />
-        </ReviewGroup>
 
-        <Separator />
-
-        <ReviewGroup title={t("review.tenantSection")}>
-          <ReviewRow label={t("tenant.fullName")} value={data.fullName} />
-          <ReviewRow label={t("tenant.cpf")} value={data.cpf} />
-          <ReviewRow label={t("tenant.birthDate")} value={data.birthDate} />
-          <ReviewRow label={t("tenant.email")} value={data.email} />
-          <ReviewRow label={t("tenant.phone")} value={data.phone} />
-          {data.score !== null && data.scoreTier !== null && (
-            <ReviewRow
-              label={t("review.score")}
-              value={`${data.score} (${data.scoreTier})`}
-            />
+          {data.entityType === "pf" && (
+            <Field label={t("tenant.birthDate")} error={resolveError(errors.birthDate)}>
+              <Input
+                type="date"
+                value={data.birthDate}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => onChange({ birthDate: e.target.value })}
+              />
+            </Field>
           )}
-        </ReviewGroup>
 
-        <Separator />
+          <Field label={t("tenant.email")} error={resolveError(errors.email)}>
+            <Input
+              type="email"
+              value={data.email}
+              onChange={(e) => onChange({ email: e.target.value })}
+            />
+          </Field>
 
-        <ReviewGroup title={t("review.coverageSection")}>
-          <ReviewRow label={t("coverage.rentMultiplierLabel")} value={data.rentMultiplier} />
-          <ReviewRow label={t("coverage.exitCostLabel")} value={data.exitCostMultiplier} />
-        </ReviewGroup>
+          <Field label={t("tenant.phone")} error={resolveError(errors.phone)}>
+            <Input value={data.phone} onChange={(e) => onChange({ phone: e.target.value })} />
+          </Field>
+        </div>
+      </section>
 
-        {preview && (
-          <>
-            <Separator />
-            <ReviewGroup title={t("review.valuesSection")}>
-              <ReviewRow
-                label={t("coverage.preview.fee")}
-                value={formatBRLCentsDisplay(preview.feeCents)}
+      {/* Property address */}
+      <section className="flex flex-col gap-4 rounded-lg border p-4 md:p-6">
+        <h2 className="text-base font-semibold">{t("complementary.addressSection")}</h2>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label={t("property.cep")} error={resolveError(errors.cep)}>
+            <Input
+              placeholder="00000-000"
+              maxLength={9}
+              value={data.cep}
+              onChange={(e) => onChange({ cep: e.target.value })}
+            />
+          </Field>
+
+          <div className="grid grid-cols-[1fr_auto] gap-3 sm:col-span-2">
+            <Field label={t("property.street")} error={resolveError(errors.street)}>
+              <Input value={data.street} onChange={(e) => onChange({ street: e.target.value })} />
+            </Field>
+            <Field
+              label={t("property.addressNumber")}
+              error={resolveError(errors.addressNumber)}
+              className="w-28"
+            >
+              <Input
+                value={data.addressNumber}
+                onChange={(e) => onChange({ addressNumber: e.target.value })}
               />
-              <ReviewRow
-                label={t("coverage.preview.activationFee")}
-                value={formatBRLCentsDisplay(preview.oneTimeActivationFeeCents)}
-              />
-              <ReviewRow
-                label={t("coverage.preview.guarantee")}
-                value={formatBRLCentsDisplay(preview.availableGuaranteeCents)}
-                highlight
-              />
-            </ReviewGroup>
-          </>
-        )}
+            </Field>
+          </div>
+
+          <Field label={t("property.neighborhood")} error={resolveError(errors.neighborhood)}>
+            <Input
+              value={data.neighborhood}
+              onChange={(e) => onChange({ neighborhood: e.target.value })}
+            />
+          </Field>
+
+          <Field label={t("property.complement")}>
+            <Input
+              value={data.complement}
+              onChange={(e) => onChange({ complement: e.target.value })}
+            />
+          </Field>
+
+          <Field label={t("property.city")} error={resolveError(errors.city)}>
+            <Input value={data.city} onChange={(e) => onChange({ city: e.target.value })} />
+          </Field>
+
+          <Field label={t("property.uf")} error={resolveError(errors.uf)}>
+            <Input
+              placeholder="SP"
+              maxLength={2}
+              className="uppercase"
+              value={data.uf}
+              onChange={(e) => onChange({ uf: e.target.value.toUpperCase() })}
+            />
+          </Field>
+        </div>
       </section>
 
       <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
+        <Button variant="outline" onClick={onBack}>
           {t("nav.back")}
         </Button>
-        <Button onClick={handleSubmit} disabled={isSubmitting}>
-          {isSubmitting ? t("review.submitting") : t("review.submit")}
-        </Button>
+        <Button onClick={handleNext}>{t("nav.nextStep4")}</Button>
       </div>
     </div>
   );
 }
 
-function ReviewGroup({ title, children }: { title: string; children: React.ReactNode }) {
+function LockedField({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-        {title}
-      </p>
-      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">{children}</div>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <div className="flex items-center gap-1.5">
+        <Label className="text-muted-foreground">{label}</Label>
+        <LockIcon className="text-muted-foreground/60 h-3 w-3" />
+      </div>
+      <div className="bg-muted/50 border-input text-muted-foreground rounded-md border px-3 py-2 font-mono text-sm">
+        {value}
+      </div>
     </div>
   );
 }
 
-function ReviewRow({
+function Field({
   label,
-  value,
-  highlight,
+  error,
+  children,
+  className,
 }: {
   label: string;
-  value: string;
-  highlight?: boolean;
+  error?: string;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 py-0.5">
-      <span className="text-muted-foreground text-sm">{label}</span>
-      <span className={highlight ? "font-mono font-semibold" : "text-sm"}>{value}</span>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <Label>{label}</Label>
+      {children}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }

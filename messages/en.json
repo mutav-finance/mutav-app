@@ -474,9 +474,17 @@
     "subheading": "Fill in the details to create a new guarantee",
     "stepLabel": "Step {current} of {total}",
     "steps": {
-      "1": "Property & Tenant",
-      "2": "Coverage",
-      "3": "Review"
+      "1": "Basic Details",
+      "2": "Simulation",
+      "3": "Additional Details",
+      "4": "Review",
+      "5": "Confirmation"
+    },
+    "step1": {
+      "entityTypeLabel": "Entity type",
+      "pf": "Individual",
+      "pj": "Company",
+      "cnpjPlaceholder": "00.000.000/0001-00"
     },
     "property": {
       "heading": "Property Details",
@@ -484,13 +492,16 @@
       "residencial": "Residential",
       "comercial": "Commercial",
       "cep": "ZIP code",
-      "streetAndNumber": "Street and number",
+      "street": "Street",
+      "addressNumber": "Number",
       "neighborhood": "Neighborhood",
-      "cityUF": "City / State",
-      "complement": "Complement (optional)"
+      "city": "City",
+      "uf": "State",
+      "complement": "Complement (optional)",
+      "lockedField": "Auto-filled"
     },
     "rent": {
-      "heading": "Rental Details",
+      "heading": "Values",
       "rent": "Monthly rent",
       "condo": "Condo fee",
       "otherFees": "Other fees",
@@ -501,8 +512,10 @@
     "tenant": {
       "heading": "Tenant Details",
       "fullName": "Full name",
+      "companyName": "Company name",
       "cpf": "CPF",
       "cpfPlaceholder": "000.000.000-00",
+      "cnpj": "CNPJ",
       "birthDate": "Date of birth",
       "email": "E-mail",
       "phone": "Phone",
@@ -510,12 +523,21 @@
       "scoreBom": "Good",
       "scoreRegular": "Regular",
       "scoreRuim": "Poor",
+      "scoreNegado": "Denied",
       "scoreLabel": "Credit score"
+    },
+    "simulation": {
+      "heading": "Simulation Result",
+      "scoreLabel": "Score",
+      "approvedValueLabel": "Approved rental value",
+      "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
+      "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
+      "closeButton": "Back to home"
     },
     "coverage": {
       "heading": "Coverage Configuration",
-      "rentMultiplierLabel": "Total coverage",
-      "exitCostLabel": "Exit cost",
+      "rentMultiplierLabel": "Define total coverage",
+      "exitCostLabel": "Define exit cost",
       "coverageDesc": "{x} months of rent covered in case of default",
       "exitDesc": "{x} times the rent in case of early termination",
       "preview": {
@@ -523,33 +545,58 @@
         "fee": "Monthly fee",
         "activationFee": "Activation fee",
         "guarantee": "Available guarantee"
+      },
+      "summary": {
+        "heading": "Summary",
+        "exitCost": "Exit cost",
+        "fee": "Fee value",
+        "commission": "Commission (1.5%)",
+        "guarantee": "Guarantee value"
       }
+    },
+    "complementary": {
+      "heading": "Additional Details",
+      "tenantSection": "Tenant Details",
+      "addressSection": "Property Address"
     },
     "review": {
       "heading": "Review",
-      "propertySection": "Property",
-      "rentSection": "Rent",
-      "tenantSection": "Tenant",
-      "coverageSection": "Coverage",
-      "valuesSection": "Calculated values",
+      "propertySection": "Property Details",
+      "rentalSection": "Rental Details",
+      "tenantSection": "Tenant Details",
+      "planSection": "Plan Details",
       "score": "Score",
       "fee": "Monthly fee",
       "activationFee": "Activation fee",
       "guarantee": "Available guarantee",
       "submit": "Create contract",
       "submitting": "Creating...",
-      "errorToast": "Failed to create contract. Please try again."
+      "missingFields": "Fill in all required fields before confirming.",
+      "errorToast": "Failed to create contract. Please try again.",
+      "editBlock": "Edit",
+      "saveBlock": "Save",
+      "cancelBlock": "Cancel"
+    },
+    "success": {
+      "heading": "Contract created!",
+      "message": "The contract has been registered successfully and is awaiting activation.",
+      "viewContract": "View contract",
+      "createAnother": "Create another contract"
     },
     "nav": {
       "back": "Back",
-      "nextStep2": "Configure coverage",
-      "nextStep3": "Review contract"
+      "nextStep2": "Simulate credit",
+      "nextStep3": "Continue",
+      "nextStep4": "Review",
+      "nextStep5": "Create contract"
     },
     "validation": {
       "required": "Required field",
       "cpfInvalid": "Invalid CPF",
+      "cnpjInvalid": "Invalid CNPJ",
       "cepInvalid": "ZIP must have 8 digits",
       "rentRequired": "Rent must be greater than zero",
+      "scoreRequired": "Waiting for score result",
       "birthDateFuture": "Date of birth cannot be in the future",
       "birthDateInvalid": "Invalid date",
       "emailInvalid": "Invalid e-mail",

@@ -1,19 +1,23 @@
-export type RentMultiplier = "20x" | "30x" | "40x";
+export type RentMultiplier = "24x" | "36x" | "48x";
 export type ExitCostMultiplier = "3x" | "5x" | "7x";
-export type ScoreTier = "bom" | "regular" | "ruim";
+export type ScoreTier = "bom" | "regular" | "ruim" | "negado";
 
 export type WizardData = {
+  entityType: "pf" | "pj" | "";
   propertyKind: "residencial" | "comercial" | "";
+  cpf: string;
+  cnpj: string;
   cep: string;
-  streetAndNumber: string;
+  street: string;
+  addressNumber: string;
   neighborhood: string;
-  cityUF: string;
+  city: string;
+  uf: string;
   complement: string;
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
   fullName: string;
-  cpf: string;
   birthDate: string;
   email: string;
   phone: string;
@@ -24,13 +28,16 @@ export type WizardData = {
 };
 
 export type WizardState = {
-  step: 1 | 2 | 3;
+  step: 1 | 2 | 3 | 4 | 5;
   data: WizardData;
+  publicId?: string;
 };
 
 export type WizardAction =
   | { type: "PATCH"; patch: Partial<WizardData> }
-  | { type: "GO_TO"; step: 1 | 2 | 3 };
+  | { type: "GO_TO"; step: 1 | 2 | 3 | 4 | 5 }
+  | { type: "COMPLETE"; publicId: string }
+  | { type: "RESET" };
 
 export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
@@ -38,21 +45,29 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       return { ...state, data: { ...state.data, ...action.patch } };
     case "GO_TO":
       return { ...state, step: action.step };
+    case "COMPLETE":
+      return { ...state, step: 5, publicId: action.publicId };
+    case "RESET":
+      return { step: 1, data: INITIAL_WIZARD_DATA };
   }
 }
 
 export const INITIAL_WIZARD_DATA: WizardData = {
+  entityType: "",
   propertyKind: "",
+  cpf: "",
+  cnpj: "",
   cep: "",
-  streetAndNumber: "",
+  street: "",
+  addressNumber: "",
   neighborhood: "",
-  cityUF: "",
+  city: "",
+  uf: "",
   complement: "",
   rentCents: 0,
   condoCents: 0,
   otherFeesCents: 0,
   fullName: "",
-  cpf: "",
   birthDate: "",
   email: "",
   phone: "",
@@ -62,9 +77,9 @@ export const INITIAL_WIZARD_DATA: WizardData = {
   exitCostMultiplier: "",
 };
 
-const COVERAGE_MULT: Record<RentMultiplier, number> = { "20x": 1.0, "30x": 1.35, "40x": 1.75 };
-const EXIT_MULT: Record<ExitCostMultiplier, number> = { "3x": 1.0, "5x": 1.25, "7x": 1.55 };
-const RENT_MULT_VALUE: Record<RentMultiplier, number> = { "20x": 20, "30x": 30, "40x": 40 };
+const COVERAGE_MULT: Record<RentMultiplier, number> = { "24x": 1.0, "36x": 1.05, "48x": 1.1 };
+const EXIT_MULT: Record<ExitCostMultiplier, number> = { "3x": 1.0, "5x": 1.02, "7x": 1.05 };
+const RENT_MULT_VALUE: Record<RentMultiplier, number> = { "24x": 24, "36x": 36, "48x": 48 };
 
 export function calcFeePreview(
   rentCents: number,
@@ -72,13 +87,13 @@ export function calcFeePreview(
   rentMultiplier: RentMultiplier,
   exitCostMultiplier: ExitCostMultiplier,
 ) {
-  const scoreFactor = score >= 700 ? 0.9 : score >= 500 ? 1.0 : 1.3;
+  const feeRate = score >= 800 ? 0.075 : score >= 600 ? 0.1 : 0.125;
   const feeCents = Math.round(
-    rentCents * 0.08 * COVERAGE_MULT[rentMultiplier] * EXIT_MULT[exitCostMultiplier] * scoreFactor,
+    rentCents * feeRate * COVERAGE_MULT[rentMultiplier] * EXIT_MULT[exitCostMultiplier],
   );
   return {
     feeCents,
-    oneTimeActivationFeeCents: feeCents * 2,
+    oneTimeActivationFeeCents: 15_000,
     availableGuaranteeCents: rentCents * RENT_MULT_VALUE[rentMultiplier],
   };
 }
@@ -106,4 +121,21 @@ export function isValidCPF(cpf: string): boolean {
   for (let i = 0; i < 10; i++) s2 += (d[i] ?? 0) * (11 - i);
   const c2 = s2 % 11 < 2 ? 0 : 11 - (s2 % 11);
   return c2 === d[10];
+}
+
+export function isValidCNPJ(cnpj: string): boolean {
+  const digits = cnpj.replace(/\D/g, "");
+  if (digits.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(digits)) return false;
+  const d = digits.split("").map(Number);
+  const weight1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const weight2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const sum1 = weight1.reduce((acc, w, i) => acc + (d[i] ?? 0) * w, 0);
+  const rem1 = sum1 % 11;
+  const c1 = rem1 < 2 ? 0 : 11 - rem1;
+  if (c1 !== d[12]) return false;
+  const sum2 = weight2.reduce((acc, w, i) => acc + (d[i] ?? 0) * w, 0);
+  const rem2 = sum2 % 11;
+  const c2 = rem2 < 2 ? 0 : 11 - rem2;
+  return c2 === d[13];
 }

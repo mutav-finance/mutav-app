@@ -1,0 +1,664 @@
+"use client";
+
+import * as React from "react";
+import { useTranslations } from "next-intl";
+import { useMutation } from "convex/react";
+import { toast } from "sonner";
+import { PencilIcon } from "lucide-react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import {
+  calcFeePreview,
+  formatBRLCentsDisplay,
+  parseBRLInput,
+  type WizardData,
+  type RentMultiplier,
+  type ExitCostMultiplier,
+} from "@/lib/contracts/wizard";
+
+type Props = {
+  data: WizardData;
+  agencyId: Id<"agencies">;
+  onChange: (patch: Partial<WizardData>) => void;
+  onComplete: (publicId: string) => void;
+  onBack: () => void;
+};
+
+type EditingBlock = "property" | "rental" | "tenant" | "plan" | null;
+
+type MissingFields = Set<string>;
+
+function getMissingFields(data: WizardData): MissingFields {
+  const missing = new Set<string>();
+  if (!data.propertyKind) missing.add("propertyKind");
+  if (!data.rentCents) missing.add("rentCents");
+  if (!data.rentMultiplier) missing.add("rentMultiplier");
+  if (!data.exitCostMultiplier) missing.add("exitCostMultiplier");
+  if (data.score === null) missing.add("score");
+  if (!data.fullName.trim()) missing.add("fullName");
+  if (data.entityType === "pf" && !data.birthDate) missing.add("birthDate");
+  if (!data.email.trim()) missing.add("email");
+  if (!data.phone.trim()) missing.add("phone");
+  if (!data.cep.trim()) missing.add("cep");
+  if (!data.street.trim()) missing.add("street");
+  if (!data.addressNumber.trim()) missing.add("addressNumber");
+  if (!data.neighborhood.trim()) missing.add("neighborhood");
+  if (!data.city.trim()) missing.add("city");
+  if (!data.uf.trim()) missing.add("uf");
+  return missing;
+}
+
+const RENT_MULTIPLIERS: RentMultiplier[] = ["24x", "36x", "48x"];
+const EXIT_MULTIPLIERS: ExitCostMultiplier[] = ["3x", "5x", "7x"];
+
+export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Props) {
+  const t = useTranslations("contractNew");
+  const createContract = useMutation(api.contracts.useCases.create);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [missing, setMissing] = React.useState<MissingFields>(new Set());
+  const [editingBlock, setEditingBlock] = React.useState<EditingBlock>(null);
+  const [draft, setDraft] = React.useState<Partial<WizardData>>({});
+
+  const preview =
+    data.rentCents > 0 && data.rentMultiplier && data.exitCostMultiplier && data.score !== null
+      ? calcFeePreview(
+          data.rentCents,
+          data.score,
+          data.rentMultiplier as RentMultiplier,
+          data.exitCostMultiplier as ExitCostMultiplier,
+        )
+      : null;
+
+  const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
+
+  function startEdit(block: EditingBlock) {
+    setEditingBlock(block);
+    setDraft({ ...data });
+  }
+
+  function saveEdit() {
+    onChange(draft);
+    setEditingBlock(null);
+    setDraft({});
+  }
+
+  function cancelEdit() {
+    setEditingBlock(null);
+    setDraft({});
+  }
+
+  const handleSubmit = async () => {
+    const missingFields = getMissingFields(data);
+    if (missingFields.size > 0) {
+      setMissing(missingFields);
+      toast.error(t("review.missingFields"));
+      return;
+    }
+    setMissing(new Set());
+
+    if (
+      !data.propertyKind ||
+      !data.rentMultiplier ||
+      !data.exitCostMultiplier ||
+      !data.entityType ||
+      data.score === null
+    )
+      return;
+
+    setIsSubmitting(true);
+    try {
+      const result = await createContract({
+        agencyId,
+        property: {
+          cep: data.cep.replace(/\D/g, ""),
+          streetAndNumber: `${data.street}, ${data.addressNumber}`,
+          neighborhood: data.neighborhood,
+          cityUF: `${data.city} / ${data.uf}`,
+        },
+        optional: { complement: data.complement, tag: "", description: "" },
+        propertyKind: data.propertyKind,
+        rentCents: data.rentCents,
+        condoCents: data.condoCents,
+        otherFeesCents: data.otherFeesCents,
+        rentMultiplier: data.rentMultiplier as RentMultiplier,
+        exitCostMultiplier: data.exitCostMultiplier as ExitCostMultiplier,
+        tenant: {
+          entityType: data.entityType,
+          fullName: data.fullName,
+          cpf: data.cpf.replace(/\D/g, ""),
+          cnpj: data.entityType === "pj" ? data.cnpj.replace(/\D/g, "") : undefined,
+          birthDate: data.birthDate,
+          email: data.email,
+          phone: data.phone,
+          score: data.score,
+        },
+      });
+      onComplete(result.publicId);
+    } catch {
+      toast.error(t("review.errorToast"));
+      setIsSubmitting(false);
+    }
+  };
+
+  const m = missing;
+  const isEditing = editingBlock !== null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="text-base font-semibold">{t("review.heading")}</h2>
+
+      {/* Bloco 1 — Dados do Imóvel */}
+      <Block
+        title={t("review.propertySection")}
+        onEdit={() => startEdit("property")}
+        editing={editingBlock === "property"}
+        disabled={isEditing && editingBlock !== "property"}
+        onSave={saveEdit}
+        onCancel={cancelEdit}
+      >
+        {editingBlock === "property" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <EditField label={t("property.kindLabel")} className="sm:col-span-2">
+              <div className="flex gap-2">
+                {(["residencial", "comercial"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setDraft((d) => ({ ...d, propertyKind: k }))}
+                    className={cn(
+                      "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                      draft.propertyKind === k
+                        ? "border-primary bg-primary/5 text-primary font-medium"
+                        : "border-input hover:bg-accent",
+                    )}
+                  >
+                    {k === "residencial" ? t("property.residencial") : t("property.comercial")}
+                  </button>
+                ))}
+              </div>
+            </EditField>
+            <EditField label={t("property.cep")}>
+              <Input
+                maxLength={9}
+                value={draft.cep ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, cep: e.target.value }))}
+              />
+            </EditField>
+            <EditField label={t("property.neighborhood")}>
+              <Input
+                value={draft.neighborhood ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, neighborhood: e.target.value }))}
+              />
+            </EditField>
+            <EditField label={t("property.street")} className="sm:col-span-2">
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <Input
+                  value={draft.street ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, street: e.target.value }))}
+                />
+                <Input
+                  className="w-24"
+                  value={draft.addressNumber ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, addressNumber: e.target.value }))}
+                  placeholder={t("property.addressNumber")}
+                />
+              </div>
+            </EditField>
+            <EditField label={t("property.city")}>
+              <Input
+                value={draft.city ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+              />
+            </EditField>
+            <EditField label={t("property.uf")}>
+              <Input
+                maxLength={2}
+                className="uppercase"
+                value={draft.uf ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, uf: e.target.value.toUpperCase() }))}
+              />
+            </EditField>
+            <EditField label={t("property.complement")} className="sm:col-span-2">
+              <Input
+                value={draft.complement ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, complement: e.target.value }))}
+              />
+            </EditField>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-0.5">
+            <ReviewRow
+              label={t("property.kindLabel")}
+              value={
+                data.propertyKind === "residencial"
+                  ? t("property.residencial")
+                  : data.propertyKind === "comercial"
+                    ? t("property.comercial")
+                    : ""
+              }
+              missing={m.has("propertyKind")}
+            />
+            <ReviewRow label={t("property.cep")} value={data.cep} mono missing={m.has("cep")} />
+            <ReviewRow
+              label={t("property.street")}
+              value={data.street}
+              missing={m.has("street")}
+              className="col-span-2"
+            />
+            <ReviewRow
+              label={t("property.addressNumber")}
+              value={data.addressNumber}
+              missing={m.has("addressNumber")}
+            />
+            <ReviewRow
+              label={t("property.neighborhood")}
+              value={data.neighborhood}
+              missing={m.has("neighborhood")}
+            />
+            <ReviewRow label={t("property.city")} value={data.city} missing={m.has("city")} />
+            <ReviewRow label={t("property.uf")} value={data.uf} missing={m.has("uf")} />
+            {data.complement && (
+              <ReviewRow
+                label={t("property.complement")}
+                value={data.complement}
+                className="col-span-2"
+              />
+            )}
+          </div>
+        )}
+      </Block>
+
+      {/* Bloco 2 — Dados de Locação */}
+      <Block
+        title={t("review.rentalSection")}
+        onEdit={() => startEdit("rental")}
+        editing={editingBlock === "rental"}
+        disabled={isEditing && editingBlock !== "rental"}
+        onSave={saveEdit}
+        onCancel={cancelEdit}
+      >
+        {editingBlock === "rental" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <EditField label={t("rent.rent")}>
+              <Input
+                placeholder="R$ 0,00"
+                defaultValue={
+                  data.rentCents ? (data.rentCents / 100).toFixed(2).replace(".", ",") : ""
+                }
+                onBlur={(e) =>
+                  setDraft((d) => ({ ...d, rentCents: parseBRLInput(e.target.value) }))
+                }
+              />
+            </EditField>
+            <EditField label={t("rent.condo")}>
+              <Input
+                placeholder="R$ 0,00"
+                defaultValue={
+                  data.condoCents ? (data.condoCents / 100).toFixed(2).replace(".", ",") : ""
+                }
+                onBlur={(e) =>
+                  setDraft((d) => ({ ...d, condoCents: parseBRLInput(e.target.value) }))
+                }
+              />
+            </EditField>
+            <EditField label={t("rent.otherFees")}>
+              <Input
+                placeholder="R$ 0,00"
+                defaultValue={
+                  data.otherFeesCents
+                    ? (data.otherFeesCents / 100).toFixed(2).replace(".", ",")
+                    : ""
+                }
+                onBlur={(e) =>
+                  setDraft((d) => ({ ...d, otherFeesCents: parseBRLInput(e.target.value) }))
+                }
+              />
+            </EditField>
+          </div>
+        ) : (
+          <div className="flex gap-8">
+            <div className="flex flex-1 flex-col gap-0.5">
+              <ReviewRow
+                label={t("rent.rent")}
+                value={formatBRLCentsDisplay(data.rentCents)}
+                mono
+                missing={m.has("rentCents")}
+              />
+              {data.otherFeesCents > 0 && (
+                <ReviewRow
+                  label={t("rent.otherFees")}
+                  value={formatBRLCentsDisplay(data.otherFeesCents)}
+                  mono
+                />
+              )}
+            </div>
+            <div className="flex flex-1 flex-col gap-0.5">
+              {data.condoCents > 0 && (
+                <ReviewRow
+                  label={t("rent.condo")}
+                  value={formatBRLCentsDisplay(data.condoCents)}
+                  mono
+                />
+              )}
+              <ReviewRow
+                label={t("rent.total")}
+                value={formatBRLCentsDisplay(totalRentCents)}
+                mono
+                highlight
+              />
+            </div>
+          </div>
+        )}
+      </Block>
+
+      {/* Bloco 3 — Dados do Inquilino */}
+      <Block
+        title={t("review.tenantSection")}
+        onEdit={() => startEdit("tenant")}
+        editing={editingBlock === "tenant"}
+        disabled={isEditing && editingBlock !== "tenant"}
+        onSave={saveEdit}
+        onCancel={cancelEdit}
+      >
+        {editingBlock === "tenant" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <LockedDisplay
+              label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
+              value={data.fullName}
+              className="sm:col-span-2"
+            />
+            <LockedDisplay
+              label={data.entityType === "pj" ? t("tenant.cnpj") : t("tenant.cpf")}
+              value={data.entityType === "pj" ? data.cnpj : data.cpf}
+            />
+            {data.entityType === "pf" && (
+              <EditField label={t("tenant.birthDate")}>
+                <Input
+                  type="date"
+                  value={draft.birthDate ?? ""}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDraft((d) => ({ ...d, birthDate: e.target.value }))}
+                />
+              </EditField>
+            )}
+            <EditField label={t("tenant.email")}>
+              <Input
+                type="email"
+                value={draft.email ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+              />
+            </EditField>
+            <EditField label={t("tenant.phone")}>
+              <Input
+                value={draft.phone ?? ""}
+                onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+              />
+            </EditField>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-0.5">
+            <ReviewRow
+              label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
+              value={data.fullName}
+              missing={m.has("fullName")}
+              className="col-span-2"
+            />
+            {data.entityType === "pf" && (
+              <ReviewRow label={t("tenant.cpf")} value={data.cpf} mono />
+            )}
+            {data.entityType === "pj" && (
+              <ReviewRow label={t("tenant.cnpj")} value={data.cnpj} mono />
+            )}
+            {data.entityType === "pf" && (
+              <ReviewRow
+                label={t("tenant.birthDate")}
+                value={data.birthDate}
+                mono
+                missing={m.has("birthDate")}
+              />
+            )}
+            <ReviewRow label={t("tenant.email")} value={data.email} missing={m.has("email")} />
+            <ReviewRow label={t("tenant.phone")} value={data.phone} mono missing={m.has("phone")} />
+            {data.score !== null && data.scoreTier !== null && (
+              <ReviewRow
+                label={t("review.score")}
+                value={`${data.score} (${data.scoreTier})`}
+                mono
+              />
+            )}
+          </div>
+        )}
+      </Block>
+
+      {/* Bloco 4 — Dados do Plano */}
+      <Block
+        title={t("review.planSection")}
+        onEdit={() => startEdit("plan")}
+        editing={editingBlock === "plan"}
+        disabled={isEditing && editingBlock !== "plan"}
+        onSave={saveEdit}
+        onCancel={cancelEdit}
+      >
+        {editingBlock === "plan" ? (
+          <div className="flex flex-col gap-4">
+            <EditField label={t("coverage.rentMultiplierLabel")}>
+              <div className="flex gap-2">
+                {RENT_MULTIPLIERS.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setDraft((d) => ({ ...d, rentMultiplier: v }))}
+                    className={cn(
+                      "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                      draft.rentMultiplier === v
+                        ? "border-primary bg-primary/5 text-primary font-medium"
+                        : "border-input hover:bg-accent",
+                    )}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </EditField>
+            <EditField label={t("coverage.exitCostLabel")}>
+              <div className="flex gap-2">
+                {EXIT_MULTIPLIERS.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setDraft((d) => ({ ...d, exitCostMultiplier: v }))}
+                    className={cn(
+                      "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                      draft.exitCostMultiplier === v
+                        ? "border-primary bg-primary/5 text-primary font-medium"
+                        : "border-input hover:bg-accent",
+                    )}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </EditField>
+          </div>
+        ) : (
+          <div className="flex gap-8">
+            <div className="flex flex-1 flex-col gap-0.5">
+              <ReviewRow
+                label={t("coverage.rentMultiplierLabel")}
+                value={data.rentMultiplier}
+                mono
+                missing={m.has("rentMultiplier")}
+              />
+              <ReviewRow
+                label={t("coverage.exitCostLabel")}
+                value={data.exitCostMultiplier}
+                mono
+                missing={m.has("exitCostMultiplier")}
+              />
+            </div>
+            {preview && (
+              <div className="flex flex-1 flex-col gap-0.5">
+                <ReviewRow
+                  label={t("coverage.preview.fee")}
+                  value={formatBRLCentsDisplay(preview.feeCents)}
+                  mono
+                />
+                <ReviewRow
+                  label={t("coverage.preview.activationFee")}
+                  value={formatBRLCentsDisplay(preview.oneTimeActivationFeeCents)}
+                  mono
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </Block>
+
+      {preview && (
+        <div className="bg-surface-2 flex items-center justify-between px-4 py-3">
+          <span className="text-muted-foreground text-base">{t("coverage.summary.guarantee")}</span>
+          <span className="font-mono text-base font-semibold">
+            {formatBRLCentsDisplay(Math.round(preview.feeCents * 1.015))}
+          </span>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-1">
+        <Button variant="outline" onClick={onBack} disabled={isSubmitting || isEditing}>
+          {t("nav.back")}
+        </Button>
+        <Button onClick={handleSubmit} disabled={isSubmitting || isEditing}>
+          {isSubmitting ? t("review.submitting") : t("review.submit")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function Block({
+  title,
+  children,
+  onEdit,
+  onSave,
+  onCancel,
+  editing,
+  disabled,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  editing: boolean;
+  disabled: boolean;
+}) {
+  const t = useTranslations("contractNew");
+  return (
+    <section
+      className={cn(
+        "flex flex-col gap-2 rounded-lg border p-4 transition-opacity",
+        disabled && "pointer-events-none opacity-40",
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+          {title}
+        </p>
+        {!editing && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+          >
+            <PencilIcon className="h-3 w-3" />
+            {t("review.editBlock")}
+          </button>
+        )}
+      </div>
+      {children}
+      {editing && (
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={onCancel}>
+            {t("nav.back")}
+          </Button>
+          <Button size="sm" onClick={onSave}>
+            {t("review.saveBlock")}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ReviewRow({
+  label,
+  value,
+  highlight,
+  mono,
+  missing,
+  large,
+  className,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+  mono?: boolean;
+  missing?: boolean;
+  large?: boolean;
+  className?: string;
+}) {
+  const t = useTranslations("contractNew");
+  const size = large ? "text-base" : "text-sm";
+  return (
+    <div className={cn("flex items-baseline gap-1.5 py-0.5", className)}>
+      <span className={cn("text-muted-foreground shrink-0", size)}>{label}:</span>
+      {missing ? (
+        <span className="text-destructive text-sm font-medium">{t("validation.required")}</span>
+      ) : (
+        <span className={cn(size, mono && "font-mono", highlight && "font-semibold")}>
+          {value || "—"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function EditField({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function LockedDisplay({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <Label className="text-muted-foreground">{label}</Label>
+      <div className="bg-muted/50 border-input text-muted-foreground rounded-md border px-3 py-2 font-mono text-sm">
+        {value}
+      </div>
+    </div>
+  );
+}

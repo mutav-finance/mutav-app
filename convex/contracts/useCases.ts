@@ -5,20 +5,20 @@ import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
 import { CONTRACT_STATUS } from "./domain";
 
-const COVERAGE_MULT: { "20x": number; "30x": number; "40x": number } = {
-  "20x": 1.0,
-  "30x": 1.35,
-  "40x": 1.75,
+const COVERAGE_MULT: { "24x": number; "36x": number; "48x": number } = {
+  "24x": 1.0,
+  "36x": 1.05,
+  "48x": 1.1,
 };
 const EXIT_MULT: { "3x": number; "5x": number; "7x": number } = {
   "3x": 1.0,
-  "5x": 1.25,
-  "7x": 1.55,
+  "5x": 1.02,
+  "7x": 1.05,
 };
-const RENT_MULT_VALUE: { "20x": number; "30x": number; "40x": number } = {
-  "20x": 20,
-  "30x": 30,
-  "40x": 40,
+const RENT_MULT_VALUE: { "24x": number; "36x": number; "48x": number } = {
+  "24x": 24,
+  "36x": 36,
+  "48x": 48,
 };
 
 function generatePublicId(): string {
@@ -195,13 +195,26 @@ export const countByMonth = query({
   },
 });
 
-/** Mock credit score lookup — CPF → deterministic score + tier. */
+/** Lookup tenant name by CPF from existing contracts in this agency. */
+export const lookupTenantByCpf = query({
+  args: { agencyId: v.id("agencies"), cpf: v.string() },
+  handler: async (ctx, { agencyId, cpf }) => {
+    const contract = await ctx.db
+      .query("contracts")
+      .withIndex("by_agency_tenant_cpf", (q) => q.eq("agencyId", agencyId).eq("tenantCpf", cpf))
+      .first();
+    if (!contract) return null;
+    return { fullName: contract.tenant.fullName, email: contract.tenant.email };
+  },
+});
+
+/** Mock credit score lookup — CPF or CNPJ → deterministic score + tier. */
 export const lookupTenantScore = query({
-  args: { cpf: v.string() },
-  handler: async (_ctx, { cpf }) => {
-    const digits = cpf.replace(/\D/g, "");
+  args: { document: v.string() },
+  handler: async (_ctx, { document }) => {
+    const digits = document.replace(/\D/g, "");
     const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
-    const tier = score >= 700 ? "bom" : score >= 500 ? "regular" : "ruim";
+    const tier = score >= 800 ? "bom" : score >= 600 ? "regular" : score >= 400 ? "ruim" : "negado";
     return { score, tier } as const;
   },
 });
@@ -225,11 +238,13 @@ export const create = mutation({
     rentCents: v.number(),
     condoCents: v.number(),
     otherFeesCents: v.number(),
-    rentMultiplier: v.union(v.literal("20x"), v.literal("30x"), v.literal("40x")),
+    rentMultiplier: v.union(v.literal("24x"), v.literal("36x"), v.literal("48x")),
     exitCostMultiplier: v.union(v.literal("3x"), v.literal("5x"), v.literal("7x")),
     tenant: v.object({
+      entityType: v.union(v.literal("pf"), v.literal("pj")),
       fullName: v.string(),
       cpf: v.string(),
+      cnpj: v.optional(v.string()),
       birthDate: v.string(),
       email: v.string(),
       phone: v.string(),
@@ -238,31 +253,26 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const totalRentCents = args.rentCents + args.condoCents + args.otherFeesCents;
-    const scoreFactor =
-      args.tenant.score >= 700 ? 0.9 : args.tenant.score >= 500 ? 1.0 : 1.3;
+    const feeRate = args.tenant.score >= 800 ? 0.075 : args.tenant.score >= 600 ? 0.1 : 0.125;
     const feeCents = Math.round(
       args.rentCents *
-        0.08 *
+        feeRate *
         COVERAGE_MULT[args.rentMultiplier] *
-        EXIT_MULT[args.exitCostMultiplier] *
-        scoreFactor,
+        EXIT_MULT[args.exitCostMultiplier],
     );
-    const oneTimeActivationFeeCents = feeCents * 2;
+    const oneTimeActivationFeeCents = 15_000;
     const availableGuaranteeCents = args.rentCents * RENT_MULT_VALUE[args.rentMultiplier];
 
     const publicId = generatePublicId();
     const today = new Date();
-    const nextRenewalDate = new Date(
-      today.getFullYear() + 1,
-      today.getMonth(),
-      today.getDate(),
-    )
+    const nextRenewalDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate())
       .toISOString()
       .slice(0, 10);
 
     const contractId = await ctx.db.insert("contracts", {
       agencyId: args.agencyId,
       publicId,
+      tenantCpf: args.tenant.cpf,
       status: "pendente",
       activatedAt: null,
       nextRenewalDate,
@@ -290,8 +300,10 @@ export const create = mutation({
       ],
       tenant: {
         approvalStatus: "pendente",
+        entityType: args.tenant.entityType,
         fullName: args.tenant.fullName,
         cpf: args.tenant.cpf,
+        cnpj: args.tenant.cnpj,
         birthDate: args.tenant.birthDate,
         email: args.tenant.email,
         phone: args.tenant.phone,

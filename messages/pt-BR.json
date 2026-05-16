@@ -473,9 +473,17 @@
     "subheading": "Preencha os dados para criar uma nova garantia",
     "stepLabel": "Passo {current} de {total}",
     "steps": {
-      "1": "Imóvel e Inquilino",
-      "2": "Cobertura",
-      "3": "Revisão"
+      "1": "Dados Básicos",
+      "2": "Simulação",
+      "3": "Dados Complementares",
+      "4": "Revisão",
+      "5": "Confirmação"
+    },
+    "step1": {
+      "entityTypeLabel": "Tipo de pessoa",
+      "pf": "Pessoa Física",
+      "pj": "Pessoa Jurídica",
+      "cnpjPlaceholder": "00.000.000/0001-00"
     },
     "property": {
       "heading": "Dados do Imóvel",
@@ -483,25 +491,30 @@
       "residencial": "Residencial",
       "comercial": "Comercial",
       "cep": "CEP",
-      "streetAndNumber": "Endereço e número",
+      "street": "Endereço",
+      "addressNumber": "Número",
       "neighborhood": "Bairro",
-      "cityUF": "Cidade / UF",
-      "complement": "Complemento (opcional)"
+      "city": "Cidade",
+      "uf": "UF",
+      "complement": "Complemento (opcional)",
+      "lockedField": "Preenchido automaticamente"
     },
     "rent": {
-      "heading": "Dados do Aluguel",
+      "heading": "Valores",
       "rent": "Aluguel mensal",
       "condo": "Condomínio",
       "otherFees": "Outras taxas",
-      "total": "Total locatício",
+      "total": "Total",
       "placeholder": "0,00",
       "prefix": "R$"
     },
     "tenant": {
       "heading": "Dados do Inquilino",
       "fullName": "Nome completo",
+      "companyName": "Razão social",
       "cpf": "CPF",
       "cpfPlaceholder": "000.000.000-00",
+      "cnpj": "CNPJ",
       "birthDate": "Data de nascimento",
       "email": "E-mail",
       "phone": "Telefone",
@@ -509,12 +522,21 @@
       "scoreBom": "Bom",
       "scoreRegular": "Regular",
       "scoreRuim": "Ruim",
+      "scoreNegado": "Negado",
       "scoreLabel": "Score de crédito"
+    },
+    "simulation": {
+      "heading": "Resultado da Simulação",
+      "scoreLabel": "Score",
+      "approvedValueLabel": "Valor locatício aprovado",
+      "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
+      "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
+      "closeButton": "Voltar ao início"
     },
     "coverage": {
       "heading": "Configuração de Cobertura",
-      "rentMultiplierLabel": "Cobertura total",
-      "exitCostLabel": "Custo de saída",
+      "rentMultiplierLabel": "Defina a cobertura total",
+      "exitCostLabel": "Defina o custo de saída",
       "coverageDesc": "{x} meses de aluguel cobertos em caso de inadimplência",
       "exitDesc": "{x} vezes o aluguel em caso de rescisão",
       "preview": {
@@ -522,33 +544,58 @@
         "fee": "Taxa mensal",
         "activationFee": "Taxa de ativação",
         "guarantee": "Garantia disponível"
+      },
+      "summary": {
+        "heading": "Resumo",
+        "exitCost": "Custo de saída",
+        "fee": "Valor da taxa",
+        "commission": "Comissão (1,5%)",
+        "guarantee": "Valor da garantia"
       }
+    },
+    "complementary": {
+      "heading": "Dados Complementares",
+      "tenantSection": "Dados do Inquilino",
+      "addressSection": "Endereço do Imóvel"
     },
     "review": {
       "heading": "Revisão",
-      "propertySection": "Imóvel",
-      "rentSection": "Aluguel",
-      "tenantSection": "Inquilino",
-      "coverageSection": "Cobertura",
-      "valuesSection": "Valores calculados",
+      "propertySection": "Dados do Imóvel",
+      "rentalSection": "Dados de Locação",
+      "tenantSection": "Dados do Inquilino",
+      "planSection": "Dados do Plano",
       "score": "Score",
       "fee": "Taxa mensal",
       "activationFee": "Taxa de ativação",
       "guarantee": "Garantia disponível",
       "submit": "Criar contrato",
       "submitting": "Criando...",
-      "errorToast": "Erro ao criar contrato. Tente novamente."
+      "errorToast": "Erro ao criar contrato. Tente novamente.",
+      "missingFields": "Preencha todos os campos obrigatórios antes de confirmar.",
+      "editBlock": "Editar dados",
+      "saveBlock": "Salvar",
+      "cancelBlock": "Cancelar"
+    },
+    "success": {
+      "heading": "Contrato criado!",
+      "message": "O contrato foi registrado com sucesso e está aguardando ativação.",
+      "viewContract": "Ver contrato",
+      "createAnother": "Criar outro contrato"
     },
     "nav": {
       "back": "Voltar",
-      "nextStep2": "Configurar cobertura",
-      "nextStep3": "Revisar contrato"
+      "nextStep2": "Simular crédito",
+      "nextStep3": "Continuar",
+      "nextStep4": "Confirmar",
+      "nextStep5": "Criar contrato"
     },
     "validation": {
       "required": "Campo obrigatório",
       "cpfInvalid": "CPF inválido",
+      "cnpjInvalid": "CNPJ inválido",
       "cepInvalid": "CEP deve ter 8 dígitos",
       "rentRequired": "Aluguel deve ser maior que zero",
+      "scoreRequired": "Aguarde o resultado do score",
       "birthDateFuture": "Data de nascimento não pode ser futura",
       "birthDateInvalid": "Data inválida",
       "emailInvalid": "E-mail inválido",
