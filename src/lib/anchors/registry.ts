@@ -28,11 +28,21 @@ import { createTestAnchorClient } from "./testanchor/client";
 export const ANCHOR_PROVIDER_NAMES = ["testanchor"] as const;
 export type AnchorProviderName = (typeof ANCHOR_PROVIDER_NAMES)[number];
 
+export type StellarNetwork = "testnet" | "pubnet";
+
+/** Canonical network passphrases per https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0001.md#NETWORK_PASSPHRASE */
+export const STELLAR_NETWORK_PASSPHRASES: Record<StellarNetwork, string> = {
+  testnet: "Test SDF Network ; September 2015",
+  pubnet: "Public Global Stellar Network ; September 2015",
+};
+
 export interface AnchorProviderEntry {
   readonly name: AnchorProviderName;
   readonly displayName: string;
   readonly description: string;
   readonly sandbox: boolean;
+  /** The Stellar network this provider operates on. Used to guard against pubnet/testnet passphrase mismatches at discovery time. */
+  readonly network: StellarNetwork;
 }
 
 const REGISTRY: Record<AnchorProviderName, AnchorProviderEntry> = {
@@ -42,6 +52,7 @@ const REGISTRY: Record<AnchorProviderName, AnchorProviderEntry> = {
     description:
       "SDF-operated testnet anchor at testanchor.stellar.org. Use for development and smoke tests, never for real funds.",
     sandbox: true,
+    network: "testnet",
   },
 };
 
