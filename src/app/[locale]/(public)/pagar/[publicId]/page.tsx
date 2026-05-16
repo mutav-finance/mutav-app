@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
 import { getTranslations } from "next-intl/server";
-import { Banknote, Coins } from "lucide-react";
+import { Banknote, Coins, FlaskConical } from "lucide-react";
 
 import { api } from "@convex/_generated/api";
 import { Link, redirect } from "@/i18n/navigation";
@@ -73,7 +73,7 @@ export default async function CheckoutPickerPage({
         <h2 className="text-muted-foreground font-mono text-[11px] tracking-[0.06em] uppercase">
           {t("heading")}
         </h2>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
           <MethodPickerCard
             href={`/pagar/${publicId}/pix`}
             icon={<Banknote className="size-5" strokeWidth={1.25} />}
@@ -87,6 +87,13 @@ export default async function CheckoutPickerPage({
             title={t("stellar.title")}
             subtitle={t("stellar.subtitle")}
             duration={t("stellar.duration")}
+          />
+          <MethodPickerCard
+            href={`/pagar/${publicId}/anchortest`}
+            icon={<FlaskConical className="size-5" strokeWidth={1.25} />}
+            title={t("anchortest.title")}
+            subtitle={t("anchortest.subtitle")}
+            duration={t("anchortest.duration")}
           />
         </div>
       </section>

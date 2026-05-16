@@ -417,12 +417,33 @@
         "title": "Crypto (Stellar)",
         "subtitle": "XLM or USDC from your wallet",
         "duration": "~10 s"
+      },
+      "anchortest": {
+        "title": "AnchorTest",
+        "subtitle": "Anchor hosted UI (SEP-24)",
+        "duration": "demo"
       }
     },
     "stellar": {
       "meta": {
         "title": "Pay with Stellar — {publicId} | Mutav",
         "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
+      }
+    },
+    "anchortest": {
+      "meta": {
+        "title": "AnchorTest — {publicId} | Mutav",
+        "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
+      },
+      "iframeTitle": "Anchor deposit form",
+      "openInNewTab": "Open in new tab",
+      "orderId": "Order",
+      "status": {
+        "preparing": "Preparing deposit",
+        "awaitingPayment": "Complete the anchor form",
+        "processing": "Anchor processing",
+        "completed": "Paid",
+        "failed": "Payment failed"
       }
     },
     "pix": {

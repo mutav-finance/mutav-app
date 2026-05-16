@@ -10,8 +10,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Mono } from "@/components/ui/mono";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { usePixOnramp, type PixOnrampPhase } from "@/hooks/use-pix-onramp";
+import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";
+import { api } from "@convex/_generated/api";
 import type { Doc, Id } from "@convex/_generated/dataModel";
 
 interface Props {
@@ -27,7 +28,11 @@ interface Props {
  */
 export function CheckoutPixView({ paymentId, totalCents }: Props) {
   const t = useTranslations("checkout.pix");
-  const { phase, order, error, start, cancel, reset } = usePixOnramp({ paymentId });
+  const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
+    paymentId,
+    startAction: api.anchors.actions.startPixOnramp,
+    pollAction: api.anchors.actions.pollPixOnramp,
+  });
 
   const startedRef = useRef(false);
   useEffect(() => {
@@ -57,7 +62,7 @@ function LoadedPanel({
 }: {
   order: Doc<"anchorOrders">;
   totalCents: number;
-  phase: PixOnrampPhase;
+  phase: AnchorOnrampPhase;
 }) {
   const t = useTranslations("checkout.pix");
   const pix = parsePixInstructions(order.instructions);
@@ -261,7 +266,7 @@ function parsePixInstructions(
   return { qrPayload, copyValue, fields: remaining };
 }
 
-function pixPhaseLabel(t: ReturnType<typeof useTranslations>, phase: PixOnrampPhase): string {
+function pixPhaseLabel(t: ReturnType<typeof useTranslations>, phase: AnchorOnrampPhase): string {
   switch (phase) {
     case "awaiting_payment":
       return t("status.awaitingPayment");

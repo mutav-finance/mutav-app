@@ -417,12 +417,33 @@
         "title": "Cripto (Stellar)",
         "subtitle": "XLM ou USDC da sua carteira",
         "duration": "~10 s"
+      },
+      "anchortest": {
+        "title": "AnchorTest",
+        "subtitle": "Fluxo via UI da anchor (SEP-24)",
+        "duration": "demo"
       }
     },
     "stellar": {
       "meta": {
         "title": "Pagar com Stellar — {publicId} | Mutav",
         "description": "Pague sua fatura Mutav via Stellar (XLM ou USDC)."
+      }
+    },
+    "anchortest": {
+      "meta": {
+        "title": "AnchorTest — {publicId} | Mutav",
+        "description": "Pague via interface da anchor (SEP-24 — demo)."
+      },
+      "iframeTitle": "Formulário de depósito da anchor",
+      "openInNewTab": "Abrir em nova aba",
+      "orderId": "Pedido",
+      "status": {
+        "preparing": "Preparando depósito",
+        "awaitingPayment": "Complete o formulário da anchor",
+        "processing": "Anchor processando",
+        "completed": "Pago",
+        "failed": "Falha no pagamento"
       }
     },
     "pix": {

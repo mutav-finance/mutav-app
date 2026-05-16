@@ -232,6 +232,13 @@ export default defineSchema({
     instructions: v.optional(v.any()),
     /** Free-form deposit summary text from SEP-6 `how` field. */
     how: v.optional(v.string()),
+    /**
+     * SEP-24 interactive deposit URL. Present only for orders kicked off via
+     * the hosted-UI path (`startAnchorTestOnramp`). The client either iframes
+     * this or opens it in a popup; status updates still come from the
+     * `anchors:poll*` action loop.
+     */
+    hostedUrl: v.optional(v.string()),
     status: anchorOrderStatus,
     amountInCents: v.optional(v.number()),
     amountOutCents: v.optional(v.number()),

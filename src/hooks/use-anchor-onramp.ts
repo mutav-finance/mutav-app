@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAction, useQuery } from "convex/react";
+import type { FunctionReference } from "convex/server";
 
 import { api } from "@convex/_generated/api";
 import type { Doc, Id } from "@convex/_generated/dataModel";
@@ -17,7 +18,7 @@ const TERMINAL_STATUSES: ReadonlySet<AnchorOrderStatus> = new Set([
   "error",
 ]);
 
-export type PixOnrampPhase =
+export type AnchorOnrampPhase =
   | "idle"
   | "starting"
   | "awaiting_payment"
@@ -25,8 +26,28 @@ export type PixOnrampPhase =
   | "completed"
   | "failed";
 
-interface UsePixOnrampResult {
-  phase: PixOnrampPhase;
+type StartActionRef = FunctionReference<
+  "action",
+  "public",
+  { paymentId: Id<"payments"> },
+  { orderId: Id<"anchorOrders">; anchorTxId: string; hostedUrl?: string }
+>;
+
+type PollActionRef = FunctionReference<
+  "action",
+  "public",
+  { orderId: Id<"anchorOrders"> },
+  { orderId: Id<"anchorOrders">; status: AnchorOrderStatus; terminal: boolean }
+>;
+
+interface UseAnchorOnrampArgs {
+  paymentId: Id<"payments">;
+  startAction: StartActionRef;
+  pollAction: PollActionRef;
+}
+
+interface UseAnchorOnrampResult {
+  phase: AnchorOnrampPhase;
   order: AnchorOrder | null;
   error: string | null;
   start: () => Promise<void>;
@@ -36,23 +57,22 @@ interface UsePixOnrampResult {
 }
 
 /**
- * View-model hook for the Pix on-ramp flow.
- *
- * Orchestrates the action calls (start + poll), subscribes reactively to
- * the underlying `anchorOrders` row so status transitions surface to the
- * UI without re-fetching, and manages the polling lifecycle (clears on
- * terminal status, cancel, or unmount).
- *
- * Deposit instructions live on `order.instructions` — the consumer renders
- * a Pix QR + key-value panel inline (no hosted popup).
+ * View-model hook for any anchor on-ramp flow (SEP-6 inline Pix, SEP-24
+ * hosted UI, future Etherfuse, …). Parameterized by which start/poll action
+ * pair to call — the lifecycle, polling cadence, and `anchorOrders`
+ * subscription are identical across providers.
  */
-export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UsePixOnrampResult {
+export function useAnchorOnramp({
+  paymentId,
+  startAction: startActionRef,
+  pollAction: pollActionRef,
+}: UseAnchorOnrampArgs): UseAnchorOnrampResult {
   const [orderId, setOrderId] = useState<Id<"anchorOrders"> | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
-  const startAction = useAction(api.anchors.actions.startPixOnramp);
-  const pollAction = useAction(api.anchors.actions.pollPixOnramp);
+  const startAction = useAction(startActionRef);
+  const pollAction = useAction(pollActionRef);
 
   const order =
     useQuery(api.anchors.orderUseCases.getOrderById, orderId ? { orderId } : "skip") ?? null;
@@ -75,7 +95,7 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
 
     const tick = () => {
       pollAction({ orderId }).catch((err: unknown) => {
-        console.warn("[pix-onramp] poll failed", err);
+        console.warn("[anchor-onramp] poll failed", err);
       });
     };
     tick();
@@ -109,7 +129,7 @@ export function usePixOnramp({ paymentId }: { paymentId: Id<"payments"> }): UseP
     setStartError(null);
   }, [clearPolling]);
 
-  const phase: PixOnrampPhase = derivePhase({
+  const phase: AnchorOnrampPhase = derivePhase({
     isStarting,
     startError,
     order,
@@ -133,7 +153,7 @@ function derivePhase({
   isStarting: boolean;
   startError: string | null;
   order: AnchorOrder | null;
-}): PixOnrampPhase {
+}): AnchorOnrampPhase {
   if (startError) return "failed";
   if (isStarting) return "starting";
   if (!order) return "idle";

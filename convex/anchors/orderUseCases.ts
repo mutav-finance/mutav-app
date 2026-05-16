@@ -39,6 +39,7 @@ export const insertOrder = internalMutation({
     anchorTxId: v.string(),
     instructions: v.optional(v.any()),
     how: v.optional(v.string()),
+    hostedUrl: v.optional(v.string()),
     status: anchorOrderStatusValidator,
   },
   returns: v.id("anchorOrders"),

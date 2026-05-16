@@ -329,3 +329,130 @@ export const pollPixOnramp = action({
     return { orderId: order._id, status, terminal: isTerminal(status) };
   },
 });
+
+// ─── AnchorTest (SEP-24 interactive) ─────────────────────────────────────────
+
+interface StartAnchorTestOnrampResult {
+  orderId: Id<"anchorOrders">;
+  anchorTxId: string;
+  hostedUrl: string;
+}
+
+/**
+ * Initiate a SEP-24 (interactive / hosted-UI) deposit against the agency's
+ * configured anchor. Mirrors `startPixOnramp` but returns the anchor's hosted
+ * URL instead of in-app Pix instructions — the client iframes / popups it and
+ * the operator completes the deposit on the anchor's own form.
+ *
+ * This is the "AnchorTest" path the picker offers as a parallel option:
+ * useful for QA and demonstrating provider parity, but not the user-facing
+ * production flow (which prefers SEP-6 + Mutav-owned UI).
+ */
+export const startAnchorTestOnramp = action({
+  args: { paymentId: v.id("payments") },
+  returns: v.object({
+    orderId: v.id("anchorOrders"),
+    anchorTxId: v.string(),
+    hostedUrl: v.string(),
+  }),
+  handler: async (ctx, args): Promise<StartAnchorTestOnrampResult> => {
+    const payment = await ctx.runQuery(api.payments.useCases.getById, {
+      paymentId: args.paymentId,
+    });
+    if (!payment) throw new Error(`Payment ${args.paymentId} not found`);
+    if (!isChargeable(payment.state)) {
+      throw new Error(
+        `Payment ${args.paymentId} is in state "${payment.state.kind}" — cannot initiate on-ramp`,
+      );
+    }
+
+    const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
+      agencyId: payment.agencyId,
+    });
+
+    const client = createAnchorClient(providerName);
+    await client.initialize();
+
+    const signer = getTreasurySigner();
+    await client.authenticate(signer.publicKey, signer.sign);
+
+    const amount = (payment.totalCents / 100).toFixed(2);
+    const response = await client.sep24.deposit({
+      asset_code: "USDC",
+      account: signer.publicKey,
+      amount,
+    });
+
+    if (!response.id || !response.url) {
+      throw new Error(
+        `Anchor "${providerName}" SEP-24 deposit response missing id/url; cannot persist order.`,
+      );
+    }
+
+    const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+      agencyId: payment.agencyId,
+      paymentId: payment._id,
+      provider: providerName,
+      anchorTxId: response.id,
+      hostedUrl: response.url,
+      status: ANCHOR_ORDER_STATUS.INCOMPLETE,
+    });
+
+    return { orderId, anchorTxId: response.id, hostedUrl: response.url };
+  },
+});
+
+/**
+ * Poll the SEP-24 transaction for an anchor-test order. Shares the
+ * normalization + completion handling with `pollPixOnramp`; the only
+ * difference is the SEP-24 transfer endpoint vs SEP-6.
+ */
+export const pollAnchorTestOnramp = action({
+  args: { orderId: v.id("anchorOrders") },
+  returns: v.object({
+    orderId: v.id("anchorOrders"),
+    status: anchorOrderStatusValidator,
+    terminal: v.boolean(),
+  }),
+  handler: async (ctx, args): Promise<PollPixOnrampResult> => {
+    const order = await ctx.runQuery(api.anchors.orderUseCases.getOrderById, {
+      orderId: args.orderId,
+    });
+    if (!order) throw new Error(`Anchor order ${args.orderId} not found`);
+
+    if (isTerminal(order.status)) {
+      return { orderId: order._id, status: order.status, terminal: true };
+    }
+
+    const client = createAnchorClient(order.provider);
+    await client.initialize();
+    const signer = getTreasurySigner();
+    await client.authenticate(signer.publicKey, signer.sign);
+
+    const tx = await client.sep24.getTransaction(order.anchorTxId);
+    const status = normalizeSep24Status(tx.status);
+
+    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+      orderId: order._id,
+      status,
+      amountInCents: brlToCents(tx.amount_in),
+      amountOutCents: brlToCents(tx.amount_out),
+      feeCents: brlToCents(tx.amount_fee),
+      completedAt: tx.completed_at,
+      rawPayload: tx,
+    });
+
+    if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
+      const pixKey = tx.from ?? `anchor:${order.anchorTxId}`;
+      const paidAt = tx.completed_at ?? new Date().toISOString();
+      await ctx.runMutation(internal.payments.mutations.markPaidByAnchor, {
+        paymentId: order.paymentId,
+        anchorTxId: order.anchorTxId,
+        pixKey,
+        paidAt,
+      });
+    }
+
+    return { orderId: order._id, status, terminal: isTerminal(status) };
+  },
+});
