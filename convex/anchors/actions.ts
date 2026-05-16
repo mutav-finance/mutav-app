@@ -232,6 +232,7 @@ export const startPixOnramp = action({
     const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
       agencyId: payment.agencyId,
     });
+    const providerEntry = getAnchorProvider(providerName);
 
     const client = createAnchorClient(providerName);
     await client.initialize();
@@ -244,7 +245,9 @@ export const startPixOnramp = action({
       asset_code: "USDC",
       account: signer.publicKey,
       amount,
-      // SEP-6 lets the wallet name itself for the anchor's audit logs.
+      // Anchor-specific deposit method. Testanchor accepts SEPA/SWIFT (no
+      // real Pix simulation); real Brazilian anchors will accept "pix".
+      type: providerEntry.sep6DepositType,
       wallet_name: "Mutav",
     });
 

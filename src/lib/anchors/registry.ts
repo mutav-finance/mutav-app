@@ -43,6 +43,16 @@ export interface AnchorProviderEntry {
   readonly sandbox: boolean;
   /** The Stellar network this provider operates on. Used to guard against pubnet/testnet passphrase mismatches at discovery time. */
   readonly network: StellarNetwork;
+  /**
+   * Value to pass as the SEP-6 deposit `type` field for this provider.
+   * Required by most anchors; the supported set is provider-specific.
+   *  - testanchor: `"SEPA"` (also accepts `"SWIFT"`; rejects unknown
+   *    values for USDC because testanchor only mocks bank rails — Pix
+   *    isn't simulated, so the QR we render holds mock SEPA fields).
+   *  - Real Pix anchors (Etherfuse): `"pix"` or equivalent — will be set
+   *    on their registry entry when added.
+   */
+  readonly sep6DepositType: string;
 }
 
 const REGISTRY: Record<AnchorProviderName, AnchorProviderEntry> = {
@@ -53,6 +63,7 @@ const REGISTRY: Record<AnchorProviderName, AnchorProviderEntry> = {
       "SDF-operated testnet anchor at testanchor.stellar.org. Use for development and smoke tests, never for real funds.",
     sandbox: true,
     network: "testnet",
+    sep6DepositType: "SEPA",
   },
 };
 
