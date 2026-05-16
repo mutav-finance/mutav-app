@@ -10,12 +10,17 @@
 
 import type * as agencies_domain from "../agencies/domain.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
+import type * as anchors_actions from "../anchors/actions.js";
+import type * as anchors_domain from "../anchors/domain.js";
+import type * as anchors_useCases from "../anchors/useCases.js";
+import type * as anchors_webhook from "../anchors/webhook.js";
 import type * as contracts_aggregate from "../contracts/aggregate.js";
 import type * as contracts_backfill from "../contracts/backfill.js";
 import type * as contracts_domain from "../contracts/domain.js";
 import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_useCases from "../contracts/useCases.js";
 import type * as crons from "../crons.js";
+import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_env from "../lib/env.js";
 import type * as payments_actions from "../payments/actions.js";
@@ -37,12 +42,17 @@ import type {
 declare const fullApi: ApiFromModules<{
   "agencies/domain": typeof agencies_domain;
   "agencies/useCases": typeof agencies_useCases;
+  "anchors/actions": typeof anchors_actions;
+  "anchors/domain": typeof anchors_domain;
+  "anchors/useCases": typeof anchors_useCases;
+  "anchors/webhook": typeof anchors_webhook;
   "contracts/aggregate": typeof contracts_aggregate;
   "contracts/backfill": typeof contracts_backfill;
   "contracts/domain": typeof contracts_domain;
   "contracts/mutations": typeof contracts_mutations;
   "contracts/useCases": typeof contracts_useCases;
   crons: typeof crons;
+  http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/env": typeof lib_env;
   "payments/actions": typeof payments_actions;
