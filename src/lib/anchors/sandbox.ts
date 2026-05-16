@@ -4,7 +4,17 @@
  * Pre-filled personal info and placeholder document URLs for sandbox/demo
  * environments. Portable — anyone copying the `anchors/` directory gets
  * sandbox data for free.
+ *
+ * Importing this module in production throws at module-evaluation time so
+ * a real KYC flow never silently submits fake data.
  */
+
+if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") {
+  throw new Error(
+    "src/lib/anchors/sandbox.ts must not be imported in production builds. " +
+      "Move sandbox-only code paths behind an environment check before importing.",
+  );
+}
 
 /** Pre-filled personal info for sandbox/demo KYC submissions (Mexico). */
 export const SANDBOX_KYC_DATA: Record<string, string> = {

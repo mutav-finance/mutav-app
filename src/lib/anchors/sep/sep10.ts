@@ -3,9 +3,15 @@
  *
  * Implements the Stellar web authentication protocol for obtaining JWT tokens.
  * https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md
+ *
+ * Challenge validation delegates to `WebAuth.readChallengeTx` from the SDK,
+ * which verifies the server's signature, the home-domain manage_data op, the
+ * web_auth_domain op, sequence number, time bounds, and operation count. Don't
+ * hand-roll this — the SDK function is the security boundary.
  */
 
-import * as StellarSdk from "@stellar/stellar-sdk";
+import { WebAuth } from "@stellar/stellar-sdk";
+
 import type {
   Sep10ChallengeResponse,
   Sep10TokenResponse,
@@ -15,10 +21,20 @@ import type {
 import { SepApiError } from "./types";
 
 export interface Sep10Config {
+  /** Anchor's SEP-10 auth endpoint, e.g. https://anchor.example.com/auth */
   authEndpoint: string;
+  /** Anchor's signing key from stellar.toml (G...) */
   serverSigningKey: string;
+  /** Stellar network passphrase, e.g. Networks.TESTNET or Networks.PUBLIC */
   networkPassphrase: string;
-  homeDomain?: string;
+  /** Anchor's home domain, e.g. anchor.example.com */
+  homeDomain: string;
+  /**
+   * Domain of the auth server. Defaults to the host of `authEndpoint`.
+   * Only override if the anchor serves auth from a different host than the
+   * one declared in `web_auth_domain` on the challenge.
+   */
+  webAuthDomain?: string;
 }
 
 export interface Sep10SignerFn {
@@ -27,11 +43,6 @@ export interface Sep10SignerFn {
 
 /**
  * Request a challenge transaction from the anchor's auth server.
- *
- * @param config - SEP-10 configuration
- * @param account - The user's Stellar public key
- * @param options - Optional parameters (memo, client_domain)
- * @param fetchFn - Optional fetch function for SSR compatibility
  */
 export async function getChallenge(
   config: Sep10Config,
@@ -44,12 +55,10 @@ export async function getChallenge(
 ): Promise<Sep10ChallengeResponse> {
   const url = new URL(config.authEndpoint);
   url.searchParams.set("account", account);
+  url.searchParams.set("home_domain", config.homeDomain);
 
   if (options?.memo) {
     url.searchParams.set("memo", options.memo);
-  }
-  if (config.homeDomain) {
-    url.searchParams.set("home_domain", config.homeDomain);
   }
   if (options?.clientDomain) {
     url.searchParams.set("client_domain", options.clientDomain);
@@ -71,127 +80,46 @@ export async function getChallenge(
 
 /**
  * Validates a challenge transaction received from the anchor.
- * This ensures the transaction is properly formed and from the expected server.
  *
- * @param challengeXdr - The challenge transaction XDR
- * @param serverSigningKey - The anchor's signing key
- * @param networkPassphrase - The Stellar network passphrase
- * @param homeDomain - The anchor's home domain
- * @param userAccount - The user's Stellar public key
+ * Delegates to `WebAuth.readChallengeTx`, which verifies the server's
+ * signature and all SEP-10 invariants. Throws `SepApiError` on any failure
+ * so callers can `catch` by type. Returns the client account ID parsed from
+ * the challenge — use it to assert the server didn't substitute a different
+ * account than the one we asked to authenticate.
  */
 export function validateChallenge(
   challengeXdr: string,
-  serverSigningKey: string,
-  networkPassphrase: string,
-  homeDomain: string,
-  userAccount: string,
-): {
-  valid: boolean;
-  transaction: StellarSdk.Transaction;
-  error?: string;
-} {
+  config: Sep10Config,
+  expectedClientAccount: string,
+): { clientAccountID: string; matchedHomeDomain: string; memo: string | null } {
+  const webAuthDomain = config.webAuthDomain ?? new URL(config.authEndpoint).host;
+
+  let result: ReturnType<typeof WebAuth.readChallengeTx>;
   try {
-    const transaction = new StellarSdk.Transaction(challengeXdr, networkPassphrase);
-
-    // Check that the transaction source is the server's signing key
-    if (transaction.source !== serverSigningKey) {
-      return {
-        valid: false,
-        transaction,
-        error: `Transaction source ${transaction.source} does not match server signing key ${serverSigningKey}`,
-      };
-    }
-
-    // Check that the transaction has a sequence number of 0
-    if (transaction.sequence !== "0") {
-      return {
-        valid: false,
-        transaction,
-        error: "Challenge transaction sequence number must be 0",
-      };
-    }
-
-    // Check that the first operation is a manage_data operation
-    if (transaction.operations.length === 0) {
-      return {
-        valid: false,
-        transaction,
-        error: "Challenge transaction must have at least one operation",
-      };
-    }
-
-    const firstOp = transaction.operations[0];
-    if (firstOp.type !== "manageData") {
-      return {
-        valid: false,
-        transaction,
-        error: "First operation must be manage_data",
-      };
-    }
-
-    // Check that the manage_data operation's name matches the home domain
-    const expectedName = `${homeDomain} auth`;
-    if (firstOp.name !== expectedName) {
-      return {
-        valid: false,
-        transaction,
-        error: `Manage data operation name ${firstOp.name} does not match expected ${expectedName}`,
-      };
-    }
-
-    // Check that the manage_data operation's source is the user's account
-    const opSource = firstOp.source || transaction.source;
-    if (opSource !== userAccount) {
-      return {
-        valid: false,
-        transaction,
-        error: `Operation source ${opSource} does not match user account ${userAccount}`,
-      };
-    }
-
-    // Check that the transaction is not expired
-    const now = Math.floor(Date.now() / 1000);
-    const maxTime = transaction.timeBounds?.maxTime;
-    if (maxTime && parseInt(maxTime, 10) < now) {
-      return {
-        valid: false,
-        transaction,
-        error: "Challenge transaction has expired",
-      };
-    }
-
-    return { valid: true, transaction };
+    result = WebAuth.readChallengeTx(
+      challengeXdr,
+      config.serverSigningKey,
+      config.networkPassphrase,
+      config.homeDomain,
+      webAuthDomain,
+    );
   } catch (error) {
-    return {
-      valid: false,
-      transaction: null as unknown as StellarSdk.Transaction,
-      error: `Failed to parse challenge transaction: ${error}`,
-    };
+    const message = error instanceof Error ? error.message : String(error);
+    throw new SepApiError(`Invalid SEP-10 challenge: ${message}`, 0);
   }
-}
 
-/**
- * Signs a challenge transaction using the provided signer function.
- * The signer function should handle the actual signing (e.g., via Freighter).
- *
- * @param challengeXdr - The challenge transaction XDR
- * @param networkPassphrase - The Stellar network passphrase
- * @param signer - A function that signs the transaction XDR
- */
-export async function signChallenge(
-  challengeXdr: string,
-  networkPassphrase: string,
-  signer: Sep10SignerFn,
-): Promise<string> {
-  return signer(challengeXdr, networkPassphrase);
+  if (result.clientAccountID !== expectedClientAccount) {
+    throw new SepApiError(
+      `Challenge clientAccountID ${result.clientAccountID} does not match expected ${expectedClientAccount}`,
+      0,
+    );
+  }
+
+  return result;
 }
 
 /**
  * Submits a signed challenge transaction to get a JWT token.
- *
- * @param authEndpoint - The anchor's auth endpoint
- * @param signedTransactionXdr - The signed challenge transaction XDR
- * @param fetchFn - Optional fetch function for SSR compatibility
  */
 export async function submitChallenge(
   authEndpoint: string,
@@ -200,9 +128,7 @@ export async function submitChallenge(
 ): Promise<Sep10TokenResponse> {
   const response = await fetchFn(authEndpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ transaction: signedTransactionXdr }),
   });
 
@@ -221,16 +147,13 @@ export async function submitChallenge(
 /**
  * Performs the full SEP-10 authentication flow:
  * 1. Get challenge from server
- * 2. Validate challenge
- * 3. Sign challenge
- * 4. Submit signed challenge
- * 5. Return JWT token
+ * 2. Validate challenge (server signature + all invariants)
+ * 3. Sign challenge with the provided signer
+ * 4. Submit signed challenge, return JWT
  *
- * @param config - SEP-10 configuration
- * @param account - The user's Stellar public key
- * @param signer - A function that signs the transaction XDR
- * @param options - Optional parameters
- * @param fetchFn - Optional fetch function for SSR compatibility
+ * Validation is non-negotiable. The `signer` (Freighter, smart account, etc.)
+ * only sees XDR — it trusts us to ensure the challenge is from the real
+ * anchor. Skipping validation = wallet-draining vector.
  */
 export async function authenticate(
   config: Sep10Config,
@@ -239,77 +162,59 @@ export async function authenticate(
   options?: {
     memo?: string;
     clientDomain?: string;
-    validateChallenge?: boolean;
   },
   fetchFn: typeof fetch = fetch,
 ): Promise<string> {
-  // 1. Get challenge
   const challenge = await getChallenge(config, account, options, fetchFn);
 
-  // 2. Validate challenge (optional but recommended)
-  if (options?.validateChallenge !== false && config.homeDomain) {
-    const validation = validateChallenge(
-      challenge.transaction,
-      config.serverSigningKey,
-      challenge.network_passphrase || config.networkPassphrase,
-      config.homeDomain,
-      account,
-    );
-    if (!validation.valid) {
-      throw new Error(`Invalid challenge: ${validation.error}`);
-    }
-  }
+  const networkPassphrase = challenge.network_passphrase || config.networkPassphrase;
+  validateChallenge(challenge.transaction, { ...config, networkPassphrase }, account);
 
-  // 3. Sign challenge
-  const signedXdr = await signChallenge(
-    challenge.transaction,
-    challenge.network_passphrase || config.networkPassphrase,
-    signer,
-  );
-
-  // 4. Submit and get token
+  const signedXdr = await signer(challenge.transaction, networkPassphrase);
   const tokenResponse = await submitChallenge(config.authEndpoint, signedXdr, fetchFn);
 
   return tokenResponse.token;
 }
 
+function base64UrlDecode(input: string): string {
+  const padded = input + "=".repeat((4 - (input.length % 4)) % 4);
+  return atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+}
+
 /**
  * Decodes a JWT token to extract the payload.
- * Note: This does NOT verify the signature - that should be done server-side.
  *
- * @param token - The JWT token
+ * Does NOT verify the signature — that's the anchor's job server-side.
+ * Throws if the token shape is invalid; callers must handle.
  */
 export function decodeToken(token: string): Sep10JwtPayload {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new Error("Invalid JWT token format");
   }
-
-  const payload = parts[1];
-  const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-  return JSON.parse(decoded);
+  return JSON.parse(base64UrlDecode(parts[1]));
 }
 
 /**
  * Checks if a JWT token is expired.
  *
- * @param token - The JWT token
- * @param bufferSeconds - Optional buffer time in seconds (default: 60)
+ * Returns `true` for malformed tokens too — a token we can't read is, for
+ * our purposes, unusable. Caller should treat this as "re-authenticate".
  */
 export function isTokenExpired(token: string, bufferSeconds: number = 60): boolean {
+  let payload: Sep10JwtPayload;
   try {
-    const payload = decodeToken(token);
-    const now = Math.floor(Date.now() / 1000);
-    return payload.exp < now + bufferSeconds;
+    payload = decodeToken(token);
   } catch {
     return true;
   }
+  if (typeof payload.exp !== "number") return true;
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp < now + bufferSeconds;
 }
 
 /**
  * Creates authorization headers for SEP API requests.
- *
- * @param token - The JWT token
  */
 export function createAuthHeaders(token: string): { Authorization: string } {
   return { Authorization: `Bearer ${token}` };

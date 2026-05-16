@@ -18,6 +18,25 @@ import type {
 import { SepApiError } from "./types";
 import { createAuthHeaders } from "./sep10";
 
+function unwrapTransaction<T>(data: unknown, action: string): T {
+  if (!data || typeof data !== "object" || !("transaction" in data) || !data.transaction) {
+    throw new SepApiError(`Anchor response missing transaction (${action})`, 0);
+  }
+  return (data as { transaction: T }).transaction;
+}
+
+function unwrapTransactions<T>(data: unknown, action: string): T[] {
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("transactions" in data) ||
+    !Array.isArray(data.transactions)
+  ) {
+    throw new SepApiError(`Anchor response missing transactions array (${action})`, 0);
+  }
+  return data.transactions as T[];
+}
+
 /**
  * Get information about the anchor's SEP-6 capabilities.
  *
@@ -154,8 +173,7 @@ export async function getTransaction(
     );
   }
 
-  const data = await response.json();
-  return data.transaction;
+  return unwrapTransaction<Sep6Transaction>(await response.json(), "get transaction");
 }
 
 /**
@@ -188,8 +206,7 @@ export async function getTransactionByStellarId(
     );
   }
 
-  const data = await response.json();
-  return data.transaction;
+  return unwrapTransaction<Sep6Transaction>(await response.json(), "get transaction");
 }
 
 /**
@@ -235,8 +252,7 @@ export async function getTransactions(
     );
   }
 
-  const data = await response.json();
-  return data.transactions;
+  return unwrapTransactions<Sep6Transaction>(await response.json(), "list transactions");
 }
 
 // =============================================================================

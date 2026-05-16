@@ -18,6 +18,44 @@ import { SepApiError } from "./types";
 import { createAuthHeaders } from "./sep10";
 
 /**
+ * Build a SEP-24 multipart form body, skipping undefined values and
+ * serializing booleans as "true"/"false" (per SEP-24 spec). Skipping rather
+ * than coercing falsy values prevents accidentally sending opt-in flags as
+ * the string "false".
+ */
+function buildSep24FormData(request: Sep24DepositRequest | Sep24WithdrawRequest): FormData {
+  const formData = new FormData();
+  for (const [key, value] of Object.entries(request)) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "boolean") {
+      if (value) formData.set(key, "true");
+      continue;
+    }
+    formData.set(key, String(value));
+  }
+  return formData;
+}
+
+function unwrapTransaction<T>(data: unknown, action: string): T {
+  if (!data || typeof data !== "object" || !("transaction" in data) || !data.transaction) {
+    throw new SepApiError(`Anchor response missing transaction (${action})`, 0);
+  }
+  return (data as { transaction: T }).transaction;
+}
+
+function unwrapTransactions<T>(data: unknown, action: string): T[] {
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("transactions" in data) ||
+    !Array.isArray(data.transactions)
+  ) {
+    throw new SepApiError(`Anchor response missing transactions array (${action})`, 0);
+  }
+  return data.transactions as T[];
+}
+
+/**
  * Get information about the anchor's SEP-24 capabilities.
  *
  * @param transferServer - The SEP-24 transfer server URL
@@ -59,14 +97,7 @@ export async function deposit(
   fetchFn: typeof fetch = fetch,
 ): Promise<Sep24InteractiveResponse> {
   const url = `${transferServer}/transactions/deposit/interactive`;
-
-  // Build multipart form data (per SEP-24 spec)
-  const formData = new FormData();
-  Object.entries(request).forEach(([key, value]) => {
-    if (value !== undefined) {
-      formData.set(key, String(value));
-    }
-  });
+  const formData = buildSep24FormData(request);
 
   const response = await fetchFn(url, {
     method: "POST",
@@ -102,14 +133,7 @@ export async function withdraw(
   fetchFn: typeof fetch = fetch,
 ): Promise<Sep24InteractiveResponse> {
   const url = `${transferServer}/transactions/withdraw/interactive`;
-
-  // Build multipart form data (per SEP-24 spec)
-  const formData = new FormData();
-  Object.entries(request).forEach(([key, value]) => {
-    if (value !== undefined) {
-      formData.set(key, String(value));
-    }
-  });
+  const formData = buildSep24FormData(request);
 
   const response = await fetchFn(url, {
     method: "POST",
@@ -159,8 +183,7 @@ export async function getTransaction(
     );
   }
 
-  const data = await response.json();
-  return data.transaction;
+  return unwrapTransaction<Sep24Transaction>(await response.json(), "get transaction");
 }
 
 /**
@@ -193,8 +216,7 @@ export async function getTransactionByStellarId(
     );
   }
 
-  const data = await response.json();
-  return data.transaction;
+  return unwrapTransaction<Sep24Transaction>(await response.json(), "get transaction");
 }
 
 /**
@@ -240,8 +262,7 @@ export async function getTransactions(
     );
   }
 
-  const data = await response.json();
-  return data.transactions;
+  return unwrapTransactions<Sep24Transaction>(await response.json(), "list transactions");
 }
 
 // =============================================================================
@@ -320,6 +341,7 @@ export async function pollTransaction(
   options: {
     interval?: number;
     timeout?: number;
+    signal?: AbortSignal;
     onStatusChange?: (transaction: Sep24Transaction) => void;
     shouldStop?: (status: TransactionStatus) => boolean;
   } = {},
@@ -327,7 +349,8 @@ export async function pollTransaction(
 ): Promise<Sep24Transaction> {
   const {
     interval = 5000,
-    timeout = 600000, // 10 minutes
+    timeout = 600000,
+    signal,
     onStatusChange,
     shouldStop = (status) =>
       status === "completed" || status === "error" || status === "expired" || status === "refunded",
@@ -335,23 +358,49 @@ export async function pollTransaction(
 
   const startTime = Date.now();
   let lastStatus: TransactionStatus | null = null;
+  let consecutiveTransientErrors = 0;
+  const maxTransientRetries = 3;
 
   while (Date.now() - startTime < timeout) {
-    const transaction = await getTransaction(transferServer, token, transactionId, fetchFn);
+    if (signal?.aborted) throw new DOMException("Polling aborted", "AbortError");
 
-    if (transaction.status !== lastStatus) {
-      lastStatus = transaction.status;
-      onStatusChange?.(transaction);
+    try {
+      const transaction = await getTransaction(transferServer, token, transactionId, fetchFn);
+      consecutiveTransientErrors = 0;
+
+      if (transaction.status !== lastStatus) {
+        lastStatus = transaction.status;
+        onStatusChange?.(transaction);
+      }
+
+      if (shouldStop(transaction.status)) return transaction;
+    } catch (error) {
+      const isTransient = error instanceof SepApiError && error.status >= 500;
+      if (!isTransient || ++consecutiveTransientErrors > maxTransientRetries) throw error;
     }
 
-    if (shouldStop(transaction.status)) {
-      return transaction;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, interval));
+    await sleep(interval, signal);
   }
 
-  throw new Error(`Transaction polling timed out after ${timeout}ms`);
+  throw new SepApiError(`Transaction polling timed out after ${timeout}ms`, 0);
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Polling aborted", "AbortError"));
+      return;
+    }
+    const id = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(id);
+      reject(new DOMException("Polling aborted", "AbortError"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 // Re-export status helpers from SEP-6 since they're the same

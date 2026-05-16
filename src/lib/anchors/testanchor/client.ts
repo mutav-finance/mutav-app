@@ -143,17 +143,23 @@ export class TestAnchorClient {
     if (!authEndpoint) {
       throw new Error("Anchor does not support SEP-10 authentication");
     }
+    if (!signingKey) {
+      throw new Error(
+        "Anchor stellar.toml is missing SIGNING_KEY — cannot verify challenge signature. " +
+          "Aborting to prevent signing an untrusted transaction.",
+      );
+    }
 
     this.token = await sep10.authenticate(
       {
         authEndpoint,
-        serverSigningKey: signingKey || "",
+        serverSigningKey: signingKey,
         networkPassphrase: this.networkPassphrase,
         homeDomain: this.domain,
       },
       account,
       signer,
-      { validateChallenge: !!signingKey },
+      undefined,
       this.fetchFn,
     );
 
