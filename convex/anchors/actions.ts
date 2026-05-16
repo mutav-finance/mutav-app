@@ -11,7 +11,7 @@ import {
   STELLAR_NETWORK_PASSPHRASES,
 } from "../../src/lib/anchors/registry";
 import type { TransactionStatus } from "../../src/lib/anchors/sep/types";
-import { getTreasurySigner } from "../lib/stellar-signer";
+import { getTreasurySigner } from "../lib/stellarSigner";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
   ANCHOR_ORDER_STATUS,
