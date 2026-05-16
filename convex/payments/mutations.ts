@@ -230,6 +230,40 @@ export const markPaidByTx = internalMutation({
 });
 
 /**
+ * Idempotent mark-as-paid for anchor-mediated on-ramps (e.g. testanchor /
+ * Etherfuse Pix). Called from `pollPixOnramp` when the underlying anchor
+ * order reaches `completed`.
+ *
+ * No-ops if the payment is already paid via the same anchor txId. Records
+ * the anchor's reported PIX key + anchor transaction ID on `method` and
+ * moves state to `paid` with the observed timestamp.
+ */
+export const markPaidByAnchor = internalMutation({
+  args: {
+    paymentId: v.id("payments"),
+    anchorTxId: v.string(),
+    pixKey: v.string(),
+    paidAt: v.string(),
+  },
+  handler: async (ctx, { paymentId, anchorTxId, pixKey, paidAt }) => {
+    const payment = await ctx.db.get(paymentId);
+    if (!payment) return { paymentId, status: "not_found" as const };
+
+    if (payment.state.kind === "paid") {
+      const existingTxId = payment.method?.kind === "pix" ? payment.method.txId : null;
+      if (existingTxId === anchorTxId) return { paymentId, status: "already_paid" as const };
+      return { paymentId, status: "duplicate_inbound" as const };
+    }
+
+    await ctx.db.patch(paymentId, {
+      state: PaymentStates.paid(paidAt),
+      method: PaymentMethods.pix(pixKey, anchorTxId),
+    });
+    return { paymentId, status: "paid" as const };
+  },
+});
+
+/**
  * Dev-only: flip a payment back to `pending` and clear `method`. Used to
  * rerun the demo flow against an already-paid invoice. The Horizon cursor
  * is not rewound, so the original tx is NOT re-discovered — only NEW

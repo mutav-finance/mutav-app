@@ -8,6 +8,7 @@ import { Mono } from "@/components/ui/mono";
 import { Link, getPathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { PixOnrampButton } from "@/components/payments/pix-onramp-button";
 import { isChargeable, type Payment } from "@convex/payments/domain";
 
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -45,10 +46,10 @@ function ShareTenantLink({ publicId }: { publicId: string }) {
 }
 
 function ChargeableActions({
-  publicId,
+  payment,
   variant,
 }: {
-  publicId: string;
+  payment: Payment;
   variant: "primary" | "secondary";
 }) {
   const t = useTranslations("paymentDetails.methodCard");
@@ -60,12 +61,13 @@ function ChargeableActions({
         variant={variant === "primary" ? "default" : "outline"}
         className="gap-2"
       >
-        <Link href={`/pagar/${publicId}/endereco`} target="_blank" rel="noopener">
+        <Link href={`/pagar/${payment.publicId}/endereco`} target="_blank" rel="noopener">
           {variant === "primary" ? t("generateStellar") : t("openPayPage")}
           <ExternalLink className="size-4" strokeWidth={1.25} />
         </Link>
       </Button>
-      <ShareTenantLink publicId={publicId} />
+      <PixOnrampButton paymentId={payment._id} variant="outline" />
+      <ShareTenantLink publicId={payment.publicId} />
     </div>
   );
 }
@@ -89,7 +91,7 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
               <p className="text-foreground text-sm font-medium">{t("none")}</p>
               <p className="text-muted-foreground text-xs">{t("noneHint")}</p>
             </div>
-            {chargeable && <ChargeableActions publicId={payment.publicId} variant="primary" />}
+            {chargeable && <ChargeableActions payment={payment} variant="primary" />}
           </div>
         )}
 
@@ -145,7 +147,7 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
                 }
               />
             </dl>
-            {chargeable && <ChargeableActions publicId={payment.publicId} variant="secondary" />}
+            {chargeable && <ChargeableActions payment={payment} variant="secondary" />}
           </div>
         )}
       </CardContent>

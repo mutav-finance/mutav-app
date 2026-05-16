@@ -454,7 +454,27 @@
       "generateStellar": "Pay with Stellar",
       "openPayPage": "Open payment page",
       "copyShareLink": "Copy link",
-      "linkCopied": "Link copied"
+      "linkCopied": "Link copied",
+      "pix": {
+        "button": "Pay with PIX",
+        "dialogTitle": "PIX Payment",
+        "openHostedFlow": "Open PIX payment",
+        "cancel": "Cancel",
+        "close": "Close",
+        "orderId": "Order",
+        "status": {
+          "starting": "Preparing payment...",
+          "awaitingPayment": "Open your bank app and complete the PIX",
+          "processing": "Payment received, processing...",
+          "completed": "Paid!",
+          "failed": "Payment failed"
+        },
+        "description": {
+          "default": "Complete the payment in the popup window. This screen updates automatically once the anchor confirms.",
+          "completed": "Payment confirmed. The invoice has been marked paid.",
+          "failed": "The anchor could not complete the operation."
+        }
+      }
     },
     "notFound": {
       "title": "Invoice not found",

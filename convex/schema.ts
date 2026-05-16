@@ -65,6 +65,25 @@ const paymentMethod = v.union(
 
 const memberRole = v.union(v.literal("owner"), v.literal("admin"), v.literal("member"));
 
+/**
+ * Anchor on-ramp lifecycle, normalized across providers. Mirrors SEP-24
+ * status values; non-SEP providers (Etherfuse later) map their states to
+ * this same set. Terminal states: `completed`, `refunded`, `expired`, `error`.
+ */
+const anchorOrderStatus = v.union(
+  v.literal("incomplete"),
+  v.literal("pending_user_transfer_start"),
+  v.literal("pending_user_transfer_complete"),
+  v.literal("pending_anchor"),
+  v.literal("pending_stellar"),
+  v.literal("completed"),
+  v.literal("refunded"),
+  v.literal("expired"),
+  v.literal("error"),
+);
+
+const anchorOrderProvider = v.union(v.literal("testanchor"));
+
 export default defineSchema({
   agencies: defineTable({
     name: v.string(),
@@ -191,4 +210,27 @@ export default defineSchema({
     cursor: v.string(),
     lastRunAt: v.string(),
   }).index("by_sourceAccount", ["sourceAccount"]),
+
+  // One row per anchor-mediated on-ramp attempt against a `payments` row.
+  // 1:N from payments (retries create new rows). On terminal `completed`,
+  // the parent payment's state flips to `paid` via `markPaidByAnchor`.
+  // `rawPayload` retains the last full anchor-side transaction object for
+  // debugging / audit.
+  anchorOrders: defineTable({
+    agencyId: v.id("agencies"),
+    paymentId: v.id("payments"),
+    provider: anchorOrderProvider,
+    anchorTxId: v.string(),
+    hostedUrl: v.string(),
+    status: anchorOrderStatus,
+    amountInCents: v.optional(v.number()),
+    amountOutCents: v.optional(v.number()),
+    feeCents: v.optional(v.number()),
+    createdAt: v.string(),
+    completedAt: v.optional(v.string()),
+    rawPayload: v.optional(v.any()),
+  })
+    .index("by_agency", ["agencyId"])
+    .index("by_payment", ["paymentId"])
+    .index("by_anchor_tx", ["anchorTxId"]),
 });

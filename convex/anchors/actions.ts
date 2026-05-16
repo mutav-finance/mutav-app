@@ -2,41 +2,31 @@
 
 import { v } from "convex/values";
 
-import { internalAction } from "../_generated/server";
-import { internal } from "../_generated/api";
+import { action, internalAction } from "../_generated/server";
+import { api, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import {
   createAnchorClient,
   getAnchorProvider,
   STELLAR_NETWORK_PASSPHRASES,
 } from "../../src/lib/anchors/registry";
+import type { TransactionStatus } from "../../src/lib/anchors/sep/types";
+import { getTreasurySigner } from "../lib/stellar-signer";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
+import {
+  ANCHOR_ORDER_STATUS,
+  anchorOrderStatusValidator,
+  isTerminal,
+  type AnchorOrderStatus,
+} from "./orderDomain";
+import { isChargeable } from "../payments/domain";
 
-/**
- * Per SEP-1 §Currency, anchors may declare `status: "live" | "dead" | "test" | "private"`.
- * Mutav surfaces only currencies an integrator should actually use:
- *   - "live"  → usable in production
- *   - "test"  → usable when the provider is a sandbox (the registry entry says so)
- *   - "dead"  → deprecated, never offer
- *   - "private" → not for public use, never offer
- *   - undefined → treat as "live" (SEP-1 default)
- */
 type CurrencyStatus = "live" | "dead" | "test" | "private";
 
-const ALLOWED_STATUSES_PROD: ReadonlyArray<CurrencyStatus | undefined> = ["live", undefined];
-const ALLOWED_STATUSES_SANDBOX: ReadonlyArray<CurrencyStatus | undefined> = [
-  "live",
-  "test",
-  undefined,
-];
-
-interface AnchorCurrency {
-  /** Asset code as declared in stellar.toml, normalized: "native" → "XLM". */
+interface AnchorCurrencyOut {
   code: string;
-  /** Issuer G-address, omitted for native XLM. */
   issuer?: string;
-  /** Pre-formatted SEP-38 asset identifier — drops the need for callers to reconstruct. */
   sep38Id: string;
-  /** SEP-1 currency status; defaults to "live" when the anchor omits it. */
   status: CurrencyStatus;
 }
 
@@ -44,9 +34,13 @@ interface AnchorCapabilities {
   provider: AnchorProvider;
   network: "testnet" | "pubnet";
   networkPassphrase: string;
-  /** SIGNING_KEY from the anchor's stellar.toml — pin per-agency to defend against future toml tampering. */
   signingKey: string | null;
-  currencies: AnchorCurrency[];
+  currencies: Array<{
+    code: string;
+    issuer?: string;
+    sep38Id: string;
+    status: "live" | "dead" | "test" | "private";
+  }>;
   supports: {
     sep6: boolean;
     sep10: boolean;
@@ -61,16 +55,8 @@ interface AnchorCapabilities {
  * Discover what the anchor configured for this agency supports.
  *
  * Runs the registry → client → SEP-1 path end-to-end against a real
- * anchor. No auth, no deposit — this proves the wiring works before the
- * signer + on-ramp slice lands. Output is the shape we'll surface in the
- * payment-method picker so the UI knows which currencies/SEPs to offer.
- *
- * Guards:
- *   - Throws if the anchor's NETWORK_PASSPHRASE doesn't match what the
- *     registry expects for this provider (e.g. testanchor must serve the
- *     testnet passphrase). Catches cross-network misconfig early.
- *   - Filters currencies by SEP-1 `status` — drops dead/private always,
- *     keeps test only for sandbox providers.
+ * anchor. No auth, no deposit — proves the wiring works and surfaces
+ * the capability matrix the UI uses when offering payment methods.
  */
 export const discoverCapabilities = internalAction({
   args: { agencyId: v.id("agencies") },
@@ -128,10 +114,12 @@ export const discoverCapabilities = internalAction({
       client.supportsSep(38),
     ]);
 
-    const allowed = provider.sandbox ? ALLOWED_STATUSES_SANDBOX : ALLOWED_STATUSES_PROD;
-    const currencies = (toml.CURRENCIES ?? [])
+    const allowed: ReadonlyArray<CurrencyStatus | undefined> = provider.sandbox
+      ? ["live", "test", undefined]
+      : ["live", undefined];
+    const currencies: AnchorCurrencyOut[] = (toml.CURRENCIES ?? [])
       .filter((c) => allowed.includes(c.status as CurrencyStatus | undefined))
-      .map<AnchorCurrency>((c) => {
+      .map<AnchorCurrencyOut>((c) => {
         const isNative = c.code === "native" || (c.code === "XLM" && !c.issuer);
         const code = isNative ? "XLM" : (c.code ?? "");
         const issuer = isNative ? undefined : c.issuer;
@@ -139,7 +127,7 @@ export const discoverCapabilities = internalAction({
           code,
           issuer,
           sep38Id: isNative ? "stellar:native" : `stellar:${code}:${issuer}`,
-          status: (c.status as CurrencyStatus | undefined) ?? "live",
+          status: ((c.status as CurrencyStatus | undefined) ?? "live") satisfies CurrencyStatus,
         };
       });
 
@@ -151,5 +139,182 @@ export const discoverCapabilities = internalAction({
       currencies,
       supports: { sep6, sep10, sep12, sep24, sep31, sep38 },
     };
+  },
+});
+
+// ─── Pix on-ramp (SEP-24 deposit) ─────────────────────────────────────────────
+
+/**
+ * Normalize the SEP-24 transaction status enum to Mutav's `anchorOrderStatus`.
+ * SEP-24 has many fine-grained "pending_*" variants that don't matter to our
+ * UI; we collapse them onto the smaller normalized set so the dialog has
+ * predictable transitions and future non-SEP providers (Etherfuse) can map
+ * onto the same shape.
+ */
+function normalizeSep24Status(sepStatus: TransactionStatus): AnchorOrderStatus {
+  switch (sepStatus) {
+    case "incomplete":
+      return ANCHOR_ORDER_STATUS.INCOMPLETE;
+    case "pending_user_transfer_start":
+    case "pending_user":
+      return ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START;
+    case "pending_user_transfer_complete":
+      return ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_COMPLETE;
+    case "pending_stellar":
+    case "pending_trust":
+      return ANCHOR_ORDER_STATUS.PENDING_STELLAR;
+    case "pending_anchor":
+    case "pending_external":
+    case "pending_customer_info_update":
+    case "pending_transaction_info_update":
+    case "pending_sender":
+    case "pending_receiver":
+      return ANCHOR_ORDER_STATUS.PENDING_ANCHOR;
+    case "completed":
+      return ANCHOR_ORDER_STATUS.COMPLETED;
+    case "refunded":
+      return ANCHOR_ORDER_STATUS.REFUNDED;
+    case "expired":
+      return ANCHOR_ORDER_STATUS.EXPIRED;
+    case "error":
+    case "no_market":
+      return ANCHOR_ORDER_STATUS.ERROR;
+  }
+}
+
+function brlToCents(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const num = Number.parseFloat(value);
+  if (!Number.isFinite(num)) return undefined;
+  return Math.round(num * 100);
+}
+
+interface StartPixOnrampResult {
+  orderId: Id<"anchorOrders">;
+  hostedUrl: string;
+  anchorTxId: string;
+}
+
+interface PollPixOnrampResult {
+  orderId: Id<"anchorOrders">;
+  status: AnchorOrderStatus;
+  terminal: boolean;
+}
+
+/**
+ * Initiate a SEP-24 deposit against the agency's configured anchor for the
+ * given chargeable payment. Returns a hosted URL the UI opens in a popup —
+ * the agency completes the anchor-side form and the deposit is reconciled
+ * by `pollPixOnramp`.
+ *
+ * Testanchor stages this end-to-end with a generic mock deposit form (not
+ * a real Pix QR) — that's the staging UX while Etherfuse onboards. The
+ * registry pattern means swapping to Etherfuse later is one config change
+ * and the call sites here don't move.
+ */
+export const startPixOnramp = action({
+  args: { paymentId: v.id("payments") },
+  returns: v.object({
+    orderId: v.id("anchorOrders"),
+    hostedUrl: v.string(),
+    anchorTxId: v.string(),
+  }),
+  handler: async (ctx, args): Promise<StartPixOnrampResult> => {
+    const payment = await ctx.runQuery(api.payments.useCases.getById, {
+      paymentId: args.paymentId,
+    });
+    if (!payment) throw new Error(`Payment ${args.paymentId} not found`);
+    if (!isChargeable(payment.state)) {
+      throw new Error(
+        `Payment ${args.paymentId} is in state "${payment.state.kind}" — cannot initiate on-ramp`,
+      );
+    }
+
+    const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
+      agencyId: payment.agencyId,
+    });
+
+    const client = createAnchorClient(providerName);
+    await client.initialize();
+
+    const signer = getTreasurySigner();
+    await client.authenticate(signer.publicKey, signer.sign);
+
+    const amount = (payment.totalCents / 100).toFixed(2);
+    const response = await client.sep24.deposit({
+      asset_code: "USDC",
+      amount,
+      account: signer.publicKey,
+    });
+
+    const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+      agencyId: payment.agencyId,
+      paymentId: payment._id,
+      provider: providerName,
+      anchorTxId: response.id,
+      hostedUrl: response.url,
+      status: ANCHOR_ORDER_STATUS.INCOMPLETE,
+    });
+
+    return { orderId, hostedUrl: response.url, anchorTxId: response.id };
+  },
+});
+
+/**
+ * Poll the anchor for the current state of an in-flight on-ramp order.
+ *
+ * The client UI calls this on an interval while a deposit is open. Updates
+ * the `anchorOrders` row with the latest SEP-24 transaction snapshot and,
+ * on terminal `completed`, marks the parent payment paid via
+ * `markPaidByAnchor` (idempotent). Once the order is terminal, subsequent
+ * polls short-circuit and return the order unchanged.
+ */
+export const pollPixOnramp = action({
+  args: { orderId: v.id("anchorOrders") },
+  returns: v.object({
+    orderId: v.id("anchorOrders"),
+    status: anchorOrderStatusValidator,
+    terminal: v.boolean(),
+  }),
+  handler: async (ctx, args): Promise<PollPixOnrampResult> => {
+    const order = await ctx.runQuery(api.anchors.orderUseCases.getOrderById, {
+      orderId: args.orderId,
+    });
+    if (!order) throw new Error(`Anchor order ${args.orderId} not found`);
+
+    if (isTerminal(order.status)) {
+      return { orderId: order._id, status: order.status, terminal: true };
+    }
+
+    const client = createAnchorClient(order.provider);
+    await client.initialize();
+    const signer = getTreasurySigner();
+    await client.authenticate(signer.publicKey, signer.sign);
+
+    const tx = await client.sep24.getTransaction(order.anchorTxId);
+    const status = normalizeSep24Status(tx.status);
+
+    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+      orderId: order._id,
+      status,
+      amountInCents: brlToCents(tx.amount_in),
+      amountOutCents: brlToCents(tx.amount_out),
+      feeCents: brlToCents(tx.amount_fee),
+      completedAt: tx.completed_at,
+      rawPayload: tx,
+    });
+
+    if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
+      const pixKey = tx.from ?? `anchor:${order.anchorTxId}`;
+      const paidAt = tx.completed_at ?? new Date().toISOString();
+      await ctx.runMutation(internal.payments.mutations.markPaidByAnchor, {
+        paymentId: order.paymentId,
+        anchorTxId: order.anchorTxId,
+        pixKey,
+        paidAt,
+      });
+    }
+
+    return { orderId: order._id, status, terminal: isTerminal(status) };
   },
 });
