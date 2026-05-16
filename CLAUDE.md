@@ -26,6 +26,15 @@ If the sibling repo is not cloned locally, fetch files directly:
 gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | base64 -d
 ```
 
+## Stellar concepts
+
+Mutav settles guarantees on Stellar and moves BRL ↔ token via anchors. Before touching anchor code, read the in-repo docs:
+
+- [`docs/stellar-anchors.md`](docs/stellar-anchors.md) — what an anchor is, which SEPs Mutav uses (SEP-1, 10, 12, 6, 24, 31, 38), how a Pix on-ramp flows end-to-end
+- [`src/lib/anchors/README.md`](src/lib/anchors/README.md) — the foundation library: when to use the SEP modules vs the `Anchor` interface, how to implement a new provider client
+- [`src/lib/anchors/sep/README.md`](src/lib/anchors/sep/README.md) — per-SEP API reference for the framework-agnostic protocol modules
+- [`src/lib/anchors/testanchor/README.md`](src/lib/anchors/testanchor/README.md) — reference SEP client composed against `testanchor.stellar.org`; copy this as the starting point for a new SEP-compliant client
+
 ## Stack
 
 - Next.js 16 (App Router, src/ directory)
