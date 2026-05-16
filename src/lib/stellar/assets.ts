@@ -1,4 +1,4 @@
-import type { ChainNetwork } from "@/lib/stellar/network";
+import type { ChainNetwork } from "./network";
 
 /**
  * Discriminated address shape per chain. Stellar today; EVM / Solana / etc.

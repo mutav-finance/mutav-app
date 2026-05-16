@@ -11,6 +11,7 @@ import {
   STELLAR_NETWORK_PASSPHRASES,
 } from "../../src/lib/anchors/registry";
 import type { TransactionStatus } from "../../src/lib/anchors/sep/types";
+import { ASSETS } from "../../src/lib/stellar/assets";
 import { getTreasurySigner } from "../lib/stellarSigner";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
@@ -189,6 +190,24 @@ function brlToCents(value: string | undefined): number | undefined {
   return Math.round(num * 100);
 }
 
+/**
+ * Convert a BRL-cent amount to the anchor asset's face-value string at
+ * the registry's static rate. This is a placeholder — production will
+ * replace with a SEP-38 quote so the rate is locked at deposit time and
+ * matched by the anchor on settlement. For testanchor + demo flows the
+ * frozen rate is sufficient (and avoids putting CoinGecko on the deposit
+ * critical path).
+ */
+function brlCentsToAssetAmount(brlCents: number, assetSymbol: string): string {
+  const asset = ASSETS.find((a) => a.symbol === assetSymbol);
+  if (!asset) {
+    throw new Error(`Unknown asset "${assetSymbol}" — cannot convert BRL amount`);
+  }
+  const brlFace = brlCents / 100;
+  const assetFace = brlFace / asset.brlPerUnit;
+  return assetFace.toFixed(asset.displayDecimals);
+}
+
 interface StartPixOnrampResult {
   orderId: Id<"anchorOrders">;
   anchorTxId: string;
@@ -240,7 +259,7 @@ export const startPixOnramp = action({
     const signer = getTreasurySigner();
     await client.authenticate(signer.publicKey, signer.sign);
 
-    const amount = (payment.totalCents / 100).toFixed(2);
+    const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
     const response = await client.sep6.deposit({
       asset_code: "USDC",
       account: signer.publicKey,
@@ -376,7 +395,7 @@ export const startAnchorTestOnramp = action({
     const signer = getTreasurySigner();
     await client.authenticate(signer.publicKey, signer.sign);
 
-    const amount = (payment.totalCents / 100).toFixed(2);
+    const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
     const response = await client.sep24.deposit({
       asset_code: "USDC",
       account: signer.publicKey,
