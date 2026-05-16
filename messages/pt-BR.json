@@ -455,24 +455,30 @@
       "openPayPage": "Abrir página de pagamento",
       "copyShareLink": "Copiar link",
       "linkCopied": "Link copiado",
-      "pix": {
-        "button": "Pagar com PIX",
-        "dialogTitle": "Pagamento via PIX",
-        "cancel": "Cancelar",
+      "pay": {
+        "button": "Pagar",
+        "title": "Pagar fatura",
+        "description": "Escolha o ativo e siga as instruções. A fatura atualiza automaticamente quando o pagamento for confirmado.",
         "close": "Fechar",
-        "copyCode": "Pix copia e cola",
         "orderId": "Pedido",
+        "copyAddress": "Endereço Stellar",
+        "copySep7": "Link SEP-7",
+        "copyPixCode": "PIX copia e cola",
+        "tabs": {
+          "xlm": "XLM",
+          "usdc": "USDC",
+          "tesouro": "TESOURO"
+        },
         "status": {
-          "starting": "Preparando pagamento...",
-          "awaitingPayment": "Escaneie o QR ou copie o código no app do seu banco",
+          "preparing": "Preparando pagamento...",
+          "awaitingStellar": "Envie {amount} {asset} para o endereço abaixo a partir da sua carteira Stellar",
+          "awaitingPix": "Escaneie o QR ou copie o código no app do seu banco",
           "processing": "Pagamento recebido, processando...",
           "completed": "Pago!",
           "failed": "Falha no pagamento"
         },
-        "description": {
-          "default": "Esta tela atualiza automaticamente assim que o pagamento for confirmado.",
-          "completed": "Pagamento confirmado. A fatura foi marcada como paga.",
-          "failed": "Não foi possível concluir a operação."
+        "hint": {
+          "stellar": "Use qualquer carteira Stellar (Freighter, Lobstr, xBull) para enviar {amount} {asset} ao endereço acima."
         }
       }
     },

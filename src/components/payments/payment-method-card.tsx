@@ -1,14 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ExternalLink, Copy, Check } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mono } from "@/components/ui/mono";
-import { Link, getPathname } from "@/i18n/navigation";
+import { getPathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { PixOnrampButton } from "@/components/payments/pix-onramp-button";
+import { PaymentButton } from "@/components/payments/payment-button";
 import { isChargeable, type Payment } from "@convex/payments/domain";
 
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -52,21 +52,14 @@ function ChargeableActions({
   payment: Payment;
   variant: "primary" | "secondary";
 }) {
-  const t = useTranslations("paymentDetails.methodCard");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        asChild
-        size="sm"
+      <PaymentButton
+        paymentId={payment._id}
+        publicId={payment.publicId}
+        totalCents={payment.totalCents}
         variant={variant === "primary" ? "default" : "outline"}
-        className="gap-2"
-      >
-        <Link href={`/pagar/${payment.publicId}/endereco`} target="_blank" rel="noopener">
-          {variant === "primary" ? t("generateStellar") : t("openPayPage")}
-          <ExternalLink className="size-4" strokeWidth={1.25} />
-        </Link>
-      </Button>
-      <PixOnrampButton paymentId={payment._id} variant="outline" />
+      />
       <ShareTenantLink publicId={payment.publicId} />
     </div>
   );

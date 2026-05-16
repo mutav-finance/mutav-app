@@ -455,24 +455,30 @@
       "openPayPage": "Open payment page",
       "copyShareLink": "Copy link",
       "linkCopied": "Link copied",
-      "pix": {
-        "button": "Pay with PIX",
-        "dialogTitle": "PIX Payment",
-        "cancel": "Cancel",
+      "pay": {
+        "button": "Pay",
+        "title": "Pay invoice",
+        "description": "Pick the asset and follow the instructions. The invoice updates automatically once the payment is confirmed.",
         "close": "Close",
-        "copyCode": "PIX copy & paste",
         "orderId": "Order",
+        "copyAddress": "Stellar address",
+        "copySep7": "SEP-7 link",
+        "copyPixCode": "PIX copy & paste",
+        "tabs": {
+          "xlm": "XLM",
+          "usdc": "USDC",
+          "tesouro": "TESOURO"
+        },
         "status": {
-          "starting": "Preparing payment...",
-          "awaitingPayment": "Scan the QR or copy the code in your bank app",
+          "preparing": "Preparing payment...",
+          "awaitingStellar": "Send {amount} {asset} to the address below from your Stellar wallet",
+          "awaitingPix": "Scan the QR or copy the code in your bank app",
           "processing": "Payment received, processing...",
           "completed": "Paid!",
           "failed": "Payment failed"
         },
-        "description": {
-          "default": "This screen updates automatically once the payment is confirmed.",
-          "completed": "Payment confirmed. The invoice has been marked paid.",
-          "failed": "Could not complete the operation."
+        "hint": {
+          "stellar": "Use any Stellar wallet (Freighter, Lobstr, xBull) to send {amount} {asset} to the address above."
         }
       }
     },
