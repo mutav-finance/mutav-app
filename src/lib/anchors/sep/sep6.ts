@@ -17,25 +17,7 @@ import type {
 } from "./types";
 import { SepApiError } from "./types";
 import { createAuthHeaders } from "./sep10";
-
-function unwrapTransaction<T>(data: unknown, action: string): T {
-  if (!data || typeof data !== "object" || !("transaction" in data) || !data.transaction) {
-    throw new SepApiError(`Anchor response missing transaction (${action})`, 0);
-  }
-  return (data as { transaction: T }).transaction;
-}
-
-function unwrapTransactions<T>(data: unknown, action: string): T[] {
-  if (
-    !data ||
-    typeof data !== "object" ||
-    !("transactions" in data) ||
-    !Array.isArray(data.transactions)
-  ) {
-    throw new SepApiError(`Anchor response missing transactions array (${action})`, 0);
-  }
-  return data.transactions as T[];
-}
+import { unwrapTransaction, unwrapTransactions } from "./_validate";
 
 /**
  * Get information about the anchor's SEP-6 capabilities.

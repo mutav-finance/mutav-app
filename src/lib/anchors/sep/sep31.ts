@@ -16,13 +16,8 @@ import type {
 } from "./types";
 import { SepApiError } from "./types";
 import { createAuthHeaders } from "./sep10";
-
-function unwrapTransaction<T>(data: unknown, action: string): T {
-  if (!data || typeof data !== "object" || !("transaction" in data) || !data.transaction) {
-    throw new SepApiError(`Anchor response missing transaction (${action})`, 0);
-  }
-  return (data as { transaction: T }).transaction;
-}
+import { assertShape, unwrapTransaction } from "./_validate";
+import { pollUntilTerminal, type PollOptions } from "./_poll";
 
 /**
  * Get information about the anchor's SEP-31 capabilities.
@@ -98,7 +93,11 @@ export async function postTransaction(
     );
   }
 
-  return response.json();
+  return assertShape<Sep31PostTransactionResponse>(
+    await response.json(),
+    ["id", "stellar_account_id", "stellar_memo_type", "stellar_memo"],
+    "create sep-31 transaction",
+  );
 }
 
 /**
@@ -303,38 +302,14 @@ export async function pollTransaction(
   directPaymentServer: string,
   token: string,
   transactionId: string,
-  options: {
-    interval?: number;
-    timeout?: number;
-    onStatusChange?: (transaction: Sep31Transaction) => void;
-    shouldStop?: (status: TransactionStatus) => boolean;
-  } = {},
+  options: PollOptions<Sep31Transaction> = {},
   fetchFn: typeof fetch = fetch,
 ): Promise<Sep31Transaction> {
-  const {
-    interval = 5000,
-    timeout = 600000, // 10 minutes
-    onStatusChange,
-    shouldStop = (status) => isComplete(status) || isFailed(status) || isRefunded(status),
-  } = options;
-
-  const startTime = Date.now();
-  let lastStatus: TransactionStatus | null = null;
-
-  while (Date.now() - startTime < timeout) {
-    const transaction = await getTransaction(directPaymentServer, token, transactionId, fetchFn);
-
-    if (transaction.status !== lastStatus) {
-      lastStatus = transaction.status;
-      onStatusChange?.(transaction);
-    }
-
-    if (shouldStop(transaction.status)) {
-      return transaction;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error(`Transaction polling timed out after ${timeout}ms`);
+  return pollUntilTerminal(
+    () => getTransaction(directPaymentServer, token, transactionId, fetchFn),
+    {
+      shouldStop: (status) => isComplete(status) || isFailed(status) || isRefunded(status),
+      ...options,
+    },
+  );
 }

@@ -16,6 +16,7 @@ import type {
 } from "./types";
 import { SepApiError } from "./types";
 import { createAuthHeaders } from "./sep10";
+import { assertShape } from "./_validate";
 
 /**
  * Get customer information and KYC status.
@@ -54,7 +55,7 @@ export async function getCustomer(
     );
   }
 
-  return response.json();
+  return assertShape<Sep12CustomerResponse>(await response.json(), ["status"], "get customer");
 }
 
 /**
@@ -129,7 +130,7 @@ export async function putCustomer(
     );
   }
 
-  return response.json();
+  return assertShape<Sep12PutCustomerResponse>(await response.json(), ["id"], "put customer");
 }
 
 /**

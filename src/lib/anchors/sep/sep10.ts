@@ -19,6 +19,7 @@ import type {
   SepError,
 } from "./types";
 import { SepApiError } from "./types";
+import { assertShape } from "./_validate";
 
 export interface Sep10Config {
   /** Anchor's SEP-10 auth endpoint, e.g. https://anchor.example.com/auth */
@@ -75,7 +76,11 @@ export async function getChallenge(
     );
   }
 
-  return response.json();
+  return assertShape<Sep10ChallengeResponse>(
+    await response.json(),
+    ["transaction"],
+    "get challenge",
+  );
 }
 
 /**
@@ -141,7 +146,7 @@ export async function submitChallenge(
     );
   }
 
-  return response.json();
+  return assertShape<Sep10TokenResponse>(await response.json(), ["token"], "submit challenge");
 }
 
 /**

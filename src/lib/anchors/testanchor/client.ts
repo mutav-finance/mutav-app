@@ -12,6 +12,18 @@
  */
 
 import { sep1, sep6, sep10, sep12, sep24, sep31, sep38 } from "../sep";
+import { SepApiError } from "../sep/types";
+
+type Sep = 6 | 10 | 12 | 24 | 31 | 38;
+
+const SEP_ENDPOINT_GETTERS: Record<Sep, (toml: sep1.StellarTomlRecord) => string | undefined> = {
+  6: sep1.getSep6Endpoint,
+  10: sep1.getSep10Endpoint,
+  12: sep1.getSep12Endpoint,
+  24: sep1.getSep24Endpoint,
+  31: sep1.getSep31Endpoint,
+  38: sep1.getSep38Endpoint,
+};
 
 import type {
   Sep6Info,
@@ -59,6 +71,7 @@ export class TestAnchorClient {
   private token: string | null = null;
   private account: string | null = null;
   private fetchFn: typeof fetch;
+  private endpointCache: Partial<Record<Sep, string>> = {};
 
   constructor(config: TestAnchorConfig = {}, fetchFn: typeof fetch = fetch) {
     this.domain = config.domain || DEFAULT_DOMAIN;
@@ -70,19 +83,21 @@ export class TestAnchorClient {
   // Private helpers
   // ===========================================================================
 
-  private async endpoint(
-    getEndpoint: (toml: sep1.StellarTomlRecord) => string | undefined,
-    sepName: string,
-  ): Promise<string> {
+  private async resolveEndpoint(sep: Sep): Promise<string> {
+    const cached = this.endpointCache[sep];
+    if (cached) return cached;
     const toml = await this.getToml();
-    const ep = getEndpoint(toml);
-    if (!ep) throw new Error(`Anchor does not support ${sepName}`);
+    const ep = SEP_ENDPOINT_GETTERS[sep](toml);
+    if (!ep) {
+      throw new SepApiError(`Anchor does not support SEP-${sep}`, 0);
+    }
+    this.endpointCache[sep] = ep;
     return ep;
   }
 
   private requireAuth(): string {
     if (!this.token || sep10.isTokenExpired(this.token)) {
-      throw new Error("Not authenticated or token expired. Call authenticate() first.");
+      throw new SepApiError("Not authenticated or token expired — call authenticate() first.", 0);
     }
     return this.token;
   }
@@ -106,24 +121,9 @@ export class TestAnchorClient {
   }
 
   /** Check if a specific SEP is supported by this anchor. */
-  async supportsSep(sep: 6 | 10 | 12 | 24 | 31 | 38): Promise<boolean> {
+  async supportsSep(sep: Sep): Promise<boolean> {
     const toml = await this.getToml();
-    switch (sep) {
-      case 6:
-        return !!sep1.getSep6Endpoint(toml);
-      case 10:
-        return !!sep1.getSep10Endpoint(toml);
-      case 12:
-        return !!sep1.getSep12Endpoint(toml);
-      case 24:
-        return !!sep1.getSep24Endpoint(toml);
-      case 31:
-        return !!sep1.getSep31Endpoint(toml);
-      case 38:
-        return !!sep1.getSep38Endpoint(toml);
-      default:
-        return false;
-    }
+    return !!SEP_ENDPOINT_GETTERS[sep](toml);
   }
 
   // ===========================================================================
@@ -136,17 +136,14 @@ export class TestAnchorClient {
    * @param signer - Function to sign the challenge transaction (e.g., from Freighter)
    */
   async authenticate(account: string, signer: sep10.Sep10SignerFn): Promise<string> {
-    const toml = await this.getToml();
-    const authEndpoint = sep1.getSep10Endpoint(toml);
-    const signingKey = sep1.getSigningKey(toml);
+    const authEndpoint = await this.resolveEndpoint(10);
+    const signingKey = sep1.getSigningKey(await this.getToml());
 
-    if (!authEndpoint) {
-      throw new Error("Anchor does not support SEP-10 authentication");
-    }
     if (!signingKey) {
-      throw new Error(
+      throw new SepApiError(
         "Anchor stellar.toml is missing SIGNING_KEY — cannot verify challenge signature. " +
           "Aborting to prevent signing an untrusted transaction.",
+        0,
       );
     }
 
@@ -200,27 +197,27 @@ export class TestAnchorClient {
 
   readonly sep6 = {
     getInfo: async (): Promise<Sep6Info> => {
-      const ep = await this.endpoint(sep1.getSep6Endpoint, "SEP-6");
+      const ep = await this.resolveEndpoint(6);
       return sep6.getInfo(ep, this.fetchFn);
     },
 
     deposit: async (request: Sep6DepositRequest): Promise<Sep6DepositResponse> => {
-      const ep = await this.endpoint(sep1.getSep6Endpoint, "SEP-6");
+      const ep = await this.resolveEndpoint(6);
       return sep6.deposit(ep, this.requireAuth(), request, this.fetchFn);
     },
 
     withdraw: async (request: Sep6WithdrawRequest): Promise<Sep6WithdrawResponse> => {
-      const ep = await this.endpoint(sep1.getSep6Endpoint, "SEP-6");
+      const ep = await this.resolveEndpoint(6);
       return sep6.withdraw(ep, this.requireAuth(), request, this.fetchFn);
     },
 
     getTransaction: async (transactionId: string): Promise<Sep6Transaction> => {
-      const ep = await this.endpoint(sep1.getSep6Endpoint, "SEP-6");
+      const ep = await this.resolveEndpoint(6);
       return sep6.getTransaction(ep, this.requireAuth(), transactionId, this.fetchFn);
     },
 
     getTransactions: async (assetCode: string, limit?: number): Promise<Sep6Transaction[]> => {
-      const ep = await this.endpoint(sep1.getSep6Endpoint, "SEP-6");
+      const ep = await this.resolveEndpoint(6);
       return sep6.getTransactions(
         ep,
         this.requireAuth(),
@@ -236,17 +233,17 @@ export class TestAnchorClient {
 
   readonly sep12 = {
     getCustomer: async (type?: string): Promise<Sep12CustomerResponse> => {
-      const ep = await this.endpoint(sep1.getSep12Endpoint, "SEP-12");
+      const ep = await this.resolveEndpoint(12);
       return sep12.getCustomer(ep, this.requireAuth(), { type }, this.fetchFn);
     },
 
     putCustomer: async (data: Sep12PutCustomerRequest): Promise<{ id: string }> => {
-      const ep = await this.endpoint(sep1.getSep12Endpoint, "SEP-12");
+      const ep = await this.resolveEndpoint(12);
       return sep12.putCustomer(ep, this.requireAuth(), data, this.fetchFn);
     },
 
     deleteCustomer: async (): Promise<void> => {
-      const ep = await this.endpoint(sep1.getSep12Endpoint, "SEP-12");
+      const ep = await this.resolveEndpoint(12);
       return sep12.deleteCustomer(ep, this.requireAuth(), {}, this.fetchFn);
     },
   };
@@ -257,27 +254,27 @@ export class TestAnchorClient {
 
   readonly sep24 = {
     getInfo: async (): Promise<Sep24Info> => {
-      const ep = await this.endpoint(sep1.getSep24Endpoint, "SEP-24");
+      const ep = await this.resolveEndpoint(24);
       return sep24.getInfo(ep, this.fetchFn);
     },
 
     deposit: async (request: Sep24DepositRequest): Promise<Sep24InteractiveResponse> => {
-      const ep = await this.endpoint(sep1.getSep24Endpoint, "SEP-24");
+      const ep = await this.resolveEndpoint(24);
       return sep24.deposit(ep, this.requireAuth(), request, this.fetchFn);
     },
 
     withdraw: async (request: Sep24WithdrawRequest): Promise<Sep24InteractiveResponse> => {
-      const ep = await this.endpoint(sep1.getSep24Endpoint, "SEP-24");
+      const ep = await this.resolveEndpoint(24);
       return sep24.withdraw(ep, this.requireAuth(), request, this.fetchFn);
     },
 
     getTransaction: async (transactionId: string): Promise<Sep24Transaction> => {
-      const ep = await this.endpoint(sep1.getSep24Endpoint, "SEP-24");
+      const ep = await this.resolveEndpoint(24);
       return sep24.getTransaction(ep, this.requireAuth(), transactionId, this.fetchFn);
     },
 
     getTransactions: async (assetCode: string, limit?: number): Promise<Sep24Transaction[]> => {
-      const ep = await this.endpoint(sep1.getSep24Endpoint, "SEP-24");
+      const ep = await this.resolveEndpoint(24);
       return sep24.getTransactions(
         ep,
         this.requireAuth(),
@@ -290,7 +287,7 @@ export class TestAnchorClient {
       transactionId: string,
       onStatusChange?: (tx: Sep24Transaction) => void,
     ): Promise<Sep24Transaction> => {
-      const ep = await this.endpoint(sep1.getSep24Endpoint, "SEP-24");
+      const ep = await this.resolveEndpoint(24);
       return sep24.pollTransaction(
         ep,
         this.requireAuth(),
@@ -307,19 +304,19 @@ export class TestAnchorClient {
 
   readonly sep31 = {
     getInfo: async (): Promise<Sep31Info> => {
-      const ep = await this.endpoint(sep1.getSep31Endpoint, "SEP-31");
+      const ep = await this.resolveEndpoint(31);
       return sep31.getInfo(ep, this.fetchFn);
     },
 
     createTransaction: async (
       request: Sep31PostTransactionRequest,
     ): Promise<Sep31PostTransactionResponse> => {
-      const ep = await this.endpoint(sep1.getSep31Endpoint, "SEP-31");
+      const ep = await this.resolveEndpoint(31);
       return sep31.postTransaction(ep, this.requireAuth(), request, this.fetchFn);
     },
 
     getTransaction: async (transactionId: string): Promise<Sep31Transaction> => {
-      const ep = await this.endpoint(sep1.getSep31Endpoint, "SEP-31");
+      const ep = await this.resolveEndpoint(31);
       return sep31.getTransaction(ep, this.requireAuth(), transactionId, this.fetchFn);
     },
 
@@ -327,7 +324,7 @@ export class TestAnchorClient {
       transactionId: string,
       fields: Record<string, string>,
     ): Promise<Sep31Transaction> => {
-      const ep = await this.endpoint(sep1.getSep31Endpoint, "SEP-31");
+      const ep = await this.resolveEndpoint(31);
       return sep31.patchTransaction(ep, this.requireAuth(), transactionId, fields, this.fetchFn);
     },
 
@@ -335,7 +332,7 @@ export class TestAnchorClient {
       transactionId: string,
       onStatusChange?: (tx: Sep31Transaction) => void,
     ): Promise<Sep31Transaction> => {
-      const ep = await this.endpoint(sep1.getSep31Endpoint, "SEP-31");
+      const ep = await this.resolveEndpoint(31);
       return sep31.pollTransaction(
         ep,
         this.requireAuth(),
@@ -352,22 +349,22 @@ export class TestAnchorClient {
 
   readonly sep38 = {
     getInfo: async (): Promise<Sep38Info> => {
-      const ep = await this.endpoint(sep1.getSep38Endpoint, "SEP-38");
+      const ep = await this.resolveEndpoint(38);
       return sep38.getInfo(ep, this.fetchFn);
     },
 
     getPrice: async (request: Sep38PriceRequest): Promise<Sep38PriceResponse> => {
-      const ep = await this.endpoint(sep1.getSep38Endpoint, "SEP-38");
+      const ep = await this.resolveEndpoint(38);
       return sep38.getPrice(ep, request, this.fetchFn);
     },
 
     createQuote: async (request: Sep38QuoteRequest): Promise<Sep38QuoteResponse> => {
-      const ep = await this.endpoint(sep1.getSep38Endpoint, "SEP-38");
+      const ep = await this.resolveEndpoint(38);
       return sep38.postQuote(ep, this.requireAuth(), request, this.fetchFn);
     },
 
     getQuote: async (quoteId: string): Promise<Sep38QuoteResponse> => {
-      const ep = await this.endpoint(sep1.getSep38Endpoint, "SEP-38");
+      const ep = await this.resolveEndpoint(38);
       return sep38.getQuote(ep, this.requireAuth(), quoteId, this.fetchFn);
     },
   };

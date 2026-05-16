@@ -16,6 +16,7 @@ import type {
 } from "./types";
 import { SepApiError } from "./types";
 import { createAuthHeaders } from "./sep10";
+import { assertShape } from "./_validate";
 
 /**
  * Get the list of supported assets and their delivery methods.
@@ -104,7 +105,11 @@ export async function getPrice(
     );
   }
 
-  return response.json();
+  return assertShape<Sep38PriceResponse>(
+    await response.json(),
+    ["total_price", "price", "sell_amount", "buy_amount", "fee"],
+    "get price",
+  );
 }
 
 /**
@@ -184,7 +189,11 @@ export async function postQuote(
     );
   }
 
-  return response.json();
+  return assertShape<Sep38QuoteResponse>(
+    await response.json(),
+    ["id", "expires_at", "total_price", "price", "sell_amount", "buy_amount", "fee"],
+    "post quote",
+  );
 }
 
 /**
@@ -216,7 +225,7 @@ export async function getQuote(
     );
   }
 
-  return response.json();
+  return assertShape<Sep38QuoteResponse>(await response.json(), ["id", "expires_at"], "get quote");
 }
 
 // =============================================================================

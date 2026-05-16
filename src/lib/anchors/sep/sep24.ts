@@ -11,17 +11,17 @@ import type {
   Sep24WithdrawRequest,
   Sep24InteractiveResponse,
   Sep24Transaction,
-  TransactionStatus,
   SepError,
 } from "./types";
 import { SepApiError } from "./types";
 import { createAuthHeaders } from "./sep10";
+import { assertShape, unwrapTransaction, unwrapTransactions } from "./_validate";
+import { pollUntilTerminal, type PollOptions } from "./_poll";
 
 /**
  * Build a SEP-24 multipart form body, skipping undefined values and
- * serializing booleans as "true"/"false" (per SEP-24 spec). Skipping rather
- * than coercing falsy values prevents accidentally sending opt-in flags as
- * the string "false".
+ * serializing booleans as "true" only when true (per SEP-24 spec). Skipping
+ * `false` prevents accidentally sending opt-in flags as the string "false".
  */
 function buildSep24FormData(request: Sep24DepositRequest | Sep24WithdrawRequest): FormData {
   const formData = new FormData();
@@ -34,25 +34,6 @@ function buildSep24FormData(request: Sep24DepositRequest | Sep24WithdrawRequest)
     formData.set(key, String(value));
   }
   return formData;
-}
-
-function unwrapTransaction<T>(data: unknown, action: string): T {
-  if (!data || typeof data !== "object" || !("transaction" in data) || !data.transaction) {
-    throw new SepApiError(`Anchor response missing transaction (${action})`, 0);
-  }
-  return (data as { transaction: T }).transaction;
-}
-
-function unwrapTransactions<T>(data: unknown, action: string): T[] {
-  if (
-    !data ||
-    typeof data !== "object" ||
-    !("transactions" in data) ||
-    !Array.isArray(data.transactions)
-  ) {
-    throw new SepApiError(`Anchor response missing transactions array (${action})`, 0);
-  }
-  return data.transactions as T[];
 }
 
 /**
@@ -114,7 +95,11 @@ export async function deposit(
     );
   }
 
-  return response.json();
+  return assertShape<Sep24InteractiveResponse>(
+    await response.json(),
+    ["url", "id"],
+    "initiate deposit",
+  );
 }
 
 /**
@@ -150,7 +135,11 @@ export async function withdraw(
     );
   }
 
-  return response.json();
+  return assertShape<Sep24InteractiveResponse>(
+    await response.json(),
+    ["url", "id"],
+    "initiate withdrawal",
+  );
 }
 
 /**
@@ -338,69 +327,13 @@ export async function pollTransaction(
   transferServer: string,
   token: string,
   transactionId: string,
-  options: {
-    interval?: number;
-    timeout?: number;
-    signal?: AbortSignal;
-    onStatusChange?: (transaction: Sep24Transaction) => void;
-    shouldStop?: (status: TransactionStatus) => boolean;
-  } = {},
+  options: PollOptions<Sep24Transaction> = {},
   fetchFn: typeof fetch = fetch,
 ): Promise<Sep24Transaction> {
-  const {
-    interval = 5000,
-    timeout = 600000,
-    signal,
-    onStatusChange,
-    shouldStop = (status) =>
-      status === "completed" || status === "error" || status === "expired" || status === "refunded",
-  } = options;
-
-  const startTime = Date.now();
-  let lastStatus: TransactionStatus | null = null;
-  let consecutiveTransientErrors = 0;
-  const maxTransientRetries = 3;
-
-  while (Date.now() - startTime < timeout) {
-    if (signal?.aborted) throw new DOMException("Polling aborted", "AbortError");
-
-    try {
-      const transaction = await getTransaction(transferServer, token, transactionId, fetchFn);
-      consecutiveTransientErrors = 0;
-
-      if (transaction.status !== lastStatus) {
-        lastStatus = transaction.status;
-        onStatusChange?.(transaction);
-      }
-
-      if (shouldStop(transaction.status)) return transaction;
-    } catch (error) {
-      const isTransient = error instanceof SepApiError && error.status >= 500;
-      if (!isTransient || ++consecutiveTransientErrors > maxTransientRetries) throw error;
-    }
-
-    await sleep(interval, signal);
-  }
-
-  throw new SepApiError(`Transaction polling timed out after ${timeout}ms`, 0);
-}
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException("Polling aborted", "AbortError"));
-      return;
-    }
-    const id = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(id);
-      reject(new DOMException("Polling aborted", "AbortError"));
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
+  return pollUntilTerminal(
+    () => getTransaction(transferServer, token, transactionId, fetchFn),
+    options,
+  );
 }
 
 // Re-export status helpers from SEP-6 since they're the same
