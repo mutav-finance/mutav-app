@@ -248,6 +248,12 @@ export interface Sep24DepositRequest {
   lang?: string;
   claimable_balance_supported?: boolean;
   customer_id?: string;
+  /**
+   * Open slot for SEP-9 fields (first_name, last_name, email_address,
+   * id_number, country_code, …) — anchors merge these into the hosted
+   * form pre-fill or onto the transaction record.
+   */
+  [key: string]: string | boolean | undefined;
 }
 
 export interface Sep24WithdrawRequest {

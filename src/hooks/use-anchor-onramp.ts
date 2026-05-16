@@ -29,7 +29,7 @@ export type AnchorOnrampPhase =
 type StartActionRef = FunctionReference<
   "action",
   "public",
-  { paymentId: Id<"payments"> },
+  { paymentId: Id<"payments">; lang?: string },
   { orderId: Id<"anchorOrders">; anchorTxId: string; hostedUrl?: string }
 >;
 
@@ -44,6 +44,8 @@ interface UseAnchorOnrampArgs {
   paymentId: Id<"payments">;
   startAction: StartActionRef;
   pollAction: PollActionRef;
+  /** Forwarded as the SEP-24/SEP-6 `lang` field so the anchor renders its hosted UI in this locale. */
+  lang?: string;
 }
 
 interface UseAnchorOnrampResult {
@@ -66,6 +68,7 @@ export function useAnchorOnramp({
   paymentId,
   startAction: startActionRef,
   pollAction: pollActionRef,
+  lang,
 }: UseAnchorOnrampArgs): UseAnchorOnrampResult {
   const [orderId, setOrderId] = useState<Id<"anchorOrders"> | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
@@ -110,14 +113,14 @@ export function useAnchorOnramp({
     setStartError(null);
     setIsStarting(true);
     try {
-      const result = await startAction({ paymentId });
+      const result = await startAction({ paymentId, lang });
       setOrderId(result.orderId);
     } catch (err) {
       setStartError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsStarting(false);
     }
-  }, [paymentId, startAction]);
+  }, [paymentId, startAction, lang]);
 
   const cancel = useCallback(() => {
     clearPolling();

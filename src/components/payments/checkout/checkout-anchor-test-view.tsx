@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,10 +34,12 @@ const POPUP_WINDOW_NAME = "mutav-anchor-deposit";
  */
 export function CheckoutAnchorTestView({ paymentId, totalCents }: Props) {
   const t = useTranslations("checkout.anchortest");
+  const locale = useLocale();
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
     paymentId,
     startAction: api.anchors.actions.startAnchorTestOnramp,
     pollAction: api.anchors.actions.pollAnchorTestOnramp,
+    lang: locale,
   });
 
   const startedRef = useRef(false);

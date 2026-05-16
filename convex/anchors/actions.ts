@@ -2,9 +2,12 @@
 
 import { v } from "convex/values";
 
+import type { GenericActionCtx } from "convex/server";
 import { action, internalAction } from "../_generated/server";
 import { api, internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { DataModel, Id } from "../_generated/dataModel";
+
+type ActionCtx = GenericActionCtx<DataModel>;
 import {
   createAnchorClient,
   getAnchorProvider,
@@ -208,6 +211,49 @@ function brlCentsToAssetAmount(brlCents: number, assetSymbol: string): string {
   return assetFace.toFixed(asset.displayDecimals);
 }
 
+interface TenantPrefill {
+  first_name?: string;
+  last_name?: string;
+  email_address?: string;
+  id_number?: string;
+}
+
+/**
+ * Resolve SEP-9 tenant fields from a payment row's first line item.
+ * Anchor hosted forms pre-fill these (and Etherfuse uses them to seed
+ * KYC). Returns an empty object when no contract/tenant is reachable —
+ * the deposit still works without prefill.
+ */
+async function resolveTenantPrefill(
+  ctx: ActionCtx,
+  contractPublicId: string | undefined,
+): Promise<TenantPrefill> {
+  if (!contractPublicId) return {};
+  const contract = await ctx.runQuery(api.contracts.useCases.getByPublicId, {
+    publicId: contractPublicId,
+  });
+  if (!contract) return {};
+  const tenant = contract.tenant;
+  const fullName = tenant.fullName.trim();
+  const [first, ...rest] = fullName.split(/\s+/);
+  return {
+    first_name: first ?? undefined,
+    last_name: rest.length > 0 ? rest.join(" ") : undefined,
+    email_address: tenant.email || undefined,
+    id_number: tenant.cpf || undefined,
+  };
+}
+
+function tenantPrefillToFields(p: TenantPrefill): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(p)) {
+    if (v !== undefined && v !== "") out[k] = v;
+  }
+  return out;
+}
+
+const PUBLIC_APP_URL = "https://mutav.app";
+
 interface StartPixOnrampResult {
   orderId: Id<"anchorOrders">;
   anchorTxId: string;
@@ -232,7 +278,10 @@ interface PollPixOnrampResult {
  * instructions when that provider lands — registry pattern preserved.
  */
 export const startPixOnramp = action({
-  args: { paymentId: v.id("payments") },
+  args: {
+    paymentId: v.id("payments"),
+    lang: v.optional(v.string()),
+  },
   returns: v.object({
     orderId: v.id("anchorOrders"),
     anchorTxId: v.string(),
@@ -260,6 +309,8 @@ export const startPixOnramp = action({
     await client.authenticate(signer.publicKey, signer.sign);
 
     const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
+    const tenant = await resolveTenantPrefill(ctx, payment.lineItems[0]?.contractPublicId);
+
     const response = await client.sep6.deposit({
       asset_code: "USDC",
       account: signer.publicKey,
@@ -268,6 +319,9 @@ export const startPixOnramp = action({
       // real Pix simulation); real Brazilian anchors will accept "pix".
       type: providerEntry.sep6DepositType,
       wallet_name: "Mutav",
+      wallet_url: PUBLIC_APP_URL,
+      lang: args.lang,
+      ...tenantPrefillToFields(tenant),
     });
 
     if (!response.id) {
@@ -368,7 +422,10 @@ interface StartAnchorTestOnrampResult {
  * production flow (which prefers SEP-6 + Mutav-owned UI).
  */
 export const startAnchorTestOnramp = action({
-  args: { paymentId: v.id("payments") },
+  args: {
+    paymentId: v.id("payments"),
+    lang: v.optional(v.string()),
+  },
   returns: v.object({
     orderId: v.id("anchorOrders"),
     anchorTxId: v.string(),
@@ -396,10 +453,16 @@ export const startAnchorTestOnramp = action({
     await client.authenticate(signer.publicKey, signer.sign);
 
     const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
+    const tenant = await resolveTenantPrefill(ctx, payment.lineItems[0]?.contractPublicId);
+
     const response = await client.sep24.deposit({
       asset_code: "USDC",
       account: signer.publicKey,
       amount,
+      wallet_name: "Mutav",
+      wallet_url: PUBLIC_APP_URL,
+      lang: args.lang,
+      ...tenantPrefillToFields(tenant),
     });
 
     if (!response.id || !response.url) {

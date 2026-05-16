@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import QRCode from "qrcode";
 import { CheckCircle2, AlertCircle, Loader2, Copy, Check, ChevronDown } from "lucide-react";
 
@@ -28,10 +28,12 @@ interface Props {
  */
 export function CheckoutPixView({ paymentId, totalCents }: Props) {
   const t = useTranslations("checkout.pix");
+  const locale = useLocale();
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
     paymentId,
     startAction: api.anchors.actions.startPixOnramp,
     pollAction: api.anchors.actions.pollPixOnramp,
+    lang: locale,
   });
 
   const startedRef = useRef(false);
