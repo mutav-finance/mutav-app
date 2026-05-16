@@ -435,13 +435,27 @@
         "title": "AnchorTest — {publicId} | Mutav",
         "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
       },
-      "iframeTitle": "Anchor deposit form",
-      "openInNewTab": "Open in new tab",
       "orderId": "Order",
+      "stepsHeading": "Steps",
+      "steps": {
+        "openForm": {
+          "title": "Open the anchor's form",
+          "caption": "We'll open the form in a new window.",
+          "popupOpen": "Form open. Complete the details in the popup window.",
+          "popupBlocked": "Your browser blocked the popup. Use the button below.",
+          "open": "Open form",
+          "reopen": "Reopen form"
+        },
+        "awaiting": {
+          "title": "Awaiting anchor confirmation",
+          "caption": "We're polling the anchor — you can close the window once you're done."
+        },
+        "done": {
+          "title": "Payment settled"
+        }
+      },
       "status": {
         "preparing": "Preparing deposit",
-        "awaitingPayment": "Complete the anchor form",
-        "processing": "Anchor processing",
         "completed": "Paid",
         "failed": "Payment failed"
       }

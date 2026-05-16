@@ -435,13 +435,27 @@
         "title": "AnchorTest — {publicId} | Mutav",
         "description": "Pague via interface da anchor (SEP-24 — demo)."
       },
-      "iframeTitle": "Formulário de depósito da anchor",
-      "openInNewTab": "Abrir em nova aba",
       "orderId": "Pedido",
+      "stepsHeading": "Passos",
+      "steps": {
+        "openForm": {
+          "title": "Abra o formulário da anchor",
+          "caption": "Vamos abrir o formulário em uma nova janela.",
+          "popupOpen": "Formulário aberto. Complete os dados na janela.",
+          "popupBlocked": "Seu navegador bloqueou a nova janela. Use o botão abaixo.",
+          "open": "Abrir formulário",
+          "reopen": "Reabrir formulário"
+        },
+        "awaiting": {
+          "title": "Aguardando confirmação da anchor",
+          "caption": "Estamos monitorando a anchor — você pode fechar a janela quando terminar."
+        },
+        "done": {
+          "title": "Pagamento liquidado"
+        }
+      },
       "status": {
         "preparing": "Preparando depósito",
-        "awaitingPayment": "Complete o formulário da anchor",
-        "processing": "Anchor processando",
         "completed": "Pago",
         "failed": "Falha no pagamento"
       }
