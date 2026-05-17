@@ -23,6 +23,7 @@ import {
   STELLAR_NETWORK_PASSPHRASES,
 } from "../../src/lib/anchors/registry";
 import { SepApiError, type TransactionStatus } from "../../src/lib/anchors/sep/types";
+import type { TransactionStatus as AnchorTransactionStatus } from "../../src/lib/anchors/types";
 import { ASSETS } from "../../src/lib/stellar/assets";
 import {
   getEtherfuseApiKey,
@@ -393,6 +394,18 @@ export const startPixOnramp = action({
     const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
       agencyId: payment.agencyId,
     });
+
+    // Etherfuse uses a non-SEP REST flow. Dispatch before falling through
+    // to the SEP-6 path so we never try to instantiate a SEP client for
+    // a provider that doesn't speak the protocol.
+    if (providerName === "etherfuse") {
+      return startEtherfusePixOnramp(ctx, {
+        paymentId: payment._id,
+        agencyId: payment.agencyId,
+        amountBRLCents: payment.totalCents,
+      });
+    }
+
     const providerEntry = getAnchorProvider(providerName);
 
     const client = createAnchorClient(providerName);
@@ -471,12 +484,16 @@ export const pollPixOnramp = action({
       return { orderId: order._id, status: order.status, terminal: true };
     }
 
-    // PR-4 will dispatch on order.provider here. Until then, only the
-    // SEP-compliant testanchor path is wired; etherfuse orders never reach
-    // this poller because no caller creates them yet.
-    if (order.provider !== "testanchor") {
-      throw new Error(`pollPixOnramp not yet implemented for provider ${order.provider}`);
+    // Dispatch on stored provider — orders from PR-4's startEtherfusePixOnramp
+    // land in this same poller via the etherfuse branch.
+    if (order.provider === "etherfuse") {
+      return pollEtherfusePixOnramp(ctx, {
+        _id: order._id,
+        anchorTxId: order.anchorTxId,
+        paymentId: order.paymentId,
+      });
     }
+
     const client = createAnchorClient(order.provider);
     await client.initialize();
     const signer = getTreasurySigner();
@@ -971,3 +988,203 @@ export const onboardAgencyEtherfuse = internalAction({
     };
   },
 });
+
+
+// ─── Etherfuse Pix on-ramp (REST flow, called from startPixOnramp dispatch) ──
+
+/**
+ * Map the vendored Anchor-interface TransactionStatus to Mutav's normalized
+ * anchorOrderStatus. The vendored EtherfuseClient collapses Etherfuse's
+ * granular states (`created | funded | completed | finalized | failed |
+ * refunded | canceled`) into this smaller set before returning, so this
+ * mapping only needs to handle the 7-value abstraction.
+ */
+function normalizeEtherfuseStatus(status: AnchorTransactionStatus): AnchorOrderStatus {
+  switch (status) {
+    case "pending":
+      return ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START;
+    case "processing":
+      return ANCHOR_ORDER_STATUS.PENDING_ANCHOR;
+    case "completed":
+      return ANCHOR_ORDER_STATUS.COMPLETED;
+    case "failed":
+    case "cancelled":
+      return ANCHOR_ORDER_STATUS.ERROR;
+    case "expired":
+      return ANCHOR_ORDER_STATUS.EXPIRED;
+    case "refunded":
+      return ANCHOR_ORDER_STATUS.REFUNDED;
+  }
+}
+
+function brlCentsToString(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+/**
+ * Build the `instructions` payload that `checkout-pix-view.tsx` consumes.
+ * The view looks for snake_case keys (`pix_qr_code`/`pix_br_code` for the
+ * QR, `pix_copia_cola`/`pix_copy_paste` for the copy-paste string). The
+ * Etherfuse client returns a typed object with camelCase fields; flatten
+ * here so the view doesn't need a per-provider branch.
+ */
+function etherfusePixInstructions(pixData: {
+  pixCode: string;
+  pixKey?: string;
+  pixKeyType?: string;
+  beneficiary?: string;
+  amount: string;
+  currency: string;
+}): Record<string, string> {
+  const out: Record<string, string> = {
+    pix_br_code: pixData.pixCode,
+    pix_copia_cola: pixData.pixCode,
+    amount: pixData.amount,
+    currency: pixData.currency,
+  };
+  if (pixData.pixKey) out.pix_chave = pixData.pixKey;
+  if (pixData.pixKeyType) out.pix_chave_type = pixData.pixKeyType;
+  if (pixData.beneficiary) out.beneficiary = pixData.beneficiary;
+  return out;
+}
+
+type EtherfuseStartContext = {
+  paymentId: Id<"payments">;
+  agencyId: Id<"agencies">;
+  amountBRLCents: number;
+};
+
+async function startEtherfusePixOnramp(
+  ctx: ActionCtx,
+  context: EtherfuseStartContext,
+): Promise<StartPixOnrampResult> {
+  const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
+    agencyId: context.agencyId,
+    provider: "etherfuse",
+  });
+  if (!account || account.data.provider !== "etherfuse") {
+    return {
+      success: false,
+      error: {
+        code: ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED,
+        detail: "Etherfuse account not provisioned for this agency",
+      },
+    };
+  }
+  if (account.data.kycStatus !== "approved") {
+    return {
+      success: false,
+      error: {
+        code: ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED,
+        detail: `KYC status ${account.data.kycStatus} (must be approved before orders)`,
+      },
+    };
+  }
+  if (!account.externalId) {
+    return {
+      success: false,
+      error: { code: ANCHOR_START_ERROR_CODE.INTERNAL, detail: "missing customerId" },
+    };
+  }
+
+  const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+  const client = new EtherfuseClient({
+    apiKey: getEtherfuseApiKey(),
+    baseUrl: getEtherfuseBaseUrl(),
+    defaultBlockchain: "stellar",
+  });
+
+  const amountBRL = brlCentsToString(context.amountBRLCents);
+
+  try {
+    // 1. Get a fresh quote (quotes expire in ~15 min; re-fetching on every
+    //    page load is cheap and avoids stale-quote 400s).
+    const quote = await client.getQuote({
+      customerId: account.externalId,
+      fromCurrency: "BRL",
+      toCurrency: "TESOURO",
+      fromAmount: amountBRL,
+      stellarAddress: account.data.publicKey,
+    });
+
+    // 2. Create the order. Etherfuse returns Pix payment instructions.
+    const onramp = await client.createOnRamp({
+      customerId: account.externalId,
+      quoteId: quote.id,
+      bankAccountId: account.data.bankAccountId,
+      stellarAddress: account.data.publicKey,
+      amount: amountBRL,
+      fromCurrency: "BRL",
+      toCurrency: "TESOURO",
+    });
+
+    if (!onramp.paymentInstructions || onramp.paymentInstructions.type !== "pix") {
+      return {
+        success: false,
+        error: {
+          code: ANCHOR_START_ERROR_CODE.ANCHOR_RESPONSE_INVALID,
+          detail: `expected pix instructions, got ${onramp.paymentInstructions?.type ?? "none"}`,
+        },
+      };
+    }
+
+    const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+      agencyId: context.agencyId,
+      paymentId: context.paymentId,
+      provider: "etherfuse",
+      anchorTxId: onramp.id,
+      instructions: etherfusePixInstructions(onramp.paymentInstructions),
+      status: ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START,
+    });
+
+    return { success: true, data: { orderId, anchorTxId: onramp.id } };
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      return {
+        success: false,
+        error: { code: ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED, detail: err.message },
+      };
+    }
+    throw err;
+  }
+}
+
+async function pollEtherfusePixOnramp(
+  ctx: ActionCtx,
+  order: { _id: Id<"anchorOrders">; anchorTxId: string; paymentId: Id<"payments"> },
+): Promise<PollPixOnrampResult> {
+  const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+  const client = new EtherfuseClient({
+    apiKey: getEtherfuseApiKey(),
+    baseUrl: getEtherfuseBaseUrl(),
+    defaultBlockchain: "stellar",
+  });
+
+  const tx = await client.getOnRampTransaction(order.anchorTxId);
+  if (!tx) throw new Error(`Etherfuse order ${order.anchorTxId} not found`);
+
+  const status = normalizeEtherfuseStatus(tx.status);
+
+  await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+    orderId: order._id,
+    status,
+    completedAt: tx.updatedAt,
+    rawPayload: tx,
+  });
+
+  if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
+    const pixKey =
+      tx.paymentInstructions?.type === "pix" && tx.paymentInstructions.pixKey
+        ? tx.paymentInstructions.pixKey
+        : `etherfuse:${order.anchorTxId}`;
+    const paidAt = tx.updatedAt ?? new Date().toISOString();
+    await ctx.runMutation(internal.payments.mutations.markPaidByAnchor, {
+      paymentId: order.paymentId,
+      anchorTxId: order.anchorTxId,
+      pixKey,
+      paidAt,
+    });
+  }
+
+  return { orderId: order._id, status, terminal: isTerminal(status) };
+}
