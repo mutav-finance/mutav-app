@@ -504,25 +504,31 @@ export const pollPixOnramp = action({
 
     const tx = await client.sep6.getTransaction(order.anchorTxId);
     const status = normalizeSep24Status(tx.status);
-
-    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
-      orderId: order._id,
+    const orderPatch = {
       status,
       amountInCents: brlToCents(tx.amount_in),
       amountOutCents: brlToCents(tx.amount_out),
       feeCents: brlToCents(tx.amount_fee),
       completedAt: tx.completed_at,
       rawPayload: tx,
-    });
+    };
 
     if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
-      const pixKey = tx.from ?? `anchor:${order.anchorTxId}`;
-      const paidAt = tx.completed_at ?? new Date().toISOString();
-      await ctx.runMutation(internal.payments.mutations.markPaidByAnchor, {
+      // Order patch + payment paid in one transaction — prevents the
+      // order from flipping completed while leaving the payment pending
+      // (which would short-circuit future polls at the isTerminal guard).
+      await ctx.runMutation(internal.anchors.orderUseCases.completeOrderAndMarkPaid, {
+        orderId: order._id,
+        ...orderPatch,
         paymentId: order.paymentId,
         anchorTxId: order.anchorTxId,
-        pixKey,
-        paidAt,
+        pixKey: tx.from ?? `anchor:${order.anchorTxId}`,
+        paidAt: tx.completed_at ?? new Date().toISOString(),
+      });
+    } else {
+      await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+        orderId: order._id,
+        ...orderPatch,
       });
     }
 
@@ -1233,27 +1239,33 @@ async function pollEtherfusePixOnramp(
 
   const status = normalizeEtherfuseStatus(tx.status);
   const terminal = isTerminal(status);
-
-  await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
-    orderId: order._id,
+  const orderPatch = {
     status,
     // completedAt is the timestamp of terminal resolution, not the last
     // update — only write it when the order has actually settled.
     completedAt: terminal ? tx.updatedAt : undefined,
     rawPayload: tx,
-  });
+  };
 
   if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
     const pixKey =
       tx.paymentInstructions?.type === "pix" && tx.paymentInstructions.pixKey
         ? tx.paymentInstructions.pixKey
         : `etherfuse:${order.anchorTxId}`;
-    const paidAt = tx.updatedAt ?? new Date().toISOString();
-    await ctx.runMutation(internal.payments.mutations.markPaidByAnchor, {
+    // Order patch + payment paid in one transaction — see SEP-6 branch
+    // for why splitting these breaks retry semantics.
+    await ctx.runMutation(internal.anchors.orderUseCases.completeOrderAndMarkPaid, {
+      orderId: order._id,
+      ...orderPatch,
       paymentId: order.paymentId,
       anchorTxId: order.anchorTxId,
       pixKey,
-      paidAt,
+      paidAt: tx.updatedAt ?? new Date().toISOString(),
+    });
+  } else {
+    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+      orderId: order._id,
+      ...orderPatch,
     });
   }
 
