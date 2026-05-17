@@ -882,6 +882,29 @@ function isOpAlreadyExistsError(err: unknown): boolean {
   return Array.isArray(operations) && operations.includes("op_already_exists");
 }
 
+/**
+ * Wrap an Etherfuse client call so a "this was already done" 4xx
+ * doesn't break onboarding retry. The vendored client surfaces these as
+ * AnchorError with statusCode 409 (Etherfuse's "already submitted" /
+ * "already accepted") or message text containing "already". Anything
+ * else rethrows.
+ */
+async function tolerateAlreadyDone<T>(fn: () => Promise<T>, label: string): Promise<T | null> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof AnchorError) {
+      const looksAlreadyDone =
+        err.statusCode === 409 || err.message.toLowerCase().includes("already");
+      if (looksAlreadyDone) {
+        console.warn(`[etherfuse] ${label} already done, continuing: ${err.message}`);
+        return null;
+      }
+    }
+    throw err;
+  }
+}
+
 // ─── Etherfuse agency onboarding (provision + KYC + terms) ────────────────────
 
 type OnboardAgencyEtherfuseArgs = {
@@ -991,48 +1014,54 @@ export const onboardAgencyEtherfuse = internalAction({
 
     // Step 5: programmatic KYC submission. Sandbox auto-approves with the
     // nested-id payload below; production gates on document review.
-    await client.submitKycIdentity(customerId, {
-      id: randomUUID(),
-      pubkey: publicKey,
-      identity: {
-        id: randomUUID(),
-        name: {
-          givenName: args.contactPerson.givenName,
-          familyName: args.contactPerson.familyName,
-        },
-        dateOfBirth: args.contactPerson.dateOfBirth,
-        address: {
+    // Tolerate duplicate-submission errors so a mid-flow failure in a
+    // previous run (e.g. terms acceptance throwing after KYC succeeded)
+    // can be retried without manual cleanup.
+    await tolerateAlreadyDone(
+      () =>
+        client.submitKycIdentity(customerId, {
           id: randomUUID(),
-          street: args.address.street,
-          city: args.address.city,
-          region: args.address.region,
-          postalCode: args.address.postalCode,
-          // Mutav is BR-only by design.
-          country: "BR",
-        },
-        idNumbers: [
-          {
+          pubkey: publicKey,
+          identity: {
             id: randomUUID(),
-            value: agency.cnpj,
-            type: "CNPJ",
+            name: {
+              givenName: args.contactPerson.givenName,
+              familyName: args.contactPerson.familyName,
+            },
+            dateOfBirth: args.contactPerson.dateOfBirth,
+            address: {
+              id: randomUUID(),
+              street: args.address.street,
+              city: args.address.city,
+              region: args.address.region,
+              postalCode: args.address.postalCode,
+              // Mutav is BR-only by design.
+              country: "BR",
+            },
+            idNumbers: [
+              {
+                id: randomUUID(),
+                value: agency.cnpj,
+                type: "CNPJ",
+              },
+            ],
           },
-        ],
-      },
-    });
+        }),
+      "submitKycIdentity",
+    );
 
     // Step 6: terms acceptance. Single endpoint suffices for sandbox; full
     // 3-agreement flow (acceptAgreements) is gated by phone-number collection
     // which is a production-only concern.
-    await client.acceptTermsAndConditions(presignedUrl);
+    await tolerateAlreadyDone(
+      () => client.acceptTermsAndConditions(presignedUrl),
+      "acceptTermsAndConditions",
+    );
 
-    // Step 7: flip the row's status to approved.
-    await ctx.runMutation(internal.anchors.accountUseCases.updateStatus, {
+    // Step 7: flip the row's onboarding status + kyc state in one
+    // transaction — see markEtherfuseOnboardingApproved.
+    await ctx.runMutation(internal.anchors.accountUseCases.markEtherfuseOnboardingApproved, {
       accountId: account._id,
-      status: ANCHOR_ONBOARDING_STATUS.APPROVED,
-    });
-    await ctx.runMutation(internal.anchors.accountUseCases.updateEtherfuseKycStatus, {
-      accountId: account._id,
-      kycStatus: "approved",
     });
 
     return {

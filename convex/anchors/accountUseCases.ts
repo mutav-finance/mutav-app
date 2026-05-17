@@ -128,6 +128,30 @@ export const markEtherfuseProvisioningHash = internalMutation({
 });
 
 /**
+ * Atomically flip the onboarding status to `approved` AND the etherfuse
+ * kycStatus to `approved`. Onboarding previously did these as two
+ * sequential runMutation calls; if the second one threw, the row was
+ * left half-approved and the next run had no resume path.
+ */
+export const markEtherfuseOnboardingApproved = internalMutation({
+  args: { accountId: v.id("anchorAccounts") },
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.accountId);
+    if (!account) throw new Error(`anchorAccounts ${args.accountId} not found`);
+    if (account.data.provider !== "etherfuse") {
+      throw new Error(
+        `anchorAccounts ${args.accountId} is not an etherfuse account (data.provider=${account.data.provider})`,
+      );
+    }
+    await ctx.db.patch(args.accountId, {
+      status: ANCHOR_ONBOARDING_STATUS.APPROVED,
+      data: { ...account.data, kycStatus: "approved" },
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+/**
  * Patch the etherfuse variant's kycStatus on an existing `anchorAccounts`
  * row. Re-asserts that the row's discriminator is etherfuse before
  * writing, so a corrupted/mismatched row throws instead of silently
