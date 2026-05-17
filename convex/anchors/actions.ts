@@ -1232,11 +1232,14 @@ async function pollEtherfusePixOnramp(
   }
 
   const status = normalizeEtherfuseStatus(tx.status);
+  const terminal = isTerminal(status);
 
   await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
     orderId: order._id,
     status,
-    completedAt: tx.updatedAt,
+    // completedAt is the timestamp of terminal resolution, not the last
+    // update — only write it when the order has actually settled.
+    completedAt: terminal ? tx.updatedAt : undefined,
     rawPayload: tx,
   });
 
@@ -1254,5 +1257,5 @@ async function pollEtherfusePixOnramp(
     });
   }
 
-  return { orderId: order._id, status, terminal: isTerminal(status) };
+  return { orderId: order._id, status, terminal };
 }
