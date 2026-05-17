@@ -286,6 +286,7 @@ export const ANCHOR_START_ERROR_CODE = {
   ASSET_UNSUPPORTED: "ASSET_UNSUPPORTED",
   ANCHOR_REJECTED: "ANCHOR_REJECTED",
   ANCHOR_RESPONSE_INVALID: "ANCHOR_RESPONSE_INVALID",
+  NO_BANK_ACCOUNT: "NO_BANK_ACCOUNT",
   INTERNAL: "INTERNAL",
 } as const;
 
@@ -299,6 +300,7 @@ const anchorStartErrorCodeValidator = v.union(
   v.literal(ANCHOR_START_ERROR_CODE.ASSET_UNSUPPORTED),
   v.literal(ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED),
   v.literal(ANCHOR_START_ERROR_CODE.ANCHOR_RESPONSE_INVALID),
+  v.literal(ANCHOR_START_ERROR_CODE.NO_BANK_ACCOUNT),
   v.literal(ANCHOR_START_ERROR_CODE.INTERNAL),
 );
 
@@ -360,6 +362,11 @@ export const startPixOnramp = action({
   args: {
     paymentId: v.id("payments"),
     lang: v.optional(v.string()),
+    // Optional for back-compat with the SEP-6 dispatch (testanchor doesn't
+    // use it) and for callers that just want the first registered bank.
+    // The etherfuse branch validates that the row belongs to the payment's
+    // agency before passing the upstream identifier to Etherfuse.
+    bankAccountId: v.optional(v.id("agencyBankAccounts")),
   },
   returns: v.union(
     v.object({
@@ -406,6 +413,7 @@ export const startPixOnramp = action({
         paymentId: payment._id,
         agencyId: payment.agencyId,
         amountBRLCents: payment.totalCents,
+        bankAccountId: args.bankAccountId,
       });
     }
 
@@ -1118,6 +1126,200 @@ export const onboardAgencyEtherfuseKyc = internalAction({
   },
 });
 
+// ─── Etherfuse bank account management ────────────────────────────────────────
+
+type BankAccountSummary = {
+  externalBankAccountId: string;
+  type: "pix" | "spei";
+  accountNumber: string;
+  accountHolderName: string;
+};
+
+const bankAccountSummaryValidator = v.object({
+  externalBankAccountId: v.string(),
+  type: v.union(v.literal("pix"), v.literal("spei")),
+  accountNumber: v.string(),
+  accountHolderName: v.string(),
+});
+
+const ETHERFUSE_HOSTED_URL_TTL_SECONDS = 900;
+
+type EtherfuseManageBankErrorCode = "NO_ANCHOR_ACCOUNT" | "KYC_NOT_APPROVED" | "INTERNAL";
+
+const etherfuseManageBankErrorCodeValidator = v.union(
+  v.literal("NO_ANCHOR_ACCOUNT"),
+  v.literal("KYC_NOT_APPROVED"),
+  v.literal("INTERNAL"),
+);
+
+type SyncEtherfuseBankAccountsResult =
+  | { success: true; data: { count: number; accounts: BankAccountSummary[] } }
+  | { success: false; error: { code: EtherfuseManageBankErrorCode; detail?: string } };
+
+type GetEtherfuseBankRegistrationUrlResult =
+  | { success: true; data: { presignedUrl: string; expiresInSeconds: number } }
+  | {
+      success: false;
+      error: { code: Exclude<EtherfuseManageBankErrorCode, "KYC_NOT_APPROVED">; detail?: string };
+    };
+
+/**
+ * Pull the agency's Etherfuse-side bank list and reconcile it with the
+ * local `agencyBankAccounts` mirror. Idempotent — upserts new rows,
+ * patches changed ones, and removes any local row whose upstream id
+ * disappeared (operator deleted a bank in Etherfuse's hosted UI).
+ *
+ * Called by the checkout pre-flight after the operator clicks
+ * "Já cadastrei" to refresh the picker, and on any other UI moment we
+ * want to re-mirror.
+ */
+export const syncEtherfuseBankAccounts = action({
+  args: { agencyId: v.id("agencies") },
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      data: v.object({
+        count: v.number(),
+        accounts: v.array(bankAccountSummaryValidator),
+      }),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.object({
+        code: etherfuseManageBankErrorCodeValidator,
+        detail: v.optional(v.string()),
+      }),
+    }),
+  ),
+  handler: async (ctx, args): Promise<SyncEtherfuseBankAccountsResult> => {
+    const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
+      agencyId: args.agencyId,
+      provider: "etherfuse",
+    });
+    if (!account || account.data.provider !== "etherfuse" || !account.externalId) {
+      return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
+    }
+    if (account.data.kycStatus !== "approved") {
+      return {
+        success: false,
+        error: {
+          code: "KYC_NOT_APPROVED",
+          detail: `kycStatus=${account.data.kycStatus}`,
+        },
+      };
+    }
+
+    const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+    const client = new EtherfuseClient({
+      apiKey: getEtherfuseApiKey(),
+      baseUrl: getEtherfuseBaseUrl(),
+      defaultBlockchain: "stellar",
+    });
+
+    let upstream;
+    try {
+      upstream = await client.getFiatAccounts(account.externalId);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        return { success: false, error: { code: "INTERNAL", detail: err.message } };
+      }
+      throw err;
+    }
+
+    // Mutav-BR only consumes Pix today. Filter out non-pix entries (the
+    // sandbox account may carry test SPEI banks from earlier experiments)
+    // so the local picker can't accidentally select a Mexican rail.
+    const pixOnly = upstream.filter((a) => a.type === "PIX");
+
+    const summaries: BankAccountSummary[] = [];
+    for (const remote of pixOnly) {
+      await ctx.runMutation(internal.anchors.bankAccountUseCases.upsertFromEtherfuse, {
+        agencyId: args.agencyId,
+        anchorAccountId: account._id,
+        externalBankAccountId: remote.id,
+        type: "pix",
+        accountNumber: remote.accountNumber,
+        accountHolderName: remote.accountHolderName,
+        etherfuseCreatedAt: remote.createdAt,
+      });
+      summaries.push({
+        externalBankAccountId: remote.id,
+        type: "pix",
+        accountNumber: remote.accountNumber,
+        accountHolderName: remote.accountHolderName,
+      });
+    }
+    await ctx.runMutation(internal.anchors.bankAccountUseCases.removeMissingExternalIds, {
+      agencyId: args.agencyId,
+      keepExternalIds: summaries.map((s) => s.externalBankAccountId),
+    });
+
+    return { success: true, data: { count: summaries.length, accounts: summaries } };
+  },
+});
+
+/**
+ * Return a fresh presigned URL the operator opens in a new tab to add
+ * a Pix bank via Etherfuse's hosted onboarding flow. Each invocation
+ * passes a fresh placeholder `bankAccountId` so the hosted UI treats
+ * the visit as a distinct new-bank registration; the upstream creates
+ * the actual bank entry only when the operator completes the form.
+ * URLs expire after 15 min per Etherfuse — surface that so the caller
+ * can decide when to re-fetch.
+ */
+export const getEtherfuseBankRegistrationUrl = action({
+  args: { agencyId: v.id("agencies") },
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      data: v.object({
+        presignedUrl: v.string(),
+        expiresInSeconds: v.number(),
+      }),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.object({
+        code: v.union(v.literal("NO_ANCHOR_ACCOUNT"), v.literal("INTERNAL")),
+        detail: v.optional(v.string()),
+      }),
+    }),
+  ),
+  handler: async (ctx, args): Promise<GetEtherfuseBankRegistrationUrlResult> => {
+    const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
+      agencyId: args.agencyId,
+      provider: "etherfuse",
+    });
+    if (!account || account.data.provider !== "etherfuse" || !account.externalId) {
+      return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
+    }
+
+    const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+    const client = new EtherfuseClient({
+      apiKey: getEtherfuseApiKey(),
+      baseUrl: getEtherfuseBaseUrl(),
+      defaultBlockchain: "stellar",
+    });
+
+    try {
+      const presignedUrl = await client.getKycUrl(
+        account.externalId,
+        account.data.publicKey,
+        randomUUID(),
+      );
+      return {
+        success: true,
+        data: { presignedUrl, expiresInSeconds: ETHERFUSE_HOSTED_URL_TTL_SECONDS },
+      };
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        return { success: false, error: { code: "INTERNAL", detail: err.message } };
+      }
+      throw err;
+    }
+  },
+});
+
 // ─── Etherfuse Pix on-ramp (REST flow, called from startPixOnramp dispatch) ──
 
 /**
@@ -1180,6 +1382,7 @@ type EtherfuseStartContext = {
   paymentId: Id<"payments">;
   agencyId: Id<"agencies">;
   amountBRLCents: number;
+  bankAccountId?: Id<"agencyBankAccounts">;
 };
 
 async function startEtherfusePixOnramp(
@@ -1215,6 +1418,42 @@ async function startEtherfusePixOnramp(
     };
   }
 
+  // Resolve which agency bank account funds the Pix. Explicit pick from
+  // the client preferred; falls back to the first registered bank when
+  // the caller doesn't care (e.g. testanchor → etherfuse dispatch).
+  // Both paths exit early with NO_BANK_ACCOUNT if the agency hasn't
+  // registered any bank yet — surfacing the gap cleanly instead of
+  // letting Etherfuse return its opaque "Proxy account not found".
+  let externalBankAccountId: string;
+  if (context.bankAccountId) {
+    const bank = await ctx.runQuery(internal.anchors.bankAccountUseCases.getById, {
+      bankAccountId: context.bankAccountId,
+    });
+    if (!bank || bank.agencyId !== context.agencyId) {
+      return {
+        success: false,
+        error: {
+          code: ANCHOR_START_ERROR_CODE.NO_BANK_ACCOUNT,
+          detail: "selected bank account not found for this agency",
+        },
+      };
+    }
+    externalBankAccountId = bank.externalBankAccountId;
+  } else {
+    const banks = await ctx.runQuery(api.anchors.bankAccountUseCases.listByAgency, {
+      agencyId: context.agencyId,
+    });
+    if (banks.length === 0) {
+      return {
+        success: false,
+        error: { code: ANCHOR_START_ERROR_CODE.NO_BANK_ACCOUNT },
+      };
+    }
+    // Deterministic ordering: by_agency index returns by _creationTime
+    // asc, so [0] is the agency's oldest registered bank.
+    externalBankAccountId = banks[0]!.externalBankAccountId;
+  }
+
   const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
     apiKey: getEtherfuseApiKey(),
@@ -1239,7 +1478,7 @@ async function startEtherfusePixOnramp(
     const onramp = await client.createOnRamp({
       customerId: account.externalId,
       quoteId: quote.id,
-      bankAccountId: account.data.bankAccountId,
+      bankAccountId: externalBankAccountId,
       stellarAddress: account.data.publicKey,
       amount: amountBRL,
       fromCurrency: "BRL",
