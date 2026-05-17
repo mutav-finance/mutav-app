@@ -1,3 +1,5 @@
+"use node";
+
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { getStellarSecretEncryptionKey } from "./env";
 
@@ -26,7 +28,9 @@ export function encryptSecret(plaintext: string): EncryptedEnvelope {
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
   if (authTag.length !== AUTH_TAG_BYTES) {
-    throw new Error(`GCM auth tag length mismatch (expected ${AUTH_TAG_BYTES}, got ${authTag.length})`);
+    throw new Error(
+      `GCM auth tag length mismatch (expected ${AUTH_TAG_BYTES}, got ${authTag.length})`,
+    );
   }
   return {
     ciphertext: ciphertext.toString("base64"),

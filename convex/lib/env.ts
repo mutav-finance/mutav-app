@@ -103,6 +103,29 @@ export function getEtherfuseApiKey(): string {
 }
 
 /**
+ * Base64 secret returned once at webhook creation
+ * (POST /ramp/webhook → response.secret). Used by `convex/http.ts` to
+ * verify HMAC-SHA256 over canonicalized JSON per
+ * docs.etherfuse.com/guides/verifying-webhooks.
+ *
+ * Each Convex deployment registers its own webhook URL (the deployment's
+ * .convex.site origin), so this secret is per-environment, not per-agency.
+ * Register via `bun run scripts/etherfuse-register-webhook.ts <url>` and
+ * paste the returned secret into the env.
+ */
+export function getEtherfuseWebhookSecret(): string {
+  const secret = process.env.ETHERFUSE_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error(
+      "ETHERFUSE_WEBHOOK_SECRET is not set. " +
+        "Register a webhook with `bun run scripts/etherfuse-register-webhook.ts <https-url>` " +
+        "and set with `bunx convex env set ETHERFUSE_WEBHOOK_SECRET <base64>`.",
+    );
+  }
+  return secret;
+}
+
+/**
  * 32-byte base64-encoded key for AES-256-GCM envelope encryption of
  * per-agency Stellar proxy account secrets. Required by
  * `convex/lib/secrets.ts` whenever PR-2's proxy provisioning runs.

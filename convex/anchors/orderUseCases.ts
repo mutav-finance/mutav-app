@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 
-import { internalMutation, query } from "../_generated/server";
+import { internalMutation, internalQuery, query } from "../_generated/server";
 import { anchorProviderValidator } from "./domain";
 import { anchorOrderStatusValidator, type AnchorOrder, type AnchorOrderId } from "./orderDomain";
 
@@ -10,6 +10,21 @@ export const getOrderById = query({
   args: { orderId: v.id("anchorOrders") },
   handler: async (ctx, args): Promise<AnchorOrder | null> => {
     return ctx.db.get(args.orderId);
+  },
+});
+
+/**
+ * Reverse lookup for webhook reconciliation: given the provider's order
+ * identifier (e.g. Etherfuse's UUID), find the local order row. O(1) via
+ * the existing `by_anchor_tx` index.
+ */
+export const getByAnchorTxId = internalQuery({
+  args: { anchorTxId: v.string() },
+  handler: async (ctx, args): Promise<AnchorOrder | null> => {
+    return ctx.db
+      .query("anchorOrders")
+      .withIndex("by_anchor_tx", (q) => q.eq("anchorTxId", args.anchorTxId))
+      .unique();
   },
 });
 
