@@ -74,3 +74,34 @@ export function getTreasurySecret(): string {
   }
   return secret;
 }
+
+/**
+ * 32-byte base64-encoded key for AES-256-GCM envelope encryption of
+ * per-agency Stellar proxy account secrets. Required by
+ * `convex/lib/secrets.ts` whenever PR-2's proxy provisioning runs.
+ *
+ * Generate one for dev/preview with:
+ *
+ *   openssl rand -base64 32
+ *
+ * Production should rotate to a managed secret (KMS/HSM/Vault) — this
+ * env-derived path is the dev/preview default per `.claude/notes/deferred-conventions.md`.
+ */
+export function getStellarSecretEncryptionKey(): Buffer {
+  const raw = process.env.MUTAV_STELLAR_SECRET_ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error(
+      "MUTAV_STELLAR_SECRET_ENCRYPTION_KEY is not set. " +
+        "Per-agency proxy account provisioning requires an encryption key. " +
+        "Generate one via `openssl rand -base64 32` and set with " +
+        "`bunx convex env set MUTAV_STELLAR_SECRET_ENCRYPTION_KEY <base64>`.",
+    );
+  }
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new Error(
+      `MUTAV_STELLAR_SECRET_ENCRYPTION_KEY must decode to 32 bytes (AES-256); got ${key.length}.`,
+    );
+  }
+  return key;
+}

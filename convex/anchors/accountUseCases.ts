@@ -100,6 +100,45 @@ export const updateStatus = internalMutation({
   },
 });
 
+/**
+ * Insert an `anchorAccounts` row for an agency's Etherfuse proxy. The
+ * provisioning action calls this AFTER the on-chain createAccount tx has
+ * confirmed, so the row's existence is the on-chain reality. `externalId`
+ * holds the customerId UUID that gets registered with Etherfuse in PR-3.
+ */
+export const insertEtherfuseAccount = internalMutation({
+  args: {
+    agencyId: v.id("agencies"),
+    customerId: v.string(),
+    bankAccountId: v.string(),
+    publicKey: v.string(),
+    encryptedSecret: v.object({
+      ciphertext: v.string(),
+      iv: v.string(),
+      authTag: v.string(),
+    }),
+  },
+  returns: v.id("anchorAccounts"),
+  handler: async (ctx, args): Promise<AnchorAccountId> => {
+    const now = new Date().toISOString();
+    return ctx.db.insert("anchorAccounts", {
+      agencyId: args.agencyId,
+      provider: "etherfuse",
+      status: ANCHOR_ONBOARDING_STATUS.PENDING,
+      externalId: args.customerId,
+      createdAt: now,
+      updatedAt: now,
+      data: {
+        provider: "etherfuse",
+        publicKey: args.publicKey,
+        encryptedSecret: args.encryptedSecret,
+        bankAccountId: args.bankAccountId,
+        kycStatus: "not_started",
+      },
+    });
+  },
+});
+
 // ─── Predicates re-export ─────────────────────────────────────────────────────
 
 export { ANCHOR_ONBOARDING_STATUS };

@@ -1,5 +1,14 @@
 "use node";
 
+import { randomUUID } from "node:crypto";
+import {
+  Asset,
+  BASE_FEE,
+  Horizon,
+  Keypair,
+  Operation,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 import { v } from "convex/values";
 
 import type { GenericActionCtx } from "convex/server";
@@ -15,6 +24,8 @@ import {
 } from "../../src/lib/anchors/registry";
 import { SepApiError, type TransactionStatus } from "../../src/lib/anchors/sep/types";
 import { ASSETS } from "../../src/lib/stellar/assets";
+import { getStellarHorizonUrl, getStellarNetwork, getTreasurySecret } from "../lib/env";
+import { encryptSecret } from "../lib/secrets";
 import { getTreasurySigner } from "../lib/stellarSigner";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
@@ -653,5 +664,140 @@ export const pollAnchorTestOnramp = action({
     }
 
     return { orderId: order._id, status, terminal: isTerminal(status) };
+  },
+});
+
+// ─── Etherfuse proxy account provisioning ─────────────────────────────────────
+
+// TESOURO is a Brazilian Treasury-tokenized asset issued by Etherfuse.
+// 7-char code → credit_alphanum12 trustline. Hardcoded here because PR-2
+// only needs to open the trustline; PR-4 (checkout wiring) is the right
+// place to promote into src/lib/stellar/assets.ts.
+const TESOURO_ASSET_CODE = "TESOURO";
+const TESOURO_ISSUER = "GC3CW7EDYRTWQ635VDIGY6S4ZUF5L6TQ7AA4MWS7LEQDBLUSZXV7UPS4";
+
+const PROXY_STARTING_BALANCE_XLM = "0";
+const PROVISIONING_OP_COUNT = 4;
+const TX_TIMEOUT_SECONDS = 180;
+
+function getStellarNetworkPassphrase(): string {
+  return STELLAR_NETWORK_PASSPHRASES[getStellarNetwork() === "public" ? "pubnet" : "testnet"];
+}
+
+type ProvisionAgencyEtherfuseAccountResult = {
+  accountId: Id<"anchorAccounts">;
+  publicKey: string;
+  transactionHash: string;
+  alreadyProvisioned: boolean;
+};
+
+/**
+ * Create the per-agency Stellar proxy account that Etherfuse delivers
+ * TESOURO into. Idempotent — if an `anchorAccounts` row already exists
+ * for (agency, etherfuse), returns its publicKey without doing anything
+ * on-chain.
+ *
+ * The provisioning tx follows the Zero-Friction pattern from
+ * labs/masterclass/01-sdk-advanced/04-zero-friction-onboarding.ts:
+ *
+ *   BeginSponsoringFutureReserves(sponsoredId=proxy)   source: treasury
+ *   CreateAccount(destination=proxy, startingBalance=0) source: treasury
+ *   ChangeTrust(source=proxy, asset=TESOURO)
+ *   EndSponsoringFutureReserves(source=proxy)
+ *
+ * Treasury holds the reserves so the proxy lands at 0 XLM with a TESOURO
+ * trustline open. The proxy's secret is encrypted under the project key
+ * before persisting; we never store raw seeds in the database.
+ *
+ * PR-3 picks up customerId/bankAccountId from the inserted row and
+ * registers them with Etherfuse via POST /ramp/onboarding-url.
+ */
+export const provisionAgencyEtherfuseAccount = internalAction({
+  args: { agencyId: v.id("agencies") },
+  returns: v.object({
+    accountId: v.id("anchorAccounts"),
+    publicKey: v.string(),
+    transactionHash: v.string(),
+    alreadyProvisioned: v.boolean(),
+  }),
+  handler: async (ctx, args): Promise<ProvisionAgencyEtherfuseAccountResult> => {
+    const existing = await ctx.runQuery(
+      internal.anchors.accountUseCases.getByAgencyAndProvider,
+      { agencyId: args.agencyId, provider: "etherfuse" },
+    );
+    if (existing) {
+      if (existing.data.provider !== "etherfuse") {
+        throw new Error(
+          `anchorAccounts ${existing._id} has provider=etherfuse but data.provider=${existing.data.provider}`,
+        );
+      }
+      return {
+        accountId: existing._id,
+        publicKey: existing.data.publicKey,
+        transactionHash: "(already provisioned)",
+        alreadyProvisioned: true,
+      };
+    }
+
+    const proxyKeypair = Keypair.random();
+    const customerId = randomUUID();
+    const bankAccountId = randomUUID();
+
+    const treasury = Keypair.fromSecret(getTreasurySecret());
+    const horizon = new Horizon.Server(getStellarHorizonUrl());
+    const treasuryAccount = await horizon.loadAccount(treasury.publicKey());
+
+    const tx = new TransactionBuilder(treasuryAccount, {
+      fee: String(Number(BASE_FEE) * PROVISIONING_OP_COUNT),
+      networkPassphrase: getStellarNetworkPassphrase(),
+    })
+      .addOperation(
+        Operation.beginSponsoringFutureReserves({ sponsoredId: proxyKeypair.publicKey() }),
+      )
+      .addOperation(
+        Operation.createAccount({
+          destination: proxyKeypair.publicKey(),
+          // 0 XLM is only legal because the base reserve is sponsored.
+          startingBalance: PROXY_STARTING_BALANCE_XLM,
+        }),
+      )
+      .addOperation(
+        Operation.changeTrust({
+          source: proxyKeypair.publicKey(),
+          asset: new Asset(TESOURO_ASSET_CODE, TESOURO_ISSUER),
+        }),
+      )
+      .addOperation(
+        Operation.endSponsoringFutureReserves({ source: proxyKeypair.publicKey() }),
+      )
+      .setTimeout(TX_TIMEOUT_SECONDS)
+      .build();
+
+    tx.sign(treasury, proxyKeypair);
+    const submitResult = await horizon.submitTransaction(tx);
+
+    // On-chain confirmed — only now persist. If the insert fails after
+    // submission, the account exists on-chain but we won't track it —
+    // the next provisioning call would create a duplicate. Acceptable
+    // tradeoff vs. inserting first and orphaning a row if submission
+    // fails.
+    const encryptedSecret = encryptSecret(proxyKeypair.secret());
+    const accountId = await ctx.runMutation(
+      internal.anchors.accountUseCases.insertEtherfuseAccount,
+      {
+        agencyId: args.agencyId,
+        customerId,
+        bankAccountId,
+        publicKey: proxyKeypair.publicKey(),
+        encryptedSecret,
+      },
+    );
+
+    return {
+      accountId,
+      publicKey: proxyKeypair.publicKey(),
+      transactionHash: submitResult.hash,
+      alreadyProvisioned: false,
+    };
   },
 });

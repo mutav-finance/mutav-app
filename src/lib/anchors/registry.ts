@@ -25,7 +25,7 @@
 import type { TestAnchorClient, TestAnchorConfig } from "./testanchor/client";
 import { createTestAnchorClient } from "./testanchor/client";
 
-export const ANCHOR_PROVIDER_NAMES = ["testanchor"] as const;
+export const ANCHOR_PROVIDER_NAMES = ["testanchor", "etherfuse"] as const;
 export type AnchorProviderName = (typeof ANCHOR_PROVIDER_NAMES)[number];
 
 export type StellarNetwork = "testnet" | "pubnet";
@@ -65,6 +65,15 @@ const REGISTRY: Record<AnchorProviderName, AnchorProviderEntry> = {
     network: "testnet",
     sep6DepositType: "SEPA",
   },
+  etherfuse: {
+    name: "etherfuse",
+    displayName: "Etherfuse",
+    description:
+      "Brazilian Pix on-ramp via Etherfuse REST API (api.sand.etherfuse.com sandbox / api.etherfuse.com prod). Mints TESOURO on Stellar in exchange for BRL settled via Pix.",
+    sandbox: true,
+    network: "testnet",
+    sep6DepositType: "pix",
+  },
 };
 
 export function listAnchorProviders(): readonly AnchorProviderEntry[] {
@@ -77,7 +86,9 @@ export function getAnchorProvider(name: AnchorProviderName): AnchorProviderEntry
 
 export type AnchorClientFor<T extends AnchorProviderName> = T extends "testanchor"
   ? TestAnchorClient
-  : never;
+  : T extends "etherfuse"
+    ? never // PR-4 will wire EtherfuseClient through createAnchorClient.
+    : never;
 
 export interface CreateAnchorClientOptions {
   testanchor?: TestAnchorConfig;
@@ -99,6 +110,8 @@ export function createAnchorClient<T extends AnchorProviderName>(
   switch (name) {
     case "testanchor":
       return createTestAnchorClient(options?.testanchor, options?.fetchFn) as AnchorClientFor<T>;
+    case "etherfuse":
+      throw new Error("createAnchorClient('etherfuse') not yet wired — see PR-4");
   }
   throw new Error(`Unknown anchor provider: ${String(name)}`);
 }

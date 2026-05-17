@@ -14,6 +14,7 @@ import { ANCHOR_PROVIDER_NAMES, type AnchorProviderName } from "../../src/lib/an
  */
 export const ANCHOR_PROVIDER = {
   TESTANCHOR: "testanchor",
+  ETHERFUSE: "etherfuse",
 } as const satisfies Record<string, AnchorProviderName>;
 
 export type AnchorProvider = AnchorProviderName;

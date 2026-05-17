@@ -108,6 +108,15 @@ const anchorAccountData = v.union(
   }),
   v.object({
     provider: v.literal("etherfuse"),
+    // Per-agency Stellar proxy account. publicKey is the G-address
+    // registered with Etherfuse; encryptedSecret holds the AES-GCM envelope
+    // of the secret seed (see convex/lib/secrets.ts for encrypt/decrypt).
+    publicKey: v.string(),
+    encryptedSecret: v.object({
+      ciphertext: v.string(),
+      iv: v.string(),
+      authTag: v.string(),
+    }),
     // Both UUIDs are client-generated and registered with Etherfuse via
     // POST /ramp/onboarding-url. Persisted forever per agency (one G-address
     // ↔ one Etherfuse customer globally — see anchorAccounts.externalId).
