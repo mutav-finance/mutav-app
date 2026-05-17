@@ -905,21 +905,19 @@ async function tolerateAlreadyDone<T>(fn: () => Promise<T>, label: string): Prom
   }
 }
 
-// ─── Etherfuse agency onboarding (provision + KYC + terms) ────────────────────
+// ─── Etherfuse agency onboarding (provision + KYC/KYB + terms) ────────────────
 
-type OnboardAgencyEtherfuseArgs = {
-  agencyId: Id<"agencies">;
-  contactPerson: {
-    givenName: string;
-    familyName: string;
-    dateOfBirth: string;
-  };
-  address: {
-    street: string;
-    city: string;
-    region: string;
-    postalCode: string;
-  };
+type OnboardAgencyEtherfuseContactPerson = {
+  givenName: string;
+  familyName: string;
+  dateOfBirth: string;
+};
+
+type OnboardAgencyEtherfuseAddress = {
+  street: string;
+  city: string;
+  region: string;
+  postalCode: string;
 };
 
 type OnboardAgencyEtherfuseResult = {
@@ -929,147 +927,194 @@ type OnboardAgencyEtherfuseResult = {
   kycStatus: string;
 };
 
+const contactPersonValidator = v.object({
+  givenName: v.string(),
+  familyName: v.string(),
+  dateOfBirth: v.string(),
+});
+
+const addressValidator = v.object({
+  street: v.string(),
+  city: v.string(),
+  region: v.string(),
+  postalCode: v.string(),
+});
+
+const onboardingReturnValidator = v.object({
+  accountId: v.id("anchorAccounts"),
+  publicKey: v.string(),
+  customerId: v.string(),
+  kycStatus: v.string(),
+});
+
 /**
- * Full agency onboarding: provision Stellar proxy account (PR-2) → register
- * with Etherfuse → submit KYC → accept terms. Idempotent; safe to re-run.
- *
- * For BR, the masterclass + labs confirmed the personal-flow path works in
- * sandbox even for businesses. Full business-KYB (`POST /ramp/organization`,
- * `accountType: business`) is a follow-up — see the vendored client's
- * `createBusinessCustomer` for that path.
- *
- * Sandbox auto-approves KYC when the payload includes nested `id` fields
- * (see MUTAV LOCAL PATCH comments in
- * `src/lib/anchors/etherfuse/types.ts → EtherfuseKycIdentityRequest`).
- * Production gates KYC on real-document review.
+ * Shared body for both KYC (personal) and KYB (business) onboarding —
+ * the only difference between them is which idNumber gets submitted in
+ * the KYC payload (CPF vs CNPJ). Everything else (provisioning, terms,
+ * approval mutation, idempotency) is identical.
  */
-export const onboardAgencyEtherfuse = internalAction({
+async function performEtherfuseOnboarding(
+  ctx: ActionCtx,
+  args: {
+    agencyId: Id<"agencies">;
+    contactPerson: OnboardAgencyEtherfuseContactPerson;
+    address: OnboardAgencyEtherfuseAddress;
+    idNumber: { value: string; type: "CPF" | "CNPJ" };
+  },
+): Promise<OnboardAgencyEtherfuseResult> {
+  // Step 1: provision Stellar proxy account (idempotent). Discard the
+  // return value — we re-read the row in Step 2 to also handle the
+  // already-provisioned case uniformly.
+  await ctx.runAction(internal.anchors.actions.provisionAgencyEtherfuseAccount, {
+    agencyId: args.agencyId,
+  });
+
+  // Step 2: load the row we just wrote (or already had) for UUIDs.
+  const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
+    agencyId: args.agencyId,
+    provider: "etherfuse",
+  });
+  if (!account || account.data.provider !== "etherfuse") {
+    throw new Error(`Failed to load anchorAccounts row for agency ${args.agencyId}`);
+  }
+  if (account.status === ANCHOR_ONBOARDING_STATUS.APPROVED) {
+    return {
+      accountId: account._id,
+      publicKey: account.data.publicKey,
+      customerId: account.externalId ?? "",
+      kycStatus: account.data.kycStatus,
+    };
+  }
+
+  const customerId = account.externalId;
+  if (!customerId) {
+    throw new Error(`anchorAccounts ${account._id} has null externalId`);
+  }
+  const { bankAccountId, publicKey } = account.data;
+
+  // Step 3: instantiate client + register the trio with Etherfuse.
+  // EtherfuseClient is imported lazily to keep startup-cost out of the
+  // hot path for actions that don't touch Etherfuse.
+  const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+  const client = new EtherfuseClient({
+    apiKey: getEtherfuseApiKey(),
+    baseUrl: getEtherfuseBaseUrl(),
+    defaultBlockchain: "stellar",
+  });
+  const presignedUrl = await client.getKycUrl(customerId, publicKey, bankAccountId);
+
+  // Step 4: programmatic KYC submission. Sandbox auto-approves with the
+  // nested-id payload below; production gates on document review.
+  // Tolerate duplicate-submission errors so a mid-flow failure in a
+  // previous run (e.g. terms acceptance throwing after KYC succeeded)
+  // can be retried without manual cleanup.
+  await tolerateAlreadyDone(
+    () =>
+      client.submitKycIdentity(customerId, {
+        id: randomUUID(),
+        pubkey: publicKey,
+        identity: {
+          id: randomUUID(),
+          name: {
+            givenName: args.contactPerson.givenName,
+            familyName: args.contactPerson.familyName,
+          },
+          dateOfBirth: args.contactPerson.dateOfBirth,
+          address: {
+            id: randomUUID(),
+            street: args.address.street,
+            city: args.address.city,
+            region: args.address.region,
+            postalCode: args.address.postalCode,
+            // Mutav is BR-only by design.
+            country: "BR",
+          },
+          idNumbers: [
+            {
+              id: randomUUID(),
+              value: args.idNumber.value,
+              type: args.idNumber.type,
+            },
+          ],
+        },
+      }),
+    "submitKycIdentity",
+  );
+
+  // Step 5: terms acceptance. Single endpoint suffices for sandbox; full
+  // 3-agreement flow (acceptAgreements) is gated by phone-number collection
+  // which is a production-only concern.
+  await tolerateAlreadyDone(
+    () => client.acceptTermsAndConditions(presignedUrl),
+    "acceptTermsAndConditions",
+  );
+
+  // Step 6: flip the row's onboarding status + kyc state in one
+  // transaction — see markEtherfuseOnboardingApproved.
+  await ctx.runMutation(internal.anchors.accountUseCases.markEtherfuseOnboardingApproved, {
+    accountId: account._id,
+  });
+
+  return {
+    accountId: account._id,
+    publicKey,
+    customerId,
+    kycStatus: "approved",
+  };
+}
+
+/**
+ * Full agency onboarding via KYB (business) — submits the agency's CNPJ
+ * as the idNumber. Etherfuse routes this to the business verification
+ * pipeline. Requires the partner account to have KYB enabled; sandbox
+ * currently rejects with "Proxy account not found" on the first /ramp/order
+ * call when KYB isn't enabled — use the KYC variant for sandbox testing
+ * until KYB access is granted.
+ */
+export const onboardAgencyEtherfuseKyb = internalAction({
   args: {
     agencyId: v.id("agencies"),
-    contactPerson: v.object({
-      givenName: v.string(),
-      familyName: v.string(),
-      dateOfBirth: v.string(),
-    }),
-    address: v.object({
-      street: v.string(),
-      city: v.string(),
-      region: v.string(),
-      postalCode: v.string(),
-    }),
+    contactPerson: contactPersonValidator,
+    address: addressValidator,
   },
-  returns: v.object({
-    accountId: v.id("anchorAccounts"),
-    publicKey: v.string(),
-    customerId: v.string(),
-    kycStatus: v.string(),
-  }),
-  handler: async (ctx, args: OnboardAgencyEtherfuseArgs): Promise<OnboardAgencyEtherfuseResult> => {
-    // Step 1: provision Stellar proxy account (idempotent). Discard the
-    // return value — we re-read the row in Step 2 to also handle the
-    // already-provisioned case uniformly.
-    await ctx.runAction(internal.anchors.actions.provisionAgencyEtherfuseAccount, {
-      agencyId: args.agencyId,
-    });
-
-    // Step 2: load the row we just wrote (or already had) for UUIDs.
-    const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
-      agencyId: args.agencyId,
-      provider: "etherfuse",
-    });
-    if (!account || account.data.provider !== "etherfuse") {
-      throw new Error(`Failed to load anchorAccounts row for agency ${args.agencyId}`);
-    }
-    if (account.status === ANCHOR_ONBOARDING_STATUS.APPROVED) {
-      return {
-        accountId: account._id,
-        publicKey: account.data.publicKey,
-        customerId: account.externalId ?? "",
-        kycStatus: account.data.kycStatus,
-      };
-    }
-
-    // Step 3: read agency CNPJ for the KYC payload.
+  returns: onboardingReturnValidator,
+  handler: async (ctx, args): Promise<OnboardAgencyEtherfuseResult> => {
     const agency = await ctx.runQuery(api.agencies.useCases.getById, {
       agencyId: args.agencyId,
     });
     if (!agency) throw new Error(`Agency ${args.agencyId} not found`);
-
-    const customerId = account.externalId;
-    if (!customerId) {
-      throw new Error(`anchorAccounts ${account._id} has null externalId`);
-    }
-    const { bankAccountId, publicKey } = account.data;
-
-    // Step 4: instantiate client + register the trio with Etherfuse.
-    // EtherfuseClient is imported lazily to keep startup-cost out of the
-    // hot path for actions that don't touch Etherfuse.
-    const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
-    const client = new EtherfuseClient({
-      apiKey: getEtherfuseApiKey(),
-      baseUrl: getEtherfuseBaseUrl(),
-      defaultBlockchain: "stellar",
+    return performEtherfuseOnboarding(ctx, {
+      agencyId: args.agencyId,
+      contactPerson: args.contactPerson,
+      address: args.address,
+      idNumber: { value: agency.cnpj, type: "CNPJ" },
     });
-    const presignedUrl = await client.getKycUrl(customerId, publicKey, bankAccountId);
+  },
+});
 
-    // Step 5: programmatic KYC submission. Sandbox auto-approves with the
-    // nested-id payload below; production gates on document review.
-    // Tolerate duplicate-submission errors so a mid-flow failure in a
-    // previous run (e.g. terms acceptance throwing after KYC succeeded)
-    // can be retried without manual cleanup.
-    await tolerateAlreadyDone(
-      () =>
-        client.submitKycIdentity(customerId, {
-          id: randomUUID(),
-          pubkey: publicKey,
-          identity: {
-            id: randomUUID(),
-            name: {
-              givenName: args.contactPerson.givenName,
-              familyName: args.contactPerson.familyName,
-            },
-            dateOfBirth: args.contactPerson.dateOfBirth,
-            address: {
-              id: randomUUID(),
-              street: args.address.street,
-              city: args.address.city,
-              region: args.address.region,
-              postalCode: args.address.postalCode,
-              // Mutav is BR-only by design.
-              country: "BR",
-            },
-            idNumbers: [
-              {
-                id: randomUUID(),
-                value: agency.cnpj,
-                type: "CNPJ",
-              },
-            ],
-          },
-        }),
-      "submitKycIdentity",
-    );
-
-    // Step 6: terms acceptance. Single endpoint suffices for sandbox; full
-    // 3-agreement flow (acceptAgreements) is gated by phone-number collection
-    // which is a production-only concern.
-    await tolerateAlreadyDone(
-      () => client.acceptTermsAndConditions(presignedUrl),
-      "acceptTermsAndConditions",
-    );
-
-    // Step 7: flip the row's onboarding status + kyc state in one
-    // transaction — see markEtherfuseOnboardingApproved.
-    await ctx.runMutation(internal.anchors.accountUseCases.markEtherfuseOnboardingApproved, {
-      accountId: account._id,
+/**
+ * Full agency onboarding via KYC (personal) — submits the contact
+ * person's CPF as the idNumber. Etherfuse routes this to the personal
+ * verification pipeline, which sandbox + most production partner
+ * accounts have enabled by default. Legally the contact person becomes
+ * the customer-of-record for Etherfuse purposes; the agency's proxy
+ * account is the destination wallet either way.
+ */
+export const onboardAgencyEtherfuseKyc = internalAction({
+  args: {
+    agencyId: v.id("agencies"),
+    contactPerson: contactPersonValidator,
+    address: addressValidator,
+    cpf: v.string(),
+  },
+  returns: onboardingReturnValidator,
+  handler: async (ctx, args): Promise<OnboardAgencyEtherfuseResult> => {
+    return performEtherfuseOnboarding(ctx, {
+      agencyId: args.agencyId,
+      contactPerson: args.contactPerson,
+      address: args.address,
+      idNumber: { value: args.cpf, type: "CPF" },
     });
-
-    return {
-      accountId: account._id,
-      publicKey,
-      customerId,
-      kycStatus: "approved",
-    };
   },
 });
 
