@@ -1220,7 +1220,16 @@ async function pollEtherfusePixOnramp(
   });
 
   const tx = await client.getOnRampTransaction(order.anchorTxId);
-  if (!tx) throw new Error(`Etherfuse order ${order.anchorTxId} not found`);
+  if (!tx) {
+    // Etherfuse 404 — the order doesn't exist on their side anymore.
+    // Persist as terminal ERROR so the poller stops retrying instead
+    // of throwing forever and pinning the row in a pending state.
+    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+      orderId: order._id,
+      status: ANCHOR_ORDER_STATUS.ERROR,
+    });
+    return { orderId: order._id, status: ANCHOR_ORDER_STATUS.ERROR, terminal: true };
+  }
 
   const status = normalizeEtherfuseStatus(tx.status);
 
