@@ -76,6 +76,33 @@ export function getTreasurySecret(): string {
 }
 
 /**
+ * Etherfuse REST API base URL. Defaults to the sandbox; production
+ * deployments must set `ETHERFUSE_BASE_URL=https://api.etherfuse.com`.
+ */
+export function getEtherfuseBaseUrl(): string {
+  return process.env.ETHERFUSE_BASE_URL ?? "https://api.sand.etherfuse.com";
+}
+
+/**
+ * Lazy getter for the Etherfuse API key. Format: `api_sand:<uuid>:<uuid>`
+ * (sandbox) or `api_prod:<uuid>:<uuid>`. Generated at devnet.etherfuse.com
+ * (Ramp → API Keys). Required for any anchor action that touches Etherfuse
+ * REST endpoints.
+ */
+export function getEtherfuseApiKey(): string {
+  const key = process.env.ETHERFUSE_API_KEY;
+  if (!key) {
+    throw new Error(
+      "ETHERFUSE_API_KEY is not set. " +
+        "Etherfuse on-ramp actions require the key. " +
+        "Get one at https://devnet.etherfuse.com → Ramp → API Keys, " +
+        "then set with `bunx convex env set ETHERFUSE_API_KEY api_sand:...`.",
+    );
+  }
+  return key;
+}
+
+/**
  * 32-byte base64-encoded key for AES-256-GCM envelope encryption of
  * per-agency Stellar proxy account secrets. Required by
  * `convex/lib/secrets.ts` whenever PR-2's proxy provisioning runs.

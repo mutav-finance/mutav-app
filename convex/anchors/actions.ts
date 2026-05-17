@@ -24,9 +24,16 @@ import {
 } from "../../src/lib/anchors/registry";
 import { SepApiError, type TransactionStatus } from "../../src/lib/anchors/sep/types";
 import { ASSETS } from "../../src/lib/stellar/assets";
-import { getStellarHorizonUrl, getStellarNetwork, getTreasurySecret } from "../lib/env";
+import {
+  getEtherfuseApiKey,
+  getEtherfuseBaseUrl,
+  getStellarHorizonUrl,
+  getStellarNetwork,
+  getTreasurySecret,
+} from "../lib/env";
 import { encryptSecret } from "../lib/secrets";
 import { getTreasurySigner } from "../lib/stellarSigner";
+import { ANCHOR_ONBOARDING_STATUS } from "./accountDomain";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
   ANCHOR_ORDER_STATUS,
@@ -798,6 +805,169 @@ export const provisionAgencyEtherfuseAccount = internalAction({
       publicKey: proxyKeypair.publicKey(),
       transactionHash: submitResult.hash,
       alreadyProvisioned: false,
+    };
+  },
+});
+
+
+// ─── Etherfuse agency onboarding (provision + KYC + terms) ────────────────────
+
+type OnboardAgencyEtherfuseArgs = {
+  agencyId: Id<"agencies">;
+  contactPerson: {
+    givenName: string;
+    familyName: string;
+    dateOfBirth: string;
+  };
+  address: {
+    street: string;
+    city: string;
+    region: string;
+    postalCode: string;
+  };
+};
+
+type OnboardAgencyEtherfuseResult = {
+  accountId: Id<"anchorAccounts">;
+  publicKey: string;
+  customerId: string;
+  kycStatus: string;
+};
+
+/**
+ * Full agency onboarding: provision Stellar proxy account (PR-2) → register
+ * with Etherfuse → submit KYC → accept terms. Idempotent; safe to re-run.
+ *
+ * For BR, the masterclass + labs confirmed the personal-flow path works in
+ * sandbox even for businesses. Full business-KYB (`POST /ramp/organization`,
+ * `accountType: business`) is a follow-up — see the vendored client's
+ * `createBusinessCustomer` for that path.
+ *
+ * Sandbox auto-approves KYC when the payload includes nested `id` fields
+ * (see MUTAV LOCAL PATCH comments in
+ * `src/lib/anchors/etherfuse/types.ts → EtherfuseKycIdentityRequest`).
+ * Production gates KYC on real-document review.
+ */
+export const onboardAgencyEtherfuse = internalAction({
+  args: {
+    agencyId: v.id("agencies"),
+    contactPerson: v.object({
+      givenName: v.string(),
+      familyName: v.string(),
+      dateOfBirth: v.string(),
+    }),
+    address: v.object({
+      street: v.string(),
+      city: v.string(),
+      region: v.string(),
+      postalCode: v.string(),
+    }),
+  },
+  returns: v.object({
+    accountId: v.id("anchorAccounts"),
+    publicKey: v.string(),
+    customerId: v.string(),
+    kycStatus: v.string(),
+  }),
+  handler: async (ctx, args: OnboardAgencyEtherfuseArgs): Promise<OnboardAgencyEtherfuseResult> => {
+    // Step 1: provision Stellar proxy account (idempotent). Discard the
+    // return value — we re-read the row in Step 2 to also handle the
+    // already-provisioned case uniformly.
+    await ctx.runAction(internal.anchors.actions.provisionAgencyEtherfuseAccount, {
+      agencyId: args.agencyId,
+    });
+
+    // Step 2: load the row we just wrote (or already had) for UUIDs.
+    const account = await ctx.runQuery(
+      internal.anchors.accountUseCases.getByAgencyAndProvider,
+      { agencyId: args.agencyId, provider: "etherfuse" },
+    );
+    if (!account || account.data.provider !== "etherfuse") {
+      throw new Error(`Failed to load anchorAccounts row for agency ${args.agencyId}`);
+    }
+    if (account.status === ANCHOR_ONBOARDING_STATUS.APPROVED) {
+      return {
+        accountId: account._id,
+        publicKey: account.data.publicKey,
+        customerId: account.externalId ?? "",
+        kycStatus: account.data.kycStatus,
+      };
+    }
+
+    // Step 3: read agency CNPJ for the KYC payload.
+    const agency = await ctx.runQuery(api.agencies.useCases.getById, {
+      agencyId: args.agencyId,
+    });
+    if (!agency) throw new Error(`Agency ${args.agencyId} not found`);
+
+    const customerId = account.externalId;
+    if (!customerId) {
+      throw new Error(`anchorAccounts ${account._id} has null externalId`);
+    }
+    const { bankAccountId, publicKey } = account.data;
+
+    // Step 4: instantiate client + register the trio with Etherfuse.
+    // EtherfuseClient is imported lazily to keep startup-cost out of the
+    // hot path for actions that don't touch Etherfuse.
+    const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+    const client = new EtherfuseClient({
+      apiKey: getEtherfuseApiKey(),
+      baseUrl: getEtherfuseBaseUrl(),
+      defaultBlockchain: "stellar",
+    });
+    const presignedUrl = await client.getKycUrl(customerId, publicKey, bankAccountId);
+
+    // Step 5: programmatic KYC submission. Sandbox auto-approves with the
+    // nested-id payload below; production gates on document review.
+    await client.submitKycIdentity(customerId, {
+      id: randomUUID(),
+      pubkey: publicKey,
+      identity: {
+        id: randomUUID(),
+        name: {
+          givenName: args.contactPerson.givenName,
+          familyName: args.contactPerson.familyName,
+        },
+        dateOfBirth: args.contactPerson.dateOfBirth,
+        address: {
+          id: randomUUID(),
+          street: args.address.street,
+          city: args.address.city,
+          region: args.address.region,
+          postalCode: args.address.postalCode,
+          // Mutav is BR-only by design.
+          country: "BR",
+        },
+        idNumbers: [
+          {
+            id: randomUUID(),
+            value: agency.cnpj,
+            type: "CNPJ",
+          },
+        ],
+      },
+    });
+
+    // Step 6: terms acceptance. Single endpoint suffices for sandbox; full
+    // 3-agreement flow (acceptAgreements) is gated by phone-number collection
+    // which is a production-only concern.
+    await client.acceptTermsAndConditions(presignedUrl);
+
+    // Step 7: flip the row's status to approved.
+    await ctx.runMutation(internal.anchors.accountUseCases.updateStatus, {
+      accountId: account._id,
+      status: ANCHOR_ONBOARDING_STATUS.APPROVED,
+    });
+    await ctx.runMutation(internal.anchors.accountUseCases.updateEtherfuseKycStatus, {
+      accountId: account._id,
+      kycStatus: "approved",
+    });
+
+    return {
+      accountId: account._id,
+      publicKey,
+      customerId,
+      kycStatus: "approved",
     };
   },
 });

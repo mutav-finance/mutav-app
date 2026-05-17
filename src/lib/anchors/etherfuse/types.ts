@@ -159,6 +159,14 @@ export interface EtherfuseBankAccountRequest {
 
 /** Request body for `POST /ramp/customer/{id}/kyc` (programmatic KYC identity submission). */
 export interface EtherfuseKycIdentityRequest {
+    /**
+     * MUTAV LOCAL PATCH: top-level `id` is required by the live API.
+     * Verified against api.sand.etherfuse.com 2026-05-17 (see
+     * labs/masterclass/02-etherfuse/02c-finalize-onboarding.ts).
+     * Without it, POST returns `Json deserialize error: missing field id`.
+     * Restore from upstream regional-starter-pack only if they add this.
+     */
+    id: string;
     /** Wallet public key. */
     pubkey: string;
     /** Identity data. */
@@ -176,6 +184,8 @@ export interface EtherfuseKycIdentityRequest {
         dateOfBirth: string;
         /** Residential address. */
         address: {
+            /** MUTAV LOCAL PATCH: nested `id` required by live API. */
+            id: string;
             /** Street address. */
             street: string;
             /** City. */
@@ -189,6 +199,8 @@ export interface EtherfuseKycIdentityRequest {
         };
         /** National identity numbers (e.g. CURP). */
         idNumbers: Array<{
+            /** MUTAV LOCAL PATCH: per-entry `id` required by live API. */
+            id: string;
             /** ID number value. */
             value: string;
             /** ID type (e.g. `"CURP"`). */

@@ -101,6 +101,37 @@ export const updateStatus = internalMutation({
 });
 
 /**
+ * Patch the etherfuse variant's kycStatus on an existing `anchorAccounts`
+ * row. Re-asserts that the row's discriminator is etherfuse before
+ * writing, so a corrupted/mismatched row throws instead of silently
+ * overwriting a different provider's data.
+ */
+export const updateEtherfuseKycStatus = internalMutation({
+  args: {
+    accountId: v.id("anchorAccounts"),
+    kycStatus: v.union(
+      v.literal("not_started"),
+      v.literal("proposed"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.accountId);
+    if (!account) throw new Error(`anchorAccounts ${args.accountId} not found`);
+    if (account.data.provider !== "etherfuse") {
+      throw new Error(
+        `anchorAccounts ${args.accountId} is not an etherfuse account (data.provider=${account.data.provider})`,
+      );
+    }
+    await ctx.db.patch(args.accountId, {
+      data: { ...account.data, kycStatus: args.kycStatus },
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+/**
  * Insert an `anchorAccounts` row for an agency's Etherfuse proxy. The
  * provisioning action calls this AFTER the on-chain createAccount tx has
  * confirmed, so the row's existence is the on-chain reality. `externalId`
