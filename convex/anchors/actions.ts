@@ -32,7 +32,7 @@ import {
   getStellarNetwork,
   getTreasurySecret,
 } from "../lib/env";
-import { encryptSecret } from "../lib/secrets";
+import { decryptSecret, encryptSecret } from "../lib/secrets";
 import { getTreasurySigner } from "../lib/stellarSigner";
 import { ANCHOR_ONBOARDING_STATUS } from "./accountDomain";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
@@ -745,27 +745,51 @@ export const provisionAgencyEtherfuseAccount = internalAction({
     alreadyProvisioned: v.boolean(),
   }),
   handler: async (ctx, args): Promise<ProvisionAgencyEtherfuseAccountResult> => {
-    const existing = await ctx.runQuery(
-      internal.anchors.accountUseCases.getByAgencyAndProvider,
-      { agencyId: args.agencyId, provider: "etherfuse" },
-    );
-    if (existing) {
-      if (existing.data.provider !== "etherfuse") {
-        throw new Error(
-          `anchorAccounts ${existing._id} has provider=etherfuse but data.provider=${existing.data.provider}`,
-        );
-      }
+    const existing = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
+      agencyId: args.agencyId,
+      provider: "etherfuse",
+    });
+    if (existing && existing.data.provider !== "etherfuse") {
+      throw new Error(
+        `anchorAccounts ${existing._id} has provider=etherfuse but data.provider=${existing.data.provider}`,
+      );
+    }
+    if (existing?.data.provider === "etherfuse" && existing.data.provisioningTxHash) {
       return {
         accountId: existing._id,
         publicKey: existing.data.publicKey,
-        transactionHash: "(already provisioned)",
+        transactionHash: existing.data.provisioningTxHash,
         alreadyProvisioned: true,
       };
     }
 
-    const proxyKeypair = Keypair.random();
-    const customerId = randomUUID();
-    const bankAccountId = randomUUID();
+    // Existing row without a tx hash means a previous attempt persisted
+    // the encrypted secret but failed before the on-chain submit
+    // confirmed. Reuse the same keypair so the on-chain account (if it
+    // did make it on-chain in a prior failed run) lines up, otherwise
+    // mint a new one.
+    let proxyKeypair: Keypair;
+    let accountId: Id<"anchorAccounts">;
+    let publicKey: string;
+    if (existing?.data.provider === "etherfuse") {
+      proxyKeypair = Keypair.fromSecret(decryptSecret(existing.data.encryptedSecret));
+      accountId = existing._id;
+      publicKey = existing.data.publicKey;
+    } else {
+      proxyKeypair = Keypair.random();
+      publicKey = proxyKeypair.publicKey();
+      const encryptedSecret = encryptSecret(proxyKeypair.secret());
+      // Persist first — if the Stellar submit below throws after the
+      // account is created on-chain, we still hold the secret and can
+      // recover by re-running this action (the retry branch above).
+      accountId = await ctx.runMutation(internal.anchors.accountUseCases.insertEtherfuseAccount, {
+        agencyId: args.agencyId,
+        customerId: randomUUID(),
+        bankAccountId: randomUUID(),
+        publicKey,
+        encryptedSecret,
+      });
+    }
 
     const treasury = Keypair.fromSecret(getTreasurySecret());
     const horizon = new Horizon.Server(getStellarHorizonUrl());
@@ -791,41 +815,63 @@ export const provisionAgencyEtherfuseAccount = internalAction({
           asset: new Asset(TESOURO_ASSET_CODE, TESOURO_ISSUER),
         }),
       )
-      .addOperation(
-        Operation.endSponsoringFutureReserves({ source: proxyKeypair.publicKey() }),
-      )
+      .addOperation(Operation.endSponsoringFutureReserves({ source: proxyKeypair.publicKey() }))
       .setTimeout(TX_TIMEOUT_SECONDS)
       .build();
 
     tx.sign(treasury, proxyKeypair);
-    const submitResult = await horizon.submitTransaction(tx);
 
-    // On-chain confirmed — only now persist. If the insert fails after
-    // submission, the account exists on-chain but we won't track it —
-    // the next provisioning call would create a duplicate. Acceptable
-    // tradeoff vs. inserting first and orphaning a row if submission
-    // fails.
-    const encryptedSecret = encryptSecret(proxyKeypair.secret());
-    const accountId = await ctx.runMutation(
-      internal.anchors.accountUseCases.insertEtherfuseAccount,
-      {
-        agencyId: args.agencyId,
-        customerId,
-        bankAccountId,
-        publicKey: proxyKeypair.publicKey(),
-        encryptedSecret,
-      },
-    );
+    let transactionHash: string;
+    try {
+      const submitResult = await horizon.submitTransaction(tx);
+      transactionHash = submitResult.hash;
+    } catch (err) {
+      // Retry path: a prior attempt's submit may have actually landed
+      // on-chain. Horizon reports this as op_already_exists on
+      // createAccount. Confirm by loading the account; if it's there,
+      // the on-chain reality matches what we want and we can mark the
+      // row provisioned without a real hash.
+      if (existing && isOpAlreadyExistsError(err)) {
+        await horizon.loadAccount(publicKey);
+        transactionHash = "(recovered: account already on-chain)";
+      } else {
+        throw err;
+      }
+    }
+
+    await ctx.runMutation(internal.anchors.accountUseCases.markEtherfuseProvisioningHash, {
+      accountId,
+      provisioningTxHash: transactionHash,
+    });
 
     return {
       accountId,
-      publicKey: proxyKeypair.publicKey(),
-      transactionHash: submitResult.hash,
+      publicKey,
+      transactionHash,
       alreadyProvisioned: false,
     };
   },
 });
 
+/**
+ * True if a Horizon submit error reports `op_already_exists` on any
+ * operation — the marker that a prior provisioning tx actually landed
+ * on-chain even though our flow believes it failed.
+ */
+function isOpAlreadyExistsError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null || !("response" in err)) return false;
+  const response = err.response;
+  if (typeof response !== "object" || response === null || !("data" in response)) return false;
+  const data = response.data;
+  if (typeof data !== "object" || data === null || !("extras" in data)) return false;
+  const extras = data.extras;
+  if (typeof extras !== "object" || extras === null || !("result_codes" in extras)) return false;
+  const resultCodes = extras.result_codes;
+  if (typeof resultCodes !== "object" || resultCodes === null || !("operations" in resultCodes))
+    return false;
+  const operations = resultCodes.operations;
+  return Array.isArray(operations) && operations.includes("op_already_exists");
+}
 
 // ─── Etherfuse agency onboarding (provision + KYC + terms) ────────────────────
 
@@ -895,10 +941,10 @@ export const onboardAgencyEtherfuse = internalAction({
     });
 
     // Step 2: load the row we just wrote (or already had) for UUIDs.
-    const account = await ctx.runQuery(
-      internal.anchors.accountUseCases.getByAgencyAndProvider,
-      { agencyId: args.agencyId, provider: "etherfuse" },
-    );
+    const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
+      agencyId: args.agencyId,
+      provider: "etherfuse",
+    });
     if (!account || account.data.provider !== "etherfuse") {
       throw new Error(`Failed to load anchorAccounts row for agency ${args.agencyId}`);
     }
@@ -988,7 +1034,6 @@ export const onboardAgencyEtherfuse = internalAction({
     };
   },
 });
-
 
 // ─── Etherfuse Pix on-ramp (REST flow, called from startPixOnramp dispatch) ──
 

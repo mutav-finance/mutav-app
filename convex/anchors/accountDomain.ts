@@ -59,6 +59,11 @@ export const anchorAccountDataValidator = v.union(
     // POST /ramp/onboarding-url. Persisted forever per agency (one
     // G-address ↔ one Etherfuse customer globally per anchorAccounts.externalId).
     bankAccountId: v.string(),
+    // Hash of the Stellar tx that created the proxy account and opened
+    // the TESOURO trustline. Absent until the on-chain submit confirms
+    // — the row is inserted before submission so a mid-flow failure
+    // still leaves the encrypted secret recoverable.
+    provisioningTxHash: v.optional(v.string()),
     // KYC state mirrors src/lib/anchors/etherfuse/types.ts → KycStatus.
     // Sandbox flips proposed → approved on POST /ramp/customer/{id}/kyc;
     // production gates on real KYC review. Orders are rejected until approved.

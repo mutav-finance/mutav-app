@@ -101,6 +101,33 @@ export const updateStatus = internalMutation({
 });
 
 /**
+ * Record the Stellar tx hash that provisioned an etherfuse proxy
+ * account. Called immediately after `submitTransaction` resolves —
+ * presence of this field is the marker that the on-chain create
+ * account + trustline are real, so subsequent provisioning calls
+ * short-circuit instead of double-spending reserves.
+ */
+export const markEtherfuseProvisioningHash = internalMutation({
+  args: {
+    accountId: v.id("anchorAccounts"),
+    provisioningTxHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.accountId);
+    if (!account) throw new Error(`anchorAccounts ${args.accountId} not found`);
+    if (account.data.provider !== "etherfuse") {
+      throw new Error(
+        `anchorAccounts ${args.accountId} is not an etherfuse account (data.provider=${account.data.provider})`,
+      );
+    }
+    await ctx.db.patch(args.accountId, {
+      data: { ...account.data, provisioningTxHash: args.provisioningTxHash },
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+/**
  * Patch the etherfuse variant's kycStatus on an existing `anchorAccounts`
  * row. Re-asserts that the row's discriminator is etherfuse before
  * writing, so a corrupted/mismatched row throws instead of silently
