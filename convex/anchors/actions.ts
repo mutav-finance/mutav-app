@@ -23,7 +23,10 @@ import {
   STELLAR_NETWORK_PASSPHRASES,
 } from "../../src/lib/anchors/registry";
 import { SepApiError, type TransactionStatus } from "../../src/lib/anchors/sep/types";
-import type { TransactionStatus as AnchorTransactionStatus } from "../../src/lib/anchors/types";
+import {
+  AnchorError,
+  type TransactionStatus as AnchorTransactionStatus,
+} from "../../src/lib/anchors/types";
 import { ASSETS } from "../../src/lib/stellar/assets";
 import {
   getEtherfuseApiKey,
@@ -1184,10 +1187,21 @@ async function startEtherfusePixOnramp(
 
     return { success: true, data: { orderId, anchorTxId: onramp.id } };
   } catch (err: unknown) {
-    if (err instanceof Error) {
+    // AnchorError = anchor really returned a 4xx/5xx (quote expired, KYC
+    // issue, validation, etc.) → surface as anchor-side rejection so the
+    // UI tells the user the anchor declined. Anything else (TypeError,
+    // network failure, our own bug) → INTERNAL so we don't blame the
+    // anchor for our problems. Non-Error throws bubble up untouched.
+    if (err instanceof AnchorError) {
       return {
         success: false,
         error: { code: ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED, detail: err.message },
+      };
+    }
+    if (err instanceof Error) {
+      return {
+        success: false,
+        error: { code: ANCHOR_START_ERROR_CODE.INTERNAL, detail: err.message },
       };
     }
     throw err;
