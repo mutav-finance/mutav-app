@@ -563,6 +563,7 @@
         "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
         "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
         "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "NO_BANK_ACCOUNT": "Register a bank account to pay via PIX before continuing.",
         "INTERNAL": "Internal error. Please try again."
       }
     },
@@ -581,6 +582,26 @@
         "completed": "Paid",
         "failed": "Payment failed"
       },
+      "bankSelection": {
+        "loading": "Loading bank accounts…",
+        "emptyTitle": "Register a bank account to pay via PIX",
+        "emptyBody": "Before paying this invoice via PIX, register one of the agency's bank accounts. Registration opens in a new tab.",
+        "addBankButton": "Register account",
+        "addingBankHint": "Finish the registration in the new tab, then come back and click \"I'm done, refresh\".",
+        "refreshButton": "I'm done, refresh",
+        "picker": {
+          "title": "Which account is paying?",
+          "holderLabel": "Holder: {name}",
+          "keyLabel": "PIX key ending in {last4}",
+          "payWithButton": "Pay with this account",
+          "addAnotherButton": "Register another account"
+        },
+        "errors": {
+          "NO_ANCHOR_ACCOUNT": "The agency hasn't completed initial setup yet. Complete it before registering accounts.",
+          "KYC_NOT_APPROVED": "Agency verification is still pending. Complete it before registering accounts.",
+          "INTERNAL": "Unexpected error. Please try again."
+        }
+      },
       "errors": {
         "PAYMENT_NOT_FOUND": "Invoice not found.",
         "NOT_CHARGEABLE": "This invoice cannot be paid right now.",
@@ -589,6 +610,7 @@
         "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
         "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
         "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "NO_BANK_ACCOUNT": "Register a bank account to pay via PIX before continuing.",
         "INTERNAL": "Internal error. Please try again."
       }
     },

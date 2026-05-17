@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useAction, useQuery } from "convex/react";
 import QRCode from "qrcode";
-import { CheckCircle2, AlertCircle, Loader2, Copy, Check, ChevronDown } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Copy,
+  Check,
+  ChevronDown,
+  ExternalLink,
+  RefreshCcw,
+  Plus,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -17,18 +28,28 @@ import type { Doc, Id } from "@convex/_generated/dataModel";
 
 interface Props {
   paymentId: Id<"payments">;
+  agencyId: Id<"agencies">;
   totalCents: number;
 }
 
 /**
- * Client island that drives the SEP-6 anchor flow on the PIX checkout
- * step. Auto-starts on mount; subscribes to the anchorOrders row via
- * useQuery (inside the hook); renders skeleton → QR + copy → terminal
- * state. The hook's poll loop tears down on unmount.
+ * Client island for the Pix checkout step. Two phases:
+ *
+ *   pre-flight — surface the agency's registered bank accounts, gate
+ *     payment initiation on at least one bank existing. Empty list →
+ *     register-a-bank CTA (opens Etherfuse hosted UI in a new tab).
+ *   on-ramp — the existing start → poll → QR + copy → terminal flow,
+ *     parameterized by the bank account the operator picked.
+ *
+ * Etherfuse needs a registered debit-side bank for every order; without
+ * one we'd get an opaque "Proxy account not found" from their API.
+ * Gating up front makes the requirement legible to the operator.
  */
-export function CheckoutPixView({ paymentId, totalCents }: Props) {
+export function CheckoutPixView({ paymentId, agencyId, totalCents }: Props) {
   const t = useTranslations("checkout.pix");
   const locale = useLocale();
+  const banks = useQuery(api.anchors.bankAccountUseCases.listByAgency, { agencyId });
+  const [started, setStarted] = useState(false);
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
     paymentId,
     startAction: api.anchors.actions.startPixOnramp,
@@ -36,18 +57,25 @@ export function CheckoutPixView({ paymentId, totalCents }: Props) {
     lang: locale,
   });
 
-  const startedRef = useRef(false);
   useEffect(() => {
-    if (!startedRef.current) {
-      startedRef.current = true;
-      void start();
-    }
     return () => {
       cancel();
       reset();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleConfirm = useCallback(
+    (bankAccountId: Id<"agencyBankAccounts">) => {
+      setStarted(true);
+      void start({ bankAccountId });
+    },
+    [start],
+  );
+
+  if (!started) {
+    return <PreFlight agencyId={agencyId} banks={banks} onConfirm={handleConfirm} />;
+  }
 
   if (phase === "failed") {
     const errorMessage = error ? t(`errors.${error.code}` as const) : t("status.failed");
@@ -58,6 +86,241 @@ export function CheckoutPixView({ paymentId, totalCents }: Props) {
     return <CheckoutSkeleton brl={formatBRLCents(totalCents)} message={t("status.preparing")} />;
 
   return <LoadedPanel order={order} totalCents={totalCents} phase={phase} />;
+}
+
+// ─── Pre-flight: bank registration + selection ────────────────────────────────
+
+type AgencyBankAccount = Doc<"agencyBankAccounts">;
+
+function PreFlight({
+  agencyId,
+  banks,
+  onConfirm,
+}: {
+  agencyId: Id<"agencies">;
+  banks: AgencyBankAccount[] | undefined;
+  onConfirm: (bankAccountId: Id<"agencyBankAccounts">) => void;
+}) {
+  const t = useTranslations("checkout.pix.bankSelection");
+  const getRegistrationUrl = useAction(api.anchors.actions.getEtherfuseBankRegistrationUrl);
+  const sync = useAction(api.anchors.actions.syncEtherfuseBankAccounts);
+  const [adding, setAdding] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<Id<"agencyBankAccounts"> | null>(null);
+
+  const handleAdd = useCallback(async () => {
+    setActionError(null);
+    setAdding(true);
+    try {
+      const result = await getRegistrationUrl({ agencyId });
+      if (result.success) {
+        window.open(result.data.presignedUrl, "_blank", "noopener,noreferrer");
+      } else {
+        setActionError(t(`errors.${result.error.code}` as const));
+        setAdding(false);
+      }
+    } catch (err) {
+      setActionError(t("errors.INTERNAL"));
+      setAdding(false);
+      console.warn("[checkout-pix] getRegistrationUrl failed", err);
+    }
+  }, [agencyId, getRegistrationUrl, t]);
+
+  const handleRefresh = useCallback(async () => {
+    setActionError(null);
+    setRefreshing(true);
+    try {
+      const result = await sync({ agencyId });
+      if (!result.success) {
+        setActionError(t(`errors.${result.error.code}` as const));
+      } else {
+        setAdding(false);
+      }
+    } catch (err) {
+      setActionError(t("errors.INTERNAL"));
+      console.warn("[checkout-pix] syncEtherfuseBankAccounts failed", err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [agencyId, sync, t]);
+
+  if (banks === undefined) {
+    return <PreFlightSkeleton message={t("loading")} />;
+  }
+
+  if (banks.length === 0) {
+    return (
+      <BanksEmptyState
+        adding={adding}
+        refreshing={refreshing}
+        error={actionError}
+        onAdd={handleAdd}
+        onRefresh={handleRefresh}
+      />
+    );
+  }
+
+  const effectiveSelected = selectedId ?? banks[0]!._id;
+  return (
+    <BankPicker
+      banks={banks}
+      selectedId={effectiveSelected}
+      onSelect={setSelectedId}
+      onConfirm={() => onConfirm(effectiveSelected)}
+      adding={adding}
+      refreshing={refreshing}
+      error={actionError}
+      onAdd={handleAdd}
+      onRefresh={handleRefresh}
+    />
+  );
+}
+
+function PreFlightSkeleton({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-16 w-full" />
+      <div className="text-muted-foreground flex items-center justify-center gap-2 pt-1">
+        <Loader2 className="size-3 animate-spin" strokeWidth={1.5} />
+        <p className="text-[11px] tracking-wide uppercase">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+function BanksEmptyState({
+  adding,
+  refreshing,
+  error,
+  onAdd,
+  onRefresh,
+}: {
+  adding: boolean;
+  refreshing: boolean;
+  error: string | null;
+  onAdd: () => void;
+  onRefresh: () => void;
+}) {
+  const t = useTranslations("checkout.pix.bankSelection");
+  return (
+    <div className="border-border flex flex-col gap-4 border p-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-foreground text-sm font-medium">{t("emptyTitle")}</p>
+        <p className="text-muted-foreground text-xs">{t("emptyBody")}</p>
+      </div>
+      {adding ? <p className="text-muted-foreground text-xs">{t("addingBankHint")}</p> : null}
+      {error ? <p className="text-destructive text-xs">{error}</p> : null}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button onClick={onAdd} disabled={refreshing} className="flex-1">
+          <ExternalLink className="size-4" strokeWidth={1.5} />
+          {t("addBankButton")}
+        </Button>
+        {adding ? (
+          <Button onClick={onRefresh} disabled={refreshing} variant="secondary" className="flex-1">
+            {refreshing ? (
+              <Loader2 className="size-4 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <RefreshCcw className="size-4" strokeWidth={1.5} />
+            )}
+            {t("refreshButton")}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function BankPicker({
+  banks,
+  selectedId,
+  onSelect,
+  onConfirm,
+  adding,
+  refreshing,
+  error,
+  onAdd,
+  onRefresh,
+}: {
+  banks: AgencyBankAccount[];
+  selectedId: Id<"agencyBankAccounts">;
+  onSelect: (id: Id<"agencyBankAccounts">) => void;
+  onConfirm: () => void;
+  adding: boolean;
+  refreshing: boolean;
+  error: string | null;
+  onAdd: () => void;
+  onRefresh: () => void;
+}) {
+  const t = useTranslations("checkout.pix.bankSelection");
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-foreground text-sm font-medium">{t("picker.title")}</p>
+      <ul className="flex flex-col gap-2">
+        {banks.map((bank) => {
+          const isSelected = bank._id === selectedId;
+          return (
+            <li key={bank._id}>
+              <button
+                type="button"
+                onClick={() => onSelect(bank._id)}
+                aria-pressed={isSelected}
+                className={`border-border hover:bg-muted/40 flex w-full flex-col items-start gap-1 border p-3 text-left transition ${
+                  isSelected ? "border-foreground bg-muted/40" : ""
+                }`}
+              >
+                <span className="text-foreground text-sm">
+                  {t("picker.holderLabel", { name: bank.accountHolderName || "—" })}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {t("picker.keyLabel", { last4: last4Of(bank.accountNumber) })}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {adding ? <p className="text-muted-foreground text-xs">{t("addingBankHint")}</p> : null}
+      {error ? <p className="text-destructive text-xs">{error}</p> : null}
+      <div className="flex flex-col gap-2">
+        <Button onClick={onConfirm} disabled={refreshing}>
+          {t("picker.payWithButton")}
+        </Button>
+        <div className="text-muted-foreground flex items-center justify-between text-xs">
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={refreshing}
+            className="hover:text-foreground inline-flex items-center gap-1"
+          >
+            <Plus className="size-3" strokeWidth={1.5} />
+            {t("picker.addAnotherButton")}
+          </button>
+          {adding ? (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="hover:text-foreground inline-flex items-center gap-1"
+            >
+              {refreshing ? (
+                <Loader2 className="size-3 animate-spin" strokeWidth={1.5} />
+              ) : (
+                <RefreshCcw className="size-3" strokeWidth={1.5} />
+              )}
+              {t("refreshButton")}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function last4Of(value: string): string {
+  if (!value) return "—";
+  return value.length <= 4 ? value : value.slice(-4);
 }
 
 function LoadedPanel({
