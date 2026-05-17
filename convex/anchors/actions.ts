@@ -453,6 +453,12 @@ export const pollPixOnramp = action({
       return { orderId: order._id, status: order.status, terminal: true };
     }
 
+    // PR-4 will dispatch on order.provider here. Until then, only the
+    // SEP-compliant testanchor path is wired; etherfuse orders never reach
+    // this poller because no caller creates them yet.
+    if (order.provider !== "testanchor") {
+      throw new Error(`pollPixOnramp not yet implemented for provider ${order.provider}`);
+    }
     const client = createAnchorClient(order.provider);
     await client.initialize();
     const signer = getTreasurySigner();
@@ -612,6 +618,11 @@ export const pollAnchorTestOnramp = action({
       return { orderId: order._id, status: order.status, terminal: true };
     }
 
+    // PR-4 will dispatch on order.provider here. SEP-24 is testanchor-only;
+    // etherfuse uses a REST flow that doesn't pass through this action.
+    if (order.provider !== "testanchor") {
+      throw new Error(`pollAnchorTestOnramp not yet implemented for provider ${order.provider}`);
+    }
     const client = createAnchorClient(order.provider);
     await client.initialize();
     const signer = getTreasurySigner();

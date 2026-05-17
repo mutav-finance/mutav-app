@@ -82,7 +82,7 @@ const anchorOrderStatus = v.union(
   v.literal("error"),
 );
 
-const anchorOrderProvider = v.union(v.literal("testanchor"));
+const anchorOrderProvider = v.union(v.literal("testanchor"), v.literal("etherfuse"));
 
 /**
  * Onboarding status of an agency with a single anchor provider. Normalized
@@ -105,6 +105,22 @@ const anchorOnboardingStatus = v.union(
 const anchorAccountData = v.union(
   v.object({
     provider: v.literal("testanchor"),
+  }),
+  v.object({
+    provider: v.literal("etherfuse"),
+    // Both UUIDs are client-generated and registered with Etherfuse via
+    // POST /ramp/onboarding-url. Persisted forever per agency (one G-address
+    // ↔ one Etherfuse customer globally — see anchorAccounts.externalId).
+    bankAccountId: v.string(),
+    // KYC state mirrors src/lib/anchors/etherfuse/types.ts → KycStatus.
+    // Sandbox flips proposed → approved on POST /ramp/customer/{id}/kyc;
+    // production gates on real KYC review. Orders are rejected until approved.
+    kycStatus: v.union(
+      v.literal("not_started"),
+      v.literal("proposed"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
   }),
 );
 
@@ -297,4 +313,17 @@ export default defineSchema({
     .index("by_agency", ["agencyId"])
     .index("by_agency_provider", ["agencyId", "provider"])
     .index("by_provider_externalId", ["provider", "externalId"]),
+
+  // Inbound anchor webhook log. The handler dedupes on `(provider, eventId)`
+  // so duplicate Etherfuse deliveries (which can arrive twice per
+  // docs.etherfuse.com/guides/verifying-webhooks) don't double-advance an
+  // order's state. Payload kept as v.any() because providers ship different
+  // event shapes; the handler narrows per `provider + eventType`.
+  anchorWebhookEvents: defineTable({
+    provider: anchorOrderProvider,
+    eventId: v.string(),
+    eventType: v.string(),
+    payload: v.any(),
+    receivedAt: v.string(),
+  }).index("by_provider_eventId", ["provider", "eventId"]),
 });
