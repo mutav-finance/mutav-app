@@ -334,11 +334,17 @@ export default defineSchema({
   // docs.etherfuse.com/guides/verifying-webhooks) don't double-advance an
   // order's state. Payload kept as v.any() because providers ship different
   // event shapes; the handler narrows per `provider + eventType`.
+  //
+  // `processedAt` is null between insert and successful processing; if a
+  // retry arrives with null processedAt the handler reprocesses instead
+  // of returning "duplicate, ignored" — otherwise a crash during the
+  // first processing would pin the order forever.
   anchorWebhookEvents: defineTable({
     provider: anchorOrderProvider,
     eventId: v.string(),
     eventType: v.string(),
     payload: v.any(),
     receivedAt: v.string(),
+    processedAt: v.optional(v.string()),
   }).index("by_provider_eventId", ["provider", "eventId"]),
 });

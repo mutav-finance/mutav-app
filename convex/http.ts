@@ -109,7 +109,7 @@ http.route({
       eventType,
       payload: parsed,
     });
-    if (!dedupe.inserted) {
+    if (dedupe.alreadyProcessed) {
       return new Response("duplicate, ignored", { status: 200 });
     }
 
@@ -124,21 +124,29 @@ http.route({
         });
         if (!order) {
           // No matching local row — webhook arrived before we persisted, or
-          // it's for an order from a different deployment. Acknowledge so
+          // it's for an order from a different deployment. Stamp processed
+          // so a retry doesn't keep re-running this lookup; ack so
           // Etherfuse doesn't retry forever.
           console.warn(`[etherfuse-webhook] no local order for ${orderExternalId}`);
+          await ctx.runMutation(internal.anchors.webhookUseCases.markWebhookEventProcessed, {
+            eventRowId: dedupe.eventRowId,
+          });
           return new Response("ok (no local order)", { status: 200 });
         }
         // pollPixOnramp re-fetches canonical state from Etherfuse and runs
         // the existing normalize → markPaid flow. We delegate rather than
         // trusting the webhook payload's status directly — the webhook can
-        // be stale by the time it lands.
+        // be stale by the time it lands. If this throws we deliberately
+        // DO NOT mark processed — the next retry will reprocess.
         await ctx.runAction(api.anchors.actions.pollPixOnramp, {
           orderId: order._id,
         });
       }
     }
 
+    await ctx.runMutation(internal.anchors.webhookUseCases.markWebhookEventProcessed, {
+      eventRowId: dedupe.eventRowId,
+    });
     return new Response("ok", { status: 200 });
   }),
 });
