@@ -7,6 +7,7 @@ import { api } from "@convex/_generated/api";
 import { Link, redirect } from "@/i18n/navigation";
 import { Mono } from "@/components/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { shouldShowTestanchor } from "@/lib/env";
 
 export async function generateMetadata({
   params,
@@ -73,7 +74,13 @@ export default async function CheckoutPickerPage({
         <h2 className="text-muted-foreground font-mono text-[11px] tracking-[0.06em] uppercase">
           {t("heading")}
         </h2>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        <div
+          className={
+            shouldShowTestanchor()
+              ? "grid grid-cols-1 gap-2 md:grid-cols-3"
+              : "grid grid-cols-1 gap-2 md:grid-cols-2"
+          }
+        >
           <MethodPickerCard
             href={`/pagar/${publicId}/pix`}
             icon={<Banknote className="size-5" strokeWidth={1.25} />}
@@ -88,13 +95,15 @@ export default async function CheckoutPickerPage({
             subtitle={t("stellar.subtitle")}
             duration={t("stellar.duration")}
           />
-          <MethodPickerCard
-            href={`/pagar/${publicId}/anchortest`}
-            icon={<FlaskConical className="size-5" strokeWidth={1.25} />}
-            title={t("anchortest.title")}
-            subtitle={t("anchortest.subtitle")}
-            duration={t("anchortest.duration")}
-          />
+          {shouldShowTestanchor() ? (
+            <MethodPickerCard
+              href={`/pagar/${publicId}/anchortest`}
+              icon={<FlaskConical className="size-5" strokeWidth={1.25} />}
+              title={t("anchortest.title")}
+              subtitle={t("anchortest.subtitle")}
+              duration={t("anchortest.duration")}
+            />
+          ) : null}
         </div>
       </section>
 

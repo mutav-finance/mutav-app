@@ -82,7 +82,7 @@ const anchorOrderStatus = v.union(
   v.literal("error"),
 );
 
-const anchorOrderProvider = v.union(v.literal("testanchor"));
+const anchorOrderProvider = v.union(v.literal("testanchor"), v.literal("etherfuse"));
 
 /**
  * Onboarding status of an agency with a single anchor provider. Normalized
@@ -105,6 +105,37 @@ const anchorOnboardingStatus = v.union(
 const anchorAccountData = v.union(
   v.object({
     provider: v.literal("testanchor"),
+  }),
+  v.object({
+    provider: v.literal("etherfuse"),
+    // Per-agency Stellar proxy account. publicKey is the G-address
+    // registered with Etherfuse; encryptedSecret holds the AES-GCM envelope
+    // of the secret seed (see convex/lib/secrets.ts for encrypt/decrypt).
+    publicKey: v.string(),
+    encryptedSecret: v.object({
+      ciphertext: v.string(),
+      iv: v.string(),
+      authTag: v.string(),
+    }),
+    // Both UUIDs are client-generated and registered with Etherfuse via
+    // POST /ramp/onboarding-url. Persisted forever per agency (one G-address
+    // ↔ one Etherfuse customer globally — see anchorAccounts.externalId).
+    bankAccountId: v.string(),
+    // Hash of the Stellar tx that created the proxy account and opened the
+    // TESOURO trustline. Absent until the on-chain submit confirms — the
+    // row is inserted before submission so a mid-flow failure still leaves
+    // the encrypted secret recoverable (any TESOURO landing on the
+    // G-address would otherwise be unspendable).
+    provisioningTxHash: v.optional(v.string()),
+    // KYC state mirrors src/lib/anchors/etherfuse/types.ts → KycStatus.
+    // Sandbox flips proposed → approved on POST /ramp/customer/{id}/kyc;
+    // production gates on real KYC review. Orders are rejected until approved.
+    kycStatus: v.union(
+      v.literal("not_started"),
+      v.literal("proposed"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
   }),
 );
 
@@ -297,4 +328,23 @@ export default defineSchema({
     .index("by_agency", ["agencyId"])
     .index("by_agency_provider", ["agencyId", "provider"])
     .index("by_provider_externalId", ["provider", "externalId"]),
+
+  // Inbound anchor webhook log. The handler dedupes on `(provider, eventId)`
+  // so duplicate Etherfuse deliveries (which can arrive twice per
+  // docs.etherfuse.com/guides/verifying-webhooks) don't double-advance an
+  // order's state. Payload kept as v.any() because providers ship different
+  // event shapes; the handler narrows per `provider + eventType`.
+  //
+  // `processedAt` is null between insert and successful processing; if a
+  // retry arrives with null processedAt the handler reprocesses instead
+  // of returning "duplicate, ignored" — otherwise a crash during the
+  // first processing would pin the order forever.
+  anchorWebhookEvents: defineTable({
+    provider: anchorOrderProvider,
+    eventId: v.string(),
+    eventType: v.string(),
+    payload: v.any(),
+    receivedAt: v.string(),
+    processedAt: v.optional(v.string()),
+  }).index("by_provider_eventId", ["provider", "eventId"]),
 });

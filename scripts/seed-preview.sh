@@ -51,18 +51,38 @@ echo "seed-preview: VERCEL_ENV=preview, deployment=${DEPLOY_NAME} — running se
 bunx convex run --deployment "${DEPLOY_NAME}" seed:fictionalContracts
 echo "✓ seed-preview: preview deployment populated"
 
-# Apply the disposable testnet treasury keypair to the preview's Convex env
-# so anchor on-ramp actions (SEP-10 signer) work out of the box. The keypair
-# is published in the repo by design (src/lib/stellar/testnet-wallet.md —
-# testnet-only, anyone watching the repo controls the account) so embedding
-# the secret here is intentional, not a leak. Set is idempotent — re-running
-# on every preview build is fine.
-PREVIEW_TREASURY_SECRET="SBDW2AG65ZSTXYTVIAGJGU7VOKBBQNNVN4KHCL5XAT65USJKYCQ72FW6"
-PREVIEW_TREASURY_ACCOUNT="GD7ZCGE3Z2KV7STAWXLTKZQP7IYZ2SSJ6VNOQ2CHK4YWRSLIYUECMNWV"
+# All config lives in Vercel Project Environment Variables (preview
+# scope) and gets propagated to the per-PR convex deployment here.
+# Nothing about Mutav is baked into this script anymore — keeping
+# values out of the repo means a future regression that runs this
+# script with VERCEL_ENV=production can't accidentally reuse a baked-in
+# testnet value against a real account.
+#
+# Required Vercel env vars (preview scope):
+#   MUTAV_TREASURY_SECRET                  S...   testnet treasury seed
+#   STELLAR_MUTAV_SOURCE_ACCOUNT           G...   testnet treasury account
+#   MUTAV_STELLAR_SECRET_ENCRYPTION_KEY    base64 AES-256 key for per-agency proxy secrets
+#   ETHERFUSE_API_KEY                      api_sand:...  sandbox API key
+#   ETHERFUSE_BASE_URL                     https://api.sand.etherfuse.com (or a different sandbox/mock URL)
+#
+# A missing var doesn't fail the build — the affected feature throws
+# loudly at runtime instead (or, for ETHERFUSE_BASE_URL, falls back to
+# the sandbox URL hardcoded in convex/lib/env.ts). Re-deploy after
+# adding it in Vercel.
 
-echo "seed-preview: setting MUTAV_TREASURY_SECRET + STELLAR_MUTAV_SOURCE_ACCOUNT on ${DEPLOY_NAME}"
-bunx convex env set MUTAV_TREASURY_SECRET "$PREVIEW_TREASURY_SECRET" \
-  --deployment "${DEPLOY_NAME}" >/dev/null
-bunx convex env set STELLAR_MUTAV_SOURCE_ACCOUNT "$PREVIEW_TREASURY_ACCOUNT" \
-  --deployment "${DEPLOY_NAME}" >/dev/null
-echo "✓ seed-preview: anchor signer env vars configured"
+set_from_env() {
+  local name="$1"
+  local hint="$2"
+  if [ -n "${!name:-}" ]; then
+    bunx convex env set "$name" "${!name}" --deployment "${DEPLOY_NAME}" >/dev/null
+    echo "✓ seed-preview: $name configured"
+  else
+    echo "⚠ seed-preview: $name not in build env — add to Vercel Project Settings (preview scope). $hint" >&2
+  fi
+}
+
+set_from_env MUTAV_TREASURY_SECRET "Stellar sponsorship will fail at runtime without it."
+set_from_env STELLAR_MUTAV_SOURCE_ACCOUNT "Falls back to a hardcoded dev value in convex/lib/env.ts when missing — set this in Vercel to override per-environment."
+set_from_env MUTAV_STELLAR_SECRET_ENCRYPTION_KEY "Per-agency etherfuse provisioning will fail at runtime without it."
+set_from_env ETHERFUSE_API_KEY "Etherfuse on-ramp actions will fail at runtime without it."
+set_from_env ETHERFUSE_BASE_URL "Falls back to https://api.sand.etherfuse.com via convex/lib/env.ts default."

@@ -29,3 +29,10 @@ docs/superpowers/
 # for design tokens. Reformatting can break the YAML structure that
 # downstream skills consume.
 .design/
+
+# Vendored anchor SDK from github.com/ElliotFriend/regional-starter-pack.
+# Kept verbatim so we can pull upstream updates with a clean diff.
+src/lib/anchors/etherfuse/
+
+# Operator-run sandbox smoke test — vendored shape, not production code.
+scripts/etherfuse-smoke.ts

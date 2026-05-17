@@ -74,3 +74,84 @@ export function getTreasurySecret(): string {
   }
   return secret;
 }
+
+/**
+ * Etherfuse REST API base URL. Defaults to the sandbox; production
+ * deployments must set `ETHERFUSE_BASE_URL=https://api.etherfuse.com`.
+ */
+export function getEtherfuseBaseUrl(): string {
+  return process.env.ETHERFUSE_BASE_URL ?? "https://api.sand.etherfuse.com";
+}
+
+/**
+ * Lazy getter for the Etherfuse API key. Format: `api_sand:<uuid>:<uuid>`
+ * (sandbox) or `api_prod:<uuid>:<uuid>`. Generated at devnet.etherfuse.com
+ * (Ramp → API Keys). Required for any anchor action that touches Etherfuse
+ * REST endpoints.
+ */
+export function getEtherfuseApiKey(): string {
+  const key = process.env.ETHERFUSE_API_KEY;
+  if (!key) {
+    throw new Error(
+      "ETHERFUSE_API_KEY is not set. " +
+        "Etherfuse on-ramp actions require the key. " +
+        "Get one at https://devnet.etherfuse.com → Ramp → API Keys, " +
+        "then set with `bunx convex env set ETHERFUSE_API_KEY api_sand:...`.",
+    );
+  }
+  return key;
+}
+
+/**
+ * Base64 secret returned once at webhook creation
+ * (POST /ramp/webhook → response.secret). Used by `convex/http.ts` to
+ * verify HMAC-SHA256 over canonicalized JSON per
+ * docs.etherfuse.com/guides/verifying-webhooks.
+ *
+ * Each Convex deployment registers its own webhook URL (the deployment's
+ * .convex.site origin), so this secret is per-environment, not per-agency.
+ * Register via `bun run scripts/etherfuse-register-webhook.ts <url>` and
+ * paste the returned secret into the env.
+ */
+export function getEtherfuseWebhookSecret(): string {
+  const secret = process.env.ETHERFUSE_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error(
+      "ETHERFUSE_WEBHOOK_SECRET is not set. " +
+        "Register a webhook with `bun run scripts/etherfuse-register-webhook.ts <https-url>` " +
+        "and set with `bunx convex env set ETHERFUSE_WEBHOOK_SECRET <base64>`.",
+    );
+  }
+  return secret;
+}
+
+/**
+ * 32-byte base64-encoded key for AES-256-GCM envelope encryption of
+ * per-agency Stellar proxy account secrets. Required by
+ * `convex/lib/secrets.ts` whenever PR-2's proxy provisioning runs.
+ *
+ * Generate one for dev/preview with:
+ *
+ *   openssl rand -base64 32
+ *
+ * Production should rotate to a managed secret (KMS/HSM/Vault) — this
+ * env-derived path is the dev/preview default per `.claude/notes/deferred-conventions.md`.
+ */
+export function getStellarSecretEncryptionKey(): Buffer {
+  const raw = process.env.MUTAV_STELLAR_SECRET_ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error(
+      "MUTAV_STELLAR_SECRET_ENCRYPTION_KEY is not set. " +
+        "Per-agency proxy account provisioning requires an encryption key. " +
+        "Generate one via `openssl rand -base64 32` and set with " +
+        "`bunx convex env set MUTAV_STELLAR_SECRET_ENCRYPTION_KEY <base64>`.",
+    );
+  }
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new Error(
+      `MUTAV_STELLAR_SECRET_ENCRYPTION_KEY must decode to 32 bytes (AES-256); got ${key.length}.`,
+    );
+  }
+  return key;
+}

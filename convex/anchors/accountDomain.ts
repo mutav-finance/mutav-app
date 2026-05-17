@@ -43,6 +43,37 @@ export const anchorAccountDataValidator = v.union(
   v.object({
     provider: v.literal("testanchor"),
   }),
+  v.object({
+    provider: v.literal("etherfuse"),
+    // Per-agency Stellar proxy account. publicKey is the G-address
+    // registered with Etherfuse; encryptedSecret holds the AES-GCM
+    // envelope of the secret seed (see convex/lib/secrets.ts for the
+    // encrypt/decrypt helpers).
+    publicKey: v.string(),
+    encryptedSecret: v.object({
+      ciphertext: v.string(),
+      iv: v.string(),
+      authTag: v.string(),
+    }),
+    // Both UUIDs are client-generated and registered with Etherfuse via
+    // POST /ramp/onboarding-url. Persisted forever per agency (one
+    // G-address ↔ one Etherfuse customer globally per anchorAccounts.externalId).
+    bankAccountId: v.string(),
+    // Hash of the Stellar tx that created the proxy account and opened
+    // the TESOURO trustline. Absent until the on-chain submit confirms
+    // — the row is inserted before submission so a mid-flow failure
+    // still leaves the encrypted secret recoverable.
+    provisioningTxHash: v.optional(v.string()),
+    // KYC state mirrors src/lib/anchors/etherfuse/types.ts → KycStatus.
+    // Sandbox flips proposed → approved on POST /ramp/customer/{id}/kyc;
+    // production gates on real KYC review. Orders are rejected until approved.
+    kycStatus: v.union(
+      v.literal("not_started"),
+      v.literal("proposed"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+  }),
 );
 
 // ─── Predicates ───────────────────────────────────────────────────────────────
