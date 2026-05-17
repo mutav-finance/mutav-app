@@ -20,6 +20,11 @@ const eslintConfig = defineConfig([
       // Local agent tooling — not project source.
       ".claude/**",
       ".agents/**",
+      // Vendored Etherfuse client — kept verbatim from regional-starter-pack
+      // so upstream pulls stay clean-diff. Same for the operator-run sandbox
+      // smoke test (vendored shape, not production code).
+      "src/lib/anchors/etherfuse/**",
+      "scripts/etherfuse-smoke.ts",
     ],
   },
   ...nextVitals,
