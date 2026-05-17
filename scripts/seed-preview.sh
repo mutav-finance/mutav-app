@@ -66,3 +66,36 @@ bunx convex env set MUTAV_TREASURY_SECRET "$PREVIEW_TREASURY_SECRET" \
 bunx convex env set STELLAR_MUTAV_SOURCE_ACCOUNT "$PREVIEW_TREASURY_ACCOUNT" \
   --deployment "${DEPLOY_NAME}" >/dev/null
 echo "✓ seed-preview: anchor signer env vars configured"
+
+# Etherfuse + per-agency proxy account encryption.
+#
+# ETHERFUSE_BASE_URL: published sandbox URL, public, hardcoded.
+#
+# MUTAV_STELLAR_SECRET_ENCRYPTION_KEY: encrypts the per-agency proxy
+# account secrets (convex/anchors/actions.ts → encryptSecret). Preview
+# convex data is wiped every push, the encrypted secrets are testnet-only
+# keypairs sponsored by the published treasury above, so a static key in
+# this script is the same trust pattern as the treasury secret itself.
+#
+# ETHERFUSE_API_KEY: tied to a sandbox account, can't live in the repo.
+# Set as a Vercel Project Environment Variable (preview scope) and we
+# propagate it to the per-PR convex deployment here.
+PREVIEW_STELLAR_SECRET_ENCRYPTION_KEY="8Afhmm80wWvnrjntLqwZp9pQ13U5xAzF1pOLWu5cPCA="
+PREVIEW_ETHERFUSE_BASE_URL="https://api.sand.etherfuse.com"
+
+echo "seed-preview: setting MUTAV_STELLAR_SECRET_ENCRYPTION_KEY + ETHERFUSE_BASE_URL on ${DEPLOY_NAME}"
+bunx convex env set MUTAV_STELLAR_SECRET_ENCRYPTION_KEY \
+  "$PREVIEW_STELLAR_SECRET_ENCRYPTION_KEY" \
+  --deployment "${DEPLOY_NAME}" >/dev/null
+bunx convex env set ETHERFUSE_BASE_URL "$PREVIEW_ETHERFUSE_BASE_URL" \
+  --deployment "${DEPLOY_NAME}" >/dev/null
+
+if [ -n "${ETHERFUSE_API_KEY:-}" ]; then
+  bunx convex env set ETHERFUSE_API_KEY "$ETHERFUSE_API_KEY" \
+    --deployment "${DEPLOY_NAME}" >/dev/null
+  echo "✓ seed-preview: etherfuse env vars configured"
+else
+  echo "⚠ seed-preview: ETHERFUSE_API_KEY not in build env — add to" >&2
+  echo "  Vercel → Project Settings → Environment Variables (preview scope)" >&2
+  echo "  to enable etherfuse on-ramp on this preview." >&2
+fi
