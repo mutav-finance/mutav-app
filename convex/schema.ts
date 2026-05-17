@@ -347,4 +347,26 @@ export default defineSchema({
     receivedAt: v.string(),
     processedAt: v.optional(v.string()),
   }).index("by_provider_eventId", ["provider", "eventId"]),
+
+  // Per-agency funding sources used to pay Mutav's monthly insurance
+  // invoices via the anchor on-ramp. Mirror of Etherfuse's per-customer
+  // bank list, kept local so the checkout picker renders without a
+  // round-trip and so we can validate a chosen account before handing
+  // it to /ramp/order. Reconciled by `syncEtherfuseBankAccounts`.
+  //
+  // Naming is provider-agnostic on purpose — `externalBankAccountId` is
+  // Etherfuse's UUID today; a future provider would just add rows with
+  // its own external identifier.
+  agencyBankAccounts: defineTable({
+    agencyId: v.id("agencies"),
+    anchorAccountId: v.id("anchorAccounts"),
+    externalBankAccountId: v.string(),
+    type: v.union(v.literal("pix"), v.literal("spei")),
+    accountNumber: v.string(),
+    accountHolderName: v.string(),
+    etherfuseCreatedAt: v.string(),
+    syncedAt: v.string(),
+  })
+    .index("by_agency", ["agencyId"])
+    .index("by_external_id", ["externalBankAccountId"]),
 });
