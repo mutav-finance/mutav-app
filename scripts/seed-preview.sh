@@ -51,27 +51,24 @@ echo "seed-preview: VERCEL_ENV=preview, deployment=${DEPLOY_NAME} — running se
 bunx convex run --deployment "${DEPLOY_NAME}" seed:fictionalContracts
 echo "✓ seed-preview: preview deployment populated"
 
-# All secrets live in Vercel Project Environment Variables (preview
-# scope) and get propagated to the per-PR convex deployment here. The
-# only thing hardcoded in this script is the published sandbox URL —
-# everything else is fetched from the build env. Keeping secrets out of
-# the repo means a future regression that runs this script with
-# VERCEL_ENV=production can't accidentally reuse a baked-in testnet
-# value against a real account.
+# All config lives in Vercel Project Environment Variables (preview
+# scope) and gets propagated to the per-PR convex deployment here.
+# Nothing about Mutav is baked into this script anymore — keeping
+# values out of the repo means a future regression that runs this
+# script with VERCEL_ENV=production can't accidentally reuse a baked-in
+# testnet value against a real account.
 #
 # Required Vercel env vars (preview scope):
 #   MUTAV_TREASURY_SECRET                  S...   testnet treasury seed
 #   STELLAR_MUTAV_SOURCE_ACCOUNT           G...   testnet treasury account
 #   MUTAV_STELLAR_SECRET_ENCRYPTION_KEY    base64 AES-256 key for per-agency proxy secrets
 #   ETHERFUSE_API_KEY                      api_sand:...  sandbox API key
+#   ETHERFUSE_BASE_URL                     https://api.sand.etherfuse.com (or a different sandbox/mock URL)
 #
 # A missing var doesn't fail the build — the affected feature throws
-# loudly at runtime instead. Re-deploy after adding it in Vercel.
-PREVIEW_ETHERFUSE_BASE_URL="https://api.sand.etherfuse.com"
-
-echo "seed-preview: setting ETHERFUSE_BASE_URL on ${DEPLOY_NAME}"
-bunx convex env set ETHERFUSE_BASE_URL "$PREVIEW_ETHERFUSE_BASE_URL" \
-  --deployment "${DEPLOY_NAME}" >/dev/null
+# loudly at runtime instead (or, for ETHERFUSE_BASE_URL, falls back to
+# the sandbox URL hardcoded in convex/lib/env.ts). Re-deploy after
+# adding it in Vercel.
 
 set_from_env() {
   local name="$1"
@@ -88,3 +85,4 @@ set_from_env MUTAV_TREASURY_SECRET "Stellar sponsorship will fail at runtime wit
 set_from_env STELLAR_MUTAV_SOURCE_ACCOUNT "Falls back to a hardcoded dev value in convex/lib/env.ts when missing — set this in Vercel to override per-environment."
 set_from_env MUTAV_STELLAR_SECRET_ENCRYPTION_KEY "Per-agency etherfuse provisioning will fail at runtime without it."
 set_from_env ETHERFUSE_API_KEY "Etherfuse on-ramp actions will fail at runtime without it."
+set_from_env ETHERFUSE_BASE_URL "Falls back to https://api.sand.etherfuse.com via convex/lib/env.ts default."
