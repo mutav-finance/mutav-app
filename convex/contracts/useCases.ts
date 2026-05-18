@@ -62,10 +62,10 @@ export const getByPublicId = query({
  */
 export const getByPublicIdInternal = internalQuery({
   args: { publicId: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { publicId }) => {
     return ctx.db
       .query("contracts")
-      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
+      .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
       .unique();
   },
 });
