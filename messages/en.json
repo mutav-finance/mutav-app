@@ -288,7 +288,8 @@
       },
       "errors": {
         "NOT_FOUND": "Proposal not found.",
-        "NOT_PENDING": "Only pending proposals can be cancelled."
+        "NOT_PENDING": "Only pending proposals can be cancelled.",
+        "UNEXPECTED": "Unexpected error. Please try again."
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this contract",

@@ -288,7 +288,8 @@
       },
       "errors": {
         "NOT_FOUND": "Proposta não encontrada.",
-        "NOT_PENDING": "Apenas propostas pendentes podem ser canceladas."
+        "NOT_PENDING": "Apenas propostas pendentes podem ser canceladas.",
+        "UNEXPECTED": "Erro inesperado. Tente novamente."
       },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",
