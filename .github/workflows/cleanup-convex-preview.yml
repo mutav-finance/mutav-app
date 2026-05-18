@@ -1,0 +1,46 @@
+name: cleanup-convex-preview
+
+# Deletes the Convex preview deployment for a branch when its PR is closed
+# (merged OR closed-without-merge). Without this, previews sit around for up
+# to 5 days waiting for free-plan auto-cleanup, and dense activity periods
+# hit the 40-deployment quota.
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  delete-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Convex preview deployment
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          TOKEN: ${{ secrets.CONVEX_MANAGEMENT_TOKEN }}
+        run: |
+          # Convex auto-names previews from the git branch when deployed via
+          # `convex deploy` in CI. Exact slug rule is confirmed by running
+          # scripts/list-convex-previews.sh against a real preview before
+          # merging this workflow.
+          NAME="${BRANCH//\//-}"
+
+          # Allow 404 — preview may already be gone (5-day auto-cleanup,
+          # never created, or manual deletion). Anything else is a real failure.
+          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://api.convex.dev/v1/deployments/$NAME/delete")
+
+          case "$HTTP_CODE" in
+            2*)
+              echo "✓ Deleted preview deployment '$NAME'"
+              ;;
+            404)
+              echo "ℹ Preview '$NAME' already gone — nothing to do"
+              ;;
+            *)
+              echo "✗ Failed to delete '$NAME' (HTTP $HTTP_CODE):"
+              cat /tmp/response.txt
+              exit 1
+              ;;
+          esac
