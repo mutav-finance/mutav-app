@@ -1485,12 +1485,23 @@ async function startEtherfusePixOnramp(
       toCurrency: "TESOURO",
     });
 
-    if (!onramp.paymentInstructions || onramp.paymentInstructions.type !== "pix") {
+    // Etherfuse's /ramp/order create response sometimes ships without
+    // populated Pix payment details (depositPixCode / depositPixKey
+    // arrive a moment later). Retry once via GET so the UI doesn't
+    // render an empty QR. The poller would catch up eventually, but
+    // forcing a populated insert keeps the UX deterministic.
+    let paymentInstructions = onramp.paymentInstructions;
+    if (!paymentInstructions || paymentInstructions.type !== "pix") {
+      const tx = await client.getOnRampTransaction(onramp.id);
+      paymentInstructions = tx?.paymentInstructions;
+    }
+
+    if (!paymentInstructions || paymentInstructions.type !== "pix") {
       return {
         success: false,
         error: {
           code: ANCHOR_START_ERROR_CODE.ANCHOR_RESPONSE_INVALID,
-          detail: `expected pix instructions, got ${onramp.paymentInstructions?.type ?? "none"}`,
+          detail: `expected pix instructions, got ${paymentInstructions?.type ?? "none"}`,
         },
       };
     }
@@ -1500,7 +1511,7 @@ async function startEtherfusePixOnramp(
       paymentId: context.paymentId,
       provider: "etherfuse",
       anchorTxId: onramp.id,
-      instructions: etherfusePixInstructions(onramp.paymentInstructions),
+      instructions: etherfusePixInstructions(paymentInstructions),
       status: ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START,
     });
 
