@@ -173,6 +173,7 @@ export default defineSchema({
     creci: v.optional(v.string()),
     bankingInfo: v.optional(bankingInfo),
     onboardingRejectionReason: v.optional(v.string()),
+    consentMarketing: v.optional(v.boolean()),
   })
     .index("by_cnpj", ["cnpj"])
     .index("by_cpf", ["cpf"])

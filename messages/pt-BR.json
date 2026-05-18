@@ -933,7 +933,6 @@
         ]
       },
       "ctaButton": "Começar cadastro",
-      "ctaNoteTime": "5 min",
       "ctaNoteReview": "análise em até 2 dias úteis"
     },
     "wizard": {
@@ -947,10 +946,6 @@
       "progressLabel": "Progresso do cadastro",
       "stepDoneSuffix": ": concluído",
       "stepCurrentSuffix": ": etapa atual",
-      "inProgress": "Etapa {step} — em construção",
-      "inProgressNoteBase": "Os próximos módulos serão implementados em breve.",
-      "inProgressNoteDocuments": "Os próximos módulos (documentos, conta bancária, revisão) serão implementados em breve.",
-      "backButton": "← Voltar",
       "banking": {
         "bankLabel": "Banco",
         "bankPlaceholder": "Ex: Nubank, Itaú, Bradesco",
@@ -1030,6 +1025,8 @@
       "errors": {
         "CNPJ_REQUIRED": "CNPJ obrigatório para imobiliária.",
         "CPF_REQUIRED": "CPF obrigatório para corretor autônomo.",
+        "CPF_INVALID": "CPF inválido. Verifique os dígitos e tente novamente.",
+        "CNPJ_INVALID": "CNPJ inválido. Verifique os dígitos e tente novamente.",
         "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
         "unknown": "Erro ao salvar. Tente novamente."
       }

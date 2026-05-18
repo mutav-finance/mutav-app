@@ -9,7 +9,7 @@ import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wi
 
 type Props = {
   data: OnboardingWizardData;
-  onSubmit: () => void;
+  onSubmit: (opts: { consentMarketing: boolean }) => void;
   onBack: () => void;
   onGoTo: (step: number) => void;
   isSubmitting: boolean;
@@ -23,7 +23,11 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
     data.agencyType === "autonomo" ? t("agencyTypeAutonomo") : t("agencyTypeEmpresa");
   const documentValue = data.agencyType === "autonomo" ? data.cpf : data.cnpj;
   const accountTypeLabel =
-    data.bankAccountType === "corrente" ? t("accountTypeCorrente") : t("accountTypePoupanca");
+    data.bankAccountType === "corrente"
+      ? t("accountTypeCorrente")
+      : data.bankAccountType === "poupanca"
+        ? t("accountTypePoupanca")
+        : "—";
 
   // Etapa do banking varia conforme o tipo: autonomo pula documentos
   const bankingStep = data.agencyType === "empresa" ? 3 : 2;
@@ -118,7 +122,7 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
         <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           {t("backButton")}
         </Button>
-        <Button size="lg" onClick={onSubmit} disabled={isSubmitting}>
+        <Button size="lg" onClick={() => onSubmit({ consentMarketing })} disabled={isSubmitting}>
           {isSubmitting ? t("submittingButton") : t("submitButton")}
         </Button>
       </div>

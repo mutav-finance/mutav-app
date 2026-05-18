@@ -8,6 +8,8 @@ import {
   agencyTypeValidator,
   bankingInfoValidator,
   agencyDocumentKindValidator,
+  isValidCPF,
+  isValidCNPJ,
 } from "./domain";
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
@@ -166,6 +168,13 @@ export const startOnboarding = mutation({
     }
     if (args.agencyType === AGENCY_TYPE.AUTONOMO && !cpf) {
       return { success: false, error: { code: "CPF_REQUIRED" } } as const;
+    }
+
+    if (cpf && !isValidCPF(cpf)) {
+      return { success: false, error: { code: "CPF_INVALID" } } as const;
+    }
+    if (cnpj && !isValidCNPJ(cnpj)) {
+      return { success: false, error: { code: "CNPJ_INVALID" } } as const;
     }
 
     // Unicidade: IN_PROGRESS não bloqueia — o cadastro só é considerado "ocupado"
@@ -329,8 +338,11 @@ export const saveDocument = mutation({
  * TODO(auth): require identity + verify ownership.
  */
 export const submitOnboarding = mutation({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }) => {
+  args: {
+    agencyId: v.id("agencies"),
+    consentMarketing: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { agencyId, consentMarketing }) => {
     const agency = await ctx.db.get(agencyId);
     if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
 
@@ -350,9 +362,10 @@ export const submitOnboarding = mutation({
     // se torna "ocupado". Dois usuários podem estar IN_PROGRESS com o mesmo documento,
     // mas apenas o primeiro a submeter passa.
     if (agency.agencyType === AGENCY_TYPE.AUTONOMO && agency.cpf) {
+      const cpf = agency.cpf;
       const existing = await ctx.db
         .query("agencies")
-        .withIndex("by_cpf", (q) => q.eq("cpf", agency.cpf!))
+        .withIndex("by_cpf", (q) => q.eq("cpf", cpf))
         .first();
       if (
         existing &&
@@ -365,9 +378,10 @@ export const submitOnboarding = mutation({
     }
 
     if (agency.agencyType === AGENCY_TYPE.EMPRESA && agency.cnpj) {
+      const cnpj = agency.cnpj;
       const existing = await ctx.db
         .query("agencies")
-        .withIndex("by_cnpj", (q) => q.eq("cnpj", agency.cnpj!))
+        .withIndex("by_cnpj", (q) => q.eq("cnpj", cnpj))
         .first();
       if (
         existing &&
@@ -397,9 +411,9 @@ export const submitOnboarding = mutation({
     await ctx.db.patch(agencyId, {
       onboardingState: ONBOARDING_STATE.SUBMITTED,
       onboardingSubmittedAt: submittedAt,
+      consentMarketing: consentMarketing ?? false,
     });
 
     return { success: true, data: { agencyId, submittedAt } } as const;
   },
 });
->>>>>>> 35ed811 (feat(onboarding): wizard completo — perfil, documentos, bancário, revisão)

@@ -6,10 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import {
-  type OnboardingWizardData,
-  isBankAccountType,
-} from "@/components/onboarding/onboarding-wizard";
+import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wizard";
 
 type Props = {
   data: OnboardingWizardData;
@@ -26,11 +23,14 @@ type BankingErrors = {
   accountType?: string;
 };
 
-const ACCOUNT_TYPE_LABEL_ID = "account-type-label";
+export function isBankAccountType(t: string): t is "corrente" | "poupanca" {
+  return t === "corrente" || t === "poupanca";
+}
 
 export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting }: Props) {
   const t = useTranslations("onboarding.wizard.banking");
   const [errors, setErrors] = React.useState<BankingErrors>({});
+  const accountTypeLabelId = React.useId();
 
   const handleNext = () => {
     const errs: BankingErrors = {};
@@ -81,14 +81,10 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
         </Field>
 
         <div className="flex flex-col gap-2 sm:col-span-2">
-          <span id={ACCOUNT_TYPE_LABEL_ID} className="text-sm font-medium">
+          <span id={accountTypeLabelId} className="text-sm font-medium">
             {t("accountTypeLabel")}
           </span>
-          <div
-            role="group"
-            aria-labelledby={ACCOUNT_TYPE_LABEL_ID}
-            className="grid grid-cols-2 gap-2"
-          >
+          <div role="group" aria-labelledby={accountTypeLabelId} className="grid grid-cols-2 gap-2">
             {(["corrente", "poupanca"] as const).map((type) => (
               <button
                 key={type}
