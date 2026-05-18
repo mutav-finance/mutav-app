@@ -274,6 +274,7 @@ Strict-compliance rule (enforced in review):
 - **Identity-only exception:** `queryWithAuth` / `mutationWithAuth` for handlers that don't have a natural agency (e.g. listing the current user's own agencies).
 - **Internal writers (`internalMutation` / `internalQuery`):** no wrapper — auth was already enforced by the public caller.
 - **Actions (`ActionCtx`):** no DB access for membership lookup; use `requireIdentity(ctx)` + an `internalQuery` for membership. Per-action wrappers may come later.
+- **Calling wrapped functions from actions:** `ctx.runQuery(api.X.wrapped, …)` inherits the action's identity — fine when the action runs from an authenticated dashboard route, **broken post-Auth0** when the action runs from a tenant/public/webhook context. For those, route through an `internal.X.Y` companion (e.g. `payments.getByIdInternal`, `contracts.getByPublicIdInternal`). When wrapping a new domain, grep `ctx\.runQuery(api\.<domain>\.` and fix every tenant-facing hit. See [`docs/auth.md`](docs/auth.md) for the full pattern.
 
 Pre-Auth0, `resolveCurrentUser` looks up the hardcoded `dev-user` row. When Auth0 lands, that one function in `convex/lib/auth.ts` swaps to `ctx.auth.getUserIdentity()` and every wrapped handler migrates at once. Do not add per-handler auth shims that would need to be undone on the swap.
 

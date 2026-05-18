@@ -1,29 +1,46 @@
 import { v } from "convex/values";
-import { query } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
+import { queryWithAgencyScope, queryWithAuth } from "../lib/auth";
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
 
-export const getById = query({
+/**
+ * Fetch one agency by id. The wrapper asserts the caller is a member of the
+ * requested agency before the handler runs — non-members get
+ * `ForbiddenError` rather than the agency doc.
+ */
+export const getById = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
+    return ctx.db.get(ctx.agencyId);
+  },
+});
+
+/**
+ * Internal companion to `getById` for use from actions/schedulers where
+ * caller identity may not propagate. The calling internal flow is
+ * responsible for whatever authorization is appropriate at its entry point.
+ */
+export const getByIdInternal = internalQuery({
   args: { agencyId: v.id("agencies") },
-  handler: async (ctx, args) => {
-    return ctx.db.get(args.agencyId);
+  handler: async (ctx, { agencyId }) => {
+    return ctx.db.get(agencyId);
   },
 });
 
 // ─── Membership queries ───────────────────────────────────────────────────────
 
 /**
- * SECURITY POSTURE (MVP): unscoped public read. Load-bearing for the
- * pre-Auth0 dev shortcut — `WorkspaceContext` calls this to populate the
- * agency switcher. When Auth0 lands, this becomes an authenticated query
- * that derives `userId` from the session rather than accepting it from args.
+ * Lists the agencies the current user belongs to. Identity is resolved by the
+ * wrapper (pre-Auth0: `dev-user`; post-Auth0: JWT subject) — no client-side
+ * `userId` arg, so a caller can never enumerate another user's memberships.
  */
-export const listAgenciesForUser = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
+export const listAgenciesForUser = queryWithAuth({
+  args: {},
+  handler: async (ctx) => {
     const memberships = await ctx.db
       .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
       .collect();
 
     const results = await Promise.all(

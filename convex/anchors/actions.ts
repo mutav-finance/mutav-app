@@ -251,7 +251,7 @@ async function resolveTenantPrefill(
   contractPublicId: string | undefined,
 ): Promise<TenantPrefill> {
   if (!contractPublicId) return {};
-  const contract = await ctx.runQuery(api.contracts.useCases.getByPublicId, {
+  const contract = await ctx.runQuery(internal.contracts.useCases.getByPublicIdInternal, {
     publicId: contractPublicId,
   });
   if (!contract) return {};
@@ -385,7 +385,7 @@ export const startPixOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartPixOnrampResult> => {
-    const payment = await ctx.runQuery(api.payments.useCases.getById, {
+    const payment = await ctx.runQuery(internal.payments.useCases.getByIdInternal, {
       paymentId: args.paymentId,
     });
     if (!payment) {
@@ -579,7 +579,7 @@ export const startAnchorTestOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartAnchorTestOnrampResult> => {
-    const payment = await ctx.runQuery(api.payments.useCases.getById, {
+    const payment = await ctx.runQuery(internal.payments.useCases.getByIdInternal, {
       paymentId: args.paymentId,
     });
     if (!payment) {
@@ -1087,7 +1087,7 @@ export const onboardAgencyEtherfuseKyb = internalAction({
   },
   returns: onboardingReturnValidator,
   handler: async (ctx, args): Promise<OnboardAgencyEtherfuseResult> => {
-    const agency = await ctx.runQuery(api.agencies.useCases.getById, {
+    const agency = await ctx.runQuery(internal.agencies.useCases.getByIdInternal, {
       agencyId: args.agencyId,
     });
     if (!agency) throw new Error(`Agency ${args.agencyId} not found`);

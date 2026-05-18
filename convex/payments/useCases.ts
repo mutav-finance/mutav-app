@@ -1,70 +1,74 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query } from "../_generated/server";
-import { isChargeable, paymentStateKindValidator, type Payment } from "./domain";
+import { assertAgencyAccess, queryWithAgencyScope } from "../lib/auth";
+import { isChargeable } from "./domain";
 import { derivePaymentMuxedAddress } from "./lib/muxedAddress";
 
-export const listByAgency = query({
-  args: {
-    agencyId: v.id("agencies"),
-    paginationOpts: paginationOptsValidator,
-  },
-  handler: async (ctx, args) => {
-    return ctx.db
-      .query("payments")
-      .withIndex("by_agency_period", (q) => q.eq("agencyId", args.agencyId))
-      .order("desc")
-      .paginate(args.paginationOpts);
-  },
-});
-
-export const listByStateKind = query({
-  args: {
-    stateKind: paymentStateKindValidator,
-    paginationOpts: paginationOptsValidator,
-  },
-  handler: async (ctx, args) => {
-    return ctx.db
-      .query("payments")
-      .withIndex("by_state_kind", (q) => q.eq("state.kind", args.stateKind))
-      .order("desc")
-      .paginate(args.paginationOpts);
-  },
-});
-
-/** Public paginated list — same security caveat as contracts.useCases.list. */
-export const list = query({
+export const listByAgency = queryWithAgencyScope({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
-    const result = await ctx.db.query("payments").order("desc").paginate(args.paginationOpts);
-    return {
-      ...result,
-      page: result.page.map(shapePaymentSummary),
-    };
+    return ctx.db
+      .query("payments")
+      .withIndex("by_agency_period", (q) => q.eq("agencyId", ctx.agencyId))
+      .order("desc")
+      .paginate(args.paginationOpts);
   },
 });
 
+/**
+ * Resource-by-id read. Returns null on three indistinguishable cases —
+ * payment doesn't exist, caller isn't authenticated, caller isn't a member
+ * of the payment's agency — to avoid leaking cross-agency existence. Action
+ * callers reading this should map null to `PAYMENT_NOT_FOUND` and accept
+ * the ambiguity.
+ */
 export const getById = query({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args) => {
-    return ctx.db.get(args.paymentId);
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) return null;
+
+    try {
+      await assertAgencyAccess(ctx, payment.agencyId);
+    } catch {
+      return null;
+    }
+
+    return payment;
   },
 });
 
+/**
+ * Resource-by-id read keyed on publicId. Same null-on-miss semantics as
+ * `getById`. Agency-staff query — for tenant-bearer access from the public
+ * portal use `getPublicByPublicId` instead.
+ */
 export const getByPublicId = query({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
-    return ctx.db
+    const payment = await ctx.db
       .query("payments")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
+    if (!payment) return null;
+
+    try {
+      await assertAgencyAccess(ctx, payment.agencyId);
+    } catch {
+      return null;
+    }
+
+    return payment;
   },
 });
 
 /**
  * Tenant-safe shape for the public payment portal. No auth required — the
- * high-entropy `publicId` IS the bearer. Excludes agency-private fields,
- * carries the derived Stellar `M…` destination address.
+ * high-entropy `publicId` IS the bearer. Carries everything the tenant
+ * checkout flow needs (including `paymentId` and `agencyId`, which the
+ * checkout actions consume) plus the derived Stellar `M…` destination
+ * address. Excludes only system fields the tenant has no use for.
  */
 export const getPublicByPublicId = query({
   args: { publicId: v.string() },
@@ -81,6 +85,8 @@ export const getPublicByPublicId = query({
     const muxedAddress = payment.muxedId ? derivePaymentMuxedAddress(payment.muxedId) : null;
 
     return {
+      paymentId: payment._id,
+      agencyId: payment.agencyId,
       publicId: payment.publicId,
       agencyName: agency.name,
       periodMonth: payment.periodMonth,
@@ -91,6 +97,19 @@ export const getPublicByPublicId = query({
       method: payment.method,
       muxedAddress,
     };
+  },
+});
+
+/**
+ * Internal companion to `getById` for actions that authorize by the
+ * publicId-bearer model (tenant checkout) rather than by user identity.
+ * The tenant has no session, so the identity-gated `getById` would always
+ * return null post-Auth0. The action gates on chargeability instead.
+ */
+export const getByIdInternal = internalQuery({
+  args: { paymentId: v.id("payments") },
+  handler: async (ctx, { paymentId }) => {
+    return ctx.db.get(paymentId);
   },
 });
 
@@ -128,14 +147,14 @@ export const getStellarIndexState = internalQuery({
  *
  * Uses the `by_agency_period` index — no full-table scan.
  */
-export const getNextPendingPayment = query({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }) => {
+export const getNextPendingPayment = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
     // Walk forward through payments sorted by period (earliest first)
     // and return the first one that is pending or overdue.
     const page = await ctx.db
       .query("payments")
-      .withIndex("by_agency_period", (q) => q.eq("agencyId", agencyId))
+      .withIndex("by_agency_period", (q) => q.eq("agencyId", ctx.agencyId))
       .order("asc")
       .collect();
 
@@ -152,19 +171,3 @@ export const getNextPendingPayment = query({
     };
   },
 });
-
-// ─── Shape helpers ────────────────────────────────────────────────────────────
-
-function shapePaymentSummary(doc: Payment) {
-  return {
-    id: doc.publicId,
-    agencyId: doc.agencyId,
-    periodMonth: doc.periodMonth,
-    issuedAt: doc.issuedAt,
-    dueDate: doc.dueDate,
-    totalCents: doc.totalCents,
-    state: doc.state,
-    method: doc.method,
-    lineItemCount: doc.lineItems.length,
-  };
-}
