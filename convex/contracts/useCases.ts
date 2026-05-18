@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { query, mutation } from "../_generated/server";
+import { query } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
 import { CONTRACT_STATUS } from "./domain";
+import { assertAgencyAccess, mutationWithAgencyScope, queryWithAgencyScope } from "../lib/auth";
 
 const COVERAGE_MULT: { "24x": number; "36x": number; "48x": number } = {
   "24x": 1.0,
@@ -32,12 +33,11 @@ function generatePublicId(): string {
 }
 
 /**
- * Public read of one contract by its human-facing public id.
- *
- * SECURITY POSTURE (MVP):
- * No identity check today (`auth.config.ts` has empty providers). Replace
- * the body with `await requireIdentity(ctx)` + an agency-scoped ownership
- * check before going to production.
+ * Resource-by-id read. The publicId is the only thing in the URL on the
+ * detail route, so the wrapper can't pre-scope by agencyId from args — we
+ * verify membership against the resource's `agencyId` inline. Returns null
+ * on both "no such id" and "not a member of that agency", to avoid leaking
+ * cross-agency existence.
  */
 export const getByPublicId = query({
   args: { publicId: v.string() },
@@ -48,6 +48,12 @@ export const getByPublicId = query({
       .unique();
 
     if (!contract) {
+      return null;
+    }
+
+    try {
+      await assertAgencyAccess(ctx, contract.agencyId);
+    } catch {
       return null;
     }
 
@@ -62,29 +68,13 @@ export const getByPublicId = query({
   },
 });
 
-/** Public paginated list — same security caveat as `getByPublicId`. */
-export const list = query({
-  args: { paginationOpts: paginationOptsValidator },
-  handler: async (ctx, args) => {
-    const result = await ctx.db.query("contracts").order("desc").paginate(args.paginationOpts);
-
-    return {
-      ...result,
-      page: result.page.map(shapeContractSummary),
-    };
-  },
-});
-
 /** Paginated list scoped to one agency. */
-export const listByAgency = query({
-  args: {
-    agencyId: v.id("agencies"),
-    paginationOpts: paginationOptsValidator,
-  },
+export const listByAgency = queryWithAgencyScope({
+  args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
     const result = await ctx.db
       .query("contracts")
-      .withIndex("by_agency_status", (q) => q.eq("agencyId", args.agencyId))
+      .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
       .order("desc")
       .paginate(args.paginationOpts);
 
@@ -120,9 +110,9 @@ function shapeContractSummary(doc: Contract) {
  *
  * Used by `section-cards.tsx` (Painel) to display KPI tiles.
  */
-export const getPipelineSummary = query({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }) => {
+export const getPipelineSummary = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
     const statuses = [
       CONTRACT_STATUS.ATIVO,
       CONTRACT_STATUS.PENDENTE,
@@ -133,7 +123,7 @@ export const getPipelineSummary = query({
     const counts = await contractsByStatus.countBatch(
       ctx,
       statuses.map((status) => ({
-        namespace: agencyId,
+        namespace: ctx.agencyId,
         bounds: {
           lower: { key: status, inclusive: true },
           upper: { key: status, inclusive: true },
@@ -151,9 +141,9 @@ export const getPipelineSummary = query({
 });
 
 /** Monthly contract counts for the given agency, up to the last 12 months. */
-export const countByMonth = query({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, args) => {
+export const countByMonth = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
     const now = new Date();
     // Build the last 12 calendar months as "YYYY-MM" labels
     const months: string[] = [];
@@ -164,7 +154,7 @@ export const countByMonth = query({
 
     const contracts = await ctx.db
       .query("contracts")
-      .withIndex("by_agency_status", (q) => q.eq("agencyId", args.agencyId))
+      .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
       .collect();
 
     return months.map((month) => {
@@ -197,13 +187,12 @@ export const countByMonth = query({
 });
 
 /** Lookup tenant name by CPF from existing contracts in this agency. */
-// TODO(auth): requireIdentity + getMembership check before exposing tenant PII
-export const lookupTenantByCpf = query({
-  args: { agencyId: v.id("agencies"), cpf: v.string() },
-  handler: async (ctx, { agencyId, cpf }) => {
+export const lookupTenantByCpf = queryWithAgencyScope({
+  args: { cpf: v.string() },
+  handler: async (ctx, { cpf }) => {
     const contract = await ctx.db
       .query("contracts")
-      .withIndex("by_agency_tenant_cpf", (q) => q.eq("agencyId", agencyId).eq("tenantCpf", cpf))
+      .withIndex("by_agency_tenant_cpf", (q) => q.eq("agencyId", ctx.agencyId).eq("tenantCpf", cpf))
       .first();
     if (!contract) return null;
     return { fullName: contract.tenant.fullName, email: contract.tenant.email };
@@ -211,10 +200,8 @@ export const lookupTenantByCpf = query({
 });
 
 /** Create a new contract with server-side fee calculation. */
-// TODO(auth): requireIdentity + getMembership check before writing to any agencyId
-export const create = mutation({
+export const create = mutationWithAgencyScope({
   args: {
-    agencyId: v.id("agencies"),
     property: v.object({
       cep: v.string(),
       streetAndNumber: v.string(),
@@ -262,7 +249,7 @@ export const create = mutation({
       .slice(0, 10);
 
     const contractId = await ctx.db.insert("contracts", {
-      agencyId: args.agencyId,
+      agencyId: ctx.agencyId,
       publicId,
       tenantCpf: args.tenant.cpf,
       status: "pendente",
@@ -309,10 +296,10 @@ export const create = mutation({
     await contractsByStatus.insert(ctx, doc);
 
     await ctx.db.insert("contractHistory", {
-      agencyId: args.agencyId,
+      agencyId: ctx.agencyId,
       contractPublicId: publicId,
       at: new Date().toISOString(),
-      username: "Sistema",
+      username: ctx.user.name,
       message: "Contrato criado",
     });
 
@@ -330,7 +317,7 @@ export const create = mutation({
   },
 });
 
-export const cancelProposal = mutation({
+export const cancelProposal = mutationWithAgencyScope({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
     const contract = await ctx.db
@@ -338,7 +325,9 @@ export const cancelProposal = mutation({
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
 
-    if (!contract) {
+    // NOT_FOUND covers both "no such publicId" and "publicId exists but in a
+    // different agency" — don't leak cross-agency existence.
+    if (!contract || contract.agencyId !== ctx.agencyId) {
       return { success: false, error: { code: "NOT_FOUND" } } as const;
     }
     if (contract.status !== "pendente") {
@@ -353,7 +342,7 @@ export const cancelProposal = mutation({
       agencyId: contract.agencyId,
       contractPublicId: args.publicId,
       at: new Date().toISOString(),
-      username: "Sistema",
+      username: ctx.user.name,
       message: "Proposta cancelada",
     });
 

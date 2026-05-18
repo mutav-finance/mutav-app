@@ -50,12 +50,17 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
   async function handleConfirmCancel() {
     setIsCancelling(true);
     try {
-      const result = await cancelProposal({ publicId: contract.id });
+      const result = await cancelProposal({
+        agencyId: contract.agencyId,
+        publicId: contract.id,
+      });
       if (result.success) {
         setCancelOpen(false);
       } else {
         toast.error(t(`errors.${result.error.code}`));
       }
+    } catch {
+      toast.error(t("errors.UNEXPECTED"));
     } finally {
       setIsCancelling(false);
     }

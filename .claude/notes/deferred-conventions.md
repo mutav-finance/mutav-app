@@ -6,37 +6,31 @@ Patterns adapted from `bwb/tokenization` that aren't worth fully formalizing as 
 
 **Adopt when:** any page renders Convex data and we want consistent loading/error states across components.
 
-**Setup:**
+**Setup:** (`convex-helpers` already installed for the auth wrappers — see below.)
 
-1. `bun add convex-helpers`
-2. Create `src/hooks/useQuery.ts`:
+1. Create `src/hooks/useQuery.ts`:
    ```ts
    import { makeUseQueryWithStatus } from "convex-helpers/react";
    import { useQueries } from "convex/react";
    export const useQuery = makeUseQueryWithStatus(useQueries);
    ```
-3. Wrap the app in `<ConvexQueryCacheProvider>` from `convex-helpers/react/cache` for SPA cache (5min default).
-4. Update the `react-hook-composition` skill to import from `@/hooks/useQuery` and remove the "current state" caveat.
+2. Wrap the app in `<ConvexQueryCacheProvider>` from `convex-helpers/react/cache` for SPA cache (5min default).
+3. Update the `react-hook-composition` skill to import from `@/hooks/useQuery` and remove the "current state" caveat.
 
 **Then port** the bwb `convex-query-hooks` skill (pass-through vs. stabilized hook patterns, anti-patterns around manual `data === undefined`).
 
 ## Convex security wrappers (auth-aware queries/mutations)
 
-**Adopt when:** auth ships (Privy or otherwise) and queries/mutations need to know who the caller is.
+**Status (2026-05-17): partially landed as Auth0 prep.** The wrapper layer lives in `convex/lib/auth.ts` with four wrappers (`queryWithAuth`, `mutationWithAuth`, `queryWithAgencyScope`, `mutationWithAgencyScope`) + an `assertAgencyAccess` helper for resource-by-id handlers. Spec: [`docs/auth.md`](../../docs/auth.md). Pre-Auth0 the wrappers resolve identity by hardcoded `dev-user` lookup; the post-Auth0 swap is one function in `convex/lib/auth.ts`.
 
-**Setup:** define the wrapper layer in `convex/lib/security.ts`:
+**Still to adopt** (when the underlying need shows up):
 
-- `authQuery` / `authMutation` — validates `ctx.auth.getUserIdentity()`
-- `userQuery` / `userMutation` — loads user document
-- `permissionQuery` / `permissionMutation` — restricts by org permission
-- `roleQuery` / `roleMutation` — restricts by account role
-- `domainQuery` / `domainMutation` — combines RLS + Triggers + Auth
+- Role-gated wrappers — `queryWithAgencyRole({ minRole: "admin" })` on top of the existing scope wrapper. Defer until the first admin-only operation lands.
+- Row-level security via `wrapDatabaseReader` / `wrapDatabaseWriter` from `convex-helpers/server/rowLevelSecurity`. Defer until handlers other than `ctx.db.query(...).withIndex("by_agency_...")` start showing up — current discipline (every query uses `by_agency_*` indexes from `ctx.agencyId`) makes RLS redundant.
+- Triggers (`convex-helpers/server/triggers`) — adopt with RLS, composition order: Triggers first, then RLS.
+- Per-action wrappers (`actionWithAuth`) — currently actions handle identity inline. Promote once a second action needs the same boilerplate.
 
-Use `customQuery`/`customMutation` from `convex-helpers/server/customFunctions`. RLS via `wrapDatabaseReader`/`wrapDatabaseWriter` from `convex-helpers/server/rowLevelSecurity`.
-
-**Composition order:** Triggers first, then RLS — triggers fire before RLS boundaries.
-
-**Then port** the bwb `convex-security` skill (security layers, RLS rules pattern, layer selection guide, anti-patterns table).
+When porting the bwb `convex-security` skill, drop the layered taxonomy (`authQuery`/`userQuery`/`permissionQuery`/`roleQuery`/`domainQuery`) — Mutav's flat 4-wrapper API is the convention.
 
 ## React Hook Form + shadcn Field
 

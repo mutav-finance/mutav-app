@@ -26,6 +26,24 @@ If the sibling repo is not cloned locally, fetch files directly:
 gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | base64 -d
 ```
 
+## System architecture
+
+[`docs/architecture/`](docs/architecture/) is the canonical system map. Read [`docs/architecture/README.md`](docs/architecture/README.md) first for actor catalog, shell catalog, domain catalog, and trust boundaries.
+
+**Surfaces:**
+
+- [`docs/architecture/admin.md`](docs/architecture/admin.md) — Mutav Admin (`mutavStaff` actor, `(admin)` shell, A1–A6 pillars, default-approval workflow, NAV updates, hash-chained audit log)
+- [`docs/architecture/investor.md`](docs/architecture/investor.md) — Investor portal (per-chain wallet-as-identity, level-gated KYC, wallet kit architecture, workflow-based deposit/redeem)
+
+**Cross-cutting (consulted by every surface):**
+
+- [`docs/architecture/compliance.md`](docs/architecture/compliance.md) — Account types, verification levels, risk classification, transaction limits, capability matrix, regulatory-pause primitive
+- [`docs/architecture/reliability.md`](docs/architecture/reliability.md) — Reconciliation, idempotency, workflow durability, audit log integrity, NAV safety
+- [`docs/architecture/regulatory.md`](docs/architecture/regulatory.md) — Brazilian regulatory floor (LGPD, CVM 175, BCB 519/2025)
+- [`docs/architecture/onchain-integration.md`](docs/architecture/onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, external integrations) — shared by admin observability and investor data
+
+Implementation-level concerns live alongside: [`docs/auth.md`](docs/auth.md) (Convex function wrappers), [`docs/stellar-anchors.md`](docs/stellar-anchors.md) (anchor SEP integration). When adding a new surface or domain, update the README catalogs before writing code. When adding a new public mutation that touches funds or accounts, consult [`docs/architecture/compliance.md`](docs/architecture/compliance.md) for the gating contract.
+
 ## Stellar concepts
 
 Mutav settles guarantees on Stellar and moves BRL ↔ token via anchors. Before touching anchor code, read the in-repo docs:
@@ -228,6 +246,33 @@ function createContract(
 
 Always declare `Result<{Function}SuccessResult, {Function}ErrorResult>` explicitly so `result.data` and `result.error` narrow correctly. See `convex-functional-programming` skill for deeper rules.
 
+### Auth & agency scoping
+
+Every public Convex `query` / `mutation` that touches agency-scoped data **must** use a wrapper from `convex/lib/auth.ts`. Full spec: [`docs/auth.md`](docs/auth.md).
+
+```typescript
+import { mutationWithAgencyScope, queryWithAgencyScope, assertAgencyAccess } from "../lib/auth";
+
+// Agency-scoped (the common case). Wrapper consumes agencyId, exposes
+// ctx.user, ctx.membership, ctx.agencyId. Handler args do NOT redeclare agencyId.
+export const cancelProposal = mutationWithAgencyScope({
+  args: { publicId: v.string() },
+  handler: async (ctx, args) => {
+    /* ctx.agencyId is guaranteed */
+  },
+});
+```
+
+Strict-compliance rule (enforced in review):
+
+- **Default:** `queryWithAgencyScope` / `mutationWithAgencyScope` for any handler that filters or writes a resource scoped to one agency.
+- **Resource-by-id exception:** when `agencyId` comes from a fetched resource rather than client args (e.g. `getByPublicId` on a deep-linkable URL), use bare `query` / `mutation` + inline `assertAgencyAccess(ctx, resource.agencyId)`. Reads should `try`/`catch` and return `null` to avoid leaking cross-agency existence; writes let the throw propagate.
+- **Identity-only exception:** `queryWithAuth` / `mutationWithAuth` for handlers that don't have a natural agency (e.g. listing the current user's own agencies).
+- **Internal writers (`internalMutation` / `internalQuery`):** no wrapper — auth was already enforced by the public caller.
+- **Actions (`ActionCtx`):** no DB access for membership lookup; use `requireIdentity(ctx)` + an `internalQuery` for membership. Per-action wrappers may come later.
+
+Pre-Auth0, `resolveCurrentUser` looks up the hardcoded `dev-user` row. When Auth0 lands, that one function in `convex/lib/auth.ts` swaps to `ctx.auth.getUserIdentity()` and every wrapped handler migrates at once. Do not add per-handler auth shims that would need to be undone on the swap.
+
 ### Convex import paths
 
 The `@` alias is **not available** inside `convex/` files (Convex module resolver). Use relative paths for server-to-server imports:
@@ -403,13 +448,13 @@ When a query needs data from two domains (e.g. membership + user info), the enri
 
 - Every function must use an index — no `.filter()` (full table scans in Convex).
 - `shape*` helpers inside `useCases.ts` define the projection between the DB schema and the UI. Name them `shapeContractSummary` / `shapeContract` etc. — not generic names like `toDTO`.
-- When real auth lands, the insertion point is: `requireIdentity(ctx)` at the top of each handler, then `getMembership(userId, agencyId)` + `hasRole()` check for agency-scoped operations. Domain boundaries make this mechanical.
+- Public handlers must use the auth wrappers from `convex/lib/auth.ts` — see Key Patterns / Auth & agency scoping and [`docs/auth.md`](docs/auth.md). Resolved `ctx.user`, `ctx.membership`, and `ctx.agencyId` come from the wrapper; do not hand-roll identity or membership lookups in handlers.
 
 **Workspace / multi-tenancy**
 
 - Every resource table carries `agencyId` — all scoped queries use the `by_agency_*` composite index.
 - `WorkspaceContext` (`src/providers/workspace.tsx`) is the frontend's single source of `selectedAgencyId`. All list queries receive it as an argument — never read `localStorage` directly from a component.
-- Auth shortcut: `DEV_USER_PUBLIC_ID = "dev-user"` in `workspace.tsx` is the only hardcoded identity. When Convex Auth ships, replace it with `ctx.auth.getUserIdentity()` and derive `userId` from the JWT subject.
+- Server side, the auth wrappers in `convex/lib/auth.ts` resolve identity and assert membership; handlers do not re-check. Pre-Auth0 the wrappers fall back to a hardcoded `dev-user` row, mirroring `DEV_USER_PUBLIC_ID` on the client. The Auth0 swap is a single function in `convex/lib/auth.ts` (see [`docs/auth.md`](docs/auth.md)) plus removing `DEV_USER_PUBLIC_ID` from `workspace.tsx` — no per-handler edits.
 
 ### Deferred conventions
 
