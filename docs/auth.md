@@ -114,19 +114,51 @@ Everything else: wrapper. PRs that add a bare public `query`/`mutation` for an a
 
 For `ActionCtx` (no `ctx.db`, can't query memberships), use the lower-level `requireIdentity(ctx)` helper for the identity check, and call an `internalQuery` for the membership lookup. Action-level wrappers may be added later; for now actions are rare enough to handle case-by-case.
 
-## Migration status (2026-05-17)
+## Calling wrapped functions from actions
+
+`ctx.runQuery(api.X.wrapped, …)` and `ctx.runMutation(api.X.wrapped, …)` inherit the calling action's identity. That cuts two ways:
+
+- **Action invoked from an authenticated dashboard route** — identity flows, the wrapped call works.
+- **Action invoked from a public/unauthenticated route (tenant checkout, webhooks, schedulers)** — no identity, the wrapped call returns `null` (queries) or throws `UnauthenticatedError` (mutations). Pre-Auth0 the `dev-user` fallback masks this; post-Auth0 it surfaces as a silent break.
+
+**Rule:** every tenant-facing action that reads or writes wrapped-domain data must call the wrapped function's `…Internal` companion via `internal.X.Y`, not the public `api.X.Y`. The action's own auth model (publicId bearer + chargeability, webhook HMAC, scheduler trust) is the authorization at the entry point; the internal helper just does the data access.
+
+Pattern when wrapping a new domain:
+
+```ts
+// convex/{domain}/useCases.ts
+export const getById = queryWithAgencyScope({ … });          // staff path
+export const getByIdInternal = internalQuery({               // action path
+  args: { id: v.id("…") },
+  handler: (ctx, { id }) => ctx.db.get(id),
+});
+```
+
+Audit hook to run whenever wrapping a domain:
+
+```bash
+grep -rn 'ctx\.runQuery(api\.<domain>\.' convex/
+```
+
+For every hit, walk back to the entry-point action and decide tenant vs staff. Tenant-facing × wrapped requires routing through the internal companion.
+
+## Migration status (2026-05-18)
 
 Wrapped:
 
-- `convex/contracts/useCases.ts` — `getByPublicId`, `listByAgency`, `getPipelineSummary`, `countByMonth`, `lookupTenantByCpf`, `create`, `cancelProposal`
+- `convex/contracts/useCases.ts` — `getByPublicId`, `listByAgency`, `getPipelineSummary`, `countByMonth`, `lookupTenantByCpf`, `create`, `cancelProposal` (+ `getByPublicIdInternal` companion for tenant prefill)
+- `convex/payments/useCases.ts` — `listByAgency`, `getById`, `getByPublicId`, `getNextPendingPayment` (+ `getByIdInternal` companion for tenant onramp actions)
+- `convex/agencies/useCases.ts` — `getById`, `listAgenciesForUser` (+ `getByIdInternal` companion for internal actions)
 
 Removed:
 
 - `convex/contracts/useCases.ts` — `list` (unscoped, leaked all agencies, no client callers)
+- `convex/payments/useCases.ts` — `list`, `listByStateKind` (same)
 
-Not yet wrapped (same playbook applies):
+Not yet wrapped (same playbook applies — and remember the internal-companion audit when you do):
 
-- `convex/anchors/`, `convex/payments/`, `convex/agencies/`, `convex/users/` — public queries/mutations still take bare ctx
+- `convex/anchors/` — `orderUseCases`, `bankAccountUseCases`, `accountUseCases` — bare public queries
+- `convex/users/useCases.ts` — `getByPublicId` (load-bearing dev-user lookup for `WorkspaceProvider`)
 - `convex/contracts/actions.ts`, `convex/contracts/mutations.ts` — internal-only, lower priority
 
 New work in those domains should adopt the wrapper as part of the change; don't add new bare handlers next to existing bare handlers.
