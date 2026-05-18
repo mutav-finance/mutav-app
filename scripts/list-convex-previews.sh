@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# Lists Convex deployments for the configured team, sorted by creation date.
+# Lists Convex deployments for the team, grouped by project.
 # Read-only — calls the Convex Management API.
 #
 # Usage:
 #   CONVEX_MANAGEMENT_TOKEN=<token> ./scripts/list-convex-previews.sh
 #
-# Get the token from: https://dashboard.convex.dev/team/settings/access-tokens
-# Drop it in .env.local (already gitignored); this script will source it.
+# Get the token from: https://dashboard.convex.dev/team/settings (Access Tokens).
+# Drop it in .env.local (already gitignored); this script sources it.
 #
 # Why this exists: the Convex CLI doesn't expose deployment listing across
-# previews. We use this output to (a) inspect what's accumulating against
-# the free-plan 40-deployment quota, and (b) confirm the preview naming
-# convention before wiring up the cleanup-convex-preview GH workflow.
+# previews. We use this output to inspect what's accumulating against the
+# free-plan 40-deployment quota.
 
 set -euo pipefail
 
-# Source .env.local if present so the token doesn't need to be re-exported each run.
 if [[ -f .env.local ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -24,28 +22,42 @@ if [[ -f .env.local ]]; then
 fi
 
 TOKEN="${CONVEX_MANAGEMENT_TOKEN:?CONVEX_MANAGEMENT_TOKEN not set — add it to .env.local}"
-TEAM="${CONVEX_TEAM_SLUG:-jhoffmannburatto}"
 
-# Resolve team slug → team id (the list endpoint takes the numeric id).
+# Discover team ID from the token itself (avoids hardcoding).
 TEAM_ID=$(curl -sf \
   -H "Authorization: Bearer $TOKEN" \
-  "https://api.convex.dev/v1/teams" \
-  | jq --arg slug "$TEAM" '.[] | select(.slug == $slug) | .id')
+  "https://api.convex.dev/v1/token_details" \
+  | jq -r '.teamId')
 
-if [[ -z "$TEAM_ID" ]]; then
-  echo "❌ Could not resolve team slug '$TEAM' — check CONVEX_TEAM_SLUG or token scope."
+if [[ -z "$TEAM_ID" || "$TEAM_ID" == "null" ]]; then
+  echo "❌ Could not resolve team ID from token — check CONVEX_MANAGEMENT_TOKEN scope."
   exit 1
 fi
+
+# Pull projects (for ID → name lookup) and deployments in parallel-ish.
+PROJECTS_MAP=$(curl -sf \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://api.convex.dev/v1/teams/$TEAM_ID/list_projects" \
+  | jq 'map({(.id|tostring): .name}) | add')
 
 curl -sf \
   -H "Authorization: Bearer $TOKEN" \
   "https://api.convex.dev/v1/teams/$TEAM_ID/list_deployments" \
-  | jq -r '
-    sort_by(.create_time) |
-    (["NAME", "TYPE", "PROJECT", "CREATED", "PREVIEW_IDENTIFIER"] | @tsv),
-    (.[] | [.name, .deployment_type, .project_id, .create_time, (.preview_identifier // "-")] | @tsv)
-  ' \
-  | column -t -s $'\t'
+  | jq --argjson names "$PROJECTS_MAP" -r '
+      .items
+      | group_by(.projectId)
+      | sort_by(-(.[0].createTime))
+      | .[]
+      | (
+          "── \($names[(.[0].projectId|tostring)] // "?") (id \(.[0].projectId)) ─ \(length) deployment(s)",
+          (.[] | "    \(.deploymentType)\t\(.name)\t\(if .previewIdentifier then "[" + .previewIdentifier + "]" else "" end)"),
+          ""
+        )
+    ' | column -t -s $'\t'
 
-echo
-echo "Total: $(curl -sf -H "Authorization: Bearer $TOKEN" "https://api.convex.dev/v1/teams/$TEAM_ID/list_deployments" | jq 'length') deployments (free-plan quota: 40)"
+TOTAL=$(curl -sf \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://api.convex.dev/v1/teams/$TEAM_ID/list_deployments" \
+  | jq '.items | length')
+
+echo "Total: $TOTAL deployments (free-plan quota: 40)"
