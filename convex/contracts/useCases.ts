@@ -2,26 +2,11 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { priceContract } from "../../src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
 import { CONTRACT_STATUS } from "./domain";
 import { assertAgencyAccess, mutationWithAgencyScope, queryWithAgencyScope } from "../lib/auth";
-
-const COVERAGE_MULT: { "24x": number; "36x": number; "48x": number } = {
-  "24x": 1.0,
-  "36x": 1.05,
-  "48x": 1.1,
-};
-const EXIT_MULT: { "3x": number; "5x": number; "7x": number } = {
-  "3x": 1.0,
-  "5x": 1.02,
-  "7x": 1.05,
-};
-const RENT_MULT_VALUE: { "24x": number; "36x": number; "48x": number } = {
-  "24x": 24,
-  "36x": 36,
-  "48x": 48,
-};
 
 function generatePublicId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -231,16 +216,14 @@ export const create = mutationWithAgencyScope({
     }),
   },
   handler: async (ctx, args) => {
-    const totalRentCents = args.rentCents + args.condoCents + args.otherFeesCents;
-    const feeRate = args.tenant.score >= 800 ? 0.075 : args.tenant.score >= 600 ? 0.1 : 0.125;
-    const feeCents = Math.round(
-      args.rentCents *
-        feeRate *
-        COVERAGE_MULT[args.rentMultiplier] *
-        EXIT_MULT[args.exitCostMultiplier],
-    );
-    const oneTimeActivationFeeCents = 15_000;
-    const availableGuaranteeCents = args.rentCents * RENT_MULT_VALUE[args.rentMultiplier];
+    const priced = priceContract({
+      rentCents: args.rentCents,
+      condoCents: args.condoCents,
+      otherFeesCents: args.otherFeesCents,
+      score: args.tenant.score,
+      rentMultiplier: args.rentMultiplier,
+      exitCostMultiplier: args.exitCostMultiplier,
+    });
 
     const publicId = generatePublicId();
     const today = new Date();
@@ -255,15 +238,15 @@ export const create = mutationWithAgencyScope({
       status: "pendente",
       activatedAt: null,
       nextRenewalDate,
-      availableGuaranteeCents,
+      availableGuaranteeCents: priced.availableGuaranteeCents,
       rental: {
         propertyKind: args.propertyKind,
         rentCents: args.rentCents,
         condoCents: args.condoCents,
         otherFeesCents: args.otherFeesCents,
-        totalRentCents,
-        feeCents,
-        oneTimeActivationFeeCents,
+        totalRentCents: priced.totalRentCents,
+        feeCents: priced.feeCents,
+        oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         setupInstallments: 1,
         exitCostMultiplier: args.exitCostMultiplier,
         rentMultiplier: args.rentMultiplier,
@@ -309,8 +292,8 @@ export const create = mutationWithAgencyScope({
       tenantEmail: args.tenant.email,
       tenantPhone: args.tenant.phone,
       rentCents: args.rentCents,
-      availableGuaranteeCents,
-      feeCents,
+      availableGuaranteeCents: priced.availableGuaranteeCents,
+      feeCents: priced.feeCents,
     });
 
     return { publicId };

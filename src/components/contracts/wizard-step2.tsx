@@ -10,14 +10,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
 import {
-  calcFeePreview,
   formatBRLCentsDisplay,
   lookupTenantScore,
   type WizardData,
-  type RentMultiplier,
-  type ExitCostMultiplier,
   type ScoreTier,
 } from "@/lib/contracts/wizard";
+import { splitCommission } from "@/lib/pricing/commission";
+import { priceContract } from "@/lib/pricing/contract";
+import {
+  EXIT_COST_MULTIPLIERS,
+  EXIT_MULT_MONTHS,
+  RENT_MULTIPLIERS,
+  RENT_MULT_MONTHS,
+} from "@/lib/pricing/tiers";
 
 type Props = {
   data: WizardData;
@@ -31,19 +36,15 @@ type Step2Errors = {
   exitCostMultiplier?: string;
 };
 
-const COVERAGE_OPTIONS: { value: RentMultiplier; months: number }[] = [
-  { value: "24x", months: 24 },
-  { value: "36x", months: 36 },
-  { value: "48x", months: 48 },
-];
+const COVERAGE_OPTIONS = RENT_MULTIPLIERS.map((value) => ({
+  value,
+  months: RENT_MULT_MONTHS[value],
+}));
 
-const EXIT_OPTIONS: { value: ExitCostMultiplier; months: number }[] = [
-  { value: "3x", months: 3 },
-  { value: "5x", months: 5 },
-  { value: "7x", months: 7 },
-];
-
-const EXIT_MONTHS: Record<ExitCostMultiplier, number> = { "3x": 3, "5x": 5, "7x": 7 };
+const EXIT_OPTIONS = EXIT_COST_MULTIPLIERS.map((value) => ({
+  value,
+  months: EXIT_MULT_MONTHS[value],
+}));
 
 const TIER_STYLE: Record<ScoreTier, string> = {
   bom: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -112,13 +113,16 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
     data.rentMultiplier &&
     data.exitCostMultiplier &&
     score !== null
-      ? calcFeePreview({
+      ? priceContract({
           rentCents: data.rentCents,
+          condoCents: data.condoCents,
+          otherFeesCents: data.otherFeesCents,
           score,
           rentMultiplier: data.rentMultiplier,
           exitCostMultiplier: data.exitCostMultiplier,
         })
       : null;
+  const commission = preview ? splitCommission(preview.feeCents) : null;
 
   const tierLabel: Record<ScoreTier, string> = {
     bom: t("tenant.scoreBom"),
@@ -261,7 +265,9 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
               label={t("coverage.summary.exitCost")}
               value={
                 data.exitCostMultiplier && data.rentCents > 0
-                  ? formatBRLCentsDisplay(EXIT_MONTHS[data.exitCostMultiplier] * data.rentCents)
+                  ? formatBRLCentsDisplay(
+                      EXIT_MULT_MONTHS[data.exitCostMultiplier] * data.rentCents,
+                    )
                   : null
               }
             />
@@ -271,11 +277,11 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             />
             <SummaryRow
               label={t("coverage.summary.commission")}
-              value={preview ? formatBRLCentsDisplay(Math.round(preview.feeCents * 0.015)) : null}
+              value={commission ? formatBRLCentsDisplay(commission.commissionCents) : null}
             />
             <SummaryRow
               label={t("coverage.summary.guarantee")}
-              value={preview ? formatBRLCentsDisplay(Math.round(preview.feeCents * 1.015)) : null}
+              value={commission ? formatBRLCentsDisplay(commission.totalCents) : null}
               highlight
             />
           </div>

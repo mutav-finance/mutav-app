@@ -1,12 +1,12 @@
 import { useState } from "react";
 import type { AssetSymbol } from "@/lib/stellar/assets";
+import { applyInvestorFee, INVESTOR_FEE_RATE } from "@/lib/pricing/investor";
 import { FUNDS } from "./fund-data";
 import type { Fund, FundId } from "./fund-data";
 
 export type OutputToken = AssetSymbol;
 
 const XLM_PRICE_USD = 0.1234;
-const FEE_RATE = 0.003;
 
 function toOutputAmount(inputUsd: number, token: OutputToken): number {
   return token === "XLM" ? inputUsd / XLM_PRICE_USD : inputUsd;
@@ -37,9 +37,9 @@ export function useRedeemWidget(initialFundId: FundId): RedeemWidgetValues {
   const fund = FUNDS.find((f) => f.id === selectedFund) ?? FUNDS[0];
   const amount = parseFloat(rawAmount) || 0;
   const inputUsd = amount * fund.navPrice;
-  const feeUsd = inputUsd * FEE_RATE;
-  const outputAmount = toOutputAmount(inputUsd - feeUsd, outputToken);
-  const ratePerFundToken = toOutputAmount(fund.navPrice * (1 - FEE_RATE), outputToken);
+  const { feeUsd, netUsd } = applyInvestorFee(inputUsd);
+  const outputAmount = toOutputAmount(netUsd, outputToken);
+  const ratePerFundToken = toOutputAmount(fund.navPrice * (1 - INVESTOR_FEE_RATE), outputToken);
 
   const hasAmount = amount > 0;
   const buttonLabel = hasAmount ? "Connect Wallet" : "Enter an amount";
