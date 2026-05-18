@@ -385,7 +385,7 @@ export const startPixOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartPixOnrampResult> => {
-    const payment = await ctx.runQuery(api.payments.useCases.getById, {
+    const payment = await ctx.runQuery(internal.payments.useCases.getByIdInternal, {
       paymentId: args.paymentId,
     });
     if (!payment) {
@@ -579,7 +579,7 @@ export const startAnchorTestOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartAnchorTestOnrampResult> => {
-    const payment = await ctx.runQuery(api.payments.useCases.getById, {
+    const payment = await ctx.runQuery(internal.payments.useCases.getByIdInternal, {
       paymentId: args.paymentId,
     });
     if (!payment) {

@@ -101,6 +101,19 @@ export const getPublicByPublicId = query({
 });
 
 /**
+ * Internal companion to `getById` for actions that authorize by the
+ * publicId-bearer model (tenant checkout) rather than by user identity.
+ * The tenant has no session, so the identity-gated `getById` would always
+ * return null post-Auth0. The action gates on chargeability instead.
+ */
+export const getByIdInternal = internalQuery({
+  args: { paymentId: v.id("payments") },
+  handler: async (ctx, { paymentId }) => {
+    return ctx.db.get(paymentId);
+  },
+});
+
+/**
  * Internal — look up a payment by its Stellar muxed-id. O(1) via
  * `by_muxedId` index. Used by the Horizon-polling reconciler.
  */
