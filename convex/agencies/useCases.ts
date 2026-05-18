@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, mutation } from "../_generated/server";
+import { query, mutation, internalQuery } from "../_generated/server";
 import {
   AGENCY_TYPE,
   MEMBER_ROLE,
@@ -14,7 +14,9 @@ import {
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
 
-export const getById = query({
+// Internal — retorna o registro completo da agência (inclui CPF, CNPJ, dados bancários).
+// Só pode ser chamada por outras funções Convex; nunca exposta diretamente ao cliente.
+export const getById = internalQuery({
   args: { agencyId: v.id("agencies") },
   handler: async (ctx, args) => {
     return ctx.db.get(args.agencyId);
@@ -51,9 +53,10 @@ export const listAgenciesForUser = query({
 
 /**
  * Returns all members of an agency, each enriched with their user info and role.
- * TODO(auth): add queryWithAgencyScope wrapper — currently any caller can enumerate members.
+ * Internal — expõe PII dos usuários (nome, email). Só acessível via funções Convex.
+ * TODO(auth): criar versão pública com queryWithAgencyScope para o dashboard.
  */
-export const listMembersForAgency = query({
+export const listMembersForAgency = internalQuery({
   args: { agencyId: v.id("agencies") },
   handler: async (ctx, args) => {
     const memberships = await ctx.db
@@ -73,8 +76,8 @@ export const listMembersForAgency = query({
   },
 });
 
-/** Returns a single membership for a user↔agency pair. */
-export const getMembership = query({
+/** Returns a single membership for a user↔agency pair. Internal — use via funções autorizadas. */
+export const getMembership = internalQuery({
   args: { userId: v.id("users"), agencyId: v.id("agencies") },
   handler: async (ctx, args) => {
     return ctx.db
@@ -98,10 +101,10 @@ export const listDocumentsForAgency = query({
 
 /**
  * Returns the in-progress onboarding agency for a user, if any.
- * Used by the wizard to restore a partially-filled session.
- * TODO(auth): replace userId arg with requireIdentity(ctx).
+ * Internal — retorna dados financeiros completos (CPF, CNPJ, bankingInfo).
+ * TODO(auth): tornar pública com requireIdentity(ctx) na migração Auth0.
  */
-export const getOnboardingInProgress = query({
+export const getOnboardingInProgress = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
     const memberships = await ctx.db
@@ -124,9 +127,9 @@ export const getOnboardingInProgress = query({
 
 /**
  * Returns the current onboarding state of an agency.
- * TODO(auth): require identity + verify ownership.
+ * Internal — use via funções autorizadas. TODO(auth): expor com ownership check.
  */
-export const getOnboardingStatus = query({
+export const getOnboardingStatus = internalQuery({
   args: { agencyId: v.id("agencies") },
   handler: async (ctx, { agencyId }) => {
     const agency = await ctx.db.get(agencyId);
