@@ -1034,6 +1034,8 @@
         "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
         "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
         "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
+        "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte.",
+        "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
         "unknown": "Erro ao salvar. Tente novamente."
       }
     },
