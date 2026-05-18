@@ -1,22 +1,31 @@
-// Convex authentication config.
+// Convex authentication configuration — Auth0 JWT provider.
 //
-// No JWT provider is wired yet — the providers array is intentionally empty.
-// Every Convex function in this app must therefore treat
-// `ctx.auth.getUserIdentity()` as `null` and route through `requireIdentity`
-// in `convex/lib/auth.ts`, which fails closed when auth is unconfigured.
+// The `domain` must be your Auth0 issuer URL (AUTH0_ISSUER_BASE_URL env var),
+// e.g. "https://your-tenant.auth0.com".
+// The `applicationID` must match the `aud` claim in Auth0 tokens — typically
+// your Convex deployment URL or a custom API identifier registered in Auth0.
 //
-// To enable auth, add a provider entry pointing at the JWT issuer's
-// `/.well-known/openid-configuration` URL — for example:
+// Required env vars (set via `bunx convex env set`):
+//   AUTH0_ISSUER_BASE_URL  — Auth0 tenant URL  (e.g. https://your.auth0.com)
+//   AUTH0_CLIENT_ID        — Auth0 application client ID
 //
-//   providers: [
-//     { domain: "https://your-issuer.example.com", applicationID: "convex" },
-//   ],
-//
-// See the Convex auth guidelines (convex/_generated/ai/guidelines.md) and
-// https://docs.convex.dev/auth for provider setup.
+// Client-side: configure `ConvexProviderWithAuth0` from `@auth0/nextjs-auth0`
+// so the JWT is automatically attached to every Convex request.
+// See: https://docs.convex.dev/auth/auth0
 
-const authConfig = {
-  providers: [],
-};
+// Only activate the Auth0 provider when the env var is present.
+// When absent (local dev without Auth0), providers stays empty and
+// ctx.auth.getUserIdentity() always returns null — the dev-user fallback
+// in convex/lib/auth.ts takes over transparently.
+const providers = process.env.AUTH0_ISSUER_BASE_URL
+  ? [
+      {
+        domain: process.env.AUTH0_ISSUER_BASE_URL,
+        applicationID: process.env.AUTH0_CLIENT_ID ?? "",
+      },
+    ]
+  : [];
+
+const authConfig = { providers };
 
 export default authConfig;

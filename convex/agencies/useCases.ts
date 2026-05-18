@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalQuery, query, mutation } from "../_generated/server";
-import { queryWithAuth } from "../lib/auth";
+import { queryWithAuth, mutationWithAuth } from "../lib/auth";
 import {
   AGENCY_TYPE,
   MEMBER_ROLE,
@@ -146,16 +146,45 @@ export const getOnboardingStatus = internalQuery({
   },
 });
 
+/**
+ * Returns the onboarding state for the current authenticated user.
+ * Used by the post-login routing logic to decide where to send the user:
+ *   null / not_started  → /onboarding (start fresh)
+ *   in_progress         → /onboarding/wizard (resume)
+ *   submitted / under_review → /onboarding/status (waiting for review)
+ *   active              → /dashboard (fully onboarded)
+ *   rejected            → /onboarding/rejected
+ */
+export const getMyOnboardingStatus = queryWithAuth({
+  args: {},
+  handler: async (ctx) => {
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+      .collect();
+
+    const agencies = await Promise.all(memberships.map((m) => ctx.db.get(m.agencyId)));
+    const agency = agencies.find((a) => a !== null) ?? null;
+    if (!agency)
+      return { state: ONBOARDING_STATE.NOT_STARTED, agencyId: null, rejectionReason: null };
+
+    return {
+      state: agency.onboardingState ?? ONBOARDING_STATE.NOT_STARTED,
+      agencyId: agency._id,
+      rejectionReason: agency.onboardingRejectionReason ?? null,
+    };
+  },
+});
+
 // ─── Onboarding mutations ─────────────────────────────────────────────────────
 
 /**
  * Step 1 — Create the agency record and owner membership.
  * Idempotent: if the user already has an in-progress agency, returns it.
- * TODO(auth): replace userId arg with requireIdentity(ctx).
+ * Auth-gated — userId is derived from the session, never accepted from client args.
  */
-export const startOnboarding = mutation({
+export const startOnboarding = mutationWithAuth({
   args: {
-    userId: v.id("users"),
     agencyType: agencyTypeValidator,
     name: v.string(),
     email: v.string(),
@@ -167,6 +196,7 @@ export const startOnboarding = mutation({
     representanteCpf: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = ctx.user._id;
     // Strip formatting before any check or write — CLAUDE.md convention: store digits-only.
     const cnpj = args.cnpj?.replace(/\D/g, "") || undefined;
     const cpf = args.cpf?.replace(/\D/g, "") || undefined;
@@ -229,7 +259,7 @@ export const startOnboarding = mutation({
 
     const memberships = await ctx.db
       .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
     for (const membership of memberships) {
@@ -272,7 +302,7 @@ export const startOnboarding = mutation({
     });
 
     await ctx.db.insert("memberships", {
-      userId: args.userId,
+      userId,
       agencyId,
       role: MEMBER_ROLE.OWNER,
       joinedAt: now,

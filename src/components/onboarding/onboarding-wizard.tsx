@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { DEV_USER_PUBLIC_ID } from "@/providers/workspace";
 import { WizardStepIndicator } from "@/components/onboarding/wizard-step-indicator";
 import { WizardStep1 } from "@/components/onboarding/wizard-step1";
 import { WizardStepBanking, isBankAccountType } from "@/components/onboarding/wizard-step-banking";
@@ -145,36 +144,15 @@ function buildInitialState(initialType: "autonomo" | "empresa" | undefined): Wiz
   };
 }
 
-// ─── Componente público: busca userId e controla loading/erro ─────────────────
+// ─── Componente público ───────────────────────────────────────────────────────
 
 export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "empresa" }) {
-  const t = useTranslations("onboarding.wizard");
-
-  // TODO(auth): swap para identidade da sessão real.
-  const devUser = useQuery(api.users.useCases.getByPublicId, { publicId: DEV_USER_PUBLIC_ID });
-
-  if (devUser === undefined) {
-    return <div className="text-text-3 py-8 text-center font-mono text-sm">{t("loading")}</div>;
-  }
-
-  if (devUser === null) {
-    return (
-      <div className="text-error py-8 text-center font-mono text-sm">{t("errors.unknown")}</div>
-    );
-  }
-
-  return <OnboardingWizardInner devUserId={devUser._id} initialType={initialType} />;
+  return <OnboardingWizardInner initialType={initialType} />;
 }
 
 // ─── Componente interno: máquina de estados + UI ──────────────────────────────
 
-function OnboardingWizardInner({
-  devUserId,
-  initialType,
-}: {
-  devUserId: Id<"users">;
-  initialType?: "autonomo" | "empresa";
-}) {
+function OnboardingWizardInner({ initialType }: { initialType?: "autonomo" | "empresa" }) {
   const t = useTranslations("onboarding.wizard");
 
   const [state, dispatch] = React.useReducer(wizardReducer, initialType, buildInitialState);
@@ -208,7 +186,6 @@ function OnboardingWizardInner({
       dispatch({ type: "SUBMIT_START" });
       try {
         const result = await startOnboarding({
-          userId: devUserId,
           agencyType,
           name: state.data.name,
           email: state.data.email,
@@ -228,7 +205,7 @@ function OnboardingWizardInner({
         dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
       }
     },
-    [devUserId, startOnboarding, state.data],
+    [startOnboarding, state.data],
   );
 
   const handleBankingNext = React.useCallback(async () => {

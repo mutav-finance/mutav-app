@@ -914,22 +914,47 @@
       "autonomo": {
         "title": "Corretor autônomo",
         "items": [
-          { "label": "CPF" },
-          { "label": "CRECI ativo (pessoa física)" },
-          { "label": "E-mail e telefone" },
-          { "label": "Dados bancários", "note": "para receber comissões" }
+          {
+            "label": "CPF"
+          },
+          {
+            "label": "CRECI ativo (pessoa física)"
+          },
+          {
+            "label": "E-mail e telefone"
+          },
+          {
+            "label": "Dados bancários",
+            "note": "para receber comissões"
+          }
         ]
       },
       "empresa": {
         "title": "Imobiliária",
         "items": [
-          { "label": "CNPJ" },
-          { "label": "CRECI da imobiliária" },
-          { "label": "Cartão CNPJ" },
-          { "label": "Contrato social" },
-          { "label": "Comprovante de endereço da empresa" },
-          { "label": "Documento do responsável", "note": "sócio ≥ 25% ou administrador" },
-          { "label": "Dados bancários", "note": "para receber comissões" }
+          {
+            "label": "CNPJ"
+          },
+          {
+            "label": "CRECI da imobiliária"
+          },
+          {
+            "label": "Cartão CNPJ"
+          },
+          {
+            "label": "Contrato social"
+          },
+          {
+            "label": "Comprovante de endereço da empresa"
+          },
+          {
+            "label": "Documento do responsável",
+            "note": "sócio ≥ 25% ou administrador"
+          },
+          {
+            "label": "Dados bancários",
+            "note": "para receber comissões"
+          }
         ]
       },
       "ctaButton": "Começar cadastro",
@@ -1072,6 +1097,24 @@
         "representanteName": "Nome do responsável obrigatório.",
         "representanteCpf": "CPF do responsável inválido."
       }
+    },
+    "status": {
+      "title": "Cadastro em análise",
+      "subtitle": "Nossa equipe está analisando suas informações. Você receberá um e-mail com o resultado em até 2 dias úteis.",
+      "stateSubmitted": "Enviado — aguardando análise",
+      "stateUnderReview": "Em análise pela equipe Mutav",
+      "backLabel": "Tem dúvidas?",
+      "backLink": "Fale conosco",
+      "homeButton": "Voltar ao início"
+    },
+    "rejected": {
+      "title": "Cadastro não aprovado",
+      "subtitle": "Infelizmente não foi possível aprovar seu cadastro neste momento.",
+      "reasonLabel": "Motivo informado pela equipe:",
+      "noReason": "Nenhum motivo informado.",
+      "contactLabel": "Tem dúvidas ou deseja recorrer?",
+      "contactLink": "Fale conosco",
+      "homeButton": "Voltar ao início"
     }
   }
 }
