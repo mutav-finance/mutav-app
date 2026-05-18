@@ -64,7 +64,11 @@ export default async function CheckoutPixPage({
         <ArrowLeft className="size-3" strokeWidth={1.5} />
         {t("back")}
       </Link>
-      <CheckoutPixView paymentId={fullPayment._id} totalCents={fullPayment.totalCents} />
+      <CheckoutPixView
+        paymentId={fullPayment._id}
+        agencyId={fullPayment.agencyId}
+        totalCents={fullPayment.totalCents}
+      />
     </div>
   );
 }

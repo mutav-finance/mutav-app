@@ -479,6 +479,13 @@ export interface EtherfuseBankAccountListItem {
     compliant: boolean;
     /** Account status (e.g. "active"). */
     status: string;
+    /**
+     * Account currency (e.g. `"brl"`, `"mxn"`). Present in real
+     * responses even though earlier docs omitted it. More reliable as a
+     * BR vs MX discriminator than `pixKey`/`abbrClabe`, which may be
+     * empty immediately after a fresh hosted-flow registration.
+     */
+    currency?: string;
 }
 
 /** Paginated response from `POST /ramp/customer/{id}/bank-accounts`. */

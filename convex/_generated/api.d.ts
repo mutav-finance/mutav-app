@@ -13,6 +13,8 @@ import type * as agencies_useCases from "../agencies/useCases.js";
 import type * as anchors_accountDomain from "../anchors/accountDomain.js";
 import type * as anchors_accountUseCases from "../anchors/accountUseCases.js";
 import type * as anchors_actions from "../anchors/actions.js";
+import type * as anchors_bankAccountDomain from "../anchors/bankAccountDomain.js";
+import type * as anchors_bankAccountUseCases from "../anchors/bankAccountUseCases.js";
 import type * as anchors_domain from "../anchors/domain.js";
 import type * as anchors_orderDomain from "../anchors/orderDomain.js";
 import type * as anchors_orderUseCases from "../anchors/orderUseCases.js";
@@ -52,6 +54,8 @@ declare const fullApi: ApiFromModules<{
   "anchors/accountDomain": typeof anchors_accountDomain;
   "anchors/accountUseCases": typeof anchors_accountUseCases;
   "anchors/actions": typeof anchors_actions;
+  "anchors/bankAccountDomain": typeof anchors_bankAccountDomain;
+  "anchors/bankAccountUseCases": typeof anchors_bankAccountUseCases;
   "anchors/domain": typeof anchors_domain;
   "anchors/orderDomain": typeof anchors_orderDomain;
   "anchors/orderUseCases": typeof anchors_orderUseCases;

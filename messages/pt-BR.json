@@ -563,6 +563,7 @@
         "ASSET_UNSUPPORTED": "Ativo não suportado pela anchor.",
         "ANCHOR_REJECTED": "A anchor recusou o depósito. Tente novamente em instantes.",
         "ANCHOR_RESPONSE_INVALID": "Resposta inesperada da anchor.",
+        "NO_BANK_ACCOUNT": "Cadastre uma conta para pagar via PIX antes de continuar.",
         "INTERNAL": "Erro interno. Tente novamente."
       }
     },
@@ -581,6 +582,26 @@
         "completed": "Pago",
         "failed": "Falha no pagamento"
       },
+      "bankSelection": {
+        "loading": "Carregando contas bancárias…",
+        "emptyTitle": "Cadastre uma conta para pagar via PIX",
+        "emptyBody": "Para pagar este boleto via PIX, cadastre uma conta bancária da imobiliária. O cadastro abre em uma nova janela.",
+        "addBankButton": "Cadastrar conta",
+        "addingBankHint": "Conclua o cadastro na nova janela e volte aqui. Depois clique em \"Já cadastrei\".",
+        "refreshButton": "Já cadastrei, atualizar",
+        "picker": {
+          "title": "Qual conta vai pagar?",
+          "holderLabel": "Titular: {name}",
+          "keyLabel": "Chave PIX terminando em {last4}",
+          "payWithButton": "Pagar com esta conta",
+          "addAnotherButton": "Cadastrar outra conta"
+        },
+        "errors": {
+          "NO_ANCHOR_ACCOUNT": "A imobiliária ainda não concluiu o cadastro inicial. Conclua antes de cadastrar contas.",
+          "KYC_NOT_APPROVED": "Verificação da imobiliária ainda pendente. Conclua antes de cadastrar contas.",
+          "INTERNAL": "Erro inesperado. Tente novamente."
+        }
+      },
       "errors": {
         "PAYMENT_NOT_FOUND": "Fatura não encontrada.",
         "NOT_CHARGEABLE": "Esta fatura não pode ser paga no momento.",
@@ -589,6 +610,7 @@
         "ASSET_UNSUPPORTED": "Ativo não suportado pela anchor.",
         "ANCHOR_REJECTED": "A anchor recusou o depósito. Tente novamente em instantes.",
         "ANCHOR_RESPONSE_INVALID": "Resposta inesperada da anchor.",
+        "NO_BANK_ACCOUNT": "Cadastre uma conta para pagar via PIX antes de continuar.",
         "INTERNAL": "Erro interno. Tente novamente."
       }
     },

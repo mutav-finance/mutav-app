@@ -659,7 +659,15 @@ export class EtherfuseClient implements Anchor {
             );
 
             return response.items.map((account) => {
-                const isPix = !!account.pixKey;
+                // `currency` reflects the rail the customer registered the
+                // bank under and is populated immediately. `pixKey` /
+                // `abbrClabe` can lag (empty for the first few seconds
+                // after hosted-flow save), so we check currency first and
+                // fall back to the legacy heuristic for older responses
+                // that don't include the currency field.
+                const currency = account.currency?.toLowerCase();
+                const isPix =
+                    currency === 'brl' || (currency === undefined && !!account.pixKey);
                 return {
                     id: account.bankAccountId,
                     type: isPix ? 'PIX' : 'SPEI',

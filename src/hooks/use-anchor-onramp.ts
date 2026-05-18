@@ -38,7 +38,11 @@ type StartActionResult =
 type StartActionRef = FunctionReference<
   "action",
   "public",
-  { paymentId: Id<"payments">; lang?: string },
+  {
+    paymentId: Id<"payments">;
+    lang?: string;
+    bankAccountId?: Id<"agencyBankAccounts">;
+  },
   StartActionResult
 >;
 
@@ -57,12 +61,21 @@ interface UseAnchorOnrampArgs {
   lang?: string;
 }
 
+interface StartOpts {
+  /**
+   * Etherfuse-only: which of the agency's registered bank accounts should
+   * fund this on-ramp. Omitted → the action picks the agency's oldest
+   * registered bank. testanchor ignores this entirely.
+   */
+  bankAccountId?: Id<"agencyBankAccounts">;
+}
+
 interface UseAnchorOnrampResult {
   phase: AnchorOnrampPhase;
   order: AnchorOrder | null;
   /** Structured error from the start action (code is stable, suitable for i18n lookup). */
   error: AnchorStartErrorPayload | null;
-  start: () => Promise<void>;
+  start: (opts?: StartOpts) => Promise<void>;
   cancel: () => void;
   /** Resets local state so the user can retry from `idle`. Does not refund or void anything anchor-side. */
   reset: () => void;
@@ -119,25 +132,32 @@ export function useAnchorOnramp({
 
   useEffect(() => clearPolling, [clearPolling]);
 
-  const start = useCallback(async () => {
-    setStartError(null);
-    setIsStarting(true);
-    try {
-      const result = await startAction({ paymentId, lang });
-      if (result.success) {
-        setOrderId(result.data.orderId);
-      } else {
-        setStartError(result.error);
+  const start = useCallback(
+    async (opts?: StartOpts) => {
+      setStartError(null);
+      setIsStarting(true);
+      try {
+        const result = await startAction({
+          paymentId,
+          lang,
+          bankAccountId: opts?.bankAccountId,
+        });
+        if (result.success) {
+          setOrderId(result.data.orderId);
+        } else {
+          setStartError(result.error);
+        }
+      } catch (err) {
+        setStartError({
+          code: "INTERNAL",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        setIsStarting(false);
       }
-    } catch (err) {
-      setStartError({
-        code: "INTERNAL",
-        detail: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setIsStarting(false);
-    }
-  }, [paymentId, startAction, lang]);
+    },
+    [paymentId, startAction, lang],
+  );
 
   const cancel = useCallback(() => {
     clearPolling();
