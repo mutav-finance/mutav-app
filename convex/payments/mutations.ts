@@ -100,8 +100,9 @@ export const generateMonthlyPayments = internalMutation({
 
       const totalCents = lineItems.reduce((sum, item) => sum + item.amountCents, 0);
 
-      // Public ID: PAY-{period}-{last 4 digits of CNPJ}
-      const publicId = `PAY-${periodMonth}-${agency.cnpj.slice(-4)}`;
+      // Public ID: PAY-{period}-{last 4 digits of CNPJ or CPF}
+      const identifier = agency.cnpj ?? agency.cpf ?? "0000";
+      const publicId = `PAY-${periodMonth}-${identifier.slice(-4)}`;
 
       const paymentId = await ctx.db.insert("payments", {
         agencyId: agency._id,

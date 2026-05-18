@@ -14,7 +14,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 
-const DEV_USER_PUBLIC_ID = "dev-user";
+export const DEV_USER_PUBLIC_ID = "dev-user";
 const STORAGE_KEY = "sgr:selectedAgencyId";
 
 /**
