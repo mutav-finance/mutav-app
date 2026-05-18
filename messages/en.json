@@ -914,22 +914,47 @@
       "autonomo": {
         "title": "Independent broker",
         "items": [
-          { "label": "CPF" },
-          { "label": "Active CRECI (individual)" },
-          { "label": "Email and phone" },
-          { "label": "Banking details", "note": "to receive commissions" }
+          {
+            "label": "CPF"
+          },
+          {
+            "label": "Active CRECI (individual)"
+          },
+          {
+            "label": "Email and phone"
+          },
+          {
+            "label": "Banking details",
+            "note": "to receive commissions"
+          }
         ]
       },
       "empresa": {
         "title": "Real estate agency",
         "items": [
-          { "label": "CNPJ" },
-          { "label": "Agency CRECI" },
-          { "label": "CNPJ card" },
-          { "label": "Articles of incorporation" },
-          { "label": "Company address proof" },
-          { "label": "Representative ID", "note": "partner ≥ 25% or administrator" },
-          { "label": "Banking details", "note": "to receive commissions" }
+          {
+            "label": "CNPJ"
+          },
+          {
+            "label": "Agency CRECI"
+          },
+          {
+            "label": "CNPJ card"
+          },
+          {
+            "label": "Articles of incorporation"
+          },
+          {
+            "label": "Company address proof"
+          },
+          {
+            "label": "Representative ID",
+            "note": "partner ≥ 25% or administrator"
+          },
+          {
+            "label": "Banking details",
+            "note": "to receive commissions"
+          }
         ]
       },
       "ctaButton": "Start registration",
@@ -1072,6 +1097,24 @@
         "representanteName": "Representative name is required.",
         "representanteCpf": "Invalid representative CPF."
       }
+    },
+    "status": {
+      "title": "Application under review",
+      "subtitle": "Our team is reviewing your information. You will receive an email with the result within 2 business days.",
+      "stateSubmitted": "Submitted — awaiting review",
+      "stateUnderReview": "Under review by Mutav team",
+      "backLabel": "Have questions?",
+      "backLink": "Contact us",
+      "homeButton": "Back to start"
+    },
+    "rejected": {
+      "title": "Application not approved",
+      "subtitle": "Unfortunately we were unable to approve your application at this time.",
+      "reasonLabel": "Reason provided by our team:",
+      "noReason": "No reason provided.",
+      "contactLabel": "Have questions or want to appeal?",
+      "contactLink": "Contact us",
+      "homeButton": "Back to start"
     }
   }
 }

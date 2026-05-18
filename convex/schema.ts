@@ -186,9 +186,13 @@ export default defineSchema({
     name: v.string(),
     email: v.string(),
     createdAt: v.string(),
+    // Auth0 JWT `sub` claim — absent on rows created before Auth0 integration.
+    // Populated by `getOrCreateByIdentity` on first login.
+    subject: v.optional(v.string()),
   })
     .index("by_publicId", ["publicId"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    .index("by_subject", ["subject"]),
 
   memberships: defineTable({
     userId: v.id("users"),
