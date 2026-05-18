@@ -3,10 +3,9 @@ import { paginationOptsValidator } from "convex/server";
 import { query } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { priceContract } from "../../src/lib/pricing/contract";
-import { tierForScore } from "../../src/lib/pricing/tiers";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
-import { CONTRACT_STATUS } from "./domain";
+import { CONTRACT_STATUS, tierForScore } from "./domain";
 import { assertAgencyAccess, mutationWithAgencyScope, queryWithAgencyScope } from "../lib/auth";
 
 function generatePublicId(): string {

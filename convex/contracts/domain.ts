@@ -45,3 +45,16 @@ export const scoreTierValidator = v.union(
   v.literal(SCORE_TIER.RUIM),
   v.literal(SCORE_TIER.NEGADO),
 );
+
+export const SCORE_TIER_THRESHOLD = {
+  high: 800,
+  medium: 600,
+  low: 400,
+} as const;
+
+export function tierForScore(score: number): ScoreTier {
+  if (score >= SCORE_TIER_THRESHOLD.high) return SCORE_TIER.BOM;
+  if (score >= SCORE_TIER_THRESHOLD.medium) return SCORE_TIER.REGULAR;
+  if (score >= SCORE_TIER_THRESHOLD.low) return SCORE_TIER.RUIM;
+  return SCORE_TIER.NEGADO;
+}
