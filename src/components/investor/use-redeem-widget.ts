@@ -1,8 +1,9 @@
 import { useState } from "react";
+import type { AssetSymbol } from "@/lib/stellar/assets";
 import { FUNDS } from "./fund-data";
 import type { Fund, FundId } from "./fund-data";
 
-export type OutputToken = "XLM" | "USDC";
+export type OutputToken = AssetSymbol;
 
 const XLM_PRICE_USD = 0.1234;
 const FEE_RATE = 0.003;

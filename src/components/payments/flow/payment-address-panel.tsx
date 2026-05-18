@@ -27,10 +27,6 @@ export async function PaymentAddressPanel({ muxedAddress, brlDisplay, options }:
   const t = await getTranslations("paymentFlow.address");
   const truncatedAddress = `${muxedAddress.slice(0, 6)}…${muxedAddress.slice(-6)}`;
 
-  // The Tabs primitive needs a non-empty options list to render meaningfully;
-  // the page composing this panel is responsible for not rendering it when no
-  // assets are active. Bail out defensively rather than rely on a non-null
-  // assertion at the Tabs defaultValue.
   const firstOption = options[0];
   if (!firstOption) return null;
 

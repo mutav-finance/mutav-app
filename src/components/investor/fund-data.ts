@@ -1,6 +1,10 @@
 export type RiskLevel = "low" | "medium" | "high";
 export type FundId = "MTVL" | "MTVM" | "MTVH";
 
+export function isFundId(value: string): value is FundId {
+  return FUNDS.some((f) => f.id === value);
+}
+
 export const RISK_COLOR: Record<RiskLevel, string> = {
   low: "bg-success",
   medium: "bg-accent",

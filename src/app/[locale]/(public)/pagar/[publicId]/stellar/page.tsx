@@ -50,8 +50,7 @@ export default async function CheckoutStellarPage({
   ]);
   const payment = preloadedQueryResult(preloadedPayment);
   if (!payment || !payment.muxedAddress) notFound();
-  // Hoist past the guard so the narrowed string survives the .map() closure
-  // boundary below.
+  // Hoist past notFound() so the narrowing survives the .map() closure below.
   const muxedAddress = payment.muxedAddress;
 
   if (payment.state.kind === "paid" || payment.state.kind === "canceled") {

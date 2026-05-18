@@ -59,17 +59,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const agencies = (agenciesRaw ?? []).filter((a): a is WorkspaceAgency => a !== null);
 
-  // 3. Persist selected agency in localStorage. Stored as a plain string and
-  //    validated against the known agency list before being treated as an Id.
   const [storedRaw, setStoredRaw] = React.useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem(STORAGE_KEY);
   });
 
-  // 4. Derive the effective selected agency id — fall back to the first agency
-  //    if the stored value is absent or no longer valid (e.g. after a re-seed).
-  //    Matching against agencies[*]._id narrows from string to Id<"agencies">
-  //    without a cast.
+  // Stored id can be stale (e.g. after a re-seed) — fall back to the first
+  // agency if it no longer matches any known id.
   const selectedAgencyId = React.useMemo<Id<"agencies"> | null>(() => {
     const first = agencies[0];
     if (!first) return null;

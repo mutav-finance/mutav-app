@@ -13,13 +13,10 @@ export const getById = query({
 // ─── Membership queries ───────────────────────────────────────────────────────
 
 /**
- * Returns all agencies a user belongs to, each enriched with their role.
- *
- * SECURITY POSTURE (MVP):
- * Unscoped public read. Load-bearing for the pre-Auth0 dev shortcut —
- * `WorkspaceContext` calls this to populate the agency switcher. When Auth0
- * lands, this becomes an authenticated query that derives `userId` from the
- * session rather than accepting it from args.
+ * SECURITY POSTURE (MVP): unscoped public read. Load-bearing for the
+ * pre-Auth0 dev shortcut — `WorkspaceContext` calls this to populate the
+ * agency switcher. When Auth0 lands, this becomes an authenticated query
+ * that derives `userId` from the session rather than accepting it from args.
  */
 export const listAgenciesForUser = query({
   args: { userId: v.id("users") },
