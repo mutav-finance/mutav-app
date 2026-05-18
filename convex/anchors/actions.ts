@@ -251,7 +251,7 @@ async function resolveTenantPrefill(
   contractPublicId: string | undefined,
 ): Promise<TenantPrefill> {
   if (!contractPublicId) return {};
-  const contract = await ctx.runQuery(api.contracts.useCases.getByPublicId, {
+  const contract = await ctx.runQuery(internal.contracts.useCases.getByPublicIdInternal, {
     publicId: contractPublicId,
   });
   if (!contract) return {};

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { query } from "../_generated/server";
+import { internalQuery, query } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { priceContract } from "../../src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
@@ -50,6 +50,23 @@ export const getByPublicId = query({
       .take(100);
 
     return shapeContract(contract, history);
+  },
+});
+
+/**
+ * Internal companion to `getByPublicId` for actions that authorize by a
+ * non-user model (e.g. tenant checkout flows triggered by publicId-bearer).
+ * Returns the raw contract doc — no history, no shaping. The calling
+ * internal flow is responsible for whatever authorization is appropriate
+ * at its entry point.
+ */
+export const getByPublicIdInternal = internalQuery({
+  args: { publicId: v.string() },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("contracts")
+      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
+      .unique();
   },
 });
 
