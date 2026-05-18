@@ -83,8 +83,9 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
 
     setUploadStatus((s) => ({ ...s, [kind]: "uploading" }));
     try {
-      const uploadUrl = await generateUploadUrl();
-      const res = await fetch(uploadUrl, {
+      const urlResult = await generateUploadUrl({ agencyId });
+      if (!urlResult.success) throw new Error(urlResult.error.code);
+      const res = await fetch(urlResult.data.url, {
         method: "POST",
         headers: { "Content-Type": file.type },
         body: file,

@@ -116,7 +116,9 @@ type WizardErrorCode =
   | "REPRESENTANTE_NAME_REQUIRED"
   | "REPRESENTANTE_CPF_REQUIRED"
   | "REPRESENTANTE_CPF_INVALID"
-  | "ALREADY_REGISTERED";
+  | "ALREADY_REGISTERED"
+  | "AGENCY_TYPE_CONFLICT"
+  | "INCOMPLETE_PROFILE";
 
 function isWizardErrorCode(code: string): code is WizardErrorCode {
   return (
@@ -127,7 +129,9 @@ function isWizardErrorCode(code: string): code is WizardErrorCode {
     code === "REPRESENTANTE_NAME_REQUIRED" ||
     code === "REPRESENTANTE_CPF_REQUIRED" ||
     code === "REPRESENTANTE_CPF_INVALID" ||
-    code === "ALREADY_REGISTERED"
+    code === "ALREADY_REGISTERED" ||
+    code === "AGENCY_TYPE_CONFLICT" ||
+    code === "INCOMPLETE_PROFILE"
   );
 }
 

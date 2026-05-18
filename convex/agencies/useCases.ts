@@ -106,18 +106,16 @@ export const getOnboardingInProgress = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
-    for (const membership of memberships) {
-      const agency = await ctx.db.get(membership.agencyId);
-      if (agency?.onboardingState === ONBOARDING_STATE.IN_PROGRESS) {
-        const documents = await ctx.db
-          .query("agencyDocuments")
-          .withIndex("by_agency", (q) => q.eq("agencyId", agency._id))
-          .collect();
-        return { agency, documents };
-      }
-    }
+    const agencies = await Promise.all(memberships.map((m) => ctx.db.get(m.agencyId)));
+    const inProgress = agencies.find((a) => a?.onboardingState === ONBOARDING_STATE.IN_PROGRESS);
+    if (!inProgress) return null;
 
-    return null;
+    const documents = await ctx.db
+      .query("agencyDocuments")
+      .withIndex("by_agency", (q) => q.eq("agencyId", inProgress._id))
+      .collect();
+
+    return { agency: inProgress, documents };
   },
 });
 
@@ -228,6 +226,11 @@ export const startOnboarding = mutation({
     for (const membership of memberships) {
       const agency = await ctx.db.get(membership.agencyId);
       if (agency?.onboardingState === ONBOARDING_STATE.IN_PROGRESS) {
+        // Switching agency type mid-session would corrupt the existing record (different required
+        // fields, stale bankingInfo). The user must finish or abandon the current session first.
+        if (agency.agencyType !== args.agencyType) {
+          return { success: false, error: { code: "AGENCY_TYPE_CONFLICT" } } as const;
+        }
         // Resume: apply updated step-1 data so the wizard pre-populates correctly.
         await ctx.db.patch(agency._id, {
           name: args.name,
@@ -296,13 +299,19 @@ export const saveBankingInfo = mutation({
 /**
  * Generate a short-lived Convex File Storage upload URL.
  * The client uploads the file directly, then calls saveDocument with the storageId.
+ * Requires the agency to be in IN_PROGRESS state — prevents unauthenticated storage abuse.
  * TODO(auth): require identity + verify ownership of agencyId.
  */
-// TODO(auth): verify ownership of agencyId before issuing upload URL.
 export const generateDocumentUploadUrl = mutation({
-  args: {},
-  handler: async (ctx) => {
-    return ctx.storage.generateUploadUrl();
+  args: { agencyId: v.id("agencies") },
+  handler: async (ctx, { agencyId }) => {
+    const agency = await ctx.db.get(agencyId);
+    if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
+    if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
+      return { success: false, error: { code: "ONBOARDING_NOT_EDITABLE" } } as const;
+    }
+    const url = await ctx.storage.generateUploadUrl();
+    return { success: true, data: { url } } as const;
   },
 });
 
@@ -373,6 +382,15 @@ export const submitOnboarding = mutation({
 
     if (!agency.bankingInfo) {
       return { success: false, error: { code: "BANKING_INFO_REQUIRED" } } as const;
+    }
+
+    if (
+      !agency.name?.trim() ||
+      !agency.email?.trim() ||
+      !agency.phone?.trim() ||
+      !agency.creci?.trim()
+    ) {
+      return { success: false, error: { code: "INCOMPLETE_PROFILE" } } as const;
     }
 
     // Garante unicidade de CPF/CNPJ no momento da submissão — é aqui que o cadastro

@@ -1034,6 +1034,8 @@
         "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
         "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
         "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
+        "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
+        "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
         "unknown": "Failed to save. Please try again."
       }
     },
