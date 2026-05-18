@@ -1,3 +1,5 @@
+import { SCORE_TIER_THRESHOLD } from "../../../convex/contracts/domain";
+
 export type RentMultiplier = "24x" | "36x" | "48x";
 export type ExitCostMultiplier = "3x" | "5x" | "7x";
 
@@ -8,11 +10,6 @@ export const SCORE_TIER_RATE = {
   high: 0.075,
   medium: 0.1,
   low: 0.125,
-} as const;
-
-export const SCORE_TIER_THRESHOLD = {
-  high: 800,
-  medium: 600,
 } as const;
 
 export function rateForScore(score: number): number {

@@ -5,7 +5,7 @@ import { internal } from "../_generated/api";
 import { priceContract } from "../../src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
-import { CONTRACT_STATUS } from "./domain";
+import { CONTRACT_STATUS, tierForScore } from "./domain";
 import { assertAgencyAccess, mutationWithAgencyScope, queryWithAgencyScope } from "../lib/auth";
 
 function generatePublicId(): string {
@@ -185,6 +185,20 @@ export const countByMonth = queryWithAgencyScope({
 
       return { month, netActive, activated, cancelled, expired };
     });
+  },
+});
+
+/**
+ * Mock credit-bureau score for a CPF or CNPJ. Pure computation today; the
+ * real-bureau call goes here so the swap is single-file. Agency-scoped so
+ * future billed lookups can be attributed and rate-limited per agency.
+ */
+export const lookupTenantScore = queryWithAgencyScope({
+  args: { document: v.string() },
+  handler: async (_ctx, { document }) => {
+    const digits = document.replace(/\D/g, "");
+    const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
+    return { score, tier: tierForScore(score) };
   },
 });
 
