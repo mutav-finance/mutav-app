@@ -2,29 +2,28 @@
 
 > Master index of unresolved questions across legal, treasury policy, vendor, and engineering. Each entry links to the canonical context. **Architecture supports any answer to most items** — this file exists so the questions don't get re-derived every session.
 
-Update this file as questions are answered (move resolved items to `## Recently resolved` at the bottom for one cycle, then delete).
-
 ## Conventions
 
 - **Owner** — who needs to answer (Counsel / Draau / Eng / Vendor / TBD)
 - **Blocks** — what's gated on the answer; forcing-function date if any
 - **Canonical source** — where the deeper context lives
+- **Curator** — whoever lands a PR that resolves an item moves it to `Recently resolved` in the same PR. The next person editing this doc deletes anything sitting in `Recently resolved` before adding their own changes.
 
 ---
 
 ## Legal & regulatory — pending counsel
 
-### 1. Mutav SA's own license stack
+### L1. Mutav SA's own license stack
 
 **Question.** Must Mutav SA register as a VASP (BCB Res 519/520/521), a payment institution (BCB Res 494–497), a FIDC (Fundo de Investimento em Direitos Creditórios), a FIF (Fundo de Investimento Financeiro), or some combination?
 
 **Why it matters.** Determines which BCB norms apply directly vs to counterparties. BCB Res 521/2025 monthly stablecoin reporting (started **May 4, 2026** — already in effect) binds VASPs directly; if Mutav is a VASP, it ships that reporting now. If Mutav is a consumer-of-VASPs, the providers report and Mutav preserves audit-grade records.
 
 **Owner.** External counsel.
-**Blocks.** Audit log primitive cadence, reconciliation reporting surface, whether the daily on-chain reconciliation job (Eng #4 below) is regulatory-mandatory or just architecturally-correct.
+**Blocks.** Audit log primitive cadence, reconciliation reporting surface, whether the daily on-chain reconciliation job (E3 below) is regulatory-mandatory or just architecturally-correct.
 **Canonical source.** [`architecture/regulatory.md`](architecture/regulatory.md) §§ "TESOURO as treasury asset — classification implications" (lines 55–67) and "Out of scope" (line 242).
 
-### 2. CVM 175 fund-of-funds applicability
+### L2. CVM 175 fund-of-funds applicability
 
 **Question.** Does Mutav SA's two-layer structure (investors hold MUTAV → MUTAV represents claim on TESOURO → TESOURO represents claim on Tesouro Direto) trigger CVM 175 Anexo II fund-of-funds rules?
 
@@ -34,17 +33,17 @@ Update this file as questions are answered (move resolved items to `## Recently 
 **Blocks.** Investor-portal disclosure UI, CVM filing template.
 **Canonical source.** [`architecture/regulatory.md`](architecture/regulatory.md) line 64.
 
-### 3. Etherfuse authorization coverage
+### L3. Etherfuse authorization coverage
 
 **Question.** Do Etherfuse's existing CVM/BCB authorizations cover Mutav's specific use case (rental-guarantee treasury + investor on-ramp), or does Mutav SA need its own?
 
 **Why it matters.** If Etherfuse's umbrella covers us, the Oct 30 2026 cliff is downstream-only. If not, Mutav needs its own authorization track started immediately.
 
 **Owner.** External counsel, in dialogue with Etherfuse legal.
-**Blocks.** Authorization track scoping; relates to #1.
+**Blocks.** Authorization track scoping; relates to L1.
 **Canonical source.** [`architecture/regulatory.md`](architecture/regulatory.md) line 65.
 
-### 4. Tax treatment of MUTAV holders
+### L4. Tax treatment of MUTAV holders
 
 **Question.** IRRF and IOF treatment of MUTAV token holders relative to direct Tesouro Direto holders — equivalent, worse, or better?
 
@@ -115,7 +114,7 @@ Each of these has a clear forcing function; intentionally not built today.
 
 **Question.** When do we ship the append-only hash-chained audit log that `admin.md` mentions throughout?
 
-**Forcing function.** Before VASP authorization (if #1 above resolves "Mutav is a VASP") — Oct 30 2026 latest. Earlier if real investor capital enters production.
+**Forcing function.** Before VASP authorization (if L1 above resolves "Mutav is a VASP") — Oct 30 2026 latest. Earlier if real investor capital enters production.
 **Canonical source.** [`architecture/admin.md`](architecture/admin.md) line 234.
 
 ### E2. Square Books-style ledger tables
@@ -129,7 +128,7 @@ Each of these has a clear forcing function; intentionally not built today.
 
 **Question.** Build the daily reconciliation worker that compares on-chain TESOURO balance to Convex's recorded position per agency.
 
-**Forcing function.** If Mutav is classified as a VASP (#1), BCB Res 521/2025 monthly reporting is already in effect (started May 4 2026) and daily reconciliation is the operational substrate for it. If not, still architecturally required before scale.
+**Forcing function.** If Mutav is classified as a VASP (L1), BCB Res 521/2025 monthly reporting is already in effect (started May 4 2026) and daily reconciliation is the operational substrate for it. If not, still architecturally required before scale.
 **Canonical source.** [`architecture/reliability.md`](architecture/reliability.md) § "Reconciliation"; [`architecture/onchain-integration.md`](architecture/onchain-integration.md).
 
 ### E4. Stellar treasury proposal queue UI
@@ -199,23 +198,23 @@ Five related deferrals, each with its own forcing function:
 
 ## Calendar pins
 
-| Date                    | Event                                                                | Affects                                                                                                                      |
-| ----------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **May 4, 2026** ✅ past | BCB Res 521/2025 monthly stablecoin reporting begins                 | Depends on #1 — applies to Mutav directly only if classified as VASP                                                         |
-| **May 2026** ongoing    | BCB Resolutions 494–497 IP authorization window                      | #1, #3, V1–V3                                                                                                                |
-| **Oct 30, 2026**        | BCB VASP authorization cliff — 270-day transition from Feb 2026 ends | Cannot transact with non-authorized counterparties after this date (#1 question is whether this applies to Mutav itself too) |
-| **Dec 2026**            | OpenZeppelin Stellar Smart Accounts audit completion (estimated)     | E4 may use these instead of native multisig if v2                                                                            |
+| Date                   | Event                                                                | Affects                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **May 4, 2026** (past) | BCB Res 521/2025 monthly stablecoin reporting begins                 | Depends on L1 — applies to Mutav directly only if classified as VASP                                                         |
+| **May 2026** ongoing   | BCB Resolutions 494–497 IP authorization window                      | L1, L3, V1–V3                                                                                                                |
+| **Oct 30, 2026**       | BCB VASP authorization cliff — 270-day transition from Feb 2026 ends | Cannot transact with non-authorized counterparties after this date (L1 question is whether this applies to Mutav itself too) |
+| **Dec 2026**           | OpenZeppelin Stellar Smart Accounts audit completion (estimated)     | E4 may use these instead of native multisig if v2                                                                            |
 
 ---
 
 ## Cross-cutting dependency notes
 
-- **#1 (Mutav VASP classification)** is the single highest-leverage open question. Its answer determines whether several engineering deferrals (E1, E3) flip from "ship before Oct 30 cliff" to "ship eventually."
+- **L1 (Mutav VASP classification)** is the single highest-leverage open question. Its answer determines whether several engineering deferrals (E1, E3) flip from "ship before Oct 30 cliff" to "ship eventually."
 - **T2 (deposit pricing approach)** has soft links to E5 (currency field): the dual-share-class option pushes USD into the schema sooner, accelerating the multi-currency migration.
 - **V2 (Etherfuse B2B extension)** failing pushes V3 (BaaS hedge) from "hedge" to "primary," which changes the conversion boundary (E6) shape.
 
 ---
 
-## Recently resolved (one cycle, then delete)
+## Recently resolved
 
-_None yet — populate this section as items resolve and delete entries from the lists above._
+_None yet. See the Curator convention at the top: PRs that resolve an item populate this section; the next editor wipes it._
