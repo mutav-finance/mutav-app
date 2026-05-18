@@ -1,63 +1,58 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query } from "../_generated/server";
-import { isChargeable, paymentStateKindValidator, type Payment } from "./domain";
+import { assertAgencyAccess, queryWithAgencyScope } from "../lib/auth";
+import { isChargeable } from "./domain";
 import { derivePaymentMuxedAddress } from "./lib/muxedAddress";
 
-export const listByAgency = query({
-  args: {
-    agencyId: v.id("agencies"),
-    paginationOpts: paginationOptsValidator,
-  },
-  handler: async (ctx, args) => {
-    return ctx.db
-      .query("payments")
-      .withIndex("by_agency_period", (q) => q.eq("agencyId", args.agencyId))
-      .order("desc")
-      .paginate(args.paginationOpts);
-  },
-});
-
-export const listByStateKind = query({
-  args: {
-    stateKind: paymentStateKindValidator,
-    paginationOpts: paginationOptsValidator,
-  },
-  handler: async (ctx, args) => {
-    return ctx.db
-      .query("payments")
-      .withIndex("by_state_kind", (q) => q.eq("state.kind", args.stateKind))
-      .order("desc")
-      .paginate(args.paginationOpts);
-  },
-});
-
-/** Public paginated list — same security caveat as contracts.useCases.list. */
-export const list = query({
+export const listByAgency = queryWithAgencyScope({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
-    const result = await ctx.db.query("payments").order("desc").paginate(args.paginationOpts);
-    return {
-      ...result,
-      page: result.page.map(shapePaymentSummary),
-    };
+    return ctx.db
+      .query("payments")
+      .withIndex("by_agency_period", (q) => q.eq("agencyId", ctx.agencyId))
+      .order("desc")
+      .paginate(args.paginationOpts);
   },
 });
 
+/**
+ * Resource-by-id read. Returns null on both "no such payment" and "not a
+ * member of that agency", to avoid leaking cross-agency existence.
+ */
 export const getById = query({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args) => {
-    return ctx.db.get(args.paymentId);
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) return null;
+
+    try {
+      await assertAgencyAccess(ctx, payment.agencyId);
+    } catch {
+      return null;
+    }
+
+    return payment;
   },
 });
 
+/** Resource-by-id read keyed on publicId. Same null-on-miss semantics. */
 export const getByPublicId = query({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
-    return ctx.db
+    const payment = await ctx.db
       .query("payments")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
+    if (!payment) return null;
+
+    try {
+      await assertAgencyAccess(ctx, payment.agencyId);
+    } catch {
+      return null;
+    }
+
+    return payment;
   },
 });
 
@@ -128,14 +123,14 @@ export const getStellarIndexState = internalQuery({
  *
  * Uses the `by_agency_period` index — no full-table scan.
  */
-export const getNextPendingPayment = query({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }) => {
+export const getNextPendingPayment = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
     // Walk forward through payments sorted by period (earliest first)
     // and return the first one that is pending or overdue.
     const page = await ctx.db
       .query("payments")
-      .withIndex("by_agency_period", (q) => q.eq("agencyId", agencyId))
+      .withIndex("by_agency_period", (q) => q.eq("agencyId", ctx.agencyId))
       .order("asc")
       .collect();
 
@@ -152,19 +147,3 @@ export const getNextPendingPayment = query({
     };
   },
 });
-
-// ─── Shape helpers ────────────────────────────────────────────────────────────
-
-function shapePaymentSummary(doc: Payment) {
-  return {
-    id: doc.publicId,
-    agencyId: doc.agencyId,
-    periodMonth: doc.periodMonth,
-    issuedAt: doc.issuedAt,
-    dueDate: doc.dueDate,
-    totalCents: doc.totalCents,
-    state: doc.state,
-    method: doc.method,
-    lineItemCount: doc.lineItems.length,
-  };
-}

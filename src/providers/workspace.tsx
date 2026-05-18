@@ -46,16 +46,13 @@ type WorkspaceContextValue = {
 const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-  // 1. Resolve the dev user.
+  // Resolve the dev user (for header display). The agencies query resolves
+  // identity server-side via `queryWithAuth` — no userId arg, can't be
+  // pointed at another user. Both queries run in parallel.
   const devUser = useQuery(api.users.useCases.getByPublicId, {
     publicId: DEV_USER_PUBLIC_ID,
   });
-
-  // 2. Load all agencies for that user once we have their id.
-  const agenciesRaw = useQuery(
-    api.agencies.useCases.listAgenciesForUser,
-    devUser ? { userId: devUser._id } : "skip",
-  );
+  const agenciesRaw = useQuery(api.agencies.useCases.listAgenciesForUser, {});
 
   const agencies = (agenciesRaw ?? []).filter((a): a is WorkspaceAgency => a !== null);
 
