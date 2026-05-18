@@ -54,6 +54,20 @@ CVM's 2026 agenda flags tokenized fund rules as a workstream. Anticipated requir
 
 These are not v1 requirements but should not be designed-out.
 
+### TESOURO as treasury asset — classification implications
+
+Mutav SA's treasury holds **TESOURO**, Etherfuse's tokenized Brazilian Treasury bonds. This is materially different from holding raw stablecoins (USDC, USDT) and creates a fund-of-funds-like structure for CVM purposes: investors hold MUTAV tokens that represent a claim on Mutav SA, which holds TESOURO that represents a claim on Brazilian Treasury bonds. Two layers of tokenized claim on the same underlying.
+
+Questions for legal counsel (not architecture decisions — flagging for the appropriate workstream):
+
+- Whether Mutav SA must register as a **FIDC** (Fundo de Investimento em Direitos Creditórios) or a **FIF** (Fundo de Investimento Financeiro) given the TESOURO holding pattern
+- Whether holding TESOURO triggers the **CVM 175 fund-of-funds** rules (Anexo II of Resolução 175 covers FoF structures)
+- Whether Etherfuse's existing CVM/BCB authorizations cover Mutav's use case or whether Mutav SA needs its own
+- Tax treatment of MUTAV holders relative to direct Tesouro Direto holders (IRRF, IOF implications)
+- Disclosure obligations specific to the two-layer structure
+
+The architecture supports any answer to these — the fund classification doesn't change the technical contracts, indexer, or compliance flows. But the **disclosure surface** (investor-facing UI must show TESOURO holding, not just an abstract "NAV") and the **reporting surface** (CVM filings) do change with classification. Plan accordingly when legal counsel confirms.
+
 ## BCB Resolução 519/2025 — KYC and VASP authorization
 
 BCB 519/2025 (in force 2025) consolidated Brazilian crypto regulation. The KYC floor it sets is non-negotiable for any consumer-facing crypto service operating in Brazil.
@@ -103,25 +117,29 @@ This matches the pattern already in place for anchors (`src/lib/anchors/registry
 
 ## Settlement provider selection (agency → Mutav)
 
-Distinct from KYC vendor selection above and from anchor selection (Etherfuse for investor on-ramp). The settlement provider handles **agency → Mutav** monthly B2B flows: agencies pay Mutav fees in BRL via Pix; the provider converts to stablecoin and delivers to a Mutav treasury address on the destination chain. Pattern documented in [`onchain-integration.md`](onchain-integration.md) § Agency settlement (BaaS providers).
+The settlement provider handles **agency → Mutav** monthly B2B flows: agencies pay Mutav fees in BRL via Pix; the destination is Mutav's TESOURO-denominated treasury on Stellar. Pattern documented in [`onchain-integration.md`](onchain-integration.md) § Agency settlement.
 
-### Required architectural properties
+**Primary rail: Etherfuse.** Because treasury holds TESOURO (Etherfuse's tokenized Brazilian Treasury bond), Etherfuse mints TESOURO directly from inbound Pix via SEP-6 — single counterparty, no intermediate stablecoin hop. The same Etherfuse primitive serves investor on-ramp; the difference for agency settlement is the destination address (Mutav treasury) and the trigger (system-driven, not user-driven UI).
+
+**Hedge rails: BaaS providers** — Transfero / Bitso / Foxbit — exist for capacity, concentration, and incident continuity. They use a multi-hop (Pix → BaaS → USDC → Stellar → Etherfuse mint TESOURO) that adds spread; that's the cost of the hedge.
+
+### Required architectural properties (any rail)
 
 - **BCB Payment Institution authorization** (existing IP license per Resolution 4.282/2013, OR will hold under the new IP regime per Resolutions 494/495/496/497 with May 2026 authorization window). Unauthorized providers cannot legally handle BRL float for Mutav after the October 30, 2026 cliff.
 - **VASP authorization under BCB Resolutions 519/520/521** (Nov 2025). Mutav cannot transact with non-authorized VASPs after the cliff; the transition window is 270 days from Feb 2026.
-- **API + webhook reliability** — REST API for the three-call orchestration (Pay-In, Trade, Crypto-Out); webhooks for each lifecycle event with correlation ids preserved end-to-end. The correlation id is mandatory; without it, reconciliation per [`reliability.md`](reliability.md) § Reconciliation is not possible.
-- **Destination chain coverage** — Stellar v1, generalizable to additional chains as Mutav expands. Native USDC delivery preferred; BRZ-as-intermediate acceptable if BRZ → USDC Trade is reliable.
-- **Travel Rule compliance** (mandatory domestic per Resolution 520). Provider collects originator/beneficiary data on transfers.
+- **API + webhook reliability** — REST API; webhooks for each lifecycle event with correlation ids preserved end-to-end. The correlation id is mandatory; without it, reconciliation per [`reliability.md`](reliability.md) § Reconciliation is not possible.
+- **Stellar address coverage** — the rail must be able to deliver to a Mutav-controlled Stellar address (TESOURO mint for Etherfuse; USDC for BaaS rails which then route through Etherfuse for the final TESOURO conversion).
+- **Travel Rule compliance** (mandatory domestic per Resolution 520).
 - **MED 2.0 readiness** — provider notifies promptly on MED reversals via webhook; Mutav's quarantine pattern depends on it.
 
 ### Shortlist (Brazilian B2B Pix-to-crypto, 2026)
 
-| Provider                  | Status                                                                                | Notes                                                                                                                                                                                                                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Transfero BaaSiC**      | BCB Payment Institution (Sept 2023). VASP re-application pending under new framework. | Issues BRZ (multichain stablecoin incl. Stellar). 13M+ tx in 2023. Three-call orchestration (Pay-In → Trade → Crypto-Out). Stellar-native USDC in one hop is **not publicly documented** — confirm in sandbox. Pricing opaque (gated by sales). Customers include Bitget, BRX Finance, Stakease, Kona Finance. |
-| **Bitso Business**        | Mexico-HQ, established BR operations.                                                 | Single-API BRL → USDC with "just-in-time" settlement. Processed $6.5B in US-MX remittances 2024 (mature reconciliation story). Strongest direct competitor to Transfero for this use case. Webhook + correlation-id story likely cleaner than Transfero's.                                                     |
-| **Foxbit Prime Desk**     | BR-native, member of BRL1 consortium.                                                 | "Invisible stablecoin" B2B FX product. REST OTC API. Quote-driven pricing. Good fit if volume is large enough to negotiate.                                                                                                                                                                                    |
-| **Etherfuse (extension)** | Currently Mutav's user-facing on-ramp.                                                | SEP-24 is interactive/user-driven by spec; SEP-6 could in principle drive system-initiated deposits. Not their primary B2B pitch, but extending the existing relationship to system-driven B2B is worth a conversation before adopting a second vendor.                                                        |
+| Provider              | Role            | Status                                                                                           | Notes                                                                                                                                                                                                                                                                                             |
+| --------------------- | --------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Etherfuse**         | **Primary**     | Existing Mutav investor on-ramp; TESOURO issuer; status under new BCB frameworks to be confirmed | Single-counterparty rail BRL Pix → TESOURO direct via SEP-6. Already in the architecture for investor on-ramp; extending to agency settlement is configuration + endpoint reuse, not a new integration. Concentration risk acknowledged — see hedge rails below.                                  |
+| **Transfero BaaSiC**  | Hedge candidate | BCB Payment Institution (Sept 2023). VASP re-application pending under new framework.            | Issues BRZ (multichain stablecoin incl. Stellar). 13M+ tx in 2023. Three-call orchestration (Pay-In → Trade → Crypto-Out). Stellar-native USDC in one hop is **not publicly documented** — confirm in sandbox. Pricing opaque (gated by sales). Customers include Bitget, BRX Finance, Stakease.  |
+| **Bitso Business**    | Hedge candidate | Mexico-HQ, established BR operations.                                                            | Single-API BRL → USDC with "just-in-time" settlement. Processed $6.5B in US-MX remittances 2024 (mature reconciliation story). Strongest BaaS-side competitor. Webhook + correlation-id story likely cleaner than Transfero's. Already named as the fallback investor on-ramp per project memory. |
+| **Foxbit Prime Desk** | Hedge candidate | BR-native, member of BRL1 consortium.                                                            | "Invisible stablecoin" B2B FX product. REST OTC API. Quote-driven pricing. Good fit if volume is large enough to negotiate.                                                                                                                                                                       |
 
 **Out of consideration:**
 
@@ -129,13 +147,25 @@ Distinct from KYC vendor selection above and from anchor selection (Etherfuse fo
 - **Mercado Bitcoin OTC** — quote-driven OTC, not a productized B2B settlement rail with webhooks.
 - **BRL1 consortium** — the stablecoin itself, not a settlement product; rails are the member exchanges (Bitso, Foxbit).
 
+### Etherfuse concentration — architectural acknowledgment
+
+Etherfuse currently fills four roles in the Mutav architecture: **investor on-ramp**, **agency settlement primary rail**, **treasury asset issuer (TESOURO)**, and **TESOURO redemption counterparty**. This is concentrated counterparty exposure. The architectural hedges:
+
+1. **Active BaaS hedge integration** — at least one (Bitso or Transfero) is wired and exercised periodically, even if Etherfuse handles steady-state volume. The hedge is not "we'll integrate when Etherfuse goes down" — that integration must work the first time it's needed.
+2. **Bitso BRL1 as fallback investor on-ramp** per project memory — independent of agency settlement, addresses the on-ramp side of the concentration.
+3. **Operational visibility into Etherfuse health** — Mutav admin monitors Etherfuse capacity, response latency, error rates; alerts fire before degradation forces hedge-rail activation.
+4. **Documented runbook for hedge-rail activation** — exactly how Mutav switches from Etherfuse-primary to BaaS-hedge for agency settlement, including the operational steps and the resulting end-to-end latency expectation.
+
+This is a real trade-off the architecture accepts in exchange for the simplicity of TESOURO-as-treasury. If concentration becomes untenable, the alternative is multi-asset treasury (TESOURO + USDC + others), which is a much more complex architecture than the hedge layer.
+
 ### Settlement provider abstraction
 
 Same pattern as KYC and anchor abstractions:
 
-- `convex/settlement/providers/{transfero,bitso,foxbit,etherfuse}.ts` implement a stable interface (`createPayIn`, `getQuote`, `executeTrade`, `deliverCrypto`, `getStatus`, `handleReversal`)
-- Vendor selection is a configuration choice per agency, per fund, or per settlement type
-- Multiple vendors can coexist (Bitso for high-volume agencies, Transfero for those already integrated elsewhere)
+- `convex/settlement/providers/{etherfuse,transfero,bitso,foxbit}.ts` implement a stable interface (`createPayIn`, `getQuote`, `executeTrade`, `deliverCrypto`, `getStatus`, `handleReversal`)
+- Provider role (primary vs hedge) is a configuration property
+- Vendor selection is a configuration choice per agency, per fund, or per settlement event
+- Multiple providers can coexist (Etherfuse primary, Bitso warm-standby, Transfero/Foxbit available for capacity expansion)
 
 ### Critical due-diligence checklist before signing any provider
 

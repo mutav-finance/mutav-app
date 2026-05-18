@@ -81,6 +81,8 @@ Pix received          Quarantine window           Settled
 - **Reserve ratio matches observed reversal rate × 3** as a buffer (a 0.5% historical reversal rate suggests holding ~1.5% of float liquid for chargebacks).
 - **Alert thresholds at 50% / 80% / 95% of float depletion**, plus pre-defined replenishment workflow per Convex `@convex-dev/workflow`.
 
+**Float denomination for Mutav:** Mutav SA's treasury asset is **TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). The pre-funded float therefore holds TESOURO rather than USDC. Trade-off vs a USDC float: TESOURO accrues yield while sitting in float (no opportunity cost), and matches the treasury denomination (no FX leg), but liquidity for emergency replenishment depends on Etherfuse's secondary market depth. A small auxiliary BRL float at Etherfuse (or at the BaaS provider if one is in the loop) absorbs same-day Pix-in events that haven't cleared quarantine yet.
+
 Float sizing is operational policy, not architecture. The architectural commitment is the float exists as a concept and the quarantine state is enforced before the float is debited.
 
 ## Idempotency
@@ -207,7 +209,9 @@ NAV is the per-share value of a fund. Wrong NAV = wrong mint amount or wrong red
 
 Mango Markets (Oct 2022, $117M) — naive median of three spot exchanges; attacker manipulated thin venue, drained protocol. Curve read-only reentrancy (2023) — `get_virtual_price` returned inconsistent state mid-call; dForce lost $3.7M. These are the most-prosecuted DeFi failure class.
 
-For Mutav, the underlying asset is **BRL rental yield** — not a publicly-traded asset on a DEX. Pulling NAV from a market oracle has no defensible source. The fund's value is what its accounting says it is.
+For Mutav, the NAV's inputs are **two exogenous, well-defined sources**: (a) rental-guarantee fee income (BRL flows from agencies, deterministic from contract state), and (b) treasury yield from TESOURO (BRL Treasury bond yield, set by the Brazilian government — not a market oracle). Neither is a DEX-quoted price; neither can be manipulated by a thin-venue attacker. The Mango / Curve oracle-manipulation failure class is **architecturally inapplicable** here — a meaningful win.
+
+What remains is the discipline of _computing_ NAV correctly from those inputs and recording the inputs in the audit log so external auditors can reproduce. The safeguards below ensure that discipline.
 
 ### Push-only NAV updates
 

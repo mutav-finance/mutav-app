@@ -119,16 +119,19 @@ Convex never signs onchain transactions. The write paths in the portal:
 
 ### Deposit (mint)
 
+**Asset note.** Investor deposits arrive in **USDC/USDT** (per the whitepaper); Mutav SA's **treasury is denominated in TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). The protocol converts USDC → TESOURO via Etherfuse as part of the deposit flow; the investor's MUTAV holding represents a claim on the TESOURO-denominated NAV. How that conversion is priced (single BRL NAV / dual share class / USD NAV with TESOURO underlying) is a **pending Draau decision** documented in [`admin.md`](admin.md) § A6; architecture supports all three.
+
 Implemented as a `@convex-dev/workflow` per [`reliability.md`](reliability.md) § Workflow durability:
 
 1. **Pre-flight gate** — compliance check (level / risk / limits / regulatory pause) via [`compliance.md`](compliance.md). Wrapper returns a `Result` error with a structured code if blocked.
 2. **Workflow start** — compose the transaction (transfer USDC/USDT + call `mint` on the fund contract) and record the intent (intent id stored in Convex; correlation id propagated per [`reliability.md`](reliability.md) § Reconciliation).
 3. **Wallet sign** — wallet kit prompts user in browser; user's keys sign locally.
 4. **Submit** — signed transaction submitted to the chain via the wallet kit.
-5. **Wait for observation** — workflow sleeps until the per-chain indexer observes the mint event.
-6. **Finalize** — `userPositions` row updated; UI reactively refreshes via Convex's live query; intent record marked `executed`.
+5. **Protocol-side conversion** — the fund contract (or a Convex-orchestrated workflow step) swaps the inbound USDC to TESOURO via Etherfuse; the investor's claim is denominated per the deposit-pricing approach (see Draau pin in [`admin.md`](admin.md) § A6).
+6. **Wait for observation** — workflow sleeps until the per-chain indexer observes the mint event.
+7. **Finalize** — `userPositions` row updated; UI reactively refreshes via Convex's live query; intent record marked `executed`.
 
-The workflow's journal makes partial failure recoverable — a Convex restart between steps 4 and 5 resumes from the last checkpoint. If the user closes the browser between sign and submit, the intent expires and is garbage-collected (the chain never sees the tx, so there's nothing to clean up).
+The workflow's journal makes partial failure recoverable — a Convex restart between steps 4 and 6 resumes from the last checkpoint. If the user closes the browser between sign and submit, the intent expires and is garbage-collected (the chain never sees the tx, so there's nothing to clean up).
 
 ### Redeem
 

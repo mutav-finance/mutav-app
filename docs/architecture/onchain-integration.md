@@ -215,11 +215,40 @@ Every external system that pushes events into Convex (anchor webhooks, KYC vendo
 
 For Mutav today, the integrations that need this hardening: **Etherfuse webhooks** (Pix deposit confirmations, KYB status changes), **agency-settlement BaaS webhooks** (Pix-in / Trade / Crypto-out events from Transfero / Bitso / Foxbit — see below), **KYC vendor callbacks** (Sumsub events per [`compliance.md`](compliance.md) and [`regulatory.md`](regulatory.md)), **Stellar event ingestion** (when polling is replaced with event subscription per § Read architecture). The pattern is the same; only the per-provider verification routine differs.
 
-### Agency settlement (BaaS providers)
+### Agency settlement
 
-**Distinct architectural pattern from the investor on-ramp.** Etherfuse handles investor BRL → MUTAV mint (user-driven, SEP-24 interactive flow). Agency settlement is **system-driven, B2B, monthly recurring**: agencies Pix into a Mutav-controlled virtual account; the BaaS provider converts BRL to a stablecoin (BRZ or USDC) and delivers to a Mutav treasury address on the destination chain. Two related but distinct flows.
+Mutav's treasury asset is **TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). Both investor on-ramp and agency settlement land in TESOURO. **Etherfuse is the primary settlement rail for both flows**; BaaS providers (Transfero / Bitso / Foxbit) sit alongside as **capacity and concentration hedges**, not as a separate primary path.
 
-The BaaS provider typically exposes a **three-call orchestration** rather than a single-step "Pix lands → USDC delivered" rail:
+#### Primary rail — Etherfuse (BRL Pix → TESOURO direct)
+
+The same Etherfuse primitive that powers investor on-ramp powers agency settlement. The difference is the **destination address** (agency-paid amounts mint TESOURO to a Mutav-controlled treasury address rather than to the investor's wallet) and the **flow trigger** (system-driven from agency invoice schedule rather than user-driven hosted UI):
+
+```
+Agency ── Pix ──► Etherfuse virtual account
+                       │
+                       │ Pix MED 2.0 quarantine window
+                       │ (per reliability.md § Quarantine windows)
+                       ▼
+                  Etherfuse mints TESOURO ──► Mutav treasury (Stellar)
+                       │
+                       │ webhook (correlationId from Mutav's payments row)
+                       ▼
+                  Convex workflow step advances ──► indexer observes mint
+```
+
+- Single-counterparty flow. Etherfuse already holds the BCB license, runs the Pix infrastructure, and mints TESOURO. No additional vendor dependency for v1.
+- The MED 2.0 quarantine pattern (per [`reliability.md`](reliability.md) § Quarantine windows) still applies — Mutav credits the agency only after the quarantine window elapses. The pre-funded TESOURO float decouples customer experience from quarantine latency.
+- Etherfuse exposes SEP-6 (programmatic) and SEP-24 (interactive). Agency settlement uses SEP-6 — system-initiated, no hosted UI needed.
+
+#### Hedge rail — BaaS providers (capacity / concentration insurance)
+
+BaaS providers serve scenarios where the Etherfuse-only rail breaks down:
+
+1. **Capacity constraint** — if Mutav's Pix-in volume exceeds Etherfuse's anchor capacity per window
+2. **Incident or downtime** — operational continuity during an Etherfuse-side issue
+3. **Concentration reduction** — diversifying away from a single counterparty as a defensive posture
+
+The BaaS rail uses a three-call orchestration (Pix-In → Trade BRL → USDC → Crypto-Out to Stellar → Etherfuse mint TESOURO from USDC). It is a **multi-hop** that adds spread and a vendor — that's the cost of the hedge:
 
 ```
                             ┌────────────────────────────────┐
@@ -233,33 +262,39 @@ The BaaS provider typically exposes a **three-call orchestration** rather than a
                                   │           ▼
    Agency ────► Pix ──────────────┘     Convex (workflow step)
                                               │
-                                              │ ② Trade (BRL → BRZ/USDC, quote-then-execute)
+                                              │ ② Trade (BRL → USDC, quote-then-execute)
                                               ▼
                                         BaaS Trade endpoint
                                               │
-                                              │ ③ Crypto-Out (deliver to Mutav treasury address)
+                                              │ ③ Crypto-Out (USDC to Mutav Stellar address)
                                               ▼
-                                        Destination chain (Stellar v1; per-chain expansion)
+                                        Stellar
                                               │
-                                              │ ⑤ indexer observes deposit
+                                              │ ⑤ Mutav swaps USDC → TESOURO via Etherfuse
                                               ▼
                                         treasury balance updated
 ```
 
-**Architectural commitments:**
+**Architectural commitments shared by both rails:**
 
-1. **One Convex workflow per settlement.** The 3-step orchestration is a `@convex-dev/workflow` per [`reliability.md`](reliability.md) § Workflow durability — exactly-once mutations, at-least-once trade calls with retry, journal-based recovery. Partial failure (Pix-in confirmed but Trade fails) is recoverable, not a silent inconsistency.
-2. **Quarantine before treasury credit.** The BRL Pix-in lands in a `quarantine` state per [`reliability.md`](reliability.md) § Quarantine windows — Mutav does **not** issue agency credit (or fire downstream operations) until the quarantine window elapses, because Pix MED 2.0 (mandatory 2026) allows up to 80-day fraud reversal with multi-hop tracking.
-3. **Pre-funded USDC float decouples customer experience.** Mutav maintains a treasury float on the destination chain; agency operations settle against the float instantly (post-Pix-confirmation but pre-quarantine-clear), while the BRL is in quarantine. The float is replenished in batches once quarantine clears. Customer-visible latency = Pix latency (seconds), not quarantine latency (days). Full pattern in [`reliability.md`](reliability.md) § Pre-funded float.
-4. **Slippage caps on every Trade call.** BRZ liquidity is thinner than USDC; spread shocks during volatile periods are real. Each Trade call carries an acceptable-slippage parameter; rejected trades alert and roll back to the previous step.
-5. **Destination address allowlist server-side.** Wrong-address crypto delivery has no recovery. The BaaS provider stores Mutav treasury addresses in a beneficiary allowlist; the destination is never accepted from a user-supplied field on the agency-payment path.
-6. **Correlation id is mandatory and end-to-end.** Mutav's `payments` row id → BaaS provider's external reference on the Pay-In call → carried through Trade → carried through Crypto-Out → matched against the indexer-observed onchain deposit event. This is what makes reconciliation possible.
-7. **Stablecoin choice.** If the destination chain treasury is USDC-denominated (matches Mutav SA accounting), the workflow does BRL → BRZ → USDC in one Trade call rather than holding BRZ. BRZ as a treasury asset is not a v1 architecture — convert immediately or hold native USDC depending on provider support.
-8. **Webhook reconciliation gap to verify per provider.** Specifically for Transfero BaaSiC: it's not publicly documented whether crypto-delivery (onchain tx hash) fires a separate webhook with the same correlation id, or whether Mutav must poll. **Confirm in sandbox before signing.** For any candidate provider, the integration spec must answer this.
+1. **One Convex workflow per settlement.** Per [`reliability.md`](reliability.md) § Workflow durability — exactly-once mutations, at-least-once external calls with retry, journal-based recovery. Partial failure (Pix-in confirmed but mint or swap fails) is recoverable, not a silent inconsistency.
+2. **Quarantine before treasury credit.** The BRL Pix-in lands in a `quarantine` state per [`reliability.md`](reliability.md) § Quarantine windows. Mutav does **not** issue agency credit (or fire downstream operations) until the quarantine window elapses — Pix MED 2.0 (mandatory 2026) allows up to 80-day fraud reversal with multi-hop tracking. The quarantine applies regardless of which rail delivered the BRL.
+3. **Pre-funded TESOURO float decouples customer experience.** Mutav maintains a TESOURO float on Stellar; agency operations settle against the float instantly (post-Pix-confirmation but pre-quarantine-clear), while the BRL is in quarantine. The float is replenished in batches once quarantine clears. Full pattern in [`reliability.md`](reliability.md) § Pre-funded float — float denomination is TESOURO, matching the treasury asset.
+4. **Destination address allowlist server-side.** Wrong-address crypto delivery has no recovery. The provider stores Mutav treasury addresses in a beneficiary allowlist; the destination is never user-supplied.
+5. **Correlation id is mandatory and end-to-end.** Mutav's `payments` row id → settlement provider's external reference → carried through every subsequent step → matched against the indexer-observed onchain mint. The reconciliation primitive depends on this.
+6. **Webhook reconciliation gap to verify per provider.** For each shortlisted vendor, confirm in sandbox whether crypto-delivery / mint events fire webhooks with the correlation id, or whether Mutav must poll.
 
-**Vendor selection criteria** live in [`regulatory.md`](regulatory.md) § Settlement provider selection (Transfero BaaSiC, Bitso Business, Foxbit Prime Desk shortlisted; Etherfuse worth a conversation about extending the existing investor relationship to system-driven B2B).
+**Commitments specific to the BaaS rail:**
 
-**Why this is distinct from anchor flows (Etherfuse SEP-24).** Anchors are designed for _user-initiated, interactive_ on-ramp UX (hosted UI, KYC step, single transaction). BaaS providers are designed for _system-initiated, programmatic_ B2B settlement (REST API, recurring volume, customer-facing latency decoupled via float). Same regulatory regime (BCB-authorized Payment Institution), same end-state (BRL in, crypto out), entirely different integration shape.
+- **Slippage caps on Trade calls.** USDC liquidity at BaaS providers is good but spread shocks during volatile periods are real; each Trade call carries an acceptable-slippage parameter; rejected trades alert and roll back.
+- **USDC as the intermediate**, not BRZ. BRZ-as-intermediate adds a peg-stability concern Mutav doesn't need. BaaS providers that only offer BRZ as intermediate are lower-priority candidates.
+- **TESOURO conversion is the final step** — once USDC lands at the Mutav Stellar address, a Convex workflow step calls Etherfuse to swap USDC → TESOURO. The treasury never holds USDC for material duration.
+
+**Vendor shortlist** lives in [`regulatory.md`](regulatory.md) § Settlement provider selection.
+
+**Why Etherfuse-primary, BaaS-as-hedge.** TESOURO as treasury collapses the rationale for an intermediate stablecoin step. Etherfuse already owns the BRL ↔ TESOURO primitive; routing through a BaaS provider adds an FX spread, a vendor hop, and reconciliation surface for the same end state. The BaaS rail exists for resilience (capacity, concentration, incident hedge), not efficiency — match it to that purpose. Concentration on Etherfuse is the trade-off Mutav accepts in exchange for operational simplicity.
+
+**Why this is distinct from purely investor flows.** Investor on-ramp is user-initiated (SEP-24 hosted UI, KYC step, single transaction). Agency settlement is system-initiated (SEP-6 programmatic, recurring monthly volume, decoupled customer experience via float). Same anchor counterparty for v1, two distinct integration shapes.
 
 ## Reconciliation
 

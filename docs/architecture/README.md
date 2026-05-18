@@ -89,33 +89,36 @@ The protocol crosses several trust boundaries. Each is a place where wrong assum
                         │                                              │
                         └─────┬──────────┬────────────┬──────────────────┘
                               │          │            │
-                              │ HTTPS/SEP│ REST + WH  │ Per-chain RPC
-                              │          │            │ (read via indexer module)
+                              │ SEP-6/24 │ REST + WH  │ Per-chain RPC
+                              │          │ (hedge)    │ (read via indexer module)
                               ▼          ▼            ▼
-                  ┌─────────────┐  ┌────────────┐  ┌──────────────────────────┐
-                  │   Anchor    │  │   BaaS     │  │  Onchain (per-chain)     │
-                  │ (Etherfuse) │  │ settlement │  │  Custody contract +      │
-                  │  BRL ↔ token│  │ (Transfero │  │  Operations contract     │
-                  │  investor   │  │  / Bitso / │  │  (Segregated Account)    │
-                  │  on-ramp    │  │  Foxbit)   │  └────────────┬─────────────┘
-                  └─────────────┘  │  agency    │               │
-                                   │  → Mutav   │               │ Mutav-built
-                                   │  B2B       │               │ proposal queue
-                                   └────────────┘               │ + Lobstr Vault
-                                                                │ signers (multisig)
-                                                                ▼
-                                                       ┌────────────────────┐
-                                                       │  Mutav SA          │
-                                                       │  treasury ops      │
-                                                       └────────────────────┘
+                  ┌───────────────────┐  ┌──────────────┐  ┌──────────────────────────┐
+                  │   Etherfuse       │  │  BaaS hedge  │  │  Onchain (per-chain)     │
+                  │   PRIMARY rail    │  │  (Transfero  │  │  Custody contract +      │
+                  │   BRL ↔ TESOURO   │  │   / Bitso /  │  │  Operations contract     │
+                  │   • investor      │  │   Foxbit)    │  │  (Segregated Account)    │
+                  │     on-ramp       │  │              │  │  Treasury asset:         │
+                  │   • agency        │  │ capacity +   │  │  TESOURO (Etherfuse-     │
+                  │     settlement    │  │ concentration│  │  issued BRL T-bonds)     │
+                  │   • TESOURO       │  │ hedge for    │  └────────────┬─────────────┘
+                  │     issuer        │  │ agency       │               │
+                  └───────────────────┘  │ settlement   │               │ Mutav-built
+                                         └──────────────┘               │ proposal queue
+                                                                        │ + Lobstr Vault
+                                                                        │ signers (multisig)
+                                                                        ▼
+                                                               ┌────────────────────┐
+                                                               │  Mutav SA          │
+                                                               │  treasury ops      │
+                                                               └────────────────────┘
 ```
 
 Boundaries (in order of blast radius):
 
 1. **Auth0 ↔ Convex** — identity boundary. Convex trusts the JWT subject; Auth0 owns user provisioning. See [`../auth.md`](../auth.md).
 2. **Wallet ↔ Convex (per chain)** — investor-only. Convex treats `(chain, address)` as the user's stable identifier. Convex does not verify wallet signatures for read; it does require wallet-signed transactions for writes (which go to chain, not Convex). One profile per (chain, wallet) — no cross-chain unification.
-3. **Convex ↔ Anchor (Etherfuse)** — investor on-ramp counterparty. Etherfuse holds the BRL float for investor deposits and runs its own KYB on agencies. Mutav and the anchor exchange data via SEP-1/6/10/12/24. Webhooks signature-verified + idempotent per [`reliability.md`](reliability.md) § Idempotency. See [`../stellar-anchors.md`](../stellar-anchors.md).
-4. **Convex ↔ BaaS settlement (Transfero / Bitso / Foxbit)** — **agency → Mutav** B2B counterparty. Distinct from boundary 3 — different flow shape (system-driven REST orchestration vs user-driven hosted UI), different volume profile, different reversal risk (MED 2.0 quarantine window). Provider must hold BCB IP + VASP authorization. See [`onchain-integration.md`](onchain-integration.md) § Agency settlement and [`regulatory.md`](regulatory.md) § Settlement provider selection.
+3. **Convex ↔ Etherfuse (primary settlement rail)** — high-concentration counterparty. Etherfuse fills four roles: investor on-ramp (SEP-24), agency settlement primary (SEP-6 BRL Pix → TESOURO direct), **TESOURO issuer** (Mutav's treasury asset), and TESOURO redemption counterparty. Webhooks signature-verified + idempotent per [`reliability.md`](reliability.md) § Idempotency. Concentration risk explicitly acknowledged and mitigated by the BaaS hedge layer (boundary 4) and Bitso BRL1 as fallback investor on-ramp. See [`../stellar-anchors.md`](../stellar-anchors.md) and [`regulatory.md`](regulatory.md) § Etherfuse concentration.
+4. **Convex ↔ BaaS hedge (Transfero / Bitso / Foxbit)** — **capacity, concentration, and incident hedge** for the agency-settlement primary rail. Multi-hop flow (Pix → BaaS → USDC → Stellar → Etherfuse mint TESOURO) adds spread; that's the cost of the hedge. Provider must hold BCB IP + VASP authorization. See [`onchain-integration.md`](onchain-integration.md) § Agency settlement (hedge rail) and [`regulatory.md`](regulatory.md) § Settlement provider selection.
 5. **Convex ↔ Onchain (per-chain)** — chain boundary. **Read** is one-way (per-chain indexer modules pull chain state into Convex tables; see [`onchain-integration.md`](onchain-integration.md) § Per-chain indexer modules). **Write** is never initiated by Convex with key material — investor wallets sign client-side, admin writes are coordinated through a Mutav-built proposal queue in `(admin)` and signed on individual ops staff Lobstr Vaults; Convex composes XDR and submits once threshold is met but holds no keys. Segregated-account contract topology enforces separation between custody and operations (see [`onchain-integration.md`](onchain-integration.md) § Contract topology and [`regulatory.md`](regulatory.md) § Stellar implementation pattern).
 6. **Anchor ↔ Onchain reconciliation** — periodic reconciliation between Etherfuse-reported BRL float, BaaS provider-reported settlement, and onchain fund supply per [`reliability.md`](reliability.md) § Reconciliation. Mismatch trips the regulatory-pause primitive (see [`compliance.md`](compliance.md)).
 7. **`publicId` ↔ Tenant access** — bearer token boundary. The tenant pays via a URL containing an unguessable id. The id is not rotated today; revocation is "cancel the contract".

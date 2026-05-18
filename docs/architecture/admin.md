@@ -161,28 +161,29 @@ A3 **does** own the **proposal queue UI** inside the `(admin)` shell — Mutav's
 
 Mutav charges agencies for guarantees (per-contract activation fee + ongoing percentage). The money flow: tenant pays agency invoice → agency pays Mutav SA → Mutav SA covers liquidations. The existing `payments` domain handles tenant → agency invoices (the Pix portal under `(public)/pagar/[publicId]`). A4 adds the **Mutav-side** layer: agency → Mutav settlement plus the Mutav-internal view of agency invoice state.
 
-This is **architecturally distinct from the investor on-ramp** (Etherfuse, user-driven SEP-24). Agency → Mutav settlement is system-driven, monthly recurring, B2B — see [`onchain-integration.md`](onchain-integration.md) § Agency settlement (BaaS providers) for the integration pattern.
+**Treasury denomination: TESOURO.** Mutav SA holds Etherfuse's tokenized Brazilian Treasury bonds as the treasury asset — BRL-denominated, yield-bearing. Agency settlement lands in TESOURO via the primary Etherfuse rail (BRL Pix → TESOURO direct); the BaaS rail (Transfero / Bitso / Foxbit) exists as capacity/concentration hedge per [`onchain-integration.md`](onchain-integration.md) § Agency settlement.
 
 **A4 will own:**
 
-- The agency-settlement orchestration workflow per [`onchain-integration.md`](onchain-integration.md) — Pix-In → Trade → Crypto-Out, with quarantine state before treasury credit
-- The Mutav treasury float on the destination chain (pre-funded USDC, per [`reliability.md`](reliability.md) § Pre-funded float) — admin UI for float monitoring + replenishment workflow
-- The BaaS provider abstraction (`convex/settlement/providers/{transfero,bitso,foxbit}.ts`) parallel to the KYC and anchor abstractions
+- The agency-settlement orchestration workflow per [`onchain-integration.md`](onchain-integration.md) — Etherfuse primary path (single-step BRL Pix → TESOURO mint) and BaaS hedge path (three-call orchestration), both with quarantine state before treasury credit
+- The Mutav TESOURO treasury float on Stellar (per [`reliability.md`](reliability.md) § Pre-funded float — float denomination is TESOURO) — admin UI for float monitoring + replenishment workflow
+- The settlement provider abstraction (`convex/settlement/providers/{etherfuse,transfero,bitso,foxbit}.ts`) parallel to the KYC and anchor abstractions; Etherfuse is the primary, others are hedges
 - Mutav-admin view over the `payments` domain at the platform level (all agencies, all flows, settlement state per invoice)
-- Reconciliation primitives applied to this flow — `correlationId` from agency Pix → BaaS event → onchain mint, end-to-end
+- Reconciliation primitives applied to this flow — `correlationId` from agency Pix → settlement event → onchain mint, end-to-end
 - The MED 2.0 reversal handler: when an MED reversal arrives, cancel the quarantined event (no-op onchain); if quarantine had already cleared (treasury already credited), trigger an offsetting treasury operation rather than a silent rollback
 
 **A4 does not own:**
 
-- The BaaS provider's internal Pix infrastructure (delegated to provider, e.g., Transfero's IP license)
+- The settlement provider's internal Pix infrastructure (delegated to provider — Etherfuse for primary, BCB-licensed BaaS for hedge)
 - The destination chain's treasury account itself (lives in [`onchain-integration.md`](onchain-integration.md) § Contract topology)
-- Specific vendor selection — see [`regulatory.md`](regulatory.md) § Settlement provider selection criteria for the shortlist (Transfero BaaSiC, Bitso Business, Foxbit Prime Desk; Etherfuse worth conversation about extending the existing relationship)
+- Specific vendor selection — see [`regulatory.md`](regulatory.md) § Settlement provider selection criteria for the shortlist (Etherfuse primary; Transfero BaaSiC, Bitso Business, Foxbit Prime Desk as hedge candidates)
 
 **Architectural sensitivity to land before A4 ships:**
 
 - **Float sizing** is operational policy (set by treasury based on observed reversal rate × 3 buffer per [`reliability.md`](reliability.md))
 - **Quarantine window length** is policy (TBD per credit type; Pix shorter than the full 80 days if treasury appetite allows)
-- **Regulatory cliff Oct 30, 2026** — BCB-supervised entities cannot transact with unauthorized VASPs after this date. Any BaaS provider Mutav uses must clear **both** the new IP authorization (May 2026 window) and VASP authorization before then. Document the chosen provider's status before integration ships.
+- **Regulatory cliff Oct 30, 2026** — BCB-supervised entities cannot transact with unauthorized VASPs after this date. Any settlement provider Mutav uses must clear the relevant BCB authorizations (IP authorization under Resolutions 494–497, May 2026 window; VASP authorization under Resolutions 519–521). Etherfuse's current status applies to the primary rail; each BaaS hedge candidate's status applies to the hedge path. Document each provider's status before integration ships.
+- **Etherfuse concentration risk.** Etherfuse is now Mutav's investor on-ramp + agency settlement primary + treasury asset issuer — three roles, one counterparty. A4's hedge-rail abstraction is the architectural mitigation; ensure at least one BaaS hedge integration is operational before any volume of agency capital flows through the system, even if Etherfuse-primary handles steady-state.
 
 ### A5 — Fund-side onchain observability (sketch)
 
@@ -192,7 +193,9 @@ The indexer is the architecturally significant piece. It is documented in [`onch
 
 ### A6 — NAV updates (sketch)
 
-NAV (Net Asset Value) updates are the most safety-critical admin operation in the protocol. Wrong NAV directly causes wrong mint and redeem amounts — the failure class that most-prosecuted DeFi protocols (Mango Markets, Curve LP exploit, …) have been compromised on. A6 is the architectural surface for safely operating NAV updates.
+NAV (Net Asset Value) updates are the most safety-critical admin operation in the protocol. Wrong NAV directly causes wrong mint and redeem amounts — historically the most-prosecuted DeFi failure class (Mango Markets, Curve LP exploit, …). A6 is the architectural surface for safely operating NAV updates.
+
+**Mutav's NAV inputs simplify because treasury holds TESOURO:** per [`reliability.md`](reliability.md) § NAV safety, both NAV inputs — rental-guarantee fee income and treasury yield (TESOURO accrual) — are exogenous, well-defined, not market-quoted. The Mango / Curve oracle-manipulation failure class is architecturally inapplicable to Mutav. What remains is the discipline of _computing_ NAV correctly from those inputs and recording inputs in the audit log so external auditors can reproduce.
 
 - **Authority:** Only `mutavStaff` with sub-role `treasury` (or `admin`) can propose NAV updates. Onchain commit requires multisig consensus per [`onchain-integration.md`](onchain-integration.md) and [`regulatory.md`](regulatory.md).
 - **Inputs are captured:** active layer value, liquidity layer value, outstanding shares — recorded in the audit log on every proposal so external auditors can reproduce the computation at any historical point.
@@ -204,6 +207,14 @@ NAV (Net Asset Value) updates are the most safety-critical admin operation in th
 - **Failure path:** the regulatory-pause primitive (per [`compliance.md`](compliance.md)) is the kill switch — single-actor invocation, multisig lift.
 
 > 📌 **Pending input from Draau (treasury policy owner):** epoch length (daily? per-block? on-demand?), per-epoch change-cap percentage (initial X), pause-on-deviation tolerance percentage, and the policy for off-NAV operations during a paused state (refund queued mints? cancel queued redeems? hold?). These are policy decisions, not architecture decisions — the architecture supports any value Draau commits to. Once defined, the values live in the compliance runbook (referenced from this section) rather than inline here.
+
+> 📌 **Pending input from Draau (treasury policy owner) — deposit pricing approach.** With TESOURO as the BRL-denominated treasury asset and investor deposits arriving in USDC/USDT (per the whitepaper), three approaches are architecturally supportable:
+>
+> 1. **Single BRL-denominated NAV** — Mutav converts USDC/USDT to BRL/TESOURO at spot rate on deposit; investor holdings track BRL NAV; investor takes BRL FX risk vs USD. Simplest; matches Brazilian retail expectations.
+> 2. **Dual share class (BRL + USD)** — separate MUTAV share classes; USD-denominated class is FX-hedged by Mutav. Better global UX; requires an FX hedging counterparty and more moving parts.
+> 3. **USD-denominated NAV with TESOURO underlying** — NAV computed by FX-converting TESOURO yields to USD daily; investor sees USD-stable NAV; FX volatility shows up as NAV variance. Hides FX from investor accounting but introduces daily FX oracle risk on the NAV print.
+>
+> Architecture supports any of the three. Choice is policy.
 
 A6 will own:
 
