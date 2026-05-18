@@ -1,5 +1,5 @@
-export type RentMultiplier = "24x" | "36x" | "48x";
-export type ExitCostMultiplier = "3x" | "5x" | "7x";
+import type { ExitCostMultiplier, RentMultiplier } from "@/lib/pricing/tiers";
+
 export type ScoreTier = "bom" | "regular" | "ruim" | "negado";
 
 export type WizardData = {
@@ -76,32 +76,6 @@ export const INITIAL_WIZARD_DATA: WizardData = {
   rentMultiplier: null,
   exitCostMultiplier: null,
 };
-
-const COVERAGE_MULT: Record<RentMultiplier, number> = { "24x": 1.0, "36x": 1.05, "48x": 1.1 };
-const EXIT_MULT: Record<ExitCostMultiplier, number> = { "3x": 1.0, "5x": 1.02, "7x": 1.05 };
-const RENT_MULT_VALUE: Record<RentMultiplier, number> = { "24x": 24, "36x": 36, "48x": 48 };
-
-export function calcFeePreview({
-  rentCents,
-  score,
-  rentMultiplier,
-  exitCostMultiplier,
-}: {
-  rentCents: number;
-  score: number;
-  rentMultiplier: RentMultiplier;
-  exitCostMultiplier: ExitCostMultiplier;
-}) {
-  const feeRate = score >= 800 ? 0.075 : score >= 600 ? 0.1 : 0.125;
-  const feeCents = Math.round(
-    rentCents * feeRate * COVERAGE_MULT[rentMultiplier] * EXIT_MULT[exitCostMultiplier],
-  );
-  return {
-    feeCents,
-    oneTimeActivationFeeCents: 15_000,
-    availableGuaranteeCents: rentCents * RENT_MULT_VALUE[rentMultiplier],
-  };
-}
 
 export function lookupTenantScore(document: string): { score: number; tier: ScoreTier } {
   const digits = document.replace(/\D/g, "");

@@ -11,14 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import {
-  calcFeePreview,
-  formatBRLCentsDisplay,
-  parseBRLInput,
-  type WizardData,
-  type RentMultiplier,
-  type ExitCostMultiplier,
-} from "@/lib/contracts/wizard";
+import { formatBRLCentsDisplay, parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
+import { splitCommission } from "@/lib/pricing/commission";
+import { priceContract } from "@/lib/pricing/contract";
+import { EXIT_COST_MULTIPLIERS, RENT_MULTIPLIERS } from "@/lib/pricing/tiers";
 
 type Props = {
   data: WizardData;
@@ -52,9 +48,6 @@ function getMissingFields(data: WizardData): MissingFields {
   return missing;
 }
 
-const RENT_MULTIPLIERS: RentMultiplier[] = ["24x", "36x", "48x"];
-const EXIT_MULTIPLIERS: ExitCostMultiplier[] = ["3x", "5x", "7x"];
-
 export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Props) {
   const t = useTranslations("contractNew");
   const createContract = useMutation(api.contracts.useCases.create);
@@ -65,13 +58,16 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
 
   const preview =
     data.rentCents > 0 && data.rentMultiplier && data.exitCostMultiplier && data.score !== null
-      ? calcFeePreview({
+      ? priceContract({
           rentCents: data.rentCents,
+          condoCents: data.condoCents,
+          otherFeesCents: data.otherFeesCents,
           score: data.score,
           rentMultiplier: data.rentMultiplier,
           exitCostMultiplier: data.exitCostMultiplier,
         })
       : null;
+  const commission = preview ? splitCommission(preview.feeCents) : null;
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
 
@@ -466,7 +462,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             </EditField>
             <EditField label={t("coverage.exitCostLabel")}>
               <div className="flex gap-2">
-                {EXIT_MULTIPLIERS.map((v) => (
+                {EXIT_COST_MULTIPLIERS.map((v) => (
                   <button
                     key={v}
                     type="button"
@@ -518,11 +514,11 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         )}
       </Block>
 
-      {preview && (
+      {commission && (
         <div className="bg-surface-2 flex items-center justify-between px-4 py-3">
           <span className="text-muted-foreground text-base">{t("coverage.summary.guarantee")}</span>
           <span className="font-mono text-base font-semibold">
-            {formatBRLCentsDisplay(Math.round(preview.feeCents * 1.015))}
+            {formatBRLCentsDisplay(commission.totalCents)}
           </span>
         </div>
       )}
