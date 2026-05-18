@@ -1105,7 +1105,7 @@
       "stateUnderReview": "Under review by Mutav team",
       "backLabel": "Have questions?",
       "backLink": "Contact us",
-      "homeButton": "Back to start"
+      "homeButton": "Back"
     },
     "rejected": {
       "title": "Application not approved",
@@ -1114,7 +1114,7 @@
       "noReason": "No reason provided.",
       "contactLabel": "Have questions or want to appeal?",
       "contactLink": "Contact us",
-      "homeButton": "Back to start"
+      "homeButton": "Back"
     }
   }
 }

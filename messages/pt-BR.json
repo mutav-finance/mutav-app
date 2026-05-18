@@ -1105,7 +1105,7 @@
       "stateUnderReview": "Em análise pela equipe Mutav",
       "backLabel": "Tem dúvidas?",
       "backLink": "Fale conosco",
-      "homeButton": "Voltar ao início"
+      "homeButton": "Voltar"
     },
     "rejected": {
       "title": "Cadastro não aprovado",
@@ -1114,7 +1114,7 @@
       "noReason": "Nenhum motivo informado.",
       "contactLabel": "Tem dúvidas ou deseja recorrer?",
       "contactLink": "Fale conosco",
-      "homeButton": "Voltar ao início"
+      "homeButton": "Voltar"
     }
   }
 }
