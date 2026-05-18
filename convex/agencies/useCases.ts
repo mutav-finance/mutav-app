@@ -168,12 +168,18 @@ export const startOnboarding = mutation({
       return { success: false, error: { code: "CPF_REQUIRED" } } as const;
     }
 
+    // Unicidade: IN_PROGRESS não bloqueia — o cadastro só é considerado "ocupado"
+    // após submissão. Isso evita bloquear o usuário que reinicia o fluxo com o mesmo CPF/CNPJ.
     if (args.agencyType === AGENCY_TYPE.EMPRESA && cnpj) {
       const existing = await ctx.db
         .query("agencies")
         .withIndex("by_cnpj", (q) => q.eq("cnpj", cnpj))
         .first();
-      if (existing && existing.onboardingState !== ONBOARDING_STATE.REJECTED) {
+      if (
+        existing &&
+        existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS &&
+        existing.onboardingState !== ONBOARDING_STATE.REJECTED
+      ) {
         return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
       }
     }
@@ -183,7 +189,11 @@ export const startOnboarding = mutation({
         .query("agencies")
         .withIndex("by_cpf", (q) => q.eq("cpf", cpf))
         .first();
-      if (existing && existing.onboardingState !== ONBOARDING_STATE.REJECTED) {
+      if (
+        existing &&
+        existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS &&
+        existing.onboardingState !== ONBOARDING_STATE.REJECTED
+      ) {
         return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
       }
     }
@@ -334,6 +344,39 @@ export const submitOnboarding = mutation({
 
     if (!agency.bankingInfo) {
       return { success: false, error: { code: "BANKING_INFO_REQUIRED" } } as const;
+    }
+
+    // Garante unicidade de CPF/CNPJ no momento da submissão — é aqui que o cadastro
+    // se torna "ocupado". Dois usuários podem estar IN_PROGRESS com o mesmo documento,
+    // mas apenas o primeiro a submeter passa.
+    if (agency.agencyType === AGENCY_TYPE.AUTONOMO && agency.cpf) {
+      const existing = await ctx.db
+        .query("agencies")
+        .withIndex("by_cpf", (q) => q.eq("cpf", agency.cpf!))
+        .first();
+      if (
+        existing &&
+        existing._id !== agencyId &&
+        existing.onboardingState !== ONBOARDING_STATE.REJECTED &&
+        existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS
+      ) {
+        return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
+      }
+    }
+
+    if (agency.agencyType === AGENCY_TYPE.EMPRESA && agency.cnpj) {
+      const existing = await ctx.db
+        .query("agencies")
+        .withIndex("by_cnpj", (q) => q.eq("cnpj", agency.cnpj!))
+        .first();
+      if (
+        existing &&
+        existing._id !== agencyId &&
+        existing.onboardingState !== ONBOARDING_STATE.REJECTED &&
+        existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS
+      ) {
+        return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
+      }
     }
 
     if (agency.agencyType === AGENCY_TYPE.EMPRESA) {

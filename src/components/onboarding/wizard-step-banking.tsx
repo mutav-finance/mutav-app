@@ -96,7 +96,7 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
                 aria-pressed={data.bankAccountType === type}
                 onClick={() => onChange({ bankAccountType: type })}
                 className={cn(
-                  "border px-4 py-3 text-sm font-medium transition-colors",
+                  "border px-4 py-2 text-sm font-medium transition-colors",
                   data.bankAccountType === type
                     ? "border-accent bg-accent/5 text-accent"
                     : "border-border text-text-2 hover:border-text-3 hover:text-text",
@@ -129,15 +129,10 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
       </div>
 
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={isSubmitting}
-          className="text-text-2 hover:text-text font-mono text-sm disabled:opacity-50"
-        >
+        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           {t("backButton")}
-        </button>
-        <Button onClick={handleNext} disabled={isSubmitting}>
+        </Button>
+        <Button size="lg" onClick={handleNext} disabled={isSubmitting}>
           {isSubmitting ? t("savingButton") : t("nextButton")}
         </Button>
       </div>
@@ -161,7 +156,7 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
+    <div className={cn("flex flex-col gap-2", className)}>
       <Label htmlFor={id}>{label}</Label>
       {children}
       {hint && !error && <p className="text-text-3 text-xs">{hint}</p>}

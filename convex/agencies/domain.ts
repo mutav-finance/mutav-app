@@ -28,9 +28,7 @@ export const ONBOARDING_STATE = {
 } as const satisfies Record<Uppercase<OnboardingState>, OnboardingState>;
 
 export const AGENCY_DOCUMENT_KIND = {
-  CARTAO_CNPJ: "cartao_cnpj",
-  CONTRATO_SOCIAL: "contrato_social",
-  COMPROVANTE_ENDERECO: "comprovante_endereco",
+  DOCUMENTO_EMPRESA: "documento_empresa",
   RESPONSAVEL_ID: "responsavel_id",
 } as const satisfies Record<Uppercase<AgencyDocumentKind>, AgencyDocumentKind>;
 
@@ -60,9 +58,7 @@ export const agencyDocumentKindValidator = _agencyDocumentKindValidator;
 
 /** Documents required for `empresa` type. `autonomo` skips all uploads. */
 export const EMPRESA_REQUIRED_DOCS: AgencyDocumentKind[] = [
-  AGENCY_DOCUMENT_KIND.CARTAO_CNPJ,
-  AGENCY_DOCUMENT_KIND.CONTRATO_SOCIAL,
-  AGENCY_DOCUMENT_KIND.COMPROVANTE_ENDERECO,
+  AGENCY_DOCUMENT_KIND.DOCUMENTO_EMPRESA,
   AGENCY_DOCUMENT_KIND.RESPONSAVEL_ID,
 ];
 
