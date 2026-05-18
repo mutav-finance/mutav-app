@@ -99,29 +99,48 @@ Convex's involvement is bounded to: (a) pre-flight checks via wrappers (KYC, wee
 
 ### Admin writes (multisig-mediated)
 
+Stellar has no production Safe/Squads-equivalent in 2026 (see [`regulatory.md`](regulatory.md) § Stellar implementation pattern). Mutav fills the gap with a **proposal queue UI built inside the `(admin)` shell** that owns the coordination; individual signers sign on Lobstr Vault (mobile push, biometric) for proper key isolation.
+
 ```
-   Admin UI ── record attestation ──► Convex (delinquencies.attested, mutavAuditLog)
+   Admin UI ── attest proposal ──► Convex (treasury.proposals, mutavAuditLog)
+                  │                       │
+                  │                       │ stores composed XDR + collected sigs
+                  ▼                       │
+   Mutav proposal queue UI                │
+   (treasury/proposals route in admin) ◄──┘
                   │
-                  │ "open in multisig"
+                  │ "Sign on Lobstr" deep link per signer
                   ▼
-           External signing tool (Stellar Lab / dedicated multisig UI)
+   Lobstr Vault (per signer, mobile) ── attaches signature ──► Convex
                   │
-                  │ multisig signers sign
+                  │ threshold met
                   ▼
-              Soroban contract
-                  │
-                  │
-   indexer observes ── update delinquencies row to "executed"
+   Convex action submits XDR ───────────► Stellar classic G-account
+                                              │ (3-of-5 weighted native multisig)
+                                              │
+                                              ▼
+                                          Soroban contract (require_auth)
+                                              │
+   indexer observes ── advances workflow ◄────┘
 ```
 
-- Mutav-admin in the (admin) shell attests a liquidation request (or any other treasury-affecting action)
-- Convex records the attestation in the relevant domain (`delinquencies`, future `treasuryOps`, etc.) + audit log
-- The Convex write does **not** initiate the onchain transaction. It surfaces a "ready to sign" link to the external multisig tool.
-- Multisig signers (could be Mutav employees, board members, external custodians — defined offchain) sign through the multisig tool
-- Onchain execution happens when the signature threshold is met
-- The indexer observes the execution and flips the Convex-side state from `attested` to `executed`
+- Mutav-admin attests the proposal (liquidation per A3, NAV update per A6, signer-set change, contract upgrade) — `mutationWithMutavRole({ minRole: "treasury" })` writes to `treasury.proposals` and `mutavAuditLog`
+- The proposal queue UI surfaces pending proposals to authorized signers, with a "Sign on Lobstr" deep link per signer
+- Each signer signs on their personal **Lobstr Vault** — mobile push notification, biometric approval, no shared signing tool, no shared key material
+- Signatures accumulate on the Convex-side proposal row until the multisig threshold is met (weighted, per [`regulatory.md`](regulatory.md) § Stellar implementation pattern)
+- A Convex action submits the now-fully-signed XDR to Stellar
+- The classic G-account's weight-based multisig validates onchain
+- For Soroban operations (NAV updater, liquidation executor), the G-account is the contract's authorized admin — multisig auth propagates via standard `require_auth`
+- The indexer observes execution and advances the workflow's terminal step
 
-Convex's role is intent + bookkeeping. Custody is the multisig, owned by people outside the app deployment.
+**Why Mutav builds the queue rather than using a third-party tool:**
+
+- No production Safe/Squads-equivalent exists for Stellar (verified 2026; see [`regulatory.md`](regulatory.md))
+- Closest options (`multisigstellar/multisig` coordinator, StellarGuard co-signer-as-a-service) are not full proposal queues
+- Building the queue inside `(admin)` keeps the audit trail unified (every proposal + signature event is a `mutavAuditLog` entry)
+- Cost: ~1–2 weeks; the alternative ("we'll integrate when a tool ships") is open-ended
+
+**Convex's role is coordination + bookkeeping + submission. Custody is the signers' Lobstr Vaults, owned by humans, not the app deployment.** Convex never holds key material; it composes and submits, but each signature is generated on a signer's device.
 
 ### Why Convex never signs
 
@@ -194,7 +213,53 @@ Every external system that pushes events into Convex (anchor webhooks, KYC vendo
 4. **Secret rotation is documented.** Webhook secrets are stored via the env-var pattern (`convex/lib/env.ts` lazy getters per [CLAUDE.md § "Environment variables"](../../CLAUDE.md)), with documented rotation procedures.
 5. **Per-provider HTTP action.** Each external integration has its own action endpoint, never a shared catch-all. Vendor-specific signature schemes and error semantics stay isolated.
 
-For Mutav today, the integrations that need this hardening: **Etherfuse webhooks** (Pix deposit confirmations, KYB status changes), **KYC vendor callbacks** (when one is selected — see [`compliance.md`](compliance.md)), **Stellar event ingestion** (when polling is replaced with event subscription per § Read architecture). The pattern is the same; only the per-provider verification routine differs.
+For Mutav today, the integrations that need this hardening: **Etherfuse webhooks** (Pix deposit confirmations, KYB status changes), **agency-settlement BaaS webhooks** (Pix-in / Trade / Crypto-out events from Transfero / Bitso / Foxbit — see below), **KYC vendor callbacks** (Sumsub events per [`compliance.md`](compliance.md) and [`regulatory.md`](regulatory.md)), **Stellar event ingestion** (when polling is replaced with event subscription per § Read architecture). The pattern is the same; only the per-provider verification routine differs.
+
+### Agency settlement (BaaS providers)
+
+**Distinct architectural pattern from the investor on-ramp.** Etherfuse handles investor BRL → MUTAV mint (user-driven, SEP-24 interactive flow). Agency settlement is **system-driven, B2B, monthly recurring**: agencies Pix into a Mutav-controlled virtual account; the BaaS provider converts BRL to a stablecoin (BRZ or USDC) and delivers to a Mutav treasury address on the destination chain. Two related but distinct flows.
+
+The BaaS provider typically exposes a **three-call orchestration** rather than a single-step "Pix lands → USDC delivered" rail:
+
+```
+                            ┌────────────────────────────────┐
+                            │     BaaS provider              │
+                            │   (Transfero / Bitso /         │
+                            │    Foxbit Prime / …)           │
+                            └────────────────────────────────┘
+                                  ▲           │
+       ① Pay-In (Pix QR)          │           │ ④ webhook (event id + correlationId)
+       virtual account            │           │
+                                  │           ▼
+   Agency ────► Pix ──────────────┘     Convex (workflow step)
+                                              │
+                                              │ ② Trade (BRL → BRZ/USDC, quote-then-execute)
+                                              ▼
+                                        BaaS Trade endpoint
+                                              │
+                                              │ ③ Crypto-Out (deliver to Mutav treasury address)
+                                              ▼
+                                        Destination chain (Stellar v1; per-chain expansion)
+                                              │
+                                              │ ⑤ indexer observes deposit
+                                              ▼
+                                        treasury balance updated
+```
+
+**Architectural commitments:**
+
+1. **One Convex workflow per settlement.** The 3-step orchestration is a `@convex-dev/workflow` per [`reliability.md`](reliability.md) § Workflow durability — exactly-once mutations, at-least-once trade calls with retry, journal-based recovery. Partial failure (Pix-in confirmed but Trade fails) is recoverable, not a silent inconsistency.
+2. **Quarantine before treasury credit.** The BRL Pix-in lands in a `quarantine` state per [`reliability.md`](reliability.md) § Quarantine windows — Mutav does **not** issue agency credit (or fire downstream operations) until the quarantine window elapses, because Pix MED 2.0 (mandatory 2026) allows up to 80-day fraud reversal with multi-hop tracking.
+3. **Pre-funded USDC float decouples customer experience.** Mutav maintains a treasury float on the destination chain; agency operations settle against the float instantly (post-Pix-confirmation but pre-quarantine-clear), while the BRL is in quarantine. The float is replenished in batches once quarantine clears. Customer-visible latency = Pix latency (seconds), not quarantine latency (days). Full pattern in [`reliability.md`](reliability.md) § Pre-funded float.
+4. **Slippage caps on every Trade call.** BRZ liquidity is thinner than USDC; spread shocks during volatile periods are real. Each Trade call carries an acceptable-slippage parameter; rejected trades alert and roll back to the previous step.
+5. **Destination address allowlist server-side.** Wrong-address crypto delivery has no recovery. The BaaS provider stores Mutav treasury addresses in a beneficiary allowlist; the destination is never accepted from a user-supplied field on the agency-payment path.
+6. **Correlation id is mandatory and end-to-end.** Mutav's `payments` row id → BaaS provider's external reference on the Pay-In call → carried through Trade → carried through Crypto-Out → matched against the indexer-observed onchain deposit event. This is what makes reconciliation possible.
+7. **Stablecoin choice.** If the destination chain treasury is USDC-denominated (matches Mutav SA accounting), the workflow does BRL → BRZ → USDC in one Trade call rather than holding BRZ. BRZ as a treasury asset is not a v1 architecture — convert immediately or hold native USDC depending on provider support.
+8. **Webhook reconciliation gap to verify per provider.** Specifically for Transfero BaaSiC: it's not publicly documented whether crypto-delivery (onchain tx hash) fires a separate webhook with the same correlation id, or whether Mutav must poll. **Confirm in sandbox before signing.** For any candidate provider, the integration spec must answer this.
+
+**Vendor selection criteria** live in [`regulatory.md`](regulatory.md) § Settlement provider selection (Transfero BaaSiC, Bitso Business, Foxbit Prime Desk shortlisted; Etherfuse worth a conversation about extending the existing investor relationship to system-driven B2B).
+
+**Why this is distinct from anchor flows (Etherfuse SEP-24).** Anchors are designed for _user-initiated, interactive_ on-ramp UX (hosted UI, KYC step, single transaction). BaaS providers are designed for _system-initiated, programmatic_ B2B settlement (REST API, recurring volume, customer-facing latency decoupled via float). Same regulatory regime (BCB-authorized Payment Institution), same end-state (BRL in, crypto out), entirely different integration shape.
 
 ## Reconciliation
 
@@ -266,7 +331,7 @@ The win: investor portal work and admin observability work can proceed in parall
 
 - Specific Soroban contract interfaces (lives in `mutav-stellar`)
 - Specific Convex table schemas (lives in domain-design at implementation time)
-- Choice of multisig tool (Stellar Lab vs custom vs other — operational; see [`regulatory.md`](regulatory.md) for governance constraints)
+- UI implementation details of the Mutav-built proposal queue (architectural commitment is the queue exists in `(admin)`; specific UI specs belong to A3/A6 implementation work — see [`admin.md`](admin.md))
 - RPC provider selection (Stellar's public RPC vs self-hosted vs third-party)
 - Indexer alerting and on-call procedures (operational, separate from architecture)
 - Cost model for RPC usage at scale (operational, revisit when scale forces the question)

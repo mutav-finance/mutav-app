@@ -74,20 +74,79 @@ BCB 519/2025 plus LGPD requirements narrow the vendor field. Architectural requi
 - **Documented LGPD-compliant data handling** — see § LGPD above
 - **COAF reporting integration** — Brazil's FIU receives suspicious activity reports; the KYC vendor should support this or the architecture must
 - **API stability + SLA** — KYC vendor downtime blocks redeem; the architecture supports a fallback (see § KYC vendor abstraction below)
-- **BR data residency option**
+- **BR data residency option** (or documented ANPD-approved SCC mechanism)
 
-Candidate vendors (verified against 2026 market): **Unico** (dominant biometric, market-leading liveness), **Caf** (fintech-friendly, customizable risk rules), **Datavalid** (SERPRO; source-of-truth for CPF/CNPJ — typically used alongside a biometric provider), **Didit** (newer, COAF-compliant, lighter integration). Common pattern: biometric vendor + Datavalid (or equivalent), not one vendor for both.
+### Recommended vendor: Sumsub (scoped B2B)
+
+**For Mutav's qualified-investor + institutional scope, the recommendation is Sumsub** ([sumsub.com](https://sumsub.com)). The product fits — global compliance pedigree, real reusable-KYC across products, iBeta PAD Level 2 liveness, strong API + webhook reliability, mature COAF SAR generation. The pricing tier (Compliance: $1.85/verification + $299/mo minimum) is rounding error at hundreds-of-verifications-per-month institutional volume.
+
+**Three commitments to confirm with Sumsub sales before signing the DPA:**
+
+1. **LGPD DPA with ANPD-approved SCCs** — Sumsub holds ISO 27001/27017/27018 + SOC 2 Type II, but does not publicly advertise ANPD registration or a BR-resident data option. ANPD's mandatory SCC framework (effective 2025-08-23) requires explicit confirmation that Sumsub's DPA uses ANPD-approved SCCs, not just EU SCCs. Push for EU data residency at minimum, ask about a BR region.
+2. **COAF SISCOAF export format** — Sumsub generates "ready-to-file" SAR/STR reports, but native SISCOAF-format export is not in the public docs. Confirm format before assuming filing can be automated; if not, Mutav's compliance team files manually from Sumsub's output.
+3. **CNPJ + SERPRO/Datavalid coverage** — Sumsub's public BR docs detail CPF verification (the `bra_gov_cpf` E_KYC check), but CNPJ direct verification and SERPRO/Datavalid integration are not advertised the way they are for BR-native vendors (Didit, Unico, Caf). Confirm CNPJ source-of-truth coverage for the institutional onboarding flow.
+
+**Scope boundary.** Sumsub's pricing breaks at retail-at-scale (>10k verifications/month). If Mutav ever expands to a retail consumer surface, re-evaluate against **Didit** ($0.30/verification, 500 free/mo, explicit SERPRO + Datavalid, COAF-formatted output) or a BR-native (Unico, Caf, Idwall). The KYC vendor abstraction below makes that swap viable.
+
+**Sanctions/PEP screening** comes in-house with Sumsub's Compliance tier (global watchlists + adverse media + ongoing monitoring). No separate Refinitiv World-Check or Dow Jones contract needed for v1.
 
 ### KYC vendor abstraction
 
 To avoid hard-coupling the architecture to a single vendor:
 
-- The `kyc` Convex domain exposes a stable interface (`startVerification`, `getStatus`, `getRef`, `revoke`) that the rest of the system calls
-- Vendor-specific clients live in `convex/kyc/providers/{unico,caf,didit}.ts` and implement the interface
+- The `compliance` Convex domain (per [`compliance.md`](compliance.md)) exposes a stable interface (`startVerification`, `getStatus`, `getRef`, `revoke`) that the rest of the system calls
+- Vendor-specific clients live in `convex/compliance/providers/{sumsub,didit,unico}.ts` and implement the interface
 - Vendor selection is a configuration choice, not a code change
-- Multiple vendors can be active simultaneously (failover, or different vendors for different investor classes)
+- Multiple vendors can be active simultaneously (Sumsub for L4/L5 institutional; a BR-native for L1/L2 if Mutav adds retail surface)
 
 This matches the pattern already in place for anchors (`src/lib/anchors/registry.ts` + per-provider clients).
+
+## Settlement provider selection (agency → Mutav)
+
+Distinct from KYC vendor selection above and from anchor selection (Etherfuse for investor on-ramp). The settlement provider handles **agency → Mutav** monthly B2B flows: agencies pay Mutav fees in BRL via Pix; the provider converts to stablecoin and delivers to a Mutav treasury address on the destination chain. Pattern documented in [`onchain-integration.md`](onchain-integration.md) § Agency settlement (BaaS providers).
+
+### Required architectural properties
+
+- **BCB Payment Institution authorization** (existing IP license per Resolution 4.282/2013, OR will hold under the new IP regime per Resolutions 494/495/496/497 with May 2026 authorization window). Unauthorized providers cannot legally handle BRL float for Mutav after the October 30, 2026 cliff.
+- **VASP authorization under BCB Resolutions 519/520/521** (Nov 2025). Mutav cannot transact with non-authorized VASPs after the cliff; the transition window is 270 days from Feb 2026.
+- **API + webhook reliability** — REST API for the three-call orchestration (Pay-In, Trade, Crypto-Out); webhooks for each lifecycle event with correlation ids preserved end-to-end. The correlation id is mandatory; without it, reconciliation per [`reliability.md`](reliability.md) § Reconciliation is not possible.
+- **Destination chain coverage** — Stellar v1, generalizable to additional chains as Mutav expands. Native USDC delivery preferred; BRZ-as-intermediate acceptable if BRZ → USDC Trade is reliable.
+- **Travel Rule compliance** (mandatory domestic per Resolution 520). Provider collects originator/beneficiary data on transfers.
+- **MED 2.0 readiness** — provider notifies promptly on MED reversals via webhook; Mutav's quarantine pattern depends on it.
+
+### Shortlist (Brazilian B2B Pix-to-crypto, 2026)
+
+| Provider                  | Status                                                                                | Notes                                                                                                                                                                                                                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Transfero BaaSiC**      | BCB Payment Institution (Sept 2023). VASP re-application pending under new framework. | Issues BRZ (multichain stablecoin incl. Stellar). 13M+ tx in 2023. Three-call orchestration (Pay-In → Trade → Crypto-Out). Stellar-native USDC in one hop is **not publicly documented** — confirm in sandbox. Pricing opaque (gated by sales). Customers include Bitget, BRX Finance, Stakease, Kona Finance. |
+| **Bitso Business**        | Mexico-HQ, established BR operations.                                                 | Single-API BRL → USDC with "just-in-time" settlement. Processed $6.5B in US-MX remittances 2024 (mature reconciliation story). Strongest direct competitor to Transfero for this use case. Webhook + correlation-id story likely cleaner than Transfero's.                                                     |
+| **Foxbit Prime Desk**     | BR-native, member of BRL1 consortium.                                                 | "Invisible stablecoin" B2B FX product. REST OTC API. Quote-driven pricing. Good fit if volume is large enough to negotiate.                                                                                                                                                                                    |
+| **Etherfuse (extension)** | Currently Mutav's user-facing on-ramp.                                                | SEP-24 is interactive/user-driven by spec; SEP-6 could in principle drive system-initiated deposits. Not their primary B2B pitch, but extending the existing relationship to system-driven B2B is worth a conversation before adopting a second vendor.                                                        |
+
+**Out of consideration:**
+
+- **Stripe + EBANX Pix** — fiat acquiring only; stablecoin balances are US-issued, not delivered onchain to arbitrary addresses. Wrong tool.
+- **Mercado Bitcoin OTC** — quote-driven OTC, not a productized B2B settlement rail with webhooks.
+- **BRL1 consortium** — the stablecoin itself, not a settlement product; rails are the member exchanges (Bitso, Foxbit).
+
+### Settlement provider abstraction
+
+Same pattern as KYC and anchor abstractions:
+
+- `convex/settlement/providers/{transfero,bitso,foxbit,etherfuse}.ts` implement a stable interface (`createPayIn`, `getQuote`, `executeTrade`, `deliverCrypto`, `getStatus`, `handleReversal`)
+- Vendor selection is a configuration choice per agency, per fund, or per settlement type
+- Multiple vendors can coexist (Bitso for high-volume agencies, Transfero for those already integrated elsewhere)
+
+### Critical due-diligence checklist before signing any provider
+
+1. **Authorization status under both Nov 2025 VASP framework and May 2026 IP framework** — confirm provider is on track for both. Mutav cannot transact post-cliff (Oct 30, 2026) with non-authorized providers.
+2. **Webhook event catalog including crypto-out / on-chain delivery events** — confirm correlation id propagates end-to-end. If only Pay-In gets a webhook and crypto-delivery requires polling, that's a reconciliation tax.
+3. **MED reversal notification SLA** — how fast does the provider notify; what's the format. Mutav's quarantine clock depends on this signal.
+4. **Travel Rule data handling** — confirm provider collects and stores; confirm what Mutav receives and must store independently.
+5. **LGPD DPA with ANPD SCCs** — same expectation as KYC vendor selection above.
+6. **Pricing model** — spread on Trade, per-tx fees, monthly minimums. Volume projections inform shortlist ranking.
+7. **Stablecoin delivery options** — native USDC on Stellar (one-hop preferred); BRZ → USDC routing if not.
+8. **Slippage controls on Trade endpoint** — confirm a max-slippage parameter exists and rejected trades roll back cleanly.
 
 ## Audit trail expectations
 
@@ -106,9 +165,29 @@ The 5-year CVM retention requirement for investor records is met by the audit lo
 Treasury operations (NAV updates, liquidations, contract upgrades, signer set changes) require multisig consensus per [`onchain-integration.md`](onchain-integration.md) § Write architecture. The architectural constraints from a regulatory perspective:
 
 1. **Signer set is documented externally.** Who can sign treasury operations is a legal/governance question, not an app configuration. The set is maintained in legal documentation (Mutav SA operating agreement); the onchain signer addresses are derived from that documentation. Changes to the signer set are themselves multisig operations that produce audit entries.
-2. **No single signer can move funds.** The threshold is set such that a compromise of one signer cannot drain the fund. Standard: 3-of-5 or 2-of-3 with geographic / role diversity in the signer set.
+2. **No single signer can move funds.** The threshold is set such that a compromise of one signer cannot drain the fund. Standard: 3-of-5 weighted with geographic / role diversity in the signer set.
 3. **Key ceremony is documented.** Initial signer key generation, rotation procedures, recovery procedures are operational artifacts but the architecture must support them — every signer change is an admin operation producing audit entries.
-4. **Multisig tool UX gap on Stellar.** Stellar's native multisig (weight-based m-of-n via signer weights + operation thresholds) is powerful but lacks a Safe / Squads-equivalent ops UI. Mutav will likely need to build the proposal-queue UX in the `(admin)` shell, since third-party Stellar multisig UIs are immature. This is documented in [`admin.md`](admin.md) A3/A4 future-pillar sketches.
+
+### Stellar implementation pattern (hybrid leaning native-first)
+
+Stellar's native multisig (classic G-account with weight-based m-of-n: signer weights 1–255, three operation thresholds Low/Med/High, up to 20 signers) is **the production primitive in 2026** and what major protocols (Aquarius Signers Guild, Blend, FxDAO) actually run for treasury. Soroban smart accounts (CAP-46-5 custom-account interface) and the OpenZeppelin Stellar Smart Accounts crate are the new modern primitive — production-ready, audited via the SDF×OpenZeppelin partnership through Dec 2026 — but they coexist with native multisig rather than replace it.
+
+**Recommendation for Mutav treasury:**
+
+- **Treasury account: classic G-account with native multisig** (3-of-5 weighted, per § Multisig governance above). Battle-tested, every Stellar wallet understands it, audit trail at the protocol level, zero contract risk. Soroban contracts (NAV updater, liquidation executor) accept this G-account as the admin/owner — multisig auth on classic accounts propagates into Soroban via standard `require_auth`. No custom smart-account contract needed for treasury ops.
+- **Signer wallet: Lobstr Vault** for each ops staff member. Mobile-first, push notifications per pending transaction, biometric approval. The closest thing to a Squads/Safe signer experience on Stellar. Add Freighter as a desktop backup signer for each role.
+- **Proposal/queue UI: built inside Mutav's `(admin)` shell** (~1–2 weeks of work). A `treasury/proposals` route that constructs the XDR, persists pending transactions in Convex with collected signatures, exposes a "Sign on Lobstr" deep link per signer, and submits the transaction once threshold is met. This is the Safe-equivalent that doesn't yet exist on Stellar. Details in [`admin.md`](admin.md) § A3/A6.
+
+**Defer Soroban smart accounts (OpenZeppelin / kalepail's `smart-account-kit`) to v2** — they're the right primitive for **investor-facing** passkey onboarding (where Meridian Pay has shipped 1k+ users), but for treasury the surface area of an unaudited custom-account contract isn't worth the UX gain over native multisig + Lobstr.
+
+**Not recommended for treasury:**
+
+- `kalepail/passkey-kit` (now legacy/demo, unaudited)
+- StellarGuard (co-signer-as-a-service, not a multi-party proposal queue)
+- `multisigstellar/multisig` (lightweight coordinator, not a full queue — useful as reference for the Mutav-built UI)
+- SEP-30 (RecoverySigner is for user account recovery, not treasury control plane — different problem)
+
+**2026 changes worth re-checking before build:** Protocol 26 (CAP-77 Quorum Freeze, CAP-82 256-bit math), OpenZeppelin Stellar Smart Accounts audit completion timeline, Lobstr full Soroban transaction parsing release.
 
 ## Architectural decisions that follow from this doc
 

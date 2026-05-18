@@ -46,6 +46,43 @@ Pix deposit                       payments row created              (no event ye
 
 Reconciliation is the **highest-leverage reliability investment** for an anchor-backed protocol. Build it before you need it.
 
+## Quarantine windows (reversible offchain credit events)
+
+Pix is irrevocable for normal settlement, but **MED 2.0 (Mecanismo Especial de Devolução)** — mandatory in Brazil from **February 2026, penalties from May 2026** — allows up to **80 days** of fraud-driven reversal with multi-hop tracking across intermediate accounts. R$6.5B was reversed in 2025. Onchain settlement is **not** reversible; if Mutav mints crypto against a Pix that later gets MED-reversed, the protocol absorbs the loss.
+
+This is not unique to Brazil. The same primitive applies anywhere offchain credit events can be reversed by the upstream system: SEPA SDD reversibility (8-week claim window in EU), ACH return codes (60 days in US), credit-card chargebacks (60–180 days depending on scheme).
+
+### The pattern
+
+Offchain credit events flow through three states before triggering onchain settlement:
+
+```
+Pix received          Quarantine window           Settled
+(BaaS webhook)        (no onchain action)         (mint / treasury credit)
+     │                                                  ▲
+     │                     N days                       │
+     └────────────── delay ──────────────────────────────┘
+
+   ┌── if MED reversal arrives during window ──► canceled, no onchain action
+   └── if window elapses without reversal ────► proceed to settle
+```
+
+### Architectural commitments
+
+- **Every reversible credit event sits in a `quarantine` state** before becoming a settled event. The quarantine duration is policy (TBD per credit type — Pix shorter than the full 80 days if treasury appetite allows; SEPA SDD ~8 weeks; etc.).
+- **Quarantined events still produce audit log entries** but do not trigger downstream actions (mint, treasury credit, agency-balance update).
+- **Reversal handlers cancel quarantined events idempotently.** When the BaaS provider notifies of an MED, the matching event flips to `canceled`; if the event already settled (quarantine elapsed), the cancel handler triggers an offsetting treasury operation rather than a silent rollback — chain state is preserved, the loss is accounted for explicitly.
+- **The reconciliation primitive accounts for quarantined events separately.** "Pix balance" splits into `pending_quarantine`, `settled`, and `reversed` buckets, each reconciled against the relevant rail.
+- **Pre-funded treasury float as the customer-facing decoupler.** Mutav maintains a USDC float on the destination chain large enough to settle agency operations against immediately, while the corresponding BRL Pix sits in quarantine. The float is replenished in batches once quarantine clears. The customer sees instant settlement; Mutav holds the chargeback risk against the float's accumulated reserve. This is the production pattern (Bitso, Wise, Circle Settlements all do variants of it).
+
+### Pre-funded float — sizing rules of thumb
+
+- **Cap per operation < float / N** where N is the number of operations expected within the quarantine window. Prevents float exhaustion from a single bad day.
+- **Reserve ratio matches observed reversal rate × 3** as a buffer (a 0.5% historical reversal rate suggests holding ~1.5% of float liquid for chargebacks).
+- **Alert thresholds at 50% / 80% / 95% of float depletion**, plus pre-defined replenishment workflow per Convex `@convex-dev/workflow`.
+
+Float sizing is operational policy, not architecture. The architectural commitment is the float exists as a concept and the quarantine state is enforced before the float is debited.
+
 ## Idempotency
 
 Required everywhere a webhook, scheduled action, or workflow step might re-execute. Convex doesn't ship an idempotency-key component; the pattern uses unique indexes.
@@ -184,11 +221,13 @@ NAV is updated by a designated `treasury` role on `mutavStaff`, through the Muta
 
 ### Safeguards
 
-- **Per-epoch change cap.** NAV cannot move more than X% per update (initial X to be determined by treasury policy; documented in admin runbook). Larger changes require explicit override + additional signers.
+- **Per-epoch change cap.** NAV cannot move more than X% per update. Larger changes require explicit override + additional signers.
 - **Monotonicity invariants where they apply.** The active layer's yield accrual is one-way (rent fees only add). Anomalous decreases trip pause.
 - **Pause-on-deviation circuit breaker.** If the indexer observes an onchain NAV that differs from the most-recent Convex-recorded proposal by more than tolerance, mint and redeem pause. Humans investigate.
 - **Audit log captures inputs.** Not just the resulting NAV — the proposal carries active layer, liquidity layer, outstanding shares, so the computation is reproducible by external auditors at any point in history.
 - **No automated NAV updates.** No cron writes NAV. Human-triggered with multisig consensus, always.
+
+> 📌 **Pending input from Draau (treasury policy owner):** epoch length (daily? per-block? on-demand?), per-epoch change-cap percentage (X), pause-on-deviation tolerance percentage, off-NAV operations policy during a paused state. Policy decisions, not architecture decisions — the architecture enforces whatever Draau commits to. Values live in the compliance runbook once defined. Same pin in [`admin.md`](admin.md) § A6.
 
 ## What this doc is not
 

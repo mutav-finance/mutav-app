@@ -153,13 +153,36 @@ A3 owns:
 A3 does **not** own:
 
 - The actual onchain liquidation function (lives in the Soroban contract, `mutav-stellar` repo)
-- The multisig signing tool (external — likely Stellar Lab or a dedicated multisig UI for v1; see [`regulatory.md`](regulatory.md) for governance constraints on the signer set)
+- The signing wallets themselves (each ops staff member signs in their personal Lobstr Vault — push-notification-based, biometric approval; see [`regulatory.md`](regulatory.md) § Stellar implementation pattern)
 
-### A4 — Fund payments management (sketch)
+A3 **does** own the **proposal queue UI** inside the `(admin)` shell — Mutav's Safe-equivalent. Stellar has no production-ready Safe/Squads-equivalent in 2026 (per [`regulatory.md`](regulatory.md)), so Mutav builds the queue: `treasury/proposals` route that constructs the XDR for the attested liquidation, persists pending transactions with collected signatures, exposes "Sign on Lobstr" deep links per signer, and submits to Stellar once the multisig threshold is met. The indexer observes execution and advances the workflow's terminal step. The queue is ~1–2 weeks of work and is shared by A6 (NAV updates) below.
 
-Mutav charges agencies for guarantees (per-contract activation fee + ongoing percentage). That money flows: tenant pays agency invoice → agency pays Mutav SA → Mutav SA covers liquidations. Today the `payments` domain handles tenant → agency invoices end-to-end (Pix or Stellar). A4 adds the Mutav-side observability layer: invoice settlement across all agencies, treasury reconciliation between agency-paid Pix (Etherfuse) and the Mutav SA onchain balance.
+### A4 — Fund payments management
 
-A4 will own no new domain — it's a Mutav-admin view over the existing `payments` domain plus a new reconciliation layer that joins offchain settlement (Etherfuse) with onchain treasury (Stellar account). Architecturally it sits at the intersection of `payments`, `anchors`, and `fundState`. Detail when A4 enters scope.
+Mutav charges agencies for guarantees (per-contract activation fee + ongoing percentage). The money flow: tenant pays agency invoice → agency pays Mutav SA → Mutav SA covers liquidations. The existing `payments` domain handles tenant → agency invoices (the Pix portal under `(public)/pagar/[publicId]`). A4 adds the **Mutav-side** layer: agency → Mutav settlement plus the Mutav-internal view of agency invoice state.
+
+This is **architecturally distinct from the investor on-ramp** (Etherfuse, user-driven SEP-24). Agency → Mutav settlement is system-driven, monthly recurring, B2B — see [`onchain-integration.md`](onchain-integration.md) § Agency settlement (BaaS providers) for the integration pattern.
+
+**A4 will own:**
+
+- The agency-settlement orchestration workflow per [`onchain-integration.md`](onchain-integration.md) — Pix-In → Trade → Crypto-Out, with quarantine state before treasury credit
+- The Mutav treasury float on the destination chain (pre-funded USDC, per [`reliability.md`](reliability.md) § Pre-funded float) — admin UI for float monitoring + replenishment workflow
+- The BaaS provider abstraction (`convex/settlement/providers/{transfero,bitso,foxbit}.ts`) parallel to the KYC and anchor abstractions
+- Mutav-admin view over the `payments` domain at the platform level (all agencies, all flows, settlement state per invoice)
+- Reconciliation primitives applied to this flow — `correlationId` from agency Pix → BaaS event → onchain mint, end-to-end
+- The MED 2.0 reversal handler: when an MED reversal arrives, cancel the quarantined event (no-op onchain); if quarantine had already cleared (treasury already credited), trigger an offsetting treasury operation rather than a silent rollback
+
+**A4 does not own:**
+
+- The BaaS provider's internal Pix infrastructure (delegated to provider, e.g., Transfero's IP license)
+- The destination chain's treasury account itself (lives in [`onchain-integration.md`](onchain-integration.md) § Contract topology)
+- Specific vendor selection — see [`regulatory.md`](regulatory.md) § Settlement provider selection criteria for the shortlist (Transfero BaaSiC, Bitso Business, Foxbit Prime Desk; Etherfuse worth conversation about extending the existing relationship)
+
+**Architectural sensitivity to land before A4 ships:**
+
+- **Float sizing** is operational policy (set by treasury based on observed reversal rate × 3 buffer per [`reliability.md`](reliability.md))
+- **Quarantine window length** is policy (TBD per credit type; Pix shorter than the full 80 days if treasury appetite allows)
+- **Regulatory cliff Oct 30, 2026** — BCB-supervised entities cannot transact with unauthorized VASPs after this date. Any BaaS provider Mutav uses must clear **both** the new IP authorization (May 2026 window) and VASP authorization before then. Document the chosen provider's status before integration ships.
 
 ### A5 — Fund-side onchain observability (sketch)
 
@@ -180,12 +203,15 @@ NAV (Net Asset Value) updates are the most safety-critical admin operation in th
   - No automated NAV updates — human-triggered with multisig consensus, always
 - **Failure path:** the regulatory-pause primitive (per [`compliance.md`](compliance.md)) is the kill switch — single-actor invocation, multisig lift.
 
+> 📌 **Pending input from Draau (treasury policy owner):** epoch length (daily? per-block? on-demand?), per-epoch change-cap percentage (initial X), pause-on-deviation tolerance percentage, and the policy for off-NAV operations during a paused state (refund queued mints? cancel queued redeems? hold?). These are policy decisions, not architecture decisions — the architecture supports any value Draau commits to. Once defined, the values live in the compliance runbook (referenced from this section) rather than inline here.
+
 A6 will own:
 
 - `nav` domain (or extension of `fundState`) — NAV proposals, inputs, current value per fund per chain
 - Read: `fundState` (current onchain NAV via indexer)
 - Write: `nav.proposals`, `mutavAuditLog`
 - Gates: compliance domain (`treasury` sub-role required; regulatory pause respected)
+- Multisig surface: shares the **proposal queue UI** with A3 — same `treasury/proposals` route, different proposal type. The queue is the cross-pillar Safe-equivalent built into the `(admin)` shell.
 
 This is the highest-stakes admin pillar; design it before any volume of investor capital is in production.
 

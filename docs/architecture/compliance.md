@@ -165,7 +165,41 @@ If limits live in code, every limit change is a deploy + audit + announcement cy
 - **Per-fund caps** — applies regardless of account (the fund itself has a redemption cap per the whitepaper)
 - **Velocity caps** — N operations per time window (separate from value caps)
 
-Concrete amounts are operational decisions and live in the compliance runbook, not this doc. Architecture commits to the rule shape and the resolution semantics.
+### Example default rules (for the official policy doc)
+
+Architecture commits to the rule shape and resolution semantics. The example default rule set below is **for the official compliance policy document, not for code**. Values are starting points constrained by Brazilian regulation; the compliance team adjusts in production through the `(admin)` shell.
+
+The 2.5% weekly redemption cap and 0.25% redemption fee are protocol-level invariants set by the whitepaper, not compliance rules — they live on the fund contract itself and are not adjustable per account.
+
+| Scope                       | Operation                         | Window       | Cap                               | Regulatory anchor                                                                                                |
+| --------------------------- | --------------------------------- | ------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| L0 (Connected)              | Deposit                           | —            | **0** (refused)                   | BCB 519/2025 — no anonymous transactions                                                                         |
+| L0 (Connected)              | Redeem                            | —            | **0** (refused)                   | BCB 519/2025                                                                                                     |
+| L1 (Identified)             | Deposit                           | per-month    | example: **R$ 5,000**             | Aligned with BCB low-friction onboarding bracket (revisit when the regulator publishes specific VASP thresholds) |
+| L1 (Identified)             | Deposit                           | per-lifetime | example: **R$ 30,000**            | Caps total exposure pre-full-KYC                                                                                 |
+| L1 (Identified)             | Redeem                            | —            | **0** (refused)                   | BCB 519/2025 — full KYC required before BRL outflow                                                              |
+| L2 (Verified)               | Deposit                           | per-month    | example: **R$ 100,000**           | Retail PF default                                                                                                |
+| L2 (Verified)               | Redeem                            | per-month    | example: **R$ 100,000**           | Mirrors deposit; subject to fund-level weekly cap                                                                |
+| L2 (Verified)               | Deposit                           | per-day      | example: **R$ 25,000**            | Velocity smoothing                                                                                               |
+| L3 (Enhanced)               | Deposit                           | per-month    | example: **R$ 1,000,000**         | Source-of-funds verified                                                                                         |
+| L3 (Enhanced)               | Redeem                            | per-month    | example: **R$ 1,000,000**         | Mirrors deposit                                                                                                  |
+| L3 (Enhanced)               | Transfer to other verified wallet | per-day      | example: **R$ 250,000**           | Optional capability                                                                                              |
+| L4 (Qualified)              | Deposit / Redeem                  | per-month    | example: **R$ 10,000,000**        | CVM 175 qualified investor minimum (R$ 1M+ net financial assets) justifies higher cap                            |
+| L4 (Qualified)              | Access to restricted products     | —            | **enabled**                       | CVM 175 Art. 4                                                                                                   |
+| L5 (Institutional)          | All operations                    | —            | **Custom per contract**           | Negotiated per institutional onboarding                                                                          |
+| Risk = High                 | Deposit                           | per-day      | example: **50% of class default** | Velocity reduction for elevated risk                                                                             |
+| Risk = High                 | Operations above R$ 50,000        | per-event    | **Requires manual review**        | Adds friction without removing capability                                                                        |
+| Risk = Blocked              | Any state-changing operation      | —            | **0** (refused)                   | Read-only access preserved                                                                                       |
+| Regulatory pause (any axis) | Operations in scope               | —            | **0** (refused)                   | Highest-precedence rule; lifted only by multisig                                                                 |
+
+Notes:
+
+- **Currency.** Caps are in BRL for BR retail and stablecoin-equivalent (USDC/USDT at the latest fund-mint quote) for crypto-native investors. The compliance domain resolves the equivalency at evaluation time.
+- **Multi-rule resolution.** When an investor is L2 + Risk=High, the most specific rule applies. L2 default cap is R$ 100k/month; Risk=High cap is 50% of class default = R$ 50k/month. Lowest cap wins.
+- **Per-CPF aggregation.** The per-chain-account model means an L2 investor with both a Stellar wallet and a Solana wallet (when Solana ships) has separate per-account caps per chain. Per-CPF aggregation across chains is anticipated by [`regulatory.md`](regulatory.md) but not v1 architecture — until it lands, each chain's account has independent caps.
+- **Effective dates.** Promotional periods (e.g., relaxed L1 cap for first 30 days) and regulatory holds (e.g., emergency cap during reconciliation pause) use the `effective from / to` fields rather than rule edits.
+
+These values are **examples for the official policy document**; the compliance team confirms them with legal/regulatory counsel before production. The architecture supports any value combination.
 
 ## Capability matrix
 
