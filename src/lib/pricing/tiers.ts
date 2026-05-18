@@ -1,3 +1,5 @@
+import { SCORE_TIER, type ScoreTier } from "../../../convex/contracts/domain";
+
 export type RentMultiplier = "24x" | "36x" | "48x";
 export type ExitCostMultiplier = "3x" | "5x" | "7x";
 
@@ -13,12 +15,20 @@ export const SCORE_TIER_RATE = {
 export const SCORE_TIER_THRESHOLD = {
   high: 800,
   medium: 600,
+  low: 400,
 } as const;
 
 export function rateForScore(score: number): number {
   if (score >= SCORE_TIER_THRESHOLD.high) return SCORE_TIER_RATE.high;
   if (score >= SCORE_TIER_THRESHOLD.medium) return SCORE_TIER_RATE.medium;
   return SCORE_TIER_RATE.low;
+}
+
+export function tierForScore(score: number): ScoreTier {
+  if (score >= SCORE_TIER_THRESHOLD.high) return SCORE_TIER.BOM;
+  if (score >= SCORE_TIER_THRESHOLD.medium) return SCORE_TIER.REGULAR;
+  if (score >= SCORE_TIER_THRESHOLD.low) return SCORE_TIER.RUIM;
+  return SCORE_TIER.NEGADO;
 }
 
 export const COVERAGE_MULT: Record<RentMultiplier, number> = {

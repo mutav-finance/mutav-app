@@ -92,7 +92,9 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   );
 
   React.useEffect(() => {
-    applyScore(scoreResult);
+    // Guard against the transient `undefined` between keystrokes (args change
+    // → useQuery re-fires) — without this, score/tier flicker to null and back.
+    if (scoreResult !== undefined) applyScore(scoreResult);
   }, [scoreResult]);
 
   React.useEffect(() => {
