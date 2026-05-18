@@ -74,10 +74,6 @@ type ContractListItem = {
 
 type StatusTab = "all" | ContractStatus | "expiring";
 
-function isStatusTab(value: string): value is StatusTab {
-  return STATUS_TABS.some((tab) => tab === value);
-}
-
 const STATUS_TABS: readonly StatusTab[] = [
   "all",
   "expiring",
@@ -86,6 +82,10 @@ const STATUS_TABS: readonly StatusTab[] = [
   "encerrado",
   "cancelado",
 ];
+
+function isStatusTab(value: string): value is StatusTab {
+  return STATUS_TABS.some((tab) => tab === value);
+}
 
 const statusTone: Record<ContractStatus, "accent" | "success" | "error" | "neutral"> = {
   ativo: "success",

@@ -95,7 +95,7 @@ export default async function CheckoutStellarPage({
       <PaymentSummaryHeader preloaded={preloadedPayment} />
       <PaymentAddressView preloaded={preloadedPayment}>
         <PaymentAddressPanel
-          muxedAddress={payment.muxedAddress}
+          muxedAddress={muxedAddress}
           brlDisplay={formatBRLCents(payment.totalCents)}
           options={options}
         />
