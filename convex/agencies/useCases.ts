@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalQuery, query, mutation } from "../_generated/server";
-import { queryWithAgencyScope, queryWithAuth } from "../lib/auth";
+import { queryWithAuth } from "../lib/auth";
 import {
   AGENCY_TYPE,
   MEMBER_ROLE,
@@ -15,24 +15,12 @@ import {
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
 
-/**
- * Fetch one agency by id. The wrapper asserts the caller is a member of the
- * requested agency before the handler runs — non-members get
- * `ForbiddenError` rather than the agency doc.
- */
-export const getById = queryWithAgencyScope({
-  args: {},
-  handler: async (ctx) => {
-    return ctx.db.get(ctx.agencyId);
-  },
-});
-
-/**
- * Internal companion to `getById` for use from actions/schedulers where
- * caller identity may not propagate. The calling internal flow is
- * responsible for whatever authorization is appropriate at its entry point.
- */
-export const getByIdInternal = internalQuery({
+// Internal — returns the complete agency record (includes CPF, CNPJ, banking).
+// Only callable from other Convex functions; never exposed directly to clients.
+// Collapses the prior queryWithAgencyScope + getByIdInternal pair: the only
+// caller (anchors/actions.ts:onboardAgencyEtherfuseKyb) is itself internalAction,
+// so narrowing to a single internalQuery removes the redundant public surface.
+export const getById = internalQuery({
   args: { agencyId: v.id("agencies") },
   handler: async (ctx, { agencyId }) => {
     return ctx.db.get(agencyId);
@@ -68,9 +56,10 @@ export const listAgenciesForUser = queryWithAuth({
 
 /**
  * Returns all members of an agency, each enriched with their user info and role.
- * TODO(auth): add queryWithAgencyScope wrapper — currently any caller can enumerate members.
+ * Internal — expõe PII dos usuários (nome, email). Só acessível via funções Convex.
+ * TODO(auth): criar versão pública com queryWithAgencyScope para o dashboard.
  */
-export const listMembersForAgency = query({
+export const listMembersForAgency = internalQuery({
   args: { agencyId: v.id("agencies") },
   handler: async (ctx, args) => {
     const memberships = await ctx.db
@@ -90,8 +79,8 @@ export const listMembersForAgency = query({
   },
 });
 
-/** Returns a single membership for a user↔agency pair. */
-export const getMembership = query({
+/** Returns a single membership for a user↔agency pair. Internal — use via funções autorizadas. */
+export const getMembership = internalQuery({
   args: { userId: v.id("users"), agencyId: v.id("agencies") },
   handler: async (ctx, args) => {
     return ctx.db
@@ -115,10 +104,10 @@ export const listDocumentsForAgency = query({
 
 /**
  * Returns the in-progress onboarding agency for a user, if any.
- * Used by the wizard to restore a partially-filled session.
- * TODO(auth): replace userId arg with requireIdentity(ctx).
+ * Internal — retorna dados financeiros completos (CPF, CNPJ, bankingInfo).
+ * TODO(auth): tornar pública com requireIdentity(ctx) na migração Auth0.
  */
-export const getOnboardingInProgress = query({
+export const getOnboardingInProgress = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
     const memberships = await ctx.db
@@ -141,9 +130,9 @@ export const getOnboardingInProgress = query({
 
 /**
  * Returns the current onboarding state of an agency.
- * TODO(auth): require identity + verify ownership.
+ * Internal — use via funções autorizadas. TODO(auth): expor com ownership check.
  */
-export const getOnboardingStatus = query({
+export const getOnboardingStatus = internalQuery({
   args: { agencyId: v.id("agencies") },
   handler: async (ctx, { agencyId }) => {
     const agency = await ctx.db.get(agencyId);
