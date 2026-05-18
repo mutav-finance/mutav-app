@@ -5,14 +5,13 @@ import { useQuery } from "convex/react";
 import { AlertTriangleIcon, CalendarIcon, FileTextIcon, ShieldAlertIcon } from "lucide-react";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import { useWorkspace } from "@/providers/workspace";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 
 export function SectionCards() {
   const t = useTranslations("metrics");
   const { selectedAgency } = useWorkspace();
-  const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
+  const agencyId = selectedAgency?._id;
 
   const summary = useQuery(
     api.contracts.useCases.getPipelineSummary,

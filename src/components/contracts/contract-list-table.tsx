@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import { useWorkspace } from "@/providers/workspace";
 import { Link } from "@/i18n/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +73,10 @@ type ContractListItem = {
 };
 
 type StatusTab = "all" | ContractStatus | "expiring";
+
+function isStatusTab(value: string): value is StatusTab {
+  return STATUS_TABS.some((tab) => tab === value);
+}
 
 const STATUS_TABS: readonly StatusTab[] = [
   "all",
@@ -166,22 +169,20 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
   const tStatus = useTranslations("contractDetails.status");
 
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
-  const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
+  const agencyId = selectedAgency?._id;
 
   const result = useQuery(
     api.contracts.useCases.listByAgency,
     agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
   );
 
-  const data = React.useMemo(
+  const data = React.useMemo<ContractListItem[]>(
     () =>
       (result?.page ?? []).map((c) => ({
         ...c,
-        urgency: getUrgencyTier(c.status as ContractStatus, c.nextRenewalDate),
-        urgencySortKey: urgencySortKey(
-          getUrgencyTier(c.status as ContractStatus, c.nextRenewalDate),
-        ),
-      })) as ContractListItem[],
+        urgency: getUrgencyTier(c.status, c.nextRenewalDate),
+        urgencySortKey: urgencySortKey(getUrgencyTier(c.status, c.nextRenewalDate)),
+      })),
     [result],
   );
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
@@ -283,7 +284,9 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
   return (
     <Tabs
       value={statusTab}
-      onValueChange={(v) => setStatusTab(v as StatusTab)}
+      onValueChange={(v) => {
+        if (isStatusTab(v)) setStatusTab(v);
+      }}
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 lg:px-6">

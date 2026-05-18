@@ -11,6 +11,14 @@ import { FUNDS, RISK_COLOR, PROTOCOL_STATS } from "./fund-data";
 import type { FundId } from "./fund-data";
 import type { OutputToken } from "./use-redeem-widget";
 
+function isFundId(value: string): value is FundId {
+  return FUNDS.some((f) => f.id === value);
+}
+
+function isOutputToken(value: string): value is OutputToken {
+  return value === "XLM" || value === "USDC";
+}
+
 // Mock investor positions — replaced by real balances once wallet connects
 const MOCK_POSITIONS: Record<FundId, { balance: number; valueUsd: number }> = {
   MTVL: { balance: 482.3156, valueUsd: 497.59 },
@@ -105,7 +113,9 @@ export function RedeemPage({ initialFund }: { initialFund: string | undefined })
                 />
                 <Select
                   value={w.selectedFund}
-                  onValueChange={(v) => w.setSelectedFund(v as FundId)}
+                  onValueChange={(v) => {
+                    if (isFundId(v)) w.setSelectedFund(v);
+                  }}
                 >
                   <SelectTrigger className="border-border h-9 w-auto shrink-0">
                     <div className="flex items-center gap-2">
@@ -147,7 +157,9 @@ export function RedeemPage({ initialFund }: { initialFund: string | undefined })
                 </span>
                 <Select
                   value={w.outputToken}
-                  onValueChange={(v) => w.setOutputToken(v as OutputToken)}
+                  onValueChange={(v) => {
+                    if (isOutputToken(v)) w.setOutputToken(v);
+                  }}
                 >
                   <SelectTrigger className="border-border h-9 w-auto shrink-0">
                     <span className="text-text font-mono text-sm">{w.outputToken}</span>

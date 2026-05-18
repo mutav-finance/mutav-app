@@ -23,7 +23,12 @@ const TRANSPARENCY_STATS = [
   { label: "Default Rate", value: "3.8%" },
 ] as const;
 
-type Period = "7D" | "30D" | "90D" | "1Y";
+const PERIODS = ["7D", "30D", "90D", "1Y"] as const;
+type Period = (typeof PERIODS)[number];
+
+function isPeriod(value: string): value is Period {
+  return PERIODS.some((p) => p === value);
+}
 
 const AUM_DATA: Record<Period, { label: string; aum: number }[]> = {
   "7D": [
@@ -138,11 +143,13 @@ function AumChart() {
         <ToggleGroup
           type="single"
           value={period}
-          onValueChange={(v) => v && setPeriod(v as Period)}
+          onValueChange={(v) => {
+            if (isPeriod(v)) setPeriod(v);
+          }}
           variant="outline"
           spacing={0}
         >
-          {(["7D", "30D", "90D", "1Y"] as Period[]).map((p) => (
+          {PERIODS.map((p) => (
             <ToggleGroupItem
               key={p}
               value={p}

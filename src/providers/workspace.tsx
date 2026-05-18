@@ -10,19 +10,20 @@
 
 import * as React from "react";
 import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 
 const DEV_USER_PUBLIC_ID = "dev-user";
 const STORAGE_KEY = "sgr:selectedAgencyId";
 
-export type WorkspaceAgency = {
-  _id: Id<"agencies">;
-  name: string;
-  cnpj: string;
-  createdAt: string;
-  role: "owner" | "admin" | "member";
-};
+/**
+ * Derived from the Convex return type so additions to the server-side projection
+ * flow through here automatically (no manual sync, no escape-hatch casts).
+ */
+export type WorkspaceAgency = NonNullable<
+  FunctionReturnType<typeof api.agencies.useCases.listAgenciesForUser>[number]
+>;
 
 export type WorkspaceUser = {
   name: string;
@@ -56,21 +57,28 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     devUser ? { userId: devUser._id } : "skip",
   );
 
-  const agencies = (agenciesRaw ?? []).filter(Boolean) as WorkspaceAgency[];
+  const agencies = (agenciesRaw ?? []).filter((a): a is WorkspaceAgency => a !== null);
 
-  // 3. Persist selected agency in localStorage.
-  const [storedId, setStoredId] = React.useState<Id<"agencies"> | null>(() => {
+  // 3. Persist selected agency in localStorage. Stored as a plain string and
+  //    validated against the known agency list before being treated as an Id.
+  const [storedRaw, setStoredRaw] = React.useState<string | null>(() => {
     if (typeof window === "undefined") return null;
-    return (localStorage.getItem(STORAGE_KEY) as Id<"agencies"> | null) ?? null;
+    return localStorage.getItem(STORAGE_KEY);
   });
 
   // 4. Derive the effective selected agency id — fall back to the first agency
   //    if the stored value is absent or no longer valid (e.g. after a re-seed).
+  //    Matching against agencies[*]._id narrows from string to Id<"agencies">
+  //    without a cast.
   const selectedAgencyId = React.useMemo<Id<"agencies"> | null>(() => {
-    if (agencies.length === 0) return null;
-    if (storedId && agencies.some((a) => a._id === storedId)) return storedId;
-    return agencies[0]!._id;
-  }, [storedId, agencies]);
+    const first = agencies[0];
+    if (!first) return null;
+    if (storedRaw) {
+      const match = agencies.find((a) => a._id === storedRaw);
+      if (match) return match._id;
+    }
+    return first._id;
+  }, [storedRaw, agencies]);
 
   // 5. Keep localStorage in sync whenever the effective selection changes.
   React.useEffect(() => {
@@ -81,7 +89,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedAgency = React.useCallback((id: Id<"agencies">) => {
     localStorage.setItem(STORAGE_KEY, id);
-    setStoredId(id);
+    setStoredRaw(id);
   }, []);
 
   const selectedAgency = agencies.find((a) => a._id === selectedAgencyId) ?? null;
