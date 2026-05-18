@@ -156,12 +156,15 @@ export const startOnboarding = mutation({
     creci: v.string(),
     cnpj: v.optional(v.string()),
     cpf: v.optional(v.string()),
+    representanteName: v.optional(v.string()),
+    representanteCpf: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Strip formatting before any check or write — CLAUDE.md convention: store digits-only.
     const cnpj = args.cnpj?.replace(/\D/g, "") || undefined;
     const cpf = args.cpf?.replace(/\D/g, "") || undefined;
     const phone = args.phone.replace(/\D/g, "");
+    const representanteCpf = args.representanteCpf?.replace(/\D/g, "") || undefined;
 
     if (args.agencyType === AGENCY_TYPE.EMPRESA && !cnpj) {
       return { success: false, error: { code: "CNPJ_REQUIRED" } } as const;
@@ -175,6 +178,16 @@ export const startOnboarding = mutation({
     }
     if (cnpj && !isValidCNPJ(cnpj)) {
       return { success: false, error: { code: "CNPJ_INVALID" } } as const;
+    }
+
+    if (args.agencyType === AGENCY_TYPE.EMPRESA && !args.representanteName?.trim()) {
+      return { success: false, error: { code: "REPRESENTANTE_NAME_REQUIRED" } } as const;
+    }
+    if (args.agencyType === AGENCY_TYPE.EMPRESA && !representanteCpf) {
+      return { success: false, error: { code: "REPRESENTANTE_CPF_REQUIRED" } } as const;
+    }
+    if (representanteCpf && !isValidCPF(representanteCpf)) {
+      return { success: false, error: { code: "REPRESENTANTE_CPF_INVALID" } } as const;
     }
 
     // Unicidade: IN_PROGRESS não bloqueia — o cadastro só é considerado "ocupado"
@@ -224,6 +237,8 @@ export const startOnboarding = mutation({
           cnpj,
           cpf,
           agencyType: args.agencyType,
+          representanteName: args.representanteName,
+          representanteCpf,
         });
         return { success: true, data: { agencyId: agency._id, resumed: true } } as const;
       }
@@ -238,6 +253,8 @@ export const startOnboarding = mutation({
       cnpj,
       cpf,
       agencyType: args.agencyType,
+      representanteName: args.representanteName,
+      representanteCpf,
       onboardingState: ONBOARDING_STATE.IN_PROGRESS,
       onboardingSubmittedAt: null,
       createdAt: now,

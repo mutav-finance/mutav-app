@@ -22,6 +22,8 @@ export type OnboardingWizardData = {
   creci: string;
   cpf: string;
   cnpj: string;
+  representanteName: string;
+  representanteCpf: string;
   bankName: string;
   bankBranch: string;
   bankAccount: string;
@@ -39,6 +41,8 @@ const INITIAL_DATA: OnboardingWizardData = {
   creci: "",
   cpf: "",
   cnpj: "",
+  representanteName: "",
+  representanteCpf: "",
   bankName: "",
   bankBranch: "",
   bankAccount: "",
@@ -109,6 +113,9 @@ type WizardErrorCode =
   | "CPF_REQUIRED"
   | "CPF_INVALID"
   | "CNPJ_INVALID"
+  | "REPRESENTANTE_NAME_REQUIRED"
+  | "REPRESENTANTE_CPF_REQUIRED"
+  | "REPRESENTANTE_CPF_INVALID"
   | "ALREADY_REGISTERED";
 
 function isWizardErrorCode(code: string): code is WizardErrorCode {
@@ -117,6 +124,9 @@ function isWizardErrorCode(code: string): code is WizardErrorCode {
     code === "CPF_REQUIRED" ||
     code === "CPF_INVALID" ||
     code === "CNPJ_INVALID" ||
+    code === "REPRESENTANTE_NAME_REQUIRED" ||
+    code === "REPRESENTANTE_CPF_REQUIRED" ||
+    code === "REPRESENTANTE_CPF_INVALID" ||
     code === "ALREADY_REGISTERED"
   );
 }
@@ -202,6 +212,8 @@ function OnboardingWizardInner({
           creci: state.data.creci,
           cpf: agencyType === "autonomo" ? state.data.cpf : undefined,
           cnpj: agencyType === "empresa" ? state.data.cnpj : undefined,
+          representanteName: agencyType === "empresa" ? state.data.representanteName : undefined,
+          representanteCpf: agencyType === "empresa" ? state.data.representanteCpf : undefined,
         });
         if (!result.success) {
           dispatch({ type: "SUBMIT_ERROR", code: result.error.code });

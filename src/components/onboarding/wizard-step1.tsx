@@ -40,6 +40,8 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
     }
     if (data.agencyType === "empresa") {
       if (!isValidCNPJ(data.cnpj)) errs.cnpj = t("errors.cnpj");
+      if (!data.representanteName.trim()) errs.representanteName = t("errors.representanteName");
+      if (!isValidCPF(data.representanteCpf)) errs.representanteCpf = t("errors.representanteCpf");
     }
 
     if (Object.keys(errs).length > 0) {
@@ -173,6 +175,44 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
           />
         </Field>
       </div>
+
+      {data.agencyType === "empresa" && (
+        <div className="flex flex-col gap-4">
+          <span className="text-text-3 font-mono text-xs tracking-wide uppercase">
+            {t("representanteSection")}
+          </span>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field
+              id="field-representante-name"
+              label={t("representanteNameLabel")}
+              error={errors.representanteName}
+              className="sm:col-span-2"
+            >
+              <Input
+                id="field-representante-name"
+                value={data.representanteName}
+                placeholder={t("representanteNamePlaceholder")}
+                autoComplete="name"
+                onChange={(e) => onChange({ representanteName: e.target.value })}
+              />
+            </Field>
+
+            <Field
+              id="field-representante-cpf"
+              label={t("representanteCpfLabel")}
+              error={errors.representanteCpf}
+            >
+              <Input
+                id="field-representante-cpf"
+                value={data.representanteCpf}
+                placeholder="000.000.000-00"
+                maxLength={14}
+                onChange={(e) => onChange({ representanteCpf: maskCPF(e.target.value) })}
+              />
+            </Field>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <Button size="lg" onClick={handleNext} disabled={isSubmitting}>

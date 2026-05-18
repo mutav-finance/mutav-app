@@ -174,6 +174,8 @@ export default defineSchema({
     bankingInfo: v.optional(bankingInfo),
     onboardingRejectionReason: v.optional(v.string()),
     consentMarketing: v.optional(v.boolean()),
+    representanteName: v.optional(v.string()),
+    representanteCpf: v.optional(v.string()),
   })
     .index("by_cnpj", ["cnpj"])
     .index("by_cpf", ["cpf"])

@@ -51,6 +51,12 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
 
   return (
     <div className="flex flex-col gap-6">
+      {data.agencyType === "empresa" && (
+        <div className="border-accent/60 bg-accent/5 border-l-2 px-4 py-3">
+          <p className="text-text-2 text-sm">{t("empresaAccountNotice")}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field id="field-bank" label={t("bankLabel")} error={errors.bank} className="sm:col-span-2">
           <Input

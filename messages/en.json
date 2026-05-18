@@ -947,6 +947,7 @@
       "stepDoneSuffix": ": completed",
       "stepCurrentSuffix": ": current step",
       "banking": {
+        "empresaAccountNotice": "The bank account must be in the company's name and linked to the registered CNPJ.",
         "bankLabel": "Bank",
         "bankPlaceholder": "E.g. Chase, Bank of America",
         "branchLabel": "Branch",
@@ -1000,6 +1001,8 @@
         "creciLabel": "CRECI",
         "emailLabel": "Email",
         "phoneLabel": "Phone",
+        "representanteNameLabel": "Representative",
+        "representanteCpfLabel": "Representative CPF",
         "bankLabel": "Bank",
         "branchLabel": "Branch",
         "accountLabel": "Account",
@@ -1027,6 +1030,9 @@
         "CPF_REQUIRED": "CPF is required for independent brokers.",
         "CPF_INVALID": "Invalid CPF. Please check the digits and try again.",
         "CNPJ_INVALID": "Invalid CNPJ. Please check the digits and try again.",
+        "REPRESENTANTE_NAME_REQUIRED": "Representative name is required for agencies.",
+        "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
+        "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
         "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
         "unknown": "Failed to save. Please try again."
       }
@@ -1047,6 +1053,10 @@
       "emailLabel": "Email",
       "emailPlaceholder": "contact@agency.com",
       "phoneLabel": "Phone",
+      "representanteSection": "Legal representative",
+      "representanteNameLabel": "Representative name",
+      "representanteNamePlaceholder": "Full name",
+      "representanteCpfLabel": "Representative CPF",
       "nextButton": "Next",
       "savingButton": "Saving…",
       "errors": {
@@ -1056,7 +1066,9 @@
         "phone": "Invalid phone number.",
         "creci": "CRECI is required.",
         "cpf": "Invalid CPF.",
-        "cnpj": "Invalid CNPJ."
+        "cnpj": "Invalid CNPJ.",
+        "representanteName": "Representative name is required.",
+        "representanteCpf": "Invalid representative CPF."
       }
     }
   }

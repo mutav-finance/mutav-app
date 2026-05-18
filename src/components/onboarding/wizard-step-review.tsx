@@ -58,6 +58,15 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           <ReviewRow label={t("creciLabel")} value={data.creci} />
           <ReviewRow label={t("emailLabel")} value={data.email} />
           <ReviewRow label={t("phoneLabel")} value={<Mono>{data.phone}</Mono>} />
+          {data.agencyType === "empresa" && (
+            <>
+              <ReviewRow label={t("representanteNameLabel")} value={data.representanteName} />
+              <ReviewRow
+                label={t("representanteCpfLabel")}
+                value={<Mono>{data.representanteCpf}</Mono>}
+              />
+            </>
+          )}
         </div>
       </section>
 
