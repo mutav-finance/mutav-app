@@ -9,12 +9,8 @@ import { Link } from "@/i18n/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
-import {
-  formatBRLCentsDisplay,
-  lookupTenantScore,
-  type WizardData,
-  type ScoreTier,
-} from "@/lib/contracts/wizard";
+import { formatBRLCentsDisplay, type WizardData } from "@/lib/contracts/wizard";
+import type { ScoreTier } from "@convex/contracts/domain";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
 import {
@@ -69,9 +65,9 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const cpfDigits = data.entityType === "pj" ? "" : data.cpf.replace(/\D/g, "");
   const docDigits = data.entityType === "pj" ? data.cnpj.replace(/\D/g, "") : cpfDigits;
 
-  const scoreResult = React.useMemo(
-    () => (docDigits ? lookupTenantScore(docDigits) : null),
-    [docDigits],
+  const scoreResult = useQuery(
+    api.contracts.useCases.lookupTenantScore,
+    agencyId && docDigits ? { agencyId, document: docDigits } : "skip",
   );
 
   const tenantLookup = useQuery(
@@ -79,9 +75,11 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
     agencyId && cpfDigits ? { agencyId, cpf: cpfDigits } : "skip",
   );
 
-  const applyScore = React.useEffectEvent((result: ReturnType<typeof lookupTenantScore> | null) => {
-    onChange({ score: result?.score ?? null, scoreTier: result?.tier ?? null });
-  });
+  const applyScore = React.useEffectEvent(
+    (result: { score: number; tier: ScoreTier } | null | undefined) => {
+      onChange({ score: result?.score ?? null, scoreTier: result?.tier ?? null });
+    },
+  );
 
   const applyTenantLookup = React.useEffectEvent(
     (lookup: { fullName: string; email: string } | null | undefined) => {

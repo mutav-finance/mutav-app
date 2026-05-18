@@ -1,6 +1,5 @@
 import type { ExitCostMultiplier, RentMultiplier } from "@/lib/pricing/tiers";
-
-export type ScoreTier = "bom" | "regular" | "ruim" | "negado";
+import type { ScoreTier } from "@convex/contracts/domain";
 
 export type WizardData = {
   entityType: "pf" | "pj" | "";
@@ -76,14 +75,6 @@ export const INITIAL_WIZARD_DATA: WizardData = {
   rentMultiplier: null,
   exitCostMultiplier: null,
 };
-
-export function lookupTenantScore(document: string): { score: number; tier: ScoreTier } {
-  const digits = document.replace(/\D/g, "");
-  const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
-  const tier: ScoreTier =
-    score >= 800 ? "bom" : score >= 600 ? "regular" : score >= 400 ? "ruim" : "negado";
-  return { score, tier };
-}
 
 export function formatBRLCentsDisplay(cents: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);

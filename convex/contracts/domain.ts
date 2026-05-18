@@ -29,3 +29,19 @@ export const contractStatusValidator = v.union(
   v.literal(CONTRACT_STATUS.PENDENTE),
   v.literal(CONTRACT_STATUS.CANCELADO),
 );
+
+export type ScoreTier = "bom" | "regular" | "ruim" | "negado";
+
+export const SCORE_TIER = {
+  BOM: "bom",
+  REGULAR: "regular",
+  RUIM: "ruim",
+  NEGADO: "negado",
+} as const satisfies Record<Uppercase<ScoreTier>, ScoreTier>;
+
+export const scoreTierValidator = v.union(
+  v.literal(SCORE_TIER.BOM),
+  v.literal(SCORE_TIER.REGULAR),
+  v.literal(SCORE_TIER.RUIM),
+  v.literal(SCORE_TIER.NEGADO),
+);
