@@ -933,7 +933,6 @@
         ]
       },
       "ctaButton": "Start registration",
-      "ctaNoteTime": "5 min",
       "ctaNoteReview": "reviewed in up to 2 business days"
     },
     "wizard": {
@@ -947,10 +946,6 @@
       "progressLabel": "Registration progress",
       "stepDoneSuffix": ": completed",
       "stepCurrentSuffix": ": current step",
-      "inProgress": "Step {step} — coming soon",
-      "inProgressNoteBase": "The next modules will be available soon.",
-      "inProgressNoteDocuments": "The next modules (documents, banking, review) will be available soon.",
-      "backButton": "← Back",
       "banking": {
         "bankLabel": "Bank",
         "bankPlaceholder": "E.g. Chase, Bank of America",
@@ -1030,6 +1025,8 @@
       "errors": {
         "CNPJ_REQUIRED": "CNPJ is required for agencies.",
         "CPF_REQUIRED": "CPF is required for independent brokers.",
+        "CPF_INVALID": "Invalid CPF. Please check the digits and try again.",
+        "CNPJ_INVALID": "Invalid CNPJ. Please check the digits and try again.",
         "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
         "unknown": "Failed to save. Please try again."
       }

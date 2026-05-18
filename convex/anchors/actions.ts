@@ -1095,7 +1095,7 @@ export const onboardAgencyEtherfuseKyb = internalAction({
       agencyId: args.agencyId,
       contactPerson: args.contactPerson,
       address: args.address,
-      idNumber: { value: agency.cnpj, type: "CNPJ" },
+      idNumber: { value: agency.cnpj ?? "", type: "CNPJ" },
     });
   },
 });

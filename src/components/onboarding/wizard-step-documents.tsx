@@ -35,13 +35,24 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
     React.useState<Record<DocumentKind, UploadStatus>>(INITIAL_STATUS);
   const [showValidationError, setShowValidationError] = React.useState(false);
 
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const pendingKindRef = React.useRef<DocumentKind | null>(null);
+  // One ref per document kind — eliminates the race condition that arises from
+  // sharing a single input + pendingKindRef between concurrent clicks.
+  const fileInputRefs = React.useRef<Record<DocumentKind, HTMLInputElement | null>>({
+    documento_empresa: null,
+    responsavel_id: null,
+  });
 
   const uploadedKinds = React.useMemo(
     () => new Set(existingDocs?.map((d) => d.kind) ?? []),
     [existingDocs],
   );
+
+  const existingDocsByKind = React.useMemo(() => {
+    const docs = existingDocs ?? [];
+    const map = new Map<DocumentKind, (typeof docs)[number]>();
+    for (const doc of docs) map.set(doc.kind as DocumentKind, doc);
+    return map;
+  }, [existingDocs]);
 
   const allUploaded = DOCUMENT_KINDS.every((k) => uploadedKinds.has(k));
 
@@ -60,19 +71,15 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
   );
 
   const triggerUpload = (kind: DocumentKind) => {
-    pendingKindRef.current = kind;
-    fileInputRef.current?.click();
+    fileInputRefs.current[kind]?.click();
   };
 
   const isAnyUploading = Object.values(uploadStatus).some((s) => s === "uploading");
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, kind: DocumentKind) => {
     const file = e.target.files?.[0];
-    const kind = pendingKindRef.current;
     e.target.value = "";
-    pendingKindRef.current = null;
-
-    if (!file || !kind) return;
+    if (!file) return;
 
     setUploadStatus((s) => ({ ...s, [kind]: "uploading" }));
     try {
@@ -83,7 +90,17 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
         body: file,
       });
       if (!res.ok) throw new Error("upload_failed");
-      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+      // External API boundary — validate shape before using.
+      const body: unknown = await res.json();
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        !("storageId" in body) ||
+        typeof (body as Record<string, unknown>).storageId !== "string"
+      ) {
+        throw new Error("upload_failed");
+      }
+      const storageId = (body as { storageId: Id<"_storage"> }).storageId;
       const result = await saveDoc({ agencyId, kind, storageId, fileName: file.name });
       if (!result.success) throw new Error(result.error.code);
       setUploadStatus((s) => ({ ...s, [kind]: "idle" }));
@@ -113,7 +130,7 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
         {DOCUMENT_KINDS.map((kind) => {
           const isDone = uploadedKinds.has(kind);
           const status = uploadStatus[kind];
-          const existingDoc = existingDocs.find((d) => d.kind === kind);
+          const existingDoc = existingDocsByKind.get(kind);
 
           return (
             <div
@@ -166,13 +183,18 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
         })}
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/pdf,image/jpeg,image/png"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      {DOCUMENT_KINDS.map((kind) => (
+        <input
+          key={kind}
+          ref={(el) => {
+            fileInputRefs.current[kind] = el;
+          }}
+          type="file"
+          accept="application/pdf,image/jpeg,image/png"
+          className="hidden"
+          onChange={(e) => handleFileChange(e, kind)}
+        />
+      ))}
 
       {uploadedKinds.size > 0 && (
         <p className="text-text-3 text-xs" role="status">

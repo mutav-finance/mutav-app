@@ -8,7 +8,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { DEV_USER_PUBLIC_ID } from "@/providers/workspace";
 import { WizardStepIndicator } from "@/components/onboarding/wizard-step-indicator";
 import { WizardStep1 } from "@/components/onboarding/wizard-step1";
-import { WizardStepBanking } from "@/components/onboarding/wizard-step-banking";
+import { WizardStepBanking, isBankAccountType } from "@/components/onboarding/wizard-step-banking";
 import { WizardStepDocuments } from "@/components/onboarding/wizard-step-documents";
 import { WizardStepReview } from "@/components/onboarding/wizard-step-review";
 
@@ -28,10 +28,6 @@ export type OnboardingWizardData = {
   bankAccountType: "corrente" | "poupanca" | "";
   bankPixKey: string;
 };
-
-export function isBankAccountType(t: string): t is "corrente" | "poupanca" {
-  return t === "corrente" || t === "poupanca";
-}
 
 // ─── Estado do wizard (reducer) ───────────────────────────────────────────────
 
@@ -108,10 +104,21 @@ function resolveStepKind(step: number, agencyType: string): StepKind {
   return "profile";
 }
 
-type WizardErrorCode = "CNPJ_REQUIRED" | "CPF_REQUIRED" | "ALREADY_REGISTERED";
+type WizardErrorCode =
+  | "CNPJ_REQUIRED"
+  | "CPF_REQUIRED"
+  | "CPF_INVALID"
+  | "CNPJ_INVALID"
+  | "ALREADY_REGISTERED";
 
 function isWizardErrorCode(code: string): code is WizardErrorCode {
-  return code === "CNPJ_REQUIRED" || code === "CPF_REQUIRED" || code === "ALREADY_REGISTERED";
+  return (
+    code === "CNPJ_REQUIRED" ||
+    code === "CPF_REQUIRED" ||
+    code === "CPF_INVALID" ||
+    code === "CNPJ_INVALID" ||
+    code === "ALREADY_REGISTERED"
+  );
 }
 
 function buildInitialState(initialType: "autonomo" | "empresa" | undefined): WizardState {
@@ -182,30 +189,33 @@ function OnboardingWizardInner({
     return [perfil, contaBancaria, revisao];
   }, [state.data.agencyType, t]);
 
-  const handleStep1Next = async (agencyType: "autonomo" | "empresa") => {
-    dispatch({ type: "SUBMIT_START" });
-    try {
-      const result = await startOnboarding({
-        userId: devUserId,
-        agencyType,
-        name: state.data.name,
-        email: state.data.email,
-        phone: state.data.phone,
-        creci: state.data.creci,
-        cpf: agencyType === "autonomo" ? state.data.cpf : undefined,
-        cnpj: agencyType === "empresa" ? state.data.cnpj : undefined,
-      });
-      if (!result.success) {
-        dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
-        return;
+  const handleStep1Next = React.useCallback(
+    async (agencyType: "autonomo" | "empresa") => {
+      dispatch({ type: "SUBMIT_START" });
+      try {
+        const result = await startOnboarding({
+          userId: devUserId,
+          agencyType,
+          name: state.data.name,
+          email: state.data.email,
+          phone: state.data.phone,
+          creci: state.data.creci,
+          cpf: agencyType === "autonomo" ? state.data.cpf : undefined,
+          cnpj: agencyType === "empresa" ? state.data.cnpj : undefined,
+        });
+        if (!result.success) {
+          dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
+          return;
+        }
+        dispatch({ type: "SUBMIT_SUCCESS", agencyId: result.data.agencyId });
+      } catch {
+        dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
       }
-      dispatch({ type: "SUBMIT_SUCCESS", agencyId: result.data.agencyId });
-    } catch {
-      dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
-    }
-  };
+    },
+    [devUserId, startOnboarding, state.data],
+  );
 
-  const handleBankingNext = async () => {
+  const handleBankingNext = React.useCallback(async () => {
     if (!state.agencyId || !isBankAccountType(state.data.bankAccountType)) {
       dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
       return;
@@ -230,29 +240,35 @@ function OnboardingWizardInner({
     } catch {
       dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
     }
-  };
+  }, [state.agencyId, state.data, saveBankingInfo]);
 
   const handleDocumentsNext = () => {
     dispatch({ type: "SUBMIT_SUCCESS" });
   };
 
-  const handleSubmit = async () => {
-    if (!state.agencyId) {
-      dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
-      return;
-    }
-    dispatch({ type: "SUBMIT_START" });
-    try {
-      const result = await submitOnboarding({ agencyId: state.agencyId });
-      if (!result.success) {
-        dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
+  const handleSubmit = React.useCallback(
+    async (opts: { consentMarketing: boolean }) => {
+      if (!state.agencyId) {
+        dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
         return;
       }
-      dispatch({ type: "SUBMIT_DONE" });
-    } catch {
-      dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
-    }
-  };
+      dispatch({ type: "SUBMIT_START" });
+      try {
+        const result = await submitOnboarding({
+          agencyId: state.agencyId,
+          consentMarketing: opts.consentMarketing,
+        });
+        if (!result.success) {
+          dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
+          return;
+        }
+        dispatch({ type: "SUBMIT_DONE" });
+      } catch {
+        dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
+      }
+    },
+    [state.agencyId, submitOnboarding],
+  );
 
   if (state.submitState === "submitted") {
     return (
@@ -310,13 +326,18 @@ function OnboardingWizardInner({
         />
       )}
 
-      {stepKind === "documents" && state.agencyId && (
-        <WizardStepDocuments
-          agencyId={state.agencyId}
-          onNext={handleDocumentsNext}
-          onBack={() => dispatch({ type: "GO_TO", step: state.step - 1 })}
-        />
-      )}
+      {stepKind === "documents" &&
+        (state.agencyId ? (
+          <WizardStepDocuments
+            agencyId={state.agencyId}
+            onNext={handleDocumentsNext}
+            onBack={() => dispatch({ type: "GO_TO", step: state.step - 1 })}
+          />
+        ) : (
+          <p role="alert" className="text-error text-sm">
+            {t("errors.unknown")}
+          </p>
+        ))}
 
       {stepKind === "review" && (
         <WizardStepReview

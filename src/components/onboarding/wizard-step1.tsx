@@ -137,20 +137,18 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
           </Field>
         )}
 
-        {data.agencyType && (
-          <Field id="field-creci" label={t("creciLabel")} error={errors.creci}>
-            <Input
-              id="field-creci"
-              value={data.creci}
-              placeholder={
-                data.agencyType === "empresa"
-                  ? t("creciPlaceholderEmpresa")
-                  : t("creciPlaceholderAutonomo")
-              }
-              onChange={(e) => onChange({ creci: e.target.value })}
-            />
-          </Field>
-        )}
+        <Field id="field-creci" label={t("creciLabel")} error={errors.creci}>
+          <Input
+            id="field-creci"
+            value={data.creci}
+            placeholder={
+              data.agencyType === "empresa"
+                ? t("creciPlaceholderEmpresa")
+                : t("creciPlaceholderAutonomo")
+            }
+            onChange={(e) => onChange({ creci: e.target.value })}
+          />
+        </Field>
 
         <Field id="field-email" label={t("emailLabel")} error={errors.email}>
           <Input
