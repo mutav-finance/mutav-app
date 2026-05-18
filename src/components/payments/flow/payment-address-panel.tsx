@@ -27,6 +27,9 @@ export async function PaymentAddressPanel({ muxedAddress, brlDisplay, options }:
   const t = await getTranslations("paymentFlow.address");
   const truncatedAddress = `${muxedAddress.slice(0, 6)}…${muxedAddress.slice(-6)}`;
 
+  const firstOption = options[0];
+  if (!firstOption) return null;
+
   return (
     <section
       id="primary-action"
@@ -39,7 +42,7 @@ export async function PaymentAddressPanel({ muxedAddress, brlDisplay, options }:
         </h2>
       </header>
 
-      <Tabs defaultValue={options[0]!.code} className="flex flex-col gap-6">
+      <Tabs defaultValue={firstOption.code} className="flex flex-col gap-6">
         <TabsList
           className="grid w-full"
           style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}

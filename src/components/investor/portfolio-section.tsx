@@ -13,7 +13,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-type Period = "7D" | "30D" | "90D" | "1Y";
+const PERIODS = ["7D", "30D", "90D", "1Y"] as const;
+type Period = (typeof PERIODS)[number];
+
+function isPeriod(value: string): value is Period {
+  return PERIODS.some((p) => p === value);
+}
 
 const PORTFOLIO_DATA: Record<Period, { label: string; value: number }[]> = {
   "7D": [
@@ -161,11 +166,13 @@ function PortfolioChart() {
         <ToggleGroup
           type="single"
           value={period}
-          onValueChange={(v) => v && setPeriod(v as Period)}
+          onValueChange={(v) => {
+            if (isPeriod(v)) setPeriod(v);
+          }}
           variant="outline"
           spacing={0}
         >
-          {(["7D", "30D", "90D", "1Y"] as Period[]).map((p) => (
+          {PERIODS.map((p) => (
             <ToggleGroupItem
               key={p}
               value={p}

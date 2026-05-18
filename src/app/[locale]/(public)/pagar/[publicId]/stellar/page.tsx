@@ -50,6 +50,8 @@ export default async function CheckoutStellarPage({
   ]);
   const payment = preloadedQueryResult(preloadedPayment);
   if (!payment || !payment.muxedAddress) notFound();
+  // Hoist past notFound() so the narrowing survives the .map() closure below.
+  const muxedAddress = payment.muxedAddress;
 
   if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
     redirect({ href: `/pagar/${publicId}/pago`, locale });
@@ -72,7 +74,7 @@ export default async function CheckoutStellarPage({
       amountCanonical: amount.canonical,
       amountDisplay: amount.display,
       sep7Uri: buildSep7PayUri({
-        destination: payment.muxedAddress!,
+        destination: muxedAddress,
         amount: amount.canonical,
         assetCode: asset.symbol,
         assetIssuer: asset.issuer ?? undefined,
@@ -92,7 +94,7 @@ export default async function CheckoutStellarPage({
       <PaymentSummaryHeader preloaded={preloadedPayment} />
       <PaymentAddressView preloaded={preloadedPayment}>
         <PaymentAddressPanel
-          muxedAddress={payment.muxedAddress}
+          muxedAddress={muxedAddress}
           brlDisplay={formatBRLCents(payment.totalCents)}
           options={options}
         />

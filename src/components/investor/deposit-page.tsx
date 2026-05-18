@@ -7,9 +7,9 @@ import { PageShell } from "@/components/page/page-shell";
 import { PageContent } from "@/components/page/page-content";
 import { ProtocolKpiStrip } from "./protocol-kpi-strip";
 import { useDepositWidget } from "./use-deposit-widget";
-import { FUNDS, RISK_COLOR, PROTOCOL_STATS } from "./fund-data";
+import { isAssetSymbol } from "@/lib/stellar/assets";
+import { FUNDS, RISK_COLOR, PROTOCOL_STATS, isFundId } from "./fund-data";
 import type { FundId } from "./fund-data";
-import type { InputToken } from "./use-deposit-widget";
 
 const FUND_RISK_LABEL: Record<FundId, string> = {
   MTVL: "Low Risk",
@@ -89,7 +89,9 @@ export function DepositPage({ initialFund }: { initialFund: string | undefined }
                 />
                 <Select
                   value={w.inputToken}
-                  onValueChange={(v) => w.setInputToken(v as InputToken)}
+                  onValueChange={(v) => {
+                    if (isAssetSymbol(v)) w.setInputToken(v);
+                  }}
                 >
                   {/* Custom children — avoids Radix SelectValue empty-on-mount issue */}
                   <SelectTrigger className="border-border h-9 w-auto shrink-0">
@@ -118,7 +120,9 @@ export function DepositPage({ initialFund }: { initialFund: string | undefined }
                 </span>
                 <Select
                   value={w.selectedFund}
-                  onValueChange={(v) => w.setSelectedFund(v as FundId)}
+                  onValueChange={(v) => {
+                    if (isFundId(v)) w.setSelectedFund(v);
+                  }}
                 >
                   {/* Custom children — avoids Radix SelectValue empty-on-mount issue */}
                   <SelectTrigger className="border-border h-9 w-auto shrink-0">

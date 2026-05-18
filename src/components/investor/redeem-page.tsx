@@ -7,7 +7,8 @@ import { PageShell } from "@/components/page/page-shell";
 import { PageContent } from "@/components/page/page-content";
 import { ProtocolKpiStrip } from "./protocol-kpi-strip";
 import { useRedeemWidget } from "./use-redeem-widget";
-import { FUNDS, RISK_COLOR, PROTOCOL_STATS } from "./fund-data";
+import { isAssetSymbol } from "@/lib/stellar/assets";
+import { FUNDS, RISK_COLOR, PROTOCOL_STATS, isFundId } from "./fund-data";
 import type { FundId } from "./fund-data";
 import type { OutputToken } from "./use-redeem-widget";
 
@@ -105,7 +106,9 @@ export function RedeemPage({ initialFund }: { initialFund: string | undefined })
                 />
                 <Select
                   value={w.selectedFund}
-                  onValueChange={(v) => w.setSelectedFund(v as FundId)}
+                  onValueChange={(v) => {
+                    if (isFundId(v)) w.setSelectedFund(v);
+                  }}
                 >
                   <SelectTrigger className="border-border h-9 w-auto shrink-0">
                     <div className="flex items-center gap-2">
@@ -147,7 +150,9 @@ export function RedeemPage({ initialFund }: { initialFund: string | undefined })
                 </span>
                 <Select
                   value={w.outputToken}
-                  onValueChange={(v) => w.setOutputToken(v as OutputToken)}
+                  onValueChange={(v) => {
+                    if (isAssetSymbol(v)) w.setOutputToken(v);
+                  }}
                 >
                   <SelectTrigger className="border-border h-9 w-auto shrink-0">
                     <span className="text-text font-mono text-sm">{w.outputToken}</span>

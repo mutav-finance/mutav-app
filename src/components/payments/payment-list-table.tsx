@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import type { PaymentStateKind } from "@convex/payments/domain";
 import { useWorkspace } from "@/providers/workspace";
 import { Link } from "@/i18n/navigation";
@@ -65,6 +64,10 @@ import { PaymentStateTag } from "@/components/payments/payment-state-tag";
 type StateTab = "all" | PaymentStateKind;
 
 const STATE_TABS: readonly StateTab[] = ["all", "pending", "overdue", "paid", "canceled"];
+
+function isStateTab(value: string): value is StateTab {
+  return STATE_TABS.some((tab) => tab === value);
+}
 
 type PaymentListItem = {
   id: string;
@@ -161,14 +164,14 @@ export function PaymentListTable() {
   const tMethod = useTranslations("paymentDetails.method");
 
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
-  const agencyId = selectedAgency?._id as Id<"agencies"> | undefined;
+  const agencyId = selectedAgency?._id;
 
   const result = useQuery(
     api.payments.useCases.listByAgency,
     agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
   );
 
-  const data = React.useMemo(
+  const data = React.useMemo<PaymentListItem[]>(
     () =>
       (result?.page ?? []).map((doc) => ({
         id: doc.publicId,
@@ -180,7 +183,7 @@ export function PaymentListTable() {
         state: doc.state,
         method: doc.method,
         lineItemCount: doc.lineItems.length,
-      })) as PaymentListItem[],
+      })),
     [result],
   );
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
@@ -254,7 +257,9 @@ export function PaymentListTable() {
   return (
     <Tabs
       value={stateTab}
-      onValueChange={(v) => setStateTab(v as StateTab)}
+      onValueChange={(v) => {
+        if (isStateTab(v)) setStateTab(v);
+      }}
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 lg:px-6">

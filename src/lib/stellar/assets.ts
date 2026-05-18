@@ -16,8 +16,14 @@ type StellarAssetAddress = {
 
 export type AssetAddress = StellarAssetAddress;
 
+export type AssetSymbol = "XLM" | "USDC";
+
+export function isAssetSymbol(value: string): value is AssetSymbol {
+  return ASSETS.some((a) => a.symbol === value);
+}
+
 export type Asset = {
-  symbol: string;
+  symbol: AssetSymbol;
   decimals: number;
   /** Display decimals; not on-chain precision. Stellar assets are all 7 on-chain. */
   displayDecimals: number;
