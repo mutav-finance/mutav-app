@@ -167,7 +167,7 @@ export default defineSchema({
     createdAt: v.string(),
     agencyType: v.optional(agencyType),
     onboardingState: v.optional(onboardingState),
-    onboardingSubmittedAt: v.optional(v.union(v.string(), v.null())),
+    onboardingSubmittedAt: v.optional(v.string()),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     creci: v.optional(v.string()),

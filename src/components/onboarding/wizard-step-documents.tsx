@@ -50,7 +50,7 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
   const existingDocsByKind = React.useMemo(() => {
     const docs = existingDocs ?? [];
     const map = new Map<DocumentKind, (typeof docs)[number]>();
-    for (const doc of docs) map.set(doc.kind as DocumentKind, doc);
+    for (const doc of docs) map.set(doc.kind, doc);
     return map;
   }, [existingDocs]);
 

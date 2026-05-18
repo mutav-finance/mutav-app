@@ -122,6 +122,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
               value={data.cpf}
               placeholder="000.000.000-00"
               maxLength={14}
+              inputMode="numeric"
               onChange={(e) => onChange({ cpf: maskCPF(e.target.value) })}
             />
           </Field>
@@ -134,6 +135,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
               value={data.cnpj}
               placeholder="00.000.000/0000-00"
               maxLength={18}
+              inputMode="numeric"
               onChange={(e) => onChange({ cnpj: maskCNPJ(e.target.value) })}
             />
           </Field>
@@ -207,6 +209,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
                 value={data.representanteCpf}
                 placeholder="000.000.000-00"
                 maxLength={14}
+                inputMode="numeric"
                 onChange={(e) => onChange({ representanteCpf: maskCPF(e.target.value) })}
               />
             </Field>

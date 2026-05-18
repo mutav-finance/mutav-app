@@ -49,7 +49,10 @@ export const listAgenciesForUser = query({
   },
 });
 
-/** Returns all members of an agency, each enriched with their user info and role. */
+/**
+ * Returns all members of an agency, each enriched with their user info and role.
+ * TODO(auth): add queryWithAgencyScope wrapper — currently any caller can enumerate members.
+ */
 export const listMembersForAgency = query({
   args: { agencyId: v.id("agencies") },
   handler: async (ctx, args) => {
@@ -259,7 +262,6 @@ export const startOnboarding = mutation({
       representanteName: args.representanteName,
       representanteCpf,
       onboardingState: ONBOARDING_STATE.IN_PROGRESS,
-      onboardingSubmittedAt: null,
       createdAt: now,
     });
 
