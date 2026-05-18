@@ -6,7 +6,6 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { DEV_USER_PUBLIC_ID } from "@/providers/workspace";
-import { maskCPF, maskCNPJ } from "@/lib/brazil";
 import { WizardStepIndicator } from "@/components/onboarding/wizard-step-indicator";
 import { WizardStep1 } from "@/components/onboarding/wizard-step1";
 import { WizardStepBanking } from "@/components/onboarding/wizard-step-banking";
@@ -115,118 +114,25 @@ function isWizardErrorCode(code: string): code is WizardErrorCode {
   return code === "CNPJ_REQUIRED" || code === "CPF_REQUIRED" || code === "ALREADY_REGISTERED";
 }
 
-// ─── Session restore ──────────────────────────────────────────────────────────
-
-// Formato mínimo necessário do retorno da query (Convex retorna isso + campos extras).
-// Structural typing do TypeScript garante compatibilidade.
-type RestoreData = {
-  agency: {
-    _id: Id<"agencies">;
-    agencyType?: "autonomo" | "empresa";
-    name: string;
-    email?: string;
-    phone?: string;
-    creci?: string;
-    cpf?: string;
-    cnpj?: string;
-    bankingInfo?: {
-      bank: string;
-      agency: string;
-      account: string;
-      accountType: "corrente" | "poupanca";
-      pixKey?: string;
-    };
-  };
-  documents: Array<{
-    kind: "cartao_cnpj" | "contrato_social" | "comprovante_endereco" | "responsavel_id";
-  }>;
-} | null;
-
-const EMPRESA_DOCS = [
-  "cartao_cnpj",
-  "contrato_social",
-  "comprovante_endereco",
-  "responsavel_id",
-] as const;
-
-/**
- * Calcula o estado inicial do wizard a partir de um cadastro em andamento.
- * Chamada UMA vez pelo useReducer (lazy initializer) — nunca re-executa.
- * Se não houver cadastro em andamento (null), retorna o estado vazio padrão.
- */
-function buildInitialState(restore: RestoreData): WizardState {
-  if (!restore) {
-    return { step: 1, agencyId: null, data: INITIAL_DATA, submitState: "idle", errorCode: null };
-  }
-
-  const { agency, documents } = restore;
-
-  // Agência em andamento mas sem tipo selecionado ainda → volta para etapa 1
-  if (!agency.agencyType) {
-    return {
-      step: 1,
-      agencyId: agency._id,
-      data: INITIAL_DATA,
-      submitState: "idle",
-      errorCode: null,
-    };
-  }
-
-  const uploadedKinds = new Set(documents.map((d) => d.kind));
-  const allDocsUploaded = EMPRESA_DOCS.every((k) => uploadedKinds.has(k));
-
-  // Determina qual etapa retomar baseado no que já foi preenchido
-  const step =
-    agency.agencyType === "empresa"
-      ? agency.bankingInfo
-        ? 4 // tem dados bancários → revisão
-        : allDocsUploaded
-          ? 3 // docs completos → conta bancária
-          : 2 // ainda faltam docs
-      : agency.bankingInfo
-        ? 3 // autônomo com banco → revisão
-        : 2; // autônomo sem banco → conta bancária
-
+function buildInitialState(initialType: "autonomo" | "empresa" | undefined): WizardState {
   return {
-    step,
-    agencyId: agency._id,
-    data: {
-      agencyType: agency.agencyType,
-      name: agency.name,
-      email: agency.email ?? "",
-      phone: agency.phone ?? "",
-      creci: agency.creci ?? "",
-      // CPF/CNPJ ficam armazenados só com dígitos; remascara para exibição no campo
-      cpf: agency.cpf ? maskCPF(agency.cpf) : "",
-      cnpj: agency.cnpj ? maskCNPJ(agency.cnpj) : "",
-      bankName: agency.bankingInfo?.bank ?? "",
-      bankBranch: agency.bankingInfo?.agency ?? "",
-      bankAccount: agency.bankingInfo?.account ?? "",
-      bankAccountType: agency.bankingInfo?.accountType ?? "",
-      bankPixKey: agency.bankingInfo?.pixKey ?? "",
-    },
+    step: 1,
+    agencyId: null,
+    data: { ...INITIAL_DATA, agencyType: initialType ?? "" },
     submitState: "idle",
     errorCode: null,
   };
 }
 
-// ─── Componente público: busca dados e controla loading/erro ──────────────────
+// ─── Componente público: busca userId e controla loading/erro ─────────────────
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "empresa" }) {
   const t = useTranslations("onboarding.wizard");
 
   // TODO(auth): swap para identidade da sessão real.
   const devUser = useQuery(api.users.useCases.getByPublicId, { publicId: DEV_USER_PUBLIC_ID });
 
-  // "skip" diz ao Convex para não executar a query enquanto devUser não estiver pronto.
-  const inProgress = useQuery(
-    api.agencies.useCases.getOnboardingInProgress,
-    devUser ? { userId: devUser._id } : "skip",
-  );
-
-  // Aguarda as duas queries terminarem antes de mostrar o wizard.
-  // Isso evita qualquer flash de "formulário vazio → etapa certa".
-  if (devUser === undefined || inProgress === undefined) {
+  if (devUser === undefined) {
     return <div className="text-text-3 py-8 text-center font-mono text-sm">{t("loading")}</div>;
   }
 
@@ -236,23 +142,27 @@ export function OnboardingWizard() {
     );
   }
 
-  return <OnboardingWizardInner devUserId={devUser._id} restore={inProgress} />;
+  return <OnboardingWizardInner devUserId={devUser._id} initialType={initialType} />;
 }
 
 // ─── Componente interno: máquina de estados + UI ──────────────────────────────
 
 function OnboardingWizardInner({
   devUserId,
-  restore,
+  initialType,
 }: {
   devUserId: Id<"users">;
-  restore: RestoreData;
+  initialType?: "autonomo" | "empresa";
 }) {
   const t = useTranslations("onboarding.wizard");
 
-  // buildInitialState é chamada UMA vez aqui com os dados já carregados.
-  // O wizard já começa na etapa e com os campos certos — sem useEffect, sem flash.
-  const [state, dispatch] = React.useReducer(wizardReducer, restore, buildInitialState);
+  const [state, dispatch] = React.useReducer(wizardReducer, initialType, buildInitialState);
+
+  // Remove ?type= da URL após montar — refresh sem o param aciona o server redirect
+  // em wizard/page.tsx, que envia o usuário de volta a /onboarding.
+  React.useEffect(() => {
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   const startOnboarding = useMutation(api.agencies.useCases.startOnboarding);
   const saveBankingInfo = useMutation(api.agencies.useCases.saveBankingInfo);

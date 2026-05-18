@@ -905,8 +905,9 @@
   "onboarding": {
     "welcome": {
       "tag": "Programa de parceiros",
-      "title": "Ofereça garantias locatícias e amplie sua receita",
-      "subtitle": "Imobiliárias e corretores parceiros da Mutav substituem fiador e seguro-fiança nos contratos de locação. Seus clientes pagam uma taxa mensal — você recebe comissão por cada contrato ativo.",
+      "title": "Garantia locatícia sem fiador.",
+      "titleLine2": "Feita pra quem tem muito o que fazer.",
+      "subtitle": "Capital segregado. Auditável em tempo real, por qualquer pessoa, a qualquer momento.",
       "warningTitle": "Atenção para imobiliárias:",
       "warningBody": "o cadastro precisa ser feito pelo sócio com participação igual ou superior a 25%, ou por um administrador com poderes para abrir contas em nome da empresa. Tenha o contrato social em mãos para comprovar.",
       "checklistTitle": "O que você vai precisar",
@@ -932,7 +933,8 @@
         ]
       },
       "ctaButton": "Começar cadastro",
-      "ctaNote": "O processo leva cerca de 5 minutos. Após o envio, nossa equipe analisa em até 2 dias úteis."
+      "ctaNoteTime": "5 min",
+      "ctaNoteReview": "análise em até 2 dias úteis"
     },
     "wizard": {
       "loading": "Carregando…",
@@ -974,19 +976,11 @@
       },
       "documents": {
         "loading": "Carregando…",
-        "subtitle": "Envie os 4 documentos abaixo. Aceitamos PDF, JPG e PNG.",
+        "subtitle": "Envie os 2 documentos abaixo. Aceitamos PDF, JPG e PNG.",
         "kinds": {
-          "cartao_cnpj": {
-            "label": "Cartão CNPJ",
-            "description": "Emitido pela Receita Federal"
-          },
-          "contrato_social": {
-            "label": "Contrato Social",
-            "description": "Última versão consolidada ou alteração mais recente"
-          },
-          "comprovante_endereco": {
-            "label": "Comprovante de Endereço",
-            "description": "Conta de luz, água, telefone ou contrato de aluguel"
+          "documento_empresa": {
+            "label": "Documento da Empresa",
+            "description": "Cartão CNPJ (Receita Federal) ou Contrato Social"
           },
           "responsavel_id": {
             "label": "Documento do Responsável",
@@ -1024,7 +1018,9 @@
         "editButton": "editar",
         "submitButton": "Enviar cadastro",
         "submittingButton": "Enviando…",
-        "backButton": "← Voltar"
+        "backButton": "← Voltar",
+        "consentMarketing": "Aceito receber comunicações direcionadas sendo possível cancelar o recebimento a qualquer momento.",
+        "consentLegal": "Ao informar meus dados, eu concordo com a <privacy>Política de Privacidade</privacy> e com os <terms>Termos de Uso</terms>."
       },
       "submitted": {
         "title": "Cadastro enviado",

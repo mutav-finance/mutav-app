@@ -4,8 +4,6 @@ import { v } from "convex/values";
 // Safe to import from schema.ts without creating a circular dependency.
 
 export const agencyDocumentKindValidator = v.union(
-  v.literal("cartao_cnpj"),
-  v.literal("contrato_social"),
-  v.literal("comprovante_endereco"),
+  v.literal("documento_empresa"),
   v.literal("responsavel_id"),
 );

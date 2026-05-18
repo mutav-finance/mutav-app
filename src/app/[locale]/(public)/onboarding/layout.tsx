@@ -6,7 +6,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
     <>
       <header className="border-border bg-canvas border-b">
         <div className="flex h-14 items-center px-4 lg:px-6">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="MUTAV">
+          <Link href="/onboarding" className="flex items-center gap-2.5" aria-label="MUTAV">
             <span className="bg-accent size-3.5" aria-hidden />
             <span className="font-mono text-sm font-semibold tracking-widest">MUTAV</span>
           </Link>

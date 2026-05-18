@@ -14,20 +14,13 @@ type Props = {
   onBack: () => void;
 };
 
-const DOCUMENT_KINDS = [
-  "cartao_cnpj",
-  "contrato_social",
-  "comprovante_endereco",
-  "responsavel_id",
-] as const;
+const DOCUMENT_KINDS = ["documento_empresa", "responsavel_id"] as const;
 
 type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 type UploadStatus = "idle" | "uploading" | "error";
 
 const INITIAL_STATUS: Record<DocumentKind, UploadStatus> = {
-  cartao_cnpj: "idle",
-  contrato_social: "idle",
-  comprovante_endereco: "idle",
+  documento_empresa: "idle",
   responsavel_id: "idle",
 };
 
@@ -54,17 +47,9 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
 
   const labels = React.useMemo(
     () => ({
-      cartao_cnpj: {
-        label: t("kinds.cartao_cnpj.label"),
-        description: t("kinds.cartao_cnpj.description"),
-      },
-      contrato_social: {
-        label: t("kinds.contrato_social.label"),
-        description: t("kinds.contrato_social.description"),
-      },
-      comprovante_endereco: {
-        label: t("kinds.comprovante_endereco.label"),
-        description: t("kinds.comprovante_endereco.description"),
+      documento_empresa: {
+        label: t("kinds.documento_empresa.label"),
+        description: t("kinds.documento_empresa.description"),
       },
       responsavel_id: {
         label: t("kinds.responsavel_id.label"),
@@ -202,14 +187,9 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
       )}
 
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={isAnyUploading}
-          className="text-text-2 hover:text-text font-mono text-sm disabled:opacity-50"
-        >
+        <Button variant="outline" onClick={onBack} disabled={isAnyUploading}>
           {t("backButton")}
-        </button>
+        </Button>
         <Button onClick={handleNext} disabled={isAnyUploading}>
           {t("nextButton")}
         </Button>

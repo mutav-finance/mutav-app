@@ -55,35 +55,44 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Tipo de cadastro */}
-      <div className="flex flex-col gap-2">
-        <span id="agency-type-label" className="text-sm font-medium">
-          {t("typeLabel")}
-        </span>
-        <div role="group" aria-labelledby="agency-type-label" className="grid grid-cols-2 gap-2">
-          {(["autonomo", "empresa"] as const).map((type) => (
-            <button
-              key={type}
-              type="button"
-              aria-pressed={data.agencyType === type}
-              onClick={() => onChange({ agencyType: type, cpf: "", cnpj: "" })}
-              className={cn(
-                "border px-4 py-3 text-sm font-medium transition-colors",
-                data.agencyType === type
-                  ? "border-accent bg-accent/5 text-accent"
-                  : "border-border text-text-2 hover:border-text-3 hover:text-text",
-              )}
-            >
-              {type === "autonomo" ? t("typeAutonomo") : t("typeEmpresa")}
-            </button>
-          ))}
+      {/* Tipo de cadastro — oculto se já foi selecionado na tela de boas-vindas */}
+      {data.agencyType ? (
+        <div className="flex items-center gap-2">
+          <span className="bg-accent size-1.5 rounded-full" aria-hidden />
+          <span className="text-text text-sm font-medium">
+            {data.agencyType === "autonomo" ? t("typeAutonomo") : t("typeEmpresa")}
+          </span>
         </div>
-        {errors.agencyType && (
-          <p className="text-error text-xs" role="alert">
-            {errors.agencyType}
-          </p>
-        )}
-      </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span id="agency-type-label" className="text-sm font-medium">
+            {t("typeLabel")}
+          </span>
+          <div role="group" aria-labelledby="agency-type-label" className="grid grid-cols-2 gap-2">
+            {(["autonomo", "empresa"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                aria-pressed={data.agencyType === type}
+                onClick={() => onChange({ agencyType: type, cpf: "", cnpj: "" })}
+                className={cn(
+                  "border px-4 py-3 text-sm font-medium transition-colors",
+                  data.agencyType === type
+                    ? "border-accent bg-accent/5 text-accent"
+                    : "border-border text-text-2 hover:border-text-3 hover:text-text",
+                )}
+              >
+                {type === "autonomo" ? t("typeAutonomo") : t("typeEmpresa")}
+              </button>
+            ))}
+          </div>
+          {errors.agencyType && (
+            <p className="text-error text-xs" role="alert">
+              {errors.agencyType}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Campos comuns */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -168,7 +177,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleNext} disabled={isSubmitting}>
+        <Button size="lg" onClick={handleNext} disabled={isSubmitting}>
           {isSubmitting ? t("savingButton") : t("nextButton")}
         </Button>
       </div>
@@ -190,7 +199,7 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
+    <div className={cn("flex flex-col gap-2", className)}>
       <Label htmlFor={id}>{label}</Label>
       {children}
       {error && (

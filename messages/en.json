@@ -905,8 +905,9 @@
   "onboarding": {
     "welcome": {
       "tag": "Partner program",
-      "title": "Offer rental guarantees and grow your revenue",
-      "subtitle": "Mutav partner agencies and brokers replace guarantors and rental insurance in lease agreements. Your clients pay a monthly fee — you earn a commission for each active contract.",
+      "title": "Rental guarantee without a guarantor.",
+      "titleLine2": "Built for people with a lot to do.",
+      "subtitle": "Segregated capital. Auditable in real time, by anyone, at any time.",
       "warningTitle": "Important for agencies:",
       "warningBody": "registration must be completed by a partner holding 25% or more equity, or by an administrator authorized to open accounts on the company's behalf. Have the articles of incorporation ready to verify.",
       "checklistTitle": "What you will need",
@@ -932,7 +933,8 @@
         ]
       },
       "ctaButton": "Start registration",
-      "ctaNote": "The process takes about 5 minutes. After submission, our team reviews within 2 business days."
+      "ctaNoteTime": "5 min",
+      "ctaNoteReview": "reviewed in up to 2 business days"
     },
     "wizard": {
       "loading": "Loading…",
@@ -974,19 +976,11 @@
       },
       "documents": {
         "loading": "Loading…",
-        "subtitle": "Upload the 4 documents below. We accept PDF, JPG, and PNG.",
+        "subtitle": "Upload the 2 documents below. We accept PDF, JPG, and PNG.",
         "kinds": {
-          "cartao_cnpj": {
-            "label": "CNPJ Card",
-            "description": "Issued by the Federal Revenue Service"
-          },
-          "contrato_social": {
-            "label": "Articles of Incorporation",
-            "description": "Latest consolidated version or most recent amendment"
-          },
-          "comprovante_endereco": {
-            "label": "Proof of Address",
-            "description": "Utility bill, phone bill, or lease agreement"
+          "documento_empresa": {
+            "label": "Company Document",
+            "description": "CNPJ Card (Federal Revenue) or Articles of Incorporation"
           },
           "responsavel_id": {
             "label": "Representative ID",
@@ -1024,7 +1018,9 @@
         "editButton": "edit",
         "submitButton": "Submit registration",
         "submittingButton": "Submitting…",
-        "backButton": "← Back"
+        "backButton": "← Back",
+        "consentMarketing": "I agree to receive targeted communications and can unsubscribe at any time.",
+        "consentLegal": "By submitting my information, I agree to the <privacy>Privacy Policy</privacy> and <terms>Terms of Use</terms>."
       },
       "submitted": {
         "title": "Registration submitted",
