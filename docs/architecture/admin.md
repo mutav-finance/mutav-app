@@ -181,7 +181,7 @@ Mutav charges agencies for guarantees (per-contract activation fee + ongoing per
 **Architectural sensitivity to land before A4 ships:**
 
 - **Float sizing** is operational policy (set by treasury based on observed reversal rate × 3 buffer per [`reliability.md`](reliability.md))
-- **Quarantine window length** is policy (TBD per credit type; Pix shorter than the full 80 days if treasury appetite allows)
+- **Quarantine window length** is pending Draau input per the [Pending Treasury Decisions pack](pending-treasury-decisions.md) (Decision 3 — 7/30/80 day options with stated trade-offs)
 - **Regulatory cliff Oct 30, 2026** — BCB-supervised entities cannot transact with unauthorized VASPs after this date. Any settlement provider Mutav uses must clear the relevant BCB authorizations (IP authorization under Resolutions 494–497, May 2026 window; VASP authorization under Resolutions 519–521). Etherfuse's current status applies to the primary rail; each BaaS hedge candidate's status applies to the hedge path. Document each provider's status before integration ships.
 - **Etherfuse concentration risk.** Etherfuse is now Mutav's investor on-ramp + agency settlement primary + treasury asset issuer — three roles, one counterparty. A4's hedge-rail abstraction is the architectural mitigation; ensure at least one BaaS hedge integration is operational before any volume of agency capital flows through the system, even if Etherfuse-primary handles steady-state.
 
@@ -206,15 +206,7 @@ NAV (Net Asset Value) updates are the most safety-critical admin operation in th
   - No automated NAV updates — human-triggered with multisig consensus, always
 - **Failure path:** the regulatory-pause primitive (per [`compliance.md`](compliance.md)) is the kill switch — single-actor invocation, multisig lift.
 
-> 📌 **Pending input from Draau (treasury policy owner):** epoch length (daily? per-block? on-demand?), per-epoch change-cap percentage (initial X), pause-on-deviation tolerance percentage, and the policy for off-NAV operations during a paused state (refund queued mints? cancel queued redeems? hold?). These are policy decisions, not architecture decisions — the architecture supports any value Draau commits to. Once defined, the values live in the compliance runbook (referenced from this section) rather than inline here.
-
-> 📌 **Pending input from Draau (treasury policy owner) — deposit pricing approach.** With TESOURO as the BRL-denominated treasury asset and investor deposits arriving in USDC/USDT (per the whitepaper), three approaches are architecturally supportable:
->
-> 1. **Single BRL-denominated NAV** — Mutav converts USDC/USDT to BRL/TESOURO at spot rate on deposit; investor holdings track BRL NAV; investor takes BRL FX risk vs USD. Simplest; matches Brazilian retail expectations.
-> 2. **Dual share class (BRL + USD)** — separate MUTAV share classes; USD-denominated class is FX-hedged by Mutav. Better global UX; requires an FX hedging counterparty and more moving parts.
-> 3. **USD-denominated NAV with TESOURO underlying** — NAV computed by FX-converting TESOURO yields to USD daily; investor sees USD-stable NAV; FX volatility shows up as NAV variance. Hides FX from investor accounting but introduces daily FX oracle risk on the NAV print.
->
-> Architecture supports any of the three. Choice is policy.
+> 📌 **Pending input from Draau (treasury policy owner) — NAV update policy and deposit pricing approach.** Two of the three decisions in the [Pending Treasury Decisions pack](pending-treasury-decisions.md). NAV policy covers epoch length, per-epoch change cap, pause-on-deviation tolerance, and off-NAV operations during paused state. Deposit pricing covers BRL NAV vs dual share class vs USD NAV with TESOURO underlying. Architecture supports any combination — values land in the compliance runbook once decided.
 
 A6 will own:
 

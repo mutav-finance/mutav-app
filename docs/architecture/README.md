@@ -16,6 +16,10 @@
 - [`regulatory.md`](regulatory.md) — Brazilian regulatory floor (LGPD, CVM 175, BCB 519/2025). Constraints the architecture must satisfy.
 - [`onchain-integration.md`](onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, write path, external integrations). Shared by admin observability and investor data.
 
+**Pending decisions:**
+
+- [`pending-treasury-decisions.md`](pending-treasury-decisions.md) — Three open treasury policy decisions for Draau (NAV update policy, deposit pricing approach, Pix quarantine window). Architecture supports any answer; pack designed to be walked through in one sitting.
+
 For implementation-level concerns see the docs alongside this set: [`../auth.md`](../auth.md) (Convex function wrappers), [`../stellar-anchors.md`](../stellar-anchors.md) (anchor SEP integration). For per-domain Convex guidance see `convex/{domain}/` folders.
 
 ## Actor catalog

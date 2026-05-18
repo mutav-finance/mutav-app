@@ -42,6 +42,10 @@ gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | b
 - [`docs/architecture/regulatory.md`](docs/architecture/regulatory.md) — Brazilian regulatory floor (LGPD, CVM 175, BCB 519/2025)
 - [`docs/architecture/onchain-integration.md`](docs/architecture/onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, external integrations) — shared by admin observability and investor data
 
+**Pending decisions:**
+
+- [`docs/architecture/pending-treasury-decisions.md`](docs/architecture/pending-treasury-decisions.md) — Three open treasury policy decisions awaiting Draau input (NAV policy, deposit pricing, Pix quarantine window)
+
 Implementation-level concerns live alongside: [`docs/auth.md`](docs/auth.md) (Convex function wrappers), [`docs/stellar-anchors.md`](docs/stellar-anchors.md) (anchor SEP integration). When adding a new surface or domain, update the README catalogs before writing code. When adding a new public mutation that touches funds or accounts, consult [`docs/architecture/compliance.md`](docs/architecture/compliance.md) for the gating contract.
 
 ## Stellar concepts

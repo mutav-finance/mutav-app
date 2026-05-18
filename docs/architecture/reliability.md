@@ -69,7 +69,7 @@ Pix received          Quarantine window           Settled
 
 ### Architectural commitments
 
-- **Every reversible credit event sits in a `quarantine` state** before becoming a settled event. The quarantine duration is policy (TBD per credit type — Pix shorter than the full 80 days if treasury appetite allows; SEPA SDD ~8 weeks; etc.).
+- **Every reversible credit event sits in a `quarantine` state** before becoming a settled event. The quarantine duration is policy per credit type — for Pix specifically, see the [Pending Treasury Decisions pack § Decision 3](pending-treasury-decisions.md#decision-3--pix-quarantine-window-length) (7/30/80-day options with trade-offs); SEPA SDD ~8 weeks; etc.
 - **Quarantined events still produce audit log entries** but do not trigger downstream actions (mint, treasury credit, agency-balance update).
 - **Reversal handlers cancel quarantined events idempotently.** When the BaaS provider notifies of an MED, the matching event flips to `canceled`; if the event already settled (quarantine elapsed), the cancel handler triggers an offsetting treasury operation rather than a silent rollback — chain state is preserved, the loss is accounted for explicitly.
 - **The reconciliation primitive accounts for quarantined events separately.** "Pix balance" splits into `pending_quarantine`, `settled`, and `reversed` buckets, each reconciled against the relevant rail.
@@ -231,7 +231,7 @@ NAV is updated by a designated `treasury` role on `mutavStaff`, through the Muta
 - **Audit log captures inputs.** Not just the resulting NAV — the proposal carries active layer, liquidity layer, outstanding shares, so the computation is reproducible by external auditors at any point in history.
 - **No automated NAV updates.** No cron writes NAV. Human-triggered with multisig consensus, always.
 
-> 📌 **Pending input from Draau (treasury policy owner):** epoch length (daily? per-block? on-demand?), per-epoch change-cap percentage (X), pause-on-deviation tolerance percentage, off-NAV operations policy during a paused state. Policy decisions, not architecture decisions — the architecture enforces whatever Draau commits to. Values live in the compliance runbook once defined. Same pin in [`admin.md`](admin.md) § A6.
+> 📌 **Pending input from Draau (treasury policy owner) — NAV update policy.** Epoch length, change cap, deviation tolerance, paused-state policy — Decision 1 in the [Pending Treasury Decisions pack](pending-treasury-decisions.md). Architecture enforces whatever values Draau commits to; runbook holds the numbers.
 
 ## What this doc is not
 
