@@ -46,13 +46,6 @@ export default async function CheckoutPixPage({
     redirect({ href: `/pagar/${publicId}/stellar`, locale });
   }
 
-  // Re-fetch the same payment via the private query to get the Id<"payments">
-  // (the public query strips _id for safety). For v1 the publicId-derived
-  // path is fine since the action authorizes by chargeability, not by user.
-  const paymentRow = await preloadQuery(api.payments.useCases.getByPublicId, { publicId });
-  const fullPayment = preloadedQueryResult(paymentRow);
-  if (!fullPayment) notFound();
-
   const t = await getTranslations({ locale, namespace: "checkout.common" });
 
   return (
@@ -65,9 +58,9 @@ export default async function CheckoutPixPage({
         {t("back")}
       </Link>
       <CheckoutPixView
-        paymentId={fullPayment._id}
-        agencyId={fullPayment.agencyId}
-        totalCents={fullPayment.totalCents}
+        paymentId={payment.paymentId}
+        agencyId={payment.agencyId}
+        totalCents={payment.totalCents}
       />
     </div>
   );

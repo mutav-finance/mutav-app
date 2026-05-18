@@ -1,3 +1,5 @@
+import { v } from "convex/values";
+import { internalQuery } from "../_generated/server";
 import { queryWithAgencyScope, queryWithAuth } from "../lib/auth";
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
@@ -11,6 +13,18 @@ export const getById = queryWithAgencyScope({
   args: {},
   handler: async (ctx) => {
     return ctx.db.get(ctx.agencyId);
+  },
+});
+
+/**
+ * Internal companion to `getById` for use from actions/schedulers where
+ * caller identity may not propagate. The calling internal flow is
+ * responsible for whatever authorization is appropriate at its entry point.
+ */
+export const getByIdInternal = internalQuery({
+  args: { agencyId: v.id("agencies") },
+  handler: async (ctx, { agencyId }) => {
+    return ctx.db.get(agencyId);
   },
 });
 

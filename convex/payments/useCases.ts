@@ -17,8 +17,11 @@ export const listByAgency = queryWithAgencyScope({
 });
 
 /**
- * Resource-by-id read. Returns null on both "no such payment" and "not a
- * member of that agency", to avoid leaking cross-agency existence.
+ * Resource-by-id read. Returns null on three indistinguishable cases —
+ * payment doesn't exist, caller isn't authenticated, caller isn't a member
+ * of the payment's agency — to avoid leaking cross-agency existence. Action
+ * callers reading this should map null to `PAYMENT_NOT_FOUND` and accept
+ * the ambiguity.
  */
 export const getById = query({
   args: { paymentId: v.id("payments") },
@@ -36,7 +39,11 @@ export const getById = query({
   },
 });
 
-/** Resource-by-id read keyed on publicId. Same null-on-miss semantics. */
+/**
+ * Resource-by-id read keyed on publicId. Same null-on-miss semantics as
+ * `getById`. Agency-staff query — for tenant-bearer access from the public
+ * portal use `getPublicByPublicId` instead.
+ */
 export const getByPublicId = query({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
@@ -58,8 +65,10 @@ export const getByPublicId = query({
 
 /**
  * Tenant-safe shape for the public payment portal. No auth required — the
- * high-entropy `publicId` IS the bearer. Excludes agency-private fields,
- * carries the derived Stellar `M…` destination address.
+ * high-entropy `publicId` IS the bearer. Carries everything the tenant
+ * checkout flow needs (including `paymentId` and `agencyId`, which the
+ * checkout actions consume) plus the derived Stellar `M…` destination
+ * address. Excludes only system fields the tenant has no use for.
  */
 export const getPublicByPublicId = query({
   args: { publicId: v.string() },
@@ -76,6 +85,8 @@ export const getPublicByPublicId = query({
     const muxedAddress = payment.muxedId ? derivePaymentMuxedAddress(payment.muxedId) : null;
 
     return {
+      paymentId: payment._id,
+      agencyId: payment.agencyId,
       publicId: payment.publicId,
       agencyName: agency.name,
       periodMonth: payment.periodMonth,

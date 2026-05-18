@@ -48,10 +48,6 @@ export default async function CheckoutAnchorTestPage({
     redirect({ href: `/pagar/${publicId}/pix`, locale });
   }
 
-  const paymentRow = await preloadQuery(api.payments.useCases.getByPublicId, { publicId });
-  const fullPayment = preloadedQueryResult(paymentRow);
-  if (!fullPayment) notFound();
-
   const t = await getTranslations({ locale, namespace: "checkout.common" });
 
   return (
@@ -63,7 +59,7 @@ export default async function CheckoutAnchorTestPage({
         <ArrowLeft className="size-3" strokeWidth={1.5} />
         {t("back")}
       </Link>
-      <CheckoutAnchorTestView paymentId={fullPayment._id} totalCents={fullPayment.totalCents} />
+      <CheckoutAnchorTestView paymentId={payment.paymentId} totalCents={payment.totalCents} />
     </div>
   );
 }

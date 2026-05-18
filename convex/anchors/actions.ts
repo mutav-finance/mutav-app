@@ -1087,7 +1087,7 @@ export const onboardAgencyEtherfuseKyb = internalAction({
   },
   returns: onboardingReturnValidator,
   handler: async (ctx, args): Promise<OnboardAgencyEtherfuseResult> => {
-    const agency = await ctx.runQuery(api.agencies.useCases.getById, {
+    const agency = await ctx.runQuery(internal.agencies.useCases.getByIdInternal, {
       agencyId: args.agencyId,
     });
     if (!agency) throw new Error(`Agency ${args.agencyId} not found`);
