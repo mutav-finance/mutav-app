@@ -947,6 +947,7 @@
       "stepDoneSuffix": ": concluído",
       "stepCurrentSuffix": ": etapa atual",
       "banking": {
+        "empresaAccountNotice": "A conta bancária deve estar no nome da empresa e vinculada ao CNPJ cadastrado.",
         "bankLabel": "Banco",
         "bankPlaceholder": "Ex: Nubank, Itaú, Bradesco",
         "branchLabel": "Agência",
@@ -1000,6 +1001,8 @@
         "creciLabel": "CRECI",
         "emailLabel": "E-mail",
         "phoneLabel": "Telefone",
+        "representanteNameLabel": "Responsável",
+        "representanteCpfLabel": "CPF do responsável",
         "bankLabel": "Banco",
         "branchLabel": "Agência",
         "accountLabel": "Conta",
@@ -1027,6 +1030,9 @@
         "CPF_REQUIRED": "CPF obrigatório para corretor autônomo.",
         "CPF_INVALID": "CPF inválido. Verifique os dígitos e tente novamente.",
         "CNPJ_INVALID": "CNPJ inválido. Verifique os dígitos e tente novamente.",
+        "REPRESENTANTE_NAME_REQUIRED": "Nome do responsável obrigatório para imobiliária.",
+        "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
+        "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
         "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
         "unknown": "Erro ao salvar. Tente novamente."
       }
@@ -1047,6 +1053,10 @@
       "emailLabel": "E-mail",
       "emailPlaceholder": "contato@imobiliaria.com.br",
       "phoneLabel": "Telefone",
+      "representanteSection": "Responsável legal",
+      "representanteNameLabel": "Nome do responsável",
+      "representanteNamePlaceholder": "Nome completo",
+      "representanteCpfLabel": "CPF do responsável",
       "nextButton": "Próximo",
       "savingButton": "Salvando…",
       "errors": {
@@ -1056,7 +1066,9 @@
         "phone": "Telefone inválido.",
         "creci": "CRECI obrigatório.",
         "cpf": "CPF inválido.",
-        "cnpj": "CNPJ inválido."
+        "cnpj": "CNPJ inválido.",
+        "representanteName": "Nome do responsável obrigatório.",
+        "representanteCpf": "CPF do responsável inválido."
       }
     }
   }
