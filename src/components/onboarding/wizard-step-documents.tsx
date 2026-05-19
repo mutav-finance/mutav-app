@@ -4,12 +4,13 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import type { AgencyId } from "@convex/agencies/domain";
+import type { StorageId } from "@convex/lib/storage";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Props = {
-  agencyId: Id<"agencies">;
+  agencyId: AgencyId;
   onNext: () => void;
   onBack: () => void;
 };
@@ -101,7 +102,7 @@ export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
       ) {
         throw new Error("upload_failed");
       }
-      const storageId = (body as { storageId: Id<"_storage"> }).storageId;
+      const storageId = (body as { storageId: StorageId }).storageId;
       const result = await saveDoc({ agencyId, kind, storageId, fileName: file.name });
       if (!result.success) throw new Error(result.error.code);
       setUploadStatus((s) => ({ ...s, [kind]: "idle" }));

@@ -83,7 +83,7 @@ const onboardingState = v.union(
 
 const bankingInfo = v.object({
   bank: v.string(),
-  agency: v.string(),
+  branch: v.string(),
   account: v.string(),
   accountType: v.union(v.literal("corrente"), v.literal("poupanca")),
   pixKey: v.optional(v.string()),

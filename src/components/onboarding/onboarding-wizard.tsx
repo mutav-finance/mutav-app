@@ -4,7 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import type { AgencyId } from "@convex/agencies/domain";
 import { WizardStepIndicator } from "@/components/onboarding/wizard-step-indicator";
 import { WizardStep1 } from "@/components/onboarding/wizard-step1";
 import { WizardStepBanking, isBankAccountType } from "@/components/onboarding/wizard-step-banking";
@@ -53,7 +53,7 @@ type SubmitState = "idle" | "submitting" | "submitted";
 
 type WizardState = {
   step: number;
-  agencyId: Id<"agencies"> | null;
+  agencyId: AgencyId | null;
   data: OnboardingWizardData;
   submitState: SubmitState;
   errorCode: string | null;
@@ -63,7 +63,7 @@ type WizardAction =
   | { type: "PATCH"; patch: Partial<OnboardingWizardData> }
   | { type: "GO_TO"; step: number }
   | { type: "SUBMIT_START" }
-  | { type: "SUBMIT_SUCCESS"; agencyId?: Id<"agencies"> }
+  | { type: "SUBMIT_SUCCESS"; agencyId?: AgencyId }
   | { type: "SUBMIT_DONE" }
   | { type: "SUBMIT_ERROR"; code: string };
 
@@ -107,31 +107,23 @@ function resolveStepKind(step: number, agencyType: string): StepKind {
   return "profile";
 }
 
-type WizardErrorCode =
-  | "CNPJ_REQUIRED"
-  | "CPF_REQUIRED"
-  | "CPF_INVALID"
-  | "CNPJ_INVALID"
-  | "REPRESENTANTE_NAME_REQUIRED"
-  | "REPRESENTANTE_CPF_REQUIRED"
-  | "REPRESENTANTE_CPF_INVALID"
-  | "ALREADY_REGISTERED"
-  | "AGENCY_TYPE_CONFLICT"
-  | "INCOMPLETE_PROFILE";
+const WIZARD_ERROR_CODES = [
+  "CNPJ_REQUIRED",
+  "CPF_REQUIRED",
+  "CPF_INVALID",
+  "CNPJ_INVALID",
+  "REPRESENTANTE_NAME_REQUIRED",
+  "REPRESENTANTE_CPF_REQUIRED",
+  "REPRESENTANTE_CPF_INVALID",
+  "ALREADY_REGISTERED",
+  "AGENCY_TYPE_CONFLICT",
+  "INCOMPLETE_PROFILE",
+] as const;
+
+type WizardErrorCode = (typeof WIZARD_ERROR_CODES)[number];
 
 function isWizardErrorCode(code: string): code is WizardErrorCode {
-  return (
-    code === "CNPJ_REQUIRED" ||
-    code === "CPF_REQUIRED" ||
-    code === "CPF_INVALID" ||
-    code === "CNPJ_INVALID" ||
-    code === "REPRESENTANTE_NAME_REQUIRED" ||
-    code === "REPRESENTANTE_CPF_REQUIRED" ||
-    code === "REPRESENTANTE_CPF_INVALID" ||
-    code === "ALREADY_REGISTERED" ||
-    code === "AGENCY_TYPE_CONFLICT" ||
-    code === "INCOMPLETE_PROFILE"
-  );
+  return (WIZARD_ERROR_CODES as readonly string[]).includes(code);
 }
 
 function buildInitialState(initialType: "autonomo" | "empresa" | undefined): WizardState {
@@ -219,7 +211,7 @@ function OnboardingWizardInner({ initialType }: { initialType?: "autonomo" | "em
         agencyId: state.agencyId,
         bankingInfo: {
           bank: state.data.bankName,
-          agency: state.data.bankBranch,
+          branch: state.data.bankBranch,
           account: state.data.bankAccount,
           accountType: state.data.bankAccountType,
           pixKey: state.data.bankPixKey || undefined,
