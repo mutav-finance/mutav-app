@@ -8,12 +8,7 @@ import { anchorOrderStatusValidator, type AnchorOrder, type AnchorOrderId } from
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-/**
- * Resource-by-id read. Returns null on three indistinguishable cases —
- * order doesn't exist, caller isn't authenticated, caller isn't a member
- * of the order's agency — to avoid leaking cross-agency existence.
- * Action callers (webhook + scheduler) use `getOrderByIdInternal` instead.
- */
+// Null on miss-or-forbidden so cross-agency existence doesn't leak.
 export const getOrderById = query({
   args: { orderId: v.id("anchorOrders") },
   handler: async (ctx, args): Promise<AnchorOrder | null> => {
@@ -30,11 +25,8 @@ export const getOrderById = query({
   },
 });
 
-/**
- * Internal companion to `getOrderById` for actions that operate in
- * tenant or webhook contexts (no user identity). Used by `pollPixOnramp`
- * (webhook + UI) and `pollAnchorTestOnramp` (UI poll fallback).
- */
+// Companion for `pollPixOnramp` (webhook) + `pollAnchorTestOnramp` (UI),
+// both of which run without user identity.
 export const getOrderByIdInternal = internalQuery({
   args: { orderId: v.id("anchorOrders") },
   handler: async (ctx, args): Promise<AnchorOrder | null> => {
@@ -57,13 +49,8 @@ export const getByAnchorTxId = internalQuery({
   },
 });
 
-/**
- * All anchor orders for a given payment, newest first. The UI dialog
- * subscribes to this so it picks up status transitions reactively (no
- * client-side poll loop — the `pollPixOnramp` action drives updates).
- * Resource-by-id pattern: derives the agency from the payment and
- * gates on membership.
- */
+// Newest first. UI subscribes so status transitions land reactively
+// without a client-side poll loop — `pollPixOnramp` drives updates.
 export const listOrdersByPayment = query({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args): Promise<AnchorOrder[]> => {

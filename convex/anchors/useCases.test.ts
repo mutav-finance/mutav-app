@@ -2,58 +2,8 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
+import { seedAgencyWithMembership, seedDevUser, seedForeignAgency } from "../lib/testFixtures";
 import schema from "../schema";
-
-// Coverage for the auth wrappers applied to the anchors domain.
-// Mirrors the agencies test setup — pre-Auth0, identity resolves to the
-// hardcoded "dev-user" row that `seedDevUser` inserts.
-
-const DEV_USER_PUBLIC_ID = "dev-user";
-
-async function seedDevUser(t: ReturnType<typeof convexTest>) {
-  return t.run((ctx) =>
-    ctx.db.insert("users", {
-      publicId: DEV_USER_PUBLIC_ID,
-      name: "Dev User",
-      email: "dev@mutav.test",
-      createdAt: new Date().toISOString(),
-    }),
-  );
-}
-
-async function seedAgencyWithMembership(
-  t: ReturnType<typeof convexTest>,
-  userId: Awaited<ReturnType<typeof seedDevUser>>,
-) {
-  return t.run(async (ctx) => {
-    const agencyId = await ctx.db.insert("agencies", {
-      name: "Mutav Test Agency",
-      cnpj: "00000000000100",
-      agencyType: "empresa",
-      onboardingState: "active",
-      createdAt: new Date().toISOString(),
-    });
-    await ctx.db.insert("memberships", {
-      userId,
-      agencyId,
-      role: "owner",
-      joinedAt: new Date().toISOString(),
-    });
-    return agencyId;
-  });
-}
-
-async function seedForeignAgency(t: ReturnType<typeof convexTest>) {
-  return t.run((ctx) =>
-    ctx.db.insert("agencies", {
-      name: "Foreign Agency",
-      cnpj: "00000000000200",
-      agencyType: "empresa",
-      onboardingState: "active",
-      createdAt: new Date().toISOString(),
-    }),
-  );
-}
 
 describe("anchors.bankAccountUseCases.listByAgency (scoped wrapper)", () => {
   test("returns the agency's bank accounts for a member", async () => {
@@ -172,7 +122,8 @@ describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
     expect(order?._id).toBe(orderId);
   });
 
-  test("returns null when the order belongs to a foreign agency (no cross-agency existence leak)", async () => {
+  // Null instead of throw to avoid leaking cross-agency existence.
+  test("returns null when the order belongs to a foreign agency", async () => {
     const t = convexTest(schema);
     await seedDevUser(t);
     const foreignAgencyId = await seedForeignAgency(t);

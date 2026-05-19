@@ -13,10 +13,6 @@ import {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-/**
- * All anchor accounts for the caller's agency. Scoped via wrapper —
- * caller must be a member. Tenant-facing surfaces shouldn't need this.
- */
 export const listByAgency = queryWithAgencyScope({
   args: {},
   handler: async (ctx): Promise<AnchorAccount[]> => {

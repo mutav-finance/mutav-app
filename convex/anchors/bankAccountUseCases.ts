@@ -2,19 +2,14 @@ import { v } from "convex/values";
 
 import { internalMutation, internalQuery } from "../_generated/server";
 import { queryWithAgencyScope } from "../lib/auth";
-import type { AgencyId } from "../agencies/domain";
 import {
   agencyBankAccountTypeValidator,
   type AgencyBankAccount,
   type AgencyBankAccountId,
 } from "./bankAccountDomain";
 
-/**
- * Public list for the checkout bank picker. Reactive — re-fires after
- * `syncEtherfuseBankAccounts` upserts so the picker repopulates without
- * a manual refetch. Scoped via wrapper — caller must be a member of the
- * agency.
- */
+// Reactive so the checkout picker repopulates after
+// `syncEtherfuseBankAccounts` upserts without a manual refetch.
 export const listByAgency = queryWithAgencyScope({
   args: {},
   handler: async (ctx): Promise<AgencyBankAccount[]> => {
@@ -25,15 +20,12 @@ export const listByAgency = queryWithAgencyScope({
   },
 });
 
-/**
- * Internal companion to `listByAgency` for actions that operate in
- * tenant or webhook contexts (no user identity). The action's own
- * authorization model (publicId-bearer + chargeability, webhook HMAC,
- * scheduler trust) is the gate at the entry point.
- */
+// Companion to `listByAgency` for actions without user identity (tenant
+// publicId-bearer flows, webhooks, schedulers). Trust gate lives at the
+// action entry point.
 export const listByAgencyInternal = internalQuery({
   args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }: { agencyId: AgencyId }): Promise<AgencyBankAccount[]> => {
+  handler: async (ctx, { agencyId }): Promise<AgencyBankAccount[]> => {
     return ctx.db
       .query("agencyBankAccounts")
       .withIndex("by_agency", (q) => q.eq("agencyId", agencyId))
