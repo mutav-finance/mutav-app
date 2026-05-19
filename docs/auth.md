@@ -103,6 +103,17 @@ That swap also requires:
 
 No handler code changes. No wrapper changes. The whole codebase migrates in one PR.
 
+### Multi-entity Auth0 consideration
+
+The three-entity model from [`architecture/entities.md`](architecture/entities.md) (`Mutav-BR` + `Mutav-Fund` + `Mutav-Mgmt`) shows up at Auth0-swap time as a question about Auth0 application / tenant topology:
+
+- **Single Auth0 application, multi-role JWT** (recommended for v1): one Auth0 tenant, one application, JWT carries role claims that map to `mutavStaff` rows scoped per entity via the role's entity tag. A user with `Mutav-BR:compliance` + `Mutav-Mgmt:treasury` holds two `mutavStaff` rows. The wrapper resolution is unchanged; only the provisioning maps Auth0 group → entity-scoped `mutavStaff` row.
+- **Separate Auth0 applications per entity** (defer): one Auth0 tenant per legal entity, separate login flows, separate session cookies. Higher friction for cross-entity users (the founders, the v1 ops team); only justified if a regulator demands legal separation of the IDP layer or if the entities split operationally to different teams.
+
+For v1 the single-application option is correct — same operations team serves all three entities, cross-entity roles are normal, and the entity scope lives in the `mutavStaff` row, not in the IDP. Revisit only if entity-level operational separation makes the single-tenant ergonomics painful.
+
+Worth noting in this doc because the Auth0 swap PR is the natural moment to commit to the topology and accidentally choosing wrong creates churn.
+
 ## Strict compliance — the rule
 
 **Every public `query` or `mutation` that touches agency-scoped data MUST use a wrapper.** No bare `query({ args, handler })` for new handlers. The two allowed exceptions:

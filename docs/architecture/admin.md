@@ -1,6 +1,6 @@
 # Mutav Admin — Architecture
 
-> Mutav Admin is the surface where Mutav-internal staff operate the platform: review agency onboarding, audit liquidation requests, observe fund state, and (later) manage treasury flows. It is a distinct shell with cross-tenant access — every other surface is agency-scoped or wallet-scoped. This document covers the architectural shape of the **admin foundations bundle** (shell, role, onboarding review, default-request approval) and sketches the future pillars (fund payments, onchain observability).
+> Mutav Admin is the surface where Mutav-internal staff operate the platform across the three entities (see [`entities.md`](entities.md)): review agency onboarding (`Mutav-BR`), screen investor compliance (`Mutav-Fund`), audit liquidation requests (cross-entity), observe fund state (`Mutav-Fund`), and (later) manage NAV updates and treasury operations (`Mutav-Mgmt`). It is a distinct shell with cross-tenant access — every other surface is agency-scoped or wallet-scoped. This document covers the architectural shape of the **admin foundations bundle** (shell, role, onboarding review, default-request approval) and sketches the future pillars (fund payments, onchain observability). Sub-role scoping per entity lives in [`compliance.md`](compliance.md) § Mutav-internal capabilities by sub-role.
 
 ## Scope
 
@@ -159,31 +159,31 @@ A3 **does** own the **proposal queue UI** inside the `(admin)` shell — Mutav's
 
 ### A4 — Fund payments management
 
-Mutav charges agencies for guarantees (per-contract activation fee + ongoing percentage). The money flow: tenant pays agency invoice → agency pays Mutav SA → Mutav SA covers liquidations. The existing `payments` domain handles tenant → agency invoices (the Pix portal under `(public)/pagar/[publicId]`). A4 adds the **Mutav-side** layer: agency → Mutav settlement plus the Mutav-internal view of agency invoice state.
+`Mutav-BR` charges agencies for guarantees (per-contract activation fee + ongoing percentage). The money flow now crosses entities: tenant pays agency invoice → agency pays `Mutav-BR` → `Mutav-BR` retains 20% → `Mutav-BR` cedes 80% via cessão de recebíveis to `Mutav-Fund` (which mints TESOURO into its Stellar address) → `Mutav-Fund` covers liquidations on `Mutav-Mgmt`'s instruction (per A3). The existing `payments` domain handles tenant → agency invoices (the Pix portal under `(public)/pagar/[publicId]`). A4 adds the **Mutav-side** layer: agency → `Mutav-BR` settlement, `Mutav-BR` → `Mutav-Fund` cessão, plus the Mutav-internal view across both legs.
 
-**Treasury denomination: TESOURO.** Mutav SA holds Etherfuse's tokenized Brazilian Treasury bonds as the treasury asset — BRL-denominated, yield-bearing. Agency settlement lands in TESOURO via the primary Etherfuse rail (BRL Pix → TESOURO direct); the BaaS rail (Transfero / Bitso / Foxbit) exists as capacity/concentration hedge per [`onchain-integration.md`](onchain-integration.md) § Agency settlement.
+**Treasury denomination: TESOURO.** `Mutav-Fund` holds Etherfuse's tokenized Brazilian Treasury bonds as the treasury asset — BRL-denominated, yield-bearing. Agency settlement lands in `Mutav-BR`'s BR bank account first; the cessão step mints TESOURO into `Mutav-Fund`'s Stellar address via the primary Etherfuse rail (BRL Pix → TESOURO direct); the BaaS rail (Transfero / Bitso / Foxbit) exists as capacity/concentration hedge per [`onchain-integration.md`](onchain-integration.md) § Agency settlement. The câmbio reporting on the cessão step is owned by `Mutav-BR` per [`regulatory.md`](regulatory.md) § BACEN câmbio reporting.
 
 **A4 will own:**
 
-- The agency-settlement orchestration workflow per [`onchain-integration.md`](onchain-integration.md) — Etherfuse primary path (single-step BRL Pix → TESOURO mint) and BaaS hedge path (three-call orchestration), both with quarantine state before treasury credit
-- The Mutav TESOURO treasury float on Stellar (per [`reliability.md`](reliability.md) § Pre-funded float — float denomination is TESOURO) — admin UI for float monitoring + replenishment workflow
+- The agency-settlement orchestration workflow per [`onchain-integration.md`](onchain-integration.md) — covering both legs: agency → `Mutav-BR` Pix collection, and `Mutav-BR` → `Mutav-Fund` cessão (Etherfuse primary or BaaS hedge), both with quarantine state before treasury credit
+- The `Mutav-Fund` TESOURO treasury float on Stellar (per [`reliability.md`](reliability.md) § Pre-funded float — float denomination is TESOURO) — admin UI for float monitoring + replenishment workflow (float operations executed by `Mutav-Mgmt`)
 - The settlement provider abstraction (`convex/settlement/providers/{etherfuse,transfero,bitso,foxbit}.ts`) parallel to the KYC and anchor abstractions; Etherfuse is the primary, others are hedges
-- Mutav-admin view over the `payments` domain at the platform level (all agencies, all flows, settlement state per invoice)
-- Reconciliation primitives applied to this flow — `correlationId` from agency Pix → settlement event → onchain mint, end-to-end
-- The MED 2.0 reversal handler: when an MED reversal arrives, cancel the quarantined event (no-op onchain); if quarantine had already cleared (treasury already credited), trigger an offsetting treasury operation rather than a silent rollback
+- Mutav-admin view over the `payments` domain at the platform level (all agencies, all flows, settlement state per invoice — including which leg is in flight)
+- Reconciliation primitives applied to both legs — `correlationId` from agency Pix → `Mutav-BR` ledger → cessão event → onchain mint into `Mutav-Fund`, end-to-end. Maps to two of the three axes in [`reliability.md`](reliability.md) § Three-axis reconciliation.
+- The MED 2.0 reversal handler: when an MED reversal arrives on the agency → `Mutav-BR` leg, cancel the quarantined event (no-op onchain); if quarantine had already cleared (cessão already executed and treasury credited), trigger an offsetting treasury operation rather than a silent rollback. Cross-entity unwind requires both `Mutav-BR` and `Mutav-Mgmt` attestations.
 
 **A4 does not own:**
 
 - The settlement provider's internal Pix infrastructure (delegated to provider — Etherfuse for primary, BCB-licensed BaaS for hedge)
-- The destination chain's treasury account itself (lives in [`onchain-integration.md`](onchain-integration.md) § Contract topology)
-- Specific vendor selection — see [`regulatory.md`](regulatory.md) § Settlement provider selection criteria for the shortlist (Etherfuse primary; Transfero BaaSiC, Bitso Business, Foxbit Prime Desk as hedge candidates)
+- The destination chain's treasury account itself (lives in [`onchain-integration.md`](onchain-integration.md) § Contract topology — owned by `Mutav-Fund`, signed by `Mutav-Mgmt` keys)
+- Specific vendor selection — see [`regulatory.md`](regulatory.md) § Settlement provider selection for the shortlist (Etherfuse primary; Transfero BaaSiC, Bitso Business, Foxbit Prime Desk as hedge candidates)
 
 **Architectural sensitivity to land before A4 ships:**
 
-- **Float sizing** is operational policy (set by treasury based on observed reversal rate × 3 buffer per [`reliability.md`](reliability.md))
+- **Float sizing** is operational policy (set by `Mutav-Mgmt`'s treasury role based on observed reversal rate × 3 buffer per [`reliability.md`](reliability.md))
 - **Quarantine window length** is pending Draau input per the [Pending Treasury Decisions pack](pending-treasury-decisions.md) (Decision 3 — 7/30/80 day options with stated trade-offs)
-- **Regulatory cliff Oct 30, 2026** — BCB-supervised entities cannot transact with unauthorized VASPs after this date. Any settlement provider Mutav uses must clear the relevant BCB authorizations (IP authorization under Resolutions 494–497, May 2026 window; VASP authorization under Resolutions 519–521). Etherfuse's current status applies to the primary rail; each BaaS hedge candidate's status applies to the hedge path. Document each provider's status before integration ships.
-- **Etherfuse concentration risk.** Etherfuse is now Mutav's investor on-ramp + agency settlement primary + treasury asset issuer — three roles, one counterparty. A4's hedge-rail abstraction is the architectural mitigation; ensure at least one BaaS hedge integration is operational before any volume of agency capital flows through the system, even if Etherfuse-primary handles steady-state.
+- **Regulatory cliff Oct 30, 2026** — `Mutav-BR` cannot transact with unauthorized VASPs after this date. Any settlement provider used on `Mutav-BR`'s side must clear the relevant BCB authorizations (IP authorization under Resolutions 494–497, May 2026 window; VASP authorization under Resolutions 519–521). Etherfuse's current status applies to the primary rail; each BaaS hedge candidate's status applies to the hedge path. Document each provider's status before integration ships.
+- **Etherfuse concentration risk.** Etherfuse fills four roles across the architecture (investor on-ramp for `Mutav-Fund`, agency settlement primary for `Mutav-BR` → `Mutav-Fund` cessão, TESOURO issuer to `Mutav-Fund`, TESOURO redemption counterparty for `Mutav-Fund`) — four roles, one counterparty. A4's hedge-rail abstraction is the architectural mitigation; ensure at least one BaaS hedge integration is operational before any volume of agency capital flows through the system, even if Etherfuse-primary handles steady-state. Concentration risk also intersects with L3 (whether Etherfuse permits offshore TESOURO holding at all — see [`regulatory.md`](regulatory.md) § TESOURO as treasury asset).
 
 ### A5 — Fund-side onchain observability (sketch)
 
@@ -195,16 +195,18 @@ The indexer is the architecturally significant piece. It is documented in [`onch
 
 NAV (Net Asset Value) updates are the most safety-critical admin operation in the protocol. Wrong NAV directly causes wrong mint and redeem amounts — historically the most-prosecuted DeFi failure class (Mango Markets, Curve LP exploit, …). A6 is the architectural surface for safely operating NAV updates.
 
-**Mutav's NAV inputs simplify because treasury holds TESOURO:** per [`reliability.md`](reliability.md) § NAV safety, both NAV inputs — rental-guarantee fee income and treasury yield (TESOURO accrual) — are exogenous, well-defined, not market-quoted. The Mango / Curve oracle-manipulation failure class is architecturally inapplicable to Mutav. What remains is the discipline of _computing_ NAV correctly from those inputs and recording inputs in the audit log so external auditors can reproduce.
+**Mutav's NAV inputs simplify because `Mutav-Fund`'s treasury holds TESOURO:** per [`reliability.md`](reliability.md) § NAV safety, both NAV inputs — rental-guarantee fee income (received from `Mutav-BR` via the cessão) and treasury yield (TESOURO accrual) — are exogenous, well-defined, not market-quoted. The Mango / Curve oracle-manipulation failure class is architecturally inapplicable to Mutav. What remains is the discipline of _computing_ per-tranche NAV correctly from those inputs and recording inputs in the audit log so external auditors can reproduce.
 
-- **Authority:** Only `mutavStaff` with sub-role `treasury` (or `admin`) can propose NAV updates. Onchain commit requires multisig consensus per [`onchain-integration.md`](onchain-integration.md) and [`regulatory.md`](regulatory.md).
-- **Inputs are captured:** active layer value, liquidity layer value, outstanding shares — recorded in the audit log on every proposal so external auditors can reproduce the computation at any historical point.
+**Per-tranche NAV.** Each NAV update produces three new NAVs (one per tranche: MTVH / MTVM / MTVL — see [`tranches.md`](tranches.md)), not one. Loss waterfall (MTVH first → MTVM → MTVL) means MTVH may move more per epoch than MTVL. Per-epoch change cap applies per tranche, not globally. Pause-on-deviation tolerance is per-tranche. A6 owns the three-NAV update primitive.
+
+- **Authority:** Only `mutavStaff` with sub-role `treasury` (which serves `Mutav-Mgmt` per [`compliance.md`](compliance.md)) or `admin` can propose NAV updates. Onchain commit requires multisig consensus by `Mutav-Mgmt` signers per [`onchain-integration.md`](onchain-integration.md) and [`regulatory.md`](regulatory.md).
+- **Inputs are captured:** per-tranche active layer value, liquidity layer value, outstanding shares — recorded in the audit log on every proposal (tagged with entity code `MUTAV_MGMT` and `MUTAV_FUND`) so external auditors can reproduce the computation at any historical point.
 - **Safeguards** (full spec in [`reliability.md`](reliability.md) § NAV safety):
-  - Per-epoch change cap (NAV cannot move more than X% per update; threshold X is set by treasury policy in the compliance runbook)
-  - Monotonicity invariants where applicable (active layer's yield accrual is one-way)
-  - Pause-on-deviation circuit breaker (if indexer-observed onchain NAV differs from Convex-recorded proposal beyond tolerance, mint and redeem pause)
+  - Per-tranche per-epoch change cap (NAV cannot move more than X% per update; threshold X per tranche set by treasury policy in the compliance runbook)
+  - Monotonicity invariants where applicable (active layer's yield accrual is one-way; the waterfall is loss-side only, appreciation distributes pro-rata)
+  - Per-tranche pause-on-deviation circuit breaker (if indexer-observed onchain NAV differs from Convex-recorded proposal beyond tolerance, mint and redeem pause on that specific tranche)
   - No automated NAV updates — human-triggered with multisig consensus, always
-- **Failure path:** the regulatory-pause primitive (per [`compliance.md`](compliance.md)) is the kill switch — single-actor invocation, multisig lift.
+- **Failure path:** the regulatory-pause primitive (per [`compliance.md`](compliance.md)) is the kill switch — can be invoked per-tranche, per-fund, or global. Single-actor invocation, multisig lift.
 
 > 📌 **Pending input from Draau (treasury policy owner) — NAV update policy and deposit pricing approach.** Two of the three decisions in the [Pending Treasury Decisions pack](pending-treasury-decisions.md). NAV policy covers epoch length, per-epoch change cap, pause-on-deviation tolerance, and off-NAV operations during paused state. Deposit pricing covers BRL NAV vs dual share class vs USD NAV with TESOURO underlying. Architecture supports any combination — values land in the compliance runbook once decided.
 
@@ -245,8 +247,10 @@ The hash-chain + Merkle anchoring upgrade is the bar for CVM/BCB defensibility p
 
 ## Related reading
 
-- [`compliance.md`](compliance.md) — account types, verification levels, risk classification, limits — the gating layer that every admin operation respects
-- [`reliability.md`](reliability.md) — workflow durability for A3 liquidation, NAV safety for A6, audit log integrity
-- [`regulatory.md`](regulatory.md) — CVM/BCB/LGPD constraints that shape these pillars
-- [`onchain-integration.md`](onchain-integration.md) — indexer, multisig write path, contract topology
+- [`entities.md`](entities.md) — pillar-to-entity mapping; `Mutav-BR` vs `Mutav-Fund` vs `Mutav-Mgmt` scoping
+- [`tranches.md`](tranches.md) — MTVH/MTVM/MTVL specification; per-tranche NAV update mechanics
+- [`compliance.md`](compliance.md) — account types, verification levels, risk classification, limits, sub-role × entity matrix — the gating layer that every admin operation respects
+- [`reliability.md`](reliability.md) — workflow durability for A3 liquidation, NAV safety for A6, three-axis reconciliation for A4, audit log integrity
+- [`regulatory.md`](regulatory.md) — per-entity CVM/BCB/LGPD constraints, BACEN câmbio reporting that A4 owns
+- [`onchain-integration.md`](onchain-integration.md) — indexer, multisig write path, offshore custody, contract topology
 - [`investor.md`](investor.md) — counterpart surface; shares the indexer infrastructure

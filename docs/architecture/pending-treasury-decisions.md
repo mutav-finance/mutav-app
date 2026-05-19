@@ -4,6 +4,8 @@
 
 The decisions are interrelated — choosing one constrains the others. Read all three before answering any. The recommended reading time is ~15 minutes; the decision capture template at the end is short.
 
+**Coordination with the wider decisions queue.** PR [mutav#32](https://github.com/mutav-finance/mutav/pull/32) introduces two more decisions lists (`model-structure.md` "Decisões em Aberto" and `operational-compliance.md` "Decisões Globais") covering structural and operational-compliance decisions that are scoped to those domains. This pack stays scoped to **treasury policy**: NAV, deposit pricing, quarantine — decisions Draau owns. The full union (this pack + PR #32's two lists + [`../open-questions.md`](../open-questions.md)) is the actual decision queue; the three lists should eventually consolidate, but each currently owns a distinct slice so the duplication risk is small. See PR #32 inline comment on `operational-compliance.md:457` for the consolidation conversation.
+
 ---
 
 ## Decision 1 — NAV update policy
@@ -69,7 +71,7 @@ Recommendation: **refund mints, hold redeems** — protects customer capital, do
 
 ## Decision 2 — Investor deposit pricing approach
 
-**Question.** Investor deposits arrive in USDC/USDT (per the whitepaper); Mutav SA's treasury is **TESOURO** (BRL-denominated, yield-bearing). How is the conversion priced, and what currency does the investor's NAV print in?
+**Question.** Investor deposits arrive in USDC/USDT (per the whitepaper); `Mutav-Fund`'s treasury is **TESOURO** (BRL-denominated, yield-bearing — see [`entities.md`](entities.md)). How is the conversion priced, and what currency does the investor's NAV print in (per tranche per [`tranches.md`](tranches.md))?
 
 **Why it matters.** This is the **central UX-and-FX decision** for the investor side. It determines whether a Brazilian retail investor sees their position in BRL (intuitive) or USD (FX-volatile); whether a global investor sees a stable USD value (intuitive for them, hides BRL FX) or a BRL value (FX-volatile for them); and whether Mutav takes on any FX hedging operational burden.
 
@@ -150,14 +152,14 @@ The **right answer depends on**:
 
 ## How these decisions interact
 
-| If you choose…                    | …it constrains…                                                                                                                     |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Daily NAV epoch (1a)              | Float in 3 sized against daily expected volume × quarantine days                                                                    |
-| Tight change cap (1b)             | Faster pause-on-deviation responses; tighter operational discipline                                                                 |
-| Single BRL NAV (2a)               | NAV computation has zero FX dependency; supports an even tighter deviation tolerance (1c)                                           |
-| Dual share class (2b)             | NAV computation runs twice (one per class); reporting/audit surfaces double; FX hedging counterparty must be selected operationally |
-| 80-day quarantine (3)             | Float sizing dominates treasury capital allocation; agency settlement volume is gated by float capacity, not by Etherfuse capacity  |
-| Short quarantine + thin float (3) | Treasury bears more chargeback risk; needs explicit risk reserve sized by observed reversal rate × 3                                |
+| If you choose…                    | …it constrains…                                                                                                                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Daily NAV epoch (1a)              | Float in 3 sized against daily expected volume × quarantine days                                                                                                                                                    |
+| Tight change cap (1b)             | Faster pause-on-deviation responses; tighter operational discipline                                                                                                                                                 |
+| Single BRL NAV (2a)               | NAV computation has zero FX dependency; supports an even tighter deviation tolerance (1c)                                                                                                                           |
+| Dual share class (2b)             | NAV computation runs twice (one per class); reporting/audit surfaces double; FX hedging counterparty must be selected operationally                                                                                 |
+| 80-day quarantine (3)             | `Mutav-Fund`'s float sizing dominates treasury capital allocation; agency settlement volume is gated by float capacity, not by Etherfuse capacity (float operated by `Mutav-Mgmt` per [`entities.md`](entities.md)) |
+| Short quarantine + thin float (3) | `Mutav-Fund` bears more chargeback risk via float depletion; needs explicit risk reserve sized by observed reversal rate × 3                                                                                        |
 
 The combination Mutav launches with is **revisable**. Tighter starting bounds (shorter quarantine, lower change cap) are reversible; the inverse may not be without customer notice.
 

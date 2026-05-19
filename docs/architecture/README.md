@@ -4,17 +4,22 @@
 
 ## Detail docs
 
+**Foundations (read first):**
+
+- [`entities.md`](entities.md) — The three legal entities (`Mutav-BR` / `Mutav-Fund` / `Mutav-Mgmt`) and how they relate. Naming convention enforcement.
+- [`tranches.md`](tranches.md) — `MTVH` / `MTVM` / `MTVL` specification, default waterfall, per-tranche eligibility.
+
 **Surfaces:**
 
-- [`admin.md`](admin.md) — Mutav Admin (Mutav-internal staff surface)
-- [`investor.md`](investor.md) — Investor portal (per-chain wallet-authenticated, KYC-gated by level)
+- [`admin.md`](admin.md) — Mutav Admin (Mutav-internal staff surface, pillars A1–A6 scoped per entity)
+- [`investor.md`](investor.md) — Investor portal (per-chain wallet-authenticated, KYC-gated by level, tranche selection at deposit, dual KYC regime for BR investors)
 
 **Cross-cutting:**
 
-- [`compliance.md`](compliance.md) — Account types, verification levels, risk classification, transaction limits, capability matrix. Consulted by every state-changing handler in the protocol.
-- [`reliability.md`](reliability.md) — Reconciliation, idempotency, workflow durability, audit log integrity, NAV safety. The substrate every surface depends on.
-- [`regulatory.md`](regulatory.md) — Brazilian regulatory floor (LGPD, CVM 175, BCB 519/2025). Constraints the architecture must satisfy.
-- [`onchain-integration.md`](onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, write path, external integrations). Shared by admin observability and investor data.
+- [`compliance.md`](compliance.md) — Account types, verification levels, risk classification, transaction limits, capability matrix (with tranche dimension). Consulted by every state-changing handler in the protocol.
+- [`reliability.md`](reliability.md) — Three-axis reconciliation, idempotency, workflow durability, cross-entity flows, entity-tagged audit log, per-tranche NAV safety. The substrate every surface depends on.
+- [`regulatory.md`](regulatory.md) — Per-entity regulatory floor (LGPD, CVM oferta pública for offshore Fund, BCB 519/2025, BACEN câmbio for cross-jurisdictional flows, cessão substance risk). Constraints the architecture must satisfy.
+- [`onchain-integration.md`](onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, offshore custody chain, write path, external integrations). Shared by admin observability and investor data.
 
 **Pending decisions:**
 
@@ -22,6 +27,16 @@
 - [`pending-treasury-decisions.md`](pending-treasury-decisions.md) — Three open treasury policy decisions for Draau (NAV update policy, deposit pricing approach, Pix quarantine window). Architecture supports any answer; pack designed to be walked through in one sitting.
 
 For implementation-level concerns see the docs alongside this set: [`../auth.md`](../auth.md) (Convex function wrappers), [`../stellar-anchors.md`](../stellar-anchors.md) (anchor SEP integration). For per-domain Convex guidance see `convex/{domain}/` folders.
+
+## Entity catalog
+
+"Mutav" is the consumer brand. As a legal/operational entity it's a composite of three (see [`entities.md`](entities.md)). Every architecture sentence that names a Mutav entity in a financial / regulatory / operational sense resolves to one of these codes — bare "Mutav" is the consumer brand only.
+
+| Code         | Entity (placeholder, see PR mutav#32) | Domicile       | Function                                                                                     |
+| ------------ | ------------------------------------- | -------------- | -------------------------------------------------------------------------------------------- |
+| `Mutav-BR`   | Mutav Garantidora                     | Brazil         | Fiança under Lei do Inquilinato; receives agency fees; routes 80% via cessão to `Mutav-Fund` |
+| `Mutav-Fund` | Mutav Fund                            | Offshore (TBD) | Holds TESOURO via Etherfuse; issues `MTVH` / `MTVM` / `MTVL` tranches with default waterfall |
+| `Mutav-Mgmt` | Mutav Management                      | Offshore (TBD) | Administers `Mutav-Fund`: NAV updates, liquidation execution, treasury signing operations    |
 
 ## Actor catalog
 
@@ -113,8 +128,10 @@ The protocol crosses several trust boundaries. Each is a place where wrong assum
                                                                         │ signers (multisig)
                                                                         ▼
                                                                ┌────────────────────┐
-                                                               │  Mutav SA          │
-                                                               │  treasury ops      │
+                                                               │  Mutav-Fund        │
+                                                               │  (custody)         │
+                                                               │  + Mutav-Mgmt      │
+                                                               │  (signers)         │
                                                                └────────────────────┘
 ```
 
@@ -122,7 +139,7 @@ Boundaries (in order of blast radius):
 
 1. **Auth0 ↔ Convex** — identity boundary. Convex trusts the JWT subject; Auth0 owns user provisioning. See [`../auth.md`](../auth.md).
 2. **Wallet ↔ Convex (per chain)** — investor-only. Convex treats `(chain, address)` as the user's stable identifier. Convex does not verify wallet signatures for read; it does require wallet-signed transactions for writes (which go to chain, not Convex). One profile per (chain, wallet) — no cross-chain unification.
-3. **Convex ↔ Etherfuse (primary settlement rail)** — high-concentration counterparty. Etherfuse fills four roles: investor on-ramp (SEP-24), agency settlement primary (SEP-6 BRL Pix → TESOURO direct), **TESOURO issuer** (Mutav's treasury asset), and TESOURO redemption counterparty. Webhooks signature-verified + idempotent per [`reliability.md`](reliability.md) § Idempotency. Concentration risk explicitly acknowledged and mitigated by the BaaS hedge layer (boundary 4) and Bitso BRL1 as fallback investor on-ramp. See [`../stellar-anchors.md`](../stellar-anchors.md) and [`regulatory.md`](regulatory.md) § Etherfuse concentration.
+3. **Convex ↔ Etherfuse (primary settlement rail)** — high-concentration counterparty. Etherfuse fills four roles across two entities: investor on-ramp for `Mutav-Fund` (SEP-24), agency settlement primary for the `Mutav-BR` → `Mutav-Fund` cessão (SEP-6 BRL Pix → TESOURO direct), **TESOURO issuer** to `Mutav-Fund`, and TESOURO redemption counterparty for `Mutav-Fund`. Webhooks signature-verified + idempotent per [`reliability.md`](reliability.md) § Idempotency. Concentration risk explicitly acknowledged and mitigated by the BaaS hedge layer (boundary 4) and Bitso BRL1 as fallback investor on-ramp. **Additional load-bearing dependency:** whether Etherfuse permits an offshore entity (`Mutav-Fund`) to hold TESOURO at all — open per L3. See [`../stellar-anchors.md`](../stellar-anchors.md) and [`regulatory.md`](regulatory.md) § Etherfuse concentration.
 4. **Convex ↔ BaaS hedge (Transfero / Bitso / Foxbit)** — **capacity, concentration, and incident hedge** for the agency-settlement primary rail. Multi-hop flow (Pix → BaaS → USDC → Stellar → Etherfuse mint TESOURO) adds spread; that's the cost of the hedge. Provider must hold BCB IP + VASP authorization. See [`onchain-integration.md`](onchain-integration.md) § Agency settlement (hedge rail) and [`regulatory.md`](regulatory.md) § Settlement provider selection.
 5. **Convex ↔ Onchain (per-chain)** — chain boundary. **Read** is one-way (per-chain indexer modules pull chain state into Convex tables; see [`onchain-integration.md`](onchain-integration.md) § Per-chain indexer modules). **Write** is never initiated by Convex with key material — investor wallets sign client-side, admin writes are coordinated through a Mutav-built proposal queue in `(admin)` and signed on individual ops staff Lobstr Vaults; Convex composes XDR and submits once threshold is met but holds no keys. Segregated-account contract topology enforces separation between custody and operations (see [`onchain-integration.md`](onchain-integration.md) § Contract topology and [`regulatory.md`](regulatory.md) § Stellar implementation pattern).
 6. **Anchor ↔ Onchain reconciliation** — periodic reconciliation between Etherfuse-reported BRL float, BaaS provider-reported settlement, and onchain fund supply per [`reliability.md`](reliability.md) § Reconciliation. Mismatch trips the regulatory-pause primitive (see [`compliance.md`](compliance.md)).

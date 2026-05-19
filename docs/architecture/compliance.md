@@ -207,18 +207,25 @@ Capabilities are what an account can do, given its type, level, risk, state, and
 
 ### Investor capabilities by level
 
-| Capability                                | L0  | L1         | L2         | L3  | L4  | L5  |
-| ----------------------------------------- | --- | ---------- | ---------- | --- | --- | --- |
-| Browse funds, view NAV, view portfolio    | ✓   | ✓          | ✓          | ✓   | ✓   | ✓   |
-| Connect wallet, link account              | ✓   | ✓          | ✓          | ✓   | ✓   | ✓   |
-| Deposit (mint MUTAV)                      | —   | ✓ (capped) | ✓ (capped) | ✓   | ✓   | ✓   |
-| Redeem (burn MUTAV)                       | —   | —          | ✓ (capped) | ✓   | ✓   | ✓   |
-| Transfer tokens to other verified wallets | —   | —          | —          | ✓   | ✓   | ✓   |
-| Access qualified-investor-only products   | —   | —          | —          | —   | ✓   | ✓   |
-| Programmatic API access                   | —   | —          | —          | —   | —   | ✓   |
-| Statements + tax reports                  | —   | ✓          | ✓          | ✓   | ✓   | ✓   |
+The matrix below covers cross-cutting investor capabilities. Tranche-specific subscription capabilities (which level can hold MTVH vs MTVM vs MTVL) live in [`tranches.md`](tranches.md) § Tranche × verification-level capability matrix and are an overlay on top of these — an investor at L2 can deposit (capped) into MTVM or MTVL but not MTVH, regardless of cap headroom.
+
+| Capability                                                              | L0  | L1         | L2         | L3  | L4              | L5  |
+| ----------------------------------------------------------------------- | --- | ---------- | ---------- | --- | --------------- | --- |
+| Browse `Mutav-Fund`, view NAV, view portfolio                           | ✓   | ✓          | ✓          | ✓   | ✓               | ✓   |
+| Connect wallet, link account                                            | ✓   | ✓          | ✓          | ✓   | ✓               | ✓   |
+| Sign Subscription Agreement with `Mutav-Fund`                           | —   | ✓          | ✓          | ✓   | ✓               | ✓   |
+| Deposit MTVL / MTVM (mint, capped per tranche)                          | —   | ✓ (capped) | ✓ (capped) | ✓   | ✓               | ✓   |
+| Deposit MTVH (subordinada — see [`tranches.md`](tranches.md))           | —   | —          | —          | —   | ✓ (if L4 floor) | ✓   |
+| Redeem MTVL / MTVM (burn)                                               | —   | —          | ✓ (capped) | ✓   | ✓               | ✓   |
+| Redeem MTVH (above SitG floor)                                          | —   | —          | —          | —   | ✓               | ✓   |
+| Transfer tokens to other verified wallets                               | —   | —          | —          | ✓   | ✓               | ✓   |
+| Access qualified-investor-only products                                 | —   | —          | —          | —   | ✓               | ✓   |
+| Programmatic API access                                                 | —   | —          | —          | —   | —               | ✓   |
+| Statements + tax reports (inc. cross-jurisdiction PII for BR investors) | —   | ✓          | ✓          | ✓   | ✓               | ✓   |
 
 Risk classification overlays this: a Blocked classification removes all "✓" except read-only browse. A High classification adds friction (manual review on deposits above a threshold) without removing the capability outright.
+
+**BR investor overlay.** A BR-resident investor's tranche access is further gated by their CVM 175 classification per [`regulatory.md`](regulatory.md) § Marketing offshore Fund to BR investors. A BR L4 (qualificado) investor can subscribe to `Mutav-Fund` under the "restricted to qualified investors" oferta pública carve-out; a BR L2 (retail) investor cannot subscribe at all, even though they have L2 capabilities for everything else. The most-restrictive rule wins.
 
 ### Agency staff capabilities by role
 
@@ -236,24 +243,29 @@ Agency staff don't have verification levels (agency-side KYB is the agency's ver
 
 ### Mutav-internal capabilities by sub-role
 
-(Authoritative version in [`admin.md`](admin.md). Reproduced here for the matrix view.)
+(Authoritative version in [`admin.md`](admin.md). Reproduced here for the matrix view. The **Entity** column indicates which of the three Mutav legal entities (see [`entities.md`](entities.md)) the capability is exercised on behalf of. A Mutav-internal user can hold roles across multiple entities — for v1 the same physical operations team serves all three.)
 
-| Capability                                 | Admin | Compliance | Support       | Treasury |
-| ------------------------------------------ | ----- | ---------- | ------------- | -------- |
-| Review agency onboarding                   | ✓     | ✓          | —             | —        |
-| Approve / reject agency                    | ✓     | ✓          | —             | —        |
-| Read all agencies / contracts (no write)   | ✓     | ✓          | ✓             | ✓        |
-| Adjust investor verification level         | ✓     | ✓          | —             | —        |
-| Adjust risk classification                 | ✓     | ✓          | —             | —        |
-| Adjust limit rules                         | ✓     | ✓          | —             | —        |
-| Attest liquidation request (A3)            | ✓     | —          | —             | ✓        |
-| Propose NAV update (treasury role)         | ✓     | —          | —             | ✓        |
-| Manage `mutavStaff` (invite / role change) | ✓     | —          | —             | —        |
-| Initiate regulatory pause (kill switch)    | ✓     | ✓          | —             | ✓        |
-| View audit log (cross-domain)              | ✓     | ✓          | ✓ (read only) | ✓        |
-| Resolve support tickets                    | ✓     | —          | ✓             | —        |
+| Capability                                  | Entity                      | Admin | Compliance | Support       | Treasury |
+| ------------------------------------------- | --------------------------- | ----- | ---------- | ------------- | -------- |
+| Review agency onboarding                    | `Mutav-BR`                  | ✓     | ✓          | —             | —        |
+| Approve / reject agency                     | `Mutav-BR`                  | ✓     | ✓          | —             | —        |
+| Read all agencies / contracts (no write)    | `Mutav-BR`                  | ✓     | ✓          | ✓             | ✓        |
+| Adjust investor verification level          | `Mutav-Fund` (KYC ref)      | ✓     | ✓          | —             | —        |
+| Adjust risk classification                  | `Mutav-Fund`                | ✓     | ✓          | —             | —        |
+| Adjust limit rules                          | both                        | ✓     | ✓          | —             | —        |
+| Attest liquidation request (A3)             | cross-entity                | ✓     | —          | —             | ✓        |
+| Propose NAV update (treasury role)          | `Mutav-Mgmt` → `Mutav-Fund` | ✓     | —          | —             | ✓        |
+| Execute treasury operations (sign onchain)  | `Mutav-Mgmt`                | ✓     | —          | —             | ✓        |
+| File BACEN câmbio reports                   | `Mutav-BR`                  | ✓     | ✓          | —             | —        |
+| File offshore fund regulator reports        | `Mutav-Mgmt`                | ✓     | ✓          | —             | ✓        |
+| Manage `mutavStaff` (invite / role change)  | all                         | ✓     | —          | —             | —        |
+| Initiate regulatory pause (kill switch)     | per pause dimension         | ✓     | ✓          | —             | ✓        |
+| View audit log (cross-domain, cross-entity) | all                         | ✓     | ✓          | ✓ (read only) | ✓        |
+| Resolve support tickets                     | `Mutav-BR`                  | ✓     | —          | ✓             | —        |
 
-A Mutav-internal user can hold multiple sub-roles. Effects are additive. Role grants and revocations are themselves auditable operations performed by users with the `admin` sub-role.
+The **`treasury` sub-role serves `Mutav-Mgmt`** specifically — it's the signing role for the offshore-Fund-controlling multisig (per [`regulatory.md`](regulatory.md) § Multisig governance). The **`compliance` sub-role spans both `Mutav-BR` and `Mutav-Mgmt`** because BR-side KYC + AML and offshore-side Subscription Agreement compliance are tightly coupled (the same person screening an investor is responsible for both BCB 519 and offshore-jurisdiction AML). The **`support` sub-role is `Mutav-BR`-scoped** (tenants and agencies are the support audience; investors get separate-channel support).
+
+A Mutav-internal user can hold multiple sub-roles across multiple entities. Effects are additive. Role grants and revocations are themselves auditable operations performed by users with the `admin` sub-role; entity scoping is preserved on the audit entry (a role grant is logged as `MUTAV_BR:grant(role=compliance)` etc).
 
 ### Tenant capabilities
 
@@ -292,14 +304,16 @@ The dev `dev-user` row is provisioned at the highest available levels (L5 invest
 
 A specific architectural primitive worth naming: a single admin operation (executed by `admin`, `compliance`, or `treasury` sub-role) that pauses all state-changing operations across one dimension:
 
+- **Per-entity** (pause all `Mutav-BR` operations while `Mutav-Fund` continues, or vice versa — useful when one entity faces a regulator inquiry without contagion)
 - **Per-jurisdiction** (pause all BR investors)
 - **Per-operation** (pause all deposits across the platform)
-- **Per-fund** (pause one fund's deposits, redeems, or both)
+- **Per-tranche** (pause MTVH inflows/outflows while MTVM and MTVL continue — see [`tranches.md`](tranches.md))
+- **Per-fund** (pause `Mutav-Fund` deposits, redeems, or both)
 - **Global** (pause everything except read access)
 
-The pause is implemented as the highest-precedence limit rule (`cap = 0`, effective immediately). Lifting the pause requires multisig — single-actor lift is not allowed. This makes the kill switch trivial to invoke (one click) and intentionally hard to reverse (forces multi-actor consensus).
+The pause is implemented as the highest-precedence limit rule (`cap = 0`, effective immediately). Lifting the pause requires multisig — single-actor lift is not allowed. This makes the kill switch trivial to invoke (one click) and intentionally hard to reverse (forces multi-actor consensus). Multisig signer set depends on the pause dimension — entity-scoped pauses lift on that entity's multisig; cross-entity pauses need co-signers from both entities.
 
-Required for: BCB 519/2025 compliance posture (regulators expect this capability), reconciliation circuit breaker (see [`reliability.md`](reliability.md)), NAV deviation circuit breaker (see [`reliability.md`](reliability.md)).
+Required for: BCB 519/2025 compliance posture (regulators expect this capability for `Mutav-BR` and its counterparties), offshore fund-admin pause capability (`Mutav-Mgmt` for `Mutav-Fund`), reconciliation circuit breaker (see [`reliability.md`](reliability.md) § Three-axis reconciliation), per-tranche NAV deviation circuit breaker (see [`reliability.md`](reliability.md)).
 
 ## Out of scope for this doc
 
@@ -313,8 +327,10 @@ Required for: BCB 519/2025 compliance posture (regulators expect this capability
 ## Related reading
 
 - [`README.md`](README.md) — actor catalog, shell catalog
-- [`admin.md`](admin.md) — Mutav-staff sub-roles and review pillars; A2 is one consumer of this domain
-- [`investor.md`](investor.md) — investor account model, KYC gating at redeem
-- [`regulatory.md`](regulatory.md) — what regulators require that this domain implements
-- [`reliability.md`](reliability.md) — workflows for verification and review, audit log, regulatory pause primitive
+- [`entities.md`](entities.md) — the three Mutav entities; sub-roles in this doc scope per entity
+- [`tranches.md`](tranches.md) — MTVH/MTVM/MTVL specification and the tranche × level matrix
+- [`admin.md`](admin.md) — Mutav-staff sub-roles and review pillars (per entity); A2 is one consumer of this domain
+- [`investor.md`](investor.md) — investor account model, KYC gating at redeem, Subscription Agreement to `Mutav-Fund`
+- [`regulatory.md`](regulatory.md) — what regulators require that this domain implements (per entity)
+- [`reliability.md`](reliability.md) — workflows for verification and review, three-axis reconciliation, audit log, regulatory pause primitive
 - [`../auth.md`](../auth.md) — auth wrappers that the compliance check plugs into
