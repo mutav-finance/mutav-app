@@ -1,23 +1,34 @@
 import { v } from "convex/values";
 
-import { internalMutation, internalQuery, query } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
+import { queryWithAgencyScope } from "../lib/auth";
 import {
   agencyBankAccountTypeValidator,
   type AgencyBankAccount,
   type AgencyBankAccountId,
 } from "./bankAccountDomain";
 
-/**
- * Public list for the checkout bank picker. Reactive — re-fires after
- * `syncEtherfuseBankAccounts` upserts so the picker repopulates without
- * a manual refetch.
- */
-export const listByAgency = query({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, args): Promise<AgencyBankAccount[]> => {
+// Reactive so the checkout picker repopulates after
+// `syncEtherfuseBankAccounts` upserts without a manual refetch.
+export const listByAgency = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx): Promise<AgencyBankAccount[]> => {
     return ctx.db
       .query("agencyBankAccounts")
-      .withIndex("by_agency", (q) => q.eq("agencyId", args.agencyId))
+      .withIndex("by_agency", (q) => q.eq("agencyId", ctx.agencyId))
+      .collect();
+  },
+});
+
+// Companion to `listByAgency` for actions without user identity (tenant
+// publicId-bearer flows, webhooks, schedulers). Trust gate lives at the
+// action entry point.
+export const listByAgencyInternal = internalQuery({
+  args: { agencyId: v.id("agencies") },
+  handler: async (ctx, { agencyId }): Promise<AgencyBankAccount[]> => {
+    return ctx.db
+      .query("agencyBankAccounts")
+      .withIndex("by_agency", (q) => q.eq("agencyId", agencyId))
       .collect();
   },
 });

@@ -24,11 +24,14 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
-import type { Doc, Id } from "@convex/_generated/dataModel";
+import type { Doc } from "@convex/_generated/dataModel";
+import type { AgencyId } from "@convex/agencies/domain";
+import type { AgencyBankAccountId } from "@convex/anchors/bankAccountDomain";
+import type { PaymentId } from "@convex/payments/domain";
 
 interface Props {
-  paymentId: Id<"payments">;
-  agencyId: Id<"agencies">;
+  paymentId: PaymentId;
+  agencyId: AgencyId;
   totalCents: number;
 }
 
@@ -66,7 +69,7 @@ export function CheckoutPixView({ paymentId, agencyId, totalCents }: Props) {
   }, []);
 
   const handleConfirm = useCallback(
-    (bankAccountId: Id<"agencyBankAccounts">) => {
+    (bankAccountId: AgencyBankAccountId) => {
       setStarted(true);
       void start({ bankAccountId });
     },
@@ -97,9 +100,9 @@ function PreFlight({
   banks,
   onConfirm,
 }: {
-  agencyId: Id<"agencies">;
+  agencyId: AgencyId;
   banks: AgencyBankAccount[] | undefined;
-  onConfirm: (bankAccountId: Id<"agencyBankAccounts">) => void;
+  onConfirm: (bankAccountId: AgencyBankAccountId) => void;
 }) {
   const t = useTranslations("checkout.pix.bankSelection");
   const getRegistrationUrl = useAction(api.anchors.actions.getEtherfuseBankRegistrationUrl);
@@ -107,7 +110,7 @@ function PreFlight({
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<Id<"agencyBankAccounts"> | null>(null);
+  const [selectedId, setSelectedId] = useState<AgencyBankAccountId | null>(null);
 
   const handleAdd = useCallback(async () => {
     setActionError(null);
@@ -244,8 +247,8 @@ function BankPicker({
   onRefresh,
 }: {
   banks: AgencyBankAccount[];
-  selectedId: Id<"agencyBankAccounts">;
-  onSelect: (id: Id<"agencyBankAccounts">) => void;
+  selectedId: AgencyBankAccountId;
+  onSelect: (id: AgencyBankAccountId) => void;
   onConfirm: () => void;
   adding: boolean;
   refreshing: boolean;

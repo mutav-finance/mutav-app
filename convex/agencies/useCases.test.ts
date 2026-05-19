@@ -2,31 +2,13 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
+import { seedDevUser } from "../lib/testFixtures";
 import schema from "../schema";
-
-// Pre-Auth0: convex/lib/auth.ts resolves to a hardcoded "dev-user" row when no
-// JWT identity is present. These tests seed that row before exercising the
-// public mutations, mirroring the production dev-user pattern. Post-Auth0, the
-// wrapper will use ctx.auth.getUserIdentity() and we'll switch to
-// `t.withIdentity(...)`.
-
-const DEV_USER_PUBLIC_ID = "dev-user";
 
 // Real-valid checksums — the validators reject zero/all-same digit strings.
 const VALID_CPF = "11144477735";
 const VALID_CPF_2 = "52998224725";
 const VALID_CNPJ = "11222333000181";
-
-async function seedDevUser(t: ReturnType<typeof convexTest>) {
-  return t.run(async (ctx) => {
-    return ctx.db.insert("users", {
-      publicId: DEV_USER_PUBLIC_ID,
-      name: "Dev User",
-      email: "dev@mutav.test",
-      createdAt: new Date().toISOString(),
-    });
-  });
-}
 
 function autonomoArgs(overrides: Partial<Record<string, string>> = {}) {
   return {

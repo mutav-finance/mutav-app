@@ -6,7 +6,7 @@ import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,7 @@ import { EXIT_COST_MULTIPLIERS, RENT_MULTIPLIERS } from "@/lib/pricing/tiers";
 
 type Props = {
   data: WizardData;
-  agencyId: Id<"agencies">;
+  agencyId: AgencyId;
   onChange: (patch: Partial<WizardData>) => void;
   onComplete: (publicId: string) => void;
   onBack: () => void;

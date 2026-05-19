@@ -1,13 +1,33 @@
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery, query } from "../_generated/server";
+import { assertAgencyAccess } from "../lib/auth";
 import { PaymentMethods, PaymentStates } from "../payments/domain";
 import { anchorProviderValidator } from "./domain";
 import { anchorOrderStatusValidator, type AnchorOrder, type AnchorOrderId } from "./orderDomain";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
+// Null on miss-or-forbidden so cross-agency existence doesn't leak.
 export const getOrderById = query({
+  args: { orderId: v.id("anchorOrders") },
+  handler: async (ctx, args): Promise<AnchorOrder | null> => {
+    const order = await ctx.db.get(args.orderId);
+    if (!order) return null;
+
+    try {
+      await assertAgencyAccess(ctx, order.agencyId);
+    } catch {
+      return null;
+    }
+
+    return order;
+  },
+});
+
+// Companion for `pollPixOnramp` (webhook) + `pollAnchorTestOnramp` (UI),
+// both of which run without user identity.
+export const getOrderByIdInternal = internalQuery({
   args: { orderId: v.id("anchorOrders") },
   handler: async (ctx, args): Promise<AnchorOrder | null> => {
     return ctx.db.get(args.orderId);
@@ -26,22 +46,6 @@ export const getByAnchorTxId = internalQuery({
       .query("anchorOrders")
       .withIndex("by_anchor_tx", (q) => q.eq("anchorTxId", args.anchorTxId))
       .unique();
-  },
-});
-
-/**
- * All anchor orders for a given payment, newest first. The UI dialog
- * subscribes to this so it picks up status transitions reactively (no
- * client-side poll loop — the `pollPixOnramp` action drives updates).
- */
-export const listOrdersByPayment = query({
-  args: { paymentId: v.id("payments") },
-  handler: async (ctx, args): Promise<AnchorOrder[]> => {
-    return ctx.db
-      .query("anchorOrders")
-      .withIndex("by_payment", (q) => q.eq("paymentId", args.paymentId))
-      .order("desc")
-      .collect();
   },
 });
 

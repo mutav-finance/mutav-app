@@ -35,6 +35,7 @@ import type * as lib_result from "../lib/result.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_stellarSigner from "../lib/stellarSigner.js";
 import type * as lib_storage from "../lib/storage.js";
+import type * as lib_testFixtures from "../lib/testFixtures.js";
 import type * as payments_actions from "../payments/actions.js";
 import type * as payments_domain from "../payments/domain.js";
 import type * as payments_lib_muxedAddress from "../payments/lib/muxedAddress.js";
@@ -79,6 +80,7 @@ declare const fullApi: ApiFromModules<{
   "lib/secrets": typeof lib_secrets;
   "lib/stellarSigner": typeof lib_stellarSigner;
   "lib/storage": typeof lib_storage;
+  "lib/testFixtures": typeof lib_testFixtures;
   "payments/actions": typeof payments_actions;
   "payments/domain": typeof payments_domain;
   "payments/lib/muxedAddress": typeof payments_lib_muxedAddress;

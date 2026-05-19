@@ -13,8 +13,8 @@ import { v } from "convex/values";
 
 import type { GenericActionCtx } from "convex/server";
 import { action, internalAction } from "../_generated/server";
-import { api, internal } from "../_generated/api";
-import type { DataModel, Id } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
+import type { DataModel } from "../_generated/dataModel";
 
 type ActionCtx = GenericActionCtx<DataModel>;
 import {
@@ -28,6 +28,8 @@ import {
   type TransactionStatus as AnchorTransactionStatus,
 } from "../../src/lib/anchors/types";
 import { ASSETS } from "../../src/lib/stellar/assets";
+import type { AgencyId } from "../agencies/domain";
+import type { PaymentId } from "../payments/domain";
 import {
   getEtherfuseApiKey,
   getEtherfuseBaseUrl,
@@ -37,14 +39,16 @@ import {
 } from "../lib/env";
 import { decryptSecret, encryptSecret } from "../lib/secrets";
 import { getTreasurySigner } from "../lib/stellarSigner";
-import { ANCHOR_ONBOARDING_STATUS } from "./accountDomain";
+import { ANCHOR_ONBOARDING_STATUS, type AnchorAccountId } from "./accountDomain";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
   ANCHOR_ORDER_STATUS,
   anchorOrderStatusValidator,
   isTerminal,
   type AnchorOrderStatus,
+  type AnchorOrderId,
 } from "./orderDomain";
+import type { AgencyBankAccountId } from "./bankAccountDomain";
 import { isChargeable } from "../payments/domain";
 
 type CurrencyStatus = "live" | "dead" | "test" | "private";
@@ -330,18 +334,18 @@ function classifySepError(err: SepApiError): AnchorStartError {
 }
 
 type StartPixOnrampResult =
-  | { success: true; data: { orderId: Id<"anchorOrders">; anchorTxId: string } }
+  | { success: true; data: { orderId: AnchorOrderId; anchorTxId: string } }
   | { success: false; error: AnchorStartError };
 
 type StartAnchorTestOnrampResult =
   | {
       success: true;
-      data: { orderId: Id<"anchorOrders">; anchorTxId: string; hostedUrl: string };
+      data: { orderId: AnchorOrderId; anchorTxId: string; hostedUrl: string };
     }
   | { success: false; error: AnchorStartError };
 
 interface PollPixOnrampResult {
-  orderId: Id<"anchorOrders">;
+  orderId: AnchorOrderId;
   status: AnchorOrderStatus;
   terminal: boolean;
 }
@@ -486,7 +490,7 @@ export const pollPixOnramp = action({
     terminal: v.boolean(),
   }),
   handler: async (ctx, args): Promise<PollPixOnrampResult> => {
-    const order = await ctx.runQuery(api.anchors.orderUseCases.getOrderById, {
+    const order = await ctx.runQuery(internal.anchors.orderUseCases.getOrderByIdInternal, {
       orderId: args.orderId,
     });
     if (!order) throw new Error(`Anchor order ${args.orderId} not found`);
@@ -661,7 +665,7 @@ export const pollAnchorTestOnramp = action({
     terminal: v.boolean(),
   }),
   handler: async (ctx, args): Promise<PollPixOnrampResult> => {
-    const order = await ctx.runQuery(api.anchors.orderUseCases.getOrderById, {
+    const order = await ctx.runQuery(internal.anchors.orderUseCases.getOrderByIdInternal, {
       orderId: args.orderId,
     });
     if (!order) throw new Error(`Anchor order ${args.orderId} not found`);
@@ -726,7 +730,7 @@ function getStellarNetworkPassphrase(): string {
 }
 
 type ProvisionAgencyEtherfuseAccountResult = {
-  accountId: Id<"anchorAccounts">;
+  accountId: AnchorAccountId;
   publicKey: string;
   transactionHash: string;
   alreadyProvisioned: boolean;
@@ -786,7 +790,7 @@ export const provisionAgencyEtherfuseAccount = internalAction({
     // did make it on-chain in a prior failed run) lines up, otherwise
     // mint a new one.
     let proxyKeypair: Keypair;
-    let accountId: Id<"anchorAccounts">;
+    let accountId: AnchorAccountId;
     let publicKey: string;
     if (existing?.data.provider === "etherfuse") {
       proxyKeypair = Keypair.fromSecret(decryptSecret(existing.data.encryptedSecret));
@@ -929,7 +933,7 @@ type OnboardAgencyEtherfuseAddress = {
 };
 
 type OnboardAgencyEtherfuseResult = {
-  accountId: Id<"anchorAccounts">;
+  accountId: AnchorAccountId;
   publicKey: string;
   customerId: string;
   kycStatus: string;
@@ -964,7 +968,7 @@ const onboardingReturnValidator = v.object({
 async function performEtherfuseOnboarding(
   ctx: ActionCtx,
   args: {
-    agencyId: Id<"agencies">;
+    agencyId: AgencyId;
     contactPerson: OnboardAgencyEtherfuseContactPerson;
     address: OnboardAgencyEtherfuseAddress;
     idNumber: { value: string; type: "CPF" | "CNPJ" };
@@ -1385,10 +1389,10 @@ function etherfusePixInstructions(pixData: {
 }
 
 type EtherfuseStartContext = {
-  paymentId: Id<"payments">;
-  agencyId: Id<"agencies">;
+  paymentId: PaymentId;
+  agencyId: AgencyId;
   amountBRLCents: number;
-  bankAccountId?: Id<"agencyBankAccounts">;
+  bankAccountId?: AgencyBankAccountId;
 };
 
 async function startEtherfusePixOnramp(
@@ -1446,7 +1450,7 @@ async function startEtherfusePixOnramp(
     }
     externalBankAccountId = bank.externalBankAccountId;
   } else {
-    const banks = await ctx.runQuery(api.anchors.bankAccountUseCases.listByAgency, {
+    const banks = await ctx.runQuery(internal.anchors.bankAccountUseCases.listByAgencyInternal, {
       agencyId: context.agencyId,
     });
     if (banks.length === 0) {
@@ -1546,7 +1550,7 @@ async function startEtherfusePixOnramp(
 
 async function pollEtherfusePixOnramp(
   ctx: ActionCtx,
-  order: { _id: Id<"anchorOrders">; anchorTxId: string; paymentId: Id<"payments"> },
+  order: { _id: AnchorOrderId; anchorTxId: string; paymentId: PaymentId },
 ): Promise<PollPixOnrampResult> {
   const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
