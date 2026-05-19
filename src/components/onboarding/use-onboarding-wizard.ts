@@ -6,6 +6,7 @@ import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 import { isBankAccountType } from "@/components/onboarding/use-wizard-step-banking";
+import type { ProfileFormValues } from "@/components/onboarding/schemas/profile-schema";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ type WizardState = {
 
 type WizardAction =
   | { type: "PATCH"; patch: Partial<OnboardingWizardData> }
+  | { type: "SAVE_PROFILE"; values: ProfileFormValues }
   | { type: "GO_TO"; step: number }
   | { type: "SUBMIT_START" }
   | { type: "SUBMIT_SUCCESS"; agencyId?: AgencyId }
@@ -69,6 +71,26 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   switch (action.type) {
     case "PATCH":
       return { ...state, data: { ...state.data, ...action.patch } };
+    case "SAVE_PROFILE":
+      // Step1 (RHF) hands the wizard a validated snapshot. Persisted so the
+      // review screen can render it and so going back to step1 prefills.
+      return {
+        ...state,
+        data: {
+          ...state.data,
+          agencyType: action.values.agencyType,
+          name: action.values.name,
+          email: action.values.email,
+          phone: action.values.phone,
+          creci: action.values.creci,
+          cpf: action.values.agencyType === "autonomo" ? action.values.cpf : "",
+          cnpj: action.values.agencyType === "empresa" ? action.values.cnpj : "",
+          representanteName:
+            action.values.agencyType === "empresa" ? action.values.representanteName : "",
+          representanteCpf:
+            action.values.agencyType === "empresa" ? action.values.representanteCpf : "",
+        },
+      };
     case "GO_TO":
       return { ...state, step: action.step };
     case "SUBMIT_START":
@@ -161,20 +183,28 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
     return [perfil, contaBancaria, revisao];
   }, [state.data.agencyType, t]);
 
-  const handleStep1Next = React.useCallback(
-    async (agencyType: "autonomo" | "empresa") => {
+  const handleStep1Submit = React.useCallback(
+    async (values: ProfileFormValues) => {
+      // Schema's superRefine rejects empty agencyType; if we got here it's
+      // narrowed by validation, not by TS.
+      if (values.agencyType === "") {
+        dispatch({ type: "SUBMIT_ERROR", code: "INCOMPLETE_PROFILE" });
+        return;
+      }
+      const agencyType = values.agencyType;
+      dispatch({ type: "SAVE_PROFILE", values });
       dispatch({ type: "SUBMIT_START" });
       try {
         const result = await startOnboarding({
           agencyType,
-          name: state.data.name,
-          email: state.data.email,
-          phone: state.data.phone,
-          creci: state.data.creci,
-          cpf: agencyType === "autonomo" ? state.data.cpf : undefined,
-          cnpj: agencyType === "empresa" ? state.data.cnpj : undefined,
-          representanteName: agencyType === "empresa" ? state.data.representanteName : undefined,
-          representanteCpf: agencyType === "empresa" ? state.data.representanteCpf : undefined,
+          name: values.name,
+          email: values.email,
+          phone: values.phone,
+          creci: values.creci,
+          cpf: agencyType === "autonomo" ? values.cpf : undefined,
+          cnpj: agencyType === "empresa" ? values.cnpj : undefined,
+          representanteName: agencyType === "empresa" ? values.representanteName : undefined,
+          representanteCpf: agencyType === "empresa" ? values.representanteCpf : undefined,
         });
         if (!result.success) {
           dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
@@ -185,7 +215,7 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
         dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
       }
     },
-    [startOnboarding, state.data],
+    [startOnboarding],
   );
 
   const handleBankingNext = React.useCallback(async () => {
@@ -267,9 +297,10 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
     isSubmitting: state.submitState === "submitting",
     isSubmitted: state.submitState === "submitted",
     agencyId: state.agencyId,
+    errorCode: state.errorCode,
     errorMessage,
     patch,
-    handleStep1Next,
+    handleStep1Submit,
     handleBankingNext,
     handleDocumentsNext,
     handleSubmit,

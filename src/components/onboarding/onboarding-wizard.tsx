@@ -50,9 +50,9 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
 
       {vm.stepKind === "profile" && (
         <WizardStep1
-          data={vm.data}
-          onChange={vm.patch}
-          onNext={vm.handleStep1Next}
+          initialValues={vm.data}
+          serverErrorCode={vm.errorCode}
+          onSubmit={vm.handleStep1Submit}
           isSubmitting={vm.isSubmitting}
         />
       )}
