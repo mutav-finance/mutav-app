@@ -1,9 +1,18 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
-import { api } from "../_generated/api";
+import { beforeAll, describe, expect, test } from "vitest";
+import { api, internal } from "../_generated/api";
+import { hashPii } from "../lib/pii";
 import { seedDevUser } from "../lib/testFixtures";
 import schema from "../schema";
+
+// PII crypto keys must be present before any handler calls hashPii.
+// The submitOnboarding path computes the documentHash for the CPF/CNPJ
+// claim row; without these, every happy-path submit test would throw.
+beforeAll(() => {
+  process.env.PII_ENCRYPTION_KEY = Buffer.from(new Uint8Array(32).fill(0xaa)).toString("base64");
+  process.env.PII_HMAC_KEY = Buffer.from(new Uint8Array(32).fill(0xbb)).toString("base64");
+});
 
 // Real-valid checksums — the validators reject zero/all-same digit strings.
 const VALID_CPF = "11144477735";
@@ -304,7 +313,158 @@ describe("submitOnboarding", () => {
     const agency = await t.run((ctx) => ctx.db.get(agencyId));
     expect(agency?.consentMarketing).toBe(true);
   });
+
+  test("inserts a claimedDocuments row carrying the HMAC, not the plaintext", async () => {
+    const t = convexTest(schema);
+    await seedDevUser(t);
+
+    const start = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    expect(start.success).toBe(true);
+    if (!start.success) return;
+    const agencyId = start.data.agencyId;
+
+    await t.mutation(api.agencies.useCases.saveBankingInfo, {
+      agencyId,
+      bankingInfo: { bank: "Nu", branch: "1", account: "1", accountType: "corrente" },
+    });
+    await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+
+    const claims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(claims).toHaveLength(1);
+    expect(claims[0].agencyId).toBe(agencyId);
+    expect(claims[0].documentHash).not.toBe(VALID_CPF);
+    expect(claims[0].documentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(claims[0].documentHash).toBe(await hashPii(VALID_CPF));
+  });
+
+  test("ALREADY_REGISTERED when a concurrent agency claimed the same CPF first", async () => {
+    const t = convexTest(schema);
+    const userId = await seedDevUser(t);
+
+    const [agencyA, agencyB] = await Promise.all([
+      seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency A"),
+      seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency B"),
+    ]);
+
+    // Sequential, but the second one observes the first's claim row — same
+    // semantic outcome as Convex OCC retrying the loser.
+    const [resultA, resultB] = await Promise.all([
+      t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA }),
+      t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyB }),
+    ]);
+
+    const successes = [resultA, resultB].filter((r) => r.success);
+    const failures = [resultA, resultB].filter((r) => !r.success);
+    expect(successes).toHaveLength(1);
+    expect(failures).toHaveLength(1);
+    const failure = failures[0];
+    if (failure.success) return;
+    expect(failure.error.code).toBe("ALREADY_REGISTERED");
+
+    const claims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(claims).toHaveLength(1);
+  });
+
+  test("submitting twice for the same agency is idempotent at the claim layer", async () => {
+    const t = convexTest(schema);
+    const userId = await seedDevUser(t);
+    const agencyId = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Solo");
+
+    const first = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    expect(first.success).toBe(true);
+
+    // Manually flip back to in_progress to exercise the "same-agency" branch
+    // of the claim check; in production this can't happen, but it exercises
+    // the `existingClaim.agencyId === agencyId` short-circuit.
+    await t.run((ctx) => ctx.db.patch(agencyId, { onboardingState: "in_progress" }));
+    const second = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    expect(second.success).toBe(true);
+
+    const claims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(claims).toHaveLength(1);
+  });
 });
+
+describe("reviewOnboarding (claim lifecycle)", () => {
+  test("rejecting frees the claim so the same CPF can re-register", async () => {
+    const t = convexTest(schema);
+    const userId = await seedDevUser(t);
+
+    const agencyA = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency A");
+    const submitA = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA });
+    expect(submitA.success).toBe(true);
+
+    const reject = await t.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
+      agencyId: agencyA,
+      decision: "rejected",
+      rejectionReason: "test",
+    });
+    expect(reject.success).toBe(true);
+
+    const claimsAfterReject = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(claimsAfterReject).toHaveLength(0);
+
+    // A fresh agency claims the now-free CPF.
+    const agencyB = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency B");
+    const submitB = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyB });
+    expect(submitB.success).toBe(true);
+
+    const finalClaims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(finalClaims).toHaveLength(1);
+    expect(finalClaims[0].agencyId).toBe(agencyB);
+  });
+
+  test("approving retains the claim — no other agency can take the CPF", async () => {
+    const t = convexTest(schema);
+    const userId = await seedDevUser(t);
+
+    const agencyA = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency A");
+    await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA });
+    const approve = await t.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
+      agencyId: agencyA,
+      decision: "approved",
+    });
+    expect(approve.success).toBe(true);
+
+    const claims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(claims).toHaveLength(1);
+    expect(claims[0].agencyId).toBe(agencyA);
+
+    const agencyB = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency B");
+    const submitB = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyB });
+    expect(submitB.success).toBe(false);
+    if (submitB.success) return;
+    expect(submitB.error.code).toBe("ALREADY_REGISTERED");
+  });
+});
+
+async function seedReadyAutonomoAgency(
+  t: ReturnType<typeof convexTest>,
+  userId: Awaited<ReturnType<typeof seedDevUser>>,
+  cpf: string,
+  name: string,
+) {
+  return t.run(async (ctx) => {
+    const agencyId = await ctx.db.insert("agencies", {
+      name,
+      cpf,
+      email: `${name.toLowerCase().replace(/\s+/g, "")}@test.br`,
+      phone: "11999999999",
+      creci: "CRECI-F 12345",
+      agencyType: "autonomo",
+      onboardingState: "in_progress",
+      createdAt: new Date().toISOString(),
+      bankingInfo: { bank: "Test", branch: "0001", account: "12345-6", accountType: "corrente" },
+    });
+    await ctx.db.insert("memberships", {
+      userId,
+      agencyId,
+      role: "owner",
+      joinedAt: new Date().toISOString(),
+    });
+    return agencyId;
+  });
+}
 
 describe("saveBankingInfo (agency-scope wrapper)", () => {
   test("succeeds when caller is a member of the agency", async () => {

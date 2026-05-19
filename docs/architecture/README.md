@@ -19,14 +19,19 @@
 - [`compliance.md`](compliance.md) — Account types, verification levels, risk classification, transaction limits, capability matrix (with tranche dimension). Consulted by every state-changing handler in the protocol.
 - [`reliability.md`](reliability.md) — Three-axis reconciliation, idempotency, workflow durability, cross-entity flows, entity-tagged audit log, per-tranche NAV safety. The substrate every surface depends on.
 - [`regulatory.md`](regulatory.md) — Per-entity regulatory floor (LGPD, CVM oferta pública for offshore Fund, BCB 519/2025, BACEN câmbio for cross-jurisdictional flows, cessão substance risk). Constraints the architecture must satisfy.
+- [`security.md`](security.md) — Secrets and PII crypto: threat model, asset inventory, two-key envelope + hash sidecar pattern, key management lifecycle (generation / storage / rotation / audit / recovery), per-entity isolation roadmap. The "how" behind the LGPD floor.
 - [`onchain-integration.md`](onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, offshore custody chain, write path, external integrations). Shared by admin observability and investor data.
+
+**Architecture decisions:**
+
+- [`decisions/`](decisions/) — Numbered ADRs documenting load-bearing decisions. Start with [`0001-pii-crypto-pattern.md`](decisions/0001-pii-crypto-pattern.md) (two-key envelope + hash sidecar — the rationale [`security.md`](security.md) implements).
 
 **Pending decisions:**
 
 - [`../open-questions.md`](../open-questions.md) — Master index of unresolved questions across legal, treasury policy, vendor selection, and engineering deferrals. Start here when you need to know "what's still open."
 - [`pending-treasury-decisions.md`](pending-treasury-decisions.md) — Three open treasury policy decisions for Draau (NAV update policy, deposit pricing approach, Pix quarantine window). Architecture supports any answer; pack designed to be walked through in one sitting.
 
-For implementation-level concerns see the docs alongside this set: [`../auth.md`](../auth.md) (Convex function wrappers), [`../stellar-anchors.md`](../stellar-anchors.md) (anchor SEP integration). For per-domain Convex guidance see `convex/{domain}/` folders.
+For implementation-level concerns see the docs alongside this set: [`../auth.md`](../auth.md) (Convex function wrappers), [`../stellar-anchors.md`](../stellar-anchors.md) (anchor SEP integration), [`../key-management-guide.md`](../key-management-guide.md) (hands-on key handling for engineers). For per-domain Convex guidance see `convex/{domain}/` folders.
 
 ## Entity catalog
 

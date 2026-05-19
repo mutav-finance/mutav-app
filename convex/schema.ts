@@ -418,4 +418,20 @@ export default defineSchema({
   })
     .index("by_agency", ["agencyId"])
     .index("by_agency_kind", ["agencyId", "kind"]),
+
+  // Server-side claim on a national document (CPF | CNPJ). The row stores
+  // only the HMAC-SHA256 of the document (`hashPii(digits)`); the
+  // plaintext lives only in the encrypted columns of the owning agency.
+  // Inserted by `submitOnboarding` *before* patching the agency state, so
+  // two concurrent submissions for the same document race on the same
+  // `by_documentHash` row — Convex OCC serializes, the loser fails its
+  // read-set conflict and on retry returns ALREADY_REGISTERED.
+  //
+  // Lifecycle: insert on submit, delete on `reviewOnboarding(rejected)`
+  // (CPF freed), retain on `reviewOnboarding(approved)` (agency ACTIVE).
+  claimedDocuments: defineTable({
+    documentHash: v.string(),
+    agencyId: v.id("agencies"),
+    claimedAt: v.string(),
+  }).index("by_documentHash", ["documentHash"]),
 });

@@ -6,6 +6,7 @@ import {
   queryWithAgencyScope,
   queryWithAuth,
 } from "../lib/auth";
+import { hashPii } from "../lib/pii";
 import type { Result } from "../lib/result";
 import {
   AGENCY_TYPE,
@@ -488,58 +489,6 @@ export const submitOnboarding = mutationWithAgencyScope({
       };
     }
 
-    // Garante unicidade de CPF/CNPJ no momento da submissão — é aqui que o cadastro
-    // se torna "ocupado". Dois usuários podem estar IN_PROGRESS com o mesmo documento,
-    // mas apenas o primeiro a submeter passa.
-    //
-    // KNOWN RACE — both writers see "no other SUBMITTED row" simultaneously and both
-    // patch their agency to SUBMITTED. Convex OCC can't catch it because the patches
-    // target distinct rows. Acceptable for the MVP: manual review (reviewOnboarding
-    // in convex/agencies/adminUseCases.ts) catches duplicates before either agency
-    // reaches ACTIVE. To eliminate the race, add a `claimedDocuments` table keyed by
-    // (cpf|cnpj) and upsert here before the patch — Convex's serialization on a
-    // single document would force the second writer to fail. Tracked in
-    // .claude/notes/deferred-conventions.md.
-    if (agency.agencyType === AGENCY_TYPE.AUTONOMO && agency.cpf) {
-      const cpf = agency.cpf;
-      const existing = await ctx.db
-        .query("agencies")
-        .withIndex("by_cpf", (q) => q.eq("cpf", cpf))
-        .first();
-      if (
-        existing &&
-        existing._id !== agencyId &&
-        existing.onboardingState !== ONBOARDING_STATE.REJECTED &&
-        existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS
-      ) {
-        return {
-          success: false,
-          error: { code: "ALREADY_REGISTERED" },
-          message: "CPF already registered with another submitted agency",
-        };
-      }
-    }
-
-    if (agency.agencyType === AGENCY_TYPE.EMPRESA && agency.cnpj) {
-      const cnpj = agency.cnpj;
-      const existing = await ctx.db
-        .query("agencies")
-        .withIndex("by_cnpj", (q) => q.eq("cnpj", cnpj))
-        .first();
-      if (
-        existing &&
-        existing._id !== agencyId &&
-        existing.onboardingState !== ONBOARDING_STATE.REJECTED &&
-        existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS
-      ) {
-        return {
-          success: false,
-          error: { code: "ALREADY_REGISTERED" },
-          message: "CNPJ already registered with another submitted agency",
-        };
-      }
-    }
-
     if (agency.agencyType === AGENCY_TYPE.EMPRESA) {
       const documents = await ctx.db
         .query("agencyDocuments")
@@ -555,6 +504,35 @@ export const submitOnboarding = mutationWithAgencyScope({
           error: { code: "MISSING_DOCUMENTS", missing },
           message: `Missing required documents: ${missing.join(", ")}`,
         };
+      }
+    }
+
+    // Claim the national document via its HMAC sidecar. Two concurrent
+    // submissions for the same CPF/CNPJ race on the by_documentHash read
+    // set; Convex OCC serializes the inserts, the loser retries and the
+    // retry observes the existing row and exits via ALREADY_REGISTERED.
+    // Replaces the prior agency-row scan, which couldn't catch the race
+    // because the patches targeted distinct rows.
+    const document = agency.agencyType === AGENCY_TYPE.AUTONOMO ? agency.cpf : agency.cnpj;
+    if (document) {
+      const documentHash = await hashPii(document);
+      const existingClaim = await ctx.db
+        .query("claimedDocuments")
+        .withIndex("by_documentHash", (q) => q.eq("documentHash", documentHash))
+        .first();
+      if (existingClaim && existingClaim.agencyId !== agencyId) {
+        return {
+          success: false,
+          error: { code: "ALREADY_REGISTERED" },
+          message: "Document already registered with another agency",
+        };
+      }
+      if (!existingClaim) {
+        await ctx.db.insert("claimedDocuments", {
+          documentHash,
+          agencyId,
+          claimedAt: new Date().toISOString(),
+        });
       }
     }
 

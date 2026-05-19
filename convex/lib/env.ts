@@ -155,3 +155,60 @@ export function getStellarSecretEncryptionKey(): Buffer {
   }
   return key;
 }
+
+/**
+ * 32-byte base64-encoded AES-256-GCM key for PII envelope encryption
+ * (`convex/lib/pii.ts:encryptPii` / `decryptPii`). Separate from the
+ * Stellar secret key and from the HMAC key below — compromise of one
+ * MUST NOT compromise the others.
+ *
+ * Generate dev/preview keys with `openssl rand -base64 32` and set via
+ * `bunx convex env set PII_ENCRYPTION_KEY <base64>`. Production rotates
+ * to a managed secret per `.claude/notes/deferred-conventions.md`.
+ */
+export function getPiiEncryptionKey(): Buffer {
+  const raw = process.env.PII_ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error(
+      "PII_ENCRYPTION_KEY is not set. " +
+        "PII field encryption requires a 32-byte key. " +
+        "Generate one via `openssl rand -base64 32` and set with " +
+        "`bunx convex env set PII_ENCRYPTION_KEY <base64>`.",
+    );
+  }
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new Error(`PII_ENCRYPTION_KEY must decode to 32 bytes (AES-256); got ${key.length}.`);
+  }
+  return key;
+}
+
+/**
+ * 32-byte base64-encoded HMAC-SHA256 key for PII equality lookups
+ * (`convex/lib/pii.ts:hashPii`). The pepper that makes CPF's ~10¹¹
+ * keyspace non-enumerable.
+ *
+ * MUST be a separate secret from `PII_ENCRYPTION_KEY` — two keys means
+ * compromise of one ≠ compromise of both. Rotation invalidates every
+ * existing `*Hash` column, so a future rotation needs a re-hash
+ * migration; treat as long-lived.
+ *
+ * Generate dev/preview keys with `openssl rand -base64 32` and set via
+ * `bunx convex env set PII_HMAC_KEY <base64>`.
+ */
+export function getPiiHmacKey(): Buffer {
+  const raw = process.env.PII_HMAC_KEY;
+  if (!raw) {
+    throw new Error(
+      "PII_HMAC_KEY is not set. " +
+        "PII hash lookups require a 32-byte HMAC key. " +
+        "Generate one via `openssl rand -base64 32` and set with " +
+        "`bunx convex env set PII_HMAC_KEY <base64>`.",
+    );
+  }
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new Error(`PII_HMAC_KEY must decode to 32 bytes; got ${key.length}.`);
+  }
+  return key;
+}

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "../_generated/server";
-import { ONBOARDING_STATE } from "./domain";
+import { hashPii } from "../lib/pii";
+import { AGENCY_TYPE, ONBOARDING_STATE } from "./domain";
 
 // ─── KYC / KYB review — funções internas para o admin dashboard ───────────────
 //
@@ -88,6 +89,21 @@ export const reviewOnboarding = internalMutation({
     if (decision === "approved") {
       await ctx.db.patch(agencyId, { onboardingState: ONBOARDING_STATE.ACTIVE });
     } else {
+      // Free the claimedDocuments row so the rejected document is
+      // available for a fresh registration. Approved agencies retain
+      // their claim — that's what blocks re-use after activation.
+      const document = agency.agencyType === AGENCY_TYPE.AUTONOMO ? agency.cpf : agency.cnpj;
+      if (document) {
+        const documentHash = await hashPii(document);
+        const claim = await ctx.db
+          .query("claimedDocuments")
+          .withIndex("by_documentHash", (q) => q.eq("documentHash", documentHash))
+          .first();
+        if (claim && claim.agencyId === agencyId) {
+          await ctx.db.delete(claim._id);
+        }
+      }
+
       await ctx.db.patch(agencyId, {
         onboardingState: ONBOARDING_STATE.REJECTED,
         onboardingRejectionReason: rejectionReason,

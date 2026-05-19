@@ -20,6 +20,8 @@ The three-entity split was chosen partly to keep `Mutav-BR` outside the fund reg
 
 Brazil's general data protection law (Lei Geral de Proteção de Dados) sets the floor for handling personal data. Applies to any entity handling PII of Brazilian residents — so `Mutav-BR` directly (it operates in Brazil), and `Mutav-Fund` / `Mutav-Mgmt` to the extent they process PII of BR investors.
 
+> The "how" of the constraints below — the two-key envelope + hash sidecar pattern, the V8/Node runtime split, the key management lifecycle from env-derived dev to managed-secret production, anti-patterns enforced by lint — lives in [`security.md`](security.md). This section defines what LGPD requires; `security.md` defines how the architecture meets it.
+
 ### Architectural constraints
 
 1. **Cross-border data transfer is allowed with disclosure.** Convex is hosted in the US (AWS). LGPD does not strictly require BR residency for personal data, but cross-border transfer requires (a) a documented legal basis — typically Standard Contractual Clauses (SCCs), (b) disclosure in the privacy policy, (c) data subject notification on first use. The cross-jurisdictional flow (BR investor → Mutav-Fund offshore) is itself a cross-border transfer that LGPD covers.
