@@ -12,11 +12,12 @@ import {
   BANK_ACCOUNT_TYPE,
   BANKING_FORM_DEFAULTS,
   bankingSchema,
+  type BankingFormInput,
   type BankingFormValues,
 } from "@/components/onboarding/schemas/banking-schema";
 
 type Props = {
-  initialValues?: Partial<BankingFormValues>;
+  initialValues?: Partial<BankingFormInput>;
   serverErrorCode?: string | null;
   agencyType: "" | "autonomo" | "empresa";
   onSubmit: (values: BankingFormValues) => void;
@@ -24,7 +25,7 @@ type Props = {
   isSubmitting: boolean;
 };
 
-const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof BankingFormValues>> = {
+const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof BankingFormInput>> = {
   BANK_REQUIRED: "bankName",
   BRANCH_REQUIRED: "bankBranch",
   ACCOUNT_REQUIRED: "bankAccount",
@@ -42,7 +43,7 @@ export function WizardStepBanking({
   const t = useTranslations("onboarding.wizard.banking");
   const accountTypeLabelId = React.useId();
 
-  const form = useForm<BankingFormValues>({
+  const form = useForm<BankingFormInput, unknown, BankingFormValues>({
     resolver: zodResolver(bankingSchema),
     defaultValues: { ...BANKING_FORM_DEFAULTS, ...initialValues },
     mode: "onSubmit",
@@ -58,7 +59,7 @@ export function WizardStepBanking({
     if (field) setError(field, { type: "server", message: serverErrorCode });
   }, [serverErrorCode, setError]);
 
-  const fieldError = (key: keyof BankingFormValues): string | undefined => {
+  const fieldError = (key: keyof BankingFormInput): string | undefined => {
     const e = errors[key];
     if (!e?.message) return undefined;
     return t(`errors.${e.message}`);

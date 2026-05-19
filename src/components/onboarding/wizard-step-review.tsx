@@ -7,22 +7,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Mono } from "@/components/ui/mono";
-import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wizard";
+import type { OnboardingWizardSnapshot } from "@/components/onboarding/use-onboarding-wizard";
 import {
   REVIEW_FORM_DEFAULTS,
   reviewSchema,
   type ReviewFormValues,
 } from "@/components/onboarding/schemas/review-schema";
 
+// Review reads the accumulated snapshot rather than receiving form-style
+// `initialValues`. Display-only access across prior steps; never writes.
+// Diverges from the step1/banking prop shape on purpose.
 type Props = {
-  data: OnboardingWizardData;
+  snapshot: OnboardingWizardSnapshot;
   onSubmit: (values: ReviewFormValues) => void;
   onBack: () => void;
   onGoTo: (step: number) => void;
   isSubmitting: boolean;
 };
 
-export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting }: Props) {
+export function WizardStepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }: Props) {
   const t = useTranslations("onboarding.wizard.review");
 
   const form = useForm<ReviewFormValues>({
@@ -33,16 +36,16 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
   const { control, handleSubmit } = form;
 
   const agencyTypeLabel =
-    data.agencyType === "autonomo" ? t("agencyTypeAutonomo") : t("agencyTypeEmpresa");
-  const documentValue = data.agencyType === "autonomo" ? data.cpf : data.cnpj;
+    snapshot.agencyType === "autonomo" ? t("agencyTypeAutonomo") : t("agencyTypeEmpresa");
+  const documentValue = snapshot.agencyType === "autonomo" ? snapshot.cpf : snapshot.cnpj;
   const accountTypeLabel =
-    data.bankAccountType === "corrente"
+    snapshot.bankAccountType === "corrente"
       ? t("accountTypeCorrente")
-      : data.bankAccountType === "poupanca"
+      : snapshot.bankAccountType === "poupanca"
         ? t("accountTypePoupanca")
         : "—";
   // Banking step number varies by type — autonomo skips documents
-  const bankingStep = data.agencyType === "empresa" ? 3 : 2;
+  const bankingStep = snapshot.agencyType === "empresa" ? 3 : 2;
 
   return (
     <form className="flex flex-col gap-6" onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -65,17 +68,17 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
         </div>
         <div className="border-border divide-border divide-y border">
           <ReviewRow label={t("agencyTypeLabel")} value={agencyTypeLabel} />
-          <ReviewRow label={t("nameLabel")} value={data.name} />
+          <ReviewRow label={t("nameLabel")} value={snapshot.name} />
           <ReviewRow label={t("documentLabel")} value={<Mono>{documentValue}</Mono>} />
-          <ReviewRow label={t("creciLabel")} value={data.creci} />
-          <ReviewRow label={t("emailLabel")} value={data.email} />
-          <ReviewRow label={t("phoneLabel")} value={<Mono>{data.phone}</Mono>} />
-          {data.agencyType === "empresa" && (
+          <ReviewRow label={t("creciLabel")} value={snapshot.creci} />
+          <ReviewRow label={t("emailLabel")} value={snapshot.email} />
+          <ReviewRow label={t("phoneLabel")} value={<Mono>{snapshot.phone}</Mono>} />
+          {snapshot.agencyType === "empresa" && (
             <>
-              <ReviewRow label={t("representanteNameLabel")} value={data.representanteName} />
+              <ReviewRow label={t("representanteNameLabel")} value={snapshot.representanteName} />
               <ReviewRow
                 label={t("representanteCpfLabel")}
-                value={<Mono>{data.representanteCpf}</Mono>}
+                value={<Mono>{snapshot.representanteCpf}</Mono>}
               />
             </>
           )}
@@ -100,14 +103,14 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           </button>
         </div>
         <div className="border-border divide-border divide-y border">
-          <ReviewRow label={t("bankLabel")} value={data.bankName} />
-          <ReviewRow label={t("branchLabel")} value={<Mono>{data.bankBranch}</Mono>} />
-          <ReviewRow label={t("accountLabel")} value={<Mono>{data.bankAccount}</Mono>} />
+          <ReviewRow label={t("bankLabel")} value={snapshot.bankName} />
+          <ReviewRow label={t("branchLabel")} value={<Mono>{snapshot.bankBranch}</Mono>} />
+          <ReviewRow label={t("accountLabel")} value={<Mono>{snapshot.bankAccount}</Mono>} />
           <ReviewRow label={t("accountTypeLabel")} value={accountTypeLabel} />
           <ReviewRow
             label={t("pixKeyLabel")}
-            value={data.bankPixKey ? <Mono>{data.bankPixKey}</Mono> : t("notProvided")}
-            muted={!data.bankPixKey}
+            value={snapshot.bankPixKey ? <Mono>{snapshot.bankPixKey}</Mono> : t("notProvided")}
+            muted={!snapshot.bankPixKey}
           />
         </div>
       </section>

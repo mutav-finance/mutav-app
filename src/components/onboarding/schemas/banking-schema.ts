@@ -12,18 +12,31 @@ const ERROR = {
 export const BANK_ACCOUNT_TYPE = ["corrente", "poupanca"] as const;
 export type BankAccountType = (typeof BANK_ACCOUNT_TYPE)[number];
 
-// Empty string lives in the input shape (initial state) — schema-level
-// refine reports the missing case but doesn't narrow the output type.
-// The handler narrows at runtime, matching the profile-schema pattern.
-export const bankingSchema = z
-  .object({
-    bankName: z.string().trim().min(1, ERROR.BANK_REQUIRED),
-    bankBranch: z.string().trim().min(1, ERROR.BRANCH_REQUIRED),
-    bankAccount: z.string().trim().min(1, ERROR.ACCOUNT_REQUIRED),
-    bankAccountType: z.enum(["", ...BANK_ACCOUNT_TYPE]),
-    bankPixKey: z.string(),
-  })
+const bankingInputSchema = z.object({
+  bankName: z.string(),
+  bankBranch: z.string(),
+  bankAccount: z.string(),
+  bankAccountType: z.enum(["", ...BANK_ACCOUNT_TYPE]),
+  bankPixKey: z.string(),
+});
+
+export type BankingFormInput = z.infer<typeof bankingInputSchema>;
+
+type BankingFormOutput = Omit<BankingFormInput, "bankAccountType"> & {
+  bankAccountType: BankAccountType;
+};
+
+export const bankingSchema = bankingInputSchema
   .superRefine((data, ctx) => {
+    if (!data.bankName.trim()) {
+      ctx.addIssue({ code: "custom", path: ["bankName"], message: ERROR.BANK_REQUIRED });
+    }
+    if (!data.bankBranch.trim()) {
+      ctx.addIssue({ code: "custom", path: ["bankBranch"], message: ERROR.BRANCH_REQUIRED });
+    }
+    if (!data.bankAccount.trim()) {
+      ctx.addIssue({ code: "custom", path: ["bankAccount"], message: ERROR.ACCOUNT_REQUIRED });
+    }
     if (data.bankAccountType === "") {
       ctx.addIssue({
         code: "custom",
@@ -31,11 +44,19 @@ export const bankingSchema = z
         message: ERROR.ACCOUNT_TYPE_REQUIRED,
       });
     }
+  })
+  // Narrows bankAccountType — the refine rejects the empty case so this
+  // branch is never taken at runtime.
+  .transform((data): BankingFormOutput => {
+    if (data.bankAccountType === "") {
+      throw new Error("unreachable: superRefine rejects empty bankAccountType");
+    }
+    return { ...data, bankAccountType: data.bankAccountType };
   });
 
-export type BankingFormValues = z.infer<typeof bankingSchema>;
+export type BankingFormValues = z.output<typeof bankingSchema>;
 
-export const BANKING_FORM_DEFAULTS: BankingFormValues = {
+export const BANKING_FORM_DEFAULTS: BankingFormInput = {
   bankName: "",
   bankBranch: "",
   bankAccount: "",

@@ -12,11 +12,12 @@ import { maskCPF, maskCNPJ, maskPhone } from "@/lib/brazil";
 import {
   PROFILE_FORM_DEFAULTS,
   profileSchema,
+  type ProfileFormInput,
   type ProfileFormValues,
 } from "@/components/onboarding/schemas/profile-schema";
 
 type Props = {
-  initialValues?: Partial<ProfileFormValues>;
+  initialValues?: Partial<ProfileFormInput>;
   serverErrorCode?: string | null;
   onSubmit: (values: ProfileFormValues) => void;
   isSubmitting: boolean;
@@ -24,7 +25,7 @@ type Props = {
 
 // Server error codes that map to a specific form field, so the user
 // retries on the same input rather than seeing a generic banner.
-const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof ProfileFormValues>> = {
+const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof ProfileFormInput>> = {
   CPF_INVALID: "cpf",
   CPF_REQUIRED: "cpf",
   CNPJ_INVALID: "cnpj",
@@ -38,7 +39,9 @@ const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof ProfileFormValues>> =
 export function WizardStep1({ initialValues, serverErrorCode, onSubmit, isSubmitting }: Props) {
   const t = useTranslations("onboarding.step1");
 
-  const form = useForm<ProfileFormValues>({
+  // 3-generic form: input is the wide shape (empty agencyType allowed);
+  // output (passed to onSubmit) is narrowed by the schema's transform.
+  const form = useForm<ProfileFormInput, unknown, ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: { ...PROFILE_FORM_DEFAULTS, ...initialValues },
     mode: "onSubmit",
@@ -57,7 +60,7 @@ export function WizardStep1({ initialValues, serverErrorCode, onSubmit, isSubmit
     }
   }, [serverErrorCode, setError]);
 
-  const fieldError = (key: keyof ProfileFormValues): string | undefined => {
+  const fieldError = (key: keyof ProfileFormInput): string | undefined => {
     const e = errors[key];
     if (!e?.message) return undefined;
     return t(`errors.${e.message}`);

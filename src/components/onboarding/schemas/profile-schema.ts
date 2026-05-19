@@ -16,27 +16,33 @@ const ERROR = {
   REPRESENTANTE_CPF_INVALID: "representanteCpf",
 } as const;
 
-// Single schema instead of discriminated union — keeps the form input shape
-// stable (agencyType can be "" until the user picks one) and lets RHF's
-// defaultValues + Controller types line up without per-field assertions.
-// Variant rules live in superRefine.
-export const profileSchema = z
-  .object({
-    agencyType: z.enum(["", "autonomo", "empresa"]),
-    name: z.string(),
-    email: z.string(),
-    phone: z.string(),
-    creci: z.string(),
-    cpf: z.string(),
-    cnpj: z.string(),
-    representanteName: z.string(),
-    representanteCpf: z.string(),
-  })
+// Input shape — RHF works with this. Empty agencyType is the initial state.
+const profileInputSchema = z.object({
+  agencyType: z.enum(["", "autonomo", "empresa"]),
+  name: z.string(),
+  email: z.string(),
+  phone: z.string(),
+  creci: z.string(),
+  cpf: z.string(),
+  cnpj: z.string(),
+  representanteName: z.string(),
+  representanteCpf: z.string(),
+});
+
+export type ProfileFormInput = z.infer<typeof profileInputSchema>;
+
+// Output shape — what handleSubmit receives. agencyType has been narrowed
+// to one of the two real variants; superRefine guaranteed it at runtime.
+type ProfileFormOutput = Omit<ProfileFormInput, "agencyType"> & {
+  agencyType: "autonomo" | "empresa";
+};
+
+export const profileSchema = profileInputSchema
   .superRefine((data, ctx) => {
     if (!data.agencyType) {
       ctx.addIssue({ code: "custom", path: ["agencyType"], message: ERROR.AGENCY_TYPE_REQUIRED });
-      // Without an agency type the variant-specific checks can't run;
-      // surface only the top-level error and stop.
+      // Variant-specific checks need an agency type; surface only the
+      // top-level error and stop.
       return;
     }
     if (!data.name.trim()) {
@@ -77,11 +83,20 @@ export const profileSchema = z
         message: ERROR.REPRESENTANTE_CPF_INVALID,
       });
     }
+  })
+  // transform narrows agencyType from "" | "autonomo" | "empresa" to
+  // "autonomo" | "empresa" — superRefine above rejects empty, so this
+  // never runs when agencyType === "". The handler reads the narrowed type.
+  .transform((data): ProfileFormOutput => {
+    if (data.agencyType === "") {
+      throw new Error("unreachable: superRefine rejects empty agencyType");
+    }
+    return { ...data, agencyType: data.agencyType };
   });
 
-export type ProfileFormValues = z.infer<typeof profileSchema>;
+export type ProfileFormValues = z.output<typeof profileSchema>;
 
-export const PROFILE_FORM_DEFAULTS: ProfileFormValues = {
+export const PROFILE_FORM_DEFAULTS: ProfileFormInput = {
   agencyType: "",
   name: "",
   email: "",
