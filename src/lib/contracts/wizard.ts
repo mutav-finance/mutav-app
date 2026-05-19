@@ -86,34 +86,4 @@ export function parseBRLInput(raw: string): number {
   return isNaN(reais) ? 0 : Math.round(reais * 100);
 }
 
-export function isValidCPF(cpf: string): boolean {
-  const digits = cpf.replace(/\D/g, "");
-  if (digits.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(digits)) return false;
-  const d = digits.split("").map(Number);
-  let s1 = 0;
-  for (let i = 0; i < 9; i++) s1 += (d[i] ?? 0) * (10 - i);
-  const c1 = s1 % 11 < 2 ? 0 : 11 - (s1 % 11);
-  if (c1 !== d[9]) return false;
-  let s2 = 0;
-  for (let i = 0; i < 10; i++) s2 += (d[i] ?? 0) * (11 - i);
-  const c2 = s2 % 11 < 2 ? 0 : 11 - (s2 % 11);
-  return c2 === d[10];
-}
-
-export function isValidCNPJ(cnpj: string): boolean {
-  const digits = cnpj.replace(/\D/g, "");
-  if (digits.length !== 14) return false;
-  if (/^(\d)\1{13}$/.test(digits)) return false;
-  const d = digits.split("").map(Number);
-  const weight1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-  const weight2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-  const sum1 = weight1.reduce((acc, w, i) => acc + (d[i] ?? 0) * w, 0);
-  const rem1 = sum1 % 11;
-  const c1 = rem1 < 2 ? 0 : 11 - rem1;
-  if (c1 !== d[12]) return false;
-  const sum2 = weight2.reduce((acc, w, i) => acc + (d[i] ?? 0) * w, 0);
-  const rem2 = sum2 % 11;
-  const c2 = rem2 < 2 ? 0 : 11 - rem2;
-  return c2 === d[13];
-}
+export { isValidCPF, isValidCNPJ } from "@/lib/brazil";

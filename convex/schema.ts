@@ -1,6 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+// Literals duplicated below in `convex/agencies/domain.ts` as the canonical
+// `agencyDocumentKindValidator`. Kept inline here because entity-file imports
+// would create a circular dependency through `_generated/dataModel`.
+const agencyDocumentKind = v.union(v.literal("documento_empresa"), v.literal("responsavel_id"));
+
 const contractStatus = v.union(
   v.literal("ativo"),
   v.literal("encerrado"),
@@ -64,6 +69,25 @@ const paymentMethod = v.union(
 );
 
 const memberRole = v.union(v.literal("owner"), v.literal("admin"), v.literal("member"));
+
+const agencyType = v.union(v.literal("autonomo"), v.literal("empresa"));
+
+const onboardingState = v.union(
+  v.literal("not_started"),
+  v.literal("in_progress"),
+  v.literal("submitted"),
+  v.literal("under_review"),
+  v.literal("active"),
+  v.literal("rejected"),
+);
+
+const bankingInfo = v.object({
+  bank: v.string(),
+  branch: v.string(),
+  account: v.string(),
+  accountType: v.union(v.literal("corrente"), v.literal("poupanca")),
+  pixKey: v.optional(v.string()),
+});
 
 /**
  * Anchor on-ramp lifecycle, normalized across providers. Mirrors SEP-24
@@ -142,9 +166,24 @@ const anchorAccountData = v.union(
 export default defineSchema({
   agencies: defineTable({
     name: v.string(),
-    cnpj: v.string(),
+    cnpj: v.optional(v.string()),
+    cpf: v.optional(v.string()),
     createdAt: v.string(),
-  }).index("by_cnpj", ["cnpj"]),
+    agencyType: v.optional(agencyType),
+    onboardingState: v.optional(onboardingState),
+    onboardingSubmittedAt: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    creci: v.optional(v.string()),
+    bankingInfo: v.optional(bankingInfo),
+    onboardingRejectionReason: v.optional(v.string()),
+    consentMarketing: v.optional(v.boolean()),
+    representanteName: v.optional(v.string()),
+    representanteCpf: v.optional(v.string()),
+  })
+    .index("by_cnpj", ["cnpj"])
+    .index("by_cpf", ["cpf"])
+    .index("by_onboardingState", ["onboardingState"]),
 
   users: defineTable({
     publicId: v.string(),
@@ -369,4 +408,14 @@ export default defineSchema({
   })
     .index("by_agency", ["agencyId"])
     .index("by_external_id", ["externalBankAccountId"]),
+
+  agencyDocuments: defineTable({
+    agencyId: v.id("agencies"),
+    kind: agencyDocumentKind,
+    storageId: v.id("_storage"),
+    fileName: v.string(),
+    uploadedAt: v.string(),
+  })
+    .index("by_agency", ["agencyId"])
+    .index("by_agency_kind", ["agencyId", "kind"]),
 });

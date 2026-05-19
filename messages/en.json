@@ -901,5 +901,220 @@
       "paidAtLabel": "Confirmed at",
       "txHashLabel": "Transaction"
     }
+  },
+  "onboarding": {
+    "welcome": {
+      "tag": "Partner program",
+      "title": "Rental guarantee without a guarantor.",
+      "titleLine2": "Built for people with a lot to do.",
+      "subtitle": "Segregated capital. Auditable in real time, by anyone, at any time.",
+      "warningTitle": "Important for agencies:",
+      "warningBody": "registration must be completed by a partner holding 25% or more equity, or by an administrator authorized to open accounts on the company's behalf. Have the articles of incorporation ready to verify.",
+      "checklistTitle": "What you will need",
+      "autonomo": {
+        "title": "Independent broker",
+        "items": [
+          {
+            "label": "CPF"
+          },
+          {
+            "label": "Active CRECI (individual)"
+          },
+          {
+            "label": "Email and phone"
+          },
+          {
+            "label": "Banking details",
+            "note": "to receive commissions"
+          }
+        ]
+      },
+      "empresa": {
+        "title": "Real estate agency",
+        "items": [
+          {
+            "label": "CNPJ"
+          },
+          {
+            "label": "Agency CRECI"
+          },
+          {
+            "label": "CNPJ card"
+          },
+          {
+            "label": "Articles of incorporation"
+          },
+          {
+            "label": "Company address proof"
+          },
+          {
+            "label": "Representative ID",
+            "note": "partner ≥ 25% or administrator"
+          },
+          {
+            "label": "Banking details",
+            "note": "to receive commissions"
+          }
+        ]
+      },
+      "ctaButton": "Start registration",
+      "ctaNoteReview": "reviewed in up to 2 business days"
+    },
+    "wizard": {
+      "loading": "Loading…",
+      "steps": {
+        "perfil": "Profile",
+        "documentos": "Documents",
+        "contaBancaria": "Banking",
+        "revisao": "Review"
+      },
+      "progressLabel": "Registration progress",
+      "stepDoneSuffix": ": completed",
+      "stepCurrentSuffix": ": current step",
+      "banking": {
+        "empresaAccountNotice": "The bank account must be in the company's name and linked to the registered CNPJ.",
+        "bankLabel": "Bank",
+        "bankPlaceholder": "E.g. Chase, Bank of America",
+        "branchLabel": "Branch",
+        "branchPlaceholder": "0000",
+        "accountLabel": "Account number",
+        "accountPlaceholder": "00000-0",
+        "accountTypeLabel": "Account type",
+        "accountTypeCorrente": "Checking",
+        "accountTypePoupanca": "Savings",
+        "pixKeyLabel": "Pix key",
+        "pixKeyPlaceholder": "CPF, CNPJ, email, phone or random key",
+        "pixKeyHint": "Optional — used for fast refunds and transfers",
+        "nextButton": "Next",
+        "savingButton": "Saving…",
+        "backButton": "← Back",
+        "errors": {
+          "bank": "Enter the bank name.",
+          "branch": "Enter the branch number.",
+          "account": "Enter the account number.",
+          "accountType": "Select an account type."
+        }
+      },
+      "documents": {
+        "loading": "Loading…",
+        "subtitle": "Upload the 2 documents below. We accept PDF, JPG, and PNG.",
+        "kinds": {
+          "documento_empresa": {
+            "label": "Company Document",
+            "description": "CNPJ Card (Federal Revenue) or Articles of Incorporation"
+          },
+          "responsavel_id": {
+            "label": "Representative ID",
+            "description": "National ID or driver's license of the responsible partner"
+          }
+        },
+        "uploadButton": "Upload",
+        "replaceButton": "Replace",
+        "uploading": "Uploading…",
+        "retryButton": "Failed — Try again",
+        "progress": "{uploaded} of {total} uploaded",
+        "allRequired": "Upload all documents to continue.",
+        "nextButton": "Next",
+        "backButton": "← Back"
+      },
+      "review": {
+        "profileSection": "Profile",
+        "bankingSection": "Banking",
+        "agencyTypeLabel": "Type",
+        "nameLabel": "Name",
+        "documentLabel": "Document",
+        "creciLabel": "CRECI",
+        "emailLabel": "Email",
+        "phoneLabel": "Phone",
+        "representanteNameLabel": "Representative",
+        "representanteCpfLabel": "Representative CPF",
+        "bankLabel": "Bank",
+        "branchLabel": "Branch",
+        "accountLabel": "Account",
+        "accountTypeLabel": "Type",
+        "pixKeyLabel": "Pix key",
+        "notProvided": "Not provided",
+        "accountTypeCorrente": "Checking",
+        "accountTypePoupanca": "Savings",
+        "agencyTypeAutonomo": "Independent broker",
+        "agencyTypeEmpresa": "Real estate agency",
+        "editButton": "edit",
+        "submitButton": "Submit registration",
+        "submittingButton": "Submitting…",
+        "backButton": "← Back",
+        "consentMarketing": "I agree to receive targeted communications and can unsubscribe at any time.",
+        "consentLegal": "By submitting my information, I agree to the <privacy>Privacy Policy</privacy> and <terms>Terms of Use</terms>."
+      },
+      "submitted": {
+        "title": "Registration submitted",
+        "subtitle": "Our team will review your information and get back to you within 2 business days.",
+        "detail": "You will receive an email with the result at {email}."
+      },
+      "errors": {
+        "CNPJ_REQUIRED": "CNPJ is required for agencies.",
+        "CPF_REQUIRED": "CPF is required for independent brokers.",
+        "CPF_INVALID": "Invalid CPF. Please check the digits and try again.",
+        "CNPJ_INVALID": "Invalid CNPJ. Please check the digits and try again.",
+        "REPRESENTANTE_NAME_REQUIRED": "Representative name is required for agencies.",
+        "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
+        "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
+        "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
+        "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
+        "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
+        "unknown": "Failed to save. Please try again."
+      }
+    },
+    "step1": {
+      "typeLabel": "Registration type",
+      "typeAutonomo": "Independent broker",
+      "typeEmpresa": "Real estate agency",
+      "nameLabel": "Full name",
+      "nameLabelEmpresa": "Legal name",
+      "namePlaceholder": "Your full name",
+      "namePlaceholderEmpresa": "Agency name",
+      "cpfLabel": "CPF",
+      "cnpjLabel": "CNPJ",
+      "creciLabel": "CRECI",
+      "creciPlaceholderAutonomo": "CRECI-F 000000",
+      "creciPlaceholderEmpresa": "CRECI-J 000000",
+      "emailLabel": "Email",
+      "emailPlaceholder": "contact@agency.com",
+      "phoneLabel": "Phone",
+      "representanteSection": "Legal representative",
+      "representanteNameLabel": "Representative name",
+      "representanteNamePlaceholder": "Full name",
+      "representanteCpfLabel": "Representative CPF",
+      "nextButton": "Next",
+      "savingButton": "Saving…",
+      "errors": {
+        "agencyType": "Select a registration type.",
+        "name": "Name is required.",
+        "email": "Invalid email.",
+        "phone": "Invalid phone number.",
+        "creci": "CRECI is required.",
+        "cpf": "Invalid CPF.",
+        "cnpj": "Invalid CNPJ.",
+        "representanteName": "Representative name is required.",
+        "representanteCpf": "Invalid representative CPF."
+      }
+    },
+    "status": {
+      "title": "Application under review",
+      "subtitle": "Our team is reviewing your information. You will receive an email with the result within 2 business days.",
+      "stateSubmitted": "Submitted — awaiting review",
+      "stateUnderReview": "Under review by Mutav team",
+      "backLabel": "Have questions?",
+      "backLink": "Contact us",
+      "homeButton": "Back"
+    },
+    "rejected": {
+      "title": "Application not approved",
+      "subtitle": "Unfortunately we were unable to approve your application at this time.",
+      "reasonLabel": "Reason provided by our team:",
+      "noReason": "No reason provided.",
+      "contactLabel": "Have questions or want to appeal?",
+      "contactLink": "Contact us",
+      "homeButton": "Back"
+    }
   }
 }

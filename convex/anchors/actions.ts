@@ -1087,10 +1087,16 @@ export const onboardAgencyEtherfuseKyb = internalAction({
   },
   returns: onboardingReturnValidator,
   handler: async (ctx, args): Promise<OnboardAgencyEtherfuseResult> => {
-    const agency = await ctx.runQuery(internal.agencies.useCases.getByIdInternal, {
+    const agency = await ctx.runQuery(internal.agencies.useCases.getById, {
       agencyId: args.agencyId,
     });
     if (!agency) throw new Error(`Agency ${args.agencyId} not found`);
+    if (!agency.cnpj) {
+      throw new Error(
+        `Agency ${args.agencyId} has no CNPJ — Etherfuse KYB is for legal entities. ` +
+          `Autonomo agencies (CPF only) must use KYC, not this action.`,
+      );
+    }
     return performEtherfuseOnboarding(ctx, {
       agencyId: args.agencyId,
       contactPerson: args.contactPerson,

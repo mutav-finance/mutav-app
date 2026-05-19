@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as agencies_adminUseCases from "../agencies/adminUseCases.js";
 import type * as agencies_domain from "../agencies/domain.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
 import type * as anchors_accountDomain from "../anchors/accountDomain.js";
@@ -30,8 +31,10 @@ import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_env from "../lib/env.js";
+import type * as lib_result from "../lib/result.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_stellarSigner from "../lib/stellarSigner.js";
+import type * as lib_storage from "../lib/storage.js";
 import type * as payments_actions from "../payments/actions.js";
 import type * as payments_domain from "../payments/domain.js";
 import type * as payments_lib_muxedAddress from "../payments/lib/muxedAddress.js";
@@ -49,6 +52,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "agencies/adminUseCases": typeof agencies_adminUseCases;
   "agencies/domain": typeof agencies_domain;
   "agencies/useCases": typeof agencies_useCases;
   "anchors/accountDomain": typeof anchors_accountDomain;
@@ -71,8 +75,10 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/env": typeof lib_env;
+  "lib/result": typeof lib_result;
   "lib/secrets": typeof lib_secrets;
   "lib/stellarSigner": typeof lib_stellarSigner;
+  "lib/storage": typeof lib_storage;
   "payments/actions": typeof payments_actions;
   "payments/domain": typeof payments_domain;
   "payments/lib/muxedAddress": typeof payments_lib_muxedAddress;
