@@ -1,7 +1,8 @@
 import { internalMutation } from "./_generated/server";
 import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./payments/domain";
 import { generatePaymentMuxedId } from "./payments/lib/muxedId";
-import type { Id } from "./_generated/dataModel";
+import type { AgencyId } from "./agencies/domain";
+import type { ContractId } from "./contracts/domain";
 import { contractsByStatus } from "./contracts/aggregate";
 
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -42,19 +43,19 @@ export const fictionalContracts = internalMutation({
 
     // â”€â”€ Agencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    const paulistaId: Id<"agencies"> = await ctx.db.insert("agencies", {
+    const paulistaId: AgencyId = await ctx.db.insert("agencies", {
       name: "ImobiliÃ¡ria Paulista",
       cnpj: "00000000000100",
       createdAt: d("2024-03-01T00:00:00-03:00"),
     });
 
-    const atlanticaId: Id<"agencies"> = await ctx.db.insert("agencies", {
+    const atlanticaId: AgencyId = await ctx.db.insert("agencies", {
       name: "ImobiliÃ¡ria AtlÃ¢ntica",
       cnpj: "00000000000200",
       createdAt: d("2024-06-15T00:00:00-03:00"),
     });
 
-    const horizonteId: Id<"agencies"> = await ctx.db.insert("agencies", {
+    const horizonteId: AgencyId = await ctx.db.insert("agencies", {
       name: "Horizonte ImÃ³veis",
       cnpj: "00000000000300",
       createdAt: d("2025-01-10T00:00:00-03:00"),
@@ -2061,8 +2062,8 @@ export const fictionalContracts = internalMutation({
     // get a spread of amounts so any agency can be selected and any
     // anchor method (Pix sep-6 / AnchorTest sep-24) will pass validation.
     const testAgencies: ReadonlyArray<{
-      agencyId: Id<"agencies">;
-      contractId: Id<"contracts">;
+      agencyId: AgencyId;
+      contractId: ContractId;
       contractPublicId: string;
     }> = [
       { agencyId: paulistaId, contractId: p1, contractPublicId: pid(1) },

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 
-import { internalMutation, internalQuery, query } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
+import { queryWithAgencyScope } from "../lib/auth";
 import { anchorProviderValidator } from "./domain";
 import {
   ANCHOR_ONBOARDING_STATUS,
@@ -13,15 +14,15 @@ import {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 /**
- * All anchor accounts for an agency. Public so admin UIs can render the
- * full onboarding matrix; tenant-facing surfaces shouldn't need this.
+ * All anchor accounts for the caller's agency. Scoped via wrapper —
+ * caller must be a member. Tenant-facing surfaces shouldn't need this.
  */
-export const listByAgency = query({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, args): Promise<AnchorAccount[]> => {
+export const listByAgency = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx): Promise<AnchorAccount[]> => {
     return ctx.db
       .query("anchorAccounts")
-      .withIndex("by_agency", (q) => q.eq("agencyId", args.agencyId))
+      .withIndex("by_agency", (q) => q.eq("agencyId", ctx.agencyId))
       .collect();
   },
 });

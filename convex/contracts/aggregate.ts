@@ -1,13 +1,13 @@
 import { TableAggregate } from "@convex-dev/aggregate";
 import { components } from "../_generated/api";
 import type { DataModel } from "../_generated/dataModel";
-import type { Id } from "../_generated/dataModel";
+import type { AgencyId } from "../agencies/domain";
 import type { ContractStatus } from "./domain";
 
 /**
  * Aggregate that counts contracts grouped by (agencyId, status).
  *
- * - Namespace: Id<"agencies"> — each agency has its own isolated B-tree for
+ * - Namespace: AgencyId — each agency has its own isolated B-tree for
  *   maximum write throughput.
  * - Key: ContractStatus — sort key within each namespace, so we can count
  *   contracts with a specific status in O(log n).
@@ -17,7 +17,7 @@ import type { ContractStatus } from "./domain";
  * deleteEntry) to keep the aggregate in sync.
  */
 export const contractsByStatus = new TableAggregate<{
-  Namespace: Id<"agencies">;
+  Namespace: AgencyId;
   Key: ContractStatus;
   DataModel: DataModel;
   TableName: "contracts";

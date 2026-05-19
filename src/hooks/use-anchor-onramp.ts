@@ -5,9 +5,10 @@ import { useAction, useQuery } from "convex/react";
 import type { FunctionReference } from "convex/server";
 
 import { api } from "@convex/_generated/api";
-import type { Doc, Id } from "@convex/_generated/dataModel";
+import type { AnchorOrder, AnchorOrderId } from "@convex/anchors/orderDomain";
+import type { AgencyBankAccountId } from "@convex/anchors/bankAccountDomain";
+import type { PaymentId } from "@convex/payments/domain";
 
-type AnchorOrder = Doc<"anchorOrders">;
 type AnchorOrderStatus = AnchorOrder["status"];
 
 const POLL_INTERVAL_MS = 5_000;
@@ -32,16 +33,16 @@ export interface AnchorStartErrorPayload {
 }
 
 type StartActionResult =
-  | { success: true; data: { orderId: Id<"anchorOrders">; anchorTxId: string; hostedUrl?: string } }
+  | { success: true; data: { orderId: AnchorOrderId; anchorTxId: string; hostedUrl?: string } }
   | { success: false; error: AnchorStartErrorPayload };
 
 type StartActionRef = FunctionReference<
   "action",
   "public",
   {
-    paymentId: Id<"payments">;
+    paymentId: PaymentId;
     lang?: string;
-    bankAccountId?: Id<"agencyBankAccounts">;
+    bankAccountId?: AgencyBankAccountId;
   },
   StartActionResult
 >;
@@ -49,12 +50,12 @@ type StartActionRef = FunctionReference<
 type PollActionRef = FunctionReference<
   "action",
   "public",
-  { orderId: Id<"anchorOrders"> },
-  { orderId: Id<"anchorOrders">; status: AnchorOrderStatus; terminal: boolean }
+  { orderId: AnchorOrderId },
+  { orderId: AnchorOrderId; status: AnchorOrderStatus; terminal: boolean }
 >;
 
 interface UseAnchorOnrampArgs {
-  paymentId: Id<"payments">;
+  paymentId: PaymentId;
   startAction: StartActionRef;
   pollAction: PollActionRef;
   /** Forwarded as the SEP-24/SEP-6 `lang` field so the anchor renders its hosted UI in this locale. */
@@ -67,7 +68,7 @@ interface StartOpts {
    * fund this on-ramp. Omitted → the action picks the agency's oldest
    * registered bank. testanchor ignores this entirely.
    */
-  bankAccountId?: Id<"agencyBankAccounts">;
+  bankAccountId?: AgencyBankAccountId;
 }
 
 interface UseAnchorOnrampResult {
@@ -93,7 +94,7 @@ export function useAnchorOnramp({
   pollAction: pollActionRef,
   lang,
 }: UseAnchorOnrampArgs): UseAnchorOnrampResult {
-  const [orderId, setOrderId] = useState<Id<"anchorOrders"> | null>(null);
+  const [orderId, setOrderId] = useState<AnchorOrderId | null>(null);
   const [startError, setStartError] = useState<AnchorStartErrorPayload | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 

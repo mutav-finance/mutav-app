@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { wizardReducer } from "@/components/onboarding/use-onboarding-wizard";
-import type { Id } from "@convex/_generated/dataModel";
+import type { AgencyId } from "@convex/agencies/domain";
 
 // wizardReducer is pure — no React, no Convex. Tests run in plain node env.
-
-const AGENCY_ID = "agencies_test_1" as Id<"agencies">;
-const AGENCY_ID_2 = "agencies_test_2" as Id<"agencies">;
+// Synthetic Ids for a pure-reducer test — opaque convex-test Ids aren't
+// reachable here. Boundary exception per CLAUDE.md.
+const AGENCY_ID = "agencies_test_1" as AgencyId;
+const AGENCY_ID_2 = "agencies_test_2" as AgencyId;
 
 function makeInitialState() {
   return {

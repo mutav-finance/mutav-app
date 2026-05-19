@@ -12,7 +12,7 @@ import * as React from "react";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import type { AgencyId } from "@convex/agencies/domain";
 
 export const DEV_USER_PUBLIC_ID = "dev-user";
 const STORAGE_KEY = "sgr:selectedAgencyId";
@@ -38,7 +38,7 @@ type WorkspaceContextValue = {
   /** Currently selected agency, or null while loading. */
   selectedAgency: WorkspaceAgency | null;
   /** Switch the active workspace. */
-  setSelectedAgency: (agencyId: Id<"agencies">) => void;
+  setSelectedAgency: (agencyId: AgencyId) => void;
   /** True while the initial query is still loading. */
   isLoading: boolean;
 };
@@ -63,7 +63,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   // Stored id can be stale (e.g. after a re-seed) — fall back to the first
   // agency if it no longer matches any known id.
-  const selectedAgencyId = React.useMemo<Id<"agencies"> | null>(() => {
+  const selectedAgencyId = React.useMemo<AgencyId | null>(() => {
     const first = agencies[0];
     if (!first) return null;
     if (storedRaw) {
@@ -80,7 +80,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedAgencyId]);
 
-  const setSelectedAgency = React.useCallback((id: Id<"agencies">) => {
+  const setSelectedAgency = React.useCallback((id: AgencyId) => {
     localStorage.setItem(STORAGE_KEY, id);
     setStoredRaw(id);
   }, []);

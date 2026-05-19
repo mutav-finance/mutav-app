@@ -160,6 +160,9 @@ Wrapped:
 - `convex/contracts/useCases.ts` — `getByPublicId`, `listByAgency`, `getPipelineSummary`, `countByMonth`, `lookupTenantByCpf`, `create`, `cancelProposal` (+ `getByPublicIdInternal` companion for tenant prefill)
 - `convex/payments/useCases.ts` — `listByAgency`, `getById`, `getByPublicId`, `getNextPendingPayment` (+ `getByIdInternal` companion for tenant onramp actions)
 - `convex/agencies/useCases.ts` — `getById`, `listAgenciesForUser` (+ `getByIdInternal` companion for internal actions)
+- `convex/anchors/orderUseCases.ts` — `getOrderById`, `listOrdersByPayment` (resource-by-id pattern; + `getOrderByIdInternal` companion for webhook + scheduler pollers)
+- `convex/anchors/bankAccountUseCases.ts` — `listByAgency` (+ `listByAgencyInternal` companion for tenant-context onramp actions)
+- `convex/anchors/accountUseCases.ts` — `listByAgency`
 
 Removed:
 
@@ -168,7 +171,6 @@ Removed:
 
 Not yet wrapped (same playbook applies — and remember the internal-companion audit when you do):
 
-- `convex/anchors/` — `orderUseCases`, `bankAccountUseCases`, `accountUseCases` — bare public queries
 - `convex/users/useCases.ts` — `getByPublicId` (load-bearing dev-user lookup for `WorkspaceProvider`)
 - `convex/contracts/actions.ts`, `convex/contracts/mutations.ts` — internal-only, lower priority
 

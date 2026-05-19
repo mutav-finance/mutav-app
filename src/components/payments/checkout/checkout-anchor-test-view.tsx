@@ -14,10 +14,11 @@ import {
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
-import type { Doc, Id } from "@convex/_generated/dataModel";
+import type { Doc } from "@convex/_generated/dataModel";
+import type { PaymentId } from "@convex/payments/domain";
 
 interface Props {
-  paymentId: Id<"payments">;
+  paymentId: PaymentId;
   totalCents: number;
 }
 

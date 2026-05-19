@@ -1,13 +1,41 @@
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery, query } from "../_generated/server";
+import { assertAgencyAccess } from "../lib/auth";
 import { PaymentMethods, PaymentStates } from "../payments/domain";
 import { anchorProviderValidator } from "./domain";
 import { anchorOrderStatusValidator, type AnchorOrder, type AnchorOrderId } from "./orderDomain";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
+/**
+ * Resource-by-id read. Returns null on three indistinguishable cases —
+ * order doesn't exist, caller isn't authenticated, caller isn't a member
+ * of the order's agency — to avoid leaking cross-agency existence.
+ * Action callers (webhook + scheduler) use `getOrderByIdInternal` instead.
+ */
 export const getOrderById = query({
+  args: { orderId: v.id("anchorOrders") },
+  handler: async (ctx, args): Promise<AnchorOrder | null> => {
+    const order = await ctx.db.get(args.orderId);
+    if (!order) return null;
+
+    try {
+      await assertAgencyAccess(ctx, order.agencyId);
+    } catch {
+      return null;
+    }
+
+    return order;
+  },
+});
+
+/**
+ * Internal companion to `getOrderById` for actions that operate in
+ * tenant or webhook contexts (no user identity). Used by `pollPixOnramp`
+ * (webhook + UI) and `pollAnchorTestOnramp` (UI poll fallback).
+ */
+export const getOrderByIdInternal = internalQuery({
   args: { orderId: v.id("anchorOrders") },
   handler: async (ctx, args): Promise<AnchorOrder | null> => {
     return ctx.db.get(args.orderId);
@@ -33,10 +61,21 @@ export const getByAnchorTxId = internalQuery({
  * All anchor orders for a given payment, newest first. The UI dialog
  * subscribes to this so it picks up status transitions reactively (no
  * client-side poll loop — the `pollPixOnramp` action drives updates).
+ * Resource-by-id pattern: derives the agency from the payment and
+ * gates on membership.
  */
 export const listOrdersByPayment = query({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args): Promise<AnchorOrder[]> => {
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) return [];
+
+    try {
+      await assertAgencyAccess(ctx, payment.agencyId);
+    } catch {
+      return [];
+    }
+
     return ctx.db
       .query("anchorOrders")
       .withIndex("by_payment", (q) => q.eq("paymentId", args.paymentId))

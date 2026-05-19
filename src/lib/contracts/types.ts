@@ -1,4 +1,4 @@
-import type { Id } from "@convex/_generated/dataModel";
+import type { AgencyId } from "@convex/agencies/domain";
 
 export type ContractStatus = "ativo" | "encerrado" | "pendente" | "cancelado";
 
@@ -61,7 +61,7 @@ export type ContractTenant = {
 
 export type Contract = {
   id: string;
-  agencyId: Id<"agencies">;
+  agencyId: AgencyId;
   status: ContractStatus;
   nextRenewalDate: string;
   availableGuaranteeCents: number;
