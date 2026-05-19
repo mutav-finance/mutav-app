@@ -32,7 +32,7 @@ Explorer: <https://stellar.expert/explorer/testnet/account/GD7ZCGE3Z2KV7STAWXLTK
 - `convex/payments/lib/muxedAddress.ts → derivePaymentMuxedAddress()` builds
   per-invoice `M…` destinations from this G + the random `muxedId` stored
   on each `payments` row.
-- The SEP-7 QR + `CopyableAddress` block on `/pagar/[publicId]/endereco`
+- The SEP-7 QR + `CopyableAddress` block on `/pay/[publicId]/stellar`
   render the muxed `M…` so any Stellar wallet can scan or paste.
 
 ## Setup on a fresh dev environment
@@ -71,7 +71,7 @@ the trustline-before-faucet gotcha.
 
 ## End-to-end manual test (XLM, today)
 
-1. Reload `/pt-BR/pagar/PAY-2026-05-0100` — the QR + address point at this
+1. Reload `/pt-BR/pay/PAY-2026-05-0100` — the QR + address point at this
    wallet's per-payment muxed surface.
 2. Open a second wallet (e.g. import `SBDW2AG6…` into Lobstr in testnet
    mode, or use the Stellar Lab) and send the exact XLM amount shown to

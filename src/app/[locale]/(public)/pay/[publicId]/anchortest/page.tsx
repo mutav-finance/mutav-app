@@ -25,7 +25,7 @@ export async function generateMetadata({
  * (`CheckoutAnchorTestView`) auto-starts the deposit and iframes the
  * anchor's interactive form.
  *
- * State redirects mirror the other method pages: paid/canceled → /pago,
+ * State redirects mirror the other method pages: paid/canceled → /paid,
  * already locked to a different method → back to that method's page.
  */
 export default async function CheckoutAnchorTestPage({
@@ -39,13 +39,13 @@ export default async function CheckoutAnchorTestPage({
   if (!payment) notFound();
 
   if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
-    redirect({ href: `/pagar/${publicId}/pago`, locale });
+    redirect({ href: `/pay/${publicId}/paid`, locale });
   }
   if (payment.method?.kind === "stellar") {
-    redirect({ href: `/pagar/${publicId}/stellar`, locale });
+    redirect({ href: `/pay/${publicId}/stellar`, locale });
   }
   if (payment.method?.kind === "pix") {
-    redirect({ href: `/pagar/${publicId}/pix`, locale });
+    redirect({ href: `/pay/${publicId}/pix`, locale });
   }
 
   const t = await getTranslations({ locale, namespace: "checkout.common" });
@@ -53,7 +53,7 @@ export default async function CheckoutAnchorTestPage({
   return (
     <div className="flex flex-col gap-6">
       <Link
-        href={`/pagar/${publicId}`}
+        href={`/pay/${publicId}`}
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
       >
         <ArrowLeft className="size-3" strokeWidth={1.5} />

@@ -26,7 +26,7 @@ export async function generateMetadata({
  * Pix-shaped instructions inline.
  *
  * State redirects:
- *  - paid           → /pago
+ *  - paid           → /paid
  *  - method=stellar → /stellar (user switched back)
  */
 export default async function CheckoutPixPage({
@@ -40,10 +40,10 @@ export default async function CheckoutPixPage({
   if (!payment) notFound();
 
   if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
-    redirect({ href: `/pagar/${publicId}/pago`, locale });
+    redirect({ href: `/pay/${publicId}/paid`, locale });
   }
   if (payment.method?.kind === "stellar") {
-    redirect({ href: `/pagar/${publicId}/stellar`, locale });
+    redirect({ href: `/pay/${publicId}/stellar`, locale });
   }
 
   const t = await getTranslations({ locale, namespace: "checkout.common" });
@@ -51,7 +51,7 @@ export default async function CheckoutPixPage({
   return (
     <div className="flex flex-col gap-6">
       <Link
-        href={`/pagar/${publicId}`}
+        href={`/pay/${publicId}`}
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
       >
         <ArrowLeft className="size-3" strokeWidth={1.5} />

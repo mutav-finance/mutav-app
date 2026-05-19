@@ -34,7 +34,7 @@ export async function generateMetadata({
 /**
  * Step 2a — pay from a Stellar wallet (XLM or USDC). Renders the
  * existing SEP-7 panel (QR + address + asset tabs + Horizon poller)
- * inside the checkout chrome. Redirects to /pago on settle and to /pix
+ * inside the checkout chrome. Redirects to /paid on settle and to /pix
  * if the user picked PIX instead.
  */
 export default async function CheckoutStellarPage({
@@ -54,10 +54,10 @@ export default async function CheckoutStellarPage({
   const muxedAddress = payment.muxedAddress;
 
   if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
-    redirect({ href: `/pagar/${publicId}/pago`, locale });
+    redirect({ href: `/pay/${publicId}/paid`, locale });
   }
   if (payment.method?.kind === "pix") {
-    redirect({ href: `/pagar/${publicId}/pix`, locale });
+    redirect({ href: `/pay/${publicId}/pix`, locale });
   }
 
   const t = await getTranslations({ locale, namespace: "checkout.common" });
@@ -85,7 +85,7 @@ export default async function CheckoutStellarPage({
   return (
     <div className="flex flex-col gap-6">
       <Link
-        href={`/pagar/${publicId}`}
+        href={`/pay/${publicId}`}
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
       >
         <ArrowLeft className="size-3" strokeWidth={1.5} />
