@@ -960,119 +960,135 @@
       "ctaButton": "Começar cadastro",
       "ctaNoteReview": "análise em até 2 dias úteis"
     },
-    "wizard": {
-      "loading": "Carregando…",
-      "steps": {
-        "perfil": "Perfil",
-        "documentos": "Documentos",
-        "contaBancaria": "Conta bancária",
-        "revisao": "Revisão"
-      },
-      "progressLabel": "Progresso do cadastro",
-      "stepDoneSuffix": ": concluído",
-      "stepCurrentSuffix": ": etapa atual",
-      "banking": {
-        "empresaAccountNotice": "A conta bancária deve estar no nome da empresa e vinculada ao CNPJ cadastrado.",
-        "bankLabel": "Banco",
-        "bankPlaceholder": "Ex: Nubank, Itaú, Bradesco",
-        "branchLabel": "Agência",
-        "branchPlaceholder": "0000",
-        "accountLabel": "Conta",
-        "accountPlaceholder": "00000-0",
-        "accountTypeLabel": "Tipo de conta",
-        "accountTypeCorrente": "Conta corrente",
-        "accountTypePoupanca": "Poupança",
-        "pixKeyLabel": "Chave Pix",
-        "pixKeyPlaceholder": "CPF, CNPJ, e-mail, telefone ou chave aleatória",
-        "pixKeyHint": "Opcional — usada para estornos e repasses ágeis",
-        "nextButton": "Próximo",
-        "savingButton": "Salvando…",
-        "backButton": "← Voltar",
-        "errors": {
-          "bank": "Informe o nome do banco.",
-          "branch": "Informe o número da agência.",
-          "account": "Informe o número da conta.",
-          "accountType": "Selecione o tipo de conta."
-        }
-      },
-      "documents": {
-        "loading": "Carregando…",
-        "subtitle": "Envie os 2 documentos abaixo. Aceitamos PDF, JPG e PNG.",
-        "kinds": {
-          "documento_empresa": {
-            "label": "Documento da Empresa",
-            "description": "Cartão CNPJ (Receita Federal) ou Contrato Social"
-          },
-          "responsavel_id": {
-            "label": "Documento do Responsável",
-            "description": "RG ou CNH do sócio responsável pelo cadastro"
-          }
-        },
-        "uploadButton": "Enviar",
-        "replaceButton": "Substituir",
-        "uploading": "Enviando…",
-        "retryButton": "Falhou — Tentar novamente",
-        "progress": "{uploaded} de {total} enviados",
-        "allRequired": "Envie todos os documentos para continuar.",
-        "nextButton": "Próximo",
-        "backButton": "← Voltar"
-      },
-      "review": {
-        "profileSection": "Perfil",
-        "bankingSection": "Conta bancária",
-        "agencyTypeLabel": "Tipo",
-        "nameLabel": "Nome",
-        "documentLabel": "Documento",
-        "creciLabel": "CRECI",
-        "emailLabel": "E-mail",
-        "phoneLabel": "Telefone",
-        "representanteNameLabel": "Responsável",
-        "representanteCpfLabel": "CPF do responsável",
-        "bankLabel": "Banco",
-        "branchLabel": "Agência",
-        "accountLabel": "Conta",
-        "accountTypeLabel": "Tipo",
-        "pixKeyLabel": "Chave Pix",
-        "notProvided": "Não informada",
-        "accountTypeCorrente": "Corrente",
-        "accountTypePoupanca": "Poupança",
-        "agencyTypeAutonomo": "Corretor autônomo",
-        "agencyTypeEmpresa": "Imobiliária",
-        "editButton": "editar",
-        "submitButton": "Enviar cadastro",
-        "submittingButton": "Enviando…",
-        "backButton": "← Voltar",
-        "consentMarketing": "Aceito receber comunicações direcionadas sendo possível cancelar o recebimento a qualquer momento.",
-        "consentLegal": "Ao informar meus dados, eu concordo com a <privacy>Política de Privacidade</privacy> e com os <terms>Termos de Uso</terms>."
-      },
-      "submitted": {
-        "title": "Cadastro enviado",
-        "subtitle": "Nossa equipe vai analisar suas informações e retornar em até 2 dias úteis.",
-        "detail": "Você receberá um e-mail com o resultado da análise em {email}."
-      },
+    "status": {
+      "title": "Cadastro em análise",
+      "subtitle": "Nossa equipe está analisando suas informações. Você receberá um e-mail com o resultado em até 2 dias úteis.",
+      "stateSubmitted": "Enviado — aguardando análise",
+      "stateUnderReview": "Em análise pela equipe Mutav",
+      "backLabel": "Tem dúvidas?",
+      "backLink": "Fale conosco",
+      "homeButton": "Voltar"
+    },
+    "rejected": {
+      "title": "Cadastro não aprovado",
+      "subtitle": "Infelizmente não foi possível aprovar seu cadastro neste momento.",
+      "reasonLabel": "Motivo informado pela equipe:",
+      "noReason": "Nenhum motivo informado.",
+      "contactLabel": "Tem dúvidas ou deseja recorrer?",
+      "contactLink": "Fale conosco",
+      "homeButton": "Voltar"
+    },
+    "loading": "Carregando…",
+    "steps": {
+      "perfil": "Perfil",
+      "documentos": "Documentos",
+      "contaBancaria": "Conta bancária",
+      "revisao": "Revisão"
+    },
+    "progressLabel": "Progresso do cadastro",
+    "stepDoneSuffix": ": concluído",
+    "stepCurrentSuffix": ": etapa atual",
+    "banking": {
+      "empresaAccountNotice": "A conta bancária deve estar no nome da empresa e vinculada ao CNPJ cadastrado.",
+      "bankLabel": "Banco",
+      "bankPlaceholder": "Ex: Nubank, Itaú, Bradesco",
+      "branchLabel": "Agência",
+      "branchPlaceholder": "0000",
+      "accountLabel": "Conta",
+      "accountPlaceholder": "00000-0",
+      "accountTypeLabel": "Tipo de conta",
+      "accountTypeCorrente": "Conta corrente",
+      "accountTypePoupanca": "Poupança",
+      "pixKeyLabel": "Chave Pix",
+      "pixKeyPlaceholder": "CPF, CNPJ, e-mail, telefone ou chave aleatória",
+      "pixKeyHint": "Opcional — usada para estornos e repasses ágeis",
+      "nextButton": "Próximo",
+      "savingButton": "Salvando…",
+      "backButton": "← Voltar",
       "errors": {
-        "CNPJ_REQUIRED": "CNPJ obrigatório para imobiliária.",
-        "CPF_REQUIRED": "CPF obrigatório para corretor autônomo.",
-        "CPF_INVALID": "CPF inválido. Verifique os dígitos e tente novamente.",
-        "CNPJ_INVALID": "CNPJ inválido. Verifique os dígitos e tente novamente.",
-        "REPRESENTANTE_NAME_REQUIRED": "Nome do responsável obrigatório para imobiliária.",
-        "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
-        "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
-        "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
-        "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte.",
-        "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
-        "AGENCY_TYPE_REQUIRED": "Selecione o tipo de cadastro para continuar.",
-        "BANKING_INFO_REQUIRED": "Preencha os dados bancários antes de finalizar.",
-        "MISSING_DOCUMENTS": "Envie todos os documentos obrigatórios antes de finalizar.",
-        "NOT_IN_PROGRESS": "Este cadastro já foi enviado para revisão.",
-        "ONBOARDING_NOT_EDITABLE": "Este cadastro não pode mais ser alterado.",
-        "NOT_FOUND": "Cadastro não encontrado.",
-        "NETWORK_ERROR": "Falha de conexão. Tente novamente.",
-        "INTERNAL_ERROR": "Erro interno. Tente recarregar a página.",
-        "unknown": "Erro ao salvar. Tente novamente."
+        "bank": "Informe o nome do banco.",
+        "branch": "Informe o número da agência.",
+        "account": "Informe o número da conta.",
+        "accountType": "Selecione o tipo de conta."
       }
     },
-    "step1": {
+    "documents": {
+      "loading": "Carregando…",
+      "subtitle": "Envie os 2 documentos abaixo. Aceitamos PDF, JPG e PNG.",
+      "kinds": {
+        "documento_empresa": {
+          "label": "Documento da Empresa",
+          "description": "Cartão CNPJ (Receita Federal) ou Contrato Social"
+        },
+        "responsavel_id": {
+          "label": "Documento do Responsável",
+          "description": "RG ou CNH do sócio responsável pelo cadastro"
+        }
+      },
+      "uploadButton": "Enviar",
+      "replaceButton": "Substituir",
+      "uploading": "Enviando…",
+      "retryButton": "Falhou — Tentar novamente",
+      "progress": "{uploaded} de {total} enviados",
+      "allRequired": "Envie todos os documentos para continuar.",
+      "nextButton": "Próximo",
+      "backButton": "← Voltar"
+    },
+    "review": {
+      "profileSection": "Perfil",
+      "bankingSection": "Conta bancária",
+      "agencyTypeLabel": "Tipo",
+      "nameLabel": "Nome",
+      "documentLabel": "Documento",
+      "creciLabel": "CRECI",
+      "emailLabel": "E-mail",
+      "phoneLabel": "Telefone",
+      "representanteNameLabel": "Responsável",
+      "representanteCpfLabel": "CPF do responsável",
+      "bankLabel": "Banco",
+      "branchLabel": "Agência",
+      "accountLabel": "Conta",
+      "accountTypeLabel": "Tipo",
+      "pixKeyLabel": "Chave Pix",
+      "notProvided": "Não informada",
+      "accountTypeCorrente": "Corrente",
+      "accountTypePoupanca": "Poupança",
+      "agencyTypeAutonomo": "Corretor autônomo",
+      "agencyTypeEmpresa": "Imobiliária",
+      "editButton": "editar",
+      "submitButton": "Enviar cadastro",
+      "submittingButton": "Enviando…",
+      "backButton": "← Voltar",
+      "consentMarketing": "Aceito receber comunicações direcionadas sendo possível cancelar o recebimento a qualquer momento.",
+      "consentLegal": "Ao informar meus dados, eu concordo com a <privacy>Política de Privacidade</privacy> e com os <terms>Termos de Uso</terms>."
+    },
+    "submitted": {
+      "title": "Cadastro enviado",
+      "subtitle": "Nossa equipe vai analisar suas informações e retornar em até 2 dias úteis.",
+      "detail": "Você receberá um e-mail com o resultado da análise em {email}."
+    },
+    "errors": {
+      "CNPJ_REQUIRED": "CNPJ obrigatório para imobiliária.",
+      "CPF_REQUIRED": "CPF obrigatório para corretor autônomo.",
+      "CPF_INVALID": "CPF inválido. Verifique os dígitos e tente novamente.",
+      "CNPJ_INVALID": "CNPJ inválido. Verifique os dígitos e tente novamente.",
+      "REPRESENTANTE_NAME_REQUIRED": "Nome do responsável obrigatório para imobiliária.",
+      "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
+      "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
+      "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
+      "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte.",
+      "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
+      "AGENCY_TYPE_REQUIRED": "Selecione o tipo de cadastro para continuar.",
+      "BANKING_INFO_REQUIRED": "Preencha os dados bancários antes de finalizar.",
+      "MISSING_DOCUMENTS": "Envie todos os documentos obrigatórios antes de finalizar.",
+      "NOT_IN_PROGRESS": "Este cadastro já foi enviado para revisão.",
+      "ONBOARDING_NOT_EDITABLE": "Este cadastro não pode mais ser alterado.",
+      "NOT_FOUND": "Cadastro não encontrado.",
+      "NETWORK_ERROR": "Falha de conexão. Tente novamente.",
+      "INTERNAL_ERROR": "Erro interno. Tente recarregar a página.",
+      "unknown": "Erro ao salvar. Tente novamente."
+    },
+    "profile": {
       "typeLabel": "Tipo de cadastro",
       "typeAutonomo": "Corretor autônomo",
       "typeEmpresa": "Imobiliária",
@@ -1105,24 +1121,6 @@
         "representanteName": "Nome do responsável obrigatório.",
         "representanteCpf": "CPF do responsável inválido."
       }
-    },
-    "status": {
-      "title": "Cadastro em análise",
-      "subtitle": "Nossa equipe está analisando suas informações. Você receberá um e-mail com o resultado em até 2 dias úteis.",
-      "stateSubmitted": "Enviado — aguardando análise",
-      "stateUnderReview": "Em análise pela equipe Mutav",
-      "backLabel": "Tem dúvidas?",
-      "backLink": "Fale conosco",
-      "homeButton": "Voltar"
-    },
-    "rejected": {
-      "title": "Cadastro não aprovado",
-      "subtitle": "Infelizmente não foi possível aprovar seu cadastro neste momento.",
-      "reasonLabel": "Motivo informado pela equipe:",
-      "noReason": "Nenhum motivo informado.",
-      "contactLabel": "Tem dúvidas ou deseja recorrer?",
-      "contactLink": "Fale conosco",
-      "homeButton": "Voltar"
     }
   }
 }

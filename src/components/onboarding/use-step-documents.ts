@@ -20,7 +20,7 @@ const INITIAL_STATUS: Record<DocumentKind, UploadStatus> = {
 type Labels = Record<DocumentKind, { label: string; description: string }>;
 
 export function useStepDocuments({ agencyId, onNext }: { agencyId: AgencyId; onNext: () => void }) {
-  const t = useTranslations("onboarding.wizard.documents");
+  const t = useTranslations("onboarding.documents");
 
   const existingDocs = useQuery(api.agencies.useCases.listDocumentsForAgency, { agencyId });
   const generateUploadUrl = useMutation(api.agencies.useCases.generateDocumentUploadUrl);

@@ -17,7 +17,7 @@ type Props = {
 };
 
 export function StepDocuments({ agencyId, onNext, onBack }: Props) {
-  const t = useTranslations("onboarding.wizard.documents");
+  const t = useTranslations("onboarding.documents");
   const vm = useStepDocuments({ agencyId, onNext });
 
   if (vm.isLoading) {

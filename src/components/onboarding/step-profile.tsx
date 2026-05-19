@@ -37,7 +37,7 @@ const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof ProfileFormInput>> = 
 };
 
 export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmitting }: Props) {
-  const t = useTranslations("onboarding.step1");
+  const t = useTranslations("onboarding.profile");
 
   // 3-generic form: input is the wide shape (empty agencyType allowed);
   // output (passed to onSubmit) is narrowed by the schema's transform.

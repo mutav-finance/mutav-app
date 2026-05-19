@@ -9,7 +9,7 @@ import { StepReview } from "@/components/onboarding/step-review";
 import { useOnboardingFlow } from "@/components/onboarding/use-onboarding-flow";
 
 export function OnboardingFlow({ initialType }: { initialType?: "autonomo" | "empresa" }) {
-  const t = useTranslations("onboarding.wizard");
+  const t = useTranslations("onboarding");
   const vm = useOnboardingFlow({ initialType });
 
   if (vm.isSubmitted) {

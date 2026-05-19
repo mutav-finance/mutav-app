@@ -26,7 +26,7 @@ type Props = {
 };
 
 export function StepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }: Props) {
-  const t = useTranslations("onboarding.wizard.review");
+  const t = useTranslations("onboarding.review");
 
   const form = useForm<ReviewFormValues>({
     resolver: zodResolver(reviewSchema),

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Same code-not-message pattern as profile-schema.ts: validators emit
-// error codes that the component maps to onboarding.wizard.banking.errors.<code>.
+// error codes that the component maps to onboarding.banking.errors.<code>.
 const ERROR = {
   BANK_REQUIRED: "bank",
   BRANCH_REQUIRED: "branch",
