@@ -24,9 +24,9 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
-import type { Doc } from "@convex/_generated/dataModel";
 import type { AgencyId } from "@convex/agencies/domain";
-import type { AgencyBankAccountId } from "@convex/anchors/bankAccountDomain";
+import type { AgencyBankAccount, AgencyBankAccountId } from "@convex/anchors/bankAccountDomain";
+import type { AnchorOrder } from "@convex/anchors/orderDomain";
 import type { PaymentId } from "@convex/payments/domain";
 
 interface Props {
@@ -92,8 +92,6 @@ export function CheckoutPixView({ paymentId, agencyId, totalCents }: Props) {
 }
 
 // ─── Pre-flight: bank registration + selection ────────────────────────────────
-
-type AgencyBankAccount = Doc<"agencyBankAccounts">;
 
 function PreFlight({
   agencyId,
@@ -331,7 +329,7 @@ function LoadedPanel({
   totalCents,
   phase,
 }: {
-  order: Doc<"anchorOrders">;
+  order: AnchorOrder;
   totalCents: number;
   phase: AnchorOnrampPhase;
 }) {

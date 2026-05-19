@@ -1,11 +1,11 @@
 import { useTranslations } from "next-intl";
 import { Check, ExternalLink } from "lucide-react";
 import { Mono } from "@/components/ui/mono";
-import type { Doc } from "@convex/_generated/dataModel";
+import type { Payment } from "@convex/payments/domain";
 
 type Props = {
   paidAt: string;
-  method: Doc<"payments">["method"];
+  method: Payment["method"];
 };
 
 const TESTNET_TX_BASE = "https://stellar.expert/explorer/testnet/tx";
