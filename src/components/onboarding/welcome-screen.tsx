@@ -55,7 +55,7 @@ export function WelcomeScreen() {
       <div className="flex flex-col items-end gap-3">
         {vm.selectedType ? (
           <Button asChild size="sm" className="px-6">
-            <Link href={`/onboarding/wizard?type=${vm.selectedType}`}>{t("ctaButton")}</Link>
+            <Link href={`/onboarding/agency?type=${vm.selectedType}`}>{t("ctaButton")}</Link>
           </Button>
         ) : (
           <Button size="sm" className="px-6" disabled>
