@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { wizardReducer } from "@/components/onboarding/use-onboarding-wizard";
+import { onboardingReducer } from "@/components/onboarding/use-onboarding-flow";
 import type { AgencyId } from "@convex/agencies/domain";
 
-// wizardReducer is pure — no React, no Convex. Tests run in plain node env.
+// onboardingReducer is pure — no React, no Convex. Tests run in plain node env.
 // Synthetic Ids for a pure-reducer test — opaque convex-test Ids aren't
 // reachable here. Boundary exception per CLAUDE.md.
 const AGENCY_ID = "agencies_test_1" as AgencyId;
@@ -33,11 +33,11 @@ function makeInitialState() {
   };
 }
 
-describe("wizardReducer", () => {
+describe("onboardingReducer", () => {
   describe("GO_TO", () => {
     it("sets step to the requested value without touching data", () => {
       const state = { ...makeInitialState(), step: 2 };
-      const next = wizardReducer(state, { type: "GO_TO", step: 4 });
+      const next = onboardingReducer(state, { type: "GO_TO", step: 4 });
       expect(next.step).toBe(4);
       expect(next.snapshot).toEqual(state.snapshot);
     });
@@ -50,7 +50,7 @@ describe("wizardReducer", () => {
         submitState: "idle" as const,
         errorCode: "CPF_INVALID",
       };
-      const next = wizardReducer(state, { type: "SUBMIT_START" });
+      const next = onboardingReducer(state, { type: "SUBMIT_START" });
       expect(next.submitState).toBe("submitting");
       expect(next.errorCode).toBe(null);
     });
@@ -59,7 +59,7 @@ describe("wizardReducer", () => {
   describe("SUBMIT_SUCCESS", () => {
     it("advances step + 1 and persists agencyId when provided", () => {
       const state = { ...makeInitialState(), step: 1, submitState: "submitting" as const };
-      const next = wizardReducer(state, { type: "SUBMIT_SUCCESS", agencyId: AGENCY_ID });
+      const next = onboardingReducer(state, { type: "SUBMIT_SUCCESS", agencyId: AGENCY_ID });
       expect(next.step).toBe(2);
       expect(next.agencyId).toBe(AGENCY_ID);
       expect(next.submitState).toBe("idle");
@@ -72,14 +72,14 @@ describe("wizardReducer", () => {
         agencyId: AGENCY_ID,
         submitState: "submitting" as const,
       };
-      const next = wizardReducer(state, { type: "SUBMIT_SUCCESS" });
+      const next = onboardingReducer(state, { type: "SUBMIT_SUCCESS" });
       expect(next.step).toBe(3);
       expect(next.agencyId).toBe(AGENCY_ID);
     });
 
     it("overwrites agencyId if a different one comes in", () => {
       const state = { ...makeInitialState(), agencyId: AGENCY_ID };
-      const next = wizardReducer(state, { type: "SUBMIT_SUCCESS", agencyId: AGENCY_ID_2 });
+      const next = onboardingReducer(state, { type: "SUBMIT_SUCCESS", agencyId: AGENCY_ID_2 });
       expect(next.agencyId).toBe(AGENCY_ID_2);
     });
   });
@@ -87,7 +87,7 @@ describe("wizardReducer", () => {
   describe("SUBMIT_DONE", () => {
     it("transitions to submitted terminal state", () => {
       const state = { ...makeInitialState(), submitState: "submitting" as const };
-      const next = wizardReducer(state, { type: "SUBMIT_DONE" });
+      const next = onboardingReducer(state, { type: "SUBMIT_DONE" });
       expect(next.submitState).toBe("submitted");
       expect(next.errorCode).toBe(null);
     });
@@ -96,14 +96,14 @@ describe("wizardReducer", () => {
   describe("SUBMIT_ERROR", () => {
     it("returns to idle and surfaces the error code", () => {
       const state = { ...makeInitialState(), submitState: "submitting" as const };
-      const next = wizardReducer(state, { type: "SUBMIT_ERROR", code: "ALREADY_REGISTERED" });
+      const next = onboardingReducer(state, { type: "SUBMIT_ERROR", code: "ALREADY_REGISTERED" });
       expect(next.submitState).toBe("idle");
       expect(next.errorCode).toBe("ALREADY_REGISTERED");
     });
 
     it("does not advance step on error (stays where the user was)", () => {
       const state = { ...makeInitialState(), step: 2, submitState: "submitting" as const };
-      const next = wizardReducer(state, { type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
+      const next = onboardingReducer(state, { type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
       expect(next.step).toBe(2);
     });
   });
@@ -111,14 +111,14 @@ describe("wizardReducer", () => {
   describe("error → retry → success flow", () => {
     it("clears error on next SUBMIT_START and lands on next step on SUCCESS", () => {
       const s0 = makeInitialState();
-      const s1 = wizardReducer(s0, { type: "SUBMIT_ERROR", code: "CPF_REQUIRED" });
+      const s1 = onboardingReducer(s0, { type: "SUBMIT_ERROR", code: "CPF_REQUIRED" });
       expect(s1.errorCode).toBe("CPF_REQUIRED");
 
-      const s2 = wizardReducer(s1, { type: "SUBMIT_START" });
+      const s2 = onboardingReducer(s1, { type: "SUBMIT_START" });
       expect(s2.errorCode).toBe(null);
       expect(s2.submitState).toBe("submitting");
 
-      const s3 = wizardReducer(s2, { type: "SUBMIT_SUCCESS", agencyId: AGENCY_ID });
+      const s3 = onboardingReducer(s2, { type: "SUBMIT_SUCCESS", agencyId: AGENCY_ID });
       expect(s3.errorCode).toBe(null);
       expect(s3.agencyId).toBe(AGENCY_ID);
       expect(s3.step).toBe(2);

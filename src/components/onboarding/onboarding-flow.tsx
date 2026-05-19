@@ -1,16 +1,16 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { WizardStepIndicator } from "@/components/onboarding/wizard-step-indicator";
-import { WizardStep1 } from "@/components/onboarding/wizard-step1";
-import { WizardStepBanking } from "@/components/onboarding/wizard-step-banking";
-import { WizardStepDocuments } from "@/components/onboarding/wizard-step-documents";
-import { WizardStepReview } from "@/components/onboarding/wizard-step-review";
-import { useOnboardingWizard } from "@/components/onboarding/use-onboarding-wizard";
+import { StepIndicator } from "@/components/onboarding/step-indicator";
+import { StepProfile } from "@/components/onboarding/step-profile";
+import { StepBanking } from "@/components/onboarding/step-banking";
+import { StepDocuments } from "@/components/onboarding/step-documents";
+import { StepReview } from "@/components/onboarding/step-review";
+import { useOnboardingFlow } from "@/components/onboarding/use-onboarding-flow";
 
-export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "empresa" }) {
+export function OnboardingFlow({ initialType }: { initialType?: "autonomo" | "empresa" }) {
   const t = useTranslations("onboarding.wizard");
-  const vm = useOnboardingWizard({ initialType });
+  const vm = useOnboardingFlow({ initialType });
 
   if (vm.isSubmitted) {
     return (
@@ -24,7 +24,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
 
   return (
     <div className="flex flex-col gap-8">
-      <WizardStepIndicator
+      <StepIndicator
         current={vm.currentStep}
         labels={vm.stepLabels}
         progressLabel={t("progressLabel")}
@@ -42,7 +42,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
       )}
 
       {vm.stepKind === "profile" && (
-        <WizardStep1
+        <StepProfile
           initialValues={vm.snapshot}
           serverErrorCode={vm.errorCode}
           onSubmit={vm.handleStep1Submit}
@@ -51,7 +51,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
       )}
 
       {vm.stepKind === "banking" && (
-        <WizardStepBanking
+        <StepBanking
           initialValues={vm.snapshot}
           serverErrorCode={vm.errorCode}
           agencyType={vm.snapshot.agencyType}
@@ -63,7 +63,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
 
       {vm.stepKind === "documents" &&
         (vm.agencyId ? (
-          <WizardStepDocuments
+          <StepDocuments
             agencyId={vm.agencyId}
             onNext={vm.handleDocumentsNext}
             onBack={vm.handleBack}
@@ -75,7 +75,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
         ))}
 
       {vm.stepKind === "review" && (
-        <WizardStepReview
+        <StepReview
           snapshot={vm.snapshot}
           onSubmit={vm.handleReviewSubmit}
           onBack={vm.handleBack}

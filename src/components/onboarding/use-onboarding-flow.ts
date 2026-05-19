@@ -20,34 +20,34 @@ import type { ReviewFormValues } from "@/components/onboarding/schemas/review-sc
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 /**
- * Accumulated form snapshot across the wizard's steps. Derived from the
+ * Accumulated form snapshot across the flow's steps. Derived from the
  * profile + banking schema input types — single source of truth. Each
  * step's RHF form is the live state; this snapshot is what the reducer
  * captures on `SAVE_*` so the review screen and back-navigation prefill
  * can read across steps.
  */
-export type OnboardingWizardSnapshot = ProfileFormInput & BankingFormInput;
+export type OnboardingSnapshot = ProfileFormInput & BankingFormInput;
 
-export type WizardStepKind = "profile" | "documents" | "banking" | "review";
+export type OnboardingStep = "profile" | "documents" | "banking" | "review";
 
 // ─── Internal: reducer + helpers ──────────────────────────────────────────────
 
-const INITIAL_SNAPSHOT: OnboardingWizardSnapshot = {
+const INITIAL_SNAPSHOT: OnboardingSnapshot = {
   ...PROFILE_FORM_DEFAULTS,
   ...BANKING_FORM_DEFAULTS,
 };
 
 type SubmitState = "idle" | "submitting" | "submitted";
 
-type WizardState = {
+type OnboardingState = {
   step: number;
   agencyId: AgencyId | null;
-  snapshot: OnboardingWizardSnapshot;
+  snapshot: OnboardingSnapshot;
   submitState: SubmitState;
   errorCode: string | null;
 };
 
-type WizardAction =
+type OnboardingAction =
   | { type: "SAVE_PROFILE"; values: ProfileFormValues }
   | { type: "SAVE_BANKING"; values: BankingFormValues }
   | { type: "GO_TO"; step: number }
@@ -56,10 +56,13 @@ type WizardAction =
   | { type: "SUBMIT_DONE" }
   | { type: "SUBMIT_ERROR"; code: string };
 
-export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
+export function onboardingReducer(
+  state: OnboardingState,
+  action: OnboardingAction,
+): OnboardingState {
   switch (action.type) {
     case "SAVE_PROFILE":
-      // Step1 (RHF) hands the wizard a validated snapshot. Persisted so the
+      // Step1 (RHF) hands the flow a validated snapshot. Persisted so the
       // review screen can render it and so going back to step1 prefills.
       // Clear the opposite-variant identity fields on type switch.
       return {
@@ -99,7 +102,7 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   }
 }
 
-function resolveStepKind(step: number, agencyType: string): WizardStepKind {
+function resolveStepKind(step: number, agencyType: string): OnboardingStep {
   if (step === 1) return "profile";
   if (agencyType === "autonomo") {
     if (step === 2) return "banking";
@@ -113,13 +116,13 @@ function resolveStepKind(step: number, agencyType: string): WizardStepKind {
   return "profile";
 }
 
-// Server + client error codes recognised by the wizard banner. Keep in
+// Server + client error codes recognised by the flow banner. Keep in
 // sync with `onboarding.wizard.errors.<CODE>` in messages/{pt-BR,en}.json
 // — the i18n parity grep in scripts/regression-greps.sh enforces both
 // locales stay aligned, but neither check verifies the union against
 // what Convex actually returns. When a new code is added on the server,
 // add it here AND in both locale files.
-const WIZARD_ERROR_CODES = [
+const ONBOARDING_ERROR_CODES = [
   // Profile-step server codes (convex/agencies/useCases.ts → startOnboarding)
   "AGENCY_TYPE_REQUIRED",
   "AGENCY_TYPE_CONFLICT",
@@ -143,13 +146,13 @@ const WIZARD_ERROR_CODES = [
   "INTERNAL_ERROR",
 ] as const;
 
-type WizardErrorCode = (typeof WIZARD_ERROR_CODES)[number];
+type OnboardingErrorCode = (typeof ONBOARDING_ERROR_CODES)[number];
 
-function isWizardErrorCode(code: string): code is WizardErrorCode {
-  return (WIZARD_ERROR_CODES as readonly string[]).includes(code);
+function isOnboardingErrorCode(code: string): code is OnboardingErrorCode {
+  return (ONBOARDING_ERROR_CODES as readonly string[]).includes(code);
 }
 
-function buildInitialState(initialType: "autonomo" | "empresa" | undefined): WizardState {
+function buildInitialState(initialType: "autonomo" | "empresa" | undefined): OnboardingState {
   return {
     step: 1,
     agencyId: null,
@@ -161,13 +164,13 @@ function buildInitialState(initialType: "autonomo" | "empresa" | undefined): Wiz
 
 // ─── View model hook ──────────────────────────────────────────────────────────
 
-export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" | "empresa" }) {
+export function useOnboardingFlow({ initialType }: { initialType?: "autonomo" | "empresa" }) {
   const t = useTranslations("onboarding.wizard");
 
-  const [state, dispatch] = React.useReducer(wizardReducer, initialType, buildInitialState);
+  const [state, dispatch] = React.useReducer(onboardingReducer, initialType, buildInitialState);
 
   // Strip ?type= from the URL once mounted — refresh without the param triggers
-  // the server redirect in wizard/page.tsx that sends the user back to /onboarding.
+  // the server redirect in flow/page.tsx that sends the user back to /onboarding.
   React.useEffect(() => {
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
@@ -189,7 +192,7 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
 
   // ─── Note on step shapes ────────────────────────────────────────────────────
   // Steps 1 (profile), 3 (banking), and 4 (review) are RHF forms — they own
-  // their field state and call onSubmit(values) on completion. The wizard
+  // their field state and call onSubmit(values) on completion. The flow
   // snapshots into state.snapshot via SAVE_PROFILE / SAVE_BANKING so the
   // review screen and back-navigation prefill can read across steps.
   //
@@ -293,7 +296,7 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
   }, []);
 
   const errorMessage = state.errorCode
-    ? isWizardErrorCode(state.errorCode)
+    ? isOnboardingErrorCode(state.errorCode)
       ? t(`errors.${state.errorCode}`)
       : t("errors.unknown")
     : null;
