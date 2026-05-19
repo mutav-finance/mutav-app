@@ -6,7 +6,7 @@
 
 /**
  * Whether to render the testanchor (SEP-24 hosted-UI debugging) card on
- * the public payment picker at `/pagar/[publicId]`. Off by default once
+ * the public payment picker at `/pay/[publicId]`. Off by default once
  * the Etherfuse Pix on-ramp is live; on for dev/preview when we want to
  * verify SEP-side behavior without touching production payment flow.
  *

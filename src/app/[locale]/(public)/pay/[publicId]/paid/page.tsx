@@ -29,7 +29,7 @@ export async function generateMetadata({
  *
  * The PDF download CTA is deferred until v1.2 (no PDF infra wired yet).
  */
-export default async function CheckoutPagoPage({
+export default async function CheckoutPaidPage({
   params,
 }: {
   params: Promise<{ publicId: string; locale: string }>;
@@ -40,7 +40,7 @@ export default async function CheckoutPagoPage({
   if (!payment) notFound();
 
   if (payment.state.kind !== "paid" && payment.state.kind !== "canceled") {
-    redirect({ href: `/pagar/${publicId}`, locale });
+    redirect({ href: `/pay/${publicId}`, locale });
   }
 
   const t = await getTranslations({ locale, namespace: "checkout.pago" });
@@ -116,7 +116,7 @@ export default async function CheckoutPagoPage({
           </Button>
         )}
         <Link
-          href={`/pagar/${publicId}`}
+          href={`/pay/${publicId}`}
           className="text-muted-foreground hover:text-foreground text-xs"
         >
           ← {tCommon("backToCheckout")}

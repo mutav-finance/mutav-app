@@ -29,7 +29,7 @@ export async function generateMetadata({
  * indexer). Users can switch freely by hitting back.
  *
  * State redirects:
- *  - paid           → /pago (receipt)
+ *  - paid           → /paid (receipt)
  *  - method=stellar → /stellar (resume in-progress)
  *  - method=pix     → /pix
  */
@@ -44,13 +44,13 @@ export default async function CheckoutPickerPage({
   if (!payment) notFound();
 
   if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
-    redirect({ href: `/pagar/${publicId}/pago`, locale });
+    redirect({ href: `/pay/${publicId}/paid`, locale });
   }
   if (payment.method?.kind === "stellar") {
-    redirect({ href: `/pagar/${publicId}/stellar`, locale });
+    redirect({ href: `/pay/${publicId}/stellar`, locale });
   }
   if (payment.method?.kind === "pix") {
-    redirect({ href: `/pagar/${publicId}/pix`, locale });
+    redirect({ href: `/pay/${publicId}/pix`, locale });
   }
 
   const t = await getTranslations({ locale, namespace: "checkout.picker" });
@@ -82,14 +82,14 @@ export default async function CheckoutPickerPage({
           }
         >
           <MethodPickerCard
-            href={`/pagar/${publicId}/pix`}
+            href={`/pay/${publicId}/pix`}
             icon={<Banknote className="size-5" strokeWidth={1.25} />}
             title={t("pix.title")}
             subtitle={t("pix.subtitle")}
             duration={t("pix.duration")}
           />
           <MethodPickerCard
-            href={`/pagar/${publicId}/stellar`}
+            href={`/pay/${publicId}/stellar`}
             icon={<Coins className="size-5" strokeWidth={1.25} />}
             title={t("stellar.title")}
             subtitle={t("stellar.subtitle")}
@@ -97,7 +97,7 @@ export default async function CheckoutPickerPage({
           />
           {shouldShowTestanchor() ? (
             <MethodPickerCard
-              href={`/pagar/${publicId}/anchortest`}
+              href={`/pay/${publicId}/anchortest`}
               icon={<FlaskConical className="size-5" strokeWidth={1.25} />}
               title={t("anchortest.title")}
               subtitle={t("anchortest.subtitle")}

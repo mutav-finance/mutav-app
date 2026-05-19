@@ -26,7 +26,7 @@ function ShareTenantLink({ publicId }: { publicId: string }) {
 
   const handleCopy = () => {
     const path = getPathname({
-      href: `/pagar/${publicId}`,
+      href: `/pay/${publicId}`,
       locale: locale as "pt-BR" | "en",
     });
     copy(`${window.location.origin}${path}`);
@@ -60,7 +60,7 @@ function ChargeableActions({
         variant={variant === "primary" ? "default" : "outline"}
         className="gap-2"
       >
-        <Link href={`/pagar/${payment.publicId}`} target="_blank" rel="noopener">
+        <Link href={`/pay/${payment.publicId}`} target="_blank" rel="noopener">
           {t("openCheckout")}
           <ExternalLink className="size-4" strokeWidth={1.25} />
         </Link>

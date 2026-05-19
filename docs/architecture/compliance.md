@@ -28,7 +28,7 @@ Every principal on the platform has exactly one account type. The type determine
 | Account type                    | Surface                            | Identity source                            | Principal of                                                                |
 | ------------------------------- | ---------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------- |
 | **Anonymous visitor**           | `(public)`, `(investor)` read-only | None                                       | Browse-only sessions                                                        |
-| **Tenant**                      | `(public)/pagar/[publicId]`        | `publicId` bearer                          | A single assigned contract                                                  |
+| **Tenant**                      | `(public)/pay/[publicId]`          | `publicId` bearer                          | A single assigned contract                                                  |
 | **Agency member**               | `(app)`                            | Auth0 (planned) → `users` + `memberships`  | An agency, with role `member` / `admin` / `owner`                           |
 | **Investor — retail PF**        | `(investor)`                       | Wallet on a supported chain                | One (chain, wallet) pair                                                    |
 | **Investor — qualified PF**     | `(investor)`                       | Wallet + qualified-investor classification | One (chain, wallet) pair with CVM 175 qualified declaration                 |
@@ -269,7 +269,7 @@ A Mutav-internal user can hold multiple sub-roles across multiple entities. Effe
 
 ### Tenant capabilities
 
-A tenant accesses only `(public)/pagar/[publicId]` and can only pay the assigned invoice. No other capabilities; no escalation path; the bearer token is the entire authorization.
+A tenant accesses only `(public)/pay/[publicId]` and can only pay the assigned invoice. No other capabilities; no escalation path; the bearer token is the entire authorization.
 
 ## Compliance review flow
 
