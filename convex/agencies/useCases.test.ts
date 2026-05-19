@@ -378,3 +378,84 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
     expect(agency?.bankingInfo).toBeUndefined();
   });
 });
+
+describe("saveDocument", () => {
+  test("replaces existing document of same kind — deletes old storage + row, inserts new", async () => {
+    const t = convexTest(schema);
+    await seedDevUser(t);
+
+    const start = await t.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
+    expect(start.success).toBe(true);
+    if (!start.success) return;
+    const agencyId = start.data.agencyId;
+
+    // Seed two storage blobs and a pre-existing agencyDocuments row pointing at one.
+    const firstStorageId = await t.run((ctx) => ctx.storage.store(new Blob(["original PDF"])));
+    const secondStorageId = await t.run((ctx) => ctx.storage.store(new Blob(["replacement PDF"])));
+
+    await t.run((ctx) =>
+      ctx.db.insert("agencyDocuments", {
+        agencyId,
+        kind: "documento_empresa",
+        storageId: firstStorageId,
+        fileName: "original.pdf",
+        uploadedAt: new Date().toISOString(),
+      }),
+    );
+
+    // Sanity — first blob exists before replace
+    const beforeUrl = await t.run((ctx) => ctx.storage.getUrl(firstStorageId));
+    expect(beforeUrl).toBeTruthy();
+
+    // Replace via saveDocument with same kind, different storageId
+    const result = await t.mutation(api.agencies.useCases.saveDocument, {
+      agencyId,
+      kind: "documento_empresa",
+      storageId: secondStorageId,
+      fileName: "replacement.pdf",
+    });
+    expect(result.success).toBe(true);
+
+    // Exactly one agencyDocuments row for this (agency, kind), pointing at the new storageId
+    const docs = await t.run((ctx) =>
+      ctx.db
+        .query("agencyDocuments")
+        .withIndex("by_agency_kind", (q) =>
+          q.eq("agencyId", agencyId).eq("kind", "documento_empresa"),
+        )
+        .collect(),
+    );
+    expect(docs).toHaveLength(1);
+    expect(docs[0].storageId).toBe(secondStorageId);
+    expect(docs[0].fileName).toBe("replacement.pdf");
+
+    // The orphaned old blob is gone (no orphans, no leak)
+    const afterUrl = await t.run((ctx) => ctx.storage.getUrl(firstStorageId));
+    expect(afterUrl).toBeNull();
+  });
+
+  test("first upload of a kind does NOT delete unrelated storage", async () => {
+    const t = convexTest(schema);
+    await seedDevUser(t);
+
+    const start = await t.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
+    expect(start.success).toBe(true);
+    if (!start.success) return;
+    const agencyId = start.data.agencyId;
+
+    // An unrelated blob in storage
+    const unrelatedStorageId = await t.run((ctx) => ctx.storage.store(new Blob(["unrelated"])));
+    const newStorageId = await t.run((ctx) => ctx.storage.store(new Blob(["new doc"])));
+
+    await t.mutation(api.agencies.useCases.saveDocument, {
+      agencyId,
+      kind: "documento_empresa",
+      storageId: newStorageId,
+      fileName: "doc.pdf",
+    });
+
+    // The unrelated blob is untouched
+    const url = await t.run((ctx) => ctx.storage.getUrl(unrelatedStorageId));
+    expect(url).toBeTruthy();
+  });
+});

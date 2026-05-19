@@ -45,6 +45,14 @@ export const getPendingReviews = internalQuery({
 /**
  * Gera uma URL temporária (curta duração) para download de um documento KYC.
  * Retorna null se o arquivo não existir no storage.
+ *
+ * SECURITY — internal-only today. When wrapped for staff use, the public
+ * caller MUST verify that the storageId's owning agency is in scope for the
+ * authenticated staff member's review queue. The current handler takes any
+ * storageId on faith; a wrapper that just adds a staff-role check (without
+ * verifying the agency) would let any staff member download any document in
+ * the deployment. Suggested pattern: accept (agencyId, kind) at the wrapper
+ * boundary, look up the agencyDocuments row, then call this with its storageId.
  */
 export const generateDocumentDownloadUrl = internalQuery({
   args: { storageId: v.id("_storage") },

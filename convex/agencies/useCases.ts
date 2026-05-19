@@ -117,50 +117,6 @@ export const listDocumentsForAgency = queryWithAgencyScope({
 });
 
 /**
- * Returns the in-progress onboarding agency for a user, if any.
- * Internal — retorna dados financeiros completos (CPF, CNPJ, bankingInfo).
- * TODO(auth): tornar pública com requireIdentity(ctx) na migração Auth0.
- */
-export const getOnboardingInProgress = internalQuery({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
-    const memberships = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-
-    const agencies = await Promise.all(memberships.map((m) => ctx.db.get(m.agencyId)));
-    const inProgress = agencies.find((a) => a?.onboardingState === ONBOARDING_STATE.IN_PROGRESS);
-    if (!inProgress) return null;
-
-    const documents = await ctx.db
-      .query("agencyDocuments")
-      .withIndex("by_agency", (q) => q.eq("agencyId", inProgress._id))
-      .collect();
-
-    return { agency: inProgress, documents };
-  },
-});
-
-/**
- * Returns the current onboarding state of an agency.
- * Internal — use via funções autorizadas. TODO(auth): expor com ownership check.
- */
-export const getOnboardingStatus = internalQuery({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }) => {
-    const agency = await ctx.db.get(agencyId);
-    if (!agency) return null;
-    return {
-      agencyId: agency._id,
-      onboardingState: agency.onboardingState ?? ONBOARDING_STATE.NOT_STARTED,
-      onboardingSubmittedAt: agency.onboardingSubmittedAt ?? null,
-      onboardingRejectionReason: agency.onboardingRejectionReason ?? null,
-    };
-  },
-});
-
-/**
  * Returns the onboarding state for the current authenticated user.
  * Used by the post-login routing logic to decide where to send the user:
  *   null / not_started  → /onboarding (start fresh)
