@@ -7,6 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wizard";
+import { useWizardStepBanking } from "@/components/onboarding/use-wizard-step-banking";
+
+// Re-export so the orchestrator hook can keep importing isBankAccountType from
+// either entry point — the canonical declaration lives in the hook file.
+export { isBankAccountType } from "@/components/onboarding/use-wizard-step-banking";
 
 type Props = {
   data: OnboardingWizardData;
@@ -16,38 +21,9 @@ type Props = {
   isSubmitting: boolean;
 };
 
-type BankingErrors = {
-  bank?: string;
-  branch?: string;
-  account?: string;
-  accountType?: string;
-};
-
-export function isBankAccountType(t: string): t is "corrente" | "poupanca" {
-  return t === "corrente" || t === "poupanca";
-}
-
 export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting }: Props) {
   const t = useTranslations("onboarding.wizard.banking");
-  const [errors, setErrors] = React.useState<BankingErrors>({});
-  const accountTypeLabelId = React.useId();
-
-  const handleNext = () => {
-    const errs: BankingErrors = {};
-
-    if (!data.bankName.trim()) errs.bank = t("errors.bank");
-    if (!data.bankBranch.trim()) errs.branch = t("errors.branch");
-    if (!data.bankAccount.trim()) errs.account = t("errors.account");
-    if (!isBankAccountType(data.bankAccountType)) errs.accountType = t("errors.accountType");
-
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-
-    setErrors({});
-    onNext();
-  };
+  const vm = useWizardStepBanking({ data, onNext });
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,7 +34,12 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field id="field-bank" label={t("bankLabel")} error={errors.bank} className="sm:col-span-2">
+        <Field
+          id="field-bank"
+          label={t("bankLabel")}
+          error={vm.errors.bank}
+          className="sm:col-span-2"
+        >
           <Input
             id="field-bank"
             value={data.bankName}
@@ -67,7 +48,7 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
           />
         </Field>
 
-        <Field id="field-branch" label={t("branchLabel")} error={errors.branch}>
+        <Field id="field-branch" label={t("branchLabel")} error={vm.errors.branch}>
           <Input
             id="field-branch"
             value={data.bankBranch}
@@ -77,7 +58,7 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
           />
         </Field>
 
-        <Field id="field-account" label={t("accountLabel")} error={errors.account}>
+        <Field id="field-account" label={t("accountLabel")} error={vm.errors.account}>
           <Input
             id="field-account"
             value={data.bankAccount}
@@ -87,10 +68,14 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
         </Field>
 
         <div className="flex flex-col gap-2 sm:col-span-2">
-          <span id={accountTypeLabelId} className="text-sm font-medium">
+          <span id={vm.accountTypeLabelId} className="text-sm font-medium">
             {t("accountTypeLabel")}
           </span>
-          <div role="group" aria-labelledby={accountTypeLabelId} className="grid grid-cols-2 gap-2">
+          <div
+            role="group"
+            aria-labelledby={vm.accountTypeLabelId}
+            className="grid grid-cols-2 gap-2"
+          >
             {(["corrente", "poupanca"] as const).map((type) => (
               <button
                 key={type}
@@ -108,9 +93,9 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
               </button>
             ))}
           </div>
-          {errors.accountType && (
+          {vm.errors.accountType && (
             <p className="text-error text-xs" role="alert">
-              {errors.accountType}
+              {vm.errors.accountType}
             </p>
           )}
         </div>
@@ -134,7 +119,7 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
         <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           {t("backButton")}
         </Button>
-        <Button size="lg" onClick={handleNext} disabled={isSubmitting}>
+        <Button size="lg" onClick={vm.handleNext} disabled={isSubmitting}>
           {isSubmitting ? t("savingButton") : t("nextButton")}
         </Button>
       </div>

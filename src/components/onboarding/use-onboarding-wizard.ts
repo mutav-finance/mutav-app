@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
-import { isBankAccountType } from "@/components/onboarding/wizard-step-banking";
+import { isBankAccountType } from "@/components/onboarding/use-wizard-step-banking";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Mono } from "@/components/ui/mono";
 import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wizard";
+import { useWizardStepReview } from "@/components/onboarding/use-wizard-step-review";
 
 type Props = {
   data: OnboardingWizardData;
@@ -17,20 +18,7 @@ type Props = {
 
 export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting }: Props) {
   const t = useTranslations("onboarding.wizard.review");
-  const [consentMarketing, setConsentMarketing] = React.useState(false);
-
-  const agencyTypeLabel =
-    data.agencyType === "autonomo" ? t("agencyTypeAutonomo") : t("agencyTypeEmpresa");
-  const documentValue = data.agencyType === "autonomo" ? data.cpf : data.cnpj;
-  const accountTypeLabel =
-    data.bankAccountType === "corrente"
-      ? t("accountTypeCorrente")
-      : data.bankAccountType === "poupanca"
-        ? t("accountTypePoupanca")
-        : "—";
-
-  // Etapa do banking varia conforme o tipo: autonomo pula documentos
-  const bankingStep = data.agencyType === "empresa" ? 3 : 2;
+  const vm = useWizardStepReview({ data, onSubmit });
 
   return (
     <div className="flex flex-col gap-6">
@@ -52,9 +40,9 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           </button>
         </div>
         <div className="border-border divide-border divide-y border">
-          <ReviewRow label={t("agencyTypeLabel")} value={agencyTypeLabel} />
+          <ReviewRow label={t("agencyTypeLabel")} value={vm.agencyTypeLabel} />
           <ReviewRow label={t("nameLabel")} value={data.name} />
-          <ReviewRow label={t("documentLabel")} value={<Mono>{documentValue}</Mono>} />
+          <ReviewRow label={t("documentLabel")} value={<Mono>{vm.documentValue}</Mono>} />
           <ReviewRow label={t("creciLabel")} value={data.creci} />
           <ReviewRow label={t("emailLabel")} value={data.email} />
           <ReviewRow label={t("phoneLabel")} value={<Mono>{data.phone}</Mono>} />
@@ -80,7 +68,7 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           </h3>
           <button
             type="button"
-            onClick={() => onGoTo(bankingStep)}
+            onClick={() => onGoTo(vm.bankingStep)}
             disabled={isSubmitting}
             className="text-accent font-mono text-xs hover:opacity-80 disabled:opacity-40"
           >
@@ -91,7 +79,7 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           <ReviewRow label={t("bankLabel")} value={data.bankName} />
           <ReviewRow label={t("branchLabel")} value={<Mono>{data.bankBranch}</Mono>} />
           <ReviewRow label={t("accountLabel")} value={<Mono>{data.bankAccount}</Mono>} />
-          <ReviewRow label={t("accountTypeLabel")} value={accountTypeLabel} />
+          <ReviewRow label={t("accountTypeLabel")} value={vm.accountTypeLabel} />
           <ReviewRow
             label={t("pixKeyLabel")}
             value={data.bankPixKey ? <Mono>{data.bankPixKey}</Mono> : t("notProvided")}
@@ -104,8 +92,8 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
         <label className="flex cursor-pointer items-start gap-2.5">
           <input
             type="checkbox"
-            checked={consentMarketing}
-            onChange={(e) => setConsentMarketing(e.target.checked)}
+            checked={vm.consentMarketing}
+            onChange={(e) => vm.toggleConsentMarketing(e.target.checked)}
             disabled={isSubmitting}
             className="accent-accent mt-0.5 shrink-0"
           />
@@ -131,7 +119,7 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
         <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           {t("backButton")}
         </Button>
-        <Button size="lg" onClick={() => onSubmit({ consentMarketing })} disabled={isSubmitting}>
+        <Button size="lg" onClick={vm.handleSubmit} disabled={isSubmitting}>
           {isSubmitting ? t("submittingButton") : t("submitButton")}
         </Button>
       </div>

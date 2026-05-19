@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { isValidCPF, isValidCNPJ, maskCPF, maskCNPJ, maskPhone } from "@/lib/brazil";
+import { maskCPF, maskCNPJ, maskPhone } from "@/lib/brazil";
 import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wizard";
+import { useWizardStep1 } from "@/components/onboarding/use-wizard-step1";
 
 type Props = {
   data: OnboardingWizardData;
@@ -16,44 +17,9 @@ type Props = {
   isSubmitting: boolean;
 };
 
-type Errors = Partial<Record<keyof OnboardingWizardData, string>>;
-
-function isAgencyTypeSelected(t: string): t is "autonomo" | "empresa" {
-  return t === "autonomo" || t === "empresa";
-}
-
 export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
   const t = useTranslations("onboarding.step1");
-  const [errors, setErrors] = React.useState<Errors>({});
-
-  const handleNext = () => {
-    const errs: Errors = {};
-
-    if (!isAgencyTypeSelected(data.agencyType)) errs.agencyType = t("errors.agencyType");
-    if (!data.name.trim()) errs.name = t("errors.name");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errs.email = t("errors.email");
-    if (data.phone.replace(/\D/g, "").length < 10) errs.phone = t("errors.phone");
-    if (!data.creci.trim()) errs.creci = t("errors.creci");
-
-    if (data.agencyType === "autonomo") {
-      if (!isValidCPF(data.cpf)) errs.cpf = t("errors.cpf");
-    }
-    if (data.agencyType === "empresa") {
-      if (!isValidCNPJ(data.cnpj)) errs.cnpj = t("errors.cnpj");
-      if (!data.representanteName.trim()) errs.representanteName = t("errors.representanteName");
-      if (!isValidCPF(data.representanteCpf)) errs.representanteCpf = t("errors.representanteCpf");
-    }
-
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-
-    if (!isAgencyTypeSelected(data.agencyType)) return;
-
-    setErrors({});
-    onNext(data.agencyType);
-  };
+  const vm = useWizardStep1({ data, onNext });
 
   return (
     <div className="flex flex-col gap-6">
@@ -88,9 +54,9 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
               </button>
             ))}
           </div>
-          {errors.agencyType && (
+          {vm.errors.agencyType && (
             <p className="text-error text-xs" role="alert">
-              {errors.agencyType}
+              {vm.errors.agencyType}
             </p>
           )}
         </div>
@@ -101,7 +67,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
         <Field
           id="field-name"
           label={data.agencyType === "empresa" ? t("nameLabelEmpresa") : t("nameLabel")}
-          error={errors.name}
+          error={vm.errors.name}
           className="sm:col-span-2"
         >
           <Input
@@ -116,7 +82,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
         </Field>
 
         {data.agencyType === "autonomo" && (
-          <Field id="field-cpf" label={t("cpfLabel")} error={errors.cpf}>
+          <Field id="field-cpf" label={t("cpfLabel")} error={vm.errors.cpf}>
             <Input
               id="field-cpf"
               value={data.cpf}
@@ -129,7 +95,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
         )}
 
         {data.agencyType === "empresa" && (
-          <Field id="field-cnpj" label={t("cnpjLabel")} error={errors.cnpj}>
+          <Field id="field-cnpj" label={t("cnpjLabel")} error={vm.errors.cnpj}>
             <Input
               id="field-cnpj"
               value={data.cnpj}
@@ -141,7 +107,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
           </Field>
         )}
 
-        <Field id="field-creci" label={t("creciLabel")} error={errors.creci}>
+        <Field id="field-creci" label={t("creciLabel")} error={vm.errors.creci}>
           <Input
             id="field-creci"
             value={data.creci}
@@ -154,7 +120,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
           />
         </Field>
 
-        <Field id="field-email" label={t("emailLabel")} error={errors.email}>
+        <Field id="field-email" label={t("emailLabel")} error={vm.errors.email}>
           <Input
             id="field-email"
             type="email"
@@ -165,7 +131,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
           />
         </Field>
 
-        <Field id="field-phone" label={t("phoneLabel")} error={errors.phone}>
+        <Field id="field-phone" label={t("phoneLabel")} error={vm.errors.phone}>
           <Input
             id="field-phone"
             type="tel"
@@ -187,7 +153,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
             <Field
               id="field-representante-name"
               label={t("representanteNameLabel")}
-              error={errors.representanteName}
+              error={vm.errors.representanteName}
               className="sm:col-span-2"
             >
               <Input
@@ -202,7 +168,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
             <Field
               id="field-representante-cpf"
               label={t("representanteCpfLabel")}
-              error={errors.representanteCpf}
+              error={vm.errors.representanteCpf}
             >
               <Input
                 id="field-representante-cpf"
@@ -218,7 +184,7 @@ export function WizardStep1({ data, onChange, onNext, isSubmitting }: Props) {
       )}
 
       <div className="flex justify-end">
-        <Button size="lg" onClick={handleNext} disabled={isSubmitting}>
+        <Button size="lg" onClick={vm.handleNext} disabled={isSubmitting}>
           {isSubmitting ? t("savingButton") : t("nextButton")}
         </Button>
       </div>

@@ -1,16 +1,14 @@
 "use client";
 
-import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-type AgencyType = "autonomo" | "empresa";
+import { useWelcomeScreen } from "@/components/onboarding/use-welcome-screen";
 
 export function WelcomeScreen() {
   const t = useTranslations("onboarding.welcome");
-  const [selectedType, setSelectedType] = React.useState<AgencyType | null>(null);
+  const vm = useWelcomeScreen();
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-12 md:py-20 lg:px-0">
@@ -25,7 +23,7 @@ export function WelcomeScreen() {
       </div>
 
       {/* Aviso sócio majoritário — relevante apenas para empresa */}
-      {selectedType === "empresa" && (
+      {vm.selectedType === "empresa" && (
         <div className="border-accent/30 bg-accent/5 mb-10 border-l-2 px-4 py-3 text-left">
           <p className="text-text text-sm leading-relaxed">
             <span className="font-medium">{t("warningTitle")}</span> {t("warningBody")}
@@ -39,11 +37,11 @@ export function WelcomeScreen() {
           <button
             key={type}
             type="button"
-            aria-pressed={selectedType === type}
-            onClick={() => setSelectedType(type)}
+            aria-pressed={vm.selectedType === type}
+            onClick={() => vm.selectType(type)}
             className={cn(
               "cursor-pointer border px-4 py-4 text-sm font-medium transition-colors",
-              selectedType === type
+              vm.selectedType === type
                 ? "border-accent bg-accent/5 text-accent"
                 : "border-text-3 bg-surface text-text hover:border-accent hover:bg-accent/5 hover:text-accent",
             )}
@@ -55,9 +53,9 @@ export function WelcomeScreen() {
 
       {/* CTA */}
       <div className="flex flex-col items-end gap-3">
-        {selectedType ? (
+        {vm.selectedType ? (
           <Button asChild size="sm" className="px-6">
-            <Link href={`/onboarding/wizard?type=${selectedType}`}>{t("ctaButton")}</Link>
+            <Link href={`/onboarding/wizard?type=${vm.selectedType}`}>{t("ctaButton")}</Link>
           </Button>
         ) : (
           <Button size="sm" className="px-6" disabled>
