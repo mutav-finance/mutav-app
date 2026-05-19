@@ -1,6 +1,11 @@
 import { v } from "convex/values";
-import { internalQuery, query, mutation } from "../_generated/server";
-import { queryWithAuth, mutationWithAuth } from "../lib/auth";
+import { internalQuery } from "../_generated/server";
+import {
+  mutationWithAgencyScope,
+  mutationWithAuth,
+  queryWithAgencyScope,
+  queryWithAuth,
+} from "../lib/auth";
 import {
   AGENCY_TYPE,
   MEMBER_ROLE,
@@ -54,50 +59,19 @@ export const listAgenciesForUser = queryWithAuth({
   },
 });
 
-/**
- * Returns all members of an agency, each enriched with their user info and role.
- * Internal — expõe PII dos usuários (nome, email). Só acessível via funções Convex.
- * TODO(auth): criar versão pública com queryWithAgencyScope para o dashboard.
- */
-export const listMembersForAgency = internalQuery({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, args) => {
-    const memberships = await ctx.db
-      .query("memberships")
-      .withIndex("by_agency", (q) => q.eq("agencyId", args.agencyId))
-      .collect();
-
-    const results = await Promise.all(
-      memberships.map(async (m) => {
-        const user = await ctx.db.get(m.userId);
-        if (!user) return null;
-        return { ...user, role: m.role, membershipId: m._id, joinedAt: m.joinedAt };
-      }),
-    );
-
-    return results.filter(Boolean);
-  },
-});
-
-/** Returns a single membership for a user↔agency pair. Internal — use via funções autorizadas. */
-export const getMembership = internalQuery({
-  args: { userId: v.id("users"), agencyId: v.id("agencies") },
-  handler: async (ctx, args) => {
-    return ctx.db
-      .query("memberships")
-      .withIndex("by_user_agency", (q) => q.eq("userId", args.userId).eq("agencyId", args.agencyId))
-      .unique();
-  },
-});
-
 // ─── Onboarding queries ───────────────────────────────────────────────────────
 
-export const listDocumentsForAgency = query({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }) => {
+/**
+ * Lists the agencyDocuments uploaded for an agency. Agency-scoped: the wrapper
+ * verifies the caller has membership before the handler runs. Non-members get
+ * ForbiddenError rather than the document list.
+ */
+export const listDocumentsForAgency = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
     return ctx.db
       .query("agencyDocuments")
-      .withIndex("by_agency", (q) => q.eq("agencyId", agencyId))
+      .withIndex("by_agency", (q) => q.eq("agencyId", ctx.agencyId))
       .collect();
   },
 });
@@ -313,37 +287,35 @@ export const startOnboarding = mutationWithAuth({
 });
 
 /**
- * Save banking information collected in the banking step.
+ * Save banking information collected in the banking step. Agency-scoped: the
+ * wrapper verifies the caller has membership before the handler runs.
  * Can be called multiple times — last write wins.
- * TODO(auth): require identity + verify ownership.
  */
-export const saveBankingInfo = mutation({
+export const saveBankingInfo = mutationWithAgencyScope({
   args: {
-    agencyId: v.id("agencies"),
     bankingInfo: bankingInfoValidator,
   },
-  handler: async (ctx, { agencyId, bankingInfo }) => {
-    const agency = await ctx.db.get(agencyId);
+  handler: async (ctx, { bankingInfo }) => {
+    const agency = await ctx.db.get(ctx.agencyId);
     if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
     if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
       return { success: false, error: { code: "ONBOARDING_NOT_EDITABLE" } } as const;
     }
 
-    await ctx.db.patch(agencyId, { bankingInfo });
-    return { success: true, data: { agencyId } } as const;
+    await ctx.db.patch(ctx.agencyId, { bankingInfo });
+    return { success: true, data: { agencyId: ctx.agencyId } } as const;
   },
 });
 
 /**
- * Generate a short-lived Convex File Storage upload URL.
- * The client uploads the file directly, then calls saveDocument with the storageId.
- * Requires the agency to be in IN_PROGRESS state — prevents unauthenticated storage abuse.
- * TODO(auth): require identity + verify ownership of agencyId.
+ * Generate a short-lived Convex File Storage upload URL. Agency-scoped: only
+ * members can mint upload URLs. Requires the agency to be in IN_PROGRESS state
+ * — prevents abusing the endpoint after submission.
  */
-export const generateDocumentUploadUrl = mutation({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, { agencyId }) => {
-    const agency = await ctx.db.get(agencyId);
+export const generateDocumentUploadUrl = mutationWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
+    const agency = await ctx.db.get(ctx.agencyId);
     if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
     if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
       return { success: false, error: { code: "ONBOARDING_NOT_EDITABLE" } } as const;
@@ -355,18 +327,24 @@ export const generateDocumentUploadUrl = mutation({
 
 /**
  * Persist a document after the client has uploaded it to File Storage.
- * Replaces any existing document of the same kind for this agency.
- * TODO(auth): require identity + verify ownership.
+ * Replaces any existing document of the same kind for this agency. Agency-scoped:
+ * only members can register documents under their own agency.
+ *
+ * Residual risk note: storageId still arrives from the client. A member of agency A
+ * could pass a storageId pointing to a file they created outside this flow (e.g.,
+ * a separate dev script) and have it recorded as agency A's document. Since members
+ * can already upload arbitrary content through the normal flow, this isn't an
+ * escalation — but if reviewers want stronger provenance, gate via a pendingUploads
+ * token table issued by generateDocumentUploadUrl and consumed here.
  */
-export const saveDocument = mutation({
+export const saveDocument = mutationWithAgencyScope({
   args: {
-    agencyId: v.id("agencies"),
     kind: agencyDocumentKindValidator,
     storageId: v.id("_storage"),
     fileName: v.string(),
   },
   handler: async (ctx, args) => {
-    const agency = await ctx.db.get(args.agencyId);
+    const agency = await ctx.db.get(ctx.agencyId);
     if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
     if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
       return { success: false, error: { code: "ONBOARDING_NOT_EDITABLE" } } as const;
@@ -374,7 +352,7 @@ export const saveDocument = mutation({
 
     const duplicate = await ctx.db
       .query("agencyDocuments")
-      .withIndex("by_agency_kind", (q) => q.eq("agencyId", args.agencyId).eq("kind", args.kind))
+      .withIndex("by_agency_kind", (q) => q.eq("agencyId", ctx.agencyId).eq("kind", args.kind))
       .unique();
 
     if (duplicate) {
@@ -384,7 +362,7 @@ export const saveDocument = mutation({
     }
 
     await ctx.db.insert("agencyDocuments", {
-      agencyId: args.agencyId,
+      agencyId: ctx.agencyId,
       kind: args.kind,
       storageId: args.storageId,
       fileName: args.fileName,
@@ -397,16 +375,15 @@ export const saveDocument = mutation({
 
 /**
  * Final step — validate all required fields and transition to `submitted`.
- * For `empresa`: all 4 documents must be uploaded.
- * For `autonomo`: no documents required.
- * TODO(auth): require identity + verify ownership.
+ * For `empresa`: required documents must be uploaded. For `autonomo`: no docs.
+ * Agency-scoped: only members can submit their own agency.
  */
-export const submitOnboarding = mutation({
+export const submitOnboarding = mutationWithAgencyScope({
   args: {
-    agencyId: v.id("agencies"),
     consentMarketing: v.optional(v.boolean()),
   },
-  handler: async (ctx, { agencyId, consentMarketing }) => {
+  handler: async (ctx, { consentMarketing }) => {
+    const { agencyId } = ctx;
     const agency = await ctx.db.get(agencyId);
     if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
 
