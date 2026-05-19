@@ -6,14 +6,7 @@ import { WizardStep1 } from "@/components/onboarding/wizard-step1";
 import { WizardStepBanking } from "@/components/onboarding/wizard-step-banking";
 import { WizardStepDocuments } from "@/components/onboarding/wizard-step-documents";
 import { WizardStepReview } from "@/components/onboarding/wizard-step-review";
-import {
-  useOnboardingWizard,
-  type OnboardingWizardData,
-} from "@/components/onboarding/use-onboarding-wizard";
-
-// Re-export the data type so the wizard-step-* components can keep importing
-// it from this module. The hook owns the canonical declaration.
-export type { OnboardingWizardData };
+import { useOnboardingWizard } from "@/components/onboarding/use-onboarding-wizard";
 
 export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "empresa" }) {
   const t = useTranslations("onboarding.wizard");
@@ -24,7 +17,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
       <div className="flex flex-col items-center gap-4 py-12 text-center">
         <p className="text-text text-lg font-medium">{t("submitted.title")}</p>
         <p className="text-text-2 max-w-sm text-sm">{t("submitted.subtitle")}</p>
-        <p className="text-text-3 text-xs">{t("submitted.detail", { email: vm.data.email })}</p>
+        <p className="text-text-3 text-xs">{t("submitted.detail", { email: vm.snapshot.email })}</p>
       </div>
     );
   }
@@ -50,7 +43,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
 
       {vm.stepKind === "profile" && (
         <WizardStep1
-          initialValues={vm.data}
+          initialValues={vm.snapshot}
           serverErrorCode={vm.errorCode}
           onSubmit={vm.handleStep1Submit}
           isSubmitting={vm.isSubmitting}
@@ -59,9 +52,9 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
 
       {vm.stepKind === "banking" && (
         <WizardStepBanking
-          initialValues={vm.data}
+          initialValues={vm.snapshot}
           serverErrorCode={vm.errorCode}
-          agencyType={vm.data.agencyType}
+          agencyType={vm.snapshot.agencyType}
           onSubmit={vm.handleBankingSubmit}
           onBack={vm.handleBack}
           isSubmitting={vm.isSubmitting}
@@ -83,7 +76,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
 
       {vm.stepKind === "review" && (
         <WizardStepReview
-          data={vm.data}
+          snapshot={vm.snapshot}
           onSubmit={vm.handleReviewSubmit}
           onBack={vm.handleBack}
           onGoTo={vm.handleGoTo}

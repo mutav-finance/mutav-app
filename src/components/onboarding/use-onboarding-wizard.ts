@@ -5,48 +5,36 @@ import { useTranslations } from "next-intl";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
-import type { BankingFormValues } from "@/components/onboarding/schemas/banking-schema";
-import type { ProfileFormValues } from "@/components/onboarding/schemas/profile-schema";
+import {
+  BANKING_FORM_DEFAULTS,
+  type BankingFormInput,
+  type BankingFormValues,
+} from "@/components/onboarding/schemas/banking-schema";
+import {
+  PROFILE_FORM_DEFAULTS,
+  type ProfileFormInput,
+  type ProfileFormValues,
+} from "@/components/onboarding/schemas/profile-schema";
 import type { ReviewFormValues } from "@/components/onboarding/schemas/review-schema";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-export type OnboardingWizardData = {
-  agencyType: "autonomo" | "empresa" | "";
-  name: string;
-  email: string;
-  phone: string;
-  creci: string;
-  cpf: string;
-  cnpj: string;
-  representanteName: string;
-  representanteCpf: string;
-  bankName: string;
-  bankBranch: string;
-  bankAccount: string;
-  bankAccountType: "corrente" | "poupanca" | "";
-  bankPixKey: string;
-};
+/**
+ * Accumulated form snapshot across the wizard's steps. Derived from the
+ * profile + banking schema input types — single source of truth. Each
+ * step's RHF form is the live state; this snapshot is what the reducer
+ * captures on `SAVE_*` so the review screen and back-navigation prefill
+ * can read across steps.
+ */
+export type OnboardingWizardSnapshot = ProfileFormInput & BankingFormInput;
 
 export type WizardStepKind = "profile" | "documents" | "banking" | "review";
 
 // ─── Internal: reducer + helpers ──────────────────────────────────────────────
 
-const INITIAL_DATA: OnboardingWizardData = {
-  agencyType: "",
-  name: "",
-  email: "",
-  phone: "",
-  creci: "",
-  cpf: "",
-  cnpj: "",
-  representanteName: "",
-  representanteCpf: "",
-  bankName: "",
-  bankBranch: "",
-  bankAccount: "",
-  bankAccountType: "",
-  bankPixKey: "",
+const INITIAL_SNAPSHOT: OnboardingWizardSnapshot = {
+  ...PROFILE_FORM_DEFAULTS,
+  ...BANKING_FORM_DEFAULTS,
 };
 
 type SubmitState = "idle" | "submitting" | "submitted";
@@ -54,13 +42,12 @@ type SubmitState = "idle" | "submitting" | "submitted";
 type WizardState = {
   step: number;
   agencyId: AgencyId | null;
-  data: OnboardingWizardData;
+  snapshot: OnboardingWizardSnapshot;
   submitState: SubmitState;
   errorCode: string | null;
 };
 
 type WizardAction =
-  | { type: "PATCH"; patch: Partial<OnboardingWizardData> }
   | { type: "SAVE_PROFILE"; values: ProfileFormValues }
   | { type: "SAVE_BANKING"; values: BankingFormValues }
   | { type: "GO_TO"; step: number }
@@ -71,15 +58,14 @@ type WizardAction =
 
 export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
-    case "PATCH":
-      return { ...state, data: { ...state.data, ...action.patch } };
     case "SAVE_PROFILE":
       // Step1 (RHF) hands the wizard a validated snapshot. Persisted so the
       // review screen can render it and so going back to step1 prefills.
+      // Clear the opposite-variant identity fields on type switch.
       return {
         ...state,
-        data: {
-          ...state.data,
+        snapshot: {
+          ...state.snapshot,
           agencyType: action.values.agencyType,
           name: action.values.name,
           email: action.values.email,
@@ -94,7 +80,7 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         },
       };
     case "SAVE_BANKING":
-      return { ...state, data: { ...state.data, ...action.values } };
+      return { ...state, snapshot: { ...state.snapshot, ...action.values } };
     case "GO_TO":
       return { ...state, step: action.step };
     case "SUBMIT_START":
@@ -150,7 +136,7 @@ function buildInitialState(initialType: "autonomo" | "empresa" | undefined): Wiz
   return {
     step: 1,
     agencyId: null,
-    data: { ...INITIAL_DATA, agencyType: initialType ?? "" },
+    snapshot: { ...INITIAL_SNAPSHOT, agencyType: initialType ?? "" },
     submitState: "idle",
     errorCode: null,
   };
@@ -173,42 +159,42 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
   const saveBankingInfo = useMutation(api.agencies.useCases.saveBankingInfo);
   const submitOnboarding = useMutation(api.agencies.useCases.submitOnboarding);
 
-  const patch = React.useCallback((p: Partial<OnboardingWizardData>) => {
-    dispatch({ type: "PATCH", patch: p });
-  }, []);
-
   const stepLabels = React.useMemo(() => {
     const perfil = t("steps.perfil");
     const documentos = t("steps.documentos");
     const contaBancaria = t("steps.contaBancaria");
     const revisao = t("steps.revisao");
-    if (state.data.agencyType === "autonomo") return [perfil, contaBancaria, revisao];
-    if (state.data.agencyType === "empresa") return [perfil, documentos, contaBancaria, revisao];
+    if (state.snapshot.agencyType === "autonomo") return [perfil, contaBancaria, revisao];
+    if (state.snapshot.agencyType === "empresa")
+      return [perfil, documentos, contaBancaria, revisao];
     return [perfil, contaBancaria, revisao];
-  }, [state.data.agencyType, t]);
+  }, [state.snapshot.agencyType, t]);
+
+  // ─── Note on step shapes ────────────────────────────────────────────────────
+  // Steps 1 (profile), 3 (banking), and 4 (review) are RHF forms — they own
+  // their field state and call onSubmit(values) on completion. The wizard
+  // snapshots into state.snapshot via SAVE_PROFILE / SAVE_BANKING so the
+  // review screen and back-navigation prefill can read across steps.
+  //
+  // Step 2 (documents) is intentionally different: it's an uploads flow,
+  // not a form. Server-side state (storageId) is the truth; the step calls
+  // onNext() on click after every required upload lands. No SAVE_* action.
 
   const handleStep1Submit = React.useCallback(
     async (values: ProfileFormValues) => {
-      // Schema's superRefine rejects empty agencyType; if we got here it's
-      // narrowed by validation, not by TS.
-      if (values.agencyType === "") {
-        dispatch({ type: "SUBMIT_ERROR", code: "INCOMPLETE_PROFILE" });
-        return;
-      }
-      const agencyType = values.agencyType;
       dispatch({ type: "SAVE_PROFILE", values });
       dispatch({ type: "SUBMIT_START" });
       try {
         const result = await startOnboarding({
-          agencyType,
+          agencyType: values.agencyType,
           name: values.name,
           email: values.email,
           phone: values.phone,
           creci: values.creci,
-          cpf: agencyType === "autonomo" ? values.cpf : undefined,
-          cnpj: agencyType === "empresa" ? values.cnpj : undefined,
-          representanteName: agencyType === "empresa" ? values.representanteName : undefined,
-          representanteCpf: agencyType === "empresa" ? values.representanteCpf : undefined,
+          cpf: values.agencyType === "autonomo" ? values.cpf : undefined,
+          cnpj: values.agencyType === "empresa" ? values.cnpj : undefined,
+          representanteName: values.agencyType === "empresa" ? values.representanteName : undefined,
+          representanteCpf: values.agencyType === "empresa" ? values.representanteCpf : undefined,
         });
         if (!result.success) {
           dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
@@ -225,11 +211,6 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
   const handleBankingSubmit = React.useCallback(
     async (values: BankingFormValues) => {
       if (!state.agencyId) {
-        dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
-        return;
-      }
-      // Schema's enum refine guarantees a non-empty accountType; narrow for TS.
-      if (values.bankAccountType !== "corrente" && values.bankAccountType !== "poupanca") {
         dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
         return;
       }
@@ -300,10 +281,10 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
       : t("errors.unknown")
     : null;
 
-  const stepKind = resolveStepKind(state.step, state.data.agencyType);
+  const stepKind = resolveStepKind(state.step, state.snapshot.agencyType);
 
   return {
-    data: state.data,
+    snapshot: state.snapshot,
     currentStep: state.step,
     stepKind,
     stepLabels,
@@ -312,7 +293,6 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
     agencyId: state.agencyId,
     errorCode: state.errorCode,
     errorMessage,
-    patch,
     handleStep1Submit,
     handleBankingSubmit,
     handleDocumentsNext,

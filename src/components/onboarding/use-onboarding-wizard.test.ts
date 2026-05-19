@@ -12,7 +12,7 @@ function makeInitialState() {
   return {
     step: 1,
     agencyId: null,
-    data: {
+    snapshot: {
       agencyType: "" as const,
       name: "",
       email: "",
@@ -34,31 +34,12 @@ function makeInitialState() {
 }
 
 describe("wizardReducer", () => {
-  describe("PATCH", () => {
-    it("merges partial data without clobbering other fields", () => {
-      const state = makeInitialState();
-      const next = wizardReducer(state, {
-        type: "PATCH",
-        patch: { name: "Acme", email: "a@b.co" },
-      });
-      expect(next.data.name).toBe("Acme");
-      expect(next.data.email).toBe("a@b.co");
-      expect(next.data.phone).toBe("");
-    });
-
-    it("does not mutate the previous state object", () => {
-      const state = makeInitialState();
-      wizardReducer(state, { type: "PATCH", patch: { name: "X" } });
-      expect(state.data.name).toBe("");
-    });
-  });
-
   describe("GO_TO", () => {
     it("sets step to the requested value without touching data", () => {
       const state = { ...makeInitialState(), step: 2 };
       const next = wizardReducer(state, { type: "GO_TO", step: 4 });
       expect(next.step).toBe(4);
-      expect(next.data).toEqual(state.data);
+      expect(next.snapshot).toEqual(state.snapshot);
     });
   });
 

@@ -9,6 +9,10 @@ import {
   useWizardStepDocuments,
 } from "@/components/onboarding/use-wizard-step-documents";
 
+// Documents step is structurally different from the form-shaped steps
+// (step1/banking/review): uploads are server-side state (storageId), not
+// form state. Hence no RHF, no zod schema, no SAVE_* action — the step
+// just calls onNext() once every required upload has landed.
 type Props = {
   agencyId: AgencyId;
   onNext: () => void;
