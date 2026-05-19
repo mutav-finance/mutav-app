@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { agencyDocumentKindValidator as _agencyDocumentKindValidator } from "./validators";
 
 // ─── Agency ───────────────────────────────────────────────────────────────────
 
@@ -54,7 +53,10 @@ export const bankingInfoValidator = v.object({
   pixKey: v.optional(v.string()),
 });
 
-export const agencyDocumentKindValidator = _agencyDocumentKindValidator;
+export const agencyDocumentKindValidator = v.union(
+  v.literal(AGENCY_DOCUMENT_KIND.DOCUMENTO_EMPRESA),
+  v.literal(AGENCY_DOCUMENT_KIND.RESPONSAVEL_ID),
+);
 
 /** Documents required for `empresa` type. `autonomo` skips all uploads. */
 export const EMPRESA_REQUIRED_DOCS: readonly AgencyDocumentKind[] = [

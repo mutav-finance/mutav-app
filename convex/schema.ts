@@ -1,6 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { agencyDocumentKindValidator } from "./agencies/validators";
+
+// Literals duplicated below in `convex/agencies/domain.ts` as the canonical
+// `agencyDocumentKindValidator`. Kept inline here because entity-file imports
+// would create a circular dependency through `_generated/dataModel`.
+const agencyDocumentKind = v.union(v.literal("documento_empresa"), v.literal("responsavel_id"));
 
 const contractStatus = v.union(
   v.literal("ativo"),
@@ -411,7 +415,7 @@ export default defineSchema({
 
   agencyDocuments: defineTable({
     agencyId: v.id("agencies"),
-    kind: agencyDocumentKindValidator,
+    kind: agencyDocumentKind,
     storageId: v.id("_storage"),
     fileName: v.string(),
     uploadedAt: v.string(),

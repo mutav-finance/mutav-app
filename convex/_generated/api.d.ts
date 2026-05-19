@@ -11,7 +11,6 @@
 import type * as agencies_adminUseCases from "../agencies/adminUseCases.js";
 import type * as agencies_domain from "../agencies/domain.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
-import type * as agencies_validators from "../agencies/validators.js";
 import type * as anchors_accountDomain from "../anchors/accountDomain.js";
 import type * as anchors_accountUseCases from "../anchors/accountUseCases.js";
 import type * as anchors_actions from "../anchors/actions.js";
@@ -54,7 +53,6 @@ declare const fullApi: ApiFromModules<{
   "agencies/adminUseCases": typeof agencies_adminUseCases;
   "agencies/domain": typeof agencies_domain;
   "agencies/useCases": typeof agencies_useCases;
-  "agencies/validators": typeof agencies_validators;
   "anchors/accountDomain": typeof anchors_accountDomain;
   "anchors/accountUseCases": typeof anchors_accountUseCases;
   "anchors/actions": typeof anchors_actions;
