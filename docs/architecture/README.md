@@ -19,7 +19,12 @@
 - [`compliance.md`](compliance.md) — Account types, verification levels, risk classification, transaction limits, capability matrix (with tranche dimension). Consulted by every state-changing handler in the protocol.
 - [`reliability.md`](reliability.md) — Three-axis reconciliation, idempotency, workflow durability, cross-entity flows, entity-tagged audit log, per-tranche NAV safety. The substrate every surface depends on.
 - [`regulatory.md`](regulatory.md) — Per-entity regulatory floor (LGPD, CVM oferta pública for offshore Fund, BCB 519/2025, BACEN câmbio for cross-jurisdictional flows, cessão substance risk). Constraints the architecture must satisfy.
+- [`security.md`](security.md) — Secrets and PII crypto: threat model, asset inventory, two-key envelope + hash sidecar pattern, key management lifecycle (generation / storage / rotation / audit / recovery), per-entity isolation roadmap. The "how" behind the LGPD floor.
 - [`onchain-integration.md`](onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, offshore custody chain, write path, external integrations). Shared by admin observability and investor data.
+
+**Architecture decisions:**
+
+- [`decisions/`](decisions/) — Numbered ADRs documenting load-bearing decisions. Start with [`0001-pii-crypto-pattern.md`](decisions/0001-pii-crypto-pattern.md) (two-key envelope + hash sidecar — the rationale [`security.md`](security.md) implements).
 
 **Pending decisions:**
 

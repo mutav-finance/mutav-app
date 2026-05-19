@@ -40,7 +40,12 @@ gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | b
 - [`docs/architecture/compliance.md`](docs/architecture/compliance.md) — Account types, verification levels, risk classification, transaction limits, capability matrix, regulatory-pause primitive
 - [`docs/architecture/reliability.md`](docs/architecture/reliability.md) — Reconciliation, idempotency, workflow durability, audit log integrity, NAV safety
 - [`docs/architecture/regulatory.md`](docs/architecture/regulatory.md) — Brazilian regulatory floor (LGPD, CVM 175, BCB 519/2025)
+- [`docs/architecture/security.md`](docs/architecture/security.md) — Secrets and PII crypto: threat model, asset inventory, two-key envelope + hash sidecar, key management lifecycle. Consult before adding a new PII field or a new env-derived secret.
 - [`docs/architecture/onchain-integration.md`](docs/architecture/onchain-integration.md) — Chain ↔ Convex boundary (per-chain indexer modules, contract topology, external integrations) — shared by admin observability and investor data
+
+**Architecture decisions:**
+
+- [`docs/architecture/decisions/`](docs/architecture/decisions/) — Numbered ADRs. Read before reopening a decided question.
 
 **Pending decisions:**
 
