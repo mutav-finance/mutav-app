@@ -59,9 +59,10 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
 
       {vm.stepKind === "banking" && (
         <WizardStepBanking
-          data={vm.data}
-          onChange={vm.patch}
-          onNext={vm.handleBankingNext}
+          initialValues={vm.data}
+          serverErrorCode={vm.errorCode}
+          agencyType={vm.data.agencyType}
+          onSubmit={vm.handleBankingSubmit}
           onBack={vm.handleBack}
           isSubmitting={vm.isSubmitting}
         />
