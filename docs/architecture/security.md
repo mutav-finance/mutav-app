@@ -3,6 +3,10 @@
 > What we protect, how we protect it, and how the keys are managed across environments. This document covers **asset-level security**: encryption of personal data, encryption of operational secrets (Stellar seeds, anchor webhook signing keys), and the management lifecycle of every key the system depends on. Identity / authorization is a separate concern documented in [`../auth.md`](../auth.md); access logging is in [`reliability.md`](reliability.md) § Audit log integrity. Both reference this document for the underlying primitives.
 >
 > Architecture decisions are anchored in [`decisions/0001-pii-crypto-pattern.md`](decisions/0001-pii-crypto-pattern.md) (two-key envelope + hash sidecar) and the LGPD floor in [`regulatory.md`](regulatory.md).
+>
+> **New to key management?** Start with [`../key-management-guide.md`](../key-management-guide.md) for the hands-on workflow (generate, store, share, rotate, recover). This document is the architecture reference; the guide is the practitioner's manual.
+>
+> **Current operating posture: pre-customer, dev-only.** Mutav runs at Level 1 of the storage maturity ladder (env-derived keys) on purpose — there's no real customer PII in any deployment yet, so the additional ceremony of a managed secret store doesn't reduce risk today. The level-up to Level 2 is scheduled alongside pre-launch hardening, not before. The controls and disciplines in this doc are designed so the cultural retrofit at launch is zero — same code paths, same key names, only the storage layer changes.
 
 ## Threat model
 

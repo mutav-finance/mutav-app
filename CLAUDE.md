@@ -51,7 +51,7 @@ gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | b
 
 - [`docs/architecture/pending-treasury-decisions.md`](docs/architecture/pending-treasury-decisions.md) — Three open treasury policy decisions awaiting Draau input (NAV policy, deposit pricing, Pix quarantine window)
 
-Implementation-level concerns live alongside: [`docs/auth.md`](docs/auth.md) (Convex function wrappers), [`docs/stellar-anchors.md`](docs/stellar-anchors.md) (anchor SEP integration). When adding a new surface or domain, update the README catalogs before writing code. When adding a new public mutation that touches funds or accounts, consult [`docs/architecture/compliance.md`](docs/architecture/compliance.md) for the gating contract.
+Implementation-level concerns live alongside: [`docs/auth.md`](docs/auth.md) (Convex function wrappers), [`docs/stellar-anchors.md`](docs/stellar-anchors.md) (anchor SEP integration), [`docs/key-management-guide.md`](docs/key-management-guide.md) (hands-on key handling — read before touching `process.env` or adding a new secret). When adding a new surface or domain, update the README catalogs before writing code. When adding a new public mutation that touches funds or accounts, consult [`docs/architecture/compliance.md`](docs/architecture/compliance.md) for the gating contract.
 
 ## Stellar concepts
 
