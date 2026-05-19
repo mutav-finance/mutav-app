@@ -1,0 +1,76 @@
+name: quality
+
+# Runs the full PR quality suite — lint, typecheck, test, and convention
+# regression-greps. Each job runs in parallel so one failure doesn't
+# block the others; all four must be green for the PR to be mergeable
+# (gate via branch protection).
+#
+# Husky pre-push only blocks direct pushes to main; it doesn't run
+# lint/typecheck/test. This workflow is the actual quality gate.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs when a branch gets a new push.
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Lint
+        run: bun run lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        # Convex generated types are committed; typecheck reads them directly.
+        # If they drift from schema.ts, tsc surfaces the inconsistency here.
+        run: bun run typecheck
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Test
+        run: bun run test
+
+  conventions:
+    name: conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ripgrep
+        # ubuntu-latest images already include rg, but pin the install in
+        # case the runner image changes upstream.
+        run: which rg || sudo apt-get update && sudo apt-get install -y ripgrep
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Regression greps
+        run: bash scripts/regression-greps.sh

@@ -14,7 +14,7 @@ import {
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
-import type { Doc } from "@convex/_generated/dataModel";
+import type { AnchorOrder } from "@convex/anchors/orderDomain";
 import type { PaymentId } from "@convex/payments/domain";
 
 interface Props {
@@ -71,7 +71,7 @@ function ActivePanel({
   totalCents,
   phase,
 }: {
-  order: Doc<"anchorOrders">;
+  order: AnchorOrder;
   totalCents: number;
   phase: AnchorOnrampPhase;
 }) {
