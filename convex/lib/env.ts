@@ -25,26 +25,6 @@ export function getWhatsAppApiKey(): string | null {
 }
 
 /**
- * Auth0 issuer URL (e.g., `https://your-tenant.auth0.com`). Lazy getter so
- * Convex's deploy-time analyzer for `auth.config.ts` doesn't flag the env var
- * as required — when Auth0 isn't wired, the getter returns null and the
- * config ships an empty providers array. Returns null when unset or empty.
- */
-export function getAuth0IssuerBaseUrl(): string | null {
-  const url = process.env.AUTH0_ISSUER_BASE_URL;
-  return url && url.length > 0 ? url : null;
-}
-
-/**
- * Auth0 application client ID. Paired with `getAuth0IssuerBaseUrl` — only
- * meaningful when the issuer is also configured.
- */
-export function getAuth0ClientId(): string | null {
-  const id = process.env.AUTH0_CLIENT_ID;
-  return id && id.length > 0 ? id : null;
-}
-
-/**
  * Dev-only fallback. Production must set `STELLAR_MUTAV_SOURCE_ACCOUNT`.
  * Generated once for the demo so muxed-address derivation works out of the
  * box. Real deployments must override.

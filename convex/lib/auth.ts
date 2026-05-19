@@ -48,30 +48,21 @@ export class ForbiddenError extends Error {
 }
 
 /**
- * Pre-Auth0 dev shortcut — only active when AUTH0_ISSUER_BASE_URL is unset.
- * Deleted when Auth0 is wired: every wrapped handler picks up the swap for free.
+ * Pre-Auth0 stand-in for `ctx.auth.getUserIdentity()`. Once Auth0 lands,
+ * delete this constant and replace `resolveCurrentUser` with a real identity
+ * lookup keyed on `identity.subject`.
  */
 const DEV_USER_PUBLIC_ID = "dev-user";
 
 async function resolveCurrentUser(ctx: DbCtx): Promise<User> {
-  const identity = await ctx.auth.getUserIdentity();
-
-  if (identity) {
-    // Auth0 path — JWT present and validated by Convex against auth.config.ts.
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
-      .unique();
-    if (!user) {
-      // Row not yet provisioned — this can happen if the Auth0 callback route
-      // handler hasn't called `getOrCreateByIdentity` yet (race on first login).
-      throw new UnauthenticatedError("User row not provisioned — retry after login callback");
-    }
-    return user;
-  }
-
-  // Dev fallback — active only when no JWT is present (Auth0 not wired yet).
-  // Remove this block once AUTH0_ISSUER_BASE_URL is set in all environments.
+  // TODO(auth0): replace with
+  //   const identity = await ctx.auth.getUserIdentity();
+  //   if (!identity) throw new UnauthenticatedError();
+  //   const user = await ctx.db.query("users")
+  //     .withIndex("by_subject", q => q.eq("subject", identity.subject))
+  //     .unique();
+  //   if (!user) throw new UnauthenticatedError("User row not provisioned");
+  //   return user;
   const user = await ctx.db
     .query("users")
     .withIndex("by_publicId", (q) => q.eq("publicId", DEV_USER_PUBLIC_ID))
