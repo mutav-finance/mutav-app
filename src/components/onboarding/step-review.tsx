@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Mono } from "@/components/ui/mono";
-import type { OnboardingWizardSnapshot } from "@/components/onboarding/use-onboarding-wizard";
+import type { OnboardingSnapshot } from "@/components/onboarding/use-onboarding-flow";
 import {
   REVIEW_FORM_DEFAULTS,
   reviewSchema,
@@ -18,14 +18,14 @@ import {
 // `initialValues`. Display-only access across prior steps; never writes.
 // Diverges from the step1/banking prop shape on purpose.
 type Props = {
-  snapshot: OnboardingWizardSnapshot;
+  snapshot: OnboardingSnapshot;
   onSubmit: (values: ReviewFormValues) => void;
   onBack: () => void;
   onGoTo: (step: number) => void;
   isSubmitting: boolean;
 };
 
-export function WizardStepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }: Props) {
+export function StepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }: Props) {
   const t = useTranslations("onboarding.wizard.review");
 
   const form = useForm<ReviewFormValues>({

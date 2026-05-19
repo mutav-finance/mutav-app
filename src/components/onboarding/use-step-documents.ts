@@ -19,13 +19,7 @@ const INITIAL_STATUS: Record<DocumentKind, UploadStatus> = {
 
 type Labels = Record<DocumentKind, { label: string; description: string }>;
 
-export function useWizardStepDocuments({
-  agencyId,
-  onNext,
-}: {
-  agencyId: AgencyId;
-  onNext: () => void;
-}) {
+export function useStepDocuments({ agencyId, onNext }: { agencyId: AgencyId; onNext: () => void }) {
   const t = useTranslations("onboarding.wizard.documents");
 
   const existingDocs = useQuery(api.agencies.useCases.listDocumentsForAgency, { agencyId });

@@ -8,7 +8,7 @@ type Props = {
   currentSuffix: string;
 };
 
-export function WizardStepIndicator({
+export function StepIndicator({
   current,
   labels,
   progressLabel,
