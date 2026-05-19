@@ -6,6 +6,7 @@ import {
   queryWithAgencyScope,
   queryWithAuth,
 } from "../lib/auth";
+import type { Result } from "../lib/result";
 import {
   AGENCY_TYPE,
   MEMBER_ROLE,
@@ -17,6 +18,45 @@ import {
   isValidCPF,
   isValidCNPJ,
 } from "./domain";
+import type { AgencyId, AgencyDocumentKind } from "./domain";
+
+// ─── Result types for mutations ───────────────────────────────────────────────
+
+type StartOnboardingSuccessResult = { agencyId: AgencyId; resumed: boolean };
+type StartOnboardingErrorResult = {
+  code:
+    | "CNPJ_REQUIRED"
+    | "CPF_REQUIRED"
+    | "CPF_INVALID"
+    | "CNPJ_INVALID"
+    | "REPRESENTANTE_NAME_REQUIRED"
+    | "REPRESENTANTE_CPF_REQUIRED"
+    | "REPRESENTANTE_CPF_INVALID"
+    | "ALREADY_REGISTERED"
+    | "AGENCY_TYPE_CONFLICT";
+};
+
+type SaveBankingInfoSuccessResult = { agencyId: AgencyId };
+type SaveBankingInfoErrorResult = { code: "NOT_FOUND" | "ONBOARDING_NOT_EDITABLE" };
+
+type GenerateDocumentUploadUrlSuccessResult = { url: string };
+type GenerateDocumentUploadUrlErrorResult = { code: "NOT_FOUND" | "ONBOARDING_NOT_EDITABLE" };
+
+type SaveDocumentSuccessResult = { kind: AgencyDocumentKind };
+type SaveDocumentErrorResult = { code: "NOT_FOUND" | "ONBOARDING_NOT_EDITABLE" };
+
+type SubmitOnboardingSuccessResult = { agencyId: AgencyId; submittedAt: string };
+type SubmitOnboardingErrorResult =
+  | {
+      code:
+        | "NOT_FOUND"
+        | "NOT_IN_PROGRESS"
+        | "AGENCY_TYPE_REQUIRED"
+        | "BANKING_INFO_REQUIRED"
+        | "INCOMPLETE_PROFILE"
+        | "ALREADY_REGISTERED";
+    }
+  | { code: "MISSING_DOCUMENTS"; missing: readonly AgencyDocumentKind[] };
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
 
@@ -169,7 +209,10 @@ export const startOnboarding = mutationWithAuth({
     representanteName: v.optional(v.string()),
     representanteCpf: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<Result<StartOnboardingSuccessResult, StartOnboardingErrorResult>> => {
     const userId = ctx.user._id;
     // Strip formatting before any check or write — CLAUDE.md convention: store digits-only.
     const cnpj = args.cnpj?.replace(/\D/g, "") || undefined;
@@ -178,27 +221,47 @@ export const startOnboarding = mutationWithAuth({
     const representanteCpf = args.representanteCpf?.replace(/\D/g, "") || undefined;
 
     if (args.agencyType === AGENCY_TYPE.EMPRESA && !cnpj) {
-      return { success: false, error: { code: "CNPJ_REQUIRED" } } as const;
+      return {
+        success: false,
+        error: { code: "CNPJ_REQUIRED" },
+        message: "CNPJ is required for empresa agencies",
+      };
     }
     if (args.agencyType === AGENCY_TYPE.AUTONOMO && !cpf) {
-      return { success: false, error: { code: "CPF_REQUIRED" } } as const;
+      return {
+        success: false,
+        error: { code: "CPF_REQUIRED" },
+        message: "CPF is required for autonomo agencies",
+      };
     }
 
     if (cpf && !isValidCPF(cpf)) {
-      return { success: false, error: { code: "CPF_INVALID" } } as const;
+      return { success: false, error: { code: "CPF_INVALID" }, message: "CPF checksum invalid" };
     }
     if (cnpj && !isValidCNPJ(cnpj)) {
-      return { success: false, error: { code: "CNPJ_INVALID" } } as const;
+      return { success: false, error: { code: "CNPJ_INVALID" }, message: "CNPJ checksum invalid" };
     }
 
     if (args.agencyType === AGENCY_TYPE.EMPRESA && !args.representanteName?.trim()) {
-      return { success: false, error: { code: "REPRESENTANTE_NAME_REQUIRED" } } as const;
+      return {
+        success: false,
+        error: { code: "REPRESENTANTE_NAME_REQUIRED" },
+        message: "Representative name is required for empresa agencies",
+      };
     }
     if (args.agencyType === AGENCY_TYPE.EMPRESA && !representanteCpf) {
-      return { success: false, error: { code: "REPRESENTANTE_CPF_REQUIRED" } } as const;
+      return {
+        success: false,
+        error: { code: "REPRESENTANTE_CPF_REQUIRED" },
+        message: "Representative CPF is required for empresa agencies",
+      };
     }
     if (representanteCpf && !isValidCPF(representanteCpf)) {
-      return { success: false, error: { code: "REPRESENTANTE_CPF_INVALID" } } as const;
+      return {
+        success: false,
+        error: { code: "REPRESENTANTE_CPF_INVALID" },
+        message: "Representative CPF checksum invalid",
+      };
     }
 
     // Unicidade: IN_PROGRESS não bloqueia — o cadastro só é considerado "ocupado"
@@ -213,7 +276,11 @@ export const startOnboarding = mutationWithAuth({
         existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS &&
         existing.onboardingState !== ONBOARDING_STATE.REJECTED
       ) {
-        return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
+        return {
+          success: false,
+          error: { code: "ALREADY_REGISTERED" },
+          message: "CNPJ already registered with Mutav",
+        };
       }
     }
 
@@ -227,7 +294,11 @@ export const startOnboarding = mutationWithAuth({
         existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS &&
         existing.onboardingState !== ONBOARDING_STATE.REJECTED
       ) {
-        return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
+        return {
+          success: false,
+          error: { code: "ALREADY_REGISTERED" },
+          message: "CPF already registered with Mutav",
+        };
       }
     }
 
@@ -242,7 +313,11 @@ export const startOnboarding = mutationWithAuth({
         // Switching agency type mid-session would corrupt the existing record (different required
         // fields, stale bankingInfo). The user must finish or abandon the current session first.
         if (agency.agencyType !== args.agencyType) {
-          return { success: false, error: { code: "AGENCY_TYPE_CONFLICT" } } as const;
+          return {
+            success: false,
+            error: { code: "AGENCY_TYPE_CONFLICT" },
+            message: "An in-progress registration with a different agency type exists",
+          };
         }
         // Resume: apply updated step-1 data so the wizard pre-populates correctly.
         await ctx.db.patch(agency._id, {
@@ -256,7 +331,11 @@ export const startOnboarding = mutationWithAuth({
           representanteName: args.representanteName,
           representanteCpf,
         });
-        return { success: true, data: { agencyId: agency._id, resumed: true } } as const;
+        return {
+          success: true,
+          data: { agencyId: agency._id, resumed: true },
+          message: "Resumed existing in-progress registration",
+        };
       }
     }
 
@@ -282,7 +361,7 @@ export const startOnboarding = mutationWithAuth({
       joinedAt: now,
     });
 
-    return { success: true, data: { agencyId, resumed: false } } as const;
+    return { success: true, data: { agencyId, resumed: false }, message: "Onboarding started" };
   },
 });
 
@@ -295,15 +374,23 @@ export const saveBankingInfo = mutationWithAgencyScope({
   args: {
     bankingInfo: bankingInfoValidator,
   },
-  handler: async (ctx, { bankingInfo }) => {
+  handler: async (
+    ctx,
+    { bankingInfo },
+  ): Promise<Result<SaveBankingInfoSuccessResult, SaveBankingInfoErrorResult>> => {
     const agency = await ctx.db.get(ctx.agencyId);
-    if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
+    if (!agency)
+      return { success: false, error: { code: "NOT_FOUND" }, message: "Agency not found" };
     if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
-      return { success: false, error: { code: "ONBOARDING_NOT_EDITABLE" } } as const;
+      return {
+        success: false,
+        error: { code: "ONBOARDING_NOT_EDITABLE" },
+        message: "Onboarding is no longer editable",
+      };
     }
 
     await ctx.db.patch(ctx.agencyId, { bankingInfo });
-    return { success: true, data: { agencyId: ctx.agencyId } } as const;
+    return { success: true, data: { agencyId: ctx.agencyId }, message: "Banking info saved" };
   },
 });
 
@@ -314,14 +401,23 @@ export const saveBankingInfo = mutationWithAgencyScope({
  */
 export const generateDocumentUploadUrl = mutationWithAgencyScope({
   args: {},
-  handler: async (ctx) => {
+  handler: async (
+    ctx,
+  ): Promise<
+    Result<GenerateDocumentUploadUrlSuccessResult, GenerateDocumentUploadUrlErrorResult>
+  > => {
     const agency = await ctx.db.get(ctx.agencyId);
-    if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
+    if (!agency)
+      return { success: false, error: { code: "NOT_FOUND" }, message: "Agency not found" };
     if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
-      return { success: false, error: { code: "ONBOARDING_NOT_EDITABLE" } } as const;
+      return {
+        success: false,
+        error: { code: "ONBOARDING_NOT_EDITABLE" },
+        message: "Onboarding is no longer editable",
+      };
     }
     const url = await ctx.storage.generateUploadUrl();
-    return { success: true, data: { url } } as const;
+    return { success: true, data: { url }, message: "Upload URL minted" };
   },
 });
 
@@ -343,11 +439,19 @@ export const saveDocument = mutationWithAgencyScope({
     storageId: v.id("_storage"),
     fileName: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<Result<SaveDocumentSuccessResult, SaveDocumentErrorResult>> => {
     const agency = await ctx.db.get(ctx.agencyId);
-    if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
+    if (!agency)
+      return { success: false, error: { code: "NOT_FOUND" }, message: "Agency not found" };
     if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
-      return { success: false, error: { code: "ONBOARDING_NOT_EDITABLE" } } as const;
+      return {
+        success: false,
+        error: { code: "ONBOARDING_NOT_EDITABLE" },
+        message: "Onboarding is no longer editable",
+      };
     }
 
     const duplicate = await ctx.db
@@ -369,7 +473,7 @@ export const saveDocument = mutationWithAgencyScope({
       uploadedAt: new Date().toISOString(),
     });
 
-    return { success: true, data: { kind: args.kind } } as const;
+    return { success: true, data: { kind: args.kind }, message: "Document saved" };
   },
 });
 
@@ -382,21 +486,37 @@ export const submitOnboarding = mutationWithAgencyScope({
   args: {
     consentMarketing: v.optional(v.boolean()),
   },
-  handler: async (ctx, { consentMarketing }) => {
+  handler: async (
+    ctx,
+    { consentMarketing },
+  ): Promise<Result<SubmitOnboardingSuccessResult, SubmitOnboardingErrorResult>> => {
     const { agencyId } = ctx;
     const agency = await ctx.db.get(agencyId);
-    if (!agency) return { success: false, error: { code: "NOT_FOUND" } } as const;
+    if (!agency)
+      return { success: false, error: { code: "NOT_FOUND" }, message: "Agency not found" };
 
     if (agency.onboardingState !== ONBOARDING_STATE.IN_PROGRESS) {
-      return { success: false, error: { code: "NOT_IN_PROGRESS" } } as const;
+      return {
+        success: false,
+        error: { code: "NOT_IN_PROGRESS" },
+        message: "Onboarding is not in progress",
+      };
     }
 
     if (!agency.agencyType) {
-      return { success: false, error: { code: "AGENCY_TYPE_REQUIRED" } } as const;
+      return {
+        success: false,
+        error: { code: "AGENCY_TYPE_REQUIRED" },
+        message: "Agency type is required before submission",
+      };
     }
 
     if (!agency.bankingInfo) {
-      return { success: false, error: { code: "BANKING_INFO_REQUIRED" } } as const;
+      return {
+        success: false,
+        error: { code: "BANKING_INFO_REQUIRED" },
+        message: "Banking info is required before submission",
+      };
     }
 
     if (
@@ -405,12 +525,25 @@ export const submitOnboarding = mutationWithAgencyScope({
       !agency.phone?.trim() ||
       !agency.creci?.trim()
     ) {
-      return { success: false, error: { code: "INCOMPLETE_PROFILE" } } as const;
+      return {
+        success: false,
+        error: { code: "INCOMPLETE_PROFILE" },
+        message: "Profile is incomplete — name/email/phone/CRECI required",
+      };
     }
 
     // Garante unicidade de CPF/CNPJ no momento da submissão — é aqui que o cadastro
     // se torna "ocupado". Dois usuários podem estar IN_PROGRESS com o mesmo documento,
     // mas apenas o primeiro a submeter passa.
+    //
+    // KNOWN RACE — both writers see "no other SUBMITTED row" simultaneously and both
+    // patch their agency to SUBMITTED. Convex OCC can't catch it because the patches
+    // target distinct rows. Acceptable for the MVP: manual review (reviewOnboarding
+    // in convex/agencies/adminUseCases.ts) catches duplicates before either agency
+    // reaches ACTIVE. To eliminate the race, add a `claimedDocuments` table keyed by
+    // (cpf|cnpj) and upsert here before the patch — Convex's serialization on a
+    // single document would force the second writer to fail. Tracked in
+    // .claude/notes/deferred-conventions.md.
     if (agency.agencyType === AGENCY_TYPE.AUTONOMO && agency.cpf) {
       const cpf = agency.cpf;
       const existing = await ctx.db
@@ -423,7 +556,11 @@ export const submitOnboarding = mutationWithAgencyScope({
         existing.onboardingState !== ONBOARDING_STATE.REJECTED &&
         existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS
       ) {
-        return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
+        return {
+          success: false,
+          error: { code: "ALREADY_REGISTERED" },
+          message: "CPF already registered with another submitted agency",
+        };
       }
     }
 
@@ -439,7 +576,11 @@ export const submitOnboarding = mutationWithAgencyScope({
         existing.onboardingState !== ONBOARDING_STATE.REJECTED &&
         existing.onboardingState !== ONBOARDING_STATE.IN_PROGRESS
       ) {
-        return { success: false, error: { code: "ALREADY_REGISTERED" } } as const;
+        return {
+          success: false,
+          error: { code: "ALREADY_REGISTERED" },
+          message: "CNPJ already registered with another submitted agency",
+        };
       }
     }
 
@@ -453,7 +594,11 @@ export const submitOnboarding = mutationWithAgencyScope({
       const missing = EMPRESA_REQUIRED_DOCS.filter((k) => !uploadedKinds.has(k));
 
       if (missing.length > 0) {
-        return { success: false, error: { code: "MISSING_DOCUMENTS", missing } } as const;
+        return {
+          success: false,
+          error: { code: "MISSING_DOCUMENTS", missing },
+          message: `Missing required documents: ${missing.join(", ")}`,
+        };
       }
     }
 
@@ -464,6 +609,10 @@ export const submitOnboarding = mutationWithAgencyScope({
       consentMarketing: consentMarketing ?? false,
     });
 
-    return { success: true, data: { agencyId, submittedAt } } as const;
+    return {
+      success: true,
+      data: { agencyId, submittedAt },
+      message: "Onboarding submitted for review",
+    };
   },
 });
