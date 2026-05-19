@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
-import { isBankAccountType } from "@/components/onboarding/use-wizard-step-banking";
+import type { BankingFormValues } from "@/components/onboarding/schemas/banking-schema";
 import type { ProfileFormValues } from "@/components/onboarding/schemas/profile-schema";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -61,6 +61,7 @@ type WizardState = {
 type WizardAction =
   | { type: "PATCH"; patch: Partial<OnboardingWizardData> }
   | { type: "SAVE_PROFILE"; values: ProfileFormValues }
+  | { type: "SAVE_BANKING"; values: BankingFormValues }
   | { type: "GO_TO"; step: number }
   | { type: "SUBMIT_START" }
   | { type: "SUBMIT_SUCCESS"; agencyId?: AgencyId }
@@ -91,6 +92,8 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
             action.values.agencyType === "empresa" ? action.values.representanteCpf : "",
         },
       };
+    case "SAVE_BANKING":
+      return { ...state, data: { ...state.data, ...action.values } };
     case "GO_TO":
       return { ...state, step: action.step };
     case "SUBMIT_START":
@@ -218,32 +221,41 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
     [startOnboarding],
   );
 
-  const handleBankingNext = React.useCallback(async () => {
-    if (!state.agencyId || !isBankAccountType(state.data.bankAccountType)) {
-      dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
-      return;
-    }
-    dispatch({ type: "SUBMIT_START" });
-    try {
-      const result = await saveBankingInfo({
-        agencyId: state.agencyId,
-        bankingInfo: {
-          bank: state.data.bankName,
-          branch: state.data.bankBranch,
-          account: state.data.bankAccount,
-          accountType: state.data.bankAccountType,
-          pixKey: state.data.bankPixKey || undefined,
-        },
-      });
-      if (!result.success) {
-        dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
+  const handleBankingSubmit = React.useCallback(
+    async (values: BankingFormValues) => {
+      if (!state.agencyId) {
+        dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
         return;
       }
-      dispatch({ type: "SUBMIT_SUCCESS" });
-    } catch {
-      dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
-    }
-  }, [state.agencyId, state.data, saveBankingInfo]);
+      // Schema's enum refine guarantees a non-empty accountType; narrow for TS.
+      if (values.bankAccountType !== "corrente" && values.bankAccountType !== "poupanca") {
+        dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
+        return;
+      }
+      dispatch({ type: "SAVE_BANKING", values });
+      dispatch({ type: "SUBMIT_START" });
+      try {
+        const result = await saveBankingInfo({
+          agencyId: state.agencyId,
+          bankingInfo: {
+            bank: values.bankName,
+            branch: values.bankBranch,
+            account: values.bankAccount,
+            accountType: values.bankAccountType,
+            pixKey: values.bankPixKey || undefined,
+          },
+        });
+        if (!result.success) {
+          dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
+          return;
+        }
+        dispatch({ type: "SUBMIT_SUCCESS" });
+      } catch {
+        dispatch({ type: "SUBMIT_ERROR", code: "NETWORK_ERROR" });
+      }
+    },
+    [state.agencyId, saveBankingInfo],
+  );
 
   const handleDocumentsNext = React.useCallback(() => {
     dispatch({ type: "SUBMIT_SUCCESS" });
@@ -301,7 +313,7 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
     errorMessage,
     patch,
     handleStep1Submit,
-    handleBankingNext,
+    handleBankingSubmit,
     handleDocumentsNext,
     handleSubmit,
     handleBack,

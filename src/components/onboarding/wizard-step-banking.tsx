@@ -2,89 +2,136 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wizard";
-import { useWizardStepBanking } from "@/components/onboarding/use-wizard-step-banking";
-
-// Re-export so the orchestrator hook can keep importing isBankAccountType from
-// either entry point — the canonical declaration lives in the hook file.
-export { isBankAccountType } from "@/components/onboarding/use-wizard-step-banking";
+import {
+  BANK_ACCOUNT_TYPE,
+  BANKING_FORM_DEFAULTS,
+  bankingSchema,
+  type BankingFormValues,
+} from "@/components/onboarding/schemas/banking-schema";
 
 type Props = {
-  data: OnboardingWizardData;
-  onChange: (patch: Partial<OnboardingWizardData>) => void;
-  onNext: () => void;
+  initialValues?: Partial<BankingFormValues>;
+  serverErrorCode?: string | null;
+  agencyType: "" | "autonomo" | "empresa";
+  onSubmit: (values: BankingFormValues) => void;
   onBack: () => void;
   isSubmitting: boolean;
 };
 
-export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting }: Props) {
+const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof BankingFormValues>> = {
+  BANK_REQUIRED: "bankName",
+  BRANCH_REQUIRED: "bankBranch",
+  ACCOUNT_REQUIRED: "bankAccount",
+  ACCOUNT_TYPE_REQUIRED: "bankAccountType",
+};
+
+export function WizardStepBanking({
+  initialValues,
+  serverErrorCode,
+  agencyType,
+  onSubmit,
+  onBack,
+  isSubmitting,
+}: Props) {
   const t = useTranslations("onboarding.wizard.banking");
-  const vm = useWizardStepBanking({ data, onNext });
+  const accountTypeLabelId = React.useId();
+
+  const form = useForm<BankingFormValues>({
+    resolver: zodResolver(bankingSchema),
+    defaultValues: { ...BANKING_FORM_DEFAULTS, ...initialValues },
+    mode: "onSubmit",
+  });
+
+  const { control, handleSubmit, formState, setError, setValue } = form;
+  const accountType = useWatch({ control, name: "bankAccountType" });
+  const errors = formState.errors;
+
+  React.useEffect(() => {
+    if (!serverErrorCode) return;
+    const field = SERVER_ERROR_FIELD_MAP[serverErrorCode];
+    if (field) setError(field, { type: "server", message: serverErrorCode });
+  }, [serverErrorCode, setError]);
+
+  const fieldError = (key: keyof BankingFormValues): string | undefined => {
+    const e = errors[key];
+    if (!e?.message) return undefined;
+    return t(`errors.${e.message}`);
+  };
 
   return (
-    <div className="flex flex-col gap-6">
-      {data.agencyType === "empresa" && (
+    <form className="flex flex-col gap-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+      {agencyType === "empresa" && (
         <div className="border-accent/60 bg-accent/5 border-l-2 px-4 py-3">
           <p className="text-text-2 text-sm">{t("empresaAccountNotice")}</p>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field
-          id="field-bank"
-          label={t("bankLabel")}
-          error={vm.errors.bank}
-          className="sm:col-span-2"
-        >
-          <Input
-            id="field-bank"
-            value={data.bankName}
-            placeholder={t("bankPlaceholder")}
-            onChange={(e) => onChange({ bankName: e.target.value })}
-          />
-        </Field>
+        <Controller
+          control={control}
+          name="bankName"
+          render={({ field }) => (
+            <Field
+              id="field-bank"
+              label={t("bankLabel")}
+              error={fieldError("bankName")}
+              className="sm:col-span-2"
+            >
+              <Input {...field} id="field-bank" placeholder={t("bankPlaceholder")} />
+            </Field>
+          )}
+        />
 
-        <Field id="field-branch" label={t("branchLabel")} error={vm.errors.branch}>
-          <Input
-            id="field-branch"
-            value={data.bankBranch}
-            placeholder={t("branchPlaceholder")}
-            inputMode="numeric"
-            onChange={(e) => onChange({ bankBranch: e.target.value })}
-          />
-        </Field>
+        <Controller
+          control={control}
+          name="bankBranch"
+          render={({ field }) => (
+            <Field id="field-branch" label={t("branchLabel")} error={fieldError("bankBranch")}>
+              <Input
+                {...field}
+                id="field-branch"
+                placeholder={t("branchPlaceholder")}
+                inputMode="numeric"
+              />
+            </Field>
+          )}
+        />
 
-        <Field id="field-account" label={t("accountLabel")} error={vm.errors.account}>
-          <Input
-            id="field-account"
-            value={data.bankAccount}
-            placeholder={t("accountPlaceholder")}
-            onChange={(e) => onChange({ bankAccount: e.target.value })}
-          />
-        </Field>
+        <Controller
+          control={control}
+          name="bankAccount"
+          render={({ field }) => (
+            <Field id="field-account" label={t("accountLabel")} error={fieldError("bankAccount")}>
+              <Input {...field} id="field-account" placeholder={t("accountPlaceholder")} />
+            </Field>
+          )}
+        />
 
         <div className="flex flex-col gap-2 sm:col-span-2">
-          <span id={vm.accountTypeLabelId} className="text-sm font-medium">
+          <span id={accountTypeLabelId} className="text-sm font-medium">
             {t("accountTypeLabel")}
           </span>
-          <div
-            role="group"
-            aria-labelledby={vm.accountTypeLabelId}
-            className="grid grid-cols-2 gap-2"
-          >
-            {(["corrente", "poupanca"] as const).map((type) => (
+          <div role="group" aria-labelledby={accountTypeLabelId} className="grid grid-cols-2 gap-2">
+            {BANK_ACCOUNT_TYPE.map((type) => (
               <button
                 key={type}
                 type="button"
-                aria-pressed={data.bankAccountType === type}
-                onClick={() => onChange({ bankAccountType: type })}
+                aria-pressed={accountType === type}
+                onClick={() =>
+                  setValue("bankAccountType", type, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
                 className={cn(
                   "border px-4 py-2 text-sm font-medium transition-colors",
-                  data.bankAccountType === type
+                  accountType === type
                     ? "border-accent bg-accent/5 text-accent"
                     : "border-border text-text-2 hover:border-text-3 hover:text-text",
                 )}
@@ -93,37 +140,38 @@ export function WizardStepBanking({ data, onChange, onNext, onBack, isSubmitting
               </button>
             ))}
           </div>
-          {vm.errors.accountType && (
+          {fieldError("bankAccountType") && (
             <p className="text-error text-xs" role="alert">
-              {vm.errors.accountType}
+              {fieldError("bankAccountType")}
             </p>
           )}
         </div>
 
-        <Field
-          id="field-pix"
-          label={t("pixKeyLabel")}
-          hint={t("pixKeyHint")}
-          className="sm:col-span-2"
-        >
-          <Input
-            id="field-pix"
-            value={data.bankPixKey}
-            placeholder={t("pixKeyPlaceholder")}
-            onChange={(e) => onChange({ bankPixKey: e.target.value })}
-          />
-        </Field>
+        <Controller
+          control={control}
+          name="bankPixKey"
+          render={({ field }) => (
+            <Field
+              id="field-pix"
+              label={t("pixKeyLabel")}
+              hint={t("pixKeyHint")}
+              className="sm:col-span-2"
+            >
+              <Input {...field} id="field-pix" placeholder={t("pixKeyPlaceholder")} />
+            </Field>
+          )}
+        />
       </div>
 
       <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
+        <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting}>
           {t("backButton")}
         </Button>
-        <Button size="lg" onClick={vm.handleNext} disabled={isSubmitting}>
+        <Button type="submit" size="lg" disabled={isSubmitting}>
           {isSubmitting ? t("savingButton") : t("nextButton")}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }
 
