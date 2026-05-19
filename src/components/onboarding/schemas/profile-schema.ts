@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isValidCPF, isValidCNPJ } from "@/lib/brazil";
 
 // Error codes — the i18n layer in the component maps these to translated
-// strings via `onboarding.step1.errors.<code>`. Mirrors the server-side
+// strings via `onboarding.profile.errors.<code>`. Mirrors the server-side
 // pattern: schema returns codes, presentation maps to messages.
 const ERROR = {
   AGENCY_TYPE_REQUIRED: "agencyType",

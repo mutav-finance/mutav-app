@@ -960,119 +960,135 @@
       "ctaButton": "Start registration",
       "ctaNoteReview": "reviewed in up to 2 business days"
     },
-    "wizard": {
-      "loading": "Loading…",
-      "steps": {
-        "perfil": "Profile",
-        "documentos": "Documents",
-        "contaBancaria": "Banking",
-        "revisao": "Review"
-      },
-      "progressLabel": "Registration progress",
-      "stepDoneSuffix": ": completed",
-      "stepCurrentSuffix": ": current step",
-      "banking": {
-        "empresaAccountNotice": "The bank account must be in the company's name and linked to the registered CNPJ.",
-        "bankLabel": "Bank",
-        "bankPlaceholder": "E.g. Chase, Bank of America",
-        "branchLabel": "Branch",
-        "branchPlaceholder": "0000",
-        "accountLabel": "Account number",
-        "accountPlaceholder": "00000-0",
-        "accountTypeLabel": "Account type",
-        "accountTypeCorrente": "Checking",
-        "accountTypePoupanca": "Savings",
-        "pixKeyLabel": "Pix key",
-        "pixKeyPlaceholder": "CPF, CNPJ, email, phone or random key",
-        "pixKeyHint": "Optional — used for fast refunds and transfers",
-        "nextButton": "Next",
-        "savingButton": "Saving…",
-        "backButton": "← Back",
-        "errors": {
-          "bank": "Enter the bank name.",
-          "branch": "Enter the branch number.",
-          "account": "Enter the account number.",
-          "accountType": "Select an account type."
-        }
-      },
-      "documents": {
-        "loading": "Loading…",
-        "subtitle": "Upload the 2 documents below. We accept PDF, JPG, and PNG.",
-        "kinds": {
-          "documento_empresa": {
-            "label": "Company Document",
-            "description": "CNPJ Card (Federal Revenue) or Articles of Incorporation"
-          },
-          "responsavel_id": {
-            "label": "Representative ID",
-            "description": "National ID or driver's license of the responsible partner"
-          }
-        },
-        "uploadButton": "Upload",
-        "replaceButton": "Replace",
-        "uploading": "Uploading…",
-        "retryButton": "Failed — Try again",
-        "progress": "{uploaded} of {total} uploaded",
-        "allRequired": "Upload all documents to continue.",
-        "nextButton": "Next",
-        "backButton": "← Back"
-      },
-      "review": {
-        "profileSection": "Profile",
-        "bankingSection": "Banking",
-        "agencyTypeLabel": "Type",
-        "nameLabel": "Name",
-        "documentLabel": "Document",
-        "creciLabel": "CRECI",
-        "emailLabel": "Email",
-        "phoneLabel": "Phone",
-        "representanteNameLabel": "Representative",
-        "representanteCpfLabel": "Representative CPF",
-        "bankLabel": "Bank",
-        "branchLabel": "Branch",
-        "accountLabel": "Account",
-        "accountTypeLabel": "Type",
-        "pixKeyLabel": "Pix key",
-        "notProvided": "Not provided",
-        "accountTypeCorrente": "Checking",
-        "accountTypePoupanca": "Savings",
-        "agencyTypeAutonomo": "Independent broker",
-        "agencyTypeEmpresa": "Real estate agency",
-        "editButton": "edit",
-        "submitButton": "Submit registration",
-        "submittingButton": "Submitting…",
-        "backButton": "← Back",
-        "consentMarketing": "I agree to receive targeted communications and can unsubscribe at any time.",
-        "consentLegal": "By submitting my information, I agree to the <privacy>Privacy Policy</privacy> and <terms>Terms of Use</terms>."
-      },
-      "submitted": {
-        "title": "Registration submitted",
-        "subtitle": "Our team will review your information and get back to you within 2 business days.",
-        "detail": "You will receive an email with the result at {email}."
-      },
+    "status": {
+      "title": "Application under review",
+      "subtitle": "Our team is reviewing your information. You will receive an email with the result within 2 business days.",
+      "stateSubmitted": "Submitted — awaiting review",
+      "stateUnderReview": "Under review by Mutav team",
+      "backLabel": "Have questions?",
+      "backLink": "Contact us",
+      "homeButton": "Back"
+    },
+    "rejected": {
+      "title": "Application not approved",
+      "subtitle": "Unfortunately we were unable to approve your application at this time.",
+      "reasonLabel": "Reason provided by our team:",
+      "noReason": "No reason provided.",
+      "contactLabel": "Have questions or want to appeal?",
+      "contactLink": "Contact us",
+      "homeButton": "Back"
+    },
+    "loading": "Loading…",
+    "steps": {
+      "perfil": "Profile",
+      "documentos": "Documents",
+      "contaBancaria": "Banking",
+      "revisao": "Review"
+    },
+    "progressLabel": "Registration progress",
+    "stepDoneSuffix": ": completed",
+    "stepCurrentSuffix": ": current step",
+    "banking": {
+      "empresaAccountNotice": "The bank account must be in the company's name and linked to the registered CNPJ.",
+      "bankLabel": "Bank",
+      "bankPlaceholder": "E.g. Chase, Bank of America",
+      "branchLabel": "Branch",
+      "branchPlaceholder": "0000",
+      "accountLabel": "Account number",
+      "accountPlaceholder": "00000-0",
+      "accountTypeLabel": "Account type",
+      "accountTypeCorrente": "Checking",
+      "accountTypePoupanca": "Savings",
+      "pixKeyLabel": "Pix key",
+      "pixKeyPlaceholder": "CPF, CNPJ, email, phone or random key",
+      "pixKeyHint": "Optional — used for fast refunds and transfers",
+      "nextButton": "Next",
+      "savingButton": "Saving…",
+      "backButton": "← Back",
       "errors": {
-        "CNPJ_REQUIRED": "CNPJ is required for agencies.",
-        "CPF_REQUIRED": "CPF is required for independent brokers.",
-        "CPF_INVALID": "Invalid CPF. Please check the digits and try again.",
-        "CNPJ_INVALID": "Invalid CNPJ. Please check the digits and try again.",
-        "REPRESENTANTE_NAME_REQUIRED": "Representative name is required for agencies.",
-        "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
-        "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
-        "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
-        "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
-        "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
-        "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
-        "BANKING_INFO_REQUIRED": "Fill in your banking details before submitting.",
-        "MISSING_DOCUMENTS": "Upload all required documents before submitting.",
-        "NOT_IN_PROGRESS": "This registration has already been submitted for review.",
-        "ONBOARDING_NOT_EDITABLE": "This registration can no longer be edited.",
-        "NOT_FOUND": "Registration not found.",
-        "NETWORK_ERROR": "Connection failed. Please try again.",
-        "INTERNAL_ERROR": "Internal error. Please reload the page.",
-        "unknown": "Failed to save. Please try again."
+        "bank": "Enter the bank name.",
+        "branch": "Enter the branch number.",
+        "account": "Enter the account number.",
+        "accountType": "Select an account type."
       }
     },
-    "step1": {
+    "documents": {
+      "loading": "Loading…",
+      "subtitle": "Upload the 2 documents below. We accept PDF, JPG, and PNG.",
+      "kinds": {
+        "documento_empresa": {
+          "label": "Company Document",
+          "description": "CNPJ Card (Federal Revenue) or Articles of Incorporation"
+        },
+        "responsavel_id": {
+          "label": "Representative ID",
+          "description": "National ID or driver's license of the responsible partner"
+        }
+      },
+      "uploadButton": "Upload",
+      "replaceButton": "Replace",
+      "uploading": "Uploading…",
+      "retryButton": "Failed — Try again",
+      "progress": "{uploaded} of {total} uploaded",
+      "allRequired": "Upload all documents to continue.",
+      "nextButton": "Next",
+      "backButton": "← Back"
+    },
+    "review": {
+      "profileSection": "Profile",
+      "bankingSection": "Banking",
+      "agencyTypeLabel": "Type",
+      "nameLabel": "Name",
+      "documentLabel": "Document",
+      "creciLabel": "CRECI",
+      "emailLabel": "Email",
+      "phoneLabel": "Phone",
+      "representanteNameLabel": "Representative",
+      "representanteCpfLabel": "Representative CPF",
+      "bankLabel": "Bank",
+      "branchLabel": "Branch",
+      "accountLabel": "Account",
+      "accountTypeLabel": "Type",
+      "pixKeyLabel": "Pix key",
+      "notProvided": "Not provided",
+      "accountTypeCorrente": "Checking",
+      "accountTypePoupanca": "Savings",
+      "agencyTypeAutonomo": "Independent broker",
+      "agencyTypeEmpresa": "Real estate agency",
+      "editButton": "edit",
+      "submitButton": "Submit registration",
+      "submittingButton": "Submitting…",
+      "backButton": "← Back",
+      "consentMarketing": "I agree to receive targeted communications and can unsubscribe at any time.",
+      "consentLegal": "By submitting my information, I agree to the <privacy>Privacy Policy</privacy> and <terms>Terms of Use</terms>."
+    },
+    "submitted": {
+      "title": "Registration submitted",
+      "subtitle": "Our team will review your information and get back to you within 2 business days.",
+      "detail": "You will receive an email with the result at {email}."
+    },
+    "errors": {
+      "CNPJ_REQUIRED": "CNPJ is required for agencies.",
+      "CPF_REQUIRED": "CPF is required for independent brokers.",
+      "CPF_INVALID": "Invalid CPF. Please check the digits and try again.",
+      "CNPJ_INVALID": "Invalid CNPJ. Please check the digits and try again.",
+      "REPRESENTANTE_NAME_REQUIRED": "Representative name is required for agencies.",
+      "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
+      "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
+      "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
+      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
+      "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
+      "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
+      "BANKING_INFO_REQUIRED": "Fill in your banking details before submitting.",
+      "MISSING_DOCUMENTS": "Upload all required documents before submitting.",
+      "NOT_IN_PROGRESS": "This registration has already been submitted for review.",
+      "ONBOARDING_NOT_EDITABLE": "This registration can no longer be edited.",
+      "NOT_FOUND": "Registration not found.",
+      "NETWORK_ERROR": "Connection failed. Please try again.",
+      "INTERNAL_ERROR": "Internal error. Please reload the page.",
+      "unknown": "Failed to save. Please try again."
+    },
+    "profile": {
       "typeLabel": "Registration type",
       "typeAutonomo": "Independent broker",
       "typeEmpresa": "Real estate agency",
@@ -1105,24 +1121,6 @@
         "representanteName": "Representative name is required.",
         "representanteCpf": "Invalid representative CPF."
       }
-    },
-    "status": {
-      "title": "Application under review",
-      "subtitle": "Our team is reviewing your information. You will receive an email with the result within 2 business days.",
-      "stateSubmitted": "Submitted — awaiting review",
-      "stateUnderReview": "Under review by Mutav team",
-      "backLabel": "Have questions?",
-      "backLink": "Contact us",
-      "homeButton": "Back"
-    },
-    "rejected": {
-      "title": "Application not approved",
-      "subtitle": "Unfortunately we were unable to approve your application at this time.",
-      "reasonLabel": "Reason provided by our team:",
-      "noReason": "No reason provided.",
-      "contactLabel": "Have questions or want to appeal?",
-      "contactLink": "Contact us",
-      "homeButton": "Back"
     }
   }
 }

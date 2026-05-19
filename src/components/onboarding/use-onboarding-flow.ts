@@ -117,7 +117,7 @@ function resolveStepKind(step: number, agencyType: string): OnboardingStep {
 }
 
 // Server + client error codes recognised by the flow banner. Keep in
-// sync with `onboarding.wizard.errors.<CODE>` in messages/{pt-BR,en}.json
+// sync with `onboarding.errors.<CODE>` in messages/{pt-BR,en}.json
 // — the i18n parity grep in scripts/regression-greps.sh enforces both
 // locales stay aligned, but neither check verifies the union against
 // what Convex actually returns. When a new code is added on the server,
@@ -165,7 +165,7 @@ function buildInitialState(initialType: "autonomo" | "empresa" | undefined): Onb
 // ─── View model hook ──────────────────────────────────────────────────────────
 
 export function useOnboardingFlow({ initialType }: { initialType?: "autonomo" | "empresa" }) {
-  const t = useTranslations("onboarding.wizard");
+  const t = useTranslations("onboarding");
 
   const [state, dispatch] = React.useReducer(onboardingReducer, initialType, buildInitialState);
 

@@ -40,7 +40,7 @@ export function StepBanking({
   onBack,
   isSubmitting,
 }: Props) {
-  const t = useTranslations("onboarding.wizard.banking");
+  const t = useTranslations("onboarding.banking");
   const accountTypeLabelId = React.useId();
 
   const form = useForm<BankingFormInput, unknown, BankingFormValues>({
