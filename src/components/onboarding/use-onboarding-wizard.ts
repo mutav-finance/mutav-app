@@ -7,6 +7,7 @@ import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 import type { BankingFormValues } from "@/components/onboarding/schemas/banking-schema";
 import type { ProfileFormValues } from "@/components/onboarding/schemas/profile-schema";
+import type { ReviewFormValues } from "@/components/onboarding/schemas/review-schema";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -261,8 +262,8 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
     dispatch({ type: "SUBMIT_SUCCESS" });
   }, []);
 
-  const handleSubmit = React.useCallback(
-    async (opts: { consentMarketing: boolean }) => {
+  const handleReviewSubmit = React.useCallback(
+    async (values: ReviewFormValues) => {
       if (!state.agencyId) {
         dispatch({ type: "SUBMIT_ERROR", code: "INTERNAL_ERROR" });
         return;
@@ -271,7 +272,7 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
       try {
         const result = await submitOnboarding({
           agencyId: state.agencyId,
-          consentMarketing: opts.consentMarketing,
+          consentMarketing: values.consentMarketing,
         });
         if (!result.success) {
           dispatch({ type: "SUBMIT_ERROR", code: result.error.code });
@@ -315,7 +316,7 @@ export function useOnboardingWizard({ initialType }: { initialType?: "autonomo" 
     handleStep1Submit,
     handleBankingSubmit,
     handleDocumentsNext,
-    handleSubmit,
+    handleReviewSubmit,
     handleBack,
     handleGoTo,
   };
