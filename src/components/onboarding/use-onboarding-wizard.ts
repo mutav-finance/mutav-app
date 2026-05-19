@@ -113,17 +113,34 @@ function resolveStepKind(step: number, agencyType: string): WizardStepKind {
   return "profile";
 }
 
+// Server + client error codes recognised by the wizard banner. Keep in
+// sync with `onboarding.wizard.errors.<CODE>` in messages/{pt-BR,en}.json
+// — the i18n parity grep in scripts/regression-greps.sh enforces both
+// locales stay aligned, but neither check verifies the union against
+// what Convex actually returns. When a new code is added on the server,
+// add it here AND in both locale files.
 const WIZARD_ERROR_CODES = [
-  "CNPJ_REQUIRED",
+  // Profile-step server codes (convex/agencies/useCases.ts → startOnboarding)
+  "AGENCY_TYPE_REQUIRED",
+  "AGENCY_TYPE_CONFLICT",
   "CPF_REQUIRED",
   "CPF_INVALID",
+  "CNPJ_REQUIRED",
   "CNPJ_INVALID",
   "REPRESENTANTE_NAME_REQUIRED",
   "REPRESENTANTE_CPF_REQUIRED",
   "REPRESENTANTE_CPF_INVALID",
   "ALREADY_REGISTERED",
-  "AGENCY_TYPE_CONFLICT",
   "INCOMPLETE_PROFILE",
+  // Cross-step server codes (saveBankingInfo, submitOnboarding, saveDocument)
+  "BANKING_INFO_REQUIRED",
+  "MISSING_DOCUMENTS",
+  "NOT_IN_PROGRESS",
+  "ONBOARDING_NOT_EDITABLE",
+  "NOT_FOUND",
+  // Client-side codes emitted from handler try/catch blocks
+  "NETWORK_ERROR",
+  "INTERNAL_ERROR",
 ] as const;
 
 type WizardErrorCode = (typeof WIZARD_ERROR_CODES)[number];

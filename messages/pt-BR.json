@@ -1061,6 +1061,14 @@
         "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
         "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte.",
         "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
+        "AGENCY_TYPE_REQUIRED": "Selecione o tipo de cadastro para continuar.",
+        "BANKING_INFO_REQUIRED": "Preencha os dados bancários antes de finalizar.",
+        "MISSING_DOCUMENTS": "Envie todos os documentos obrigatórios antes de finalizar.",
+        "NOT_IN_PROGRESS": "Este cadastro já foi enviado para revisão.",
+        "ONBOARDING_NOT_EDITABLE": "Este cadastro não pode mais ser alterado.",
+        "NOT_FOUND": "Cadastro não encontrado.",
+        "NETWORK_ERROR": "Falha de conexão. Tente novamente.",
+        "INTERNAL_ERROR": "Erro interno. Tente recarregar a página.",
         "unknown": "Erro ao salvar. Tente novamente."
       }
     },
