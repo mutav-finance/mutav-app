@@ -1,6 +1,6 @@
 # Chain ↔ Convex Integration — Architecture
 
-> The Mutav SA fund lives onchain (Stellar / Soroban for v1; additional chains in the future per [`investor.md`](investor.md)). The web app is offchain (Convex + Next.js). This document defines the boundary between them: how chain state becomes Convex tables (read path), how user and admin intents become onchain transactions (write path), the contract topology that satisfies the segregated-account model, and the stub-first contract that lets both sides ship independently. The infrastructure here is **shared** between Mutav Admin's A5 (fund observability) and the Investor portal's I2 (real fund data).
+> The `Mutav-Fund` (the offshore fund per [`entities.md`](entities.md)) lives onchain (Stellar / Soroban for v1; additional chains in the future per [`investor.md`](investor.md)). Treasury custody is `Mutav-Fund`'s; treasury operations (NAV updates, liquidation, signer-set changes) are executed by `Mutav-Mgmt` per offshore fund-admin custody norms. The web app is offchain (Convex + Next.js). This document defines the boundary between them: how chain state becomes Convex tables (read path), how user and admin intents become onchain transactions (write path), the contract topology that satisfies the segregated-account model, the offshore custody chain that satisfies fund-admin separation requirements, and the stub-first contract that lets both sides ship independently. The infrastructure here is **shared** between Mutav Admin's A5 (fund observability) and the Investor portal's I2 (real fund data).
 
 Cross-cutting reliability primitives (reconciliation, idempotency, workflow durability, audit-log integrity, NAV safety) are factored into [`reliability.md`](reliability.md). This document references them rather than re-explaining each one.
 
@@ -173,35 +173,96 @@ This isolation keeps blast-radius bounded: a Solana indexer bug cannot affect St
 
 ## Contract topology — Segregated Account
 
-CVM 175 (and the Mutav whitepaper) commit to a Segregated Account structure: investor capital is legally and operationally separated from protocol operations. This is not just a legal artifact — it must be enforced in the contract topology onchain. The architectural commitment, per chain:
+Offshore fund-admin custody rules (Cayman CIMA, BVI Fund Admin Code, similar elsewhere) and the Mutav whitepaper commit to a Segregated Account structure: investor capital is legally and operationally separated from protocol operations, and the fund's custody is separated from its administrator. This is not just a legal artifact — it must be enforced in the contract topology onchain. The architectural commitment, per chain:
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   Mutav SA on {chain}                  │
-│                                                        │
-│   ┌──────────────────────┐    ┌──────────────────┐     │
-│   │  Custody contract    │    │  Operations      │     │
-│   │  (per risk tier)     │◄───┤  contract        │     │
-│   │                      │    │                  │     │
-│   │ • Holds investor     │    │ • Mint authority │     │
-│   │   capital            │    │ • Redeem queue   │     │
-│   │ • Issues MUTAV       │    │ • NAV updater    │     │
-│   │   tokens             │    │ • Liquidation    │     │
-│   │ • Narrow interface   │    │   executor       │     │
-│   │   (deposit / redeem) │    │ • Multisig-gated │     │
-│   └──────────────────────┘    └──────────────────┘     │
-│                                                        │
-└────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  Mutav-Fund + Mutav-Mgmt on {chain}         │
+│                                                             │
+│   ┌──────────────────────┐       ┌──────────────────┐       │
+│   │  Custody contracts   │       │  Operations      │       │
+│   │  (per tranche)       │◄──────┤  contracts       │       │
+│   │  owned by Mutav-Fund │       │  owned by        │       │
+│   │                      │       │  Mutav-Mgmt      │       │
+│   │ • Hold TESOURO       │       │                  │       │
+│   │   per tranche        │       │ • Mint authority │       │
+│   │ • Issue MTVH/MTVM/   │       │ • Redeem queue   │       │
+│   │   MTVL tokens        │       │ • NAV updater    │       │
+│   │ • Narrow interface   │       │   (3 tranches)   │       │
+│   │   (deposit/redeem    │       │ • Liquidation    │       │
+│   │   per tranche)       │       │   executor       │       │
+│   │                      │       │ • Multisig-gated │       │
+│   └──────────────────────┘       │   (Mutav-Mgmt    │       │
+│                                  │    signers)      │       │
+│                                  └──────────────────┘       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 **Invariants the topology enforces:**
 
-- **One custody contract per fund (per risk tier).** Low-risk, medium-risk, and high-risk funds each have their own custody contract. Cross-fund contamination is impossible at the protocol level — a default in the high-risk fund cannot drain the low-risk fund.
+- **One custody contract per tranche.** MTVH, MTVM, and MTVL each have their own custody contract (or per-tranche partitions within one contract). Cross-tranche contamination is impossible at the protocol level — a default in MTVH's waterfall step (see [`tranches.md`](tranches.md)) cannot drain MTVL's custody.
 - **Operations contracts are subordinate.** Operations contracts hold no investor capital. They have approval-gated authority to invoke custody operations (mint on deposit, burn on redeem, transfer-out on liquidation) but cannot move capital except through these narrow entry points.
-- **Multisig gates operations.** Operations contracts that affect treasury (NAV update, liquidation, mint authority changes) require multisig consensus per [`reliability.md`](reliability.md) and [`regulatory.md`](regulatory.md). Single-actor authority does not exist.
-- **Topology is verifiable.** External auditors can verify the separation by reading the contract registry — the architecture commits to publishing the contract addresses and their relationships in a public manifest.
+- **Entity ownership is explicit.** Custody contracts' admin/owner key is `Mutav-Fund`'s Stellar account. Operations contracts' admin/owner key is `Mutav-Mgmt`'s signer set (Lobstr Vault multisig). Custody granting operations access is itself a multisig-gated operation that requires both entities' attestation per [`regulatory.md`](regulatory.md) § Multisig governance.
+- **Multisig gates operations.** Operations contracts that affect treasury (NAV update per tranche, liquidation, mint authority changes) require multisig consensus per [`reliability.md`](reliability.md) and [`regulatory.md`](regulatory.md). Single-actor authority does not exist.
+- **Topology is verifiable.** External auditors can verify the separation by reading the contract registry — the architecture commits to publishing the contract addresses, their entity owners, and their relationships in a public manifest.
 
 This is architecture, not implementation. The actual Soroban contracts (and equivalent contracts on future chains) live in `mutav-stellar` and follow this topology. The doc commits to what the topology must enforce; it does not specify contract signatures.
+
+## Offshore custody chain
+
+The three-entity model imposes additional custody discipline beyond standard segregated-account topology. Offshore fund-admin custody rules require the administrator (`Mutav-Mgmt`) to be operationally separable from the fund (`Mutav-Fund`); the architecture reflects this in how keys, signers, and authorization flow.
+
+```
+                    ┌────────────────────────────────┐
+                    │   Mutav-Fund                   │
+                    │   (Cayman / BVI / etc.)        │
+                    │                                │
+                    │   Owns:                        │
+                    │   • Stellar treasury G-account │
+                    │   • TESOURO balance            │
+                    │   • Tranche token issuance     │
+                    └──────────────┬─────────────────┘
+                                   │
+                                   │  delegates signing authority
+                                   │  (admin agreement)
+                                   ▼
+                    ┌────────────────────────────────┐
+                    │   Mutav-Mgmt                   │
+                    │   (same offshore jurisdiction) │
+                    │                                │
+                    │   Operates:                    │
+                    │   • Lobstr Vault signers       │
+                    │     (3-of-5 weighted multisig) │
+                    │   • Proposal queue UI          │
+                    │     (in Mutav (admin) shell)   │
+                    │   • NAV computation, audit log │
+                    └──────────────┬─────────────────┘
+                                   │
+                                   │  proposes / signs / submits onchain ops
+                                   ▼
+                    ┌────────────────────────────────┐
+                    │   Stellar / Soroban            │
+                    │                                │
+                    │   require_auth(Mutav-Fund      │
+                    │     treasury G-account)        │
+                    │     ↑                          │
+                    │     │                          │
+                    │   propagates from native       │
+                    │   multisig signed by           │
+                    │   Mutav-Mgmt signers           │
+                    └────────────────────────────────┘
+```
+
+**Custody invariants:**
+
+- **`Mutav-Fund` owns the treasury account; `Mutav-Mgmt` holds the signing keys** for the treasury account's multisig signer set. This separation matches offshore fund-admin custody rules — the fund and its administrator are distinct.
+- **No single `Mutav-Mgmt` signer can move funds.** The native multisig threshold (3-of-5 weighted per [`regulatory.md`](regulatory.md)) ensures collusion by one signer or one device is insufficient.
+- **Cross-entity attestations required for specific operations.** Operations that affect both entities' balances (e.g. liquidation: `Mutav-Fund` burns TESOURO, `Mutav-BR` receives BRL for default coverage) require attestation from both `Mutav-Mgmt` (to sign the Stellar tx) and `Mutav-BR` (to acknowledge the receipt). The cross-entity attestation lives in `mutavAuditLog` per [`reliability.md`](reliability.md).
+- **Signer set changes are themselves multisig operations.** Adding or rotating a `Mutav-Mgmt` signer requires the existing signer-set's consensus + an entry in `Mutav-Mgmt`'s operating agreement (off-chain legal artifact) per [`regulatory.md`](regulatory.md) § Multisig governance.
+- **The custody chain is documented in the offshore fund-admin agreement.** External auditors verify the contract registry + the admin agreement together — the technical custody must match the legal custody specification.
+
+**Open per L3 / P3 — TESOURO offshore holder eligibility.** Whether Etherfuse permits an offshore entity (`Mutav-Fund`) to hold TESOURO is the load-bearing question. If Etherfuse restricts TESOURO holders to BR-domiciled entities, the custody chain inserts a BR intermediary: `Mutav-BR-Treasury` would hold TESOURO on behalf of `Mutav-Fund`, with corresponding documentation tying the BR holding to the offshore beneficiary. The Soroban contract topology absorbs this addition without rewrite — only the treasury G-account ownership shifts from `Mutav-Fund` to `Mutav-BR-Treasury`.
 
 ## External integrations
 
@@ -217,23 +278,30 @@ For Mutav today, the integrations that need this hardening: **Etherfuse webhooks
 
 ### Agency settlement
 
-Mutav's treasury asset is **TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). Both investor on-ramp and agency settlement land in TESOURO. **Etherfuse is the primary settlement rail for both flows**; BaaS providers (Transfero / Bitso / Foxbit) sit alongside as **capacity and concentration hedges**, not as a separate primary path.
+`Mutav-Fund`'s treasury asset is **TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). Both investor on-ramp and agency settlement land in TESOURO into `Mutav-Fund`'s Stellar address. Agency settlement is the cessão leg from `Mutav-BR` to `Mutav-Fund` per [`entities.md`](entities.md). **Etherfuse is the primary settlement rail for both flows**; BaaS providers (Transfero / Bitso / Foxbit) sit alongside as **capacity and concentration hedges**, not as a separate primary path.
 
 #### Primary rail — Etherfuse (BRL Pix → TESOURO direct)
 
-The same Etherfuse primitive that powers investor on-ramp powers agency settlement. The difference is the **destination address** (agency-paid amounts mint TESOURO to a Mutav-controlled treasury address rather than to the investor's wallet) and the **flow trigger** (system-driven from agency invoice schedule rather than user-driven hosted UI):
+The same Etherfuse primitive that powers investor on-ramp powers agency settlement. The difference is the **destination address** (the cessão amount mints TESOURO to `Mutav-Fund`'s treasury address rather than to the investor's wallet) and the **flow trigger** (system-driven from `Mutav-BR`'s cessão schedule rather than user-driven hosted UI):
 
 ```
-Agency ── Pix ──► Etherfuse virtual account
+Agency ── Pix ──► Mutav-BR's Etherfuse virtual account
                        │
                        │ Pix MED 2.0 quarantine window
                        │ (per reliability.md § Quarantine windows)
-                       ▼
-                  Etherfuse mints TESOURO ──► Mutav treasury (Stellar)
                        │
-                       │ webhook (correlationId from Mutav's payments row)
+                       │ Mutav-BR retains 20%; cedes 80% via cessão
+                       ▼
+                  Etherfuse mints TESOURO ──► Mutav-Fund treasury (Stellar)
+                       │
+                       │ webhook (correlationId from Mutav-BR's payments row,
+                       │ entity codes MUTAV_BR + MUTAV_FUND tagged on audit entry)
                        ▼
                   Convex workflow step advances ──► indexer observes mint
+                       │
+                       │ Mutav-BR files BACEN câmbio record on cessão event
+                       ▼
+                  (per regulatory.md § BACEN câmbio reporting)
 ```
 
 - Single-counterparty flow. Etherfuse already holds the BCB license, runs the Pix infrastructure, and mints TESOURO. No additional vendor dependency for v1.
@@ -258,7 +326,7 @@ The BaaS rail uses a three-call orchestration (Pix-In → Trade BRL → USDC →
                             └────────────────────────────────┘
                                   ▲           │
        ① Pay-In (Pix QR)          │           │ ④ webhook (event id + correlationId)
-       virtual account            │           │
+       Mutav-BR virtual account   │           │
                                   │           ▼
    Agency ────► Pix ──────────────┘     Convex (workflow step)
                                               │
@@ -266,29 +334,30 @@ The BaaS rail uses a three-call orchestration (Pix-In → Trade BRL → USDC →
                                               ▼
                                         BaaS Trade endpoint
                                               │
-                                              │ ③ Crypto-Out (USDC to Mutav Stellar address)
+                                              │ ③ Crypto-Out (USDC to Mutav-Fund Stellar address)
                                               ▼
                                         Stellar
                                               │
-                                              │ ⑤ Mutav swaps USDC → TESOURO via Etherfuse
+                                              │ ⑤ Mutav-Mgmt swaps USDC → TESOURO via Etherfuse
+                                              │   (Mutav-Fund treasury balance updated)
                                               ▼
-                                        treasury balance updated
+                                        Mutav-Fund treasury balance updated
 ```
 
 **Architectural commitments shared by both rails:**
 
 1. **One Convex workflow per settlement.** Per [`reliability.md`](reliability.md) § Workflow durability — exactly-once mutations, at-least-once external calls with retry, journal-based recovery. Partial failure (Pix-in confirmed but mint or swap fails) is recoverable, not a silent inconsistency.
 2. **Quarantine before treasury credit.** The BRL Pix-in lands in a `quarantine` state per [`reliability.md`](reliability.md) § Quarantine windows. Mutav does **not** issue agency credit (or fire downstream operations) until the quarantine window elapses — Pix MED 2.0 (mandatory 2026) allows up to 80-day fraud reversal with multi-hop tracking. The quarantine applies regardless of which rail delivered the BRL.
-3. **Pre-funded TESOURO float decouples customer experience.** Mutav maintains a TESOURO float on Stellar; agency operations settle against the float instantly (post-Pix-confirmation but pre-quarantine-clear), while the BRL is in quarantine. The float is replenished in batches once quarantine clears. Full pattern in [`reliability.md`](reliability.md) § Pre-funded float — float denomination is TESOURO, matching the treasury asset.
-4. **Destination address allowlist server-side.** Wrong-address crypto delivery has no recovery. The provider stores Mutav treasury addresses in a beneficiary allowlist; the destination is never user-supplied.
-5. **Correlation id is mandatory and end-to-end.** Mutav's `payments` row id → settlement provider's external reference → carried through every subsequent step → matched against the indexer-observed onchain mint. The reconciliation primitive depends on this.
+3. **Pre-funded TESOURO float decouples customer experience.** `Mutav-Fund` maintains a TESOURO float on Stellar (operated by `Mutav-Mgmt`); agency operations settle against the float instantly (post-Pix-confirmation but pre-quarantine-clear), while the BRL is in quarantine in `Mutav-BR`'s account. The float is replenished in batches once quarantine clears. Full pattern in [`reliability.md`](reliability.md) § Pre-funded float — float denomination is TESOURO, matching the treasury asset.
+4. **Destination address allowlist server-side.** Wrong-address crypto delivery has no recovery. The provider stores `Mutav-Fund`'s treasury addresses in a beneficiary allowlist; the destination is never user-supplied.
+5. **Correlation id is mandatory and end-to-end.** `Mutav-BR`'s `payments` row id → settlement provider's external reference → carried through every subsequent step → matched against the indexer-observed onchain mint into `Mutav-Fund`. The reconciliation primitive depends on this; see [`reliability.md`](reliability.md) § Three-axis reconciliation.
 6. **Webhook reconciliation gap to verify per provider.** For each shortlisted vendor, confirm in sandbox whether crypto-delivery / mint events fire webhooks with the correlation id, or whether Mutav must poll.
 
 **Commitments specific to the BaaS rail:**
 
 - **Slippage caps on Trade calls.** USDC liquidity at BaaS providers is good but spread shocks during volatile periods are real; each Trade call carries an acceptable-slippage parameter; rejected trades alert and roll back.
 - **USDC as the intermediate**, not BRZ. BRZ-as-intermediate adds a peg-stability concern Mutav doesn't need. BaaS providers that only offer BRZ as intermediate are lower-priority candidates.
-- **TESOURO conversion is the final step** — once USDC lands at the Mutav Stellar address, a Convex workflow step calls Etherfuse to swap USDC → TESOURO. The treasury never holds USDC for material duration.
+- **TESOURO conversion is the final step** — once USDC lands at `Mutav-Fund`'s Stellar address, a `Mutav-Mgmt`-initiated Convex workflow step calls Etherfuse to swap USDC → TESOURO. The treasury never holds USDC for material duration.
 
 **Vendor shortlist** lives in [`regulatory.md`](regulatory.md) § Settlement provider selection.
 
@@ -375,8 +444,10 @@ The win: investor portal work and admin observability work can proceed in parall
 
 ## Related reading
 
-- [`reliability.md`](reliability.md) — workflow durability, idempotency, reconciliation, audit log integrity, NAV safety
-- [`regulatory.md`](regulatory.md) — CVM segregated account topology, multisig governance, KYC vendor criteria
+- [`entities.md`](entities.md) — `Mutav-Fund` owns custody, `Mutav-Mgmt` operates signers, `Mutav-BR` handles BR-side câmbio
+- [`tranches.md`](tranches.md) — MTVH/MTVM/MTVL onchain representation, per-tranche custody contracts
+- [`reliability.md`](reliability.md) — workflow durability, idempotency, three-axis reconciliation, audit log integrity, NAV safety
+- [`regulatory.md`](regulatory.md) — offshore fund-admin segregation, per-entity multisig governance, KYC vendor criteria
 - [`compliance.md`](compliance.md) — account-level gating that applies before any operation reaches this layer
 - [`admin.md`](admin.md) — admin-side consumers (A3 liquidation, A4 fund payments, A5 observability)
-- [`investor.md`](investor.md) — investor-side consumers (deposit, redeem, portfolio)
+- [`investor.md`](investor.md) — investor-side consumers (deposit, redeem, portfolio, Subscription Agreement with `Mutav-Fund`)

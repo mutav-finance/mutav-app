@@ -1,12 +1,12 @@
 # Reliability Primitives — Architecture
 
-> Cross-cutting primitives that every Mutav surface depends on: reconciliation, idempotency, durable orchestration, bounded parallelism, audit-log integrity, and NAV safety. These are not features of any one pillar — they are the substrate. [`admin.md`](admin.md), [`investor.md`](investor.md), and [`onchain-integration.md`](onchain-integration.md) reference this document rather than re-explaining each primitive.
+> Cross-cutting primitives that every Mutav surface depends on: reconciliation (three-axis, cross-entity), idempotency, durable orchestration, bounded parallelism, audit-log integrity (entity-tagged), and per-tranche NAV safety. These are not features of any one pillar — they are the substrate. [`admin.md`](admin.md), [`investor.md`](investor.md), and [`onchain-integration.md`](onchain-integration.md) reference this document rather than re-explaining each primitive. The three-entity model from [`entities.md`](entities.md) shows up here as cross-entity reconciliation axes and entity-tagged audit entries.
 
 Every primitive here has a documented industry analog or a Convex-native component. None are speculative. None require custom infrastructure beyond what the Convex ecosystem already provides.
 
 ## Reconciliation
 
-The most important primitive for any system that moves money across two ledgers (anchor BRL float ↔ onchain token supply, agency invoice ↔ Mutav SA balance, redemption queue ↔ executed burns). Without it, mismatches accumulate silently and surface as audit nightmares.
+The most important primitive for any system that moves money across multiple ledgers. With the three-entity model (see [`entities.md`](entities.md)), Mutav reconciles across three independent axes — see § Three-axis reconciliation below.
 
 ### The pattern (Circle Mint)
 
@@ -46,6 +46,43 @@ Pix deposit                       payments row created              (no event ye
 
 Reconciliation is the **highest-leverage reliability investment** for an anchor-backed protocol. Build it before you need it.
 
+### Three-axis reconciliation
+
+The three-entity model from [`entities.md`](entities.md) means reconciliation runs across three independent axes — each catches a different class of mismatch:
+
+```
+   Axis 1: Mutav-BR BRL ledger ←──→ collected agency fees (Etherfuse / BaaS confirmed)
+                                       │
+                                       │ (catches: missing Pix-in, BaaS provider drift,
+                                       │  agency dispute, MED reversal not applied)
+                                       ▼
+
+   Axis 2: Mutav-BR 80% cessão outflow ←──→ Mutav-Fund TESOURO mint inflow
+                                       │
+                                       │ (catches: cessão recorded but mint never landed,
+                                       │  duplicate mint, wrong-tranche assignment,
+                                       │  câmbio reporting mismatch)
+                                       ▼
+
+   Axis 3: Mutav-Fund recorded position ←──→ on-chain TESOURO balance at fund's Stellar address
+                                       │
+                                       │ (catches: indexer lag, chain reorg, mint event missed,
+                                       │  TESOURO transfer out without record)
+                                       ▼
+
+                                   Three independent reconciliation jobs;
+                                   each axis pauses its own affected operations
+                                   on detected mismatch.
+```
+
+**Axis-1 reconciler** runs on `Mutav-BR`'s schedule (typically daily, aligned to BR business days). Owned by `Mutav-BR` ops. Mismatches pause new agency Pix collection.
+
+**Axis-2 reconciler** runs on the cessão batch cadence (typically monthly, matching the cessão event schedule). Owned by `Mutav-BR` × `Mutav-Mgmt` (cross-entity audit log entry per `reliability.md` § Audit log integrity). Mismatches pause new cessão operations and trigger the BACEN câmbio reporting workflow's correction path.
+
+**Axis-3 reconciler** runs continuously (every N minutes per chain). Owned by `Mutav-Mgmt`. Mismatches pause mint / redeem operations on the affected tranche (per [`tranches.md`](tranches.md) § Redemption queue semantics) and surface for treasury review.
+
+**Why three axes, not one composite check.** A composite "agency fee → on-chain mint" check would fire on any mismatch across the chain, masking which leg failed. Splitting the axes localizes the diagnosis: an Axis-2 mismatch with Axis-1 and Axis-3 clean means the cessão step itself is broken (specific operations team to involve); an Axis-3 mismatch with Axis-1 and Axis-2 clean means an indexer issue. Faster mean-time-to-resolve.
+
 ## Quarantine windows (reversible offchain credit events)
 
 Pix is irrevocable for normal settlement, but **MED 2.0 (Mecanismo Especial de Devolução)** — mandatory in Brazil from **February 2026, penalties from May 2026** — allows up to **80 days** of fraud-driven reversal with multi-hop tracking across intermediate accounts. R$6.5B was reversed in 2025. Onchain settlement is **not** reversible; if Mutav mints crypto against a Pix that later gets MED-reversed, the protocol absorbs the loss.
@@ -73,7 +110,7 @@ Pix received          Quarantine window           Settled
 - **Quarantined events still produce audit log entries** but do not trigger downstream actions (mint, treasury credit, agency-balance update).
 - **Reversal handlers cancel quarantined events idempotently.** When the BaaS provider notifies of an MED, the matching event flips to `canceled`; if the event already settled (quarantine elapsed), the cancel handler triggers an offsetting treasury operation rather than a silent rollback — chain state is preserved, the loss is accounted for explicitly.
 - **The reconciliation primitive accounts for quarantined events separately.** "Pix balance" splits into `pending_quarantine`, `settled`, and `reversed` buckets, each reconciled against the relevant rail.
-- **Pre-funded treasury float as the customer-facing decoupler.** Mutav maintains a USDC float on the destination chain large enough to settle agency operations against immediately, while the corresponding BRL Pix sits in quarantine. The float is replenished in batches once quarantine clears. The customer sees instant settlement; Mutav holds the chargeback risk against the float's accumulated reserve. This is the production pattern (Bitso, Wise, Circle Settlements all do variants of it).
+- **Pre-funded treasury float as the customer-facing decoupler.** `Mutav-Fund` maintains a TESOURO float on Stellar (operated by `Mutav-Mgmt`) large enough to settle agency operations against immediately, while the corresponding BRL Pix sits in quarantine in `Mutav-BR`'s account. The float is replenished in batches once quarantine clears and the cessão is executed. The customer sees instant settlement; `Mutav-Fund` holds the chargeback risk against the float's accumulated reserve. This is the production pattern (Bitso, Wise, Circle Settlements all do variants of it).
 
 ### Pre-funded float — sizing rules of thumb
 
@@ -81,7 +118,7 @@ Pix received          Quarantine window           Settled
 - **Reserve ratio matches observed reversal rate × 3** as a buffer (a 0.5% historical reversal rate suggests holding ~1.5% of float liquid for chargebacks).
 - **Alert thresholds at 50% / 80% / 95% of float depletion**, plus pre-defined replenishment workflow per Convex `@convex-dev/workflow`.
 
-**Float denomination for Mutav:** Mutav SA's treasury asset is **TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). The pre-funded float therefore holds TESOURO rather than USDC. Trade-off vs a USDC float: TESOURO accrues yield while sitting in float (no opportunity cost), and matches the treasury denomination (no FX leg), but liquidity for emergency replenishment depends on Etherfuse's secondary market depth. A small auxiliary BRL float at Etherfuse (or at the BaaS provider if one is in the loop) absorbs same-day Pix-in events that haven't cleared quarantine yet.
+**Float denomination for Mutav:** `Mutav-Fund`'s treasury asset is **TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). The pre-funded float therefore holds TESOURO rather than USDC. Trade-off vs a USDC float: TESOURO accrues yield while sitting in float (no opportunity cost), and matches the treasury denomination (no FX leg), but liquidity for emergency replenishment depends on Etherfuse's secondary market depth. A small auxiliary BRL float at Etherfuse (held by `Mutav-BR`, or at the BaaS provider if one is in the loop) absorbs same-day Pix-in events that haven't cleared quarantine yet.
 
 Float sizing is operational policy, not architecture. The architectural commitment is the float exists as a concept and the quarantine state is enforced before the float is debited.
 
@@ -165,7 +202,104 @@ Convex uses OCC (optimistic concurrency). When two mutations write the same row,
 - Independent agencies process in parallel
 - Backpressure is observable; pool depth surfaces in admin tooling
 
-The decision rule: if you can write a query that surfaces "writes to this row in the last second" and the count is reliably >1 in production, the row needs workpool isolation. For Mutav this applies to per-agency `payments` aggregation and per-fund `redemptionQueue` updates.
+The decision rule: if you can write a query that surfaces "writes to this row in the last second" and the count is reliably >1 in production, the row needs workpool isolation. For Mutav this applies to per-agency `payments` aggregation and per-fund-tranche `redemptionQueue` updates.
+
+## Cross-entity flows
+
+Three flows cross entity boundaries (per [`entities.md`](entities.md)) and need special workflow + audit-log discipline. Each is implemented as a single `@convex-dev/workflow` with the entity boundary explicit in the step structure.
+
+### Monthly fee split (agency → `Mutav-BR` → `Mutav-Fund`)
+
+```
+Agency invoice paid (Pix)
+      │
+      ▼
+[Mutav-BR step] Pix landed in BR account; enter quarantine
+      │  audit: MUTAV_BR.pix_received
+      ▼
+... (quarantine window elapses per Decision 3) ...
+      │
+      ▼
+[Mutav-BR step] Recognize 20% as revenue; book 80% as cessão receivable
+      │  audit: MUTAV_BR.revenue_recognized + MUTAV_BR.cessao_booked
+      ▼
+[Mutav-BR step] File BACEN câmbio reporting record
+      │  audit: MUTAV_BR.cambio_filed
+      ▼
+[Mutav-Fund step] Initiate Etherfuse SEP-6 mint into Fund's Stellar address
+      │  audit: MUTAV_FUND.mint_initiated
+      ▼
+[Mutav-Mgmt step] Multisig-sign the mint authorization (if required by tier)
+      │  audit: MUTAV_MGMT.mint_signed
+      ▼
+[Indexer step] Observe TESOURO mint event on Stellar
+      │  audit: MUTAV_FUND.mint_observed
+      ▼
+[Mutav-Mgmt step] Recompute and propose new per-tranche NAVs
+      │  audit: MUTAV_MGMT.nav_proposed
+      ▼
+[Workflow complete] correlationId preserved end-to-end across 7 audit entries
+```
+
+### Default coverage (`Mutav-BR` notification → `Mutav-Fund` liquidation → `Mutav-BR` payout)
+
+```
+[Mutav-BR step] Agency reports default; pre-check contract eligibility
+      │  audit: MUTAV_BR.default_received
+      ▼
+[Cross-entity step] Mutav-Mgmt attests liquidation request (admin queue)
+      │  audit: MUTAV_MGMT.liquidation_attested
+      ▼
+[Mutav-Mgmt step] Mutav-Mgmt multisig signs TESOURO burn at Etherfuse
+      │  audit: MUTAV_MGMT.burn_signed + MUTAV_FUND.burn_executed
+      ▼
+[Mutav-Fund step] Waterfall: MTVH NAV absorbs first, propagates if exhausted
+      │  audit: MUTAV_FUND.waterfall_applied (per tranche)
+      ▼
+[Mutav-BR step] BRL arrives in Mutav-BR account from Etherfuse redemption
+      │  audit: MUTAV_BR.brl_received + MUTAV_BR.cambio_filed (return leg)
+      ▼
+[Mutav-BR step] Disburse to imobiliária / proprietário
+      │  audit: MUTAV_BR.disbursed
+      ▼
+[Workflow complete] every step logged with originating entity code;
+                   liquidation event reconciles against Axis-3 reconciler
+```
+
+### Investor deposit / redeem (investor → `Mutav-Fund` direct)
+
+This flow is unique in that `Mutav-BR` isn't in the path — investors interact with `Mutav-Fund` directly via Subscription Agreement (see [`investor.md`](investor.md)). Only the BR-investor variant has a `Mutav-BR` câmbio reporting leg:
+
+```
+Investor selects tranche (MTVH / MTVM / MTVL) and submits deposit
+      │
+      ▼
+[Mutav-Fund step] Pre-flight compliance check (level + risk + tranche eligibility)
+      │  audit: MUTAV_FUND.deposit_intent
+      ▼
+... investor signs in wallet; tx submitted to Stellar ...
+      │
+      ▼
+[Indexer step] Observe mint event for chosen tranche
+      │  audit: MUTAV_FUND.tranche_minted
+      ▼
+[Conditional: BR investor only]
+[Mutav-BR step] File BACEN câmbio reporting record (cross-jurisdiction inflow)
+      │  audit: MUTAV_BR.cambio_filed (investor leg)
+      ▼
+[Mutav-Mgmt step] Update Fund position; next NAV proposal reflects new outstanding
+      │  audit: MUTAV_MGMT.position_updated
+      ▼
+[Workflow complete]
+```
+
+Redeem mirrors deposit in reverse; the câmbio leg fires for BR investors on the outflow.
+
+### Why cross-entity steps need their own attestation primitive
+
+A workflow that crosses entities cannot rely on a single signer's authority — each entity is a separate legal vehicle with its own multisig signer set per [`regulatory.md`](regulatory.md) § Multisig governance. The cross-entity step requires attestations from both entities, logged separately, with the correlation id tying them together. This is more than just "one transaction with two signers" — it's two independent attestations that the workflow must collect before advancing.
+
+The architecture supports this via a `cross_entity_attestation` table that pairs entity codes with attestation events. A workflow step that needs cross-entity authority sleeps until both attestations land. Treat this as a workflow building block; specific operations (liquidation, signer-set change, large cessão) are use cases.
 
 ## Audit log integrity
 
@@ -201,6 +335,16 @@ The cost is one Stellar transaction per anchor period — trivial. The defensibi
 - **Every state-affecting integration event** (anchor webhook, KYC vendor callback) produces an audit entry on receipt.
 - **Agency-side audit log is separate.** Agencies see their own changes, never Mutav's internal audit log.
 
+### Entity tagging
+
+Every audit log entry carries an `entity` column with one of `MUTAV_BR` / `MUTAV_FUND` / `MUTAV_MGMT` (per [`entities.md`](entities.md)), reflecting which entity initiated the operation. This:
+
+- Lets regulators query the log filtered to their entity of interest (BACEN inquires about `MUTAV_BR` flows; CVM about `MUTAV_FUND` offerings; the offshore regulator about `MUTAV_MGMT` admin acts) without seeing irrelevant cross-entity noise
+- Enables per-entity reconciliation reports (axis-1 reconciler queries `MUTAV_BR.pix_received` and `MUTAV_BR.revenue_recognized`; axis-2 queries the cessão pair `MUTAV_BR.cessao_booked` + `MUTAV_FUND.mint_observed`)
+- Maintains forensic clarity when a cross-entity workflow produces interleaved entries — the entity tag distinguishes "Mutav-BR booked the cessão" from "Mutav-Fund received the mint" even when they share a correlation id
+
+Cross-entity operations (where both entities act) produce two entries — one per entity — with the same correlation id linking them.
+
 ## NAV safety
 
 NAV is the per-share value of a fund. Wrong NAV = wrong mint amount or wrong redeem amount = direct loss to investors. The whitepaper specifies that NAV is computed onchain; this section covers the off-chain bookkeeping that feeds it and the safeguards that bound what can happen.
@@ -213,23 +357,23 @@ For Mutav, the NAV's inputs are **two exogenous, well-defined sources**: (a) ren
 
 What remains is the discipline of _computing_ NAV correctly from those inputs and recording the inputs in the audit log so external auditors can reproduce. The safeguards below ensure that discipline.
 
-### Push-only NAV updates
+### Push-only NAV updates (per tranche)
 
-NAV is updated by a designated `treasury` role on `mutavStaff`, through the Mutav admin UI, with multisig signing for the onchain commit:
+NAV is updated by a designated `treasury` sub-role on `mutavStaff` (the sub-role serves `Mutav-Mgmt` per [`compliance.md`](compliance.md)), through the Mutav admin UI, with multisig signing for the onchain commit. **Each NAV update produces three new per-tranche NAVs** (one each for MTVH / MTVM / MTVL per [`tranches.md`](tranches.md)), not one. The five-step flow runs once per update event:
 
-1. Treasury role computes new NAV inputs (active layer value, liquidity layer value, outstanding shares) using Mutav SA's bookkeeping
-2. Submits the proposed NAV through the admin UI
-3. Convex records the proposal with the inputs in the audit log
-4. Multisig signers approve the onchain NAV-update transaction
-5. Indexer observes the update, fundState row reflects the new value
+1. Treasury role computes new per-tranche NAV inputs (per-tranche active layer value, liquidity layer value, outstanding shares) using `Mutav-Mgmt`'s bookkeeping for the Fund (separate from `Mutav-BR`'s own books)
+2. Submits the proposed NAVs through the admin UI (three values; one event)
+3. Convex records the proposal with the inputs in the audit log (tagged with entity codes `MUTAV_MGMT` proposing and `MUTAV_FUND` affected)
+4. `Mutav-Mgmt` multisig signers approve the onchain NAV-update transaction
+5. Indexer observes the update, `fundState` rows (one per tranche) reflect the new values
 
 ### Safeguards
 
-- **Per-epoch change cap.** NAV cannot move more than X% per update. Larger changes require explicit override + additional signers.
-- **Monotonicity invariants where they apply.** The active layer's yield accrual is one-way (rent fees only add). Anomalous decreases trip pause.
-- **Pause-on-deviation circuit breaker.** If the indexer observes an onchain NAV that differs from the most-recent Convex-recorded proposal by more than tolerance, mint and redeem pause. Humans investigate.
-- **Audit log captures inputs.** Not just the resulting NAV — the proposal carries active layer, liquidity layer, outstanding shares, so the computation is reproducible by external auditors at any point in history.
-- **No automated NAV updates.** No cron writes NAV. Human-triggered with multisig consensus, always.
+- **Per-tranche per-epoch change cap.** Each tranche's NAV cannot move more than X% per update; the cap may differ per tranche (MTVH legitimately moves more under loss-waterfall pressure than MTVL). Larger changes require explicit override + additional signers.
+- **Monotonicity invariants where they apply.** The active layer's yield accrual is one-way (rent fees only add, distributed pro-rata across tranches). Anomalous per-tranche decreases (outside the waterfall mechanics) trip pause.
+- **Per-tranche pause-on-deviation circuit breaker.** If the indexer observes an onchain NAV that differs from the most-recent Convex-recorded proposal by more than tolerance, mint and redeem pause on the affected tranche specifically — other tranches continue unless the deviation cascades through the waterfall.
+- **Audit log captures inputs.** Not just the resulting per-tranche NAVs — the proposal carries per-tranche active layer, liquidity layer, outstanding shares, so the computation is reproducible by external auditors at any point in history.
+- **No automated NAV updates.** No cron writes NAV. Human-triggered with `Mutav-Mgmt` multisig consensus, always.
 
 > 📌 **Pending input from Draau (treasury policy owner) — NAV update policy.** Epoch length, change cap, deviation tolerance, paused-state policy — Decision 1 in the [Pending Treasury Decisions pack](pending-treasury-decisions.md). Architecture enforces whatever values Draau commits to; runbook holds the numbers.
 
@@ -242,10 +386,12 @@ NAV is updated by a designated `treasury` role on `mutavStaff`, through the Muta
 
 ## Related reading
 
-- [`onchain-integration.md`](onchain-integration.md) — uses reconciliation, idempotency, per-chain indexer module pattern
-- [`admin.md`](admin.md) — uses workflow durability (liquidation), audit log integrity (hash chain), NAV safety
-- [`investor.md`](investor.md) — uses workflow durability (deposit/redeem)
-- [`regulatory.md`](regulatory.md) — names which of these primitives satisfy which regulator's expectations
+- [`entities.md`](entities.md) — three-entity model that informs three-axis reconciliation, cross-entity flows, entity-tagged audit log
+- [`tranches.md`](tranches.md) — per-tranche NAV update mechanics
+- [`onchain-integration.md`](onchain-integration.md) — uses reconciliation, idempotency, per-chain indexer module pattern, offshore custody
+- [`admin.md`](admin.md) — uses workflow durability (liquidation, per A3), audit log integrity (hash chain), per-tranche NAV safety (per A6)
+- [`investor.md`](investor.md) — uses workflow durability (deposit/redeem; dual-regime for BR investors)
+- [`regulatory.md`](regulatory.md) — names which of these primitives satisfy which entity's regulator expectations
 - [Convex Workflow](https://github.com/get-convex/workflow) · [Workpool](https://github.com/get-convex/workpool) · [Action Retrier](https://github.com/get-convex/action-retrier) · [Aggregate](https://github.com/get-convex/aggregate)
 - [Stack: Durable Workflows](https://stack.convex.dev/durable-workflows-and-strong-guarantees)
 - [Trillian](https://transparency.dev/) — reference verifiable append-only log

@@ -1,6 +1,6 @@
 # Investor Portal — Architecture
 
-> The investor portal is the surface where capital providers participate in Mutav SA funds: deposit stablecoins (USDC / USDT) and mint fund tokens, redeem through a KYC-gated queue, view portfolio and protocol-level state. **Funds are per-chain** — a Stellar fund needs a Stellar wallet; a Solana fund (future) needs a Solana wallet. Each (chain, wallet) pair is a distinct investor account; cross-chain identity unification is explicitly not in scope. The portal is **non-custodial by design** — Convex never holds or signs for user funds. This document is the target architecture; the existing portal ships as a UI mockup with hardcoded data.
+> The investor portal is the surface where capital providers subscribe to `Mutav-Fund` (the offshore fund — see [`entities.md`](entities.md)): deposit stablecoins (USDC / USDT) and mint one of three tranche tokens (`MTVH` / `MTVM` / `MTVL` — see [`tranches.md`](tranches.md)), redeem through a KYC-gated per-tranche queue, view portfolio and protocol-level state. The investor's legal counterparty is **`Mutav-Fund`** (not "Mutav" generically); the Subscription Agreement is with `Mutav-Fund`. **Funds are per-chain** — a Stellar fund needs a Stellar wallet; a Solana fund (future) needs a Solana wallet. Each (chain, wallet) pair is a distinct investor account; cross-chain identity unification is explicitly not in scope. The portal is **non-custodial by design** — Convex never holds or signs for user funds. This document is the target architecture; the existing portal ships as a UI mockup with hardcoded data.
 
 ## Scope
 
@@ -70,9 +70,9 @@ The capability ladder is defined in [`compliance.md`](compliance.md) § Verifica
 ```
 L0 (Connected)    → Browse, view NAV/portfolio                  No PII
 L1 (Identified)   → Deposit (capped)                            CPF/email/phone
-L2 (Verified)     → Redeem (capped)                             + biometric + ID + address
+L2 (Verified)     → Redeem (capped); MTVL/MTVM access           + biometric + ID + address
 L3 (Enhanced)     → Higher caps, transfers to verified wallets  + source of funds + sanctions/PEP
-L4 (Qualified)    → Qualified-investor-only products            + CVM 175 declaration
+L4 (Qualified)    → MTVH access; qualified-investor-only        + CVM 175 declaration
 L5 (Institutional) → Programmatic API, custom limits             + corporate KYB
 ```
 
@@ -82,6 +82,19 @@ Architectural commitments:
 - **Gating is in the auth/compliance wrapper, not in handler bodies** — every state-changing investor handler consults the compliance domain per [`compliance.md`](compliance.md) § How the compliance domain plugs in. The wrapper resolves account level + risk + limits + state in one pass and returns allow / deny with a structured error code.
 - **KYC vendor abstraction is mandatory.** Direct vendor coupling is prohibited. Vendor-specific clients live in `convex/compliance/providers/{vendor}.ts` implementing a stable interface — see [`regulatory.md`](regulatory.md) § KYC vendor selection criteria. Vendor selection criteria (BR data residency, ANPD-registered, biometric ISO/IEC 30107-3 PAD L2+) narrow the field but a specific vendor is operational, not architectural.
 - **Sensitive PII stays at the vendor.** Convex stores `kycLevel`, `kycStatus`, `kycRef` (vendor's verification id) — never raw biometric payloads or ID document images. Per [`regulatory.md`](regulatory.md) § LGPD.
+
+### Dual KYC regime for BR-resident investors
+
+A BR-resident investor subscribing to `Mutav-Fund` faces a dual regulatory regime that single-jurisdiction KYC does not capture (see [`regulatory.md`](regulatory.md) § Marketing offshore Fund to BR investors):
+
+1. **Offshore Fund's own KYC / AML** — FATF floor, sanctions screening, sometimes ID/PoA, source of funds. Required by `Mutav-Fund`'s domicile regulator and its Subscription Agreement.
+2. **Brazilian regulatory overlay** for BR-resident investors specifically:
+   - **CVM 175 classification** (qualificado / profissional) — gates tranche access (MTVH requires L4+, see [`tranches.md`](tranches.md)) and oferta pública carve-outs
+   - **CPF identification** per BCB 519/2025 (same artifact serves both regimes — collected once, used twice)
+   - **DIRPF disclosure** — investor must declare offshore holdings in their annual return; `Mutav-BR` issues an extrato compatível at year-end (or `Mutav-Mgmt` for `Mutav-Fund` directly, depending on which entity issues the statement)
+   - **BACEN câmbio reporting** on the BRL → crypto → offshore-Fund chain (architecturally owned by `Mutav-BR`'s reporting workflow, not the investor's responsibility, but the investor's deposit triggers it)
+
+The portal's onboarding flow detects the investor's residency and applies the appropriate KYC track: international investors get the single FATF/AML floor; BR investors get the dual regime in one flow that collects both data sets without making the investor re-enter shared fields. The compliance domain records both classifications per [`compliance.md`](compliance.md).
 
 ## Stub-first onchain data pattern
 
@@ -119,29 +132,32 @@ Convex never signs onchain transactions. The write paths in the portal:
 
 ### Deposit (mint)
 
-**Asset note.** Investor deposits arrive in **USDC/USDT** (per the whitepaper); Mutav SA's **treasury is denominated in TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing). The protocol converts USDC → TESOURO via Etherfuse as part of the deposit flow; the investor's MUTAV holding represents a claim on the TESOURO-denominated NAV. How that conversion is priced (single BRL NAV / dual share class / USD NAV with TESOURO underlying) is a **pending Draau decision** documented in [`admin.md`](admin.md) § A6; architecture supports all three.
+**Asset note.** Investor deposits arrive in **USDC/USDT** (per the whitepaper); `Mutav-Fund`'s **treasury is denominated in TESOURO** (Etherfuse's tokenized Brazilian Treasury bonds — BRL-denominated, yield-bearing — held in `Mutav-Fund`'s Stellar address per [`onchain-integration.md`](onchain-integration.md) § Offshore custody chain). The protocol converts USDC → TESOURO via Etherfuse as part of the deposit flow; the investor's tranche holding (MTVH / MTVM / MTVL) represents a claim on the TESOURO-denominated NAV of that specific tranche. How that conversion is priced (single BRL NAV / dual share class / USD NAV with TESOURO underlying) is a **pending Draau decision** documented in [`admin.md`](admin.md) § A6; architecture supports all three.
+
+**Tranche selection.** Before the deposit workflow starts, the investor selects which of MTVH / MTVM / MTVL they're subscribing to. The portal enforces tranche eligibility per [`tranches.md`](tranches.md) (a L2 investor sees only MTVL/MTVM cards; a L4+ qualificado investor also sees MTVH). The selected tranche flows through to the mint step — the fund contract issues the corresponding tranche token.
 
 Implemented as a `@convex-dev/workflow` per [`reliability.md`](reliability.md) § Workflow durability:
 
-1. **Pre-flight gate** — compliance check (level / risk / limits / regulatory pause) via [`compliance.md`](compliance.md). Wrapper returns a `Result` error with a structured code if blocked.
-2. **Workflow start** — compose the transaction (transfer USDC/USDT + call `mint` on the fund contract) and record the intent (intent id stored in Convex; correlation id propagated per [`reliability.md`](reliability.md) § Reconciliation).
+1. **Pre-flight gate** — compliance check (level / risk / limits / regulatory pause / **tranche eligibility**) via [`compliance.md`](compliance.md). Wrapper returns a `Result` error with a structured code if blocked. For BR investors, the gate also enforces the CVM 175 classification overlay.
+2. **Workflow start** — compose the transaction (transfer USDC/USDT + call `mint` on the fund contract with the chosen tranche) and record the intent (intent id stored in Convex; correlation id propagated per [`reliability.md`](reliability.md) § Reconciliation; entity code `MUTAV_FUND` tagged on audit entry).
 3. **Wallet sign** — wallet kit prompts user in browser; user's keys sign locally.
 4. **Submit** — signed transaction submitted to the chain via the wallet kit.
-5. **Protocol-side conversion** — the fund contract (or a Convex-orchestrated workflow step) swaps the inbound USDC to TESOURO via Etherfuse; the investor's claim is denominated per the deposit-pricing approach (see Draau pin in [`admin.md`](admin.md) § A6).
+5. **Protocol-side conversion** — the fund contract (or a Convex-orchestrated workflow step) swaps the inbound USDC to TESOURO via Etherfuse; the investor's claim is denominated per the deposit-pricing approach (see Draau pin in [`admin.md`](admin.md) § A6). For BR investors, `Mutav-BR` is notified to file the câmbio reporting record per [`regulatory.md`](regulatory.md) § BACEN câmbio reporting.
 6. **Wait for observation** — workflow sleeps until the per-chain indexer observes the mint event.
-7. **Finalize** — `userPositions` row updated; UI reactively refreshes via Convex's live query; intent record marked `executed`.
+7. **Finalize** — `userPositions` row updated (with `tranche` discriminant); UI reactively refreshes via Convex's live query; intent record marked `executed`.
 
 The workflow's journal makes partial failure recoverable — a Convex restart between steps 4 and 6 resumes from the last checkpoint. If the user closes the browser between sign and submit, the intent expires and is garbage-collected (the chain never sees the tx, so there's nothing to clean up).
 
 ### Redeem
 
-Same workflow shape, with two added pre-flight gates:
+Same workflow shape, with added pre-flight gates:
 
-1. **KYC level check** — must satisfy the fund's redeem threshold (typically L2; per the compliance domain)
+1. **KYC level check** — must satisfy the fund's redeem threshold (typically L2 for MTVL/MTVM, L4+ for MTVH; per the compliance domain)
 2. **Limit check** — per-account redeem cap not exceeded
-3. **Weekly cap check** — fund-level weekly cap (per the whitepaper's 2.5% weekly cap) not exhausted
+3. **Per-tranche weekly cap check** — applied per tranche (the whitepaper's 2.5% weekly cap divides per tranche, not aggregated) — see [`tranches.md`](tranches.md) § Redemption queue semantics
+4. **SitG floor check** (MTVH only) — `Mutav-BR`'s mandatory skin-in-the-game minimum cannot be redeemed below the agreed floor
 
-If any gate fails, the wrapper returns a `Result` error code. If all pass, the workflow proceeds as deposit, except the redeem transaction enters the onchain queue rather than executing immediately. The queue is observed by the indexer and surfaced in `redemptionQueue`. The workflow remains live (sleeping) until execution, then finalizes.
+If any gate fails, the wrapper returns a `Result` error code. If all pass, the workflow proceeds as deposit, except the redeem transaction enters the **per-tranche** onchain queue rather than executing immediately. The queue is observed by the indexer and surfaced in `redemptionQueue` (with `tranche` discriminant). The workflow remains live (sleeping) until execution, then finalizes. For BR investors, `Mutav-BR` is notified of the inbound BRL leg for câmbio reporting per [`regulatory.md`](regulatory.md).
 
 ### Why Convex never signs
 
@@ -232,8 +248,10 @@ What goes wrong, what the user sees, what the architecture does about it:
 
 ## Related reading
 
+- [`entities.md`](entities.md) — `Mutav-Fund` is the investor's counterparty; `Mutav-BR` handles BR-side câmbio
+- [`tranches.md`](tranches.md) — MTVH / MTVM / MTVL specification; tranche eligibility per verification level
 - [`compliance.md`](compliance.md) — account types, verification levels, risk classification, limits, capability matrix — the gating layer this portal consults
-- [`reliability.md`](reliability.md) — workflow durability for deposit/redeem, reconciliation, idempotency, NAV safety
-- [`regulatory.md`](regulatory.md) — BCB 519/2025 KYC floor, LGPD residency, KYC vendor criteria
-- [`onchain-integration.md`](onchain-integration.md) — per-chain indexer modules, contract topology, write path, wallet kit pattern
+- [`reliability.md`](reliability.md) — workflow durability for deposit/redeem, three-axis reconciliation, idempotency, NAV safety
+- [`regulatory.md`](regulatory.md) — BCB 519/2025 KYC floor, LGPD residency, KYC vendor criteria, CVM oferta pública for BR investors, BACEN câmbio
+- [`onchain-integration.md`](onchain-integration.md) — per-chain indexer modules, contract topology, write path, wallet kit pattern, offshore custody
 - [`admin.md`](admin.md) — counterpart Mutav-internal surface; shares the indexer infrastructure
