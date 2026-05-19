@@ -1061,6 +1061,14 @@
         "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
         "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
         "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
+        "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
+        "BANKING_INFO_REQUIRED": "Fill in your banking details before submitting.",
+        "MISSING_DOCUMENTS": "Upload all required documents before submitting.",
+        "NOT_IN_PROGRESS": "This registration has already been submitted for review.",
+        "ONBOARDING_NOT_EDITABLE": "This registration can no longer be edited.",
+        "NOT_FOUND": "Registration not found.",
+        "NETWORK_ERROR": "Connection failed. Please try again.",
+        "INTERNAL_ERROR": "Internal error. Please reload the page.",
         "unknown": "Failed to save. Please try again."
       }
     },
