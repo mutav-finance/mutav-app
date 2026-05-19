@@ -4,10 +4,7 @@ import { useTranslations } from "next-intl";
 import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  DOCUMENT_KINDS,
-  useWizardStepDocuments,
-} from "@/components/onboarding/use-wizard-step-documents";
+import { DOCUMENT_KINDS, useStepDocuments } from "@/components/onboarding/use-step-documents";
 
 // Documents step is structurally different from the form-shaped steps
 // (step1/banking/review): uploads are server-side state (storageId), not
@@ -19,9 +16,9 @@ type Props = {
   onBack: () => void;
 };
 
-export function WizardStepDocuments({ agencyId, onNext, onBack }: Props) {
+export function StepDocuments({ agencyId, onNext, onBack }: Props) {
   const t = useTranslations("onboarding.wizard.documents");
-  const vm = useWizardStepDocuments({ agencyId, onNext });
+  const vm = useStepDocuments({ agencyId, onNext });
 
   if (vm.isLoading) {
     return <div className="text-text-3 py-8 text-center font-mono text-sm">{t("loading")}</div>;

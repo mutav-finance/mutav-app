@@ -1,6 +1,6 @@
 import { redirect } from "@/i18n/navigation";
 import { PageContent } from "@/components/page/page-content";
-import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
+import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -18,7 +18,7 @@ export default async function OnboardingWizardPage({ params, searchParams }: Pro
 
   return (
     <PageContent variant="narrow" className="py-8 md:py-12">
-      <OnboardingWizard initialType={initialType} />
+      <OnboardingFlow initialType={initialType} />
     </PageContent>
   );
 }

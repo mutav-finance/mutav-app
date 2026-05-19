@@ -36,7 +36,7 @@ const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof ProfileFormInput>> = 
   ALREADY_REGISTERED: "cpf",
 };
 
-export function WizardStep1({ initialValues, serverErrorCode, onSubmit, isSubmitting }: Props) {
+export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmitting }: Props) {
   const t = useTranslations("onboarding.step1");
 
   // 3-generic form: input is the wide shape (empty agencyType allowed);

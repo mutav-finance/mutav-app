@@ -32,7 +32,7 @@ const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof BankingFormInput>> = 
   ACCOUNT_TYPE_REQUIRED: "bankAccountType",
 };
 
-export function WizardStepBanking({
+export function StepBanking({
   initialValues,
   serverErrorCode,
   agencyType,
