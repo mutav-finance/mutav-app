@@ -2,15 +2,21 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Mono } from "@/components/ui/mono";
 import type { OnboardingWizardData } from "@/components/onboarding/onboarding-wizard";
-import { useWizardStepReview } from "@/components/onboarding/use-wizard-step-review";
+import {
+  REVIEW_FORM_DEFAULTS,
+  reviewSchema,
+  type ReviewFormValues,
+} from "@/components/onboarding/schemas/review-schema";
 
 type Props = {
   data: OnboardingWizardData;
-  onSubmit: (opts: { consentMarketing: boolean }) => void;
+  onSubmit: (values: ReviewFormValues) => void;
   onBack: () => void;
   onGoTo: (step: number) => void;
   isSubmitting: boolean;
@@ -18,10 +24,28 @@ type Props = {
 
 export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting }: Props) {
   const t = useTranslations("onboarding.wizard.review");
-  const vm = useWizardStepReview({ data, onSubmit });
+
+  const form = useForm<ReviewFormValues>({
+    resolver: zodResolver(reviewSchema),
+    defaultValues: REVIEW_FORM_DEFAULTS,
+    mode: "onSubmit",
+  });
+  const { control, handleSubmit } = form;
+
+  const agencyTypeLabel =
+    data.agencyType === "autonomo" ? t("agencyTypeAutonomo") : t("agencyTypeEmpresa");
+  const documentValue = data.agencyType === "autonomo" ? data.cpf : data.cnpj;
+  const accountTypeLabel =
+    data.bankAccountType === "corrente"
+      ? t("accountTypeCorrente")
+      : data.bankAccountType === "poupanca"
+        ? t("accountTypePoupanca")
+        : "—";
+  // Banking step number varies by type — autonomo skips documents
+  const bankingStep = data.agencyType === "empresa" ? 3 : 2;
 
   return (
-    <div className="flex flex-col gap-6">
+    <form className="flex flex-col gap-6" onSubmit={handleSubmit(onSubmit)} noValidate>
       <section aria-labelledby="review-profile-heading">
         <div className="mb-3 flex items-center justify-between">
           <h3
@@ -40,9 +64,9 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           </button>
         </div>
         <div className="border-border divide-border divide-y border">
-          <ReviewRow label={t("agencyTypeLabel")} value={vm.agencyTypeLabel} />
+          <ReviewRow label={t("agencyTypeLabel")} value={agencyTypeLabel} />
           <ReviewRow label={t("nameLabel")} value={data.name} />
-          <ReviewRow label={t("documentLabel")} value={<Mono>{vm.documentValue}</Mono>} />
+          <ReviewRow label={t("documentLabel")} value={<Mono>{documentValue}</Mono>} />
           <ReviewRow label={t("creciLabel")} value={data.creci} />
           <ReviewRow label={t("emailLabel")} value={data.email} />
           <ReviewRow label={t("phoneLabel")} value={<Mono>{data.phone}</Mono>} />
@@ -68,7 +92,7 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           </h3>
           <button
             type="button"
-            onClick={() => onGoTo(vm.bankingStep)}
+            onClick={() => onGoTo(bankingStep)}
             disabled={isSubmitting}
             className="text-accent font-mono text-xs hover:opacity-80 disabled:opacity-40"
           >
@@ -79,7 +103,7 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
           <ReviewRow label={t("bankLabel")} value={data.bankName} />
           <ReviewRow label={t("branchLabel")} value={<Mono>{data.bankBranch}</Mono>} />
           <ReviewRow label={t("accountLabel")} value={<Mono>{data.bankAccount}</Mono>} />
-          <ReviewRow label={t("accountTypeLabel")} value={vm.accountTypeLabel} />
+          <ReviewRow label={t("accountTypeLabel")} value={accountTypeLabel} />
           <ReviewRow
             label={t("pixKeyLabel")}
             value={data.bankPixKey ? <Mono>{data.bankPixKey}</Mono> : t("notProvided")}
@@ -89,16 +113,25 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
       </section>
 
       <div className="border-border flex flex-col gap-3 border-t pt-4">
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={vm.consentMarketing}
-            onChange={(e) => vm.toggleConsentMarketing(e.target.checked)}
-            disabled={isSubmitting}
-            className="accent-accent mt-0.5 shrink-0"
-          />
-          <span className="text-text-2 text-sm">{t("consentMarketing")}</span>
-        </label>
+        <Controller
+          control={control}
+          name="consentMarketing"
+          render={({ field }) => (
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={field.value}
+                onChange={(e) => field.onChange(e.target.checked)}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                name={field.name}
+                disabled={isSubmitting}
+                className="accent-accent mt-0.5 shrink-0"
+              />
+              <span className="text-text-2 text-sm">{t("consentMarketing")}</span>
+            </label>
+          )}
+        />
         <p className="text-text-2 text-sm">
           {t.rich("consentLegal", {
             privacy: (chunks) => (
@@ -116,14 +149,14 @@ export function WizardStepReview({ data, onSubmit, onBack, onGoTo, isSubmitting 
       </div>
 
       <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
+        <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting}>
           {t("backButton")}
         </Button>
-        <Button size="lg" onClick={vm.handleSubmit} disabled={isSubmitting}>
+        <Button type="submit" size="lg" disabled={isSubmitting}>
           {isSubmitting ? t("submittingButton") : t("submitButton")}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }
 

@@ -84,7 +84,7 @@ export function OnboardingWizard({ initialType }: { initialType?: "autonomo" | "
       {vm.stepKind === "review" && (
         <WizardStepReview
           data={vm.data}
-          onSubmit={vm.handleSubmit}
+          onSubmit={vm.handleReviewSubmit}
           onBack={vm.handleBack}
           onGoTo={vm.handleGoTo}
           isSubmitting={vm.isSubmitting}
