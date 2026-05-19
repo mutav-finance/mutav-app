@@ -6,6 +6,8 @@ import { priceContract } from "../../src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
 import { CONTRACT_STATUS, tierForScore } from "./domain";
+import { AUDIT_ACTION } from "../audit/domain";
+import { appendAuditEntry } from "../audit/useCases";
 import { assertAgencyAccess, mutationWithAgencyScope, queryWithAgencyScope } from "../lib/auth";
 
 function generatePublicId(): string {
@@ -317,6 +319,25 @@ export const create = mutationWithAgencyScope({
       message: "Contrato criado",
     });
 
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.CONTRACT_CREATED,
+      resourceType: "contracts",
+      resourceId: publicId,
+      payload: {
+        contractId,
+        agencyId: ctx.agencyId,
+        propertyKind: args.propertyKind,
+        rentCents: args.rentCents,
+        totalRentCents: priced.totalRentCents,
+        feeCents: priced.feeCents,
+        oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
+        availableGuaranteeCents: priced.availableGuaranteeCents,
+        rentMultiplier: args.rentMultiplier,
+        exitCostMultiplier: args.exitCostMultiplier,
+      },
+    });
+
     await ctx.scheduler.runAfter(0, internal.contracts.actions.sendProposalNotifications, {
       publicId,
       tenantName: args.tenant.fullName,
@@ -358,6 +379,18 @@ export const cancelProposal = mutationWithAgencyScope({
       at: new Date().toISOString(),
       username: ctx.user.name,
       message: "Proposta cancelada",
+    });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.CONTRACT_CANCELED,
+      resourceType: "contracts",
+      resourceId: args.publicId,
+      payload: {
+        contractId: contract._id,
+        agencyId: contract.agencyId,
+        previousStatus: contract.status,
+      },
     });
 
     return { success: true, data: { cancelled: true } } as const;

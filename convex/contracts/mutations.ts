@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
+import { AUDIT_ACTION } from "../audit/domain";
+import { appendAuditEntry } from "../audit/useCases";
 import { contractsByStatus } from "./aggregate";
 import { contractStatusValidator } from "./domain";
 
@@ -36,5 +38,20 @@ export const updateStatus = internalMutation({
     // Replace updates the aggregate: removes the old (namespace, key) entry
     // and inserts the new one atomically.
     await contractsByStatus.replace(ctx, before, after);
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "system", source: "contract_status_update" },
+      action: AUDIT_ACTION.CONTRACT_STATUS_UPDATED,
+      resourceType: "contracts",
+      resourceId: before.publicId,
+      payload: {
+        contractId,
+        agencyId: before.agencyId,
+        previousStatus: before.status,
+        newStatus: status,
+        activatedAt: patch.activatedAt ?? null,
+        deactivatedAt: patch.deactivatedAt ?? null,
+      },
+    });
   },
 });
