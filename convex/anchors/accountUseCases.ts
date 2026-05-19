@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery } from "../_generated/server";
-import { queryWithAgencyScope } from "../lib/auth";
 import { anchorProviderValidator } from "./domain";
 import {
   ANCHOR_ONBOARDING_STATUS,
@@ -12,16 +11,6 @@ import {
 } from "./accountDomain";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
-
-export const listByAgency = queryWithAgencyScope({
-  args: {},
-  handler: async (ctx): Promise<AnchorAccount[]> => {
-    return ctx.db
-      .query("anchorAccounts")
-      .withIndex("by_agency", (q) => q.eq("agencyId", ctx.agencyId))
-      .collect();
-  },
-});
 
 /**
  * Lookup an agency's record for a specific provider, if any.

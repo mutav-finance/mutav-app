@@ -49,28 +49,6 @@ export const getByAnchorTxId = internalQuery({
   },
 });
 
-// Newest first. UI subscribes so status transitions land reactively
-// without a client-side poll loop — `pollPixOnramp` drives updates.
-export const listOrdersByPayment = query({
-  args: { paymentId: v.id("payments") },
-  handler: async (ctx, args): Promise<AnchorOrder[]> => {
-    const payment = await ctx.db.get(args.paymentId);
-    if (!payment) return [];
-
-    try {
-      await assertAgencyAccess(ctx, payment.agencyId);
-    } catch {
-      return [];
-    }
-
-    return ctx.db
-      .query("anchorOrders")
-      .withIndex("by_payment", (q) => q.eq("paymentId", args.paymentId))
-      .order("desc")
-      .collect();
-  },
-});
-
 // ─── Internal mutations (called from actions) ─────────────────────────────────
 
 export const insertOrder = internalMutation({

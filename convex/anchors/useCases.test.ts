@@ -55,40 +55,6 @@ describe("anchors.bankAccountUseCases.listByAgency (scoped wrapper)", () => {
   });
 });
 
-describe("anchors.accountUseCases.listByAgency (scoped wrapper)", () => {
-  test("returns the agency's anchor accounts for a member", async () => {
-    const t = convexTest(schema);
-    const userId = await seedDevUser(t);
-    const agencyId = await seedAgencyWithMembership(t, userId);
-
-    await t.run((ctx) =>
-      ctx.db.insert("anchorAccounts", {
-        agencyId,
-        provider: "testanchor",
-        status: "approved",
-        externalId: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        data: { provider: "testanchor" },
-      }),
-    );
-
-    const accounts = await t.query(api.anchors.accountUseCases.listByAgency, { agencyId });
-    expect(accounts).toHaveLength(1);
-    expect(accounts[0].provider).toBe("testanchor");
-  });
-
-  test("throws ForbiddenError when the caller is not a member", async () => {
-    const t = convexTest(schema);
-    await seedDevUser(t);
-    const foreignAgencyId = await seedForeignAgency(t);
-
-    await expect(
-      t.query(api.anchors.accountUseCases.listByAgency, { agencyId: foreignAgencyId }),
-    ).rejects.toThrow(/Forbidden|not a member/i);
-  });
-});
-
 describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
   test("returns the order for a member of its agency", async () => {
     const t = convexTest(schema);
@@ -152,71 +118,5 @@ describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
 
     const order = await t.query(api.anchors.orderUseCases.getOrderById, { orderId });
     expect(order).toBeNull();
-  });
-});
-
-describe("anchors.orderUseCases.listOrdersByPayment (resource-by-id pattern via payment)", () => {
-  test("returns orders for a payment in the caller's agency", async () => {
-    const t = convexTest(schema);
-    const userId = await seedDevUser(t);
-    const agencyId = await seedAgencyWithMembership(t, userId);
-
-    const paymentId = await t.run(async (ctx) => {
-      const pid = await ctx.db.insert("payments", {
-        agencyId,
-        publicId: "pay_test_2",
-        periodMonth: "2026-05",
-        issuedAt: new Date().toISOString(),
-        dueDate: new Date().toISOString(),
-        totalCents: 10000,
-        state: { kind: "pending" },
-        method: null,
-        lineItems: [],
-      });
-      await ctx.db.insert("anchorOrders", {
-        agencyId,
-        paymentId: pid,
-        provider: "testanchor",
-        anchorTxId: "tx_a",
-        status: "pending_user_transfer_start",
-        createdAt: new Date().toISOString(),
-      });
-      return pid;
-    });
-
-    const orders = await t.query(api.anchors.orderUseCases.listOrdersByPayment, { paymentId });
-    expect(orders).toHaveLength(1);
-  });
-
-  test("returns [] when the payment belongs to a foreign agency", async () => {
-    const t = convexTest(schema);
-    await seedDevUser(t);
-    const foreignAgencyId = await seedForeignAgency(t);
-
-    const paymentId = await t.run(async (ctx) => {
-      const pid = await ctx.db.insert("payments", {
-        agencyId: foreignAgencyId,
-        publicId: "pay_foreign_2",
-        periodMonth: "2026-05",
-        issuedAt: new Date().toISOString(),
-        dueDate: new Date().toISOString(),
-        totalCents: 10000,
-        state: { kind: "pending" },
-        method: null,
-        lineItems: [],
-      });
-      await ctx.db.insert("anchorOrders", {
-        agencyId: foreignAgencyId,
-        paymentId: pid,
-        provider: "testanchor",
-        anchorTxId: "tx_b",
-        status: "pending_user_transfer_start",
-        createdAt: new Date().toISOString(),
-      });
-      return pid;
-    });
-
-    const orders = await t.query(api.anchors.orderUseCases.listOrdersByPayment, { paymentId });
-    expect(orders).toEqual([]);
   });
 });
