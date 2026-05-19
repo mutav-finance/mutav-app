@@ -16,3 +16,13 @@
 export function shouldShowTestanchor(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_SHOW_TESTANCHOR);
 }
+
+/**
+ * App public URL — used by server-side route handlers (e.g. /api/auth/*)
+ * when constructing absolute redirect URLs. Falls back to localhost:3000
+ * for dev. Production sets `NEXT_PUBLIC_APP_URL` (Vercel exposes it on
+ * `VERCEL_URL` too, but we prefer the explicit project-set value).
+ */
+export function getAppUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+}

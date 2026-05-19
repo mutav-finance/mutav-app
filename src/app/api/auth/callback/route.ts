@@ -19,10 +19,9 @@
  */
 
 import { NextResponse } from "next/server";
+import { getAppUrl } from "@/lib/env";
 
 // Stub: redirect to onboarding until Auth0 SDK is wired.
 export function GET() {
-  return NextResponse.redirect(
-    new URL("/onboarding", process.env.AUTH0_BASE_URL ?? "http://localhost:3000"),
-  );
+  return NextResponse.redirect(new URL("/onboarding", getAppUrl()));
 }
