@@ -108,6 +108,37 @@ After P0 (with claim row):
 
 The lifecycle is minimal: insert on submit, delete on `reviewOnboarding(rejected)`, retain on `reviewOnboarding(approved)`. Erasure (LGPD P6, [#97](https://github.com/mutav-finance/mutav-app/issues/97)) extends this — `eraseUser` will also delete the claim rows of erased agencies, keeping a tombstone with a hashed-anonymized actor ref for CVM record-keeping.
 
+## Audit log integrity (P1a landed)
+
+`mutavAuditLog` is a hash-chained, tamper-evident log of every money-moving and lifecycle-changing action. Each row stores:
+
+```
+{ actor, action, resourceType, resourceId, payloadHash, prevHash, entryHash, timestamp }
+```
+
+The chain links every entry to the previous one regardless of resource — a global chain, not per-resource. `entryHash` is the SHA-256 of the canonicalized entry contents (including `prevHash`); `prevHash` is the previous entry's `entryHash`. The first entry's `prevHash` is `GENESIS_PREV_HASH` (64 zero hex chars).
+
+### What's protected
+
+Tampering with **any historical entry** invalidates the chain from that point forward, because:
+
+- Changing `payloadHash`, `action`, `resourceType`, `resourceId`, `actor`, `timestamp`, or `prevHash` on entry N → recomputed `entryHash(N)` no longer matches stored `entryHash(N)`
+- Changing the stored `entryHash(N)` directly → `prevHash(N+1)` no longer matches → chain link broken at N+1
+
+`verifyChain` walks the log chronologically, recomputes every `entryHash`, and checks both invariants. It returns `{valid: false, brokenAtId, reason}` on the first failure. For v1 the log is small enough to verify on demand; once volume grows, the daily Merkle anchor (P1b) becomes the cheap-to-verify path and `verifyChain` becomes the deep-audit tool used during incident response.
+
+### What's NOT yet protected (P1b)
+
+Without an external anchor, an attacker with full Convex deployment access can rewrite the entire chain from scratch — recompute every entry's hash under their tampered values, and the chain will pass `verifyChain`. P1b closes this by daily-anchoring the latest `entryHash` to Stellar via a treasury memo transaction; rewriting history would require also rewriting Stellar mainnet, which is the actual security boundary.
+
+### Wired consumers (current)
+
+Every state-changing mutation in `convex/payments/` and `convex/contracts/` calls `appendAuditEntry`. Internal mutations called by webhooks/cron use `{kind: "system", source: "..."}` actors; public mutations use `{kind: "user", userId: ctx.user._id}`. The actor passthrough refinement (so an admin-initiated internal mutation records the admin user, not "system") lands with the `(admin)` shell and `mutationWithMutavStaff` wrapper.
+
+### Atomicity
+
+`appendAuditEntry` is called inside the same Convex mutation as the resource write. Convex transactions are all-or-nothing — if the caller throws after `appendAuditEntry`, the audit row rolls back with the rest of the mutation. **No orphan audit entries; no missed audit entries for committed writes.** This is a stronger guarantee than typical "log first, write second" patterns because there's no chance of the resource committing but the log failing.
+
 ## Key management lifecycle
 
 Mutav is currently on **env-derived keys**, which is appropriate for dev/preview but not for production. The production target is a managed secret store with automated rotation and IAM-bound access. This section is the playbook for getting there.
@@ -192,16 +223,16 @@ The regression-greps script (`scripts/regression-greps.sh`) enforces some of the
 
 ## Current state and target
 
-| Control                      | Current (v1, pre-customer)                                                                                                                                                                | Target (production)                                                                                                                                                                            |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PII encryption at rest**   | Primitive ready ([`pii.ts`](../../convex/lib/pii.ts)); first consumer (`claimedDocuments`) live. Existing PII columns (CPF, CNPJ, email, etc.) still plaintext — migration in LGPD P2/P3. | Every PII field uses `*Hash + *Encrypted`; zero raw `v.string()` PII columns in [`convex/schema.ts`](../../convex/schema.ts).                                                                  |
-| **Key storage**              | Env-derived via `convex env set` + `.env.local`.                                                                                                                                          | Managed secret store (AWS Secrets Manager / 1Password Connect), IAM-bound retrieval.                                                                                                           |
-| **Key rotation**             | Manual. No versioned envelopes yet.                                                                                                                                                       | Quarterly automated rotation on `PII_ENCRYPTION_KEY`; versioned envelopes for rolling migrations.                                                                                              |
-| **Audit logging on decrypt** | Not implemented.                                                                                                                                                                          | LGPD P5 ([#96](https://github.com/mutav-finance/mutav-app/issues/96)) — every decrypt emits a `mutavAuditLog` row with a `purpose` tag.                                                        |
-| **Erasure workflow**         | Not implemented.                                                                                                                                                                          | LGPD P6 ([#97](https://github.com/mutav-finance/mutav-app/issues/97)) — `eraseUser` cascades across domains, leaves a CVM-compliant tombstone.                                                 |
-| **DSR surfaces**             | Not implemented.                                                                                                                                                                          | LGPD P7 ([#98](https://github.com/mutav-finance/mutav-app/issues/98)) — export endpoint (signed link), inbound erasure request, DPO contact.                                                   |
-| **Audit log integrity**      | Not implemented.                                                                                                                                                                          | LGPD P1 ([#79](https://github.com/mutav-finance/mutav-app/issues/79)) — hash-chained `mutavAuditLog`, daily Merkle anchor to chain ([`reliability.md`](reliability.md) § Audit log integrity). |
-| **Per-entity key isolation** | Single key set for all of Mutav.                                                                                                                                                          | Separate key pairs per entity (`Mutav-BR`, `Mutav-Fund`, `Mutav-Mgmt`).                                                                                                                        |
+| Control                      | Current (v1, pre-customer)                                                                                                                                                                                                                                  | Target (production)                                                                                                                                                                      |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PII encryption at rest**   | Primitive ready ([`pii.ts`](../../convex/lib/pii.ts)); first consumer (`claimedDocuments`) live. Existing PII columns (CPF, CNPJ, email, etc.) still plaintext — migration in LGPD P2/P3.                                                                   | Every PII field uses `*Hash + *Encrypted`; zero raw `v.string()` PII columns in [`convex/schema.ts`](../../convex/schema.ts).                                                            |
+| **Key storage**              | Env-derived via `convex env set` + `.env.local`.                                                                                                                                                                                                            | Managed secret store (AWS Secrets Manager / 1Password Connect), IAM-bound retrieval.                                                                                                     |
+| **Key rotation**             | Manual. No versioned envelopes yet.                                                                                                                                                                                                                         | Quarterly automated rotation on `PII_ENCRYPTION_KEY`; versioned envelopes for rolling migrations.                                                                                        |
+| **Audit logging on decrypt** | Not implemented.                                                                                                                                                                                                                                            | LGPD P5 ([#96](https://github.com/mutav-finance/mutav-app/issues/96)) — every decrypt emits a `mutavAuditLog` row with a `purpose` tag.                                                  |
+| **Erasure workflow**         | Not implemented.                                                                                                                                                                                                                                            | LGPD P6 ([#97](https://github.com/mutav-finance/mutav-app/issues/97)) — `eraseUser` cascades across domains, leaves a CVM-compliant tombstone.                                           |
+| **DSR surfaces**             | Not implemented.                                                                                                                                                                                                                                            | LGPD P7 ([#98](https://github.com/mutav-finance/mutav-app/issues/98)) — export endpoint (signed link), inbound erasure request, DPO contact.                                             |
+| **Audit log integrity**      | **P1a landed** — hash-chained `mutavAuditLog` table with `appendAuditEntry` helper, wired into every money-moving mutation across `payments/` and `contracts/`. `verifyChainQuery` recomputes the chain on demand. Daily Merkle anchor still pending (P1b). | LGPD P1 ([#79](https://github.com/mutav-finance/mutav-app/issues/79)) — completes with the Stellar Merkle anchor cron in P1b ([`reliability.md`](reliability.md) § Audit log integrity). |
+| **Per-entity key isolation** | Single key set for all of Mutav.                                                                                                                                                                                                                            | Separate key pairs per entity (`Mutav-BR`, `Mutav-Fund`, `Mutav-Mgmt`).                                                                                                                  |
 
 LGPD-driven phases are tracked in [#82](https://github.com/mutav-finance/mutav-app/issues/82). The first row of the target column lands incrementally — P2/P3 migrate the existing PII surface; P5/P6/P7 round out the LGPD compliance posture.
 

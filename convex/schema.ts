@@ -434,4 +434,40 @@ export default defineSchema({
     agencyId: v.id("agencies"),
     claimedAt: v.string(),
   }).index("by_documentHash", ["documentHash"]),
+
+  // Hash-chained audit log of money-moving and lifecycle-changing actions.
+  // Every state-changing mutation in `payments/` and `contracts/` appends
+  // one row via `appendAuditEntry` (see `convex/audit/useCases.ts`).
+  //
+  // Chain invariant: every entry's `prevHash` equals the previous entry's
+  // `entryHash`. The first entry uses `GENESIS_PREV_HASH` (64 zero hex
+  // chars). `entryHash` is SHA-256 over the canonicalized entry contents.
+  // Tampering with any historical entry invalidates the chain from that
+  // point forward — verifiable at any time by recomputing entryHashes and
+  // re-walking the prevHash links.
+  //
+  // P1b will daily-Merkle-anchor the latest `entryHash` to Stellar via a
+  // treasury memo tx, making the chain externally verifiable even if the
+  // entire Convex deployment is compromised.
+  //
+  // `actor` is a discriminated union — see `convex/audit/domain.ts`:
+  // - { kind: "user", userId }     — human via an auth wrapper
+  // - { kind: "system", source }   — webhook, cron, or scheduled action
+  mutavAuditLog: defineTable({
+    actor: v.union(
+      v.object({ kind: v.literal("user"), userId: v.id("users") }),
+      v.object({ kind: v.literal("system"), source: v.string() }),
+    ),
+    action: v.string(),
+    resourceType: v.string(),
+    resourceId: v.string(),
+    payloadHash: v.string(),
+    prevHash: v.string(),
+    entryHash: v.string(),
+    timestamp: v.number(),
+  })
+    .index("by_resource", ["resourceType", "resourceId", "timestamp"])
+    .index("by_actor_userId", ["actor.userId"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_entryHash", ["entryHash"]),
 });

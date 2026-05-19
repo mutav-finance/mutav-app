@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
+import { AUDIT_ACTION } from "../audit/domain";
+import { appendAuditEntry } from "../audit/useCases";
 import {
   PAYMENT_LINE_ITEM_KIND,
   PAYMENT_STATE_KIND,
@@ -123,6 +125,20 @@ export const generateMonthlyPayments = internalMutation({
         totalCents,
         lineItemCount: lineItems.length,
       });
+
+      await appendAuditEntry(ctx, {
+        actor: { kind: "system", source: "cron_monthly_billing" },
+        action: AUDIT_ACTION.PAYMENT_BATCH_GENERATED,
+        resourceType: "payments",
+        resourceId: publicId,
+        payload: {
+          paymentId,
+          agencyId: agency._id,
+          periodMonth,
+          totalCents,
+          lineItemCount: lineItems.length,
+        },
+      });
     }
 
     return results;
@@ -150,6 +166,17 @@ export const markOverduePayments = internalMutation({
       if (payment.dueDate < today) {
         await ctx.db.patch(payment._id, { state: PaymentStates.overdue() });
         count++;
+        await appendAuditEntry(ctx, {
+          actor: { kind: "system", source: "cron_overdue_sweep" },
+          action: AUDIT_ACTION.PAYMENT_MARKED_OVERDUE,
+          resourceType: "payments",
+          resourceId: payment.publicId,
+          payload: {
+            paymentId: payment._id,
+            agencyId: payment.agencyId,
+            dueDate: payment.dueDate,
+          },
+        });
       }
     }
 
@@ -193,6 +220,19 @@ export const setPaymentMethod = internalMutation({
     }
 
     await ctx.db.patch(paymentId, { method: newMethod });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "system", source: "checkout_action" },
+      action: AUDIT_ACTION.PAYMENT_METHOD_SET,
+      resourceType: "payments",
+      resourceId: payment.publicId,
+      payload: {
+        paymentId,
+        agencyId: payment.agencyId,
+        methodKind: newMethod.kind,
+      },
+    });
+
     return { paymentId, method: newMethod };
   },
 });
@@ -226,6 +266,21 @@ export const markPaidByTx = internalMutation({
       state: PaymentStates.paid(paidAt),
       method: PaymentMethods.stellar(muxedAddress, txHash),
     });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "system", source: "stellar_indexer" },
+      action: AUDIT_ACTION.PAYMENT_PAID,
+      resourceType: "payments",
+      resourceId: payment.publicId,
+      payload: {
+        paymentId,
+        agencyId: payment.agencyId,
+        method: "stellar",
+        txHash,
+        paidAt,
+      },
+    });
+
     return { paymentId, status: "paid" as const };
   },
 });
@@ -260,6 +315,21 @@ export const markPaidByAnchor = internalMutation({
       state: PaymentStates.paid(paidAt),
       method: PaymentMethods.pix(pixKey, anchorTxId),
     });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "system", source: "anchor_webhook" },
+      action: AUDIT_ACTION.PAYMENT_PAID,
+      resourceType: "payments",
+      resourceId: payment.publicId,
+      payload: {
+        paymentId,
+        agencyId: payment.agencyId,
+        method: "pix",
+        anchorTxId,
+        paidAt,
+      },
+    });
+
     return { paymentId, status: "paid" as const };
   },
 });
@@ -285,6 +355,19 @@ export const resetPaymentToPending = internalMutation({
       state: PaymentStates.pending(),
       method: null,
     });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "system", source: "dev_reset" },
+      action: AUDIT_ACTION.PAYMENT_RESET,
+      resourceType: "payments",
+      resourceId: publicId,
+      payload: {
+        paymentId: payment._id,
+        agencyId: payment.agencyId,
+        previousState,
+      },
+    });
+
     return { publicId, previousState };
   },
 });

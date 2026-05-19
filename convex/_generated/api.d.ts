@@ -21,6 +21,8 @@ import type * as anchors_orderDomain from "../anchors/orderDomain.js";
 import type * as anchors_orderUseCases from "../anchors/orderUseCases.js";
 import type * as anchors_useCases from "../anchors/useCases.js";
 import type * as anchors_webhookUseCases from "../anchors/webhookUseCases.js";
+import type * as audit_domain from "../audit/domain.js";
+import type * as audit_useCases from "../audit/useCases.js";
 import type * as contracts_actions from "../contracts/actions.js";
 import type * as contracts_aggregate from "../contracts/aggregate.js";
 import type * as contracts_backfill from "../contracts/backfill.js";
@@ -67,6 +69,8 @@ declare const fullApi: ApiFromModules<{
   "anchors/orderUseCases": typeof anchors_orderUseCases;
   "anchors/useCases": typeof anchors_useCases;
   "anchors/webhookUseCases": typeof anchors_webhookUseCases;
+  "audit/domain": typeof audit_domain;
+  "audit/useCases": typeof audit_useCases;
   "contracts/actions": typeof contracts_actions;
   "contracts/aggregate": typeof contracts_aggregate;
   "contracts/backfill": typeof contracts_backfill;
