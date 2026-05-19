@@ -31,6 +31,7 @@ import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_env from "../lib/env.js";
+import type * as lib_pii from "../lib/pii.js";
 import type * as lib_result from "../lib/result.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_stellarSigner from "../lib/stellarSigner.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/env": typeof lib_env;
+  "lib/pii": typeof lib_pii;
   "lib/result": typeof lib_result;
   "lib/secrets": typeof lib_secrets;
   "lib/stellarSigner": typeof lib_stellarSigner;

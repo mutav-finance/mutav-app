@@ -254,6 +254,47 @@ type JobMetadata = Job["metadata"];
 type PJMetadata = Extract<JobMetadata, { recipientType: "PJ" }>;
 ```
 
+## PII fields: hash + envelope
+
+Any new field that stores personal data — CPF, CNPJ, full name, email, phone, birth date, bank account number, account holder name, address — uses the **hash + envelope pattern from day one**. Never add a `v.string()` PII column.
+
+The pattern stores two columns per logical field:
+
+- `fieldHash: v.string()` — HMAC-SHA256 of the plaintext, hex-encoded. Indexed when equality lookups are needed. Computed via `hashPii(value)` from `convex/lib/pii.ts`.
+- `fieldEncrypted: encryptedEnvelopeValidator` — AES-256-GCM envelope `{ ciphertext, iv, authTag }`. Computed via `encryptPii(value)` and read back via `decryptPii(envelope)`.
+
+```typescript
+import { encryptedEnvelopeValidator } from "../lib/pii";
+
+defineTable({
+  agencyId: v.id("agencies"),
+  // Logical field: CPF
+  cpfHash: v.string(),
+  cpfEncrypted: encryptedEnvelopeValidator,
+  // … other fields
+}).index("by_cpfHash", ["cpfHash"]);
+```
+
+When a table stores ONLY the hash (no decrypt path needed — e.g. `claimedDocuments`), drop the `*Encrypted` column entirely. The hash is the value.
+
+```typescript
+defineTable({
+  documentHash: v.string(), // hashPii(cpf | cnpj) — no plaintext
+  agencyId: v.id("agencies"),
+  claimedAt: v.string(),
+}).index("by_documentHash", ["documentHash"]);
+```
+
+Writes always compute both columns in the same mutation:
+
+```typescript
+const cpfHash = await hashPii(cpf);
+const cpfEncrypted = await encryptPii(cpf);
+await ctx.db.insert("...", { ..., cpfHash, cpfEncrypted });
+```
+
+Reads decrypt only at presentation/export boundaries (later phases will audit-log each decrypt). Equality lookups go through the hash index, never a plaintext column. The full pattern rationale (two-key separation, WebCrypto choice, rotation story) lives in [`docs/architecture/decisions/0001-pii-crypto-pattern.md`](../../../docs/architecture/decisions/0001-pii-crypto-pattern.md).
+
 ## Index vs Filter Decision
 
 Before using `.filter()` after `.withIndex()`, evaluate whether a composite index is better. `.filter()` runs **in-memory after loading all index-matched documents**.
