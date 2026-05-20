@@ -59,4 +59,14 @@ crons.interval(
   {},
 );
 
+/**
+ * Every day at 00:10 UTC (5 minutes after `mark overdue payments`).
+ * Computes the Merkle root over every audit-log entry committed since the
+ * previous anchor and anchors it to Stellar via a MEMO_HASH self-payment
+ * from a dedicated audit account. Dev/preview without `AUDIT_ANCHOR_SECRET`
+ * persists the local root but skips the Stellar submission. See
+ * `docs/architecture/security.md` § Audit log integrity.
+ */
+crons.cron("daily audit anchor", "10 0 * * *", internal.audit.actions.submitDailyAnchor, {});
+
 export default crons;
