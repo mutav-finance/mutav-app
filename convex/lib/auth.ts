@@ -8,11 +8,21 @@ import type { Membership } from "../agencies/domain";
 /**
  * Authenticated identity helpers + per-handler wrappers.
  *
- * Pre-Auth0 (current state): identity is resolved by looking up the hardcoded
- * `dev-user` row — same shortcut the client's `WorkspaceContext` uses. When
- * Auth0 ships, swap `resolveCurrentUser` below to read `ctx.auth.getUserIdentity()`
- * and look up the user by JWT subject. Every wrapped handler picks up the
- * change for free; no per-handler edits.
+ * Identity resolution is JWT-first with a dev-user fallback:
+ *
+ * 1. **Auth0 wired** (`AUTH0_DOMAIN` + `AUTH0_CLIENT_ID` set on the Convex
+ *    deployment): `ctx.auth.getUserIdentity()` returns the decoded ID
+ *    token. We look up the user by `subject` (the `{issuer}|{userId}` JWT
+ *    claim). First-login provisioning happens via
+ *    `users.getOrCreateByIdentity` — wrappers throw `UnauthenticatedError`
+ *    if the row hasn't been created yet, which the client recovers from by
+ *    calling `getOrCreateByIdentity` once at session start.
+ *
+ * 2. **Auth0 unwired** (env vars absent, dev/preview default): identity
+ *    falls back to the `dev-user` row by `publicId`. The fallback is
+ *    gated by the same env presence used in `auth.config.ts`, so prod
+ *    cannot accidentally land here — if `AUTH0_DOMAIN` is set but the
+ *    JWT is missing, the handler errors instead of silently impersonating.
  *
  * Wrappers:
  * - `queryWithAuth` / `mutationWithAuth` — adds `ctx.user` (the resolved
@@ -48,31 +58,55 @@ export class ForbiddenError extends Error {
 }
 
 /**
- * Pre-Auth0 stand-in for `ctx.auth.getUserIdentity()`. Once Auth0 lands,
- * delete this constant and replace `resolveCurrentUser` with a real identity
- * lookup keyed on `identity.subject`.
+ * Dev fallback identity used when Auth0 is not configured on the Convex
+ * deployment. Matches the `publicId` of the row inserted by `seed.ts`.
+ * The constant lives here (and in `testFixtures.ts`) — the client no
+ * longer imports it. Once Auth0 is set in every environment, this
+ * constant and the fallback branch in `resolveCurrentUser` go away.
  */
-const DEV_USER_PUBLIC_ID = "dev-user";
+export const DEV_USER_PUBLIC_ID = "dev-user";
 
 async function resolveCurrentUser(ctx: DbCtx): Promise<User> {
-  // TODO(auth0): replace with
-  //   const identity = await ctx.auth.getUserIdentity();
-  //   if (!identity) throw new UnauthenticatedError();
-  //   const user = await ctx.db.query("users")
-  //     .withIndex("by_subject", q => q.eq("subject", identity.subject))
-  //     .unique();
-  //   if (!user) throw new UnauthenticatedError("User row not provisioned");
-  //   return user;
-  const user = await ctx.db
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity) {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
+      .unique();
+    if (!user) {
+      // The JWT is valid but no Convex row exists yet — the client must
+      // call `users.getOrCreateByIdentity` once at session start to
+      // provision. Throwing here surfaces the missing provisioning
+      // explicitly instead of silently failing reads.
+      throw new UnauthenticatedError(
+        "Authenticated, but no user row provisioned. " +
+          "Call `users.getOrCreateByIdentity` once at session start.",
+      );
+    }
+    return user;
+  }
+
+  // No JWT. Two cases:
+  //   (a) Auth0 is configured on this deployment → request is genuinely
+  //       unauthenticated, fail closed.
+  //   (b) Auth0 is unconfigured (dev/preview) → fall back to dev-user.
+  // The presence of the Auth0 domain env var distinguishes the two so
+  // prod cannot accidentally accept anonymous requests as `dev-user`.
+  if (process.env.AUTH0_DOMAIN) {
+    throw new UnauthenticatedError("Authentication required");
+  }
+
+  const fallback = await ctx.db
     .query("users")
     .withIndex("by_publicId", (q) => q.eq("publicId", DEV_USER_PUBLIC_ID))
     .unique();
-  if (!user) {
+  if (!fallback) {
     throw new UnauthenticatedError(
-      `Dev user '${DEV_USER_PUBLIC_ID}' not found — run \`bunx convex run seed\``,
+      `Dev user '${DEV_USER_PUBLIC_ID}' not found — run \`bunx convex run seed\` ` +
+        "(or set AUTH0_DOMAIN to require real authentication).",
     );
   }
-  return user;
+  return fallback;
 }
 
 async function resolveMembership(

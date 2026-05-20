@@ -1,20 +1,20 @@
 "use client";
 
 /**
- * WorkspaceContext — dev-shortcut implementation.
+ * WorkspaceContext — resolves the current user + selected agency.
  *
- * Loads agencies for a hardcoded "dev-user" (publicId: "dev-user") and stores
- * the selected agencyId in localStorage.  When real auth is wired up, swap
- * `DEV_USER_PUBLIC_ID` for the authenticated user's publicId from the session.
+ * Identity comes from `api.users.useCases.getMe`, which handles both
+ * paths: JWT-subject lookup when Auth0 is wired, dev-user fallback when
+ * it isn't. The client doesn't pass any user identifier — the server
+ * resolves it from the bearer token (or absence thereof).
  */
 
 import * as React from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 
-export const DEV_USER_PUBLIC_ID = "dev-user";
 const STORAGE_KEY = "sgr:selectedAgencyId";
 
 /**
@@ -46,13 +46,23 @@ type WorkspaceContextValue = {
 const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-  // Resolve the dev user (for header display). The agencies query resolves
-  // identity server-side via `queryWithAuth` — no userId arg, can't be
-  // pointed at another user. Both queries run in parallel.
-  const devUser = useQuery(api.users.useCases.getByPublicId, {
-    publicId: DEV_USER_PUBLIC_ID,
-  });
+  // Resolve the current user (for header display). Identity comes from
+  // the JWT (Auth0) or the dev-user fallback (no Auth0). The agencies
+  // query likewise reads identity server-side via `queryWithAuth` — no
+  // userId arg, no impersonation surface.
+  const currentUserRow = useQuery(api.users.useCases.getMe, {});
   const agenciesRaw = useQuery(api.agencies.useCases.listAgenciesForUser, {});
+  const provisionMe = useMutation(api.users.useCases.getOrCreateByIdentity);
+
+  // Client-side provisioning fallback: if Auth0 is wired (so `getMe` is
+  // querying by JWT subject) but no row exists yet, kick off a one-shot
+  // provisioning mutation. Covers the gap when `onCallback` in
+  // `src/lib/auth0.ts` failed transiently — the next session start retries.
+  React.useEffect(() => {
+    if (currentUserRow === null && typeof window !== "undefined") {
+      void provisionMe({}).catch(() => {});
+    }
+  }, [currentUserRow, provisionMe]);
 
   const agencies = (agenciesRaw ?? []).filter((a): a is WorkspaceAgency => a !== null);
 
@@ -86,9 +96,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const selectedAgency = agencies.find((a) => a._id === selectedAgencyId) ?? null;
-  const isLoading = devUser === undefined || agenciesRaw === undefined;
-  const currentUser: WorkspaceUser | null = devUser
-    ? { name: devUser.name, email: devUser.email }
+  const isLoading = currentUserRow === undefined || agenciesRaw === undefined;
+  const currentUser: WorkspaceUser | null = currentUserRow
+    ? { name: currentUserRow.name, email: currentUserRow.email }
     : null;
 
   return (

@@ -184,6 +184,27 @@ export function getPiiEncryptionKey(): Buffer {
 }
 
 /**
+ * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). When unset, the
+ * Convex `auth.config.ts` registers no provider and `resolveCurrentUser`
+ * falls back to the dev-user lookup. The "no provider" state is the
+ * dev-mode default and must not break the Convex analyzer or fail
+ * preview deploys — that's the historical bug from PR #75.
+ *
+ * Set via `bunx convex env set AUTH0_DOMAIN your-tenant.auth0.com`.
+ */
+export function getAuth0Domain(): string | null {
+  return process.env.AUTH0_DOMAIN ?? null;
+}
+
+/**
+ * Auth0 application (client) ID. Matches the `aud` claim on ID tokens
+ * issued by the tenant, which is how Convex authorizes the JWT.
+ */
+export function getAuth0ClientId(): string | null {
+  return process.env.AUTH0_CLIENT_ID ?? null;
+}
+
+/**
  * Optional Stellar secret seed (`S…`) for the dedicated audit-anchor
  * account. Returns null when unset — the daily anchor cron then computes
  * and persists the Merkle root locally (status: `pending`) but skips the

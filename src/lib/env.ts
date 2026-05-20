@@ -26,3 +26,16 @@ export function shouldShowTestanchor(): boolean {
 export function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
+
+/**
+ * Public Auth0 tenant domain, exposed to the client so the Convex provider
+ * can decide whether to wrap with `ConvexProviderWithAuth` (Auth0 wired)
+ * or fall back to bare `ConvexProvider` (dev mode, dev-user fallback).
+ *
+ * Mirrors the server-side `AUTH0_DOMAIN`; both must be set for prod.
+ * Returns null when unset — the client provider then operates in
+ * dev-bypass mode.
+ */
+export function getAuth0Domain(): string | null {
+  return process.env.NEXT_PUBLIC_AUTH0_DOMAIN ?? null;
+}
