@@ -6,6 +6,17 @@ export type AuditEntryId = Id<"mutavAuditLog">;
 export type AuditAction = AuditEntry["action"];
 export type AuditActor = AuditEntry["actor"];
 
+export type AuditAnchor = Doc<"mutavAuditAnchors">;
+export type AuditAnchorId = Id<"mutavAuditAnchors">;
+export type AuditAnchorStatus = AuditAnchor["status"];
+export type StellarNetwork = NonNullable<AuditAnchor["stellarNetwork"]>;
+
+export const AUDIT_ANCHOR_STATUS = {
+  PENDING: "pending",
+  SUBMITTED: "submitted",
+  FAILED: "failed",
+} as const satisfies Record<Uppercase<AuditAnchorStatus>, AuditAnchorStatus>;
+
 /**
  * Sentinel `prevHash` for the very first entry in the chain. Distinct from
  * any real SHA-256 hex string because it's all zeros — a real digest has

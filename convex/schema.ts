@@ -470,4 +470,38 @@ export default defineSchema({
     .index("by_actor_userId", ["actor.userId"])
     .index("by_timestamp", ["timestamp"])
     .index("by_entryHash", ["entryHash"]),
+
+  // Periodic Merkle anchor of the audit chain. One row per submission
+  // attempt by the daily cron. The `rootHash` is the Merkle root over
+  // every `mutavAuditLog.entryHash` in `[periodStart, periodEnd)`; the
+  // `stellarTxHash` is the on-chain witness submitted as MEMO_HASH on a
+  // dedicated single-sig account.
+  //
+  // Status lifecycle:
+  // - `pending`   — row inserted, Stellar tx not yet submitted (dev/preview
+  //                 mode without AUDIT_ANCHOR_SECRET, or transient state
+  //                 between computeAuditAnchor and submitDailyAnchor).
+  // - `submitted` — Stellar tx accepted by Horizon; `stellarTxHash` populated.
+  // - `failed`    — Stellar tx submission threw; `stellarTxHash` null,
+  //                 `failureReason` set. Cron retries next day with a fresh
+  //                 row covering the same period (loser stays as audit
+  //                 trail of the attempt).
+  //
+  // `stellarNetwork` is null only on `pending` dev rows that were never
+  // submitted; once `submitted` or `failed`, it records which network the
+  // attempt targeted so a deployment moved between testnet/mainnet doesn't
+  // produce confusing cross-network anchor history.
+  mutavAuditAnchors: defineTable({
+    rootHash: v.string(),
+    stellarTxHash: v.union(v.string(), v.null()),
+    stellarNetwork: v.union(v.literal("testnet"), v.literal("public"), v.null()),
+    periodStart: v.number(),
+    periodEnd: v.number(),
+    entryCount: v.number(),
+    anchoredAt: v.number(),
+    status: v.union(v.literal("pending"), v.literal("submitted"), v.literal("failed")),
+    failureReason: v.union(v.string(), v.null()),
+  })
+    .index("by_status", ["status", "anchoredAt"])
+    .index("by_periodEnd", ["periodEnd"]),
 });

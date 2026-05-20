@@ -184,6 +184,35 @@ export function getPiiEncryptionKey(): Buffer {
 }
 
 /**
+ * Optional Stellar secret seed (`S…`) for the dedicated audit-anchor
+ * account. Returns null when unset — the daily anchor cron then computes
+ * and persists the Merkle root locally (status: `pending`) but skips the
+ * Stellar submission. This is the dev/preview default.
+ *
+ * In production, set this to a freshly-generated single-sig Stellar
+ * account funded with ~10 XLM (enough for several years of daily
+ * 100-stroop memo-hash transactions). The account is intentionally
+ * separate from `MUTAV_TREASURY_SECRET` so audit-anchor failures can't
+ * leak treasury authority, and so a treasury rotation doesn't force an
+ * audit-anchor rotation. Compromise impact is bounded: an attacker could
+ * submit a wrong root, and `verifyLatestAnchor` would surface the
+ * mismatch — no loss of funds, just loss of anchor integrity until
+ * rotation.
+ *
+ *   `bunx convex env set AUDIT_ANCHOR_SECRET S...`
+ */
+export function getAuditAnchorSecret(): string | null {
+  const secret = process.env.AUDIT_ANCHOR_SECRET;
+  if (!secret) return null;
+  if (!secret.startsWith("S") || secret.length !== 56) {
+    throw new Error(
+      "AUDIT_ANCHOR_SECRET does not look like a Stellar secret seed (expected 'S' prefix, 56 chars).",
+    );
+  }
+  return secret;
+}
+
+/**
  * 32-byte base64-encoded HMAC-SHA256 key for PII equality lookups
  * (`convex/lib/pii.ts:hashPii`). The pepper that makes CPF's ~10¹¹
  * keyspace non-enumerable.
