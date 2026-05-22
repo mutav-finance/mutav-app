@@ -184,24 +184,30 @@ export function getPiiEncryptionKey(): Buffer {
 }
 
 /**
- * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). When unset, the
- * Convex `auth.config.ts` registers no provider and `resolveCurrentUser`
- * falls back to the dev-user lookup. The "no provider" state is the
- * dev-mode default and must not break the Convex analyzer or fail
- * preview deploys — that's the historical bug from PR #75.
+ * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). Returns an empty
+ * string when the env var is unset OR explicitly set to `""` (dev
+ * default). Callers should treat empty as "no Auth0 wired".
  *
- * Set via `bunx convex env set AUTH0_DOMAIN your-tenant.auth0.com`.
+ * **Must be SET on every Convex deployment** — including dev — even if
+ * the value is empty. Convex's deploy-time analyzer scans `auth.config.ts`
+ * for env var references transitively, and refuses to deploy if any
+ * referenced var is missing. Setting to `""` satisfies the analyzer
+ * while keeping `resolveCurrentUser` in dev-user fallback mode. See
+ * `convex/auth.config.ts` for the full explanation.
+ *
+ *   bunx convex env set AUTH0_DOMAIN ""                        # dev
+ *   bunx convex env set AUTH0_DOMAIN your-tenant.auth0.com     # prod
  */
-export function getAuth0Domain(): string | null {
-  return process.env.AUTH0_DOMAIN ?? null;
+export function getAuth0Domain(): string {
+  return process.env.AUTH0_DOMAIN ?? "";
 }
 
 /**
- * Auth0 application (client) ID. Matches the `aud` claim on ID tokens
- * issued by the tenant, which is how Convex authorizes the JWT.
+ * Auth0 application (client) ID. Same env-var-must-be-set requirement
+ * as `getAuth0Domain`; empty value means "no Auth0 wired".
  */
-export function getAuth0ClientId(): string | null {
-  return process.env.AUTH0_CLIENT_ID ?? null;
+export function getAuth0ClientId(): string {
+  return process.env.AUTH0_CLIENT_ID ?? "";
 }
 
 /**

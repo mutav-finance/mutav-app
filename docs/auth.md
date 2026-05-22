@@ -76,9 +76,29 @@ The `try`/`catch` exists because `assertAgencyAccess` throws `ForbiddenError`. R
 
 ## Identity resolution: JWT-first with dev fallback
 
-`resolveCurrentUser(ctx)` in [`convex/lib/auth.ts`](../convex/lib/auth.ts) tries `ctx.auth.getUserIdentity()` first and looks up the row by `users.subject`. When `process.env.AUTH0_DOMAIN` is unset (dev/preview default), it falls back to `users` keyed on `publicId = "dev-user"`. Both branches return the same `User` type so wrappers don't care which path ran.
+`resolveCurrentUser(ctx)` in [`convex/lib/auth.ts`](../convex/lib/auth.ts) tries `ctx.auth.getUserIdentity()` first and looks up the row by `users.subject`. When `process.env.AUTH0_DOMAIN` is empty (dev/preview default — see the next section on why it's empty, not unset), it falls back to `users` keyed on `publicId = "dev-user"`. Both branches return the same `User` type so wrappers don't care which path ran.
 
-The dev fallback is gated by the same env presence used in `convex/auth.config.ts` — so a prod deployment that has `AUTH0_DOMAIN` set but receives a request without a JWT errors instead of impersonating the dev user.
+The dev fallback is gated by the truthiness of `AUTH0_DOMAIN` and the same env presence check used in `convex/auth.config.ts` — so a prod deployment that has `AUTH0_DOMAIN` set to a real value but receives a request without a JWT errors instead of impersonating the dev user.
+
+### Required env vars (Convex side): empty is OK, missing is not
+
+**Convex requires `AUTH0_DOMAIN` and `AUTH0_CLIENT_ID` to be SET on every deployment**, including dev. The value may be empty (`""`); only the existence of the var matters to Convex's deploy-time analyzer.
+
+Convex's analyzer scans `auth.config.ts` (and everything it imports transitively) for `process.env.X` references. Any reference makes Convex refuse to deploy unless that var is present in the deployment's env. Wrapping the read in a getter function (the `getAuth0Domain()` pattern in `convex/lib/env.ts`) does **not** dodge this — the analyzer follows call chains. That was the root cause of PR #75's rollback; do not assume the lazy-getter wrapping helps here.
+
+Setup commands:
+
+```bash
+# Dev / preview (no real tenant) — values explicitly empty:
+bunx convex env set AUTH0_DOMAIN ""
+bunx convex env set AUTH0_CLIENT_ID ""
+
+# Production (real Auth0 tenant):
+bunx convex env set AUTH0_DOMAIN your-tenant.auth0.com
+bunx convex env set AUTH0_CLIENT_ID your-real-client-id
+```
+
+If `bunx convex dev` fails with `Environment variable AUTH0_DOMAIN is used in auth config file but its value was not set`, you forgot to run the empty-string set above. Run it once per Convex deployment (dev/preview/prod each get their own).
 
 ```ts
 // convex/lib/auth.ts (simplified)
