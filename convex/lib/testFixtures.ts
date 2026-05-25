@@ -1,26 +1,44 @@
 import type { convexTest } from "convex-test";
 
-/**
- * Pre-Auth0, `resolveCurrentUser` in `convex/lib/auth.ts` falls back to
- * the user row with this publicId. Tests seed it before exercising
- * wrapped handlers. Drop with the Auth0 swap (see docs/auth.md).
- */
-export const DEV_USER_PUBLIC_ID = "dev-user";
+export const TEST_USER_SUBJECT = "auth0|test-user";
 
-export async function seedDevUser(t: ReturnType<typeof convexTest>) {
+type SeedUserOptions = {
+  subject?: string;
+  email?: string;
+  name?: string;
+};
+
+export async function seedAuthenticatedUser(
+  t: ReturnType<typeof convexTest>,
+  options: SeedUserOptions = {},
+) {
+  const subject = options.subject ?? TEST_USER_SUBJECT;
   return t.run((ctx) =>
     ctx.db.insert("users", {
-      publicId: DEV_USER_PUBLIC_ID,
-      name: "Dev User",
-      email: "dev@mutav.test",
+      publicId: `user-${subject.replace(/[^a-zA-Z0-9-]/g, "-")}`,
+      subject,
+      name: options.name ?? "Test User",
+      email: options.email ?? "test@mutav.test",
       createdAt: new Date().toISOString(),
     }),
   );
 }
 
+export async function setupAuthenticatedUser(
+  t: ReturnType<typeof convexTest>,
+  options: SeedUserOptions = {},
+) {
+  const userId = await seedAuthenticatedUser(t, options);
+  const subject = options.subject ?? TEST_USER_SUBJECT;
+  const asUser = t.withIdentity({ subject });
+  return { asUser, userId, subject };
+}
+
+export type SeededUserId = Awaited<ReturnType<typeof seedAuthenticatedUser>>;
+
 export async function seedAgencyWithMembership(
   t: ReturnType<typeof convexTest>,
-  userId: Awaited<ReturnType<typeof seedDevUser>>,
+  userId: SeededUserId,
 ) {
   return t.run(async (ctx) => {
     const agencyId = await ctx.db.insert("agencies", {

@@ -1,37 +1,12 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { seedDevUser } from "../lib/testFixtures";
 import schema from "../schema";
 
-// Tests run with AUTH0_DOMAIN unset by default so the dev-fallback branch
-// is exercised. Individual tests that need the "Auth0 wired" branch set
-// the env locally and restore it afterward.
-const originalAuth0Domain = process.env.AUTH0_DOMAIN;
-beforeEach(() => {
-  delete process.env.AUTH0_DOMAIN;
-});
-afterEach(() => {
-  if (originalAuth0Domain) process.env.AUTH0_DOMAIN = originalAuth0Domain;
-  else delete process.env.AUTH0_DOMAIN;
-});
-
 describe("getMe", () => {
-  test("dev fallback: returns dev-user when no JWT and AUTH0_DOMAIN unset", async () => {
+  test("returns null when no JWT is present (signed-out reader)", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
-
-    const result = await t.query(api.users.useCases.getMe, {});
-    expect(result).not.toBeNull();
-    expect(result?.publicId).toBe("dev-user");
-  });
-
-  test("returns null when no JWT and AUTH0_DOMAIN is set (prod-side, signed out)", async () => {
-    process.env.AUTH0_DOMAIN = "test.auth0.com";
-    const t = convexTest(schema);
-    await seedDevUser(t);
-
     const result = await t.query(api.users.useCases.getMe, {});
     expect(result).toBeNull();
   });
