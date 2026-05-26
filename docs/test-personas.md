@@ -9,30 +9,28 @@ Pre-provisioned Auth0 accounts for testing each Mutav user state without going t
 
 All four personas share the password **`MutavDev2026!`**.
 
-| Persona          | Email                       | Auth0 subject                     | Convex seeded state | Expected landing on login                              |
-| ---------------- | --------------------------- | --------------------------------- | ------------------- | ------------------------------------------------------ |
-| **System admin** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | none                | `/onboarding` (no agency yet — staff role TBD per #87) |
-| **Agency owner** | `agencyowner@mutav.finance` | `auth0\|6a150df7def07da7a5297480` | active agency       | `/` (dashboard)                                        |
-| **Pending user** | `pendinguser@mutav.finance` | `auth0\|6a150df8d2051b0ac866a3b6` | under_review agency | `/onboarding/status?state=under_review`                |
-| **New user**     | `newuser@mutav.finance`     | `auth0\|6a150df9a100fbf318f393c3` | none                | `/onboarding`                                          |
+| Persona                       | Email                       | Auth0 subject                     | Convex seeded state | Expected landing on login                                             |
+| ----------------------------- | --------------------------- | --------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| **System admin (Mutav team)** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | none (staff)        | `/onboarding` today — gap: no `(admin)` shell yet, tracked separately |
+| **Agency owner**              | `agencyowner@mutav.finance` | `auth0\|6a150df7def07da7a5297480` | active agency       | `/` (dashboard)                                                       |
+| **Pending user**              | `pendinguser@mutav.finance` | `auth0\|6a150df8d2051b0ac866a3b6` | under_review agency | `/onboarding/status?state=under_review`                               |
+| **New user**                  | `newuser@mutav.finance`     | `auth0\|6a150df9a100fbf318f393c3` | none                | `/onboarding`                                                         |
 
 All four are marked `email_verified: true` on Auth0 — no verification step on first login.
 
 ## How the seeded state attaches to the Auth0 user
 
-The Convex seed mutations (`convex/seed.ts:singleAgencyActive`, `singleAgencyUnderReview`, `singleAgencyRejected`) create a `users` row with the persona email and **no `subject`**. On first Auth0 login, `users.useCases.getOrCreateByIdentity` runs the email-link path: finds the row by email, patches the JWT subject onto it. The user inherits the seeded membership without any onboarding wizard.
+`convex/seed.ts:seedTestPersonas` writes the Convex `users` row with the Auth0 `subject` **baked in** — the binding is explicit, not derivative. No email-link dance on first login. The persona-to-subject map lives in the `PERSONAS` constant in `convex/seed.ts` and must stay in sync with this doc and the Auth0 tenant; updating the dev tenant means updating both.
 
 ## Recreating the personas on a fresh Convex deployment
 
-Each preview deployment gets its own Convex DB (5-day auto-cleanup). To bootstrap personas on a new preview, run from a local checkout linked to that preview:
+Each preview deployment gets its own Convex DB (5-day auto-cleanup). One command bootstraps all four personas:
 
 ```bash
-bunx convex run seed:singleAgencyActive       '{"adminEmail":"agencyowner@mutav.finance"}'
-bunx convex run seed:singleAgencyUnderReview  '{"adminEmail":"pendinguser@mutav.finance"}'
-bunx convex run seed:singleAgencyRejected     '{"adminEmail":"rejecteduser@mutav.finance"}'   # optional — Auth0 user not yet provisioned
+bunx convex run seed:seedTestPersonas
 ```
 
-The Auth0 side (account + password) doesn't need recreating — it's tenant-scoped, not deployment-scoped.
+Idempotent — re-runs skip personas whose state already matches. The Auth0 side (account + password) doesn't need recreating — it's tenant-scoped, not deployment-scoped.
 
 ## Recreating the personas on a fresh Auth0 tenant
 
@@ -53,7 +51,7 @@ EOF
 done
 ```
 
-Then run the Convex seed mutations above pointing at the matching preview/dev deployment.
+The new tenant will issue different `user_id` values for each persona. **Update the `PERSONAS` constant in `convex/seed.ts`** with the new subjects (and this table), then run `bunx convex run seed:seedTestPersonas` against the matching Convex deployment.
 
 ## Multi-persona testing in one browser
 

@@ -2128,52 +2128,128 @@ export const fictionalContracts = internalMutation({
 });
 
 /**
- * One-off seed: provision a single agency in `under_review` for an
- * existing-or-new user identified by email. Use to preview the
- * `/onboarding/status` waiting screen without going through the full
- * onboarding flow.
- *
- *   bunx convex run seed:singleAgencyUnderReview '{"adminEmail":"you@example.com"}'
+ * Test personas — see `docs/test-personas.md`. Source of truth for the
+ * Auth0 subject ↔ Convex user binding so seeds attach state to the
+ * exact same identity the JWT will resolve to (no email-link dance).
  */
-export const singleAgencyUnderReview = internalMutation({
-  args: { adminEmail: v.string() },
-  handler: async (ctx, args) => {
-    const now = new Date().toISOString();
+type PersonaKey = "systemadmin" | "agencyowner" | "pendinguser" | "newuser";
 
-    const existing = await ctx.db
+const PERSONAS: Record<
+  PersonaKey,
+  {
+    email: string;
+    subject: string;
+    name: string;
+    agency: { name: string; cnpj: string; state: "active" | "under_review" } | null;
+  }
+> = {
+  systemadmin: {
+    email: "systemadmin@mutav.finance",
+    subject: "auth0|6a150df6a100fbf318f393c0",
+    name: "Mutav Team",
+    agency: null,
+  },
+  agencyowner: {
+    email: "agencyowner@mutav.finance",
+    subject: "auth0|6a150df7def07da7a5297480",
+    name: "Agency Owner",
+    agency: { name: "ImobiliÃ¡ria Aprovada", cnpj: "00000000000500", state: "active" },
+  },
+  pendinguser: {
+    email: "pendinguser@mutav.finance",
+    subject: "auth0|6a150df8d2051b0ac866a3b6",
+    name: "Pending User",
+    agency: { name: "ImobiliÃ¡ria Pendente", cnpj: "00000000000400", state: "under_review" },
+  },
+  newuser: {
+    email: "newuser@mutav.finance",
+    subject: "auth0|6a150df9a100fbf318f393c3",
+    name: "New User",
+    agency: null,
+  },
+};
+
+/**
+ * Idempotent persona seed: looks up the user by Auth0 subject (the
+ * source of truth post-Auth0), then by email as a fallback, creates if
+ * missing, and attaches the seeded agency if the persona declares one.
+ * Skips agency creation when a membership already exists for this user
+ * in an agency of the same intended state — keeps re-runs no-op.
+ */
+async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: PersonaKey) {
+  const persona = PERSONAS[key];
+  const now = new Date().toISOString();
+
+  const bySubject = await ctx.db
+    .query("users")
+    .withIndex("by_subject", (q) => q.eq("subject", persona.subject))
+    .unique();
+  const byEmail =
+    bySubject ??
+    (await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.adminEmail))
-      .unique();
+      .withIndex("by_email", (q) => q.eq("email", persona.email))
+      .unique());
 
-    const userId = existing
-      ? existing._id
-      : await ctx.db.insert("users", {
-          publicId: `user-seed-${Date.now().toString(36)}`,
-          name: args.adminEmail.split("@")[0],
-          email: args.adminEmail,
-          createdAt: now,
-        });
-
-    const agencyId = await ctx.db.insert("agencies", {
-      name: "ImobiliÃ¡ria de Teste",
-      cnpj: "00000000000400",
-      agencyType: "empresa",
-      onboardingState: "under_review",
-      onboardingSubmittedAt: now,
-      email: args.adminEmail,
-      phone: "11999999999",
-      creci: "CRECI-J 99999",
+  let userId;
+  if (byEmail) {
+    userId = byEmail._id;
+    if (!byEmail.subject) {
+      await ctx.db.patch(userId, { subject: persona.subject });
+    }
+  } else {
+    userId = await ctx.db.insert("users", {
+      publicId: `user-persona-${key}`,
+      subject: persona.subject,
+      name: persona.name,
+      email: persona.email,
       createdAt: now,
     });
+  }
 
-    await ctx.db.insert("memberships", {
-      userId,
-      agencyId,
-      role: "owner",
-      joinedAt: now,
-    });
+  if (!persona.agency) {
+    return { persona: key, userId, agencyId: null };
+  }
 
-    return { userId, agencyId, state: "under_review" as const };
+  const memberships = await ctx.db
+    .query("memberships")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  for (const m of memberships) {
+    const agency = await ctx.db.get(m.agencyId);
+    if (agency?.onboardingState === persona.agency.state) {
+      return { persona: key, userId, agencyId: m.agencyId, skipped: true };
+    }
+  }
+
+  const agencyId = await ctx.db.insert("agencies", {
+    name: persona.agency.name,
+    cnpj: persona.agency.cnpj,
+    agencyType: "empresa",
+    onboardingState: persona.agency.state,
+    onboardingSubmittedAt: now,
+    email: persona.email,
+    phone: "11999999999",
+    creci: "CRECI-J 99999",
+    createdAt: now,
+  });
+  await ctx.db.insert("memberships", {
+    userId,
+    agencyId,
+    role: "owner",
+    joinedAt: now,
+  });
+  return { persona: key, userId, agencyId };
+}
+
+export const seedTestPersonas = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const results = [];
+    for (const key of Object.keys(PERSONAS) as PersonaKey[]) {
+      results.push(await seedPersona(ctx, key));
+    }
+    return results;
   },
 });
 
