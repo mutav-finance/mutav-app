@@ -1,25 +1,16 @@
 import { redirect as nextRedirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { fetchQuery } from "convex/nextjs";
-import { api } from "@convex/_generated/api";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/providers/theme";
 import { redirect } from "@/i18n/navigation";
-import { getAuthToken } from "@/lib/auth-token";
+import { resolveUserDestination } from "@/lib/user-destination";
 
 /**
- * Server-side guard. Three exit branches before rendering the shell:
- * 1. No Auth0 session → `/auth/login` (proxy handles the OAuth dance)
- * 2. Authenticated but zero agency memberships → `/onboarding`
- * 3. Agencies exist but none `active` (all in_progress/submitted/etc.) →
- *    `/onboarding/status`
- *
- * `/auth/login` uses Next's native `redirect` because the Auth0 proxy
- * matches the bare `/auth/*` paths regardless of locale prefix —
- * pushing a locale segment in front would miss the matcher.
+ * Server-side guard. Resolves the user's canonical destination and
+ * renders the (app) shell only when that destination is `dashboard`.
  */
 export default async function AppLayout({
   children,
@@ -31,24 +22,18 @@ export default async function AppLayout({
   const { locale } = await params;
   const tA11y = await getTranslations({ locale, namespace: "common.a11y" });
 
-  const token = await getAuthToken();
-  if (!token) {
+  const dest = await resolveUserDestination();
+  if (dest.kind === "login") {
     nextRedirect("/auth/login");
   }
-
-  const agencies = await fetchQuery(
-    api.agencies.useCases.listAgenciesForUser,
-    {},
-    { token: token! },
-  );
-
-  if (agencies.length === 0) {
+  if (dest.kind === "onboarding-welcome") {
     redirect({ href: "/onboarding", locale });
   }
-
-  const hasActive = agencies.some((a) => a && a.onboardingState === "active");
-  if (!hasActive) {
-    redirect({ href: "/onboarding/status", locale });
+  if (dest.kind === "onboarding-status") {
+    redirect({ href: `/onboarding/status?state=${dest.state}`, locale });
+  }
+  if (dest.kind === "onboarding-rejected") {
+    redirect({ href: "/onboarding/rejected", locale });
   }
 
   return (

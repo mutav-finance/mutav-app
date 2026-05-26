@@ -1,13 +1,28 @@
 import { getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
+import { Link, redirect } from "@/i18n/navigation";
 import { PageContent } from "@/components/page/page-content";
 import { Button } from "@/components/ui/button";
+import { resolveUserDestination } from "@/lib/user-destination";
 
 type Props = {
   searchParams: Promise<{ state?: string }>;
+  params: Promise<{ locale: string }>;
 };
 
-export default async function OnboardingStatusPage({ searchParams }: Props) {
+export default async function OnboardingStatusPage({ searchParams, params }: Props) {
+  const { locale } = await params;
+  const dest = await resolveUserDestination();
+
+  if (dest.kind === "dashboard") {
+    redirect({ href: "/", locale });
+  }
+  if (dest.kind === "onboarding-welcome") {
+    redirect({ href: "/onboarding", locale });
+  }
+  if (dest.kind === "onboarding-rejected") {
+    redirect({ href: "/onboarding/rejected", locale });
+  }
+
   const t = await getTranslations("onboarding.status");
   const { state } = await searchParams;
 
