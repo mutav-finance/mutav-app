@@ -206,6 +206,44 @@ export function getAuth0ClientId(): string {
 }
 
 /**
+ * Auth0 Management API M2M client id. Different from `getAuth0ClientId()` —
+ * that one is the public Application id used by end-user JWTs; this one is
+ * the dedicated M2M app's id used only by Convex actions calling
+ * `https://{domain}/oauth/token` for management operations.
+ *
+ * Throws when unset, because every caller (`auth0Mgmt.ts`) is in an error
+ * path if it's missing — no useful default.
+ */
+export function getAuth0MgmtClientId(): string {
+  const id = process.env.AUTH0_MGMT_CLIENT_ID;
+  if (!id) {
+    throw new Error(
+      "AUTH0_MGMT_CLIENT_ID is not set. Create a Machine-to-Machine app in " +
+        "the Auth0 dashboard with Management API scopes and set " +
+        "`bunx convex env set AUTH0_MGMT_CLIENT_ID <id>` on this deployment.",
+    );
+  }
+  return id;
+}
+
+/**
+ * Secret half of the Auth0 Management API M2M app credentials. See
+ * `getAuth0MgmtClientId` for the rationale on why this is a separate
+ * env from the public Auth0 application secret.
+ */
+export function getAuth0MgmtClientSecret(): string {
+  const secret = process.env.AUTH0_MGMT_CLIENT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "AUTH0_MGMT_CLIENT_SECRET is not set. Get it from the M2M app's " +
+        "Settings tab in the Auth0 dashboard and set " +
+        "`bunx convex env set AUTH0_MGMT_CLIENT_SECRET <secret>` on this deployment.",
+    );
+  }
+  return secret;
+}
+
+/**
  * Optional Stellar secret seed (`S…`) for the dedicated audit-anchor
  * account. Returns null when unset — the daily anchor cron then computes
  * and persists the Merkle root locally (status: `pending`) but skips the
