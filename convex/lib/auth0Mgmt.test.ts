@@ -98,6 +98,16 @@ describe("getMgmtToken", () => {
 
     await expect(getMgmtToken()).rejects.toThrow(/401 Unauthorized.*invalid_client/);
   });
+
+  test("throws when AUTH0_DOMAIN is not set on the deployment", async () => {
+    delete process.env.AUTH0_DOMAIN;
+    // Keep client id + secret set so the test verifies the domain guard
+    // specifically, not a generic "env missing" error.
+    process.env.AUTH0_MGMT_CLIENT_ID = "client_id_xyz";
+    process.env.AUTH0_MGMT_CLIENT_SECRET = "client_secret_abc";
+
+    await expect(getMgmtToken()).rejects.toThrow(/AUTH0_DOMAIN is not set/);
+  });
 });
 
 describe("mgmtRequest", () => {

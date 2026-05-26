@@ -1,5 +1,3 @@
-"use node";
-
 import { getAuth0Domain, getAuth0MgmtClientId, getAuth0MgmtClientSecret } from "./env";
 
 /**
@@ -115,6 +113,8 @@ export async function mgmtRequest<TResponse>(
   // not dereference it. The Auth0 endpoints we wrap return 204 only on
   // void operations (member adds/removes), so the type lie is bounded.
   if (res.status === 204) return undefined as TResponse;
+  // Caller-supplied generic; callers are responsible for matching the
+  // Auth0 response shape they declare. Boundary cast per CLAUDE.md.
   return (await res.json()) as TResponse;
 }
 
