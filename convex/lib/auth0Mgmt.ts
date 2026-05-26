@@ -18,6 +18,7 @@ import { getAuth0Domain, getAuth0MgmtClientId, getAuth0MgmtClientSecret } from "
 type TokenCache = { value: string; expiresAt: number };
 
 let cachedToken: TokenCache | null = null;
+let inFlightFetch: Promise<TokenCache> | null = null;
 
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
@@ -29,18 +30,19 @@ function getAuthorityBase(): string {
         "The Management API client cannot run without a tenant domain.",
     );
   }
+  // The dashboard sometimes copies the value with a scheme prefix; that
+  // would compose into `https://https://...` and fail with an opaque DNS
+  // error. Reject early with a clear message.
+  if (domain.includes("://")) {
+    throw new Error(
+      `AUTH0_DOMAIN must be a bare host (e.g. "tenant.us.auth0.com"); got "${domain}". ` +
+        "Strip the scheme prefix.",
+    );
+  }
   return `https://${domain}`;
 }
 
-/**
- * Returns a valid Management API access token. Fetches a fresh one when the
- * cache is empty or within the refresh margin of expiry.
- */
-export async function getMgmtToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt - TOKEN_REFRESH_MARGIN_MS) {
-    return cachedToken.value;
-  }
-
+async function fetchFreshToken(): Promise<TokenCache> {
   const res = await fetch(`${getAuthorityBase()}/oauth/token`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -70,11 +72,33 @@ export async function getMgmtToken(): Promise<string> {
       `Auth0 token response missing expected fields. Got: ${JSON.stringify(json).slice(0, 200)}`,
     );
   }
-  cachedToken = {
+  return {
     value: json.access_token,
     expiresAt: Date.now() + json.expires_in * 1000,
   };
-  return cachedToken.value;
+}
+
+/**
+ * Returns a valid Management API access token. Fetches a fresh one when the
+ * cache is empty or within the refresh margin of expiry.
+ *
+ * Single-flight: concurrent callers on a cold cache share one fetch.
+ * Without this, N parallel actions on startup would each issue an
+ * `/oauth/token` POST and the later writes would clobber the earlier
+ * cached value (benign for correctness, wasteful for Auth0 quota).
+ */
+export async function getMgmtToken(): Promise<string> {
+  if (cachedToken && Date.now() < cachedToken.expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+    return cachedToken.value;
+  }
+  if (!inFlightFetch) {
+    inFlightFetch = fetchFreshToken().finally(() => {
+      inFlightFetch = null;
+    });
+  }
+  const fresh = await inFlightFetch;
+  cachedToken = fresh;
+  return fresh.value;
 }
 
 /**
@@ -124,7 +148,10 @@ export async function mgmtRequest<TResponse>(
  * Promote to a public helper if/when a real caller emerges.
  */
 type TenantSettings = {
-  friendly_name?: string;
+  // Auth0 returns `friendly_name: null` (explicit null) when not configured,
+  // not an absent key. Typed as `string | null` so the cast in
+  // `mgmtRequest` doesn't lie about what comes back.
+  friendly_name?: string | null;
   enabled_locales?: readonly string[];
 };
 

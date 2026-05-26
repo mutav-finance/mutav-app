@@ -108,6 +108,27 @@ describe("getMgmtToken", () => {
 
     await expect(getMgmtToken()).rejects.toThrow(/AUTH0_DOMAIN is not set/);
   });
+
+  test("rejects AUTH0_DOMAIN with a scheme prefix (common copy-paste mistake)", async () => {
+    setEnv("https://tenant.us.auth0.com", "client_id_xyz", "client_secret_abc");
+    await expect(getMgmtToken()).rejects.toThrow(/bare host.*Strip the scheme/);
+  });
+
+  test("concurrent cold-cache callers share a single /oauth/token request", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ access_token: "tok_shared", expires_in: 86400 }), {
+          status: 200,
+        }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const [a, b, c] = await Promise.all([getMgmtToken(), getMgmtToken(), getMgmtToken()]);
+    expect(a).toBe("tok_shared");
+    expect(b).toBe("tok_shared");
+    expect(c).toBe("tok_shared");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });
 
 describe("mgmtRequest", () => {
