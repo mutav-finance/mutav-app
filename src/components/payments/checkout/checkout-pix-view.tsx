@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAction, useQuery } from "convex/react";
 import QRCode from "qrcode";
@@ -60,12 +60,16 @@ export function CheckoutPixView({ paymentId, agencyId, totalCents }: Props) {
     lang: locale,
   });
 
+  // Cleanup runs once on unmount. `useEffectEvent` decouples the latest
+  // cancel/reset references from the effect's dep array so we don't
+  // re-run the effect (and re-arm the cleanup) whenever the on-ramp
+  // hook re-renders.
+  const onUnmount = useEffectEvent(() => {
+    cancel();
+    reset();
+  });
   useEffect(() => {
-    return () => {
-      cancel();
-      reset();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => onUnmount();
   }, []);
 
   const handleConfirm = useCallback(

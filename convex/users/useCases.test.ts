@@ -150,4 +150,12 @@ describe("getOrCreateByIdentity", () => {
     const t = convexTest(schema);
     await expect(t.mutation(api.users.useCases.getOrCreateByIdentity, {})).rejects.toThrow(/JWT/);
   });
+
+  test("refuses to provision when the JWT has no email claim", async () => {
+    const t = convexTest(schema);
+    const asAnon = t.withIdentity({ subject: "auth0|no-email" });
+    await expect(asAnon.mutation(api.users.useCases.getOrCreateByIdentity, {})).rejects.toThrow(
+      /email/,
+    );
+  });
 });

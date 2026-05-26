@@ -19,9 +19,9 @@ const STORAGE_KEY = "sgr:selectedAgencyId";
  * Derived from the Convex return type so additions to the server-side projection
  * flow through here automatically (no manual sync, no escape-hatch casts).
  */
-export type WorkspaceAgency = NonNullable<
-  FunctionReturnType<typeof api.agencies.useCases.listAgenciesForUser>[number]
->;
+export type WorkspaceAgency = FunctionReturnType<
+  typeof api.agencies.useCases.listAgenciesForUser
+>[number];
 
 export type WorkspaceUser = {
   name: string;
@@ -45,11 +45,16 @@ const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // Resolve the current user (for header display). Identity comes from
-  // the JWT (Auth0). The agencies query likewise reads identity
-  // server-side via `queryWithAuth` — no userId arg, no impersonation
-  // surface.
+  // the JWT (Auth0). `getMe` is the only Convex query that returns null
+  // on missing identity; `listAgenciesForUser` is `queryWithAuth` and
+  // throws `UnauthenticatedError`, so gate it on a known-good identity
+  // to avoid noisy error boundaries on public routes (/onboarding,
+  // /pay/[publicId]) where the provider still mounts.
   const currentUserRow = useQuery(api.users.useCases.getMe, {});
-  const agenciesRaw = useQuery(api.agencies.useCases.listAgenciesForUser, {});
+  const agenciesRaw = useQuery(
+    api.agencies.useCases.listAgenciesForUser,
+    currentUserRow ? {} : "skip",
+  );
   const provisionMe = useMutation(api.users.useCases.getOrCreateByIdentity);
 
   // Client-side provisioning fallback: if Auth0 is wired (so `getMe` is
@@ -62,7 +67,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUserRow, provisionMe]);
 
-  const agencies = (agenciesRaw ?? []).filter((a): a is WorkspaceAgency => a !== null);
+  const agencies = React.useMemo(() => agenciesRaw ?? [], [agenciesRaw]);
 
   const [storedRaw, setStoredRaw] = React.useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -81,7 +86,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return first._id;
   }, [storedRaw, agencies]);
 
-  // 5. Keep localStorage in sync whenever the effective selection changes.
+  // Keep localStorage in sync whenever the effective selection changes.
   React.useEffect(() => {
     if (selectedAgencyId) {
       localStorage.setItem(STORAGE_KEY, selectedAgencyId);
@@ -94,7 +99,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const selectedAgency = agencies.find((a) => a._id === selectedAgencyId) ?? null;
-  const isLoading = currentUserRow === undefined || agenciesRaw === undefined;
+  // `agenciesRaw === undefined` covers both "still loading" and "skipped
+  // because no user" — only the former should keep us in the loading
+  // state. The latter resolves to "no agencies" once getMe returns null.
+  const isLoading =
+    currentUserRow === undefined || (currentUserRow !== null && agenciesRaw === undefined);
   const currentUser: WorkspaceUser | null = currentUserRow
     ? { name: currentUserRow.name, email: currentUserRow.email }
     : null;

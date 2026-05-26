@@ -23,16 +23,24 @@ import { getAuth0ClientId, getAuth0Domain } from "./lib/env";
 const domain = getAuth0Domain();
 const applicationID = getAuth0ClientId();
 
+// Normalize the domain to an https:// origin. Accepts:
+//   - bare host (`tenant.auth0.com`) — most common, recommended
+//   - already-prefixed `https://tenant.auth0.com`
+// Rejects `http://` (silent downgrade to an unencrypted JWT issuer would
+// break verification at best, mis-trust a forgery at worst).
+function normalizeAuth0Issuer(value: string): string {
+  if (value.startsWith("https://")) return value;
+  if (value.startsWith("http://")) {
+    throw new Error(
+      `AUTH0_DOMAIN must use https:// (got "${value}"). Strip the scheme or fix the env value.`,
+    );
+  }
+  return `https://${value}`;
+}
+
 const authConfig = {
   providers:
-    domain && applicationID
-      ? [
-          {
-            domain: domain.startsWith("http") ? domain : `https://${domain}`,
-            applicationID,
-          },
-        ]
-      : [],
+    domain && applicationID ? [{ domain: normalizeAuth0Issuer(domain), applicationID }] : [],
 };
 
 export default authConfig;

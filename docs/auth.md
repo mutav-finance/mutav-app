@@ -1,6 +1,6 @@
 # Auth — Convex Function Wrappers
 
-> Mutav uses custom Convex function wrappers from [convex-helpers](https://stack.convex.dev/custom-functions) to authenticate and agency-scope every public query and mutation. The wrappers resolve the calling user once, attach `user` / `membership` / `agencyId` to `ctx`, and fail closed on missing identity or membership. Identity resolution is JWT-first (Auth0) with a dev-user fallback gated by the absence of `AUTH0_DOMAIN`. See [`src/lib/auth0.ts`](../src/lib/auth0.ts), [`src/providers/convex.tsx`](../src/providers/convex.tsx), and [`convex/auth.config.ts`](../convex/auth.config.ts) for the wiring.
+> Mutav uses custom Convex function wrappers from [convex-helpers](https://stack.convex.dev/custom-functions) to authenticate and agency-scope every public query and mutation. The wrappers resolve the calling user once, attach `user` / `membership` / `agencyId` to `ctx`, and fail closed on missing identity or membership. Identity is JWT-only via Auth0 — there is no dev-user fallback; a deployment without a real `AUTH0_DOMAIN` rejects every authenticated request. See [`src/lib/auth0.ts`](../src/lib/auth0.ts), [`src/providers/convex.tsx`](../src/providers/convex.tsx), and [`convex/auth.config.ts`](../convex/auth.config.ts) for the wiring.
 
 ## The four wrappers + one helper
 
@@ -74,11 +74,9 @@ export const getByPublicId = query({
 
 The `try`/`catch` exists because `assertAgencyAccess` throws `ForbiddenError`. Resource-by-id queries swallow it and return `null` to avoid leaking which ids exist in other agencies. Mutations using `assertAgencyAccess` should let the throw propagate — they're never reachable from a legitimate UI path.
 
-## Identity resolution: JWT-first with dev fallback
+## Identity resolution: JWT-only, fail closed
 
-`resolveCurrentUser(ctx)` in [`convex/lib/auth.ts`](../convex/lib/auth.ts) tries `ctx.auth.getUserIdentity()` first and looks up the row by `users.subject`. When `process.env.AUTH0_DOMAIN` is empty (dev/preview default — see the next section on why it's empty, not unset), it falls back to `users` keyed on `publicId = "dev-user"`. Both branches return the same `User` type so wrappers don't care which path ran.
-
-The dev fallback is gated by the truthiness of `AUTH0_DOMAIN` and the same env presence check used in `convex/auth.config.ts` — so a prod deployment that has `AUTH0_DOMAIN` set to a real value but receives a request without a JWT errors instead of impersonating the dev user.
+`resolveCurrentUser(ctx)` in [`convex/lib/auth.ts`](../convex/lib/auth.ts) reads `ctx.auth.getUserIdentity()` and looks up the row by `users.subject`. If the JWT is missing or the lookup misses, it throws `UnauthenticatedError`. There is **no fallback row** — a deployment without a real `AUTH0_DOMAIN` rejects every wrapped handler.
 
 ### Required env vars (Convex side): empty is OK, missing is not
 
@@ -86,33 +84,33 @@ The dev fallback is gated by the truthiness of `AUTH0_DOMAIN` and the same env p
 
 Convex's analyzer scans `auth.config.ts` (and everything it imports transitively) for `process.env.X` references. Any reference makes Convex refuse to deploy unless that var is present in the deployment's env. Wrapping the read in a getter function (the `getAuth0Domain()` pattern in `convex/lib/env.ts`) does **not** dodge this — the analyzer follows call chains. That was the root cause of PR #75's rollback; do not assume the lazy-getter wrapping helps here.
 
+An empty string satisfies the analyzer but registers no provider — every wrapped handler then throws (fail-closed). That's fine for previews that aren't expected to authenticate; a real dev tenant needs the real values.
+
 Setup commands:
 
 ```bash
-# Dev / preview (no real tenant) — values explicitly empty:
+# Satisfy the analyzer on previews that don't authenticate:
 bunx convex env set AUTH0_DOMAIN ""
 bunx convex env set AUTH0_CLIENT_ID ""
 
-# Production (real Auth0 tenant):
+# Real tenant (dev / prod):
 bunx convex env set AUTH0_DOMAIN your-tenant.auth0.com
 bunx convex env set AUTH0_CLIENT_ID your-real-client-id
 ```
 
-If `bunx convex dev` fails with `Environment variable AUTH0_DOMAIN is used in auth config file but its value was not set`, you forgot to run the empty-string set above. Run it once per Convex deployment (dev/preview/prod each get their own).
+If `bunx convex dev` fails with `Environment variable AUTH0_DOMAIN is used in auth config file but its value was not set`, you forgot the set above. Run it once per Convex deployment (dev/preview/prod each get their own).
 
 ```ts
 // convex/lib/auth.ts (simplified)
 async function resolveCurrentUser(ctx: DbCtx): Promise<User> {
   const identity = await ctx.auth.getUserIdentity();
-  if (identity) {
-    return ctx.db.query("users").withIndex("by_subject", (q) =>
-      q.eq("subject", identity.subject),
-    ).unique() ?? throw UnauthenticatedError("not provisioned");
-  }
-  if (process.env.AUTH0_DOMAIN) throw UnauthenticatedError(); // prod, signed out
-  return ctx.db.query("users").withIndex("by_publicId", (q) =>
-    q.eq("publicId", DEV_USER_PUBLIC_ID),
-  ).unique() ?? throw "run bunx convex run seed";
+  if (!identity) throw new UnauthenticatedError(); // no JWT, no fallback
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
+    .unique();
+  if (!user) throw new UnauthenticatedError("not provisioned");
+  return user;
 }
 ```
 
@@ -135,21 +133,20 @@ Two callsites:
 
 `getMe` (bare `query` in [`convex/users/useCases.ts`](../convex/users/useCases.ts)) is the only Convex query that intentionally returns `null` on missing identity or missing row. The UI needs the null to distinguish "loading", "signed out", and "signed in but unprovisioned" — wrapped handlers don't, they fail closed.
 
-| Path                                | Returns                                                  |
-| ----------------------------------- | -------------------------------------------------------- |
-| Auth0 wired, JWT present, row found | The user row                                             |
-| Auth0 wired, JWT present, no row    | `null` (client provider retries `getOrCreateByIdentity`) |
-| Auth0 wired, JWT absent             | `null` (UI renders signed-out state)                     |
-| Auth0 unwired, dev mode             | The seeded `dev-user` row                                |
+| Path                    | Returns                                                  |
+| ----------------------- | -------------------------------------------------------- |
+| JWT present, row found  | The user row                                             |
+| JWT present, no row     | `null` (client provider retries `getOrCreateByIdentity`) |
+| JWT absent (signed out) | `null` (UI renders signed-out state)                     |
 
 ### Wiring on the client
 
 [`src/providers/convex.tsx`](../src/providers/convex.tsx) decides at build time which Convex provider to render:
 
 - `NEXT_PUBLIC_AUTH0_DOMAIN` set → `<ConvexProviderWithAuth>` + `useAuthFromAuth0` hook that fetches the ID token from `/api/auth/convex-token` (which reads the encrypted session cookie via `auth0.getSession()`).
-- Unset → bare `<ConvexProvider>`. The Convex backend sees no JWT and falls back to dev-user.
+- Unset → bare `<ConvexProvider>`. The Convex backend sees no JWT; every wrapped handler throws `UnauthenticatedError`.
 
-The two halves of the dev fallback (Convex `resolveCurrentUser` + client provider choice) are gated on the same env presence, so a mismatched config can't silently downgrade auth.
+Both halves are gated on the same env presence, so a mismatched config can't silently downgrade auth.
 
 ### Multi-entity Auth0 consideration
 
@@ -180,7 +177,7 @@ For `ActionCtx` (no `ctx.db`, can't query memberships), use the lower-level `req
 `ctx.runQuery(api.X.wrapped, …)` and `ctx.runMutation(api.X.wrapped, …)` inherit the calling action's identity. That cuts two ways:
 
 - **Action invoked from an authenticated dashboard route** — identity flows, the wrapped call works.
-- **Action invoked from a public/unauthenticated route (tenant checkout, webhooks, schedulers)** — no identity, the wrapped call returns `null` (queries) or throws `UnauthenticatedError` (mutations). In dev mode the `dev-user` fallback masks this; once `AUTH0_DOMAIN` is set on the deployment, it surfaces as a silent break — that's the right outcome (the action must route through an internal companion).
+- **Action invoked from a public/unauthenticated route (tenant checkout, webhooks, schedulers)** — no identity, the wrapped call returns `null` (queries) or throws `UnauthenticatedError` (mutations). The action must route through an internal companion (see pattern below) — the public wrapped function is not accessible without a JWT.
 
 **Rule:** every tenant-facing action that reads or writes wrapped-domain data must call the wrapped function's `…Internal` companion via `internal.X.Y`, not the public `api.X.Y`. The action's own auth model (publicId bearer + chargeability, webhook HMAC, scheduler trust) is the authorization at the entry point; the internal helper just does the data access.
 

@@ -2,6 +2,7 @@ import { Auth0Client } from "@auth0/nextjs-auth0/server";
 import { ConvexHttpClient } from "convex/browser";
 import { NextResponse } from "next/server";
 import { api } from "@convex/_generated/api";
+import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
 
 /**
  * Singleton Auth0 client for the Next.js side.
@@ -26,7 +27,7 @@ import { api } from "@convex/_generated/api";
  */
 export const auth0 = new Auth0Client({
   async onCallback(error, context, session) {
-    const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+    const baseUrl = getAppBaseUrl();
 
     if (error) {
       return NextResponse.redirect(
@@ -36,7 +37,7 @@ export const auth0 = new Auth0Client({
 
     if (session) {
       try {
-        const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+        const convexUrl = getConvexUrl();
         const idToken = session.tokenSet.idToken;
         if (convexUrl && idToken) {
           const convex = new ConvexHttpClient(convexUrl);

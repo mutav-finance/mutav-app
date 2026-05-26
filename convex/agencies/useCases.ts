@@ -96,7 +96,10 @@ export const listAgenciesForUser = queryWithAuth({
       }),
     );
 
-    return results.filter(Boolean);
+    // Explicit predicate so the array narrows to `NonNullable<…>[]`;
+    // `.filter(Boolean)` strips the null at runtime but TypeScript still
+    // returns `(T | null)[]`, forcing optional-chains at every callsite.
+    return results.filter((r): r is NonNullable<typeof r> => r !== null);
   },
 });
 

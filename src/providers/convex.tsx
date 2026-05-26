@@ -3,9 +3,9 @@
 import { useUser } from "@auth0/nextjs-auth0";
 import { ConvexProvider, ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { useCallback, useMemo } from "react";
-import { getAuth0Domain } from "@/lib/env";
+import { getAuth0Domain, getConvexUrl } from "@/lib/env";
 
-const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+const url = getConvexUrl();
 const convex = url ? new ConvexReactClient(url) : null;
 
 /**

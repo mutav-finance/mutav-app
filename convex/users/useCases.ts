@@ -53,7 +53,18 @@ export const getOrCreateByIdentity = mutation({
     }
 
     const subject = identity.subject;
-    const email = identity.email ?? "";
+    const email = identity.email;
+    // The schema's `users.email` is `v.string()` and `by_email` is unique.
+    // Storing `""` for a no-email JWT (e.g. some social connections that
+    // omit the email scope) would let a second no-email user collide on
+    // `.unique()`. Refuse provisioning instead — Auth0 social connections
+    // can be configured to require email, and password connections
+    // always carry it.
+    if (!email) {
+      throw new UnauthenticatedError(
+        "Auth0 identity is missing the email claim; cannot provision user",
+      );
+    }
     const name = identity.name ?? identity.nickname ?? email.split("@")[0] ?? "user";
 
     const bySubject = await ctx.db
@@ -64,15 +75,13 @@ export const getOrCreateByIdentity = mutation({
       return { userId: bySubject._id, created: false, linked: false };
     }
 
-    if (email) {
-      const byEmail = await ctx.db
-        .query("users")
-        .withIndex("by_email", (q) => q.eq("email", email))
-        .unique();
-      if (byEmail && !byEmail.subject) {
-        await ctx.db.patch(byEmail._id, { subject });
-        return { userId: byEmail._id, created: false, linked: true };
-      }
+    const byEmail = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .unique();
+    if (byEmail && !byEmail.subject) {
+      await ctx.db.patch(byEmail._id, { subject });
+      return { userId: byEmail._id, created: false, linked: true };
     }
 
     const userId = await ctx.db.insert("users", {

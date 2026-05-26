@@ -27,17 +27,17 @@ export async function resolveUserDestination(): Promise<UserDestination> {
 
   if (agencies.length === 0) return { kind: "onboarding-welcome" };
 
-  if (agencies.some((a) => a?.onboardingState === "active")) {
+  if (agencies.some((a) => a.onboardingState === "active")) {
     return { kind: "dashboard" };
   }
 
-  const review = agencies.find((a) => a?.onboardingState === "under_review");
+  const review = agencies.find((a) => a.onboardingState === "under_review");
   if (review) return { kind: "onboarding-status", state: "under_review" };
 
-  const submitted = agencies.find((a) => a?.onboardingState === "submitted");
+  const submitted = agencies.find((a) => a.onboardingState === "submitted");
   if (submitted) return { kind: "onboarding-status", state: "submitted" };
 
-  const rejected = agencies.find((a) => a?.onboardingState === "rejected");
+  const rejected = agencies.find((a) => a.onboardingState === "rejected");
   if (rejected) return { kind: "onboarding-rejected" };
 
   // Fallback: agency exists but is in_progress or not_started — let the
