@@ -57,11 +57,9 @@ function useAuthFromAuth0() {
  *   `ConvexProviderWithAuth` and pipes the Auth0 ID token through the
  *   `useAuthFromAuth0` hook above. The Convex backend verifies the JWT
  *   per `convex/auth.config.ts`.
- * - **Auth0 unconfigured** (dev/preview): plain `ConvexProvider`. The
- *   Convex backend sees no JWT and `resolveCurrentUser` falls back to
- *   the seeded `dev-user` row. The two halves of the dev fallback are
- *   gated by the SAME env presence so a mismatched prod config can't
- *   silently downgrade auth.
+ * - **Auth0 unconfigured** (preview deployments without Auth0 envs):
+ *   plain `ConvexProvider`. The Convex backend sees no JWT and every
+ *   wrapped handler throws `UnauthenticatedError`.
  *
  * The conditional is on a build-time env var, so the component tree
  * shape is stable within a single deployment. No runtime hook-order

@@ -187,11 +187,9 @@ export default defineSchema({
 
   users: defineTable({
     publicId: v.string(),
-    // Auth0 JWT subject claim (`{issuer}|{userId}` format). Optional so
-    // the legacy `dev-user` row continues to validate during the dev
-    // fallback window; once Auth0 is wired in every environment and the
-    // dev row is gone, narrow this to `v.string()`. Populated by
-    // `getOrCreateByIdentity` on first login.
+    // Auth0 JWT subject claim (`{issuer}|{userId}` format). Populated by
+    // `getOrCreateByIdentity` on first login. Optional only to tolerate
+    // legacy rows pre-dating the Auth0 wiring; new rows always carry it.
     subject: v.optional(v.string()),
     name: v.string(),
     email: v.string(),

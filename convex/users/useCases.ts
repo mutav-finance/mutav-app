@@ -1,17 +1,12 @@
-import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
-import { DEV_USER_PUBLIC_ID, UnauthenticatedError, queryWithAuth } from "../lib/auth";
+import { UnauthenticatedError, queryWithAuth } from "../lib/auth";
 
 /**
- * Resolves the current user using the same precedence as the auth
- * wrappers: JWT subject when Auth0 is wired, dev-user fallback only when
- * the deployment has no Auth0 configured.
- *
- * Returns `null` (instead of throwing) for two states the UI must
+ * Returns the current user row, or `null` for two states the UI must
  * distinguish from "unknown error":
- * - Auth0 wired, JWT absent → user is signed out, render the public shell.
- * - Auth0 wired, JWT present, but no Convex row yet → first login mid-flight,
- *   the provisioning hook is about to write the row.
+ * - JWT absent → user is signed out, render the public shell.
+ * - JWT present, but no Convex row yet → first login mid-flight; the
+ *   provisioning hook is about to write the row.
  *
  * Use this for client-side identity reads (e.g. `WorkspaceContext`).
  * Server-side handlers go through `queryWithAuth` / `mutationWithAuth`
@@ -22,16 +17,10 @@ export const getMe = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (identity) {
-      return ctx.db
-        .query("users")
-        .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
-        .unique();
-    }
-    if (process.env.AUTH0_DOMAIN) return null;
+    if (!identity) return null;
     return ctx.db
       .query("users")
-      .withIndex("by_publicId", (q) => q.eq("publicId", DEV_USER_PUBLIC_ID))
+      .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
       .unique();
   },
 });
@@ -94,22 +83,6 @@ export const getOrCreateByIdentity = mutation({
       createdAt: new Date().toISOString(),
     });
     return { userId, created: true, linked: false };
-  },
-});
-
-/**
- * SECURITY POSTURE (legacy, dev only): unscoped public read by publicId.
- * Used to retain backwards compatibility for any tooling still pointing
- * at the pre-Auth0 dev-user lookup. New code should call `getMe` instead;
- * this endpoint disappears with the dev-user row.
- */
-export const getByPublicId = query({
-  args: { publicId: v.string() },
-  handler: async (ctx, args) => {
-    return ctx.db
-      .query("users")
-      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
-      .unique();
   },
 });
 

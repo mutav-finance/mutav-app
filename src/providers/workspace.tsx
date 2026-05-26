@@ -3,10 +3,8 @@
 /**
  * WorkspaceContext — resolves the current user + selected agency.
  *
- * Identity comes from `api.users.useCases.getMe`, which handles both
- * paths: JWT-subject lookup when Auth0 is wired, dev-user fallback when
- * it isn't. The client doesn't pass any user identifier — the server
- * resolves it from the bearer token (or absence thereof).
+ * Identity comes from `api.users.useCases.getMe`, which reads the JWT
+ * subject server-side. The client never passes a user identifier.
  */
 
 import * as React from "react";
@@ -47,9 +45,9 @@ const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // Resolve the current user (for header display). Identity comes from
-  // the JWT (Auth0) or the dev-user fallback (no Auth0). The agencies
-  // query likewise reads identity server-side via `queryWithAuth` — no
-  // userId arg, no impersonation surface.
+  // the JWT (Auth0). The agencies query likewise reads identity
+  // server-side via `queryWithAuth` — no userId arg, no impersonation
+  // surface.
   const currentUserRow = useQuery(api.users.useCases.getMe, {});
   const agenciesRaw = useQuery(api.agencies.useCases.listAgenciesForUser, {});
   const provisionMe = useMutation(api.users.useCases.getOrCreateByIdentity);

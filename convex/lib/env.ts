@@ -184,28 +184,14 @@ export function getPiiEncryptionKey(): Buffer {
 }
 
 /**
- * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). Returns an empty
- * string when the env var is unset OR explicitly set to `""` (dev
- * default). Callers should treat empty as "no Auth0 wired".
- *
- * **Must be SET on every Convex deployment** — including dev — even if
- * the value is empty. Convex's deploy-time analyzer scans `auth.config.ts`
- * for env var references transitively, and refuses to deploy if any
- * referenced var is missing. Setting to `""` satisfies the analyzer
- * while keeping `resolveCurrentUser` in dev-user fallback mode. See
- * `convex/auth.config.ts` for the full explanation.
- *
- *   bunx convex env set AUTH0_DOMAIN ""                        # dev
- *   bunx convex env set AUTH0_DOMAIN your-tenant.auth0.com     # prod
+ * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). Must be SET on every
+ * Convex deployment — see `convex/auth.config.ts` for why the analyzer
+ * requires it even though only `auth.config.ts` reads it.
  */
 export function getAuth0Domain(): string {
   return process.env.AUTH0_DOMAIN ?? "";
 }
 
-/**
- * Auth0 application (client) ID. Same env-var-must-be-set requirement
- * as `getAuth0Domain`; empty value means "no Auth0 wired".
- */
 export function getAuth0ClientId(): string {
   return process.env.AUTH0_CLIENT_ID ?? "";
 }

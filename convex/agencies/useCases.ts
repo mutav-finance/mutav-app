@@ -77,8 +77,8 @@ export const getById = internalQuery({
 
 /**
  * Lists the agencies the current user belongs to. Identity is resolved by the
- * wrapper (pre-Auth0: `dev-user`; post-Auth0: JWT subject) — no client-side
- * `userId` arg, so a caller can never enumerate another user's memberships.
+ * wrapper from the JWT subject — no client-side `userId` arg, so a caller can
+ * never enumerate another user's memberships.
  */
 export const listAgenciesForUser = queryWithAuth({
   args: {},

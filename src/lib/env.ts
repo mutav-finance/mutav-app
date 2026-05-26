@@ -29,12 +29,9 @@ export function getAppUrl(): string {
 
 /**
  * Public Auth0 tenant domain, exposed to the client so the Convex provider
- * can decide whether to wrap with `ConvexProviderWithAuth` (Auth0 wired)
- * or fall back to bare `ConvexProvider` (dev mode, dev-user fallback).
- *
- * Mirrors the server-side `AUTH0_DOMAIN`; both must be set for prod.
- * Returns null when unset — the client provider then operates in
- * dev-bypass mode.
+ * can decide whether to wrap with `ConvexProviderWithAuth`. Mirrors the
+ * server-side `AUTH0_DOMAIN`. Returns null when unset — the provider then
+ * uses bare `ConvexProvider` and every wrapped backend handler throws.
  */
 export function getAuth0Domain(): string | null {
   return process.env.NEXT_PUBLIC_AUTH0_DOMAIN ?? null;
