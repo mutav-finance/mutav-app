@@ -2127,6 +2127,56 @@ export const fictionalContracts = internalMutation({
   },
 });
 
+/**
+ * One-off seed: provision a single agency in `under_review` for an
+ * existing-or-new user identified by email. Use to preview the
+ * `/onboarding/status` waiting screen without going through the full
+ * onboarding flow.
+ *
+ *   bunx convex run seed:singleAgencyUnderReview '{"adminEmail":"you@example.com"}'
+ */
+export const singleAgencyUnderReview = internalMutation({
+  args: { adminEmail: v.string() },
+  handler: async (ctx, args) => {
+    const now = new Date().toISOString();
+
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.adminEmail))
+      .unique();
+
+    const userId = existing
+      ? existing._id
+      : await ctx.db.insert("users", {
+          publicId: `user-seed-${Date.now().toString(36)}`,
+          name: args.adminEmail.split("@")[0],
+          email: args.adminEmail,
+          createdAt: now,
+        });
+
+    const agencyId = await ctx.db.insert("agencies", {
+      name: "ImobiliÃ¡ria de Teste",
+      cnpj: "00000000000400",
+      agencyType: "empresa",
+      onboardingState: "under_review",
+      onboardingSubmittedAt: now,
+      email: args.adminEmail,
+      phone: "11999999999",
+      creci: "CRECI-J 99999",
+      createdAt: now,
+    });
+
+    await ctx.db.insert("memberships", {
+      userId,
+      agencyId,
+      role: "owner",
+      joinedAt: now,
+    });
+
+    return { userId, agencyId, state: "under_review" as const };
+  },
+});
+
 /** Bulk wipe â€” admin only. */
 export const clearAll = internalMutation({
   args: {},
