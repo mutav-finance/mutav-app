@@ -504,4 +504,20 @@ export default defineSchema({
   })
     .index("by_status", ["status", "anchoredAt"])
     .index("by_periodEnd", ["periodEnd"]),
+
+  // Anonymous public waitlist for the marketing site (mutav-website).
+  // One row per (audience, email). Dedup is enforced in the `join` mutation
+  // via the `by_email_audience` index — the table itself has no unique
+  // constraint primitive. Audit fields (`ip`, `ua`, `referer`) are best-effort
+  // and may be missing if request headers don't expose them.
+  waitlist: defineTable({
+    email: v.string(),
+    audience: v.union(v.literal("investidor"), v.literal("imobiliaria")),
+    ts: v.number(),
+    ip: v.optional(v.string()),
+    ua: v.optional(v.string()),
+    referer: v.optional(v.string()),
+  })
+    .index("by_email_audience", ["email", "audience"])
+    .index("by_audience_ts", ["audience", "ts"]),
 });

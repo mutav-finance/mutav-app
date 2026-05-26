@@ -10,6 +10,15 @@ export function getResendFromEmail(): string {
   return from;
 }
 
+// Waitlist audience IDs are optional per audience — when an audience hasn't
+// been provisioned in Resend yet, the action logs and skips. Returns null
+// rather than throwing so the surrounding mutation succeeds regardless.
+export function getWaitlistAudienceId(audience: "investidor" | "imobiliaria"): string | null {
+  const key =
+    audience === "investidor" ? "RESEND_INVESTIDOR_AUDIENCE_ID" : "RESEND_IMOBILIARIA_AUDIENCE_ID";
+  return process.env[key] ?? null;
+}
+
 export function getAppUrl(): string {
   const url = process.env.APP_URL;
   if (!url) throw new Error("APP_URL is not set");

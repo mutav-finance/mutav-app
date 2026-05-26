@@ -51,6 +51,9 @@ import type * as payments_useCases from "../payments/useCases.js";
 import type * as seed from "../seed.js";
 import type * as users_domain from "../users/domain.js";
 import type * as users_useCases from "../users/useCases.js";
+import type * as waitlist_actions from "../waitlist/actions.js";
+import type * as waitlist_domain from "../waitlist/domain.js";
+import type * as waitlist_useCases from "../waitlist/useCases.js";
 
 import type {
   ApiFromModules,
@@ -102,6 +105,9 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   "users/domain": typeof users_domain;
   "users/useCases": typeof users_useCases;
+  "waitlist/actions": typeof waitlist_actions;
+  "waitlist/domain": typeof waitlist_domain;
+  "waitlist/useCases": typeof waitlist_useCases;
 }>;
 
 /**
