@@ -9,14 +9,20 @@ Pre-provisioned Auth0 accounts for testing each Mutav user state without going t
 
 All four personas share the password **`MutavDev2026!`**.
 
-| Persona                       | Email                       | Auth0 subject                     | Convex seeded state | Expected landing on login                                             |
-| ----------------------------- | --------------------------- | --------------------------------- | ------------------- | --------------------------------------------------------------------- |
-| **System admin (Mutav team)** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | none (staff)        | `/onboarding` today — gap: no `(admin)` shell yet, tracked separately |
-| **Agency owner**              | `agencyowner@mutav.finance` | `auth0\|6a150df7def07da7a5297480` | active agency       | `/` (dashboard)                                                       |
-| **Pending user**              | `pendinguser@mutav.finance` | `auth0\|6a150df8d2051b0ac866a3b6` | under_review agency | `/onboarding/status?state=under_review`                               |
-| **New user**                  | `newuser@mutav.finance`     | `auth0\|6a150df9a100fbf318f393c3` | none                | `/onboarding`                                                         |
+| Persona                       | Email                       | Auth0 subject                     | Convex seeded state              | Expected landing on login                                                        |
+| ----------------------------- | --------------------------- | --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------- |
+| **System admin (Mutav team)** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | `users.isStaff: true`, no agency | `/onboarding` today — gap: no `(admin)` shell yet (tracked in #121 cascade PR-6) |
+| **Agency owner**              | `agencyowner@mutav.finance` | `auth0\|6a150df7def07da7a5297480` | active agency                    | `/` (dashboard)                                                                  |
+| **Pending user**              | `pendinguser@mutav.finance` | `auth0\|6a150df8d2051b0ac866a3b6` | under_review agency              | `/onboarding/status?state=under_review`                                          |
+| **New user**                  | `newuser@mutav.finance`     | `auth0\|6a150df9a100fbf318f393c3` | none                             | `/onboarding`                                                                    |
 
 All four are marked `email_verified: true` on Auth0 — no verification step on first login.
+
+### How `isStaff` is set
+
+The `seedTestPersonas` mutation patches `users.isStaff: true` onto the systemadmin row at seed time. The `PERSONAS` map in `convex/seed.ts` is the source of truth for who gets the flag — currently only `systemadmin`. To grant staff to additional users post-seed, flip `isStaff: true` via the Convex dashboard on their `users` row.
+
+Staff identity isn't enforced anywhere yet — the `(admin)` route group + `queryWithStaff`/`mutationWithStaff` wrappers ship in PR-6 of the Auth0 Orgs cascade.
 
 ## How the seeded state attaches to the Auth0 user
 
