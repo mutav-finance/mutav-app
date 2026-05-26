@@ -30,8 +30,15 @@ export const auth0 = new Auth0Client({
     const baseUrl = getAppBaseUrl();
 
     if (error) {
+      console.error("[auth0.onCallback] error:", {
+        name: error.name,
+        message: error.message,
+        code: (error as { code?: string }).code,
+        cause: (error as { cause?: unknown }).cause,
+      });
+      const causeMsg = (error as { cause?: { message?: string } }).cause?.message ?? error.message;
       return NextResponse.redirect(
-        new URL(`/login?error=${encodeURIComponent(error.message)}`, baseUrl),
+        new URL(`/auth/login?error=${encodeURIComponent(causeMsg)}`, baseUrl),
       );
     }
 
