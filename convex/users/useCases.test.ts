@@ -159,3 +159,37 @@ describe("getOrCreateByIdentity", () => {
     );
   });
 });
+
+describe("isStaff field", () => {
+  test("isStaff defaults to absent on freshly-provisioned users", async () => {
+    const t = convexTest(schema);
+    const asAlice = t.withIdentity({
+      subject: "auth0|alice",
+      email: "alice@test.br",
+      name: "Alice",
+    });
+
+    const result = await asAlice.mutation(api.users.useCases.getOrCreateByIdentity, {});
+    const user = await t.run((ctx) => ctx.db.get(result.userId));
+
+    expect(user?.isStaff).toBeUndefined();
+  });
+
+  test("isStaff can be set to true on an existing user", async () => {
+    const t = convexTest(schema);
+    const userId = await t.run((ctx) =>
+      ctx.db.insert("users", {
+        publicId: "user-mutav-admin",
+        subject: "auth0|mutav-admin",
+        name: "Mutav Admin",
+        email: "admin@mutav.finance",
+        createdAt: new Date().toISOString(),
+      }),
+    );
+
+    await t.run((ctx) => ctx.db.patch(userId, { isStaff: true }));
+    const user = await t.run((ctx) => ctx.db.get(userId));
+
+    expect(user?.isStaff).toBe(true);
+  });
+});
