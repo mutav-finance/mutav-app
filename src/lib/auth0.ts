@@ -30,8 +30,25 @@ export const auth0 = new Auth0Client({
     const baseUrl = getAppBaseUrl();
 
     if (error) {
+      // `error` is `SdkError | null` per the SDK signature — `name`, `code`,
+      // `message`, `cause` are all on the prototype chain (SdkError extends
+      // Error). `cause` is `unknown` per Error.cause; narrow with a type
+      // guard before reading message.
+      const cause = error.cause;
+      const causeMsg =
+        cause instanceof Error
+          ? cause.message
+          : typeof cause === "object" && cause !== null && "message" in cause
+            ? String(cause.message)
+            : null;
+      console.error("[auth0.onCallback] error:", {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        cause,
+      });
       return NextResponse.redirect(
-        new URL(`/login?error=${encodeURIComponent(error.message)}`, baseUrl),
+        new URL(`/auth/login?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
       );
     }
 
