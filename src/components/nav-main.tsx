@@ -30,16 +30,17 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
             <SidebarMenuButton
               asChild
               tooltip={t("createContract")}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground h-auto min-w-8 py-[18px] pl-4 duration-200 ease-linear [&_svg]:size-5"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
             >
               <Link href="/contracts/new">
                 <CirclePlusIcon />
-                <span className="text-base">{t("createContract")}</span>
+                <span>{t("createContract")}</span>
               </Link>
             </SidebarMenuButton>
             <Button
-              className="h-auto w-8 py-[18px] group-data-[collapsible=icon]:opacity-0"
+              className="group-data-[collapsible=icon]:opacity-0"
               variant="outline"
+              size="icon"
               disabled
             >
               <MailIcon />
