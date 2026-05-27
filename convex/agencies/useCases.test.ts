@@ -607,3 +607,48 @@ describe("saveDocument", () => {
     expect(url).toBeTruthy();
   });
 });
+
+describe("auth0OrgId index", () => {
+  test("by_auth0OrgId index lookup finds an agency by its Auth0 org id", async () => {
+    const t = convexTest(schema);
+
+    const agencyId = await t.run((ctx) =>
+      ctx.db.insert("agencies", {
+        name: "Test Org-Backed Agency",
+        cnpj: "00000000000111",
+        createdAt: new Date().toISOString(),
+        auth0OrgId: "org_test_123",
+      }),
+    );
+
+    const found = await t.run((ctx) =>
+      ctx.db
+        .query("agencies")
+        .withIndex("by_auth0OrgId", (q) => q.eq("auth0OrgId", "org_test_123"))
+        .unique(),
+    );
+
+    expect(found?._id).toBe(agencyId);
+  });
+
+  test("an agency without auth0OrgId is not returned by the index", async () => {
+    const t = convexTest(schema);
+
+    await t.run((ctx) =>
+      ctx.db.insert("agencies", {
+        name: "Legacy Agency",
+        cnpj: "00000000000222",
+        createdAt: new Date().toISOString(),
+      }),
+    );
+
+    const found = await t.run((ctx) =>
+      ctx.db
+        .query("agencies")
+        .withIndex("by_auth0OrgId", (q) => q.eq("auth0OrgId", "org_does_not_exist"))
+        .unique(),
+    );
+
+    expect(found).toBeNull();
+  });
+});

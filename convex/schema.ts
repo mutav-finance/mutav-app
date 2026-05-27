@@ -180,10 +180,16 @@ export default defineSchema({
     consentMarketing: v.optional(v.boolean()),
     representanteName: v.optional(v.string()),
     representanteCpf: v.optional(v.string()),
+    // Auth0 Organization id (e.g. `org_xxx`). Populated when the agency
+    // is provisioned through the Auth0 Orgs path (see #121). Legacy
+    // agencies stay Convex-only with this field absent — wrappers MUST
+    // tolerate both shapes during the migration window.
+    auth0OrgId: v.optional(v.string()),
   })
     .index("by_cnpj", ["cnpj"])
     .index("by_cpf", ["cpf"])
-    .index("by_onboardingState", ["onboardingState"]),
+    .index("by_onboardingState", ["onboardingState"])
+    .index("by_auth0OrgId", ["auth0OrgId"]),
 
   users: defineTable({
     publicId: v.string(),
@@ -194,6 +200,9 @@ export default defineSchema({
     name: v.string(),
     email: v.string(),
     createdAt: v.string(),
+    // True for Mutav internal staff members (who admin the system,
+    // approve agencies, etc). False/absent for regular users (corretores).
+    isStaff: v.optional(v.boolean()),
   })
     .index("by_publicId", ["publicId"])
     .index("by_email", ["email"])
