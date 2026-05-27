@@ -2297,10 +2297,23 @@ type SeedPersonasResult = Array<{
  * contracts, two months of paid history, one month due. Distinct
  * `publicId` range (1000031–1000036) so it doesn't collide with the
  * fictional Paulista/Atlântica/Horizonte ids.
+ *
+ * Idempotent — if a contract in the seeded range already exists for
+ * this agency, the function is a no-op. Lets `seedPreview` (post-wipe)
+ * and the standalone `seedAprovadaContracts` mutation (against
+ * existing prod data) both call it safely.
  */
-async function seedAprovadaContracts(ctx: MutationCtx, agencyId: AgencyId) {
+async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
   const FIRST_PID = 31;
   const FEE_MULTIPLIER = 1.6;
+
+  const existingForAgency = await ctx.db
+    .query("contracts")
+    .withIndex("by_publicId", (q) => q.eq("publicId", pid(FIRST_PID)))
+    .collect();
+  if (existingForAgency.some((c) => c.agencyId === agencyId)) {
+    return { contractsInserted: 0, ativoCount: 0, skipped: true as const };
+  }
 
   type ContractSpec = {
     n: number;
@@ -2601,6 +2614,20 @@ async function seedAprovadaContracts(ctx: MutationCtx, agencyId: AgencyId) {
 }
 
 /**
+ * Standalone wrapper for {@link populateAprovadaBook} — lets you seed the
+ * Aprovada starter book against any existing agency id without running
+ * the full `seedPreview` (which wipes the DB). Idempotent: re-runs
+ * against the same agency are a no-op.
+ *
+ * Run with:
+ *   bunx convex run seed:seedAprovadaContracts '{"agencyId":"<id>"}'
+ */
+export const seedAprovadaContracts = internalMutation({
+  args: { agencyId: v.id("agencies") },
+  handler: async (ctx, args) => populateAprovadaBook(ctx, args.agencyId),
+});
+
+/**
  * One-shot preview reset: wipes the demo tables, re-seeds the fictional
  * dataset, attaches the four Auth0 test personas, and tops the
  * `agencyowner` persona's agency ("Imobiliária Aprovada") with a small
@@ -2621,7 +2648,7 @@ export const seedPreview = internalMutation({
     const personas: SeedPersonasResult = await ctx.runMutation(internal.seed.seedTestPersonas, {});
 
     const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
-    const aprovada = aprovadaAgencyId ? await seedAprovadaContracts(ctx, aprovadaAgencyId) : null;
+    const aprovada = aprovadaAgencyId ? await populateAprovadaBook(ctx, aprovadaAgencyId) : null;
 
     return { fictional, personas, aprovada };
   },
