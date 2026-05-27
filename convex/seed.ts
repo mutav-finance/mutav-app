@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, type MutationCtx } from "./_generated/server";
 import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./payments/domain";
 import { generatePaymentMuxedId } from "./payments/lib/muxedId";
 import type { AgencyId } from "./agencies/domain";
@@ -15,8 +16,34 @@ const pid = (n: number) => String(1_000_000 + n);
 const d = (s: string) => s;
 
 /**
- * Idempotent dev seed — 3 agencies, 30 contracts, contract history, and
- * historical payments covering the last two months.
+ * Demo tables wiped by `clearAll` and `seedPreview`. Order matters —
+ * tables with foreign-key-like references come first so we don't leave
+ * dangling pointers mid-wipe.
+ */
+const DEMO_TABLES = [
+  "payments",
+  "contractHistory",
+  "contracts",
+  "memberships",
+  "users",
+  "agencies",
+] as const;
+
+async function wipeDemoTables(ctx: MutationCtx) {
+  for (const table of DEMO_TABLES) {
+    let rows = await ctx.db.query(table).take(200);
+    while (rows.length > 0) {
+      for (const row of rows) await ctx.db.delete(row._id);
+      rows = await ctx.db.query(table).take(200);
+    }
+  }
+}
+
+/**
+ * Additive dev seed — inserts 3 agencies, 30 contracts, contract history,
+ * and historical payments covering the last two months. Does NOT wipe
+ * existing rows; call `clearAll` first if you need a clean slate, or use
+ * `seedPreview` for the standard wipe-then-seed flow.
  *
  * Optional `adminEmail` provisions a user row with that email and grants
  * it owner/admin/member memberships across the three seeded agencies. On
@@ -25,30 +52,14 @@ const d = (s: string) => s;
  * developer inherits the seeded memberships without re-onboarding.
  *
  * Run with:
- *   bunx convex run seed:fictionalContracts
- *   bunx convex run seed:fictionalContracts '{"adminEmail":"you@example.com"}'
+ *   bunx convex run seed:seedFictional
+ *   bunx convex run seed:seedFictional '{"adminEmail":"you@example.com"}'
  *
  * Dev-only. Do NOT call from production.
  */
-export const fictionalContracts = internalMutation({
+export const seedFictional = internalMutation({
   args: { adminEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    // Wipe in dependency order.
-    for (const table of [
-      "payments",
-      "contractHistory",
-      "contracts",
-      "memberships",
-      "users",
-      "agencies",
-    ] as const) {
-      let rows = await ctx.db.query(table).take(200);
-      while (rows.length > 0) {
-        for (const row of rows) await ctx.db.delete(row._id);
-        rows = await ctx.db.query(table).take(200);
-      }
-    }
-
     // ── Agencies ──────────────────────────────────────────────────────────────
 
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
@@ -2263,20 +2274,355 @@ export const seedTestPersonas = internalMutation({
 export const clearAll = internalMutation({
   args: {},
   handler: async (ctx) => {
-    for (const table of [
-      "payments",
-      "contractHistory",
-      "contracts",
-      "memberships",
-      "users",
-      "agencies",
-    ] as const) {
-      let rows = await ctx.db.query(table).take(200);
-      while (rows.length > 0) {
-        for (const row of rows) await ctx.db.delete(row._id);
-        rows = await ctx.db.query(table).take(200);
-      }
-    }
+    await wipeDemoTables(ctx);
     return null;
+  },
+});
+
+type SeedFictionalResult = {
+  agencies: { paulistaId: AgencyId; atlanticaId: AgencyId; horizonteId: AgencyId };
+  contractCounts: { paulista: number; atlantica: number; horizonte: number };
+};
+
+type SeedPersonasResult = Array<{
+  persona: PersonaKey;
+  userId: import("./_generated/dataModel").Id<"users">;
+  agencyId: AgencyId | null;
+  skipped?: boolean;
+}>;
+
+/**
+ * Populate the `agencyowner` persona's agency ("Imobiliária Aprovada")
+ * with a believable dashboard: 4 ativo + 1 pendente + 1 encerrado
+ * contracts, two months of paid history, one month due. Distinct
+ * `publicId` range (1000031–1000036) so it doesn't collide with the
+ * fictional Paulista/Atlântica/Horizonte ids.
+ */
+async function seedAprovadaContracts(ctx: MutationCtx, agencyId: AgencyId) {
+  const FIRST_PID = 31;
+  const FEE_MULTIPLIER = 1.6;
+
+  type ContractSpec = {
+    n: number;
+    status: "ativo" | "pendente" | "encerrado";
+    activatedAt: string | null;
+    deactivatedAt: string | null;
+    nextRenewalDate: string;
+    rentCents: number;
+    condoCents: number;
+    property: { cep: string; streetAndNumber: string; neighborhood: string; cityUF: string };
+    complement: string;
+    tenant: {
+      fullName: string;
+      cpf: string;
+      birthDate: string;
+      phoneSuffix: string;
+      emailLocal: string;
+      score: number;
+    };
+  };
+
+  const specs: ContractSpec[] = [
+    {
+      n: 0,
+      status: "ativo",
+      activatedAt: d("2025-09-15T10:00:00-03:00"),
+      deactivatedAt: null,
+      nextRenewalDate: "2027-09-15",
+      rentCents: 285_000,
+      condoCents: 42_000,
+      property: {
+        cep: "04543-011",
+        streetAndNumber: "Rua Joaquim Floriano, 533",
+        neighborhood: "Itaim Bibi",
+        cityUF: "São Paulo/SP",
+      },
+      complement: "Apto 82",
+      tenant: {
+        fullName: "Beatriz Almeida Carvalho",
+        cpf: "232.323.232-32",
+        birthDate: "1992-08-23",
+        phoneSuffix: "31",
+        emailLocal: "beatriz.almeida",
+        score: 780,
+      },
+    },
+    {
+      n: 1,
+      status: "ativo",
+      activatedAt: d("2025-11-01T10:00:00-03:00"),
+      deactivatedAt: null,
+      nextRenewalDate: "2027-11-01",
+      rentCents: 420_000,
+      condoCents: 65_000,
+      property: {
+        cep: "01451-000",
+        streetAndNumber: "Rua Oscar Freire, 1200",
+        neighborhood: "Jardins",
+        cityUF: "São Paulo/SP",
+      },
+      complement: "Apto 1502",
+      tenant: {
+        fullName: "Rafael Monteiro Lima",
+        cpf: "323.232.323-23",
+        birthDate: "1985-04-17",
+        phoneSuffix: "32",
+        emailLocal: "rafael.monteiro",
+        score: 820,
+      },
+    },
+    {
+      n: 2,
+      status: "ativo",
+      activatedAt: d("2026-01-20T10:00:00-03:00"),
+      deactivatedAt: null,
+      nextRenewalDate: "2028-01-20",
+      rentCents: 195_000,
+      condoCents: 28_000,
+      property: {
+        cep: "05402-000",
+        streetAndNumber: "Rua Cardeal Arcoverde, 1820",
+        neighborhood: "Pinheiros",
+        cityUF: "São Paulo/SP",
+      },
+      complement: "Apto 41",
+      tenant: {
+        fullName: "Letícia Andrade Pires",
+        cpf: "424.242.424-24",
+        birthDate: "1994-11-30",
+        phoneSuffix: "33",
+        emailLocal: "leticia.andrade",
+        score: 695,
+      },
+    },
+    {
+      n: 3,
+      status: "ativo",
+      activatedAt: d("2026-03-10T10:00:00-03:00"),
+      deactivatedAt: null,
+      nextRenewalDate: "2028-03-10",
+      rentCents: 650_000,
+      condoCents: 98_000,
+      property: {
+        cep: "01310-100",
+        streetAndNumber: "Av. Paulista, 2100",
+        neighborhood: "Bela Vista",
+        cityUF: "São Paulo/SP",
+      },
+      complement: "Cobertura 18",
+      tenant: {
+        fullName: "Fernanda Lopes Cavalcanti",
+        cpf: "525.252.525-25",
+        birthDate: "1980-07-08",
+        phoneSuffix: "34",
+        emailLocal: "fernanda.lopes",
+        score: 855,
+      },
+    },
+    {
+      n: 4,
+      status: "pendente",
+      activatedAt: null,
+      deactivatedAt: null,
+      nextRenewalDate: "2028-06-01",
+      rentCents: 340_000,
+      condoCents: 52_000,
+      property: {
+        cep: "04094-050",
+        streetAndNumber: "Rua Vergueiro, 3800",
+        neighborhood: "Vila Mariana",
+        cityUF: "São Paulo/SP",
+      },
+      complement: "Apto 73",
+      tenant: {
+        fullName: "Gustavo Ribeiro Tavares",
+        cpf: "626.262.626-26",
+        birthDate: "1989-02-14",
+        phoneSuffix: "35",
+        emailLocal: "gustavo.ribeiro",
+        score: 610,
+      },
+    },
+    {
+      n: 5,
+      status: "encerrado",
+      activatedAt: d("2024-04-15T10:00:00-03:00"),
+      deactivatedAt: d("2026-03-31T18:00:00-03:00"),
+      nextRenewalDate: "2026-04-15",
+      rentCents: 225_000,
+      condoCents: 38_000,
+      property: {
+        cep: "02011-000",
+        streetAndNumber: "Rua Voluntários da Pátria, 990",
+        neighborhood: "Santana",
+        cityUF: "São Paulo/SP",
+      },
+      complement: "Apto 22",
+      tenant: {
+        fullName: "Bruno Tavares Macedo",
+        cpf: "727.272.727-27",
+        birthDate: "1986-09-19",
+        phoneSuffix: "36",
+        emailLocal: "bruno.tavares",
+        score: 705,
+      },
+    },
+  ];
+
+  const inserted: { spec: ContractSpec; id: ContractId; publicId: string; feeCents: number }[] = [];
+
+  for (const spec of specs) {
+    const publicId = pid(FIRST_PID + spec.n);
+    const feeCents = Math.round(spec.rentCents * FEE_MULTIPLIER);
+    const isApproved = spec.status !== "pendente";
+
+    const id = await ctx.db.insert("contracts", {
+      agencyId,
+      publicId,
+      tenantCpf: spec.tenant.cpf.replace(/\D/g, ""),
+      status: spec.status,
+      activatedAt: spec.activatedAt,
+      deactivatedAt: spec.deactivatedAt,
+      nextRenewalDate: spec.nextRenewalDate,
+      availableGuaranteeCents: spec.status === "encerrado" ? 0 : spec.rentCents * 40,
+      rental: {
+        propertyKind: "residencial",
+        rentCents: spec.rentCents,
+        condoCents: spec.condoCents,
+        otherFeesCents: 0,
+        totalRentCents: spec.rentCents + spec.condoCents,
+        feeCents,
+        oneTimeActivationFeeCents: 20_000,
+        setupInstallments: 1,
+        exitCostMultiplier: "6x",
+        rentMultiplier: "48x",
+        payer: "Recorrência via Imobiliária",
+        pviMigrationSchedule: null,
+      },
+      property: spec.property,
+      optional: { complement: spec.complement, tag: "", description: "" },
+      documents: isApproved
+        ? [
+            { key: "rentalContract", status: "aprovado" },
+            { key: "inspection", status: "aprovado" },
+            { key: "policy", status: "aprovado" },
+          ]
+        : [
+            { key: "rentalContract", status: "enviado" },
+            { key: "inspection", status: "pendente" },
+            { key: "policy", status: "pendente" },
+          ],
+      tenant: {
+        approvalStatus: isApproved ? "aprovado" : "pendente",
+        fullName: spec.tenant.fullName,
+        cpf: spec.tenant.cpf,
+        birthDate: spec.tenant.birthDate,
+        email: `${spec.tenant.emailLocal}@example.com`,
+        phone: `119000000${spec.tenant.phoneSuffix}`,
+        termApprovedAt: isApproved ? (spec.activatedAt ?? d("2025-09-15T09:00:00-03:00")) : null,
+        score: spec.tenant.score,
+      },
+    });
+    inserted.push({ spec, id, publicId, feeCents });
+  }
+
+  for (const row of inserted) {
+    const doc = await ctx.db.get(row.id);
+    if (doc) await contractsByStatus.insert(ctx, doc);
+  }
+
+  const ativoRows = inserted.filter((r) => r.spec.status === "ativo");
+
+  const monthlyLineItems = (month: string) =>
+    ativoRows.map((r) => ({
+      contractId: r.id,
+      contractPublicId: r.publicId,
+      kind: PAYMENT_LINE_ITEM_KIND.RECURRING,
+      amountCents: r.feeCents,
+      description: `Mensalidade contrato ${r.publicId} — ${month}`,
+    }));
+
+  const march = monthlyLineItems("2026-03");
+  await ctx.db.insert("payments", {
+    agencyId,
+    publicId: "PAY-2026-03-0500",
+    periodMonth: "2026-03",
+    issuedAt: "2026-03-01",
+    dueDate: "2026-03-10",
+    totalCents: march.reduce((s, x) => s + x.amountCents, 0),
+    state: PaymentStates.paid(d("2026-03-08T10:00:00-03:00")),
+    method: PaymentMethods.pix(
+      "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b500",
+      "E00038166202603081000aprov01",
+    ),
+    muxedId: generatePaymentMuxedId(),
+    lineItems: march,
+  });
+
+  const april = monthlyLineItems("2026-04");
+  await ctx.db.insert("payments", {
+    agencyId,
+    publicId: "PAY-2026-04-0500",
+    periodMonth: "2026-04",
+    issuedAt: "2026-04-01",
+    dueDate: "2026-04-10",
+    totalCents: april.reduce((s, x) => s + x.amountCents, 0),
+    state: PaymentStates.paid(d("2026-04-07T11:30:00-03:00")),
+    method: PaymentMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000005920"),
+    muxedId: generatePaymentMuxedId(),
+    lineItems: april,
+  });
+
+  const may = monthlyLineItems("2026-05");
+  await ctx.db.insert("payments", {
+    agencyId,
+    publicId: "PAY-2026-05-0500",
+    periodMonth: "2026-05",
+    issuedAt: "2026-05-01",
+    dueDate: "2026-05-10",
+    totalCents: may.reduce((s, x) => s + x.amountCents, 0),
+    state: PaymentStates.pending(),
+    method: null,
+    muxedId: generatePaymentMuxedId(),
+    lineItems: may,
+  });
+
+  for (const r of ativoRows) {
+    await ctx.db.insert("contractHistory", {
+      agencyId,
+      contractPublicId: r.publicId,
+      at: r.spec.activatedAt ?? d("2025-09-15T09:00:00-03:00"),
+      username: "agency.owner",
+      message: `Criada Solicitação #${r.publicId} — ${r.spec.tenant.fullName}, aluguel R$ ${(r.spec.rentCents / 100).toLocaleString("pt-BR")}.`,
+    });
+  }
+
+  return { contractsInserted: inserted.length, ativoCount: ativoRows.length };
+}
+
+/**
+ * One-shot preview reset: wipes the demo tables, re-seeds the fictional
+ * dataset, attaches the four Auth0 test personas, and tops the
+ * `agencyowner` persona's agency ("Imobiliária Aprovada") with a small
+ * believable contract set so logging in as that persona lands on a
+ * populated dashboard. This is what the Vercel preview hook
+ * (`scripts/seed-preview.sh`) and a developer's "give me a clean dev
+ * DB" workflow call.
+ *
+ * The two nested `runMutation` calls are same-file, so per the Convex
+ * guidelines the local return types are annotated to break TypeScript
+ * circularity.
+ */
+export const seedPreview = internalMutation({
+  args: { adminEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    await wipeDemoTables(ctx);
+    const fictional: SeedFictionalResult = await ctx.runMutation(internal.seed.seedFictional, args);
+    const personas: SeedPersonasResult = await ctx.runMutation(internal.seed.seedTestPersonas, {});
+
+    const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
+    const aprovada = aprovadaAgencyId ? await seedAprovadaContracts(ctx, aprovadaAgencyId) : null;
+
+    return { fictional, personas, aprovada };
   },
 });

@@ -30,13 +30,16 @@ Staff identity isn't enforced anywhere yet — the `(admin)` route group + `quer
 
 ## Recreating the personas on a fresh Convex deployment
 
-Each preview deployment gets its own Convex DB (5-day auto-cleanup). One command bootstraps all four personas:
+Each preview deployment gets its own Convex DB (5-day auto-cleanup). For Vercel previews this is automatic — `scripts/seed-preview.sh` calls `seed:seedPreview` after every deploy, which wipes the DB and re-seeds the fictional dataset plus all four personas.
 
-```bash
-bunx convex run seed:seedTestPersonas
-```
+For local dev or manual reset, two commands give you each axis of the seed:
 
-Idempotent — re-runs skip personas whose state already matches. The Auth0 side (account + password) doesn't need recreating — it's tenant-scoped, not deployment-scoped.
+| Goal                                                           | Command                                 |
+| -------------------------------------------------------------- | --------------------------------------- |
+| Full reset (wipe + fictional dataset + personas)               | `bunx convex run seed:seedPreview`      |
+| Refresh only the personas (idempotent, leaves everything else) | `bunx convex run seed:seedTestPersonas` |
+
+`seedTestPersonas` skips personas whose state already matches, so it's safe to re-run. The Auth0 side (account + password) doesn't need recreating — it's tenant-scoped, not deployment-scoped.
 
 ## Recreating the personas on a fresh Auth0 tenant
 
