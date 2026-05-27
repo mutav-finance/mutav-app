@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAction, useQuery } from "convex/react";
 import QRCode from "qrcode";
@@ -60,12 +60,16 @@ export function CheckoutPixView({ paymentId, agencyId, totalCents }: Props) {
     lang: locale,
   });
 
+  // Cleanup runs once on unmount. `useEffectEvent` decouples the latest
+  // cancel/reset references from the effect's dep array so we don't
+  // re-run the effect (and re-arm the cleanup) whenever the on-ramp
+  // hook re-renders.
+  const onUnmount = useEffectEvent(() => {
+    cancel();
+    reset();
+  });
   useEffect(() => {
-    return () => {
-      cancel();
-      reset();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => onUnmount();
   }, []);
 
   const handleConfirm = useCallback(
@@ -437,38 +441,33 @@ function FailedBlock({ message }: { message: string }) {
 }
 
 function PaymentQrCode({ value }: { value: string }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    QRCode.toDataURL(value, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      color: { dark: "#1A1A1A", light: "#FFFFFF" },
-      width: 240,
-    })
-      .then((url) => {
-        if (!cancelled) setDataUrl(url);
-      })
-      .catch(() => {
-        if (!cancelled) setDataUrl(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [value]);
+  const dataUrlPromise = useMemo(
+    () =>
+      QRCode.toDataURL(value, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        color: { dark: "#1A1A1A", light: "#FFFFFF" },
+        width: 240,
+      }).catch(() => null),
+    [value],
+  );
 
   return (
     <div className="flex justify-center">
       <div className="border-border bg-background inline-flex items-center justify-center border p-2">
-        {dataUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={dataUrl} alt="Pix QR" width={240} height={240} />
-        ) : (
-          <div className="bg-muted size-[240px] animate-pulse" />
-        )}
+        <Suspense fallback={<div className="bg-muted size-[240px] animate-pulse" />}>
+          <PaymentQrImage promise={dataUrlPromise} />
+        </Suspense>
       </div>
     </div>
   );
+}
+
+function PaymentQrImage({ promise }: { promise: Promise<string | null> }) {
+  const dataUrl = use(promise);
+  if (!dataUrl) return <div className="bg-muted size-[240px] animate-pulse" />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={dataUrl} alt="Pix QR" width={240} height={240} />;
 }
 
 function CopyField({ label, value }: { label: string; value: string }) {

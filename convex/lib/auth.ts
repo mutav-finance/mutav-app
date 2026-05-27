@@ -8,11 +8,12 @@ import type { Membership } from "../agencies/domain";
 /**
  * Authenticated identity helpers + per-handler wrappers.
  *
- * Pre-Auth0 (current state): identity is resolved by looking up the hardcoded
- * `dev-user` row — same shortcut the client's `WorkspaceContext` uses. When
- * Auth0 ships, swap `resolveCurrentUser` below to read `ctx.auth.getUserIdentity()`
- * and look up the user by JWT subject. Every wrapped handler picks up the
- * change for free; no per-handler edits.
+ * `ctx.auth.getUserIdentity()` returns the decoded ID token issued by
+ * Auth0; we look up the user by `subject` (the `{issuer}|{userId}` JWT
+ * claim). First-login provisioning happens via
+ * `users.getOrCreateByIdentity` — wrappers throw `UnauthenticatedError`
+ * if the row hasn't been created yet, which the client recovers from by
+ * calling `getOrCreateByIdentity` once at session start.
  *
  * Wrappers:
  * - `queryWithAuth` / `mutationWithAuth` — adds `ctx.user` (the resolved
@@ -47,29 +48,23 @@ export class ForbiddenError extends Error {
   }
 }
 
-/**
- * Pre-Auth0 stand-in for `ctx.auth.getUserIdentity()`. Once Auth0 lands,
- * delete this constant and replace `resolveCurrentUser` with a real identity
- * lookup keyed on `identity.subject`.
- */
-const DEV_USER_PUBLIC_ID = "dev-user";
-
 async function resolveCurrentUser(ctx: DbCtx): Promise<User> {
-  // TODO(auth0): replace with
-  //   const identity = await ctx.auth.getUserIdentity();
-  //   if (!identity) throw new UnauthenticatedError();
-  //   const user = await ctx.db.query("users")
-  //     .withIndex("by_subject", q => q.eq("subject", identity.subject))
-  //     .unique();
-  //   if (!user) throw new UnauthenticatedError("User row not provisioned");
-  //   return user;
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new UnauthenticatedError("Authentication required");
+  }
   const user = await ctx.db
     .query("users")
-    .withIndex("by_publicId", (q) => q.eq("publicId", DEV_USER_PUBLIC_ID))
+    .withIndex("by_subject", (q) => q.eq("subject", identity.subject))
     .unique();
   if (!user) {
+    // The JWT is valid but no Convex row exists yet — the client must
+    // call `users.getOrCreateByIdentity` once at session start to
+    // provision. Throwing here surfaces the missing provisioning
+    // explicitly instead of silently failing reads.
     throw new UnauthenticatedError(
-      `Dev user '${DEV_USER_PUBLIC_ID}' not found — run \`bunx convex run seed\``,
+      "Authenticated, but no user row provisioned. " +
+        "Call `users.getOrCreateByIdentity` once at session start.",
     );
   }
   return user;

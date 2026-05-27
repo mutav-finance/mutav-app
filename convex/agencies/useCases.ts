@@ -77,8 +77,8 @@ export const getById = internalQuery({
 
 /**
  * Lists the agencies the current user belongs to. Identity is resolved by the
- * wrapper (pre-Auth0: `dev-user`; post-Auth0: JWT subject) — no client-side
- * `userId` arg, so a caller can never enumerate another user's memberships.
+ * wrapper from the JWT subject — no client-side `userId` arg, so a caller can
+ * never enumerate another user's memberships.
  */
 export const listAgenciesForUser = queryWithAuth({
   args: {},
@@ -96,7 +96,10 @@ export const listAgenciesForUser = queryWithAuth({
       }),
     );
 
-    return results.filter(Boolean);
+    // Explicit predicate so the array narrows to `NonNullable<…>[]`;
+    // `.filter(Boolean)` strips the null at runtime but TypeScript still
+    // returns `(T | null)[]`, forcing optional-chains at every callsite.
+    return results.filter((r): r is NonNullable<typeof r> => r !== null);
   },
 });
 

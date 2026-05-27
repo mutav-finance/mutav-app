@@ -1,22 +1,46 @@
-// Convex authentication config.
-//
-// No JWT provider is wired yet — the providers array is intentionally empty.
-// Every Convex function in this app must therefore treat
-// `ctx.auth.getUserIdentity()` as `null` and route through `requireIdentity`
-// in `convex/lib/auth.ts`, which fails closed when auth is unconfigured.
-//
-// To enable auth, add a provider entry pointing at the JWT issuer's
-// `/.well-known/openid-configuration` URL — for example:
-//
-//   providers: [
-//     { domain: "https://your-issuer.example.com", applicationID: "convex" },
-//   ],
-//
-// See the Convex auth guidelines (convex/_generated/ai/guidelines.md) and
-// https://docs.convex.dev/auth for provider setup.
+import { getAuth0ClientId, getAuth0Domain } from "./lib/env";
+
+/**
+ * Convex auth providers — Auth0 JWT verification.
+ *
+ * **REQUIRED env vars on every Convex deployment** (yes, every — dev,
+ * preview, prod):
+ *
+ *   bunx convex env set AUTH0_DOMAIN <tenant.auth0.com>
+ *   bunx convex env set AUTH0_CLIENT_ID <client-id>
+ *
+ * Convex's deploy-time analyzer scans this file (and everything it
+ * transitively imports) for `process.env.X` references and refuses to
+ * deploy if any referenced var is missing from the deployment. The
+ * lazy-getter pattern in `lib/env.ts` does NOT bypass this — the
+ * analyzer follows call chains. That was the lesson of PR #75's
+ * rollback; do not repeat it.
+ *
+ * Half-configured (one set, one empty) is treated as fully unconfigured
+ * — both must be real for the provider to register, otherwise every
+ * authenticated request throws `UnauthenticatedError`.
+ */
+const domain = getAuth0Domain();
+const applicationID = getAuth0ClientId();
+
+// Normalize the domain to an https:// origin. Accepts:
+//   - bare host (`tenant.auth0.com`) — most common, recommended
+//   - already-prefixed `https://tenant.auth0.com`
+// Rejects `http://` (silent downgrade to an unencrypted JWT issuer would
+// break verification at best, mis-trust a forgery at worst).
+function normalizeAuth0Issuer(value: string): string {
+  if (value.startsWith("https://")) return value;
+  if (value.startsWith("http://")) {
+    throw new Error(
+      `AUTH0_DOMAIN must use https:// (got "${value}"). Strip the scheme or fix the env value.`,
+    );
+  }
+  return `https://${value}`;
+}
 
 const authConfig = {
-  providers: [],
+  providers:
+    domain && applicationID ? [{ domain: normalizeAuth0Issuer(domain), applicationID }] : [],
 };
 
 export default authConfig;

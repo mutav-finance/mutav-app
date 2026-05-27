@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
-import { seedDevUser } from "../lib/testFixtures";
+import { setupAuthenticatedUser, type SeededUserId } from "../lib/testFixtures";
 import schema from "../schema";
 
 // PII crypto keys must be present before any handler calls hashPii.
@@ -48,9 +48,9 @@ function empresaArgs(overrides: Partial<Record<string, string>> = {}) {
 describe("startOnboarding", () => {
   test("creates a new autonomo agency + owner membership on first call", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const result = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const result = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
 
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -72,9 +72,9 @@ describe("startOnboarding", () => {
 
   test("creates an empresa agency with representante fields", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const result = await t.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
+    const result = await asUser.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
 
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -87,13 +87,13 @@ describe("startOnboarding", () => {
 
   test("resumes (idempotent) when called twice with same type — no duplicate agency", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const first = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const first = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(first.success).toBe(true);
     if (!first.success) return;
 
-    const second = await t.mutation(
+    const second = await asUser.mutation(
       api.agencies.useCases.startOnboarding,
       autonomoArgs({ name: "Updated Name" }),
     );
@@ -110,12 +110,12 @@ describe("startOnboarding", () => {
 
   test("returns AGENCY_TYPE_CONFLICT when switching type mid-session", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const first = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const first = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(first.success).toBe(true);
 
-    const second = await t.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
+    const second = await asUser.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
     expect(second.success).toBe(false);
     if (second.success) return;
     expect(second.error.code).toBe("AGENCY_TYPE_CONFLICT");
@@ -123,9 +123,9 @@ describe("startOnboarding", () => {
 
   test("rejects invalid CPF before writing anything", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const result = await t.mutation(
+    const result = await asUser.mutation(
       api.agencies.useCases.startOnboarding,
       autonomoArgs({ cpf: "11111111111" }), // all-same digits — fails checksum
     );
@@ -139,9 +139,9 @@ describe("startOnboarding", () => {
 
   test("rejects invalid CNPJ before writing anything", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const result = await t.mutation(
+    const result = await asUser.mutation(
       api.agencies.useCases.startOnboarding,
       empresaArgs({ cnpj: "11111111111111" }),
     );
@@ -152,7 +152,7 @@ describe("startOnboarding", () => {
 
   test("ALREADY_REGISTERED blocks new registration with same CPF after another agency submitted", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
     // Simulate a prior submitted agency with the same CPF (different user — different membership)
     await t.run(async (ctx) => {
@@ -166,7 +166,7 @@ describe("startOnboarding", () => {
       });
     });
 
-    const result = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const result = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("ALREADY_REGISTERED");
@@ -174,9 +174,9 @@ describe("startOnboarding", () => {
 
   test("strips CPF formatting before storage and validation", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const result = await t.mutation(
+    const result = await asUser.mutation(
       api.agencies.useCases.startOnboarding,
       autonomoArgs({ cpf: "111.444.777-35" }),
     );
@@ -190,10 +190,10 @@ describe("startOnboarding", () => {
 describe("submitOnboarding", () => {
   test("rejects NOT_IN_PROGRESS when agency already submitted", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
     // Start + manually flip to submitted
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
     const agencyId = start.data.agencyId;
@@ -205,7 +205,7 @@ describe("submitOnboarding", () => {
       }),
     );
 
-    const result = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    const result = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("NOT_IN_PROGRESS");
@@ -213,13 +213,13 @@ describe("submitOnboarding", () => {
 
   test("rejects BANKING_INFO_REQUIRED when bankingInfo not saved", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
 
-    const result = await t.mutation(api.agencies.useCases.submitOnboarding, {
+    const result = await asUser.mutation(api.agencies.useCases.submitOnboarding, {
       agencyId: start.data.agencyId,
     });
     expect(result.success).toBe(false);
@@ -229,14 +229,14 @@ describe("submitOnboarding", () => {
 
   test("rejects MISSING_DOCUMENTS for empresa when uploads incomplete", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
     const agencyId = start.data.agencyId;
 
-    await t.mutation(api.agencies.useCases.saveBankingInfo, {
+    await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
       agencyId,
       bankingInfo: {
         bank: "Test Bank",
@@ -246,7 +246,7 @@ describe("submitOnboarding", () => {
       },
     });
 
-    const result = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    const result = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("MISSING_DOCUMENTS");
@@ -257,14 +257,14 @@ describe("submitOnboarding", () => {
 
   test("autonomo: full happy path → submitted", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
     const agencyId = start.data.agencyId;
 
-    const banking = await t.mutation(api.agencies.useCases.saveBankingInfo, {
+    const banking = await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
       agencyId,
       bankingInfo: {
         bank: "Nubank",
@@ -275,7 +275,7 @@ describe("submitOnboarding", () => {
     });
     expect(banking.success).toBe(true);
 
-    const submit = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    const submit = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
     expect(submit.success).toBe(true);
     if (!submit.success) return;
     expect(submit.data.agencyId).toBe(agencyId);
@@ -288,14 +288,14 @@ describe("submitOnboarding", () => {
 
   test("consentMarketing flag is persisted", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
     const agencyId = start.data.agencyId;
 
-    await t.mutation(api.agencies.useCases.saveBankingInfo, {
+    await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
       agencyId,
       bankingInfo: {
         bank: "Nubank",
@@ -305,7 +305,7 @@ describe("submitOnboarding", () => {
       },
     });
 
-    await t.mutation(api.agencies.useCases.submitOnboarding, {
+    await asUser.mutation(api.agencies.useCases.submitOnboarding, {
       agencyId,
       consentMarketing: true,
     });
@@ -316,18 +316,18 @@ describe("submitOnboarding", () => {
 
   test("inserts a claimedDocuments row carrying the HMAC, not the plaintext", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
     const agencyId = start.data.agencyId;
 
-    await t.mutation(api.agencies.useCases.saveBankingInfo, {
+    await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
       agencyId,
       bankingInfo: { bank: "Nu", branch: "1", account: "1", accountType: "corrente" },
     });
-    await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
 
     const claims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
     expect(claims).toHaveLength(1);
@@ -339,7 +339,7 @@ describe("submitOnboarding", () => {
 
   test("ALREADY_REGISTERED when a concurrent agency claimed the same CPF first", async () => {
     const t = convexTest(schema);
-    const userId = await seedDevUser(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
 
     const [agencyA, agencyB] = await Promise.all([
       seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency A"),
@@ -349,8 +349,8 @@ describe("submitOnboarding", () => {
     // Sequential, but the second one observes the first's claim row — same
     // semantic outcome as Convex OCC retrying the loser.
     const [resultA, resultB] = await Promise.all([
-      t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA }),
-      t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyB }),
+      asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA }),
+      asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyB }),
     ]);
 
     const successes = [resultA, resultB].filter((r) => r.success);
@@ -367,17 +367,17 @@ describe("submitOnboarding", () => {
 
   test("submitting twice for the same agency is idempotent at the claim layer", async () => {
     const t = convexTest(schema);
-    const userId = await seedDevUser(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Solo");
 
-    const first = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    const first = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
     expect(first.success).toBe(true);
 
     // Manually flip back to in_progress to exercise the "same-agency" branch
     // of the claim check; in production this can't happen, but it exercises
     // the `existingClaim.agencyId === agencyId` short-circuit.
     await t.run((ctx) => ctx.db.patch(agencyId, { onboardingState: "in_progress" }));
-    const second = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+    const second = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
     expect(second.success).toBe(true);
 
     const claims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
@@ -388,13 +388,15 @@ describe("submitOnboarding", () => {
 describe("reviewOnboarding (claim lifecycle)", () => {
   test("rejecting frees the claim so the same CPF can re-register", async () => {
     const t = convexTest(schema);
-    const userId = await seedDevUser(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
 
     const agencyA = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency A");
-    const submitA = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA });
+    const submitA = await asUser.mutation(api.agencies.useCases.submitOnboarding, {
+      agencyId: agencyA,
+    });
     expect(submitA.success).toBe(true);
 
-    const reject = await t.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
+    const reject = await asUser.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
       agencyId: agencyA,
       decision: "rejected",
       rejectionReason: "test",
@@ -406,7 +408,9 @@ describe("reviewOnboarding (claim lifecycle)", () => {
 
     // A fresh agency claims the now-free CPF.
     const agencyB = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency B");
-    const submitB = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyB });
+    const submitB = await asUser.mutation(api.agencies.useCases.submitOnboarding, {
+      agencyId: agencyB,
+    });
     expect(submitB.success).toBe(true);
 
     const finalClaims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
@@ -416,11 +420,11 @@ describe("reviewOnboarding (claim lifecycle)", () => {
 
   test("approving retains the claim — no other agency can take the CPF", async () => {
     const t = convexTest(schema);
-    const userId = await seedDevUser(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
 
     const agencyA = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency A");
-    await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA });
-    const approve = await t.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
+    await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA });
+    const approve = await asUser.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
       agencyId: agencyA,
       decision: "approved",
     });
@@ -431,7 +435,9 @@ describe("reviewOnboarding (claim lifecycle)", () => {
     expect(claims[0].agencyId).toBe(agencyA);
 
     const agencyB = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency B");
-    const submitB = await t.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyB });
+    const submitB = await asUser.mutation(api.agencies.useCases.submitOnboarding, {
+      agencyId: agencyB,
+    });
     expect(submitB.success).toBe(false);
     if (submitB.success) return;
     expect(submitB.error.code).toBe("ALREADY_REGISTERED");
@@ -440,7 +446,7 @@ describe("reviewOnboarding (claim lifecycle)", () => {
 
 async function seedReadyAutonomoAgency(
   t: ReturnType<typeof convexTest>,
-  userId: Awaited<ReturnType<typeof seedDevUser>>,
+  userId: SeededUserId,
   cpf: string,
   name: string,
 ) {
@@ -469,13 +475,13 @@ async function seedReadyAutonomoAgency(
 describe("saveBankingInfo (agency-scope wrapper)", () => {
   test("succeeds when caller is a member of the agency", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
 
-    const result = await t.mutation(api.agencies.useCases.saveBankingInfo, {
+    const result = await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
       agencyId: start.data.agencyId,
       bankingInfo: {
         bank: "Nubank",
@@ -490,9 +496,9 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
 
   test("throws ForbiddenError when caller is not a member of the agency", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    // Create an agency that dev-user has NO membership in
+    // Create an agency that the test user has NO membership in
     const foreignAgencyId = await t.run(async (ctx) => {
       return ctx.db.insert("agencies", {
         name: "Foreign Agency",
@@ -504,7 +510,7 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
     });
 
     await expect(
-      t.mutation(api.agencies.useCases.saveBankingInfo, {
+      asUser.mutation(api.agencies.useCases.saveBankingInfo, {
         agencyId: foreignAgencyId,
         bankingInfo: {
           bank: "Attacker Bank",
@@ -524,9 +530,9 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
 describe("saveDocument", () => {
   test("replaces existing document of same kind — deletes old storage + row, inserts new", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
     const agencyId = start.data.agencyId;
@@ -550,7 +556,7 @@ describe("saveDocument", () => {
     expect(beforeUrl).toBeTruthy();
 
     // Replace via saveDocument with same kind, different storageId
-    const result = await t.mutation(api.agencies.useCases.saveDocument, {
+    const result = await asUser.mutation(api.agencies.useCases.saveDocument, {
       agencyId,
       kind: "documento_empresa",
       storageId: secondStorageId,
@@ -578,9 +584,9 @@ describe("saveDocument", () => {
 
   test("first upload of a kind does NOT delete unrelated storage", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
 
-    const start = await t.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, empresaArgs());
     expect(start.success).toBe(true);
     if (!start.success) return;
     const agencyId = start.data.agencyId;
@@ -589,7 +595,7 @@ describe("saveDocument", () => {
     const unrelatedStorageId = await t.run((ctx) => ctx.storage.store(new Blob(["unrelated"])));
     const newStorageId = await t.run((ctx) => ctx.storage.store(new Blob(["new doc"])));
 
-    await t.mutation(api.agencies.useCases.saveDocument, {
+    await asUser.mutation(api.agencies.useCases.saveDocument, {
       agencyId,
       kind: "documento_empresa",
       storageId: newStorageId,

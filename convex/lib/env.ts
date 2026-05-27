@@ -193,6 +193,19 @@ export function getPiiEncryptionKey(): Buffer {
 }
 
 /**
+ * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). Must be SET on every
+ * Convex deployment — see `convex/auth.config.ts` for why the analyzer
+ * requires it even though only `auth.config.ts` reads it.
+ */
+export function getAuth0Domain(): string {
+  return process.env.AUTH0_DOMAIN ?? "";
+}
+
+export function getAuth0ClientId(): string {
+  return process.env.AUTH0_CLIENT_ID ?? "";
+}
+
+/**
  * Optional Stellar secret seed (`S…`) for the dedicated audit-anchor
  * account. Returns null when unset — the daily anchor cron then computes
  * and persists the Merkle root locally (status: `pending`) but skips the

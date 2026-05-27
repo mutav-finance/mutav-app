@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./payments/domain";
 import { generatePaymentMuxedId } from "./payments/lib/muxedId";
@@ -17,14 +18,21 @@ const d = (s: string) => s;
  * Idempotent dev seed â€” 3 agencies, 30 contracts, contract history, and
  * historical payments covering the last two months.
  *
+ * Optional `adminEmail` provisions a user row with that email and grants
+ * it owner/admin/member memberships across the three seeded agencies. On
+ * the developer's first Auth0 login with that email, the existing row
+ * gets its `subject` patched (see `getOrCreateByIdentity`) so the
+ * developer inherits the seeded memberships without re-onboarding.
+ *
  * Run with:
  *   bunx convex run seed:fictionalContracts
+ *   bunx convex run seed:fictionalContracts '{"adminEmail":"you@example.com"}'
  *
  * Dev-only. Do NOT call from production.
  */
 export const fictionalContracts = internalMutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { adminEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
     // Wipe in dependency order.
     for (const table of [
       "payments",
@@ -63,14 +71,14 @@ export const fictionalContracts = internalMutation({
 
     // â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    // dev-user is a super-user member of all three agencies (useful for
-    // the workspace-switcher dev shortcut).
-    const devUserId = await ctx.db.insert("users", {
-      publicId: "dev-user",
-      name: "Dev User",
-      email: "dev@sgr.example.com",
-      createdAt: d("2024-01-01T00:00:00-03:00"),
-    });
+    const adminUserId = args.adminEmail
+      ? await ctx.db.insert("users", {
+          publicId: `user-seed-${Date.now().toString(36)}`,
+          name: "Seed Admin",
+          email: args.adminEmail,
+          createdAt: d("2024-01-01T00:00:00-03:00"),
+        })
+      : null;
 
     const paulistaOwnerId = await ctx.db.insert("users", {
       publicId: "admin-paulista",
@@ -95,25 +103,28 @@ export const fictionalContracts = internalMutation({
 
     // â”€â”€ Memberships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    // dev-user: owner of Paulista, admin of AtlÃ¢ntica, member of Horizonte
-    await ctx.db.insert("memberships", {
-      userId: devUserId,
-      agencyId: paulistaId,
-      role: "owner",
-      joinedAt: d("2024-03-01T00:00:00-03:00"),
-    });
-    await ctx.db.insert("memberships", {
-      userId: devUserId,
-      agencyId: atlanticaId,
-      role: "admin",
-      joinedAt: d("2024-06-15T00:00:00-03:00"),
-    });
-    await ctx.db.insert("memberships", {
-      userId: devUserId,
-      agencyId: horizonteId,
-      role: "member",
-      joinedAt: d("2025-01-10T00:00:00-03:00"),
-    });
+    if (adminUserId) {
+      // Seed admin gets the full workspace-switcher experience: owner of
+      // Paulista, admin of AtlÃ¢ntica, member of Horizonte.
+      await ctx.db.insert("memberships", {
+        userId: adminUserId,
+        agencyId: paulistaId,
+        role: "owner",
+        joinedAt: d("2024-03-01T00:00:00-03:00"),
+      });
+      await ctx.db.insert("memberships", {
+        userId: adminUserId,
+        agencyId: atlanticaId,
+        role: "admin",
+        joinedAt: d("2024-06-15T00:00:00-03:00"),
+      });
+      await ctx.db.insert("memberships", {
+        userId: adminUserId,
+        agencyId: horizonteId,
+        role: "member",
+        joinedAt: d("2025-01-10T00:00:00-03:00"),
+      });
+    }
 
     // Each agency owner is owner of their own agency only
     await ctx.db.insert("memberships", {
@@ -2113,6 +2124,132 @@ export const fictionalContracts = internalMutation({
       agencies: { paulistaId, atlanticaId, horizonteId },
       contractCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
     };
+  },
+});
+
+/**
+ * Test personas — see `docs/test-personas.md`. Source of truth for the
+ * Auth0 subject ↔ Convex user binding so seeds attach state to the
+ * exact same identity the JWT will resolve to (no email-link dance).
+ */
+type PersonaKey = "systemadmin" | "agencyowner" | "pendinguser" | "newuser";
+
+const PERSONAS: Record<
+  PersonaKey,
+  {
+    email: string;
+    subject: string;
+    name: string;
+    agency: { name: string; cnpj: string; state: "active" | "under_review" } | null;
+  }
+> = {
+  systemadmin: {
+    email: "systemadmin@mutav.finance",
+    subject: "auth0|6a150df6a100fbf318f393c0",
+    name: "Mutav Team",
+    agency: null,
+  },
+  agencyowner: {
+    email: "agencyowner@mutav.finance",
+    subject: "auth0|6a150df7def07da7a5297480",
+    name: "Agency Owner",
+    agency: { name: "ImobiliÃ¡ria Aprovada", cnpj: "00000000000500", state: "active" },
+  },
+  pendinguser: {
+    email: "pendinguser@mutav.finance",
+    subject: "auth0|6a150df8d2051b0ac866a3b6",
+    name: "Pending User",
+    agency: { name: "ImobiliÃ¡ria Pendente", cnpj: "00000000000400", state: "under_review" },
+  },
+  newuser: {
+    email: "newuser@mutav.finance",
+    subject: "auth0|6a150df9a100fbf318f393c3",
+    name: "New User",
+    agency: null,
+  },
+};
+
+/**
+ * Idempotent persona seed: looks up the user by Auth0 subject (the
+ * source of truth post-Auth0), then by email as a fallback, creates if
+ * missing, and attaches the seeded agency if the persona declares one.
+ * Skips agency creation when a membership already exists for this user
+ * in an agency of the same intended state — keeps re-runs no-op.
+ */
+async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: PersonaKey) {
+  const persona = PERSONAS[key];
+  const now = new Date().toISOString();
+
+  const bySubject = await ctx.db
+    .query("users")
+    .withIndex("by_subject", (q) => q.eq("subject", persona.subject))
+    .unique();
+  const byEmail =
+    bySubject ??
+    (await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", persona.email))
+      .unique());
+
+  let userId;
+  if (byEmail) {
+    userId = byEmail._id;
+    if (!byEmail.subject) {
+      await ctx.db.patch(userId, { subject: persona.subject });
+    }
+  } else {
+    userId = await ctx.db.insert("users", {
+      publicId: `user-persona-${key}`,
+      subject: persona.subject,
+      name: persona.name,
+      email: persona.email,
+      createdAt: now,
+    });
+  }
+
+  if (!persona.agency) {
+    return { persona: key, userId, agencyId: null };
+  }
+
+  const memberships = await ctx.db
+    .query("memberships")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  for (const m of memberships) {
+    const agency = await ctx.db.get(m.agencyId);
+    if (agency?.onboardingState === persona.agency.state) {
+      return { persona: key, userId, agencyId: m.agencyId, skipped: true };
+    }
+  }
+
+  const agencyId = await ctx.db.insert("agencies", {
+    name: persona.agency.name,
+    cnpj: persona.agency.cnpj,
+    agencyType: "empresa",
+    onboardingState: persona.agency.state,
+    onboardingSubmittedAt: now,
+    email: persona.email,
+    phone: "11999999999",
+    creci: "CRECI-J 99999",
+    createdAt: now,
+  });
+  await ctx.db.insert("memberships", {
+    userId,
+    agencyId,
+    role: "owner",
+    joinedAt: now,
+  });
+  return { persona: key, userId, agencyId };
+}
+
+export const seedTestPersonas = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const results = [];
+    for (const key of Object.keys(PERSONAS) as PersonaKey[]) {
+      results.push(await seedPersona(ctx, key));
+    }
+    return results;
   },
 });
 

@@ -26,3 +26,33 @@ export function shouldShowTestanchor(): boolean {
 export function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
+
+/**
+ * Server-only base URL used by the Auth0 SDK + our `onCallback` redirect
+ * construction. Distinct from `getAppUrl()` (client-facing
+ * `NEXT_PUBLIC_APP_URL`): `APP_BASE_URL` is the canonical name the
+ * Auth0 v4 SDK reads itself, so we mirror it for consistency.
+ * Returns `undefined` in the browser bundle.
+ */
+export function getAppBaseUrl(): string {
+  return process.env.APP_BASE_URL ?? "http://localhost:3000";
+}
+
+/**
+ * Convex deployment URL. Public because the browser bundle needs it to
+ * construct the `ConvexReactClient`. Returns null when unset so callers
+ * can degrade gracefully (e.g. render without Convex provider).
+ */
+export function getConvexUrl(): string | null {
+  return process.env.NEXT_PUBLIC_CONVEX_URL ?? null;
+}
+
+/**
+ * Public Auth0 tenant domain, exposed to the client so the Convex provider
+ * can decide whether to wrap with `ConvexProviderWithAuth`. Mirrors the
+ * server-side `AUTH0_DOMAIN`. Returns null when unset — the provider then
+ * uses bare `ConvexProvider` and every wrapped backend handler throws.
+ */
+export function getAuth0Domain(): string | null {
+  return process.env.NEXT_PUBLIC_AUTH0_DOMAIN ?? null;
+}

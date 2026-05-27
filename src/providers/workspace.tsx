@@ -1,29 +1,27 @@
 "use client";
 
 /**
- * WorkspaceContext — dev-shortcut implementation.
+ * WorkspaceContext — resolves the current user + selected agency.
  *
- * Loads agencies for a hardcoded "dev-user" (publicId: "dev-user") and stores
- * the selected agencyId in localStorage.  When real auth is wired up, swap
- * `DEV_USER_PUBLIC_ID` for the authenticated user's publicId from the session.
+ * Identity comes from `api.users.useCases.getMe`, which reads the JWT
+ * subject server-side. The client never passes a user identifier.
  */
 
 import * as React from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 
-export const DEV_USER_PUBLIC_ID = "dev-user";
 const STORAGE_KEY = "sgr:selectedAgencyId";
 
 /**
  * Derived from the Convex return type so additions to the server-side projection
  * flow through here automatically (no manual sync, no escape-hatch casts).
  */
-export type WorkspaceAgency = NonNullable<
-  FunctionReturnType<typeof api.agencies.useCases.listAgenciesForUser>[number]
->;
+export type WorkspaceAgency = FunctionReturnType<
+  typeof api.agencies.useCases.listAgenciesForUser
+>[number];
 
 export type WorkspaceUser = {
   name: string;
@@ -46,15 +44,30 @@ type WorkspaceContextValue = {
 const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-  // Resolve the dev user (for header display). The agencies query resolves
-  // identity server-side via `queryWithAuth` — no userId arg, can't be
-  // pointed at another user. Both queries run in parallel.
-  const devUser = useQuery(api.users.useCases.getByPublicId, {
-    publicId: DEV_USER_PUBLIC_ID,
-  });
-  const agenciesRaw = useQuery(api.agencies.useCases.listAgenciesForUser, {});
+  // Resolve the current user (for header display). Identity comes from
+  // the JWT (Auth0). `getMe` is the only Convex query that returns null
+  // on missing identity; `listAgenciesForUser` is `queryWithAuth` and
+  // throws `UnauthenticatedError`, so gate it on a known-good identity
+  // to avoid noisy error boundaries on public routes (/onboarding,
+  // /pay/[publicId]) where the provider still mounts.
+  const currentUserRow = useQuery(api.users.useCases.getMe, {});
+  const agenciesRaw = useQuery(
+    api.agencies.useCases.listAgenciesForUser,
+    currentUserRow ? {} : "skip",
+  );
+  const provisionMe = useMutation(api.users.useCases.getOrCreateByIdentity);
 
-  const agencies = (agenciesRaw ?? []).filter((a): a is WorkspaceAgency => a !== null);
+  // Client-side provisioning fallback: if Auth0 is wired (so `getMe` is
+  // querying by JWT subject) but no row exists yet, kick off a one-shot
+  // provisioning mutation. Covers the gap when `onCallback` in
+  // `src/lib/auth0.ts` failed transiently — the next session start retries.
+  React.useEffect(() => {
+    if (currentUserRow === null && typeof window !== "undefined") {
+      void provisionMe({}).catch(() => {});
+    }
+  }, [currentUserRow, provisionMe]);
+
+  const agencies = React.useMemo(() => agenciesRaw ?? [], [agenciesRaw]);
 
   const [storedRaw, setStoredRaw] = React.useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -73,7 +86,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return first._id;
   }, [storedRaw, agencies]);
 
-  // 5. Keep localStorage in sync whenever the effective selection changes.
+  // Keep localStorage in sync whenever the effective selection changes.
   React.useEffect(() => {
     if (selectedAgencyId) {
       localStorage.setItem(STORAGE_KEY, selectedAgencyId);
@@ -86,9 +99,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const selectedAgency = agencies.find((a) => a._id === selectedAgencyId) ?? null;
-  const isLoading = devUser === undefined || agenciesRaw === undefined;
-  const currentUser: WorkspaceUser | null = devUser
-    ? { name: devUser.name, email: devUser.email }
+  // `agenciesRaw === undefined` covers both "still loading" and "skipped
+  // because no user" — only the former should keep us in the loading
+  // state. The latter resolves to "no agencies" once getMe returns null.
+  const isLoading =
+    currentUserRow === undefined || (currentUserRow !== null && agenciesRaw === undefined);
+  const currentUser: WorkspaceUser | null = currentUserRow
+    ? { name: currentUserRow.name, email: currentUserRow.email }
     : null;
 
   return (

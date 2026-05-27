@@ -2,13 +2,17 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { seedAgencyWithMembership, seedDevUser, seedForeignAgency } from "../lib/testFixtures";
+import {
+  seedAgencyWithMembership,
+  seedForeignAgency,
+  setupAuthenticatedUser,
+} from "../lib/testFixtures";
 import schema from "../schema";
 
 describe("anchors.bankAccountUseCases.listByAgency (scoped wrapper)", () => {
   test("returns the agency's bank accounts for a member", async () => {
     const t = convexTest(schema);
-    const userId = await seedDevUser(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
     await t.run(async (ctx) => {
@@ -39,18 +43,18 @@ describe("anchors.bankAccountUseCases.listByAgency (scoped wrapper)", () => {
       });
     });
 
-    const banks = await t.query(api.anchors.bankAccountUseCases.listByAgency, { agencyId });
+    const banks = await asUser.query(api.anchors.bankAccountUseCases.listByAgency, { agencyId });
     expect(banks).toHaveLength(1);
     expect(banks[0].externalBankAccountId).toBe("ext_bank_1");
   });
 
   test("throws ForbiddenError when the caller is not a member", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
     const foreignAgencyId = await seedForeignAgency(t);
 
     await expect(
-      t.query(api.anchors.bankAccountUseCases.listByAgency, { agencyId: foreignAgencyId }),
+      asUser.query(api.anchors.bankAccountUseCases.listByAgency, { agencyId: foreignAgencyId }),
     ).rejects.toThrow(/Forbidden|not a member/i);
   });
 });
@@ -58,7 +62,7 @@ describe("anchors.bankAccountUseCases.listByAgency (scoped wrapper)", () => {
 describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
   test("returns the order for a member of its agency", async () => {
     const t = convexTest(schema);
-    const userId = await seedDevUser(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
     const orderId = await t.run(async (ctx) => {
@@ -83,7 +87,7 @@ describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
       });
     });
 
-    const order = await t.query(api.anchors.orderUseCases.getOrderById, { orderId });
+    const order = await asUser.query(api.anchors.orderUseCases.getOrderById, { orderId });
     expect(order).not.toBeNull();
     expect(order?._id).toBe(orderId);
   });
@@ -91,7 +95,7 @@ describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
   // Null instead of throw to avoid leaking cross-agency existence.
   test("returns null when the order belongs to a foreign agency", async () => {
     const t = convexTest(schema);
-    await seedDevUser(t);
+    const { asUser } = await setupAuthenticatedUser(t);
     const foreignAgencyId = await seedForeignAgency(t);
 
     const orderId = await t.run(async (ctx) => {
@@ -116,7 +120,7 @@ describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
       });
     });
 
-    const order = await t.query(api.anchors.orderUseCases.getOrderById, { orderId });
+    const order = await asUser.query(api.anchors.orderUseCases.getOrderById, { orderId });
     expect(order).toBeNull();
   });
 });
