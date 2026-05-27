@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, type MutationCtx } from "./_generated/server";
 import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./payments/domain";
 import { generatePaymentMuxedId } from "./payments/lib/muxedId";
 import type { AgencyId } from "./agencies/domain";
@@ -15,8 +16,34 @@ const pid = (n: number) => String(1_000_000 + n);
 const d = (s: string) => s;
 
 /**
- * Idempotent dev seed — 3 agencies, 30 contracts, contract history, and
- * historical payments covering the last two months.
+ * Demo tables wiped by `clearAll` and `seedPreview`. Order matters —
+ * tables with foreign-key-like references come first so we don't leave
+ * dangling pointers mid-wipe.
+ */
+const DEMO_TABLES = [
+  "payments",
+  "contractHistory",
+  "contracts",
+  "memberships",
+  "users",
+  "agencies",
+] as const;
+
+async function wipeDemoTables(ctx: MutationCtx) {
+  for (const table of DEMO_TABLES) {
+    let rows = await ctx.db.query(table).take(200);
+    while (rows.length > 0) {
+      for (const row of rows) await ctx.db.delete(row._id);
+      rows = await ctx.db.query(table).take(200);
+    }
+  }
+}
+
+/**
+ * Additive dev seed — inserts 3 agencies, 30 contracts, contract history,
+ * and historical payments covering the last two months. Does NOT wipe
+ * existing rows; call `clearAll` first if you need a clean slate, or use
+ * `seedPreview` for the standard wipe-then-seed flow.
  *
  * Optional `adminEmail` provisions a user row with that email and grants
  * it owner/admin/member memberships across the three seeded agencies. On
@@ -25,30 +52,14 @@ const d = (s: string) => s;
  * developer inherits the seeded memberships without re-onboarding.
  *
  * Run with:
- *   bunx convex run seed:fictionalContracts
- *   bunx convex run seed:fictionalContracts '{"adminEmail":"you@example.com"}'
+ *   bunx convex run seed:seedFictional
+ *   bunx convex run seed:seedFictional '{"adminEmail":"you@example.com"}'
  *
  * Dev-only. Do NOT call from production.
  */
-export const fictionalContracts = internalMutation({
+export const seedFictional = internalMutation({
   args: { adminEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    // Wipe in dependency order.
-    for (const table of [
-      "payments",
-      "contractHistory",
-      "contracts",
-      "memberships",
-      "users",
-      "agencies",
-    ] as const) {
-      let rows = await ctx.db.query(table).take(200);
-      while (rows.length > 0) {
-        for (const row of rows) await ctx.db.delete(row._id);
-        rows = await ctx.db.query(table).take(200);
-      }
-    }
-
     // ── Agencies ──────────────────────────────────────────────────────────────
 
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
@@ -2263,20 +2274,39 @@ export const seedTestPersonas = internalMutation({
 export const clearAll = internalMutation({
   args: {},
   handler: async (ctx) => {
-    for (const table of [
-      "payments",
-      "contractHistory",
-      "contracts",
-      "memberships",
-      "users",
-      "agencies",
-    ] as const) {
-      let rows = await ctx.db.query(table).take(200);
-      while (rows.length > 0) {
-        for (const row of rows) await ctx.db.delete(row._id);
-        rows = await ctx.db.query(table).take(200);
-      }
-    }
+    await wipeDemoTables(ctx);
     return null;
+  },
+});
+
+type SeedFictionalResult = {
+  agencies: { paulistaId: AgencyId; atlanticaId: AgencyId; horizonteId: AgencyId };
+  contractCounts: { paulista: number; atlantica: number; horizonte: number };
+};
+
+type SeedPersonasResult = Array<{
+  persona: PersonaKey;
+  userId: import("./_generated/dataModel").Id<"users">;
+  agencyId: AgencyId | null;
+  skipped?: boolean;
+}>;
+
+/**
+ * One-shot preview reset: wipes the demo tables, re-seeds the fictional
+ * dataset, then attaches the four Auth0 test personas. This is what the
+ * Vercel preview hook (`scripts/seed-preview.sh`) and a developer's
+ * "give me a clean dev DB" workflow call.
+ *
+ * The two nested `runMutation` calls are same-file, so per the Convex
+ * guidelines the local return types are annotated to break TypeScript
+ * circularity.
+ */
+export const seedPreview = internalMutation({
+  args: { adminEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    await wipeDemoTables(ctx);
+    const fictional: SeedFictionalResult = await ctx.runMutation(internal.seed.seedFictional, args);
+    const personas: SeedPersonasResult = await ctx.runMutation(internal.seed.seedTestPersonas, {});
+    return { fictional, personas };
   },
 });
