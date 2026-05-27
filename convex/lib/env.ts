@@ -193,16 +193,65 @@ export function getPiiEncryptionKey(): Buffer {
 }
 
 /**
- * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). Must be SET on every
- * Convex deployment — see `convex/auth.config.ts` for why the analyzer
- * requires it even though only `auth.config.ts` reads it.
+ * Auth0 tenant domain (e.g. `mutav.us.auth0.com`). MUST be present as an
+ * env var on every Convex deployment (the deploy-time analyzer scans
+ * `auth.config.ts` and refuses to deploy otherwise); the *value* may be
+ * empty. Empty string is a deliberate sentinel for "no Auth0 provider on
+ * this deployment" — `auth.config.ts` then registers no provider and
+ * every wrapped handler throws `UnauthenticatedError` (fail-closed).
+ *
+ * Distinct from `getAuth0MgmtClientId` / `getAuth0MgmtClientSecret`,
+ * which throw on missing: those are only consumed by mgmt-API actions
+ * that have no graceful no-op mode.
  */
 export function getAuth0Domain(): string {
   return process.env.AUTH0_DOMAIN ?? "";
 }
 
+/**
+ * Auth0 application client id used by end-user JWTs. Same empty-sentinel
+ * shape as `getAuth0Domain`; see that doc for the rationale.
+ */
 export function getAuth0ClientId(): string {
   return process.env.AUTH0_CLIENT_ID ?? "";
+}
+
+/**
+ * Auth0 Management API M2M client id. Different from `getAuth0ClientId()` —
+ * that one is the public Application id used by end-user JWTs; this one is
+ * the dedicated M2M app's id used only by Convex actions calling
+ * `https://{domain}/oauth/token` for management operations.
+ *
+ * Throws when unset, because every caller (`auth0Mgmt.ts`) is in an error
+ * path if it's missing — no useful default.
+ */
+export function getAuth0MgmtClientId(): string {
+  const id = process.env.AUTH0_MGMT_CLIENT_ID;
+  if (!id) {
+    throw new Error(
+      "AUTH0_MGMT_CLIENT_ID is not set. Create a Machine-to-Machine app in " +
+        "the Auth0 dashboard with Management API scopes and set " +
+        "`bunx convex env set AUTH0_MGMT_CLIENT_ID <id>` on this deployment.",
+    );
+  }
+  return id;
+}
+
+/**
+ * Secret half of the Auth0 Management API M2M app credentials. See
+ * `getAuth0MgmtClientId` for the rationale on why this is a separate
+ * env from the public Auth0 application secret.
+ */
+export function getAuth0MgmtClientSecret(): string {
+  const secret = process.env.AUTH0_MGMT_CLIENT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "AUTH0_MGMT_CLIENT_SECRET is not set. Get it from the M2M app's " +
+        "Settings tab in the Auth0 dashboard and set " +
+        "`bunx convex env set AUTH0_MGMT_CLIENT_SECRET <secret>` on this deployment.",
+    );
+  }
+  return secret;
 }
 
 /**
