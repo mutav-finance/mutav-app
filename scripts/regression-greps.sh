@@ -33,8 +33,13 @@ SRC_GLOB=(src convex)
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Bare public mutation/query handlers must use the auth wrappers
 #    or the documented resource-by-id pattern (assertAgencyAccess).
-#    Allowlist: convex/users/useCases.ts:getByPublicId — load-bearing
-#    dev-user lookup, deferred to #92 Auth0.
+#    Allowlist (with rationale):
+#    - convex/users/useCases.ts: getMe is the only bare query intentionally
+#      returning null on missing JWT (UI needs to distinguish loading vs
+#      signed-out); getOrCreateByIdentity reads identity from
+#      ctx.auth.getUserIdentity() and throws on miss.
+#    - convex/waitlist/useCases.ts: anonymous public submission endpoint
+#      called from the marketing site — no JWT, no agency.
 # ─────────────────────────────────────────────────────────────────────────────
 section "1. bare public mutation/query without auth"
 
@@ -44,8 +49,11 @@ files_with_bare=$(rg -l '^export const \w+ = (mutation|query)\(\{' convex/ 2>/de
 
 bare_violations=0
 for file in $files_with_bare; do
-  # Allowlist: dev-user lookup
+  # Allowlists — see header above for rationale.
   if [[ "$file" == "convex/users/useCases.ts" ]]; then
+    continue
+  fi
+  if [[ "$file" == "convex/waitlist/useCases.ts" ]]; then
     continue
   fi
   # File must call assertAgencyAccess somewhere (resource-by-id pattern)
