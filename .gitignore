@@ -71,5 +71,7 @@ docs/superpowers/*
 .convex/
 .convex-preview-url
 
+.claude/scheduled_tasks.lock
+
 # Codex agent runtime (not used; sibling of .claude installed by stellar-build)
 .codex/
