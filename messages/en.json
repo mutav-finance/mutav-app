@@ -107,26 +107,19 @@
     }
   },
   "nav": {
+    "roadmapBadge": "soon",
     "main": {
       "createContract": "Create Contract",
-      "inbox": "Inbox",
       "dashboard": "Dashboard",
       "contracts": "Contracts",
       "payments": "Invoices",
-      "delinquencies": "Delinquencies",
-      "lifecycle": "Lifecycle",
-      "reports": "Reports"
+      "delinquencies": "Delinquencies"
     },
-    "secondary": {
-      "settings": "Settings",
-      "getHelp": "Get Help"
-    },
-    "documents": {
-      "groupLabel": "Cadastro",
+    "cadastros": {
+      "groupLabel": "Registries",
       "tenants": "Tenants",
       "properties": "Properties",
-      "contractTemplates": "Contract Templates",
-      "guaranteePolicies": "Guarantee Policies"
+      "propertyOwners": "Landlords"
     },
     "agency": {
       "groupLabel": "Agency",

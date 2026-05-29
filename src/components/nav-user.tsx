@@ -163,9 +163,18 @@ export function NavUser({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOutIcon />
-              {t("logOut")}
+            <DropdownMenuItem asChild>
+              {/*
+               * Auth0 SDK mounts /auth/logout at the root, not under [locale],
+               * and needs a real navigation so the proxy middleware clears the
+               * session cookie. next/link's client routing would skip the
+               * middleware — keep the plain <a>.
+               */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/auth/logout">
+                <LogOutIcon />
+                {t("logOut")}
+              </a>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
