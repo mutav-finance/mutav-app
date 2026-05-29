@@ -20,6 +20,22 @@ Convex agent skills for common tasks can be installed by running
 
 <!-- convex-ai-end -->
 
+<!-- BEGIN:terminology -->
+
+# Terminology (overloaded across repos)
+
+The MUTAV protocol spans three repos and re-uses a few words across them. When you write or read code in **this** repo, the agency-platform / Web2 sense always applies:
+
+- **contract** here = a **rental contract** (lease agreement between an agency and a tenant). Database record + CRUD UI. Lives in `convex/contracts/`, `src/components/contracts/`, `src/lib/contracts/`, `src/app/(app)/contracts/`. On `mutav-stellar` the same word means a **Soroban smart contract** — the `Fund` Rust code. They are unrelated.
+- **admin** here = an Auth0 **staff role** that reviews KYC/KYB submissions, manages internal users, etc. (`convex/agencies/adminUseCases.ts`). On `mutav-stellar` the same word means the **Stellar admin keypair** (cold wallet that signs `set_*`, `cover_default`, partner whitelist).
+- **operator** doesn't appear in this repo. On `mutav-stellar` it's the hot-wallet keypair the daemons use.
+- **treasury** here = the Mutav treasury Stellar account whose keypair lives in `convex/lib/stellarSigner.ts`. Used for SEP-10/SEP-24 anchor flows only (Etherfuse interactions). Distinct from operator/admin.
+- **fund** = the MUTAV fund (a Soroban contract instance on `mutav-stellar`). Same sense everywhere.
+
+Full table: `mutav-stellar/docs/architecture/01-protocol-overview.md#terminology`.
+
+<!-- END:terminology -->
+
 <!-- BEGIN:stellar-build-tool -->
 
 # stellar-build (recommended toolkit)
