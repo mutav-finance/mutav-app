@@ -70,3 +70,6 @@ docs/superpowers/*
 # Convex local dev artifacts
 .convex/
 .convex-preview-url
+
+# Codex agent runtime (not used; sibling of .claude installed by stellar-build)
+.codex/
