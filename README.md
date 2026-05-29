@@ -17,6 +17,10 @@ Shared strategy, whitepaper, pitch deck, and brand assets live in [`mutav-financ
 - **Bun** — package manager + script runner
 - **Railway** — deployment
 
+## Related tools
+
+[**stellar-build**](https://web-nine-umber-74.vercel.app/) — community CLI bundling 42 Stellar-focused Claude skills + 6 personas; useful when this app needs to interact with Stellar contracts on `mutav-stellar`. Install: `curl -fsSL https://raw.githubusercontent.com/kaankacar/stellar-build/main/install.sh | bash`
+
 > Stellar wallet connection is currently unwired. The previous
 > `@creit.tech/stellar-wallets-kit` integration was removed pending a
 > replacement with a smaller transitive surface (the kit shipped Trezor,

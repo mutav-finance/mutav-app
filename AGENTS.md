@@ -19,3 +19,15 @@ Convex agent skills for common tasks can be installed by running
 `npx convex ai-files install`.
 
 <!-- convex-ai-end -->
+
+<!-- BEGIN:stellar-build-tool -->
+
+# stellar-build (recommended toolkit)
+
+CLI that bundles 42 Stellar-focused Claude skills (Soroban guidance, dApp patterns, SCF grant submission, security review, edge-case hunters) plus 6 named personas. Useful when the agency-side surface needs to interact with Stellar contracts on `mutav-stellar` or reference Stellar-specific patterns.
+
+- Site: https://web-nine-umber-74.vercel.app/
+- Source: https://github.com/kaankacar/stellar-build
+- Install: `curl -fsSL https://raw.githubusercontent.com/kaankacar/stellar-build/main/install.sh | bash`
+
+<!-- END:stellar-build-tool -->
