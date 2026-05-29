@@ -88,3 +88,7 @@ into `.env.local` for you.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for branch workflow, commit style,
 and code standards.
+
+## License
+
+Licensed under the Apache License, Version 2.0 — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
