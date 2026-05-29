@@ -2,33 +2,18 @@
 
 import * as React from "react";
 
-import { NavDocuments } from "@/components/nav-documents";
+import { NavCadastros } from "@/components/nav-cadastros";
 import { NavMain } from "@/components/nav-main";
-import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
 import { NavAgency } from "@/components/nav-agency";
 import { AgencySwitcher } from "@/components/agency-switcher";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
-import {
-  LayoutDashboardIcon,
-  ChartBarIcon,
-  Settings2Icon,
-  CircleHelpIcon,
-  FileTextIcon,
-  ReceiptIcon,
-  HomeIcon,
-  UserRoundIcon,
-  CalendarClockIcon,
-  ShieldCheckIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { LayoutDashboardIcon, FileTextIcon, ReceiptIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useWorkspace } from "@/providers/workspace";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const tMain = useTranslations("nav.main");
-  const tSecondary = useTranslations("nav.secondary");
-  const tDocs = useTranslations("nav.documents");
   const { currentUser } = useWorkspace();
 
   const navMain = [
@@ -36,18 +21,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
     { title: tMain("payments"), href: "/payments", icon: <ReceiptIcon /> },
     { title: tMain("delinquencies"), href: "/delinquencies", icon: <TriangleAlertIcon /> },
-    { title: tMain("lifecycle"), icon: <CalendarClockIcon />, disabled: true },
-    { title: tMain("reports"), icon: <ChartBarIcon />, disabled: true },
-  ];
-  const navSecondary = [
-    { title: tSecondary("settings"), url: "#", icon: <Settings2Icon /> },
-    { title: tSecondary("getHelp"), url: "#", icon: <CircleHelpIcon /> },
-  ];
-  const documents = [
-    { name: tDocs("tenants"), url: "#", icon: <UserRoundIcon /> },
-    { name: tDocs("properties"), url: "#", icon: <HomeIcon /> },
-    { name: tDocs("contractTemplates"), url: "#", icon: <FileTextIcon /> },
-    { name: tDocs("guaranteePolicies"), url: "#", icon: <ShieldCheckIcon /> },
   ];
 
   return (
@@ -62,9 +35,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
-        <NavDocuments items={documents} />
         <NavAgency />
-        <NavSecondary items={navSecondary} className="mt-auto" />
+        <NavCadastros />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={currentUser ?? { name: "…", email: "" }} />

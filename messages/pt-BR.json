@@ -107,26 +107,19 @@
     }
   },
   "nav": {
+    "roadmapBadge": "em breve",
     "main": {
       "createContract": "Criar Contrato",
-      "inbox": "Caixa de Entrada",
       "dashboard": "Painel",
       "contracts": "Contratos",
       "payments": "Faturas",
-      "delinquencies": "Inadimplências",
-      "lifecycle": "Ciclo de Vida",
-      "reports": "Relatórios"
+      "delinquencies": "Inadimplências"
     },
-    "secondary": {
-      "settings": "Configurações",
-      "getHelp": "Obter Ajuda"
-    },
-    "documents": {
-      "groupLabel": "Cadastro",
-      "tenants": "Inquilinos",
+    "cadastros": {
+      "groupLabel": "Cadastros",
+      "tenants": "Locatários",
       "properties": "Imóveis",
-      "contractTemplates": "Modelos de Contrato",
-      "guaranteePolicies": "Apólices de Garantia"
+      "propertyOwners": "Locadores"
     },
     "agency": {
       "groupLabel": "Agência",

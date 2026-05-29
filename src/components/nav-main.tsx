@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -9,14 +8,13 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Link, usePathname } from "@/i18n/navigation";
-import { CirclePlusIcon, MailIcon } from "lucide-react";
+import { CirclePlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 type NavMainItem = {
   title: string;
-  href?: string;
+  href: string;
   icon?: React.ReactNode;
-  disabled?: boolean;
 };
 
 export function NavMain({ items }: { items: NavMainItem[] }) {
@@ -26,7 +24,7 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
-          <SidebarMenuItem className="flex items-center gap-2">
+          <SidebarMenuItem>
             <SidebarMenuButton
               asChild
               tooltip={t("createContract")}
@@ -37,44 +35,22 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
                 <span>{t("createContract")}</span>
               </Link>
             </SidebarMenuButton>
-            <Button
-              className="group-data-[collapsible=icon]:opacity-0"
-              variant="outline"
-              size="icon"
-              disabled
-            >
-              <MailIcon />
-              <span className="sr-only">{t("inbox")}</span>
-            </Button>
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
           {items.map((item) => {
             const isActive =
-              !item.disabled &&
-              item.href != null &&
-              (item.href === "/"
+              item.href === "/"
                 ? pathname === "/"
-                : pathname === item.href || pathname.startsWith(`${item.href}/`));
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <SidebarMenuItem key={item.title}>
-                {item.href && !item.disabled ? (
-                  <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                    <Link href={item.href}>
-                      {item.icon}
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                ) : (
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    disabled={item.disabled}
-                    className={item.disabled ? "cursor-not-allowed opacity-40" : undefined}
-                  >
+                <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
+                  <Link href={item.href}>
                     {item.icon}
                     <span>{item.title}</span>
-                  </SidebarMenuButton>
-                )}
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             );
           })}
