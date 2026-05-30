@@ -191,6 +191,56 @@ export const countByMonth = queryWithAgencyScope({
 });
 
 /**
+ * Active contracts during the given `YYYY-MM` period, shaped for the
+ * Commission page. "Active during" means `activatedAt` is on or before
+ * the period and the contract wasn't deactivated before it. Commission
+ * is a placeholder 1.5% of `rentCents` until the rate-card domain ships
+ * (#83 — `pricingVersion` snapshot).
+ */
+const COMMISSION_RATE_BPS = 150;
+const COMMISSION_INSTALLMENTS_TOTAL = 12;
+
+function monthDiff(fromYYYYMM: string, toYYYYMM: string): number {
+  const [fy, fm] = fromYYYYMM.split("-").map(Number);
+  const [ty, tm] = toYYYYMM.split("-").map(Number);
+  return (ty - fy) * 12 + (tm - fm);
+}
+
+export const listForCommissionByMonth = queryWithAgencyScope({
+  args: { periodMonth: v.string() },
+  handler: async (ctx, { periodMonth }) => {
+    const contracts = await ctx.db
+      .query("contracts")
+      .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
+      .collect();
+
+    return contracts
+      .filter((c) => {
+        if (!c.activatedAt) return false;
+        if (c.activatedAt.slice(0, 7) > periodMonth) return false;
+        if (c.deactivatedAt && c.deactivatedAt.slice(0, 7) <= periodMonth) return false;
+        return true;
+      })
+      .map((c) => {
+        const activatedMonth = c.activatedAt!.slice(0, 7);
+        const monthsElapsed = Math.min(
+          monthDiff(activatedMonth, periodMonth) + 1,
+          COMMISSION_INSTALLMENTS_TOTAL,
+        );
+        return {
+          contractId: c.publicId,
+          tenantName: c.tenant.fullName,
+          rentCents: c.rental.rentCents,
+          commissionCents: Math.round((c.rental.rentCents * COMMISSION_RATE_BPS) / 10000),
+          installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
+          activatedAt: c.activatedAt!,
+        };
+      })
+      .sort((a, b) => a.activatedAt.localeCompare(b.activatedAt));
+  },
+});
+
+/**
  * Mock credit-bureau score for a CPF or CNPJ. Pure computation today; the
  * real-bureau call goes here so the swap is single-file. Agency-scoped so
  * future billed lookups can be attributed and rate-limited per agency.

@@ -142,6 +142,26 @@ export const getStellarIndexState = internalQuery({
 });
 
 /**
+ * Count of payments in the `overdue` state for the current agency. Used
+ * by the Inadimplências KPI tile on the dashboard until a dedicated
+ * delinquency domain ships (see issue #52).
+ *
+ * Scans the agency-scoped payments index — bounded by agency size, no
+ * full-table scan. Filtering on `state.kind` happens in memory because
+ * the table-wide `by_state_kind` index isn't agency-scoped.
+ */
+export const getOverdueCount = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db
+      .query("payments")
+      .withIndex("by_agency_period", (q) => q.eq("agencyId", ctx.agencyId))
+      .collect();
+    return rows.reduce((count, p) => (p.state.kind === "overdue" ? count + 1 : count), 0);
+  },
+});
+
+/**
  * Returns the next pending or overdue payment for the agency, ordered by
  * periodMonth ascending (earliest first).
  *

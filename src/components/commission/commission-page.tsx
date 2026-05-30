@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { useQuery } from "convex/react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -10,6 +11,7 @@ import {
   FileTextIcon,
   DownloadIcon,
 } from "lucide-react";
+import { api } from "@convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,103 +25,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/navigation";
-import { formatBRLCents } from "@/lib/contracts/format";
-
-type CommissionRow = {
-  contractId: string;
-  tenantName: string;
-  rentCents: number;
-  commissionCents: number;
-  installment: string;
-  activatedAt: string;
-};
-
-const MOCK_ROWS: CommissionRow[] = [
-  {
-    contractId: "CTR-2T32IJ76",
-    tenantName: "Ana Carolina Souza",
-    rentCents: 274600,
-    commissionCents: 4000,
-    installment: "11/12",
-    activatedAt: "06/06/2025",
-  },
-  {
-    contractId: "CTR-8K91LM23",
-    tenantName: "Bruno Henrique Lima",
-    rentCents: 182000,
-    commissionCents: 4000,
-    installment: "9/12",
-    activatedAt: "03/06/2025",
-  },
-  {
-    contractId: "CTR-4P57QR85",
-    tenantName: "Carla Mendes Pereira",
-    rentCents: 175000,
-    commissionCents: 4000,
-    installment: "9/12",
-    activatedAt: "03/06/2025",
-  },
-  {
-    contractId: "CTR-7N34WX19",
-    tenantName: "Diego Faria Costa",
-    rentCents: 190100,
-    commissionCents: 3800,
-    installment: "8/12",
-    activatedAt: "29/01/2025",
-  },
-  {
-    contractId: "CTR-3M65YZ47",
-    tenantName: "Elaine Cristina Rocha",
-    rentCents: 165000,
-    commissionCents: 3800,
-    installment: "8/12",
-    activatedAt: "10/09/2025",
-  },
-  {
-    contractId: "CTR-6J21AB93",
-    tenantName: "Felipe Santos Oliveira",
-    rentCents: 204800,
-    commissionCents: 4600,
-    installment: "7/12",
-    activatedAt: "30/10/2025",
-  },
-  {
-    contractId: "CTR-1R78CD62",
-    tenantName: "Gabriela Alves Martins",
-    rentCents: 228300,
-    commissionCents: 4600,
-    installment: "7/12",
-    activatedAt: "26/10/2025",
-  },
-  {
-    contractId: "CTR-5S43EF11",
-    tenantName: "Henrique Gomes Barros",
-    rentCents: 180000,
-    commissionCents: 5200,
-    installment: "6/12",
-    activatedAt: "09/11/2025",
-  },
-];
+import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { useWorkspace } from "@/providers/workspace";
 
 function formatMonth(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
 }
 
+function toPeriodMonth(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function CommissionPage() {
   const t = useTranslations("commission");
+  const { selectedAgency } = useWorkspace();
+  const agencyId = selectedAgency?._id;
   const [month, setMonth] = React.useState(() => new Date());
   const [search, setSearch] = React.useState("");
 
-  const filtered = MOCK_ROWS.filter((r) => {
-    const [, mm, yyyy] = r.activatedAt.split("/");
-    const rowMonth = Number(mm) - 1;
-    const rowYear = Number(yyyy);
-    const matchesMonth = rowMonth === month.getMonth() && rowYear === month.getFullYear();
-    const matchesSearch =
-      r.contractId.toLowerCase().includes(search.toLowerCase()) ||
-      r.tenantName.toLowerCase().includes(search.toLowerCase());
-    return matchesMonth && matchesSearch;
-  });
+  const rows = useQuery(
+    api.contracts.useCases.listForCommissionByMonth,
+    agencyId ? { agencyId, periodMonth: toPeriodMonth(month) } : "skip",
+  );
+
+  const term = search.toLowerCase();
+  const filtered = (rows ?? []).filter(
+    (r) => r.contractId.toLowerCase().includes(term) || r.tenantName.toLowerCase().includes(term),
+  );
 
   const totalCommissionCents = filtered.reduce((sum, r) => sum + r.commissionCents, 0);
   const contractCount = filtered.length;
@@ -284,7 +216,9 @@ export function CommissionPage() {
                       <Mono className="text-muted-foreground text-sm">{row.installment}</Mono>
                     </TableCell>
                     <TableCell>
-                      <Mono className="text-muted-foreground text-sm">{row.activatedAt}</Mono>
+                      <Mono className="text-muted-foreground text-sm">
+                        {formatDateBR(row.activatedAt)}
+                      </Mono>
                     </TableCell>
                   </TableRow>
                 ))

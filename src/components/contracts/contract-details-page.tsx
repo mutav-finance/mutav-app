@@ -22,6 +22,7 @@ import { ContractDocumentsCard } from "./contract-documents-card";
 import { ContractHistoryCard } from "./contract-history-card";
 import { ContractRentalDataCard } from "./contract-rental-data-card";
 import { ContractSummaryCard } from "./contract-summary-card";
+import { ContractTenantCard } from "./contract-tenant-card";
 
 export function ContractDetailsPage({
   preloaded,
@@ -63,6 +64,7 @@ export function ContractDetailsPage({
       />
       <PageContent variant="narrow">
         <ContractSummaryCard contract={contract} />
+        <ContractTenantCard tenant={contract.tenant} />
         <ContractRentalDataCard contract={contract} />
         <ContractDocumentsCard documents={contract.documents} />
         <ContractHistoryCard history={contract.history} />
