@@ -23,6 +23,11 @@ export function SectionCards() {
     agencyId ? { agencyId } : "skip",
   );
 
+  const overdueCount = useQuery(
+    api.payments.useCases.getOverdueCount,
+    agencyId ? { agencyId } : "skip",
+  );
+
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       {/* Ativos */}
@@ -81,19 +86,24 @@ export function SectionCards() {
         </CardFooter>
       </Card>
 
-      {/* Inadimplências — placeholder until schema is defined */}
+      {/* Inadimplências — overdue payment count, an approximation of the
+          delinquency concept until issue #52 ships a dedicated domain. */}
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <ShieldAlertIcon className="size-3.5" />
             {t("delinquencies.label")}
           </CardDescription>
-          <CardTitle className="text-muted-foreground text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            —
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {overdueCount === undefined ? "—" : overdueCount}
           </CardTitle>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">{t("delinquencies.footer")}</div>
+          <div className="text-muted-foreground">
+            {overdueCount === undefined || overdueCount === 0
+              ? t("delinquencies.footerNone")
+              : t("delinquencies.footerSome", { count: overdueCount })}
+          </div>
         </CardFooter>
       </Card>
     </div>

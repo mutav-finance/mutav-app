@@ -164,7 +164,8 @@
     },
     "delinquencies": {
       "label": "Inadimplências",
-      "footer": "Em breve"
+      "footerNone": "Nenhuma fatura em atraso",
+      "footerSome": "{count, plural, one {# fatura em atraso} other {# faturas em atraso}}"
     }
   },
   "dataTable": {

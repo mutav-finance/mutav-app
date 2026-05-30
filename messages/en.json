@@ -164,7 +164,8 @@
     },
     "delinquencies": {
       "label": "Delinquencies",
-      "footer": "Coming soon"
+      "footerNone": "No overdue invoices",
+      "footerSome": "{count, plural, one {# overdue invoice} other {# overdue invoices}}"
     }
   },
   "dataTable": {
