@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import { AlertTriangleIcon, CalendarIcon, FileTextIcon, ShieldAlertIcon } from "lucide-react";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@convex/_generated/api";
 import { useWorkspace } from "@/providers/workspace";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
@@ -95,14 +96,18 @@ export function SectionCards() {
             {t("delinquencies.label")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {overdueCount === undefined ? "—" : overdueCount}
+            {overdueCount === undefined ? <Skeleton className="h-8 w-10" /> : overdueCount}
           </CardTitle>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="text-muted-foreground">
-            {overdueCount === undefined || overdueCount === 0
-              ? t("delinquencies.footerNone")
-              : t("delinquencies.footerSome", { count: overdueCount })}
+            {overdueCount === undefined ? (
+              <Skeleton className="h-4 w-32" />
+            ) : overdueCount === 0 ? (
+              t("delinquencies.footerNone")
+            ) : (
+              t("delinquencies.footerSome", { count: overdueCount })
+            )}
           </div>
         </CardFooter>
       </Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import {
   ChevronLeftIcon,
@@ -28,20 +28,22 @@ import { Link } from "@/i18n/navigation";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { useWorkspace } from "@/providers/workspace";
 
-function formatMonth(date: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
-}
-
 function toPeriodMonth(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function CommissionPage() {
   const t = useTranslations("commission");
+  const locale = useLocale();
   const { selectedAgency } = useWorkspace();
   const agencyId = selectedAgency?._id;
   const [month, setMonth] = React.useState(() => new Date());
   const [search, setSearch] = React.useState("");
+
+  const monthFormatter = React.useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }),
+    [locale],
+  );
 
   const rows = useQuery(
     api.contracts.useCases.listForCommissionByMonth,
@@ -79,7 +81,7 @@ export function CommissionPage() {
           <ChevronLeftIcon className="size-4" strokeWidth={1.5} />
         </Button>
         <span className="text-base-sm min-w-40 text-center font-mono font-medium capitalize">
-          {formatMonth(month)}
+          {monthFormatter.format(month)}
         </span>
         <Button
           variant="outline"

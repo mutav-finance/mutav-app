@@ -193,12 +193,15 @@ export const countByMonth = queryWithAgencyScope({
 /**
  * Active contracts during the given `YYYY-MM` period, shaped for the
  * Commission page. "Active during" means `activatedAt` is on or before
- * the period and the contract wasn't deactivated before it. Commission
- * is a placeholder 1.5% of `rentCents` until the rate-card domain ships
- * (#83 — `pricingVersion` snapshot).
+ * the period and the contract wasn't deactivated *before* it — a
+ * contract deactivated during the period still earned commission for
+ * that period, so it stays in the result. Commission is a placeholder
+ * 1.5% of `rentCents` until the rate-card domain ships (#83 —
+ * `pricingVersion` snapshot).
  */
-const COMMISSION_RATE_BPS = 150;
+const COMMISSION_RATE_BPS = 150; // 150 basis points = 1.5%
 const COMMISSION_INSTALLMENTS_TOTAL = 12;
+const PERIOD_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 function monthDiff(fromYYYYMM: string, toYYYYMM: string): number {
   const [fy, fm] = fromYYYYMM.split("-").map(Number);
@@ -206,25 +209,42 @@ function monthDiff(fromYYYYMM: string, toYYYYMM: string): number {
   return (ty - fy) * 12 + (tm - fm);
 }
 
+function currentPeriodMonth(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+type ActivatedContract = Contract & { activatedAt: string };
+
+function isActiveDuring(c: Contract, period: string): c is ActivatedContract {
+  if (!c.activatedAt) return false;
+  if (c.activatedAt.slice(0, 7) > period) return false;
+  if (c.deactivatedAt && c.deactivatedAt.slice(0, 7) < period) return false;
+  return true;
+}
+
 export const listForCommissionByMonth = queryWithAgencyScope({
   args: { periodMonth: v.string() },
   handler: async (ctx, { periodMonth }) => {
+    if (!PERIOD_MONTH_PATTERN.test(periodMonth)) {
+      return [];
+    }
+
+    // Cap server-side: the UI guards next-month, but a stale tab or a
+    // direct caller could still request a future period.
+    const effectivePeriod = periodMonth > currentPeriodMonth() ? currentPeriodMonth() : periodMonth;
+
     const contracts = await ctx.db
       .query("contracts")
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
       .collect();
 
     return contracts
-      .filter((c) => {
-        if (!c.activatedAt) return false;
-        if (c.activatedAt.slice(0, 7) > periodMonth) return false;
-        if (c.deactivatedAt && c.deactivatedAt.slice(0, 7) <= periodMonth) return false;
-        return true;
-      })
+      .filter((c) => isActiveDuring(c, effectivePeriod))
       .map((c) => {
-        const activatedMonth = c.activatedAt!.slice(0, 7);
+        const activatedMonth = c.activatedAt.slice(0, 7);
         const monthsElapsed = Math.min(
-          monthDiff(activatedMonth, periodMonth) + 1,
+          monthDiff(activatedMonth, effectivePeriod) + 1,
           COMMISSION_INSTALLMENTS_TOTAL,
         );
         return {
@@ -233,7 +253,7 @@ export const listForCommissionByMonth = queryWithAgencyScope({
           rentCents: c.rental.rentCents,
           commissionCents: Math.round((c.rental.rentCents * COMMISSION_RATE_BPS) / 10000),
           installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
-          activatedAt: c.activatedAt!,
+          activatedAt: c.activatedAt,
         };
       })
       .sort((a, b) => a.activatedAt.localeCompare(b.activatedAt));

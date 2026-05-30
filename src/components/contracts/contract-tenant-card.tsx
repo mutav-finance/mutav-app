@@ -2,7 +2,7 @@ import { CheckIcon, UserIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mono } from "@/components/ui/mono";
-import { formatDateTimeBR } from "@/lib/contracts/format";
+import { formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
 import type { ContractTenant } from "@/lib/contracts/types";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";
 import { StatusTag } from "./status-tag";
@@ -58,7 +58,7 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
           <FieldGroupHeader>{t("personal")}</FieldGroupHeader>
           <FieldRow label={tFields("fullName")} value={tenant.fullName} />
           <FieldRow label={tFields("cpf")} value={tenant.cpf} mono />
-          <FieldRow label={tFields("birthDate")} value={tenant.birthDate} mono />
+          <FieldRow label={tFields("birthDate")} value={formatDateBR(tenant.birthDate)} mono />
           <FieldRow label={tFields("email")} value={tenant.email} />
           <FieldRow label={tFields("phone")} value={tenant.phone} mono />
         </FieldGroup>
