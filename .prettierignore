@@ -17,8 +17,10 @@ convex/_generated/
 next-env.d.ts
 
 # i18n message catalogs — they ship as canonical JSON; reformatting them
-# can produce noisy diffs that obscure copy changes.
+# can produce noisy diffs that obscure copy changes. apps/pay carries a
+# duplicate of the same files until packages extraction (PR 6).
 apps/agency/messages/
+apps/pay/messages/
 
 # Local agent tooling — not project source.
 .claude/
@@ -32,8 +34,11 @@ docs/superpowers/
 .design/
 
 # Vendored anchor SDK from github.com/ElliotFriend/regional-starter-pack.
-# Kept verbatim so we can pull upstream updates with a clean diff.
+# Kept verbatim so we can pull upstream updates with a clean diff. Same
+# client lives duplicated under apps/pay during the PR 3 split; both
+# copies stay vendored verbatim until packages extraction (PR 6).
 apps/agency/src/lib/anchors/etherfuse/
+apps/pay/src/lib/anchors/etherfuse/
 
 # Operator-run sandbox smoke test — vendored shape, not production code.
 scripts/etherfuse-smoke.ts

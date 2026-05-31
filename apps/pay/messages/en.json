@@ -1,0 +1,1120 @@
+{
+  "meta": {
+    "title": "Mutav — Registered Guarantee System",
+    "description": "Dashboard for managing rental guarantees registered on-chain."
+  },
+  "common": {
+    "a11y": {
+      "skipToMain": "Skip to main content"
+    }
+  },
+  "userMenu": {
+    "account": "Account",
+    "notifications": "Notifications",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "language": "Language",
+    "logOut": "Log out"
+  },
+  "siteHeader": {
+    "title": "Documents"
+  },
+  "brand": {
+    "name": "Acme Inc."
+  },
+  "commission": {
+    "meta": {
+      "title": "Commission — MUTAV",
+      "description": "Track your agency's monthly commission balance and active contract history."
+    },
+    "heading": "Commission",
+    "subheading": "Amounts released to your agency for the selected period",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "kpi": {
+      "monthCommission": "Month commission",
+      "contracts": "{count} active contracts",
+      "invoice": "Invoice",
+      "invoiceEmpty": "No invoice issued",
+      "invoiceEmptyHint": "The invoice will be available once the monthly commission is closed.",
+      "invoiceDownload": "Download invoice"
+    },
+    "table": {
+      "heading": "Month breakdown",
+      "export": "Export as PDF",
+      "search": "Search contract or tenant",
+      "empty": "No results found.",
+      "total": "{count} contracts",
+      "col": {
+        "contract": "Contract",
+        "tenant": "Tenant",
+        "rent": "Rent Value",
+        "commission": "Commission",
+        "installment": "Installment",
+        "activatedAt": "Activation"
+      }
+    }
+  },
+  "delinquencies": {
+    "meta": {
+      "title": "Delinquencies — MUTAV",
+      "description": "Track and manage delinquency actions for your agency's contracts."
+    },
+    "heading": "Delinquency Actions",
+    "subheading": "Track and manage open delinquencies for your contracts",
+    "actions": {
+      "report": "Generate report",
+      "statement": "Payment statement"
+    },
+    "status": {
+      "pendencia_aberta": "Open",
+      "entregue": "Delivered",
+      "cancelado": "Cancelled"
+    },
+    "filter": {
+      "property": "Property",
+      "propertyPlaceholder": "Property ID",
+      "tenantName": "Tenant name",
+      "tenantNamePlaceholder": "Full name",
+      "tenantCpf": "Tenant CPF",
+      "status": "Status",
+      "statusAll": "All",
+      "order": "Order",
+      "orderDate": "Date",
+      "orderAmount": "Amount",
+      "orderStatus": "Status",
+      "dateFrom": "Notice date — from",
+      "dateTo": "Notice date — to",
+      "amountFrom": "Amount — from",
+      "amountTo": "Amount — to",
+      "search": "Search",
+      "clear": "Clear"
+    },
+    "table": {
+      "heading": "Results",
+      "empty": "No delinquencies found.",
+      "view": "View delinquency",
+      "col": {
+        "property": "Property",
+        "status": "Status",
+        "noticeAt": "Notice date",
+        "amount": "Amount",
+        "updatedAmount": "Updated amount",
+        "action": "Action"
+      }
+    }
+  },
+  "nav": {
+    "roadmapBadge": "soon",
+    "main": {
+      "createContract": "Create Contract",
+      "dashboard": "Dashboard",
+      "contracts": "Contracts",
+      "payments": "Invoices",
+      "delinquencies": "Delinquencies"
+    },
+    "cadastros": {
+      "groupLabel": "Registries",
+      "tenants": "Tenants",
+      "properties": "Properties",
+      "propertyOwners": "Landlords"
+    },
+    "agency": {
+      "groupLabel": "Agency",
+      "members": "Members",
+      "commission": "Commission",
+      "agencySettings": "Agency Settings"
+    }
+  },
+  "chart": {
+    "title": "Contracts under Management",
+    "descriptionLong": "Total contracts created over the last months",
+    "descriptionShort": "Contracts per month",
+    "last6Months": "Last 6 months",
+    "last12Months": "Last 12 months",
+    "selectRangeAriaLabel": "Select a range",
+    "series": {
+      "contracts": "Contracts",
+      "desktop": "Desktop",
+      "mobile": "Mobile",
+      "newActivations": "New Activations",
+      "cumulative": "Cumulative Total",
+      "netActive": "Active Contracts",
+      "activated": "Activated",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
+    }
+  },
+  "metrics": {
+    "ativo": {
+      "label": "Active Contracts",
+      "footer": "Currently active"
+    },
+    "pendente": {
+      "label": "Pending",
+      "footer": "Awaiting activation"
+    },
+    "nextPayment": {
+      "label": "Next Invoice",
+      "footer": "No pending invoices",
+      "noneLabel": "None",
+      "dueOn": "Due on {date}"
+    },
+    "delinquencies": {
+      "label": "Delinquencies",
+      "footerNone": "No overdue invoices",
+      "footerSome": "{count, plural, one {# overdue invoice} other {# overdue invoices}}"
+    }
+  },
+  "dataTable": {
+    "columns": {
+      "header": "Header",
+      "sectionType": "Section Type",
+      "status": "Status",
+      "target": "Target",
+      "limit": "Limit",
+      "reviewer": "Reviewer"
+    },
+    "status": {
+      "Done": "Done",
+      "In Process": "In Process",
+      "Not Started": "Not Started"
+    },
+    "sectionType": {
+      "Cover page": "Cover page",
+      "Table of contents": "Table of contents",
+      "Narrative": "Narrative",
+      "Technical content": "Technical content",
+      "Financial": "Financial",
+      "Legal": "Legal",
+      "Plain language": "Plain language",
+      "Planning": "Planning",
+      "Research": "Research",
+      "Visual": "Visual",
+      "Capabilities": "Capabilities",
+      "Focus Documents": "Focus Documents",
+      "Design": "Design",
+      "Executive Summary": "Executive Summary",
+      "Technical Approach": "Technical Approach",
+      "Cover Page": "Cover Page",
+      "Table of Contents": "Table of Contents"
+    },
+    "reviewerSelectPlaceholder": "Assign reviewer",
+    "actions": {
+      "openMenu": "Open menu",
+      "edit": "Edit",
+      "makeCopy": "Make a copy",
+      "favorite": "Favorite",
+      "delete": "Delete"
+    },
+    "a11y": {
+      "dragToReorder": "Drag to reorder",
+      "selectAll": "Select all",
+      "selectRow": "Select row"
+    },
+    "toast": {
+      "saving": "Saving {header}",
+      "success": "Done",
+      "error": "Error"
+    },
+    "viewSelectorAriaLabel": "View",
+    "viewSelectorPlaceholder": "Select a view",
+    "tabs": {
+      "outline": "Outline",
+      "pastPerformance": "Past Performance",
+      "keyPersonnel": "Key Personnel",
+      "focusDocuments": "Focus Documents"
+    },
+    "columnsButton": "Columns",
+    "addSection": "Add Section",
+    "noResults": "No results.",
+    "pagination": {
+      "selected": "{selected} of {total} row(s) selected.",
+      "rowsPerPage": "Rows per page",
+      "pageOf": "Page {current} of {total}",
+      "firstPage": "Go to first page",
+      "previousPage": "Go to previous page",
+      "nextPage": "Go to next page",
+      "lastPage": "Go to last page"
+    },
+    "drawer": {
+      "description": "Showing total visitors for the last 6 months",
+      "trendingNote": "Trending up by 5.2% this month",
+      "blurb": "Showing total visitors for the last 6 months. This is just some random text to test the layout. It spans multiple lines and should wrap around.",
+      "headerLabel": "Header",
+      "typeLabel": "Type",
+      "statusLabel": "Status",
+      "targetLabel": "Target",
+      "limitLabel": "Limit",
+      "reviewerLabel": "Reviewer",
+      "selectTypePlaceholder": "Select a type",
+      "selectStatusPlaceholder": "Select a status",
+      "selectReviewerPlaceholder": "Select a reviewer",
+      "submit": "Submit",
+      "done": "Done"
+    }
+  },
+  "contractDetails": {
+    "backToDashboard": "Back",
+    "breadcrumb": "Contract Details",
+    "heroTitle": "Contract {status}",
+    "summary": {
+      "heading": "Request",
+      "currentStatus": "Current status:",
+      "nextRenewal": "Estimated next renewal:",
+      "availableGuarantee": "Available guarantee:",
+      "guaranteeTooltip": "This value accounts for all open, under-review, provisioned, and paid delinquencies.",
+      "openDelinquency": "Open delinquency",
+      "trackDelinquencies": "Track delinquencies",
+      "cancelProposal": "Cancel proposal",
+      "idLabel": "Contract ID",
+      "guaranteeTooltipLabel": "Available guarantee details",
+      "copyId": "Copy ID",
+      "cancelProposalHint": "Available only for pending contracts",
+      "cancelDialog": {
+        "title": "Cancel proposal?",
+        "description": "The contract will be marked as cancelled. History will be preserved.",
+        "confirm": "Yes, cancel",
+        "cancelling": "Cancelling…",
+        "back": "Go back"
+      },
+      "errors": {
+        "NOT_FOUND": "Proposal not found.",
+        "NOT_PENDING": "Only pending proposals can be cancelled.",
+        "UNEXPECTED": "Unexpected error. Please try again."
+      },
+      "openDelinquencyHint": "Register a new delinquency",
+      "trackDelinquenciesHint": "View delinquencies for this contract",
+      "actionsMenu": "Contract actions"
+    },
+    "status": {
+      "ativo": "Active",
+      "encerrado": "Ended",
+      "pendente": "Pending",
+      "cancelado": "Cancelled"
+    },
+    "rentalData": {
+      "heading": "Rental Data",
+      "actions": "Actions",
+      "actionEdit": "Edit",
+      "actionDuplicate": "Duplicate",
+      "actionArchive": "Archive",
+      "actionDisabled": "Coming soon",
+      "groups": {
+        "contract": "Contract Data",
+        "property": "Property Data",
+        "optional": "Optional Data",
+        "documents": "Documents"
+      },
+      "fields": {
+        "propertyKind": "Property Type",
+        "rent": "Rent",
+        "condo": "Condo Fee",
+        "otherFees": "Other Fees",
+        "totalRent": "Total Rent",
+        "fee": "Fee Amount",
+        "oneTimeActivationFee": "One-time activation fee",
+        "setupInstallments": "Setup Installments",
+        "exitCost": "Exit cost",
+        "rentMultiplier": "Rent multiplier",
+        "payer": "Payer",
+        "pviSchedule": "PVI migration schedule",
+        "cep": "ZIP",
+        "addressNumber": "Street/Number",
+        "neighborhood": "Neighborhood",
+        "cityUF": "City/State",
+        "complement": "Complement",
+        "tag": "Tag",
+        "description": "Description"
+      },
+      "propertyKind": {
+        "residencial": "Residential",
+        "comercial": "Commercial"
+      },
+      "empty": "—"
+    },
+    "documents": {
+      "heading": "Documents",
+      "send": "Upload",
+      "sendDisabled": "Coming soon",
+      "downloadTemplate": "Download standard template",
+      "labels": {
+        "rentalContract": "Rental contract",
+        "inspection": "Inspection",
+        "policy": "Policy"
+      },
+      "status": {
+        "pendente": "Pending",
+        "enviado": "Uploaded",
+        "aprovado": "Approved"
+      }
+    },
+    "history": {
+      "heading": "History",
+      "expand": "Expand history",
+      "collapse": "Collapse history",
+      "empty": "No records."
+    },
+    "tenant": {
+      "heading": "Tenant",
+      "personal": "Personal Data",
+      "approval": {
+        "aprovado": "Approved",
+        "pendente": "Pending",
+        "reprovado": "Rejected"
+      },
+      "fields": {
+        "fullName": "Name",
+        "cpf": "CPF",
+        "birthDate": "Date of Birth",
+        "email": "E-mail",
+        "phone": "Phone"
+      },
+      "termApproved": "Term Approved",
+      "approvalFailedHelp": "Rejection on file. Request updated documentation from the tenant to reopen review.",
+      "initialsLabel": "Tenant initials"
+    },
+    "notFound": {
+      "title": "Contract not found",
+      "body": "We could not find a contract with this identifier."
+    },
+    "errors": {
+      "title": "We couldn't load this contract",
+      "body": "Something went wrong fetching the data. Try again or go back to the dashboard.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard",
+      "backToContracts": "Back to contracts"
+    },
+    "loading": {
+      "label": "Loading contract"
+    }
+  },
+  "contractList": {
+    "meta": {
+      "title": "Contracts | Mutav",
+      "description": "Real estate agency contracts list"
+    },
+    "heading": "Contracts",
+    "subheading": "Track your agency's contracts",
+    "tabs": {
+      "all": "All",
+      "expiring": "Expiring",
+      "ativo": "Active",
+      "pendente": "Pending",
+      "encerrado": "Closed",
+      "cancelado": "Canceled"
+    },
+    "columns": {
+      "publicId": "ID",
+      "urgency": "Urgency",
+      "status": "Status",
+      "tenant": "Tenant",
+      "availableGuarantee": "Available guarantee",
+      "nextRenewalDate": "Next renewal",
+      "creationTime": "Created"
+    },
+    "urgency": {
+      "overdue": "Overdue",
+      "expiring": "Expiring",
+      "critical": "Caution",
+      "warning": "On track",
+      "pendente": "Pending",
+      "ok": "OK",
+      "inactive": "Inactive"
+    },
+    "search": {
+      "placeholder": "Search by ID or tenant"
+    },
+    "columnsButton": "Columns",
+    "createButton": "Create contract",
+    "emptyStateCta": "Create your first contract",
+    "noResults": "No contracts found",
+    "loading": "Loading contracts…",
+    "noAgencySelected": "Select an agency to view contracts.",
+    "errors": {
+      "title": "Could not load contracts",
+      "body": "We couldn't load the list. Please try again.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard"
+    },
+    "pagination": {
+      "rowsPerPage": "Rows per page",
+      "pageOf": "Page {current} of {total}",
+      "firstPage": "First page",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "lastPage": "Last page"
+    }
+  },
+  "paymentList": {
+    "meta": {
+      "title": "Invoices | Mutav",
+      "description": "Monthly invoices for the agency"
+    },
+    "heading": "Invoices",
+    "subheading": "Track your agency's monthly invoices",
+    "tabs": {
+      "all": "All",
+      "pending": "Pending",
+      "overdue": "Overdue",
+      "paid": "Paid",
+      "canceled": "Canceled"
+    },
+    "columns": {
+      "publicId": "ID",
+      "period": "Period",
+      "dueDate": "Due Date",
+      "total": "Total",
+      "state": "Status",
+      "contracts": "Contracts"
+    },
+    "search": {
+      "placeholder": "Search by ID or period"
+    },
+    "columnsButton": "Columns",
+    "noResults": "No invoices found",
+    "loading": "Loading invoices…",
+    "pagination": {
+      "rowsPerPage": "Rows per page",
+      "pageOf": "Page {current} of {total}",
+      "firstPage": "First page",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "lastPage": "Last page"
+    }
+  },
+  "checkout": {
+    "common": {
+      "payee": "Pay to",
+      "dueDate": "Due on",
+      "back": "Back",
+      "backToCheckout": "Back to checkout",
+      "trust": "Payments settled via Stellar and regulated anchors. Invoice"
+    },
+    "picker": {
+      "meta": {
+        "title": "Pay invoice {publicId} | Mutav",
+        "description": "Choose how to pay your Mutav invoice."
+      },
+      "heading": "How do you want to pay?",
+      "pix": {
+        "title": "PIX",
+        "subtitle": "Direct from your bank account",
+        "duration": "~1 min"
+      },
+      "stellar": {
+        "title": "Crypto (Stellar)",
+        "subtitle": "XLM or USDC from your wallet",
+        "duration": "~10 s"
+      },
+      "anchortest": {
+        "title": "AnchorTest",
+        "subtitle": "Anchor hosted UI (SEP-24)",
+        "duration": "demo"
+      }
+    },
+    "stellar": {
+      "meta": {
+        "title": "Pay with Stellar — {publicId} | Mutav",
+        "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
+      }
+    },
+    "anchortest": {
+      "meta": {
+        "title": "AnchorTest — {publicId} | Mutav",
+        "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
+      },
+      "orderId": "Order",
+      "stepsHeading": "Steps",
+      "steps": {
+        "openForm": {
+          "title": "Open the anchor's form",
+          "caption": "We'll open the form in a new window.",
+          "popupOpen": "Form open. Complete the details in the popup window.",
+          "popupBlocked": "Your browser blocked the popup. Use the button below.",
+          "open": "Open in new window",
+          "reopen": "Reopen window"
+        },
+        "awaiting": {
+          "title": "Awaiting anchor confirmation",
+          "caption": "We're polling the anchor — you can close the window once you're done."
+        },
+        "done": {
+          "title": "Payment settled"
+        }
+      },
+      "status": {
+        "preparing": "Preparing deposit",
+        "completed": "Paid",
+        "failed": "Payment failed"
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Invoice not found.",
+        "NOT_CHARGEABLE": "This invoice cannot be paid right now.",
+        "AMOUNT_INVALID": "Invalid amount for the selected method.",
+        "AMOUNT_OUT_OF_RANGE": "Amount is outside the anchor's accepted range — use R$ 5.00–R$ 50.00 on the test environment.",
+        "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
+        "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
+        "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "NO_BANK_ACCOUNT": "Register a bank account to pay via PIX before continuing.",
+        "INTERNAL": "Internal error. Please try again."
+      }
+    },
+    "pix": {
+      "meta": {
+        "title": "Pay with PIX — {publicId} | Mutav",
+        "description": "Pay your Mutav invoice via PIX."
+      },
+      "copyCode": "PIX copy & paste",
+      "orderId": "Order",
+      "details": "Details",
+      "status": {
+        "preparing": "Preparing payment",
+        "awaitingPayment": "Awaiting payment",
+        "processing": "Received, processing",
+        "completed": "Paid",
+        "failed": "Payment failed"
+      },
+      "bankSelection": {
+        "loading": "Loading bank accounts…",
+        "emptyTitle": "Register a bank account to pay via PIX",
+        "emptyBody": "Before paying this invoice via PIX, register one of the agency's bank accounts. Registration opens in a new tab.",
+        "addBankButton": "Register account",
+        "addingBankHint": "Finish the registration in the new tab, then come back and click \"I'm done, refresh\".",
+        "refreshButton": "I'm done, refresh",
+        "picker": {
+          "title": "Which account is paying?",
+          "holderLabel": "Holder: {name}",
+          "keyLabel": "PIX key ending in {last4}",
+          "payWithButton": "Pay with this account",
+          "addAnotherButton": "Register another account"
+        },
+        "errors": {
+          "NO_ANCHOR_ACCOUNT": "The agency hasn't completed initial setup yet. Complete it before registering accounts.",
+          "KYC_NOT_APPROVED": "Agency verification is still pending. Complete it before registering accounts.",
+          "INTERNAL": "Unexpected error. Please try again."
+        }
+      },
+      "errors": {
+        "PAYMENT_NOT_FOUND": "Invoice not found.",
+        "NOT_CHARGEABLE": "This invoice cannot be paid right now.",
+        "AMOUNT_INVALID": "Invalid amount for the selected method.",
+        "AMOUNT_OUT_OF_RANGE": "Amount is outside the anchor's accepted range — use R$ 5.00–R$ 50.00 on the test environment.",
+        "ASSET_UNSUPPORTED": "Asset not supported by the anchor.",
+        "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
+        "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
+        "NO_BANK_ACCOUNT": "Register a bank account to pay via PIX before continuing.",
+        "INTERNAL": "Internal error. Please try again."
+      }
+    },
+    "pago": {
+      "meta": {
+        "title": "Paid — {publicId} | Mutav",
+        "description": "Mutav payment receipt."
+      },
+      "badge": {
+        "paid": "Paid",
+        "canceled": "Canceled"
+      },
+      "paidVia": "via {method}",
+      "dueWas": "Was due on",
+      "invoiceId": "Invoice",
+      "txHash": "Transaction hash",
+      "txId": "Transaction ID",
+      "canceledRecovery": "This invoice was canceled. Request a new one from the agency.",
+      "methods": {
+        "pix": "PIX",
+        "stellar": "Stellar",
+        "boleto": "Boleto",
+        "unknown": "—"
+      },
+      "backToDashboard": "Back to dashboard"
+    }
+  },
+  "paymentDetails": {
+    "meta": {
+      "title": "Invoice {id} | Mutav",
+      "description": "Invoice details"
+    },
+    "breadcrumb": "Invoice Details",
+    "heroTitle": "Invoice {state}",
+    "state": {
+      "pending": "Pending",
+      "overdue": "Overdue",
+      "paid": "Paid",
+      "canceled": "Canceled"
+    },
+    "method": {
+      "none": "Not set",
+      "boleto": "Boleto",
+      "pix": "PIX",
+      "stellar": "Stellar"
+    },
+    "summary": {
+      "heading": "Summary",
+      "idLabel": "Invoice ID",
+      "period": "Period",
+      "issuedAt": "Issued on",
+      "dueDate": "Due date",
+      "total": "Total",
+      "state": "Status",
+      "method": "Payment method",
+      "actionsMenu": "Invoice actions"
+    },
+    "lineItems": {
+      "heading": "Line Items",
+      "columns": {
+        "contract": "Contract",
+        "kind": "Type",
+        "amount": "Amount",
+        "description": "Description"
+      },
+      "kind": {
+        "recurring": "Monthly fee",
+        "activation": "Activation"
+      },
+      "total": "Total",
+      "empty": "No items."
+    },
+    "methodCard": {
+      "heading": "Payment Method",
+      "none": "Payment method not defined",
+      "noneHint": "The payment method will be set by the finance team.",
+      "barcode": "Barcode",
+      "barcodeEmpty": "Awaiting boleto generation",
+      "pixKey": "PIX Key",
+      "txId": "Transaction ID",
+      "txIdEmpty": "Awaiting payment",
+      "address": "Destination address",
+      "txHash": "Transaction hash",
+      "txHashEmpty": "Awaiting on-chain confirmation",
+      "generateStellar": "Pay with Stellar",
+      "openPayPage": "Open payment page",
+      "copyShareLink": "Copy link",
+      "linkCopied": "Link copied",
+      "openCheckout": "Open checkout"
+    },
+    "notFound": {
+      "title": "Invoice not found",
+      "body": "We could not find an invoice with this identifier."
+    },
+    "errors": {
+      "title": "Could not load this invoice",
+      "body": "Something went wrong fetching the data. Try again or go back to the dashboard.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard"
+    },
+    "loading": {
+      "label": "Loading invoice"
+    }
+  },
+  "contractNew": {
+    "meta": {
+      "title": "New Contract | Mutav"
+    },
+    "heading": "New Contract",
+    "subheading": "Fill in the details to create a new guarantee",
+    "stepLabel": "Step {current} of {total}",
+    "steps": {
+      "1": "Basic Details",
+      "2": "Simulation",
+      "3": "Additional Details",
+      "4": "Review",
+      "5": "Confirmation"
+    },
+    "step1": {
+      "entityTypeLabel": "Entity type",
+      "pf": "Individual",
+      "pj": "Company",
+      "cnpjPlaceholder": "00.000.000/0001-00"
+    },
+    "property": {
+      "heading": "Property Details",
+      "kindLabel": "Property type",
+      "residencial": "Residential",
+      "comercial": "Commercial",
+      "cep": "ZIP code",
+      "street": "Street",
+      "addressNumber": "Number",
+      "neighborhood": "Neighborhood",
+      "city": "City",
+      "uf": "State",
+      "complement": "Complement (optional)",
+      "lockedField": "Auto-filled"
+    },
+    "rent": {
+      "heading": "Values",
+      "rent": "Monthly rent",
+      "condo": "Condo fee",
+      "otherFees": "Other fees",
+      "total": "Total rent",
+      "placeholder": "0.00",
+      "prefix": "R$"
+    },
+    "tenant": {
+      "heading": "Tenant Details",
+      "fullName": "Full name",
+      "companyName": "Company name",
+      "cpf": "CPF",
+      "cpfPlaceholder": "000.000.000-00",
+      "cnpj": "CNPJ",
+      "birthDate": "Date of birth",
+      "email": "E-mail",
+      "phone": "Phone",
+      "scoreLoading": "Looking up score...",
+      "scoreBom": "Good",
+      "scoreRegular": "Regular",
+      "scoreRuim": "Poor",
+      "scoreNegado": "Denied",
+      "scoreLabel": "Credit score"
+    },
+    "simulation": {
+      "heading": "Simulation Result",
+      "scoreLabel": "Score",
+      "approvedValueLabel": "Approved rental value",
+      "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
+      "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
+      "closeButton": "Back to home"
+    },
+    "coverage": {
+      "heading": "Coverage Configuration",
+      "rentMultiplierLabel": "Define total coverage",
+      "exitCostLabel": "Define exit cost",
+      "coverageDesc": "{x} months of rent covered in case of default",
+      "exitDesc": "{x} times the rent in case of early termination",
+      "preview": {
+        "heading": "Estimated Values",
+        "fee": "Monthly fee",
+        "activationFee": "Activation fee",
+        "guarantee": "Available guarantee"
+      },
+      "summary": {
+        "heading": "Summary",
+        "exitCost": "Exit cost",
+        "fee": "Fee value",
+        "commission": "Commission (1.5%)",
+        "guarantee": "Guarantee value"
+      }
+    },
+    "complementary": {
+      "heading": "Additional Details",
+      "tenantSection": "Tenant Details",
+      "addressSection": "Property Address"
+    },
+    "review": {
+      "heading": "Review",
+      "propertySection": "Property Details",
+      "rentalSection": "Rental Details",
+      "tenantSection": "Tenant Details",
+      "planSection": "Plan Details",
+      "score": "Score",
+      "fee": "Monthly fee",
+      "activationFee": "Activation fee",
+      "guarantee": "Available guarantee",
+      "submit": "Create contract",
+      "submitting": "Creating...",
+      "missingFields": "Fill in all required fields before confirming.",
+      "errorToast": "Failed to create contract. Please try again.",
+      "editBlock": "Edit",
+      "saveBlock": "Save",
+      "cancelBlock": "Cancel"
+    },
+    "success": {
+      "heading": "CONTRACT PROPOSAL CREATED",
+      "subtitle": "The proposal has been successfully sent and is awaiting activation by the tenant.",
+      "description": "The contract will be activated upon the tenant's acceptance of the terms and payment of the activation fee. The proposal has been sent to the tenant via email and WhatsApp.",
+      "viewContract": "View contract",
+      "createAnother": "Create another contract"
+    },
+    "nav": {
+      "back": "Back",
+      "nextStep2": "Simulate credit",
+      "nextStep3": "Continue",
+      "nextStep4": "Review",
+      "nextStep5": "Create contract"
+    },
+    "validation": {
+      "required": "Required field",
+      "cpfInvalid": "Invalid CPF",
+      "cnpjInvalid": "Invalid CNPJ",
+      "cepInvalid": "ZIP must have 8 digits",
+      "rentRequired": "Rent must be greater than zero",
+      "scoreRequired": "Waiting for score result",
+      "birthDateFuture": "Date of birth cannot be in the future",
+      "birthDateInvalid": "Invalid date",
+      "emailInvalid": "Invalid e-mail",
+      "coverageRequired": "Select a coverage option",
+      "exitRequired": "Select an exit cost option"
+    }
+  },
+  "paymentFlow": {
+    "meta": {
+      "title": "Pay with Stellar — {publicId}",
+      "description": "Pay your TGA invoice via the Stellar network."
+    },
+    "shell": {
+      "brand": "mutav",
+      "paymentLabel": "Invoice",
+      "footerBrand": "Mutav · Rental Guarantee Protocol"
+    },
+    "summary": {
+      "dueLabel": "Due",
+      "amountLabel": "Amount due",
+      "paidAtLabel": "Paid at"
+    },
+    "copy": {
+      "toast": "Copied"
+    },
+    "address": {
+      "cardLabel": "Payment address",
+      "copyLabel": "Copy payment address",
+      "pollerLabel": "Waiting for payment on network",
+      "qrTitle": "Stellar payment code — {amount}",
+      "qrDesc": "Use a Stellar wallet's camera. Alternatively, copy the address below.",
+      "disclosureLabel": "How to pay via Stellar",
+      "steps": {
+        "s1": "Open a Stellar wallet app.",
+        "s2": "Scan the code above or tap \"Open in wallet\".",
+        "s3": "Confirm the amount and destination in your wallet.",
+        "s4": "Send the payment.",
+        "s5": "Wait for confirmation here — the status updates automatically."
+      },
+      "pageTitle": "Pay with Stellar",
+      "pageSubtitle": "Send the amount below to the address generated for this invoice.",
+      "copyPaymentLinkLabel": "Copy {asset} payment link",
+      "paymentLinkHint": "Paste this link in a Stellar wallet — destination, amount, and asset come pre-filled.",
+      "paymentLinkLabel": "Payment link ({asset})",
+      "addressFallbackLabel": "Address",
+      "copyAddressLabel": "Copy invoice address"
+    },
+    "receipt": {
+      "title": "Payment confirmed",
+      "subtitle": "Your payment was received on the Stellar network. You can close this page.",
+      "paidAtLabel": "Confirmed at",
+      "txHashLabel": "Transaction"
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "tag": "Partner program",
+      "title": "Rental guarantee without a guarantor.",
+      "titleLine2": "Built for people with a lot to do.",
+      "subtitle": "Segregated capital. Auditable in real time, by anyone, at any time.",
+      "warningTitle": "Important for agencies:",
+      "warningBody": "registration must be completed by a partner holding 25% or more equity, or by an administrator authorized to open accounts on the company's behalf. Have the articles of incorporation ready to verify.",
+      "checklistTitle": "What you will need",
+      "autonomo": {
+        "title": "Independent broker",
+        "items": [
+          {
+            "label": "CPF"
+          },
+          {
+            "label": "Active CRECI (individual)"
+          },
+          {
+            "label": "Email and phone"
+          },
+          {
+            "label": "Banking details",
+            "note": "to receive commissions"
+          }
+        ]
+      },
+      "empresa": {
+        "title": "Real estate agency",
+        "items": [
+          {
+            "label": "CNPJ"
+          },
+          {
+            "label": "Agency CRECI"
+          },
+          {
+            "label": "CNPJ card"
+          },
+          {
+            "label": "Articles of incorporation"
+          },
+          {
+            "label": "Company address proof"
+          },
+          {
+            "label": "Representative ID",
+            "note": "partner ≥ 25% or administrator"
+          },
+          {
+            "label": "Banking details",
+            "note": "to receive commissions"
+          }
+        ]
+      },
+      "ctaButton": "Start registration",
+      "ctaNoteReview": "reviewed in up to 2 business days"
+    },
+    "status": {
+      "title": "Application under review",
+      "subtitle": "Our team is reviewing your information. You will receive an email with the result within 2 business days.",
+      "stateSubmitted": "Submitted — awaiting review",
+      "stateUnderReview": "Under review by Mutav team",
+      "backLabel": "Have questions?",
+      "backLink": "Contact us",
+      "homeButton": "Back"
+    },
+    "rejected": {
+      "title": "Application not approved",
+      "subtitle": "Unfortunately we were unable to approve your application at this time.",
+      "reasonLabel": "Reason provided by our team:",
+      "noReason": "No reason provided.",
+      "contactLabel": "Have questions or want to appeal?",
+      "contactLink": "Contact us",
+      "homeButton": "Back"
+    },
+    "loading": "Loading…",
+    "steps": {
+      "perfil": "Profile",
+      "documentos": "Documents",
+      "contaBancaria": "Banking",
+      "revisao": "Review"
+    },
+    "progressLabel": "Registration progress",
+    "stepDoneSuffix": ": completed",
+    "stepCurrentSuffix": ": current step",
+    "banking": {
+      "empresaAccountNotice": "The bank account must be in the company's name and linked to the registered CNPJ.",
+      "bankLabel": "Bank",
+      "bankPlaceholder": "E.g. Chase, Bank of America",
+      "branchLabel": "Branch",
+      "branchPlaceholder": "0000",
+      "accountLabel": "Account number",
+      "accountPlaceholder": "00000-0",
+      "accountTypeLabel": "Account type",
+      "accountTypeCorrente": "Checking",
+      "accountTypePoupanca": "Savings",
+      "pixKeyLabel": "Pix key",
+      "pixKeyPlaceholder": "CPF, CNPJ, email, phone or random key",
+      "pixKeyHint": "Optional — used for fast refunds and transfers",
+      "nextButton": "Next",
+      "savingButton": "Saving…",
+      "backButton": "← Back",
+      "errors": {
+        "bank": "Enter the bank name.",
+        "branch": "Enter the branch number.",
+        "account": "Enter the account number.",
+        "accountType": "Select an account type."
+      }
+    },
+    "documents": {
+      "loading": "Loading…",
+      "subtitle": "Upload the 2 documents below. We accept PDF, JPG, and PNG.",
+      "kinds": {
+        "documento_empresa": {
+          "label": "Company Document",
+          "description": "CNPJ Card (Federal Revenue) or Articles of Incorporation"
+        },
+        "responsavel_id": {
+          "label": "Representative ID",
+          "description": "National ID or driver's license of the responsible partner"
+        }
+      },
+      "uploadButton": "Upload",
+      "replaceButton": "Replace",
+      "uploading": "Uploading…",
+      "retryButton": "Failed — Try again",
+      "progress": "{uploaded} of {total} uploaded",
+      "allRequired": "Upload all documents to continue.",
+      "nextButton": "Next",
+      "backButton": "← Back"
+    },
+    "review": {
+      "profileSection": "Profile",
+      "bankingSection": "Banking",
+      "agencyTypeLabel": "Type",
+      "nameLabel": "Name",
+      "documentLabel": "Document",
+      "creciLabel": "CRECI",
+      "emailLabel": "Email",
+      "phoneLabel": "Phone",
+      "representanteNameLabel": "Representative",
+      "representanteCpfLabel": "Representative CPF",
+      "bankLabel": "Bank",
+      "branchLabel": "Branch",
+      "accountLabel": "Account",
+      "accountTypeLabel": "Type",
+      "pixKeyLabel": "Pix key",
+      "notProvided": "Not provided",
+      "accountTypeCorrente": "Checking",
+      "accountTypePoupanca": "Savings",
+      "agencyTypeAutonomo": "Independent broker",
+      "agencyTypeEmpresa": "Real estate agency",
+      "editButton": "edit",
+      "submitButton": "Submit registration",
+      "submittingButton": "Submitting…",
+      "backButton": "← Back",
+      "consentMarketing": "I agree to receive targeted communications and can unsubscribe at any time.",
+      "consentLegal": "By submitting my information, I agree to the <privacy>Privacy Policy</privacy> and <terms>Terms of Use</terms>."
+    },
+    "submitted": {
+      "title": "Registration submitted",
+      "subtitle": "Our team will review your information and get back to you within 2 business days.",
+      "detail": "You will receive an email with the result at {email}."
+    },
+    "errors": {
+      "CNPJ_REQUIRED": "CNPJ is required for agencies.",
+      "CPF_REQUIRED": "CPF is required for independent brokers.",
+      "CPF_INVALID": "Invalid CPF. Please check the digits and try again.",
+      "CNPJ_INVALID": "Invalid CNPJ. Please check the digits and try again.",
+      "REPRESENTANTE_NAME_REQUIRED": "Representative name is required for agencies.",
+      "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
+      "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
+      "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
+      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
+      "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
+      "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
+      "BANKING_INFO_REQUIRED": "Fill in your banking details before submitting.",
+      "MISSING_DOCUMENTS": "Upload all required documents before submitting.",
+      "NOT_IN_PROGRESS": "This registration has already been submitted for review.",
+      "ONBOARDING_NOT_EDITABLE": "This registration can no longer be edited.",
+      "NOT_FOUND": "Registration not found.",
+      "NETWORK_ERROR": "Connection failed. Please try again.",
+      "INTERNAL_ERROR": "Internal error. Please reload the page.",
+      "unknown": "Failed to save. Please try again."
+    },
+    "profile": {
+      "typeLabel": "Registration type",
+      "typeAutonomo": "Independent broker",
+      "typeEmpresa": "Real estate agency",
+      "nameLabel": "Full name",
+      "nameLabelEmpresa": "Legal name",
+      "namePlaceholder": "Your full name",
+      "namePlaceholderEmpresa": "Agency name",
+      "cpfLabel": "CPF",
+      "cnpjLabel": "CNPJ",
+      "creciLabel": "CRECI",
+      "creciPlaceholderAutonomo": "CRECI-F 000000",
+      "creciPlaceholderEmpresa": "CRECI-J 000000",
+      "emailLabel": "Email",
+      "emailPlaceholder": "contact@agency.com",
+      "phoneLabel": "Phone",
+      "representanteSection": "Legal representative",
+      "representanteNameLabel": "Representative name",
+      "representanteNamePlaceholder": "Full name",
+      "representanteCpfLabel": "Representative CPF",
+      "nextButton": "Next",
+      "savingButton": "Saving…",
+      "errors": {
+        "agencyType": "Select a registration type.",
+        "name": "Name is required.",
+        "email": "Invalid email.",
+        "phone": "Invalid phone number.",
+        "creci": "CRECI is required.",
+        "cpf": "Invalid CPF.",
+        "cnpj": "Invalid CNPJ.",
+        "representanteName": "Representative name is required.",
+        "representanteCpf": "Invalid representative CPF."
+      }
+    }
+  }
+}
