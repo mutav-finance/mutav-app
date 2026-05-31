@@ -17,10 +17,12 @@ convex/_generated/
 next-env.d.ts
 
 # i18n message catalogs — they ship as canonical JSON; reformatting them
-# can produce noisy diffs that obscure copy changes. apps/pay carries a
-# duplicate of the same files until packages extraction (PR 6).
+# can produce noisy diffs that obscure copy changes. apps/pay and
+# apps/fund carry duplicates of the same files until packages extraction
+# (PR 6).
 apps/agency/messages/
 apps/pay/messages/
+apps/fund/messages/
 
 # Local agent tooling — not project source.
 .claude/
