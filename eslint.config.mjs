@@ -22,20 +22,23 @@ const eslintConfig = defineConfig([
       ".agents/**",
       // Vendored Etherfuse client — kept verbatim from regional-starter-pack
       // so upstream pulls stay clean-diff. Same for the operator-run sandbox
-      // smoke test (vendored shape, not production code).
+      // smoke test (vendored shape, not production code). The same client is
+      // duplicated under apps/pay during the PR 3 split; both copies stay
+      // vendored verbatim until packages extraction (PR 6).
       "apps/agency/src/lib/anchors/etherfuse/**",
+      "apps/pay/src/lib/anchors/etherfuse/**",
       "scripts/etherfuse-smoke.ts",
     ],
   },
-  // Tell the Next.js eslint plugin where the Next app lives so its
+  // Tell the Next.js eslint plugin where the Next apps live so its
   // pages/app-dir discovery (and rules like no-html-link-for-pages) work
   // post-monorepo move. Without this the plugin probes `<cwd>/pages` and
   // emits a "Pages directory cannot be found" warning when lint runs from
-  // the repo root.
+  // a per-app directory. The plugin accepts an array of rootDirs.
   {
     settings: {
       next: {
-        rootDir: "apps/agency",
+        rootDir: ["apps/agency", "apps/pay"],
       },
     },
   },
