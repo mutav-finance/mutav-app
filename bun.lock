@@ -69,6 +69,10 @@
       "name": "@mutav/agency",
       "version": "0.1.0",
     },
+    "apps/fund": {
+      "name": "@mutav/fund",
+      "version": "0.1.0",
+    },
     "apps/pay": {
       "name": "@mutav/pay",
       "version": "0.1.0",
@@ -378,6 +382,8 @@
     "@mswjs/interceptors": ["@mswjs/interceptors@0.41.4", "", { "dependencies": { "@open-draft/deferred-promise": "^2.2.0", "@open-draft/logger": "^0.3.0", "@open-draft/until": "^2.0.0", "is-node-process": "^1.2.0", "outvariant": "^1.4.3", "strict-event-emitter": "^0.5.1" } }, "sha512-3B9EinUkrdOUGYzHRzRWSXunQ4YFGboJnyLNRwEJWEde+j8fNhPUHvrN1E3g1DU/iS/s8JQrMNVe+S7AHHVs0w=="],
 
     "@mutav/agency": ["@mutav/agency@workspace:apps/agency"],
+
+    "@mutav/fund": ["@mutav/fund@workspace:apps/fund"],
 
     "@mutav/pay": ["@mutav/pay@workspace:apps/pay"],
 
