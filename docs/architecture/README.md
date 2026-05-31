@@ -61,16 +61,33 @@ The Auth0 swap is documented in [`../auth.md`](../auth.md). Pre-Auth0, all human
 
 The app is a single Next.js deployment that hosts four distinct shells via App Router route groups. Each shell has its own layout, sidebar, identity model, and role gate. They share zero UI chrome — the visual separation reflects the actor separation.
 
-| Shell                | Route group  | Layout owns                                         | Gate                                   | Status                                   |
-| -------------------- | ------------ | --------------------------------------------------- | -------------------------------------- | ---------------------------------------- |
-| **Agency dashboard** | `(app)`      | `AppSidebar`, agency switcher, NavMain/NavAgency    | Auth + agency membership               | Shipped                                  |
-| **Tenant payment**   | `(public)`   | Minimal chrome, no auth UI                          | `publicId` validity + contract status  | Shipped                                  |
-| **Investor portal**  | `(investor)` | Investor nav (no agency context)                    | Wallet-connected (KYC-gated per route) | UI shipped, data + auth mocked           |
-| **Mutav Admin**      | `(admin)`    | `AdminSidebar` (Mutav branding, no agency switcher) | `mutavStaff` row exists                | **Planned** — see [`admin.md`](admin.md) |
+Today all four shells coexist in one Next.js deployment. The [monorepo migration](../superpowers/specs/2026-05-31-monorepo-migration-design.md) moves each shell into its own persona app over PRs 2–7; the **Future home** column shows the target.
 
-The two authenticated shells (`(app)` and `(admin)`) coexist on the same domain (`app.mutav.app/{,admin}/*`) for v1. A future migration to `admin.mutav.app` is documented as a security-driven trigger in [`admin.md`](admin.md), not committed for v1.
+| Shell                | Route group  | Layout owns                                         | Gate                                   | Future home              | Status                                   |
+| -------------------- | ------------ | --------------------------------------------------- | -------------------------------------- | ------------------------ | ---------------------------------------- |
+| **Agency dashboard** | `(app)`      | `AppSidebar`, agency switcher, NavMain/NavAgency    | Auth + agency membership               | `apps/agency/`           | Shipped                                  |
+| **Tenant payment**   | `(public)`   | Minimal chrome, no auth UI                          | `publicId` validity + contract status  | `apps/pay/` (own origin) | Shipped                                  |
+| **Investor portal**  | `(investor)` | Investor nav (no agency context)                    | Wallet-connected (KYC-gated per route) | `apps/fund/`             | UI shipped, data + auth mocked           |
+| **Mutav Admin**      | `(admin)`    | `AdminSidebar` (Mutav branding, no agency switcher) | `mutavStaff` row exists                | `apps/admin/`            | **Planned** — see [`admin.md`](admin.md) |
 
-Mutav-internal users who also hold agency memberships flip between `(app)` and `(admin)` via a shell-switcher in the user menu. They do not see the admin sidebar while inside `(app)`, and vice versa.
+Pre-migration, the two authenticated shells (`(app)` and `(admin)`) coexist on the same domain. Post-migration, each shell sits on its own origin (`app.mutav.finance`, `pay.mutav.finance`, `fund.mutav.finance`, `admin.mutav.finance`); the per-app deployment model is described in the App catalog below.
+
+Mutav-internal users who also hold agency memberships flip between `(app)` and `(admin)` via a shell-switcher in the user menu. They do not see the admin sidebar while inside `(app)`, and vice versa. Post-migration the switcher becomes a cross-origin link (cookies are `Host-Only` per the [Non-trust-boundary principles](#non-trust-boundary-principles), so a fresh Auth0 session is required on each origin).
+
+## App catalog
+
+The Shell catalog describes _how the UI is organized_; the App catalog describes _where the deployable units live_. Post-migration the app layer is a Turborepo monorepo with one Next.js app per audience, each on its own origin. See the [monorepo migration spec](../superpowers/specs/2026-05-31-monorepo-migration-design.md) for the full rationale and the staged-PR sequence.
+
+| App           | Origin                | Hosts shell                       | Auth                                                                   | Cookie posture                                                           | Status            |
+| ------------- | --------------------- | --------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------- |
+| `apps/agency` | `app.mutav.finance`   | `(app)` + (today) `(public)/pay/` | Auth0 (agency connection) + agency membership                          | `Host-Only, SameSite=Strict, Secure, HttpOnly`                           | Planned (PR 2)    |
+| `apps/pay`    | `pay.mutav.finance`   | `(public)/pay/[publicId]/*`       | None — `publicId` bearer in URL                                        | No session cookie; only short-lived `__Host-` CSRF token if forms appear | Planned (PR 3)    |
+| `apps/fund`   | `fund.mutav.finance`  | `(investor)`                      | Wallet-as-identity (per chain)                                         | No Auth0 cookie; wallet session in `localStorage` scoped to origin       | Planned (PRs 4–5) |
+| `apps/admin`  | `admin.mutav.finance` | `(admin)`                         | Auth0 (separate `mutavStaff` connection, mandatory MFA + IP allowlist) | `Host-Only, SameSite=Strict, Secure, HttpOnly`; shorter session lifetime | Planned (PR 7)    |
+
+The four apps share a **single Convex deployment** at the repo root (the Mutav API). The single-writer rule is load-bearing — the hash-chained audit log + Merkle anchor in [`reliability.md`](reliability.md) § Audit log integrity requires it. Per-app backends are explicitly rejected.
+
+`apps/pay/` carries no Auth0 SDK in its dependency list (defends against phishing UI; limits blast radius of a future Auth0 vulnerability). `apps/admin/` runs against an administratively distinct Auth0 connection (`mutavStaff`); the escalation path to a separate Auth0 tenant is documented in [`admin.md`](admin.md).
 
 ## Domain catalog
 
@@ -90,6 +107,8 @@ Convex domain folders are the system's bounded contexts. Existing domains are li
 | `nav`           | **Planned** | NAV proposals + safeguards (push-only by treasury role, per-epoch change cap, pause-on-deviation)                                                               | [`admin.md`](admin.md) § A6, [`reliability.md`](reliability.md) § NAV safety |
 
 **Promotion rule** (from CLAUDE.md): new domains start as a single file and split into `domain.ts` + `useCases.ts` (+ `mutations.ts` / `actions.ts` as needed) the moment they gain a second non-trivial function.
+
+**Cross-reference to `mutav-stellar#57`.** The consolidation issue sketches Convex modules as `agencies · investments · fundMgmt · payments · compliance`. `agencies`, `payments`, and `compliance` carry over with the same names. `investments` and `fundMgmt` are **not** adopted as domain names: their conceptual scope is split across `fundState` (per-chain NAV/AUM/redemption-queue mirror), `nav` (proposals + safeguards), `contracts` (rental contracts), and `mutavStaff` (treasury sub-role). When a `#57` reader hits "where is `investments`?" — it's the union of those four. The [monorepo migration spec](../superpowers/specs/2026-05-31-monorepo-migration-design.md) § Section 3 walks through the disposition for each `#57` name.
 
 ## Trust boundaries
 
@@ -151,6 +170,7 @@ Boundaries (in order of blast radius):
 7. **`publicId` ↔ Tenant access** — bearer token boundary. The tenant pays via a URL containing an unguessable id. The id is not rotated today; revocation is "cancel the contract".
 8. **Mutav-admin ↔ everything** — cross-tenant boundary. Mutav staff see across all agencies. Mitigated by `mutavStaff` sub-role gating + hash-chained audit log on every write (Merkle-anchored daily to chain for CVM/BCB defensibility per [`reliability.md`](reliability.md) § Audit log integrity).
 9. **Convex (US) ↔ Brazilian PII** — data residency boundary. Convex is US-hosted; LGPD cross-border transfer is documented via SCCs; sensitive PII (biometric KYC, ID documents) stays at the KYC vendor (BR-resident option required where available — Sumsub is the v1 recommendation with DPA caveats per [`regulatory.md`](regulatory.md) § Recommended vendor). See [`regulatory.md`](regulatory.md) § LGPD.
+10. **Cross-origin boundary between persona apps** (post-migration) — containment boundary. Each persona app (`agency` / `pay` / `fund` / `admin`) sits on its own origin (`app` / `pay` / `fund` / `admin`.`mutav.finance`). The enforcement mechanism is the cookie posture in [Non-trust-boundary principles](#non-trust-boundary-principles): cookies are `Host-Only` (no `Domain=.mutav.finance`), so a session set on one origin is unreachable from another. A bug or compromise on one origin does not yield access to another origin's session, even though the origins share a parent domain. This is the boundary that limits the blast radius of #1 (Auth0) and #8 (Mutav-admin) across persona apps. Before the [monorepo migration](../superpowers/specs/2026-05-31-monorepo-migration-design.md) lands, all shells share an origin — this boundary is a future commitment, not a current control.
 
 ## Non-trust-boundary principles
 
@@ -165,3 +185,6 @@ A few architectural rules that aren't boundary calls but constrain how each shel
 - **Default to server components.** Push interactivity to leaf islands. (CLAUDE.md § "Server vs Client Components".)
 - **Domain folders are bounded contexts.** A domain that needs data from another goes through that domain's `useCases.ts`, not its tables. (CLAUDE.md § "Domain design".)
 - **Result pattern at domain boundaries.** Throw only at external integration edges. (CLAUDE.md § "Result pattern".)
+- **All cookies are `Host-Only`.** No `Domain=.mutav.finance` ever. A session cookie set on one persona app's origin is never sent to a sibling subdomain. Forecloses cross-subdomain cookie leakage between staff (`apps/admin`) and customer-facing surfaces (`apps/agency`, `apps/fund`, `apps/pay`). Pair with `SameSite=Strict`, `Secure`, `HttpOnly` on every session cookie. See [monorepo migration spec](../superpowers/specs/2026-05-31-monorepo-migration-design.md) § Section 5.
+- **`mutavStaff` Auth0 connection is administratively distinct.** Mutav-internal staff authenticate through a separate Auth0 connection from agency staff, with mandatory MFA at the Auth0 rule level + IP allowlist + shorter session lifetime. Escalation path (separate Auth0 tenant) is documented; trigger = BACEN/CVM diligence requires it. See [`admin.md`](admin.md) § Subdomain split.
+- **Convex stays a single deployment.** The four persona apps share one Convex (the Mutav API). Load-bearing: the hash-chained audit log + Merkle anchor in [`reliability.md`](reliability.md) § Audit log integrity requires a single writer. Per-app backends are explicitly rejected; the trade-off is acknowledged (if Convex has an incident, all apps degrade together).
