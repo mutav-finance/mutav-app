@@ -31,6 +31,12 @@ export default defineConfig({
     // make the intent explicit. The historical pattern is kept verbatim so the
     // local-only worktree failure mode (.claude/worktrees/etherfuse-onramp/...)
     // is preserved unchanged — fixing that is out of scope for PR 2.
+    // Scope discovery to apps/agency/** + convex/** so the apps/pay tree
+    // (which has its own vitest config) doesn't get picked up twice.
+    include: [
+      "apps/agency/**/*.{test,spec}.?(c|m)[jt]s?(x)",
+      "convex/**/*.{test,spec}.?(c|m)[jt]s?(x)",
+    ],
     exclude: [
       "**/node_modules/**",
       "**/.next/**",
