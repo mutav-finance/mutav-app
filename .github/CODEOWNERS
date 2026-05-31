@@ -1,0 +1,29 @@
+# Mutav monorepo — CODEOWNERS
+#
+# Per the spec at docs/superpowers/specs/2026-05-31-monorepo-migration-design.md
+# § Section 6, every app and every package has its own ownership rule.
+# Team handles are placeholders — see spec § Section 10 follow-up.
+
+# Persona apps
+/apps/agency/         @mutav-finance/agency-team
+/apps/pay/            @mutav-finance/agency-team
+/apps/fund/           @mutav-finance/fund-team
+/apps/admin/          @mutav-finance/admin-team
+
+# Mutav API (Convex backend) — single shared deployment
+/convex/              @mutav-finance/api-team
+
+# Shared packages
+/packages/ui/         @mutav-finance/design-system
+/packages/*           @mutav-finance/api-team
+
+# CI and infra
+/.github/             @mutav-finance/api-team
+/CODEOWNERS           @mutav-finance/api-team
+/turbo.json           @mutav-finance/api-team
+/tsconfig.base.json   @mutav-finance/api-team
+/package.json         @mutav-finance/api-team
+/bun.lock             @mutav-finance/api-team
+
+# Architecture docs
+/docs/                @mutav-finance/api-team
