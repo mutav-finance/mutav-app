@@ -4,7 +4,28 @@
 
 ## Project
 
-Mutav — dashboard for managing rental guarantees across chains.
+Mutav — the web surface for the MUTAV protocol. Agency dashboard, tenant payment, investor portal, Mutav-internal admin, and the **Mutav API** (Convex backend) that orchestrates everything off-chain. Settles guarantees on Stellar via the `Fund` contract published by [`mutav-finance/mutav-stellar`](https://github.com/mutav-finance/mutav-stellar).
+
+## Target architecture (per [mutav-stellar#57](https://github.com/mutav-finance/mutav-stellar/issues/57))
+
+On 2026-05-30 the protocol consolidated to **two repos** (down from three):
+
+- **`mutav-stellar`** — Fund contract (Soroban/Rust) + TS SDK only. Audited surface, slow cadence. No daemons, no UI.
+- **`mutav-app`** (this repo) — Turborepo monorepo holding the persona apps + Mutav API. The 6 Bun operator daemons that were in flight on `mutav-stellar` (PRs #22–#27) move here as **Convex crons + Actions**. Operator key custody moves from a daemon host to a **KMS-backed Convex Action** (tracked at [`mutav-stellar#41`](https://github.com/mutav-finance/mutav-stellar/issues/41)).
+
+The web3 portal currently in [`mutav-finance/mutav-fund`](https://github.com/mutav-finance/mutav-fund) folds into `apps/fund/`; that repo soft-deprecates and eventually archives (see [`mutav-fund#11`](https://github.com/mutav-finance/mutav-fund/issues/11)).
+
+**Authority model** — which key signs what:
+
+| Key                | Where it lives                                | Signs                                                                                     |
+| ------------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Operator** (hot) | KMS-backed Convex Action                      | Routine fund ops — partner inflows, redemption processing, yield/fee accrual, TTL renewal |
+| **Admin** (cold)   | Hardware wallet inside `apps/admin/`          | Parameter changes, `cover_default`, partner whitelist, pause, admin handover              |
+| **Investor**       | User wallet inside `apps/fund/` (client-side) | Deposit, request/cancel redemption, SEP-41 token ops                                      |
+
+**Status: planning, not yet built.** The monorepo scaffold, persona-app split, and Convex Action implementations are a separate planning effort tracked at [`#139`](https://github.com/mutav-finance/mutav-app/issues/139). Until that plan lands, the **current Next.js layout below remains authoritative**. Don't pre-emptively scaffold `apps/*` or rename existing Convex domains without going through the plan.
+
+> **Reconciliation note for `#57`**: that issue sketches `apps/{marketing,agency,fund,admin,docs}` and Convex modules `agencies · investments · fundMgmt · payments · compliance`. Neither sketch 1:1 with what this repo already has (see [`docs/architecture/README.md`](docs/architecture/README.md) § Shell catalog and § Domain catalog). The migration plan reconciles them — it does not unilaterally adopt `#57`'s names.
 
 ## Shared docs
 
