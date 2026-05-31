@@ -18,7 +18,18 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+
+    /* Path aliases — mirror apps/agency/tsconfig.json so convex's tsc
+     * can typecheck through the cross-boundary imports (convex/*.ts
+     * files reach into ../../apps/agency/src/...; some of those files
+     * use @/* and @convex/* aliases that need to resolve here too).
+     * Architectural cleanup tracked for the packages/ extraction PR. */
+    "baseUrl": ".",
+    "paths": {
+      "@convex/*": ["./*"],
+      "@/*": ["../apps/agency/src/*"]
+    }
   },
   "include": ["./**/*"],
   "exclude": ["./_generated"]

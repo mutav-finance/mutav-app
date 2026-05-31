@@ -1,4 +1,4 @@
-import { SCORE_TIER_THRESHOLD } from "../../../convex/contracts/domain";
+import { SCORE_TIER_THRESHOLD } from "@convex/contracts/domain";
 
 export type RentMultiplier = "24x" | "36x" | "48x";
 export type ExitCostMultiplier = "3x" | "5x" | "7x";

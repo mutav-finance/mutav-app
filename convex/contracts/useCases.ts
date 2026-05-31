@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { priceContract } from "../../src/lib/pricing/contract";
+import { priceContract } from "../../apps/agency/src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
 import { CONTRACT_STATUS, tierForScore } from "./domain";

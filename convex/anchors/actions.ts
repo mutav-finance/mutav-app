@@ -21,13 +21,13 @@ import {
   createAnchorClient,
   getAnchorProvider,
   STELLAR_NETWORK_PASSPHRASES,
-} from "../../src/lib/anchors/registry";
-import { SepApiError, type TransactionStatus } from "../../src/lib/anchors/sep/types";
+} from "../../apps/agency/src/lib/anchors/registry";
+import { SepApiError, type TransactionStatus } from "../../apps/agency/src/lib/anchors/sep/types";
 import {
   AnchorError,
   type TransactionStatus as AnchorTransactionStatus,
-} from "../../src/lib/anchors/types";
-import { ASSETS } from "../../src/lib/stellar/assets";
+} from "../../apps/agency/src/lib/anchors/types";
+import { ASSETS } from "../../apps/agency/src/lib/stellar/assets";
 import type { AgencyId } from "../agencies/domain";
 import type { PaymentId } from "../payments/domain";
 import {
@@ -1007,7 +1007,7 @@ async function performEtherfuseOnboarding(
   // Step 3: instantiate client + register the trio with Etherfuse.
   // EtherfuseClient is imported lazily to keep startup-cost out of the
   // hot path for actions that don't touch Etherfuse.
-  const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+  const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
     apiKey: getEtherfuseApiKey(),
     baseUrl: getEtherfuseBaseUrl(),
@@ -1219,7 +1219,7 @@ export const syncEtherfuseBankAccounts = action({
       };
     }
 
-    const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+    const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
     const client = new EtherfuseClient({
       apiKey: getEtherfuseApiKey(),
       baseUrl: getEtherfuseBaseUrl(),
@@ -1304,7 +1304,7 @@ export const getEtherfuseBankRegistrationUrl = action({
       return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
     }
 
-    const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+    const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
     const client = new EtherfuseClient({
       apiKey: getEtherfuseApiKey(),
       baseUrl: getEtherfuseBaseUrl(),
@@ -1464,7 +1464,7 @@ async function startEtherfusePixOnramp(
     externalBankAccountId = banks[0]!.externalBankAccountId;
   }
 
-  const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+  const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
     apiKey: getEtherfuseApiKey(),
     baseUrl: getEtherfuseBaseUrl(),
@@ -1552,7 +1552,7 @@ async function pollEtherfusePixOnramp(
   ctx: ActionCtx,
   order: { _id: AnchorOrderId; anchorTxId: string; paymentId: PaymentId },
 ): Promise<PollPixOnrampResult> {
-  const { EtherfuseClient } = await import("../../src/lib/anchors/etherfuse/index");
+  const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
     apiKey: getEtherfuseApiKey(),
     baseUrl: getEtherfuseBaseUrl(),

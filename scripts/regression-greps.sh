@@ -28,7 +28,7 @@ pass() { echo "${green}PASS${reset}: $*"; }
 section() { echo; echo "── $* ──"; }
 
 # Source files. Excludes _generated, vendored client, build artifacts.
-SRC_GLOB=(src convex)
+SRC_GLOB=(apps/agency/src convex)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Bare public mutation/query handlers must use the auth wrappers
@@ -126,14 +126,14 @@ section "5. process.env outside env boundary"
 
 env_violations=$(rg -n --type ts --type tsx 'process\.env\.' "${SRC_GLOB[@]}" 2>/dev/null \
   | grep -v '_generated' \
-  | grep -v 'src/lib/env\.ts' \
+  | grep -v 'apps/agency/src/lib/env\.ts' \
   | grep -v 'convex/lib/env\.ts' \
   | grep -v 'convex/auth\.config\.ts' \
   | grep -vE '^[^:]+:[0-9]+:\s*\*' || true)  # skip JSDoc comment lines
 
 if [[ -n "$env_violations" ]]; then
   echo "$env_violations" | while IFS= read -r line; do
-    fail "$line — read env vars via src/lib/env.ts or convex/lib/env.ts only"
+    fail "$line — read env vars via apps/agency/src/lib/env.ts or convex/lib/env.ts only"
   done
 else
   pass "no process.env outside env boundary files"
@@ -145,7 +145,7 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 section "6. React hooks in *.tsx (view-model violation)"
 
-hook_violations=$(rg -n 'use(State|Effect|Reducer|Callback|Memo|Ref|Id)\(' src/components/ 2>/dev/null \
+hook_violations=$(rg -n 'use(State|Effect|Reducer|Callback|Memo|Ref|Id)\(' apps/agency/src/components/ 2>/dev/null \
   | grep '\.tsx:' \
   | grep -v '\.test\.tsx:' || true)
 
@@ -172,7 +172,7 @@ section "7. as Type casts (informational)"
 as_violations=$(rg -n --type ts --type tsx ' as [A-Z]\w*' "${SRC_GLOB[@]}" 2>/dev/null \
   | grep -v ' as const' \
   | grep -v '_generated' \
-  | grep -v 'src/components/ui/' \
+  | grep -v 'apps/agency/src/components/ui/' \
   | grep -vE '^[^:]+:[0-9]+:\s*(import|export)\b' \
   | grep -vE '^[^:]+:[0-9]+:.*\bfrom\s+"' || true)
 
@@ -201,14 +201,14 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 section "8. i18n key parity (pt-BR vs en)"
 
-if [[ -f messages/pt-BR.json && -f messages/en.json ]]; then
+if [[ -f apps/agency/messages/pt-BR.json && -f apps/agency/messages/en.json ]]; then
   if ! node scripts/i18n-parity.mjs; then
-    fail "i18n key drift between messages/pt-BR.json and messages/en.json (see output above)"
+    fail "i18n key drift between apps/agency/messages/pt-BR.json and apps/agency/messages/en.json (see output above)"
   else
     pass "i18n keys in sync between pt-BR.json and en.json"
   fi
 else
-  echo "${yellow}WARN${reset}: messages/{pt-BR,en}.json not found — skipping i18n parity check"
+  echo "${yellow}WARN${reset}: apps/agency/messages/{pt-BR,en}.json not found — skipping i18n parity check"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
