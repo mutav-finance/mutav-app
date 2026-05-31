@@ -6,6 +6,10 @@
   "engines": {
     "bun": ">=1.3.0"
   },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently --names \"web,cvx\" --prefix-colors \"cyan,magenta\" --kill-others-on-fail \"bun run dev:web\" \"bun run dev:convex\"",
     "dev:web": "next dev",
