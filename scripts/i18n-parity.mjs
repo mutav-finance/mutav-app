@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Verify messages/pt-BR.json and messages/en.json have identical key sets.
+ * Verify apps/agency/messages/pt-BR.json and apps/agency/messages/en.json
+ * have identical key sets.
  *
  * next-intl falls back silently to the key string at runtime when a
  * translation is missing — so drift is invisible until a user sees
@@ -14,8 +15,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const FILES = {
-  ptBR: resolve("messages/pt-BR.json"),
-  en: resolve("messages/en.json"),
+  ptBR: resolve("apps/agency/messages/pt-BR.json"),
+  en: resolve("apps/agency/messages/en.json"),
 };
 
 function flatten(obj, prefix = "") {

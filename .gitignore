@@ -19,8 +19,8 @@ yarn.lock
 /coverage
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # turborepo cache (per-project; turbo creates this on first run)
 .turbo/
