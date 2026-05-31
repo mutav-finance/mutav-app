@@ -22,6 +22,9 @@ yarn.lock
 /.next/
 /out/
 
+# turborepo cache (per-project; turbo creates this on first run)
+.turbo/
+
 # production
 /build
 

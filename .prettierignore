@@ -10,6 +10,7 @@ out/
 build/
 dist/
 coverage/
+.turbo/
 
 # Auto-generated.
 convex/_generated/
