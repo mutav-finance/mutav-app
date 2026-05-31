@@ -9,10 +9,10 @@ const eslintConfig = defineConfig([
   {
     ignores: [
       // eslint-config-next defaults
-      ".next/**",
+      "**/.next/**",
       "out/**",
       "build/**",
-      "next-env.d.ts",
+      "**/next-env.d.ts",
       // Auto-generated Convex types — they ship their own eslint-disable
       // headers; ESLint flags those headers as "unused" since the rules
       // they disable aren't active here.
@@ -23,9 +23,21 @@ const eslintConfig = defineConfig([
       // Vendored Etherfuse client — kept verbatim from regional-starter-pack
       // so upstream pulls stay clean-diff. Same for the operator-run sandbox
       // smoke test (vendored shape, not production code).
-      "src/lib/anchors/etherfuse/**",
+      "apps/agency/src/lib/anchors/etherfuse/**",
       "scripts/etherfuse-smoke.ts",
     ],
+  },
+  // Tell the Next.js eslint plugin where the Next app lives so its
+  // pages/app-dir discovery (and rules like no-html-link-for-pages) work
+  // post-monorepo move. Without this the plugin probes `<cwd>/pages` and
+  // emits a "Pages directory cannot be found" warning when lint runs from
+  // the repo root.
+  {
+    settings: {
+      next: {
+        rootDir: "apps/agency",
+      },
+    },
   },
   ...nextVitals,
   ...nextTs,

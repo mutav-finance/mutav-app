@@ -18,7 +18,7 @@ next-env.d.ts
 
 # i18n message catalogs — they ship as canonical JSON; reformatting them
 # can produce noisy diffs that obscure copy changes.
-messages/
+apps/agency/messages/
 
 # Local agent tooling — not project source.
 .claude/
@@ -33,7 +33,7 @@ docs/superpowers/
 
 # Vendored anchor SDK from github.com/ElliotFriend/regional-starter-pack.
 # Kept verbatim so we can pull upstream updates with a clean diff.
-src/lib/anchors/etherfuse/
+apps/agency/src/lib/anchors/etherfuse/
 
 # Operator-run sandbox smoke test — vendored shape, not production code.
 scripts/etherfuse-smoke.ts

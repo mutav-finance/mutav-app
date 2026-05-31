@@ -13,7 +13,7 @@
 
 import { Keypair, TransactionBuilder } from "@stellar/stellar-sdk";
 
-import type { Sep10SignerFn } from "../../src/lib/anchors/sep/sep10";
+import type { Sep10SignerFn } from "../../apps/agency/src/lib/anchors/sep/sep10";
 import { getMutavSourceAccount, getTreasurySecret } from "./env";
 
 export interface TreasurySigner {
