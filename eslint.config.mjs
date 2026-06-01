@@ -38,7 +38,7 @@ const eslintConfig = defineConfig([
   {
     settings: {
       next: {
-        rootDir: ["apps/agency", "apps/pay", "apps/fund"],
+        rootDir: ["apps/agency", "apps/pay", "apps/fund", "apps/admin"],
       },
     },
   },
