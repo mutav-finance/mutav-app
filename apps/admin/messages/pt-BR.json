@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "title": "Mutav Admin",
+    "description": "Console interno da equipe Mutav."
+  },
+  "common": {
+    "a11y": {
+      "skipToMain": "Pular para o conteúdo principal"
+    }
+  },
+  "adminShell": {
+    "placeholder": {
+      "title": "Mutav admin",
+      "subtitle": "Pilares A1–A6 pendentes — esta é a casca vazia do shell de staff."
+    }
+  }
+}
