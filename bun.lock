@@ -154,6 +154,18 @@
         "react-dom": "^19.0.0",
       },
     },
+    "packages/wallet": {
+      "name": "@mutav/wallet",
+      "version": "0.1.0",
+      "dependencies": {
+        "react": "19.2.4",
+      },
+      "devDependencies": {
+        "@mutav/tsconfig": "workspace:*",
+        "typescript": "^5",
+        "vitest": "^4.1.6",
+      },
+    },
   },
   "packages": {
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
@@ -471,6 +483,8 @@
     "@mutav/tsconfig": ["@mutav/tsconfig@workspace:packages/tsconfig"],
 
     "@mutav/ui": ["@mutav/ui@workspace:packages/ui"],
+
+    "@mutav/wallet": ["@mutav/wallet@workspace:packages/wallet"],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@0.2.12", "", { "dependencies": { "@emnapi/core": "^1.4.3", "@emnapi/runtime": "^1.4.3", "@tybys/wasm-util": "^0.10.0" } }, "sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ=="],
 
