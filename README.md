@@ -58,6 +58,76 @@ so you never end up with half a dev environment.
 | `bun run format`       | Prettier — write changes                 |
 | `bun run format:check` | Prettier — verify only                   |
 
+The root scripts above run unfiltered — the whole workspace is touched
+regardless of what changed. CI uses a Turborepo filter
+(`turbo run <task> --filter='...[origin/main]'`) so only changed apps
+plus their dependents execute on a given PR.
+
+## Workspace
+
+`mutav-app` is a [Turborepo](https://turborepo.com) monorepo with four
+persona apps and three shared packages, sharing one Convex backend at
+the repo root.
+
+### Apps
+
+| App           | Origin                | Identity                       | Vercel project |
+| ------------- | --------------------- | ------------------------------ | -------------- |
+| `apps/agency` | `app.mutav.finance`   | Auth0 (agency staff)           | `mutav-agency` |
+| `apps/pay`    | `pay.mutav.finance`   | None — `publicId` bearer URL   | `mutav-pay`    |
+| `apps/fund`   | `fund.mutav.finance`  | Wallet-as-identity (per chain) | `mutav-fund`   |
+| `apps/admin`  | `admin.mutav.finance` | Auth0 (`mutavStaff`, MFA)      | `mutav-admin`  |
+
+Each app has its own Vercel project rooted at `apps/<name>` and its own
+hostname. Cookies are `Host-Only` so a session never crosses subdomains
+(see [spec § Section 1](docs/superpowers/specs/2026-05-31-monorepo-migration-design.md)).
+
+### Packages
+
+| Package           | Owns                                                  |
+| ----------------- | ----------------------------------------------------- |
+| `@mutav/ui`       | shadcn primitives shared across apps                  |
+| `@mutav/i18n`     | next-intl `routing` / `navigation` / `request` shells |
+| `@mutav/tsconfig` | `base.json` + `nextjs.json` consumed by every app     |
+
+Packages are extracted on demand — only when a second app actually
+consumes the code. No speculative package boundaries.
+
+### Running a single app
+
+```bash
+bun --filter @mutav/agency dev          # Next dev server, agency only
+bun --filter @mutav/agency test         # vitest run, agency only
+bun --filter @mutav/agency typecheck    # tsc --noEmit, agency only
+bun --filter @mutav/agency build        # next build, agency only
+```
+
+Swap `agency` for `pay`, `fund`, or `admin` to target a different app.
+`bun run dev` at the root still launches Next (agency) + Convex
+together for the common dev loop.
+
+### Per-app Vercel deploy gating
+
+Each of the four Vercel projects has its **Ignored Build Step** set to
+`npx turbo-ignore @mutav/<app>` (where `<app>` matches the project,
+e.g. `npx turbo-ignore @mutav/agency` for the agency project).
+`turbo-ignore` exits `0` (skip the build) when nothing in the app's
+dependency graph changed since the last successful deploy, and exits
+`1` (proceed) otherwise. A PR that only touches `apps/admin/` does not
+trigger a redeploy of `agency`, `pay`, or `fund`.
+
+`convex/` is a dependency of every app, so a `convex/` change rebuilds
+all four — by design (single Convex deployment, single audit log).
+
+### Per-app CI gating
+
+`.github/workflows/quality.yml` uses
+`bunx turbo run <task> --filter='...[origin/main]'` for `lint`,
+`typecheck`, and `test`. Only changed apps plus their dependents run,
+which keeps CI fast as more persona apps land. The `conventions`
+(regression-greps) and root `format:check` are not per-app turbo tasks
+and continue to run on every PR.
+
 ## Git hooks
 
 Hooks are managed by [Husky](https://typicode.github.io/husky/) and install automatically on `bun install` (via the `prepare` script). No manual setup needed.
