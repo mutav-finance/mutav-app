@@ -11,7 +11,7 @@ import {
 import { SidebarRoadmapItem } from "@/components/sidebar-roadmap-item";
 import { UsersIcon, BuildingIcon, BadgeDollarSignIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link, usePathname } from "@mutav/i18n/navigation";
 
 export function NavAgency() {
   const t = useTranslations("nav.agency");

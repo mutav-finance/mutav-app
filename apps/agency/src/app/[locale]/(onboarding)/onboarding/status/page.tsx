@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { Link, redirect } from "@/i18n/navigation";
+import { Link, redirect } from "@mutav/i18n/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { Button } from "@mutav/ui/button";
 import { resolveUserDestination } from "@/lib/user-destination";

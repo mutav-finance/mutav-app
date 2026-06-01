@@ -7,7 +7,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link, usePathname } from "@mutav/i18n/navigation";
 import { CirclePlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 

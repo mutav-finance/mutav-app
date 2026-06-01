@@ -4,7 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 import { Mono } from "@mutav/ui/mono";
 import type { OnboardingSnapshot } from "@/components/onboarding/use-onboarding-flow";

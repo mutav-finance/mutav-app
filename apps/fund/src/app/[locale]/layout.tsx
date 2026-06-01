@@ -4,7 +4,7 @@ import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { Providers } from "@/providers";
-import { routing } from "@/i18n/routing";
+import { routing } from "@mutav/i18n/routing";
 import "../globals.css";
 
 const geist = Geist({

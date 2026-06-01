@@ -69,6 +69,7 @@
       "name": "@mutav/agency",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
       "devDependencies": {
@@ -79,6 +80,7 @@
       "name": "@mutav/fund",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
       "devDependencies": {
@@ -89,10 +91,27 @@
       "name": "@mutav/pay",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
       "devDependencies": {
         "@mutav/tsconfig": "workspace:*",
+      },
+    },
+    "packages/i18n": {
+      "name": "@mutav/i18n",
+      "version": "0.1.0",
+      "dependencies": {
+        "next-intl": "^4.11.0",
+      },
+      "devDependencies": {
+        "@mutav/tsconfig": "workspace:*",
+        "@types/react": "^19",
+        "typescript": "^5",
+      },
+      "peerDependencies": {
+        "next": "^16.0.0",
+        "react": "^19.0.0",
       },
     },
     "packages/tsconfig": {
@@ -431,6 +450,8 @@
     "@mutav/agency": ["@mutav/agency@workspace:apps/agency"],
 
     "@mutav/fund": ["@mutav/fund@workspace:apps/fund"],
+
+    "@mutav/i18n": ["@mutav/i18n@workspace:packages/i18n"],
 
     "@mutav/pay": ["@mutav/pay@workspace:apps/pay"],
 

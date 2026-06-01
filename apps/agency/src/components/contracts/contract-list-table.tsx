@@ -28,7 +28,7 @@ import {
 
 import { api } from "@convex/_generated/api";
 import { useWorkspace } from "@/providers/workspace";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@mutav/ui/button";
 import {

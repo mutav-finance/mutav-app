@@ -15,7 +15,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Mono } from "@mutav/ui/mono";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import type { api } from "@convex/_generated/api";
 import { PaymentSummaryCard } from "./payment-summary-card";
 import { PaymentLineItemsCard } from "./payment-line-items-card";

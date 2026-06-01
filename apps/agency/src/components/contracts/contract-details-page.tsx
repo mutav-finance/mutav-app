@@ -16,7 +16,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Mono } from "@mutav/ui/mono";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import type { api } from "@convex/_generated/api";
 import { ContractDocumentsCard } from "./contract-documents-card";
 import { ContractHistoryCard } from "./contract-history-card";

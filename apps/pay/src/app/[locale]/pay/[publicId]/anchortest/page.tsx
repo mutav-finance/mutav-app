@@ -3,7 +3,7 @@ import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
 import { getTranslations } from "next-intl/server";
 import { ArrowLeft } from "lucide-react";
 
-import { Link, redirect } from "@/i18n/navigation";
+import { Link, redirect } from "@mutav/i18n/navigation";
 import { CheckoutAnchorTestView } from "@/components/payments/checkout/checkout-anchor-test-view";
 import { api } from "@convex/_generated/api";
 

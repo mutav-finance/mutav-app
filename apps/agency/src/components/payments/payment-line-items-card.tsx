@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents } from "@/lib/contracts/format";
 import type { Payment } from "@convex/payments/domain";
 

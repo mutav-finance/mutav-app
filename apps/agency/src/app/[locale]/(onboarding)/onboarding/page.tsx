@@ -1,5 +1,5 @@
 import { WelcomeScreen } from "@/components/onboarding/welcome-screen";
-import { redirect } from "@/i18n/navigation";
+import { redirect } from "@mutav/i18n/navigation";
 import { resolveUserDestination } from "@/lib/user-destination";
 
 export default async function OnboardingWelcomePage({

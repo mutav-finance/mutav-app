@@ -2,7 +2,7 @@
 
 import { PlusIcon } from "lucide-react";
 import { Button } from "@mutav/ui/button";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 
 export function CreateContractButton({ label }: { label: string }) {
   return (

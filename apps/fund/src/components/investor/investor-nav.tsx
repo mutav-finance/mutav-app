@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link, usePathname } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 
 const NAV_ITEMS = [

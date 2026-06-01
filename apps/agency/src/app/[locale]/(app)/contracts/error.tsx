@@ -5,7 +5,7 @@ import { PageContent } from "@mutav/ui/page/page-content";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { Button } from "@mutav/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 
 export default function ContractsError({
   error,

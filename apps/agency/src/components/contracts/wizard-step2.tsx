@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
