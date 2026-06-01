@@ -1,0 +1,9 @@
+{
+  "name": "@mutav/tsconfig",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "files": [
+    "nextjs.json"
+  ]
+}

@@ -2,6 +2,9 @@
   "name": "@mutav/pay",
   "version": "0.1.0",
   "private": true,
+  "devDependencies": {
+    "@mutav/tsconfig": "workspace:*"
+  },
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",

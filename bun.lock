@@ -68,13 +68,26 @@
     "apps/agency": {
       "name": "@mutav/agency",
       "version": "0.1.0",
+      "devDependencies": {
+        "@mutav/tsconfig": "workspace:*",
+      },
     },
     "apps/fund": {
       "name": "@mutav/fund",
       "version": "0.1.0",
+      "devDependencies": {
+        "@mutav/tsconfig": "workspace:*",
+      },
     },
     "apps/pay": {
       "name": "@mutav/pay",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@mutav/tsconfig": "workspace:*",
+      },
+    },
+    "packages/tsconfig": {
+      "name": "@mutav/tsconfig",
       "version": "0.1.0",
     },
   },
@@ -386,6 +399,8 @@
     "@mutav/fund": ["@mutav/fund@workspace:apps/fund"],
 
     "@mutav/pay": ["@mutav/pay@workspace:apps/pay"],
+
+    "@mutav/tsconfig": ["@mutav/tsconfig@workspace:packages/tsconfig"],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@0.2.12", "", { "dependencies": { "@emnapi/core": "^1.4.3", "@emnapi/runtime": "^1.4.3", "@tybys/wasm-util": "^0.10.0" } }, "sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ=="],
 
