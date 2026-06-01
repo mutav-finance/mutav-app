@@ -1,6 +1,6 @@
 # Wallet kit selection — design
 
-**Status:** Approved design, ready for implementation plan
+**Status:** PARKED 2026-06-01 — Approach A blocked at Task 4 of the foundation plan. The `@creit.tech/stellar-wallets-kit` package ships its adapter SDKs (Trezor / Hot Wallet / NEAR Snap / WalletConnect) as regular `dependencies`, so installing the kit pulls in 1 critical + 20 high CVEs (protobufjs `GHSA-xq3m-2v4x-88gg` arbitrary code exec; axios prototype-pollution / credential-theft chain) at every recently-published version (1.7.5, 1.9.5, 2.2.0). The spec's "explicit module imports avoid CVEs" mitigation is unworkable because it only prevents runtime execution; the vulnerable files still install and ship. **Pick-up requires choosing between**: Approach B (hand-rolled per-wallet integrations using `@stellar/freighter-api` + per-wallet APIs); Approach D (vendor-fork the kit, strip adapter SDKs to `peerDependencies`); or Approach E (accept the risk pre-launch with a documented "resolve before mainnet" gate). See PR #157 conversation for the full analysis.
 **Owners:** Migration spec § Section 4 follow-up (apps/fund + apps/agency + apps/admin signing); investor portal (`docs/architecture/investor.md`); admin portal (`docs/architecture/admin.md`)
 **Last decision date:** 2026-06-01
 
