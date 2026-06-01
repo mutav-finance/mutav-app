@@ -18,6 +18,9 @@
   },
   "devDependencies": {
     "@mutav/tsconfig": "workspace:*",
+    "@typescript-eslint/rule-tester": "8.60.0",
+    "@typescript-eslint/utils": "8.60.0",
+    "eslint": "^9",
     "typescript": "^5",
     "vitest": "^4.1.6"
   }

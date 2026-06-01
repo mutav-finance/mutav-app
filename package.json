@@ -75,6 +75,7 @@
     "@commitlint/config-conventional": "^20.5.3",
     "@commitlint/types": "^20.5.0",
     "@edge-runtime/vm": "^5.0.0",
+    "@mutav/wallet": "workspace:*",
     "@tailwindcss/postcss": "^4",
     "@types/bun": "^1.3.14",
     "@types/node": "^20",
