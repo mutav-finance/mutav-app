@@ -71,12 +71,12 @@ the repo root.
 
 ### Apps
 
-| App           | Origin                | Identity                       | Vercel project |
-| ------------- | --------------------- | ------------------------------ | -------------- |
-| `apps/agency` | `app.mutav.finance`   | Auth0 (agency staff)           | `mutav-agency` |
-| `apps/pay`    | `pay.mutav.finance`   | None — `publicId` bearer URL   | `mutav-pay`    |
-| `apps/fund`   | `fund.mutav.finance`  | Wallet-as-identity (per chain) | `mutav-fund`   |
-| `apps/admin`  | `admin.mutav.finance` | Auth0 (`mutavStaff`, MFA)      | `mutav-admin`  |
+| App           | Origin                | Identity                       | Vercel project    |
+| ------------- | --------------------- | ------------------------------ | ----------------- |
+| `apps/agency` | `app.mutav.finance`   | Auth0 (agency staff)           | `mutav-app`       |
+| `apps/pay`    | `pay.mutav.finance`   | None — `publicId` bearer URL   | `mutav-app-pay`   |
+| `apps/fund`   | `fund.mutav.finance`  | Wallet-as-identity (per chain) | `mutav-app-fund`  |
+| `apps/admin`  | `admin.mutav.finance` | Auth0 (`mutavStaff`, MFA)      | `mutav-app-admin` |
 
 Each app has its own Vercel project rooted at `apps/<name>` and its own
 hostname. Cookies are `Host-Only` so a session never crosses subdomains
