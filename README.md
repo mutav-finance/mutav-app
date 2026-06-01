@@ -108,21 +108,25 @@ together for the common dev loop.
 
 ### Per-app Vercel deploy gating
 
-Each of the four Vercel projects relies on Vercel's built-in
-[**Skip Deployments**](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step)
-in **Automatic** mode (Settings → Git → Ignored Build Step). Vercel
-uses each project's `rootDirectory` (`apps/<name>`) plus its Turborepo
-dependency graph to decide whether to build: a PR that only touches
-`apps/admin/` does not trigger a redeploy of `agency`, `pay`, or
-`fund`.
+Each of the four Vercel projects has its
+[**Ignored Build Step**](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step)
+(Settings → Build and Deployment → Ignored Build Step → **Custom**)
+set to a one-line `git diff` that returns exit `0` (skip) when none of
+this app's relevant paths changed since the parent commit, and exit
+`1` (proceed) otherwise:
 
-This replaces the now-deprecated `npx turbo-ignore @mutav/<app>`
-custom command — Vercel's automatic detection is the supported way
-to do per-app deploy gating in a Turborepo monorepo.
+| Project           | Ignored Build Step command                                      |
+| ----------------- | --------------------------------------------------------------- |
+| `mutav-app`       | `git diff --quiet HEAD^ HEAD -- apps/agency/ convex/ packages/` |
+| `mutav-app-pay`   | `git diff --quiet HEAD^ HEAD -- apps/pay/ convex/ packages/`    |
+| `mutav-app-fund`  | `git diff --quiet HEAD^ HEAD -- apps/fund/ convex/ packages/`   |
+| `mutav-app-admin` | `git diff --quiet HEAD^ HEAD -- apps/admin/ convex/ packages/`  |
 
-`convex/` is consumed by every app via the workspace dependency
-graph, so a `convex/` change rebuilds all four — by design (single
-Convex deployment, single audit log).
+`convex/` and `packages/` are in every app's path list because they are
+shared dependencies — a change to either triggers a rebuild of all four
+apps (single Convex deployment, single audit log; PR 6 packages
+consumed via `transpilePackages`). This replaces the deprecated
+`npx turbo-ignore` package referenced in some older docs.
 
 ### Per-app CI gating
 
