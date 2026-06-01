@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Link, usePathname } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/investor" },

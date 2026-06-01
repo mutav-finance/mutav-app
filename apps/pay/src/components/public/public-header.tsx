@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 
 /**
  * Public payment portal header. TGA wordmark on the left, invoice public id

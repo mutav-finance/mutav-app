@@ -1,9 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { PageContent } from "@/components/page/page-content";
-import { PageShell } from "@/components/page/page-shell";
-import { Button } from "@/components/ui/button";
+import { PageContent } from "@mutav/ui/page/page-content";
+import { PageShell } from "@mutav/ui/page/page-shell";
+import { Button } from "@mutav/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
 

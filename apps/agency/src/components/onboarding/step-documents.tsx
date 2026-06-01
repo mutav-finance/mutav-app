@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { AgencyId } from "@convex/agencies/domain";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { cn } from "@/lib/utils";
 import { DOCUMENT_KINDS, useStepDocuments } from "@/components/onboarding/use-step-documents";
 

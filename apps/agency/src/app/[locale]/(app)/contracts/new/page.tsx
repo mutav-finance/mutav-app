@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
-import { PageContent } from "@/components/page/page-content";
-import { PageHeader } from "@/components/page/page-header";
-import { PageShell } from "@/components/page/page-shell";
+import { PageContent } from "@mutav/ui/page/page-content";
+import { PageHeader } from "@mutav/ui/page/page-header";
+import { PageShell } from "@mutav/ui/page/page-shell";
 import { ContractWizard } from "@/components/contracts/contract-wizard";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {

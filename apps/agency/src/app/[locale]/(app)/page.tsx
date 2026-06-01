@@ -1,7 +1,7 @@
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { ContractListTable } from "@/components/contracts/contract-list-table";
-import { PageContent } from "@/components/page/page-content";
-import { PageShell } from "@/components/page/page-shell";
+import { PageContent } from "@mutav/ui/page/page-content";
+import { PageShell } from "@mutav/ui/page/page-shell";
 import { SectionCards } from "@/components/section-cards";
 
 export default function Page() {

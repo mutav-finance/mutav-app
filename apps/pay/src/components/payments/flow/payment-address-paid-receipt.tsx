@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Check, ExternalLink } from "lucide-react";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import type { Payment } from "@convex/payments/domain";
 
 type Props = {

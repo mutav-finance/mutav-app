@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../cn";
 
 /**
  * Outermost page wrapper. Provides the project's vertical rhythm

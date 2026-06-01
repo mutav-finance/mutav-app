@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
-import { PageContent } from "@/components/page/page-content";
-import { PageShell } from "@/components/page/page-shell";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageContent } from "@mutav/ui/page/page-content";
+import { PageShell } from "@mutav/ui/page/page-shell";
+import { Skeleton } from "@mutav/ui/skeleton";
 
 export default async function ContractsLoading() {
   const t = await getTranslations("contractList");

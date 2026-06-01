@@ -1,5 +1,5 @@
 import { redirect } from "@/i18n/navigation";
-import { PageContent } from "@/components/page/page-content";
+import { PageContent } from "@mutav/ui/page/page-content";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 
 type Props = {

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
 import { LockIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";

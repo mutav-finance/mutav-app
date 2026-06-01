@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { cn } from "@/lib/utils";
 import { useWelcomeScreen } from "@/components/onboarding/use-welcome-screen";
 

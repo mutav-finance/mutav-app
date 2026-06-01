@@ -2,7 +2,7 @@
 
 import { Copy, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
 

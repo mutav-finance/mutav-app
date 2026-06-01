@@ -1,6 +1,6 @@
 import { PublicHeader } from "@/components/public/public-header";
-import { PublicFooter } from "@/components/public/public-footer";
-import { PageContent } from "@/components/page/page-content";
+import { PublicFooter } from "@mutav/ui/public/public-footer";
+import { PageContent } from "@mutav/ui/page/page-content";
 
 /**
  * Checkout chrome — wraps every step (`page.tsx`, `stellar/`, `pix/`, `pago/`).

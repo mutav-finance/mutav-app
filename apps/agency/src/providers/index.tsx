@@ -1,6 +1,6 @@
 "use client";
 
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@mutav/ui/tooltip";
 import { ConvexClientProvider } from "./convex";
 import { WorkspaceProvider } from "./workspace";
 

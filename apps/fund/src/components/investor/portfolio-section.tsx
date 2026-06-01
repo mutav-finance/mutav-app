@@ -8,8 +8,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+} from "@mutav/ui/chart";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 

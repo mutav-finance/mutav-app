@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { Link } from "@/i18n/navigation";
 import { CheckCircle2Icon } from "lucide-react";
 

@@ -5,8 +5,8 @@ import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
-import { Mono } from "@/components/ui/mono";
+import { Button } from "@mutav/ui/button";
+import { Mono } from "@mutav/ui/mono";
 import type { OnboardingSnapshot } from "@/components/onboarding/use-onboarding-flow";
 import {
   REVIEW_FORM_DEFAULTS,

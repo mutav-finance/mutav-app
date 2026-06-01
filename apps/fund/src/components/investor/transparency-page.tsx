@@ -3,16 +3,16 @@
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
-import { PageShell } from "@/components/page/page-shell";
-import { PageContent } from "@/components/page/page-content";
-import { PageHeader } from "@/components/page/page-header";
+import { PageShell } from "@mutav/ui/page/page-shell";
+import { PageContent } from "@mutav/ui/page/page-content";
+import { PageHeader } from "@mutav/ui/page/page-header";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+} from "@mutav/ui/chart";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 

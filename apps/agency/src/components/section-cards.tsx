@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import { AlertTriangleIcon, CalendarIcon, FileTextIcon, ShieldAlertIcon } from "lucide-react";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@mutav/ui/skeleton";
 import { api } from "@convex/_generated/api";
 import { useWorkspace } from "@/providers/workspace";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";

@@ -1,7 +1,7 @@
 "use client";
 
 import { PlusIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { Link } from "@/i18n/navigation";
 
 export function CreateContractButton({ label }: { label: string }) {

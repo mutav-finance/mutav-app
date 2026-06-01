@@ -2,7 +2,7 @@
 
 import { usePreloadedQuery, type Preloaded } from "convex/react";
 import { useTranslations } from "next-intl";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { PaymentStateTag } from "@/components/payments/payment-state-tag";
 import { PAYMENT_STATE_KIND } from "@convex/payments/domain";

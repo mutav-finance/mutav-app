@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../cn";
 
 /**
  * Outer shell for the `(public)` route group. Scrollable column inside the

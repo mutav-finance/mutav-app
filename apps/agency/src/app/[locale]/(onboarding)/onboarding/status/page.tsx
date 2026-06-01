@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link, redirect } from "@/i18n/navigation";
-import { PageContent } from "@/components/page/page-content";
-import { Button } from "@/components/ui/button";
+import { PageContent } from "@mutav/ui/page/page-content";
+import { Button } from "@mutav/ui/button";
 import { resolveUserDestination } from "@/lib/user-destination";
 
 type Props = {

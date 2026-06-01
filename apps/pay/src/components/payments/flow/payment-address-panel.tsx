@@ -1,8 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { ChevronDown } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@mutav/ui/collapsible";
+import { Separator } from "@mutav/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { CopyableSep7Link } from "@/components/payments/copyable-sep7-link";
 import { CopyableValue } from "@/components/payments/copyable-value";
 import { AssetAmount } from "@/components/payments/flow/asset-amount";

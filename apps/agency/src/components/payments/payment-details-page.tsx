@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { usePreloadedQuery, type Preloaded } from "convex/react";
 import { notFound } from "next/navigation";
-import { PageContent } from "@/components/page/page-content";
-import { PageHeader } from "@/components/page/page-header";
-import { PageShell } from "@/components/page/page-shell";
+import { PageContent } from "@mutav/ui/page/page-content";
+import { PageHeader } from "@mutav/ui/page/page-header";
+import { PageShell } from "@mutav/ui/page/page-shell";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,7 +14,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import { Link } from "@/i18n/navigation";
 import type { api } from "@convex/_generated/api";
 import { PaymentSummaryCard } from "./payment-summary-card";

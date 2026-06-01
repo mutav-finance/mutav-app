@@ -1,5 +1,5 @@
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import { cn } from "@/lib/utils";
 
 export function FieldRow({

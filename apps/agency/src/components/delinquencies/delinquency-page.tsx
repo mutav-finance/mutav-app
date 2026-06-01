@@ -3,18 +3,12 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mono } from "@/components/ui/mono";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Mono } from "@mutav/ui/mono";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
 import {
   Table,
   TableBody,
