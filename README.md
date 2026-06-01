@@ -108,16 +108,21 @@ together for the common dev loop.
 
 ### Per-app Vercel deploy gating
 
-Each of the four Vercel projects has its **Ignored Build Step** set to
-`npx turbo-ignore @mutav/<app>` (where `<app>` matches the project,
-e.g. `npx turbo-ignore @mutav/agency` for the agency project).
-`turbo-ignore` exits `0` (skip the build) when nothing in the app's
-dependency graph changed since the last successful deploy, and exits
-`1` (proceed) otherwise. A PR that only touches `apps/admin/` does not
-trigger a redeploy of `agency`, `pay`, or `fund`.
+Each of the four Vercel projects relies on Vercel's built-in
+[**Skip Deployments**](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step)
+in **Automatic** mode (Settings → Git → Ignored Build Step). Vercel
+uses each project's `rootDirectory` (`apps/<name>`) plus its Turborepo
+dependency graph to decide whether to build: a PR that only touches
+`apps/admin/` does not trigger a redeploy of `agency`, `pay`, or
+`fund`.
 
-`convex/` is a dependency of every app, so a `convex/` change rebuilds
-all four — by design (single Convex deployment, single audit log).
+This replaces the now-deprecated `npx turbo-ignore @mutav/<app>`
+custom command — Vercel's automatic detection is the supported way
+to do per-app deploy gating in a Turborepo monorepo.
+
+`convex/` is consumed by every app via the workspace dependency
+graph, so a `convex/` change rebuilds all four — by design (single
+Convex deployment, single audit log).
 
 ### Per-app CI gating
 
