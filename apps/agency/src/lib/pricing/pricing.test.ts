@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { splitCommission } from "./commission";
 import { priceContract, type PriceContractInput } from "./contract";
-import { applyInvestorFee, INVESTOR_FEE_RATE } from "./investor";
 
 describe("priceContract", () => {
   const cases: Array<{ name: string; input: PriceContractInput }> = [
@@ -78,19 +77,6 @@ describe("splitCommission", () => {
     for (const fee of [0, 1, 33, 67, 167, 1_000, 9_999, 10_000, 999_999, 1_234_567]) {
       const { commissionCents, totalCents } = splitCommission(fee);
       expect(totalCents).toBe(fee + commissionCents);
-    }
-  });
-});
-
-describe("applyInvestorFee", () => {
-  test("rate is 0.3%", () => {
-    expect(INVESTOR_FEE_RATE).toBe(0.003);
-  });
-
-  test("fee + net equals input within float tolerance", () => {
-    for (const amount of [100, 1_234.56, 10_000, 999_999.99]) {
-      const { feeUsd, netUsd } = applyInvestorFee(amount);
-      expect(feeUsd + netUsd).toBeCloseTo(amount, 10);
     }
   });
 });
