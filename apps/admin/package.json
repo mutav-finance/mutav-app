@@ -1,0 +1,22 @@
+{
+  "name": "@mutav/admin",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@mutav/i18n": "workspace:*",
+    "@mutav/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@mutav/tsconfig": "workspace:*"
+  },
+  "scripts": {
+    "dev": "next dev --port 3003",
+    "build": "next build",
+    "start": "next start --port 3003",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
