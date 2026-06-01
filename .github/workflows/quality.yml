@@ -24,19 +24,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # turbo --filter='...[origin/main]' needs the full history so
+          # the action can resolve origin/main. Default shallow clone
+          # (fetch-depth: 1) breaks the filter. mutav-app is small enough
+          # that the extra fetch cost is negligible.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install
         run: bun install --frozen-lockfile
       - name: Lint
-        run: bun run lint
+        # Per-app gating via Turborepo filter: lint only changed apps +
+        # their dependents (`...[origin/main]`). Root-level scripts in
+        # package.json stay unfiltered so local devs get whole-monorepo
+        # behavior; the filter only applies in CI.
+        run: bunx turbo run lint --filter='...[origin/main]'
 
   typecheck:
     name: typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -45,20 +57,22 @@ jobs:
       - name: Typecheck
         # Convex generated types are committed; typecheck reads them directly.
         # If they drift from schema.ts, tsc surfaces the inconsistency here.
-        run: bun run typecheck
+        run: bunx turbo run typecheck --filter='...[origin/main]'
 
   test:
     name: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install
         run: bun install --frozen-lockfile
       - name: Test
-        run: bun run test
+        run: bunx turbo run test --filter='...[origin/main]'
 
   conventions:
     name: conventions
@@ -73,4 +87,6 @@ jobs:
         with:
           bun-version: latest
       - name: Regression greps
+        # Root-level convention check (not a per-app turbo task) — always
+        # runs on every PR regardless of which app changed.
         run: bash scripts/regression-greps.sh
