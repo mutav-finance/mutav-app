@@ -1,10 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { PageShell } from "@/components/page/page-shell";
-import { PageContent } from "@/components/page/page-content";
+import { Button } from "@mutav/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@mutav/ui/select";
+import { PageShell } from "@mutav/ui/page/page-shell";
+import { PageContent } from "@mutav/ui/page/page-content";
 import { ProtocolKpiStrip } from "./protocol-kpi-strip";
 import { useRedeemWidget } from "./use-redeem-widget";
 import { isAssetSymbol } from "@/lib/stellar/assets";

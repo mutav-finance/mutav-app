@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Mono } from "@/components/ui/mono";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@mutav/ui/button";
+import { Mono } from "@mutav/ui/mono";
+import { Skeleton } from "@mutav/ui/skeleton";
 import {
   CheckoutSteps,
   type CheckoutStepState,

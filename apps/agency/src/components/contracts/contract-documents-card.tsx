@@ -1,8 +1,8 @@
 import { DownloadIcon, FileTextIcon, UploadIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import type { ContractDocument, ContractDocumentKey, DocumentStatus } from "@/lib/contracts/types";
 import { StatusTag } from "./status-tag";
 

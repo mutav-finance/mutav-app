@@ -2,6 +2,13 @@
   "name": "@mutav/agency",
   "version": "0.1.0",
   "private": true,
+  "dependencies": {
+    "@mutav/i18n": "workspace:*",
+    "@mutav/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@mutav/tsconfig": "workspace:*"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

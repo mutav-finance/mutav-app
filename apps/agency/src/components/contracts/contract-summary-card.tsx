@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -21,8 +21,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Mono } from "@/components/ui/mono";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Mono } from "@mutav/ui/mono";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import type { Contract, ContractStatus } from "@/lib/contracts/types";

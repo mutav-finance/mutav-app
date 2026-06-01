@@ -1,4 +1,4 @@
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 
 type Props = {
   amountDisplay: string;

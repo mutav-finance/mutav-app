@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
-import { PublicShell } from "@/components/public/public-shell";
-import { Toaster } from "@/components/ui/sonner";
+import { PublicShell } from "@mutav/ui/public/public-shell";
+import { Toaster } from "@mutav/ui/sonner";
 
 /**
  * Shell for the `/pay/*` namespace. Equivalent to the old `(public)/layout.tsx`

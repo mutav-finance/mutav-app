@@ -4,8 +4,8 @@ import { getTranslations } from "next-intl/server";
 import { Banknote, Coins, FlaskConical } from "lucide-react";
 
 import { api } from "@convex/_generated/api";
-import { Link, redirect } from "@/i18n/navigation";
-import { Mono } from "@/components/ui/mono";
+import { Link, redirect } from "@mutav/i18n/navigation";
+import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { shouldShowTestanchor } from "@/lib/env";
 

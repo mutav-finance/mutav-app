@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents } from "@/lib/contracts/format";
 import type { Payment } from "@convex/payments/domain";
 

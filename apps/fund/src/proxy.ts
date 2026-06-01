@@ -1,5 +1,5 @@
 import createMiddleware from "next-intl/middleware";
-import { routing } from "./i18n/routing";
+import { routing } from "@mutav/i18n/routing";
 
 /**
  * Fund carries no Auth0 (spec § Section 1 load-bearing constraint), so the

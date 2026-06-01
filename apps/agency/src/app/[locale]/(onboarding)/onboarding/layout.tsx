@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
-import { PublicFooter } from "@/components/public/public-footer";
+import { Link } from "@mutav/i18n/navigation";
+import { PublicFooter } from "@mutav/ui/public/public-footer";
 import { auth0 } from "@/lib/auth0";
 
 export default async function OnboardingLayout({ children }: { children: React.ReactNode }) {

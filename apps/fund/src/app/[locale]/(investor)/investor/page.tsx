@@ -1,6 +1,6 @@
-import { PageShell } from "@/components/page/page-shell";
-import { PageHeader } from "@/components/page/page-header";
-import { PageContent } from "@/components/page/page-content";
+import { PageShell } from "@mutav/ui/page/page-shell";
+import { PageHeader } from "@mutav/ui/page/page-header";
+import { PageContent } from "@mutav/ui/page/page-content";
 import { FundCard } from "@/components/investor/fund-card";
 import { ProtocolKpiStrip } from "@/components/investor/protocol-kpi-strip";
 import { PortfolioSection } from "@/components/investor/portfolio-section";

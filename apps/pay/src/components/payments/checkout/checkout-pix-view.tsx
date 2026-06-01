@@ -16,10 +16,10 @@ import {
   Plus,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Mono } from "@/components/ui/mono";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@mutav/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@mutav/ui/collapsible";
+import { Mono } from "@mutav/ui/mono";
+import { Skeleton } from "@mutav/ui/skeleton";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";

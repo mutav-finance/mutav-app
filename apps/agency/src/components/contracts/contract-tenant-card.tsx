@@ -1,7 +1,7 @@
 import { CheckIcon, UserIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import { formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
 import type { ContractTenant } from "@/lib/contracts/types";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";

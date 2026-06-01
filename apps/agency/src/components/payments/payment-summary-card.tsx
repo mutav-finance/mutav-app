@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { formatPeriodMonth } from "@/lib/payments/format";
 import type { Payment } from "@convex/payments/domain";

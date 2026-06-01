@@ -3,9 +3,9 @@ import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
 import { getTranslations } from "next-intl/server";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 
-import { Link, redirect } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
-import { Mono } from "@/components/ui/mono";
+import { Link, redirect } from "@mutav/i18n/navigation";
+import { Button } from "@mutav/ui/button";
+import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
 

@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/navigation";
+import { Button } from "@mutav/ui/button";
+import { Link } from "@mutav/i18n/navigation";
 import { RISK_COLOR } from "./fund-data";
 import type { Fund } from "./fund-data";
 

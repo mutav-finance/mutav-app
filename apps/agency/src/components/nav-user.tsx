@@ -33,8 +33,8 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter, usePathname } from "@/i18n/navigation";
-import { routing } from "@/i18n/routing";
+import { useRouter, usePathname } from "@mutav/i18n/navigation";
+import { routing } from "@mutav/i18n/routing";
 
 const LOCALE_LABELS: Record<(typeof routing.locales)[number], string> = {
   "pt-BR": "Português",

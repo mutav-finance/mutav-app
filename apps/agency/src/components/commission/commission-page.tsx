@@ -12,10 +12,10 @@ import {
   DownloadIcon,
 } from "lucide-react";
 import { api } from "@convex/_generated/api";
-import { Button } from "@/components/ui/button";
+import { Button } from "@mutav/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Mono } from "@/components/ui/mono";
+import { Mono } from "@mutav/ui/mono";
 import {
   Table,
   TableBody,
@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { useWorkspace } from "@/providers/workspace";
 
