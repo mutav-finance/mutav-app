@@ -2,20 +2,5 @@
   "meta": {
     "title": "Mutav Fund — Investor Portal",
     "description": "Invest in the MUTAV fund. Deposit, redeem, and track NAV onchain."
-  },
-  "common": {
-    "a11y": {
-      "skipToMain": "Skip to main content"
-    }
-  },
-  "investorShell": {
-    "header": {
-      "title": "Investor portal"
-    },
-    "placeholder": {
-      "heading": "Investor portal",
-      "body": "This is the empty apps/fund shell. Wallet kit selection is pending; investor flows land in a follow-up.",
-      "walletDisconnected": "No wallet connected."
-    }
   }
 }

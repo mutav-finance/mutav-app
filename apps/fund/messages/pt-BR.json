@@ -2,20 +2,5 @@
   "meta": {
     "title": "Mutav Fund — Portal do Investidor",
     "description": "Invista no fundo MUTAV. Deposite, resgate e acompanhe o NAV onchain."
-  },
-  "common": {
-    "a11y": {
-      "skipToMain": "Pular para o conteúdo principal"
-    }
-  },
-  "investorShell": {
-    "header": {
-      "title": "Portal do investidor"
-    },
-    "placeholder": {
-      "heading": "Portal do investidor",
-      "body": "Este é o shell vazio de apps/fund. A seleção da wallet kit está pendente; os fluxos do investidor virão em um PR seguinte.",
-      "walletDisconnected": "Nenhuma carteira conectada."
-    }
   }
 }
