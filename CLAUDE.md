@@ -324,7 +324,7 @@ import { api } from "@/convex/_generated/api";
 
 ### TypeScript escape hatches
 
-Zero tolerance: never use `any`, `as Type`, `!` (non-null assertion), `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`. Use generics, type guards, `unknown` + Zod, discriminated unions, `?.`, `??`. **Boundary exception:** route params and external API responses may assert with a comment (`// route param validated by route shape`).
+Zero tolerance: never use `any`, `as Type`, `!` (non-null assertion), `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`. Use generics, type guards, `unknown` + Zod, discriminated unions, `?.`, `??`. **Boundary exception:** assertions at serialization edges (route params, external API responses, Convex deserialization) are acceptable when tagged inline with `// hook-ok: <reason>` (e.g. `// hook-ok: route param validated by loader`). The PreToolUse `code-quality` hook surfaces every other case as an advisory.
 
 `as const` (narrowing) is allowed and encouraged for value objects — distinct from `as Type` (cast).
 
