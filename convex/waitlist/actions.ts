@@ -3,6 +3,7 @@
 import { v } from "convex/values";
 import { Resend } from "resend";
 import { internalAction } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { getResendApiKey, getWaitlistAudienceId } from "../lib/env";
 import { waitlistAudienceValidator } from "./domain";
 
@@ -42,5 +43,111 @@ export const addToResendAudience = internalAction({
     if (error) {
       console.error(`[waitlist] Resend contacts.create failed for ${audience}:${email}`, error);
     }
+  },
+});
+
+type BackfillSummary = {
+  dryRun: boolean;
+  audience: "investidor" | "imobiliaria";
+  audienceId: string;
+  totalInConvex: number;
+  syncedToResend: number;
+  alreadyInResend: number;
+  errors: Array<{ email: string; message: string }>;
+};
+
+// One-shot backfill — enumerates every Convex waitlist row for the given
+// audience and replays it into the corresponding Resend audience. Idempotent
+// against Resend: contacts.create returns an "already exists" error for
+// addresses already in the audience, which is treated as success.
+//
+// Run via convex CLI (dry-run by default — returns a count without touching
+// Resend; pass `dryRun: false` once the count looks right):
+//
+//   npx convex run --prod waitlist/actions:backfillResendAudience \
+//     '{"audience":"imobiliaria"}'
+//   npx convex run --prod waitlist/actions:backfillResendAudience \
+//     '{"audience":"imobiliaria","dryRun":false}'
+//
+// Use case: the website's `/imobiliaria` LP was launched before the
+// `RESEND_IMOBILIARIA_AUDIENCE_ID` env var was provisioned, so the
+// per-signup `addToResendAudience` action skipped the sync. Convex retained
+// every row; this rebuilds the Resend projection from the source of truth.
+export const backfillResendAudience = internalAction({
+  args: {
+    audience: waitlistAudienceValidator,
+    dryRun: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { audience, dryRun = true }): Promise<BackfillSummary> => {
+    const audienceId = getWaitlistAudienceId(audience);
+    if (!audienceId) {
+      throw new Error(
+        `RESEND_${audience.toUpperCase()}_AUDIENCE_ID is not set on this deployment — set it before running the backfill.`,
+      );
+    }
+
+    const rows = await ctx.runQuery(internal.waitlist.useCases.listByAudienceInternal, {
+      audience,
+    });
+    const totalInConvex = rows.length;
+
+    console.log(
+      `[backfill] ${dryRun ? "DRY RUN — " : ""}audience=${audience} ` +
+        `audienceId=${audienceId} totalInConvex=${totalInConvex}`,
+    );
+
+    if (dryRun) {
+      return {
+        dryRun: true,
+        audience,
+        audienceId,
+        totalInConvex,
+        syncedToResend: 0,
+        alreadyInResend: 0,
+        errors: [],
+      };
+    }
+
+    const resend = new Resend(getResendApiKey());
+    let syncedToResend = 0;
+    let alreadyInResend = 0;
+    const errors: Array<{ email: string; message: string }> = [];
+
+    for (const row of rows) {
+      const { error } = await resend.contacts.create({
+        email: row.email,
+        audienceId,
+        unsubscribed: false,
+      });
+
+      if (!error) {
+        syncedToResend++;
+        continue;
+      }
+
+      const message = error.message ?? String(error);
+      if (/already exist/i.test(message)) {
+        alreadyInResend++;
+        continue;
+      }
+
+      errors.push({ email: row.email, message });
+      console.error(`[backfill] failed for ${audience}:${row.email}`, error);
+    }
+
+    console.log(
+      `[backfill] done audience=${audience} synced=${syncedToResend} ` +
+        `alreadyPresent=${alreadyInResend} errors=${errors.length}`,
+    );
+
+    return {
+      dryRun: false,
+      audience,
+      audienceId,
+      totalInConvex,
+      syncedToResend,
+      alreadyInResend,
+      errors,
+    };
   },
 });

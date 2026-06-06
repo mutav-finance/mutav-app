@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { internalQuery, mutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Result } from "../lib/result";
 import {
@@ -76,5 +76,18 @@ export const join = mutation({
       data: { waitlistId, alreadyOnList: false },
       message: "Joined waitlist",
     };
+  },
+});
+
+// Internal — used by the backfill action to enumerate every signup of a given
+// audience and replay it into the corresponding Resend audience. The
+// `by_email_audience` index is leading-on-email, so a plain filter is the
+// honest answer here; the waitlist table is bounded (pre-launch + curated
+// growth) and this only runs ad-hoc, not on a hot path.
+export const listByAudienceInternal = internalQuery({
+  args: { audience: waitlistAudienceValidator },
+  handler: async (ctx, { audience }) => {
+    const all = await ctx.db.query("waitlist").collect();
+    return all.filter((row) => row.audience === audience);
   },
 });
