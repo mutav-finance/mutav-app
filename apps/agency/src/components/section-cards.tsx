@@ -15,7 +15,7 @@ export function SectionCards() {
   const agencyId = selectedAgency?._id;
 
   const summary = useQuery(
-    api.contracts.useCases.getPipelineSummary,
+    api.contracts.useCases.getStatusCounts,
     agencyId ? { agencyId } : "skip",
   );
 

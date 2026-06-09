@@ -113,7 +113,8 @@
       "dashboard": "Dashboard",
       "contracts": "Contracts",
       "payments": "Invoices",
-      "delinquencies": "Delinquencies"
+      "delinquencies": "Delinquencies",
+      "health": "Transparency"
     },
     "cadastros": {
       "groupLabel": "Registries",
@@ -1117,6 +1118,45 @@
         "cnpj": "Invalid CNPJ.",
         "representanteName": "Representative name is required.",
         "representanteCpf": "Invalid representative CPF."
+      }
+    }
+  },
+  "health": {
+    "meta": {
+      "title": "Transparency",
+      "description": "Mutav risk position and onchain treasury."
+    },
+    "heading": "Transparency",
+    "subheading": "Risk position transparency and onchain treasury.",
+    "footer": "Contract data updated in real time.",
+    "contracts": {
+      "ativo": "Active contracts",
+      "pendente": "Under review",
+      "defaultRate": "Default rate"
+    },
+    "capacity": {
+      "label": "Capital utilization",
+      "used": "{pct}% utilized",
+      "of": "of {total}"
+    },
+    "treasury": {
+      "label": "Coverage capital",
+      "previewBadge": "Preview",
+      "unavailable": "Unavailable",
+      "viewExplorer": "Verify myself on the Stellar network"
+    },
+    "timeline": {
+      "title": "Contracts per week",
+      "descriptionLong": "Weekly contract breakdown for the selected period.",
+      "descriptionShort": "Contracts per week",
+      "m6": "Last 6 months",
+      "m12": "Last 12 months",
+      "selectRangeAriaLabel": "Select a range",
+      "series": {
+        "netActive": "Active contracts",
+        "activated": "Activated",
+        "cancelled": "Cancelled",
+        "expired": "Expired"
       }
     }
   }

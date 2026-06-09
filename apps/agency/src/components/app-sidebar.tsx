@@ -8,7 +8,13 @@ import { NavUser } from "@/components/nav-user";
 import { NavAgency } from "@/components/nav-agency";
 import { AgencySwitcher } from "@/components/agency-switcher";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
-import { LayoutDashboardIcon, FileTextIcon, ReceiptIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  LayoutDashboardIcon,
+  FileTextIcon,
+  HeartPulseIcon,
+  ReceiptIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useWorkspace } from "@/providers/workspace";
 
@@ -21,6 +27,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
     { title: tMain("payments"), href: "/payments", icon: <ReceiptIcon /> },
     { title: tMain("delinquencies"), href: "/delinquencies", icon: <TriangleAlertIcon /> },
+    { title: tMain("health"), href: "/health", icon: <HeartPulseIcon /> },
   ];
 
   return (

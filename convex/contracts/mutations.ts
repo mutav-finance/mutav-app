@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
-import { contractsByStatus } from "./aggregate";
+import { replaceContractAggregates } from "./aggregateWrites";
 import { contractStatusValidator } from "./domain";
 
 /**
@@ -35,9 +35,7 @@ export const updateStatus = internalMutation({
     const after = await ctx.db.get(contractId);
     if (!after) throw new Error("Contract disappeared mid-mutation");
 
-    // Replace updates the aggregate: removes the old (namespace, key) entry
-    // and inserts the new one atomically.
-    await contractsByStatus.replace(ctx, before, after);
+    await replaceContractAggregates(ctx, before, after);
 
     await appendAuditEntry(ctx, {
       actor: { kind: "system", source: "contract_status_update" },

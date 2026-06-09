@@ -4,6 +4,14 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
 
+/* Tailwind 4 only auto-detects classes from the consuming project. Workspace
+   packages we transpile through Next.js (see `transpilePackages` in
+   `next.config.ts`) need an explicit `@source` so utilities used inside them
+   (e.g. `h-2 w-2` in `@mutav/ui`'s chart legend swatch) actually compile into
+   the agency bundle. Without this, the classes are silently dropped and the
+   element renders with zero dimensions / unstyled. */
+@source "../../../../packages/ui/src";
+
 /* Exclude docs and skills dirs from Tailwind's content scan — they contain
    literal class examples (e.g. `bg-[url(...)]`) that would otherwise compile
    into broken CSS. Globs are relative to this file. */

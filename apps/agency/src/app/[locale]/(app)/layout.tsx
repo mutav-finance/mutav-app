@@ -56,7 +56,7 @@ export default async function AppLayout({
           <main
             id="main-content"
             data-front="imobiliarias"
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+            className="@container/main flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
             {children}
           </main>

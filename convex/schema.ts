@@ -83,7 +83,7 @@ const onboardingState = v.union(
 
 const bankingInfo = v.object({
   bank: v.string(),
-  branch: v.string(),
+  agency: v.optional(v.string()),
   account: v.string(),
   accountType: v.union(v.literal("corrente"), v.literal("poupanca")),
   pixKey: v.optional(v.string()),
@@ -171,7 +171,7 @@ export default defineSchema({
     createdAt: v.string(),
     agencyType: v.optional(agencyType),
     onboardingState: v.optional(onboardingState),
-    onboardingSubmittedAt: v.optional(v.string()),
+    onboardingSubmittedAt: v.optional(v.union(v.string(), v.null())),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     creci: v.optional(v.string()),

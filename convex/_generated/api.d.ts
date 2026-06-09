@@ -10,6 +10,7 @@
 
 import type * as agencies_adminUseCases from "../agencies/adminUseCases.js";
 import type * as agencies_domain from "../agencies/domain.js";
+import type * as agencies_migrations from "../agencies/migrations.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
 import type * as anchors_accountDomain from "../anchors/accountDomain.js";
 import type * as anchors_accountUseCases from "../anchors/accountUseCases.js";
@@ -28,6 +29,7 @@ import type * as audit_merkle from "../audit/merkle.js";
 import type * as audit_useCases from "../audit/useCases.js";
 import type * as contracts_actions from "../contracts/actions.js";
 import type * as contracts_aggregate from "../contracts/aggregate.js";
+import type * as contracts_aggregateWrites from "../contracts/aggregateWrites.js";
 import type * as contracts_backfill from "../contracts/backfill.js";
 import type * as contracts_creditProviders from "../contracts/creditProviders.js";
 import type * as contracts_domain from "../contracts/domain.js";
@@ -35,6 +37,9 @@ import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_scoreProviders from "../contracts/scoreProviders.js";
 import type * as contracts_useCases from "../contracts/useCases.js";
 import type * as crons from "../crons.js";
+import type * as health_actions from "../health/actions.js";
+import type * as health_domain from "../health/domain.js";
+import type * as health_useCases from "../health/useCases.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_auth0Mgmt from "../lib/auth0Mgmt.js";
@@ -68,6 +73,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "agencies/adminUseCases": typeof agencies_adminUseCases;
   "agencies/domain": typeof agencies_domain;
+  "agencies/migrations": typeof agencies_migrations;
   "agencies/useCases": typeof agencies_useCases;
   "anchors/accountDomain": typeof anchors_accountDomain;
   "anchors/accountUseCases": typeof anchors_accountUseCases;
@@ -86,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   "audit/useCases": typeof audit_useCases;
   "contracts/actions": typeof contracts_actions;
   "contracts/aggregate": typeof contracts_aggregate;
+  "contracts/aggregateWrites": typeof contracts_aggregateWrites;
   "contracts/backfill": typeof contracts_backfill;
   "contracts/creditProviders": typeof contracts_creditProviders;
   "contracts/domain": typeof contracts_domain;
@@ -93,6 +100,9 @@ declare const fullApi: ApiFromModules<{
   "contracts/scoreProviders": typeof contracts_scoreProviders;
   "contracts/useCases": typeof contracts_useCases;
   crons: typeof crons;
+  "health/actions": typeof health_actions;
+  "health/domain": typeof health_domain;
+  "health/useCases": typeof health_useCases;
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/auth0Mgmt": typeof lib_auth0Mgmt;
@@ -146,4 +156,6 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   contractsByStatus: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatus">;
+  contractsByStatusPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatusPlatform">;
+  ativoInsuredCentsPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"ativoInsuredCentsPlatform">;
 };

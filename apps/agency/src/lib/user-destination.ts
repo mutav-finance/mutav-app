@@ -9,6 +9,14 @@ export type UserDestination =
   | { kind: "onboarding-rejected" }
   | { kind: "dashboard" };
 
+async function fetchAgencies(token: string) {
+  try {
+    return await fetchQuery(api.agencies.useCases.listAgenciesForUser, {}, { token });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Single source of truth for "where should this user be?". Reads the
  * Auth0 session + agency memberships and returns a discriminated
@@ -23,7 +31,8 @@ export async function resolveUserDestination(): Promise<UserDestination> {
   const token = await getAuthToken();
   if (!token) return { kind: "login" };
 
-  const agencies = await fetchQuery(api.agencies.useCases.listAgenciesForUser, {}, { token });
+  const agencies = await fetchAgencies(token);
+  if (!agencies) return { kind: "login" };
 
   if (agencies.length === 0) return { kind: "onboarding-welcome" };
 

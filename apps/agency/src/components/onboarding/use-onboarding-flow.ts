@@ -241,7 +241,7 @@ export function useOnboardingFlow({ initialType }: { initialType?: "autonomo" | 
           agencyId: state.agencyId,
           bankingInfo: {
             bank: values.bankName,
-            branch: values.bankBranch,
+            agency: values.bankBranch,
             account: values.bankAccount,
             accountType: values.bankAccountType,
             pixKey: values.bankPixKey || undefined,

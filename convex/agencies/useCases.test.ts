@@ -240,7 +240,7 @@ describe("submitOnboarding", () => {
       agencyId,
       bankingInfo: {
         bank: "Test Bank",
-        branch: "0001",
+        agency: "0001",
         account: "12345-6",
         accountType: "corrente",
       },
@@ -268,7 +268,7 @@ describe("submitOnboarding", () => {
       agencyId,
       bankingInfo: {
         bank: "Nubank",
-        branch: "0001",
+        agency: "0001",
         account: "12345-6",
         accountType: "corrente",
       },
@@ -299,7 +299,7 @@ describe("submitOnboarding", () => {
       agencyId,
       bankingInfo: {
         bank: "Nubank",
-        branch: "0001",
+        agency: "0001",
         account: "12345-6",
         accountType: "corrente",
       },
@@ -325,7 +325,7 @@ describe("submitOnboarding", () => {
 
     await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
       agencyId,
-      bankingInfo: { bank: "Nu", branch: "1", account: "1", accountType: "corrente" },
+      bankingInfo: { bank: "Nu", agency: "1", account: "1", accountType: "corrente" },
     });
     await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
 
@@ -460,7 +460,7 @@ async function seedReadyAutonomoAgency(
       agencyType: "autonomo",
       onboardingState: "in_progress",
       createdAt: new Date().toISOString(),
-      bankingInfo: { bank: "Test", branch: "0001", account: "12345-6", accountType: "corrente" },
+      bankingInfo: { bank: "Test", agency: "0001", account: "12345-6", accountType: "corrente" },
     });
     await ctx.db.insert("memberships", {
       userId,
@@ -485,7 +485,7 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
       agencyId: start.data.agencyId,
       bankingInfo: {
         bank: "Nubank",
-        branch: "0001",
+        agency: "0001",
         account: "12345-6",
         accountType: "corrente",
       },
@@ -514,7 +514,7 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
         agencyId: foreignAgencyId,
         bankingInfo: {
           bank: "Attacker Bank",
-          branch: "0001",
+          agency: "0001",
           account: "00000-0",
           accountType: "corrente",
         },
@@ -524,6 +524,28 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
     // Confirm the foreign agency was NOT patched
     const agency = await t.run((ctx) => ctx.db.get(foreignAgencyId));
     expect(agency?.bankingInfo).toBeUndefined();
+  });
+});
+
+describe("bankingInfo.agency optional", () => {
+  test("accepts bankingInfo without the agency key", async () => {
+    const t = convexTest(schema);
+    const { asUser } = await setupAuthenticatedUser(t);
+
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    expect(start.success).toBe(true);
+    if (!start.success) return;
+
+    const result = await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
+      agencyId: start.data.agencyId,
+      bankingInfo: {
+        bank: "Nubank",
+        account: "12345-6",
+        accountType: "corrente",
+      },
+    });
+
+    expect(result.success).toBe(true);
   });
 });
 
