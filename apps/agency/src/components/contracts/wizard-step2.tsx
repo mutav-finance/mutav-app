@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
 import { Link } from "@mutav/i18n/navigation";
@@ -13,12 +13,7 @@ import { formatBRLCentsDisplay, type WizardData } from "@/lib/contracts/wizard";
 import type { ScoreTier } from "@convex/contracts/domain";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
-import {
-  EXIT_COST_MULTIPLIERS,
-  EXIT_MULT_MONTHS,
-  RENT_MULTIPLIERS,
-  RENT_MULT_MONTHS,
-} from "@/lib/pricing/tiers";
+import { RENT_COVERAGE_MONTHS, EXIT_COVERAGE_MONTHS, SCORE_TIER_RATE } from "@/lib/pricing/tiers";
 
 type Props = {
   data: WizardData;
@@ -26,21 +21,6 @@ type Props = {
   onNext: () => void;
   onBack: () => void;
 };
-
-type Step2Errors = {
-  rentMultiplier?: string;
-  exitCostMultiplier?: string;
-};
-
-const COVERAGE_OPTIONS = RENT_MULTIPLIERS.map((value) => ({
-  value,
-  months: RENT_MULT_MONTHS[value],
-}));
-
-const EXIT_OPTIONS = EXIT_COST_MULTIPLIERS.map((value) => ({
-  value,
-  months: EXIT_MULT_MONTHS[value],
-}));
 
 const TIER_STYLE: Record<ScoreTier, string> = {
   bom: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -56,17 +36,25 @@ const TIER_CARD_STYLE: Record<ScoreTier, string> = {
   negado: "border-red-500 bg-red-50/50 dark:bg-red-950/20",
 };
 
+const TIER_FEE_RATE: Record<Exclude<ScoreTier, "negado">, number> = {
+  bom: SCORE_TIER_RATE.high,
+  regular: SCORE_TIER_RATE.medium,
+  ruim: SCORE_TIER_RATE.low,
+};
+
 export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const t = useTranslations("contractNew");
-  const [errors, setErrors] = React.useState<Step2Errors>({});
   const { selectedAgency } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
   const cpfDigits = data.entityType === "pj" ? "" : data.cpf.replace(/\D/g, "");
   const docDigits = data.entityType === "pj" ? data.cnpj.replace(/\D/g, "") : cpfDigits;
 
+  const requestScore = useMutation(api.contracts.useCases.requestCreditScore);
+  const [requestedFor, setRequestedFor] = React.useState<string | null>(null);
+
   const scoreResult = useQuery(
-    api.contracts.useCases.lookupTenantScore,
+    api.contracts.useCases.getCachedCreditScore,
     agencyId && docDigits ? { agencyId, document: docDigits } : "skip",
   );
 
@@ -74,6 +62,21 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
     api.contracts.useCases.lookupTenantByCpf,
     agencyId && cpfDigits ? { agencyId, cpf: cpfDigits } : "skip",
   );
+
+  const triggerScoreRequest = React.useEffectEvent(
+    (doc: string, agId: NonNullable<typeof agencyId>) => {
+      requestScore({ agencyId: agId, document: doc })
+        .then((result) => {
+          if (result.status !== "invalid") setRequestedFor(doc);
+        })
+        .catch(() => {});
+    },
+  );
+
+  React.useEffect(() => {
+    if (!agencyId || !docDigits) return;
+    triggerScoreRequest(docDigits, agencyId);
+  }, [docDigits, agencyId]);
 
   const applyScore = React.useEffectEvent(
     (result: { score: number; tier: ScoreTier } | null | undefined) => {
@@ -92,8 +95,6 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   );
 
   React.useEffect(() => {
-    // Guard against the transient `undefined` between keystrokes (args change
-    // → useQuery re-fires) — without this, score/tier flicker to null and back.
     if (scoreResult !== undefined) applyScore(scoreResult);
   }, [scoreResult]);
 
@@ -104,22 +105,19 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const score = scoreResult?.score ?? null;
   const scoreTier = scoreResult?.tier ?? null;
 
-  const isLoading = !docDigits;
+  // Loading while: no document entered, Convex query loading (undefined),
+  // or action in flight (requested for this doc but no cached result yet).
+  const isLoading =
+    !docDigits || scoreResult === undefined || (requestedFor === docDigits && scoreResult === null);
   const isNegado = score !== null && score < 400;
 
   const preview =
-    !isNegado &&
-    data.rentCents > 0 &&
-    data.rentMultiplier &&
-    data.exitCostMultiplier &&
-    score !== null
+    !isNegado && data.rentCents > 0 && score !== null
       ? priceContract({
           rentCents: data.rentCents,
           condoCents: data.condoCents,
           otherFeesCents: data.otherFeesCents,
           score,
-          rentMultiplier: data.rentMultiplier,
-          exitCostMultiplier: data.exitCostMultiplier,
         })
       : null;
   const commission = preview ? splitCommission(preview.feeCents) : null;
@@ -129,18 +127,6 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
     regular: t("tenant.scoreRegular"),
     ruim: t("tenant.scoreRuim"),
     negado: t("tenant.scoreNegado"),
-  };
-
-  const handleNext = () => {
-    const errs: Step2Errors = {};
-    if (!data.rentMultiplier) errs.rentMultiplier = t("validation.coverageRequired");
-    if (!data.exitCostMultiplier) errs.exitCostMultiplier = t("validation.exitRequired");
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-    setErrors({});
-    onNext();
   };
 
   return (
@@ -209,54 +195,25 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
         )}
       </section>
 
-      {/* Coverage — only when approved and score loaded */}
+      {/* Fixed plan + pricing — only when approved and score loaded */}
       {!isLoading && !isNegado && (
         <section className="flex flex-col gap-4 rounded-lg border p-4 md:p-6">
           <h2 className="text-base font-semibold">{t("coverage.heading")}</h2>
 
-          <div className="flex flex-col gap-3">
-            <p className="text-muted-foreground text-sm font-medium">
-              {t("coverage.rentMultiplierLabel")}
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {COVERAGE_OPTIONS.map(({ value, months }) => (
-                <OptionCard
-                  key={value}
-                  label={value}
-                  description={t("coverage.coverageDesc", { x: months })}
-                  selected={data.rentMultiplier === value}
-                  onSelect={() => onChange({ rentMultiplier: value })}
-                />
-              ))}
-            </div>
-            {errors.rentMultiplier && (
-              <p className="text-destructive text-xs">{errors.rentMultiplier}</p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <p className="text-muted-foreground text-sm font-medium">
-              {t("coverage.exitCostLabel")}
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {EXIT_OPTIONS.map(({ value, months }) => (
-                <OptionCard
-                  key={value}
-                  label={value}
-                  description={t("coverage.exitDesc", { x: months })}
-                  selected={data.exitCostMultiplier === value}
-                  onSelect={() => onChange({ exitCostMultiplier: value })}
-                />
-              ))}
-            </div>
-            {errors.exitCostMultiplier && (
-              <p className="text-destructive text-xs">{errors.exitCostMultiplier}</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <PlanRow label={t("coverage.rentCoverage")} value={`${RENT_COVERAGE_MONTHS}x`} />
+            <PlanRow label={t("coverage.exitCoverage")} value={`${EXIT_COVERAGE_MONTHS}x`} />
+            {scoreTier && scoreTier !== "negado" && (
+              <PlanRow
+                label={t("coverage.feeRate")}
+                value={`${(TIER_FEE_RATE[scoreTier] * 100).toFixed(0)}%`}
+              />
             )}
           </div>
         </section>
       )}
 
-      {/* Summary block — always visible once approved, values fill in as options are selected */}
+      {/* Summary block */}
       {!isLoading && !isNegado && (
         <section className="flex flex-col gap-3 rounded-lg border p-4 md:p-6">
           <h2 className="text-base font-semibold">{t("coverage.summary.heading")}</h2>
@@ -264,10 +221,8 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             <SummaryRow
               label={t("coverage.summary.exitCost")}
               value={
-                data.exitCostMultiplier && data.rentCents > 0
-                  ? formatBRLCentsDisplay(
-                      EXIT_MULT_MONTHS[data.exitCostMultiplier] * data.rentCents,
-                    )
+                data.rentCents > 0
+                  ? formatBRLCentsDisplay(EXIT_COVERAGE_MONTHS * data.rentCents)
                   : null
               }
             />
@@ -297,43 +252,21 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             <Link href="/">{t("simulation.closeButton")}</Link>
           </Button>
         ) : (
-          <Button onClick={handleNext}>{t("nav.nextStep3")}</Button>
+          <Button onClick={onNext} disabled={isLoading || score === null}>
+            {t("nav.nextStep3")}
+          </Button>
         )}
       </div>
     </div>
   );
 }
 
-function OptionCard({
-  label,
-  description,
-  selected,
-  onSelect,
-}: {
-  label: string;
-  description: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
+function PlanRow({ label, value }: { label: string; value: string }) {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "flex flex-col gap-1 rounded-md border p-3 text-left text-sm transition-colors",
-        selected ? "border-primary bg-primary/5 text-primary" : "border-input hover:bg-accent",
-      )}
-    >
-      <span className="font-semibold">{label}</span>
-      <span
-        className={cn(
-          "text-xs leading-tight",
-          selected ? "text-primary/70" : "text-muted-foreground",
-        )}
-      >
-        {description}
-      </span>
-    </button>
+    <div className="bg-muted/50 flex flex-col gap-1 rounded-md p-3">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="font-mono text-sm font-semibold">{value}</span>
+    </div>
   );
 }
 

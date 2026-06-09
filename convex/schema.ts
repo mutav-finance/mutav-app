@@ -237,8 +237,8 @@ export default defineSchema({
       feeCents: v.number(),
       oneTimeActivationFeeCents: v.number(),
       setupInstallments: v.number(),
-      exitCostMultiplier: v.string(),
-      rentMultiplier: v.string(),
+      exitCostMultiplier: v.literal("5x"),
+      rentMultiplier: v.literal("30x"),
       payer: v.string(),
       pviMigrationSchedule: v.union(v.string(), v.null()),
     }),
@@ -534,4 +534,19 @@ export default defineSchema({
   })
     .index("by_email_audience", ["email", "audience"])
     .index("by_audience_ts", ["audience", "ts"]),
+
+  // Per-agency credit report cache. One row per lookup; never mutated after
+  // insert. The `cpfHash` is HMAC-SHA256 of the CPF/CNPJ digits (same key as
+  // `claimedDocuments`) so we can index without storing plaintext PII.
+  // `pulledAt` is a unix ms timestamp — used for the 24-hour cache window.
+  // `providerRef` is the bureau's own query ID for audit/dispute trail.
+  tenantCreditReports: defineTable({
+    agencyId: v.id("agencies"),
+    cpfHash: v.string(),
+    score: v.number(),
+    tier: v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"), v.literal("negado")),
+    provider: v.string(),
+    providerRef: v.optional(v.string()),
+    pulledAt: v.number(),
+  }).index("by_agency_cpf_time", ["agencyId", "cpfHash", "pulledAt"]),
 });

@@ -1,3 +1,70 @@
+/**
+ * Which score bureau provider to use for tenant score lookups.
+ * Defaults to "mock" so deployments without credentials still work.
+ * Any registered provider name is valid — unknown values fall back to "mock"
+ * inside `resolveProvider()` in `convex/contracts/scoreProviders.ts`.
+ *
+ *   bunx convex env set SCORE_PROVIDER cpfcnpj
+ *   bunx convex env set SCORE_PROVIDER bigdatacorp
+ */
+export function getScoreProvider(): string {
+  return process.env.SCORE_PROVIDER ?? "mock"; // hook-ok: env module boundary
+}
+
+/**
+ * CPF.CNPJ API token. Self-service at cpfcnpj.com.br/register.
+ * Test token (fictional data): 5ae973d7a997af13f0aaf2bf60e65803
+ *
+ *   bunx convex env set CPFCNPJ_TOKEN <token>
+ */
+export function getCpfCnpjToken(): string {
+  const t = process.env.CPFCNPJ_TOKEN; // hook-ok: env module boundary
+  if (!t)
+    throw new Error(
+      "CPFCNPJ_TOKEN is not set. Set via `bunx convex env set CPFCNPJ_TOKEN <token>`.",
+    );
+  return t;
+}
+
+/**
+ * BigDataCorp platform login (email used to create the account at
+ * plataforma.bigdatacorp.com.br). Required when `SCORE_PROVIDER=bigdatacorp`.
+ *
+ *   bunx convex env set BIGDATACORP_LOGIN you@example.com
+ */
+export function getBigDataCorpLogin(): string {
+  const v = process.env.BIGDATACORP_LOGIN; // hook-ok: env module boundary
+  if (!v)
+    throw new Error(
+      "BIGDATACORP_LOGIN is not set. Set via `bunx convex env set BIGDATACORP_LOGIN <email>`.",
+    );
+  return v;
+}
+
+/**
+ * BigDataCorp platform password. Required when `SCORE_PROVIDER=bigdatacorp`.
+ *
+ *   bunx convex env set BIGDATACORP_PASSWORD yourpassword
+ */
+export function getBigDataCorpPassword(): string {
+  const v = process.env.BIGDATACORP_PASSWORD; // hook-ok: env module boundary
+  if (!v)
+    throw new Error(
+      "BIGDATACORP_PASSWORD is not set. Set via `bunx convex env set BIGDATACORP_PASSWORD <password>`.",
+    );
+  return v;
+}
+
+/**
+ * BigDataCorp dataset for CPF score queries. Defaults to BoaVista One Score.
+ * Override to switch to Multidados or another bureau without code changes:
+ *
+ *   bunx convex env set BIGDATACORP_DATASET partner_multidados_score_credito_pessoa
+ */
+export function getBigDataCorpDataset(): string {
+  return process.env.BIGDATACORP_DATASET ?? "partner_boavista_one_score_person"; // hook-ok: env module boundary
+}
+
 export function getResendApiKey(): string {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("RESEND_API_KEY is not set");

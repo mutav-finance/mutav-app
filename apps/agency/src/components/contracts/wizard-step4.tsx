@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatBRLCentsDisplay, parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
-import { EXIT_COST_MULTIPLIERS, RENT_MULTIPLIERS } from "@/lib/pricing/tiers";
+import { RENT_COVERAGE_MONTHS, EXIT_COVERAGE_MONTHS } from "@/lib/pricing/tiers";
 
 type Props = {
   data: WizardData;
@@ -24,7 +24,7 @@ type Props = {
   onBack: () => void;
 };
 
-type EditingBlock = "property" | "rental" | "tenant" | "plan" | null;
+type EditingBlock = "property" | "rental" | "tenant" | null;
 
 type MissingFields = Set<string>;
 
@@ -32,8 +32,6 @@ function getMissingFields(data: WizardData): MissingFields {
   const missing = new Set<string>();
   if (!data.propertyKind) missing.add("propertyKind");
   if (!data.rentCents) missing.add("rentCents");
-  if (!data.rentMultiplier) missing.add("rentMultiplier");
-  if (!data.exitCostMultiplier) missing.add("exitCostMultiplier");
   if (data.score === null) missing.add("score");
   if (!data.fullName.trim()) missing.add("fullName");
   if (data.entityType === "pf" && !data.birthDate) missing.add("birthDate");
@@ -57,14 +55,12 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
   const [draft, setDraft] = React.useState<Partial<WizardData>>({});
 
   const preview =
-    data.rentCents > 0 && data.rentMultiplier && data.exitCostMultiplier && data.score !== null
+    data.rentCents > 0 && data.score !== null
       ? priceContract({
           rentCents: data.rentCents,
           condoCents: data.condoCents,
           otherFeesCents: data.otherFeesCents,
           score: data.score,
-          rentMultiplier: data.rentMultiplier,
-          exitCostMultiplier: data.exitCostMultiplier,
         })
       : null;
   const commission = preview ? splitCommission(preview.feeCents) : null;
@@ -96,14 +92,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
     }
     setMissing(new Set());
 
-    if (
-      !data.propertyKind ||
-      !data.rentMultiplier ||
-      !data.exitCostMultiplier ||
-      !data.entityType ||
-      data.score === null
-    )
-      return;
+    if (!data.propertyKind || !data.entityType || data.score === null) return;
 
     setIsSubmitting(true);
     try {
@@ -120,8 +109,6 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         rentCents: data.rentCents,
         condoCents: data.condoCents,
         otherFeesCents: data.otherFeesCents,
-        rentMultiplier: data.rentMultiplier,
-        exitCostMultiplier: data.exitCostMultiplier,
         tenant: {
           entityType: data.entityType,
           fullName: data.fullName,
@@ -431,88 +418,39 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
       </Block>
 
       {/* Bloco 4 — Dados do Plano */}
-      <Block
-        title={t("review.planSection")}
-        onEdit={() => startEdit("plan")}
-        editing={editingBlock === "plan"}
-        disabled={isEditing && editingBlock !== "plan"}
-        onSave={saveEdit}
-        onCancel={cancelEdit}
-      >
-        {editingBlock === "plan" ? (
-          <div className="flex flex-col gap-4">
-            <EditField label={t("coverage.rentMultiplierLabel")}>
-              <div className="flex gap-2">
-                {RENT_MULTIPLIERS.map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setDraft((d) => ({ ...d, rentMultiplier: v }))}
-                    className={cn(
-                      "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                      draft.rentMultiplier === v
-                        ? "border-primary bg-primary/5 text-primary font-medium"
-                        : "border-input hover:bg-accent",
-                    )}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </EditField>
-            <EditField label={t("coverage.exitCostLabel")}>
-              <div className="flex gap-2">
-                {EXIT_COST_MULTIPLIERS.map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setDraft((d) => ({ ...d, exitCostMultiplier: v }))}
-                    className={cn(
-                      "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                      draft.exitCostMultiplier === v
-                        ? "border-primary bg-primary/5 text-primary font-medium"
-                        : "border-input hover:bg-accent",
-                    )}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </EditField>
+      <section className="flex flex-col gap-2 rounded-lg border p-4">
+        <p className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+          {t("review.planSection")}
+        </p>
+        <div className="flex gap-8">
+          <div className="flex flex-1 flex-col gap-0.5">
+            <ReviewRow
+              label={t("coverage.rentMultiplierLabel")}
+              value={`${RENT_COVERAGE_MONTHS}x`}
+              mono
+            />
+            <ReviewRow
+              label={t("coverage.exitCostLabel")}
+              value={`${EXIT_COVERAGE_MONTHS}x`}
+              mono
+            />
           </div>
-        ) : (
-          <div className="flex gap-8">
+          {preview && (
             <div className="flex flex-1 flex-col gap-0.5">
               <ReviewRow
-                label={t("coverage.rentMultiplierLabel")}
-                value={data.rentMultiplier ?? ""}
+                label={t("coverage.preview.fee")}
+                value={formatBRLCentsDisplay(preview.feeCents)}
                 mono
-                missing={m.has("rentMultiplier")}
               />
               <ReviewRow
-                label={t("coverage.exitCostLabel")}
-                value={data.exitCostMultiplier ?? ""}
+                label={t("coverage.preview.activationFee")}
+                value={formatBRLCentsDisplay(preview.oneTimeActivationFeeCents)}
                 mono
-                missing={m.has("exitCostMultiplier")}
               />
             </div>
-            {preview && (
-              <div className="flex flex-1 flex-col gap-0.5">
-                <ReviewRow
-                  label={t("coverage.preview.fee")}
-                  value={formatBRLCentsDisplay(preview.feeCents)}
-                  mono
-                />
-                <ReviewRow
-                  label={t("coverage.preview.activationFee")}
-                  value={formatBRLCentsDisplay(preview.oneTimeActivationFeeCents)}
-                  mono
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </Block>
+          )}
+        </div>
+      </section>
 
       {commission && (
         <div className="bg-surface-2 flex items-center justify-between px-4 py-3">
