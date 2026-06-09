@@ -19,7 +19,25 @@ import { auth0 } from "@/lib/auth0";
  * returns a richer shape (`{ session, mutavStaff }` or `null`).
  */
 export async function getStaffMember(): Promise<SessionData | null> {
-  const session = await auth0.getSession();
+  let session: SessionData | null;
+  try {
+    session = await auth0.getSession();
+  } catch (err) {
+    // `auth0.getSession()` decrypts the encrypted session cookie. It throws
+    // on malformed/tampered cookies, post-`AUTH0_SECRET`-rotation stale
+    // cookies, clock-skewed `exp` claims, and transient SDK errors. The
+    // *expected* recovery for all of these is the same as "no session":
+    // send the user to Universal Login. Surface to the layout as `null`
+    // (its `if (!member) redirect(...)` branch handles it) rather than
+    // bubbling to Next's error boundary, which has no sign-in affordance.
+    //
+    // Logging is intentionally minimal here — A1 will wire Sentry / the
+    // chosen sink and tag this with a stable error id so the config drift
+    // is debuggable. For now, a `console.error` is enough trail for local
+    // dev and Vercel function logs.
+    console.error("[admin] auth0.getSession() failed:", err);
+    return null;
+  }
   if (!session) return null;
 
   // TODO(A1): once `convex/mutavStaff/` lands, fetch the row by Auth0 sub

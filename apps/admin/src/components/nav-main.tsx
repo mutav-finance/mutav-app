@@ -22,6 +22,9 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
           {items.map((item) => {
+            // Root needs exact match — `startsWith("/")` would mark every
+            // route active. Children prefix-match so `/agencies/123` still
+            // highlights the `/agencies` item.
             const isActive =
               item.href === "/"
                 ? pathname === "/"

@@ -32,10 +32,17 @@ export default async function AdminLayout({
     redirect(`/auth/login?returnTo=/${locale}`);
   }
 
+  // Empty strings are valid Auth0 claim values (`name: ""`) and would slip
+  // past `??`, leaving the avatar to render "UNDEFINED" initials. `||` on
+  // a trimmed value falls through to the next fallback.
   const user = {
-    name: member.user.name ?? member.user.email ?? "Staff",
-    email: member.user.email ?? "",
-    avatar: member.user.picture ?? undefined,
+    name: member.user.name?.trim() || member.user.email?.trim() || "Staff",
+    email: member.user.email?.trim() || "",
+    // Intentionally omit `picture`. Staff sessions can return social-provider
+    // URLs (Gravatar, googleusercontent) that don't match the staff CSP
+    // `img-src` allowlist; rather than widening the allowlist on a high-
+    // privilege surface, render initials. Revisit when A1 provisions staff
+    // pictures from a controlled source.
   };
 
   return (

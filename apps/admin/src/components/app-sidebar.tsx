@@ -51,6 +51,9 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
+            {/* Brand block — non-interactive label, intentionally not a link.
+                Agency renders an AgencySwitcher here; staff have no analogous
+                workspace to switch between. */}
             <SidebarMenuButton size="lg" className="pointer-events-none">
               <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                 <ShieldCheckIcon className="size-4" />
