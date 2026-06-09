@@ -1141,6 +1141,7 @@
     },
     "treasury": {
       "label": "Coverage capital",
+      "previewBadge": "Preview",
       "unavailable": "Unavailable",
       "viewExplorer": "Verify myself on the Stellar network"
     },

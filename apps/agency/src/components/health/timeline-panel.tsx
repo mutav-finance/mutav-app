@@ -29,69 +29,11 @@ type Period = "m6" | "m12";
 type Props = { timeline: HealthTimeline | null };
 
 const PERIOD_VALUES = ["m6", "m12"] as const;
+const PERIOD_WEEKS: Record<Period, number> = { m6: 26, m12: 52 };
+
 function isPeriod(v: string): v is Period {
   return (PERIOD_VALUES as readonly string[]).includes(v);
 }
-
-// Mock weekly data (52 weeks back from 2026-06-09) — replace with real platform-wide
-// aggregates in production (issue #52)
-const ALL_WEEKLY_DATA = [
-  { week: "2025-06-04", activeContracts: 4, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-06-11", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2025-06-18", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2025-06-25", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-07-02", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2025-07-09", activeContracts: 5, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2025-07-16", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2025-07-23", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2025-07-30", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2025-08-06", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-08-13", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-08-20", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-08-27", activeContracts: 6, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-09-03", activeContracts: 7, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-09-10", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-09-17", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-09-24", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-10-01", activeContracts: 9, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-10-08", activeContracts: 10, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-10-15", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-10-22", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-10-29", activeContracts: 11, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-11-05", activeContracts: 10, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-11-12", activeContracts: 9, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-11-19", activeContracts: 8, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-11-26", activeContracts: 7, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-12-03", activeContracts: 6, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-12-10", activeContracts: 5, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-12-17", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2025-12-24", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2025-12-31", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 0 },
-  { week: "2026-01-07", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-01-14", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-01-21", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-01-28", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-02-04", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-02-11", activeContracts: 10, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-02-18", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-02-25", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-03-04", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-03-11", activeContracts: 8, cancelledContracts: 1, delinquentContracts: 1 },
-  { week: "2026-03-18", activeContracts: 10, cancelledContracts: 0, delinquentContracts: 2 },
-  { week: "2026-03-25", activeContracts: 9, cancelledContracts: 2, delinquentContracts: 1 },
-  { week: "2026-04-01", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-04-08", activeContracts: 5, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-04-15", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-04-22", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-04-29", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-05-06", activeContracts: 4, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-05-13", activeContracts: 3, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-05-20", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 1 },
-  { week: "2026-05-27", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 0 },
-  { week: "2026-06-03", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 1 },
-];
-
-const PERIOD_WEEKS: Record<Period, number> = { m6: 26, m12: 52 };
 
 export function TimelinePanel({ timeline }: Props) {
   const t = useTranslations("health.timeline");
@@ -123,7 +65,8 @@ export function TimelinePanel({ timeline }: Props) {
   );
 
   const chartData = React.useMemo(() => {
-    const slice = ALL_WEEKLY_DATA.slice(-PERIOD_WEEKS[period]);
+    if (!timeline) return [];
+    const slice = timeline.slice(-PERIOD_WEEKS[period]);
     return slice.reduce<
       {
         week: string;
@@ -134,9 +77,18 @@ export function TimelinePanel({ timeline }: Props) {
       }[]
     >((acc, entry) => {
       const prev = acc[acc.length - 1]?.cumulativeContracts ?? 0;
-      return [...acc, { ...entry, cumulativeContracts: prev + entry.activeContracts }];
+      return [
+        ...acc,
+        {
+          week: entry.weekStartISO,
+          activeContracts: entry.activeContracts,
+          cancelledContracts: entry.cancelledContracts,
+          delinquentContracts: entry.delinquentContracts,
+          cumulativeContracts: prev + entry.activeContracts,
+        },
+      ];
     }, []);
-  }, [period]);
+  }, [period, timeline]);
 
   return (
     <Card className="@container/card">

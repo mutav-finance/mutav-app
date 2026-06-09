@@ -13,7 +13,6 @@ async function fetchAgencies(token: string) {
   try {
     return await fetchQuery(api.agencies.useCases.listAgenciesForUser, {}, { token });
   } catch {
-    // Convex unavailable (dev server down, deploy in progress)
     return null;
   }
 }

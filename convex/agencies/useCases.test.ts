@@ -527,6 +527,28 @@ describe("saveBankingInfo (agency-scope wrapper)", () => {
   });
 });
 
+describe("bankingInfo.agency optional", () => {
+  test("accepts bankingInfo without the agency key", async () => {
+    const t = convexTest(schema);
+    const { asUser } = await setupAuthenticatedUser(t);
+
+    const start = await asUser.mutation(api.agencies.useCases.startOnboarding, autonomoArgs());
+    expect(start.success).toBe(true);
+    if (!start.success) return;
+
+    const result = await asUser.mutation(api.agencies.useCases.saveBankingInfo, {
+      agencyId: start.data.agencyId,
+      bankingInfo: {
+        bank: "Nubank",
+        account: "12345-6",
+        accountType: "corrente",
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
 describe("saveDocument", () => {
   test("replaces existing document of same kind — deletes old storage + row, inserts new", async () => {
     const t = convexTest(schema);

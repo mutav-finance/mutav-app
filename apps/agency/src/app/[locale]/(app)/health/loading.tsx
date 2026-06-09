@@ -11,14 +11,17 @@ export default async function HealthLoading() {
     <PageShell>
       <PageHeader title={t("heading")} subtitle={t("subheading")} />
       <PageContent variant="wide">
-        <div className="grid gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
-          ))}
-        </div>
-        <div className="grid gap-4 px-4 lg:px-6 @xl/main:grid-cols-2">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
+        <div className="flex flex-col gap-4 px-4 lg:px-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Skeleton className="h-36 rounded-xl" />
+            <Skeleton className="h-36 rounded-xl" />
+            <Skeleton className="h-36 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
+          </div>
+          <Skeleton className="h-[340px] w-full rounded-xl" />
         </div>
       </PageContent>
     </PageShell>

@@ -2,6 +2,7 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { ExternalLinkIcon, LinkIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { TreasurySnapshot } from "@convex/health/domain";
@@ -26,6 +27,9 @@ export function TreasuryPanel({ treasury, error }: Props) {
         <CardDescription className="flex items-center gap-1.5">
           <LinkIcon className="size-3.5" />
           {t("label")}
+          <Badge variant="outline" className="ml-1">
+            {t("previewBadge")}
+          </Badge>
         </CardDescription>
         <CardTitle className="text-2xl font-semibold tabular-nums">
           {loading ? (

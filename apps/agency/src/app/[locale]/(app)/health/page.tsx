@@ -32,9 +32,7 @@ export default async function HealthRoutePage() {
     ]);
     aggregates = preloadedQueryResult(preloadedAggregates);
     timeline = preloadedQueryResult(preloadedTimeline);
-  } catch {
-    // Convex health functions not deployed yet — render with null data
-  }
+  } catch {}
 
   return (
     <PageShell>

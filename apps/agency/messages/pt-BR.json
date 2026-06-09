@@ -1141,6 +1141,7 @@
     },
     "treasury": {
       "label": "Capital de cobertura",
+      "previewBadge": "Prévia",
       "unavailable": "Indisponível",
       "viewExplorer": "Checar eu mesmo na rede Stellar"
     },

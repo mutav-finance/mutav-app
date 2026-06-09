@@ -6,17 +6,14 @@ export type ContractAggregates = {
   maxCapacityCents: number;
 };
 
-export type TimelinePeriod = {
+export type TimelineWeek = {
+  weekStartISO: string;
   activeContracts: number;
   cancelledContracts: number;
   delinquentContracts: number;
 };
 
-export type HealthTimeline = {
-  d30: TimelinePeriod;
-  d60: TimelinePeriod;
-  d90: TimelinePeriod;
-};
+export type HealthTimeline = TimelineWeek[];
 
 export type TreasurySnapshot = {
   address: string;

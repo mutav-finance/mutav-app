@@ -93,8 +93,15 @@ export function getWaitlistAudienceId(audience: "investidor" | "imobiliaria"): s
  */
 export function getMaxGuaranteeCapacityCents(): number {
   const raw = process.env.MAX_GUARANTEE_CAPACITY_CENTS; // hook-ok: env module boundary
-  const parsed = raw ? parseInt(raw, 10) : NaN;
-  return isNaN(parsed) ? 500_000_000 : parsed;
+  if (!raw) return 500_000_000;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    console.warn(
+      `[env] MAX_GUARANTEE_CAPACITY_CENTS=${JSON.stringify(raw)} is not a positive integer; falling back to default`,
+    );
+    return 500_000_000;
+  }
+  return parsed;
 }
 
 export function getAppUrl(): string {

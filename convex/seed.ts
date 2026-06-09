@@ -1569,21 +1569,17 @@ export const seedFictional = internalMutation({
       },
     });
 
-    // ── Assign historical activatedAt dates ──────────────────────────────────
-    // Dates chosen so getTimeline (activatedAt-based) yields d30=3, d90=8, d180=15
-    // relative to 2026-06-09. d30 after 2026-05-10, d90 after 2026-03-11, d180 after 2025-12-12.
+    // Seeded contract dates spread across recent windows for transparency dashboard demo data
     const activationMap: Record<string, string> = {
-      // Older — before d180 window, not counted in timeline
       [pid(1)]: "2025-06-03",
       [pid(2)]: "2025-07-08",
       [pid(3)]: "2025-08-12",
       [pid(4)]: "2025-09-05",
-      [pid(15)]: "2024-08-01", // encerrado — was once ativo
+      [pid(15)]: "2024-08-01",
       [pid(16)]: "2025-06-15",
       [pid(17)]: "2025-07-22",
-      [pid(26)]: "2024-06-15", // encerrado
+      [pid(26)]: "2024-06-15",
       [pid(28)]: "2025-08-01",
-      // d180 window (2025-12-12 → 2026-03-10) — 7 contracts
       [pid(20)]: "2025-12-15",
       [pid(7)]: "2025-12-28",
       [pid(6)]: "2026-01-10",
@@ -1591,13 +1587,11 @@ export const seedFictional = internalMutation({
       [pid(29)]: "2026-02-05",
       [pid(5)]: "2026-02-22",
       [pid(18)]: "2026-03-05",
-      // d90 window (2026-03-11 → 2026-05-09) — 5 contracts
       [pid(11)]: "2026-03-15",
       [pid(10)]: "2026-03-25",
       [pid(21)]: "2026-04-02",
       [pid(9)]: "2026-04-18",
       [pid(8)]: "2026-05-05",
-      // d30 window (after 2026-05-10) — 3 contracts
       [pid(12)]: "2026-05-15",
       [pid(23)]: "2026-05-22",
       [pid(22)]: "2026-06-03",

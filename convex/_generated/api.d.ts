@@ -10,6 +10,7 @@
 
 import type * as agencies_adminUseCases from "../agencies/adminUseCases.js";
 import type * as agencies_domain from "../agencies/domain.js";
+import type * as agencies_migrations from "../agencies/migrations.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
 import type * as anchors_accountDomain from "../anchors/accountDomain.js";
 import type * as anchors_accountUseCases from "../anchors/accountUseCases.js";
@@ -28,8 +29,6 @@ import type * as audit_merkle from "../audit/merkle.js";
 import type * as audit_useCases from "../audit/useCases.js";
 import type * as contracts_actions from "../contracts/actions.js";
 import type * as contracts_aggregate from "../contracts/aggregate.js";
-import type * as contracts_creditProviders from "../contracts/creditProviders.js";
-import type * as contracts_scoreProviders from "../contracts/scoreProviders.js";
 import type * as contracts_backfill from "../contracts/backfill.js";
 import type * as contracts_creditProviders from "../contracts/creditProviders.js";
 import type * as contracts_domain from "../contracts/domain.js";
@@ -73,6 +72,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "agencies/adminUseCases": typeof agencies_adminUseCases;
   "agencies/domain": typeof agencies_domain;
+  "agencies/migrations": typeof agencies_migrations;
   "agencies/useCases": typeof agencies_useCases;
   "anchors/accountDomain": typeof anchors_accountDomain;
   "anchors/accountUseCases": typeof anchors_accountUseCases;
@@ -91,8 +91,6 @@ declare const fullApi: ApiFromModules<{
   "audit/useCases": typeof audit_useCases;
   "contracts/actions": typeof contracts_actions;
   "contracts/aggregate": typeof contracts_aggregate;
-  "contracts/creditProviders": typeof contracts_creditProviders;
-  "contracts/scoreProviders": typeof contracts_scoreProviders;
   "contracts/backfill": typeof contracts_backfill;
   "contracts/creditProviders": typeof contracts_creditProviders;
   "contracts/domain": typeof contracts_domain;
