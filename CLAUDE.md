@@ -114,20 +114,8 @@ When the in-repo docs and skills aren't enough, consult:
 ## Stack
 
 - Next.js 16 (App Router, src/ directory)
-- Tailwind CSS 4
+- Tailwind CSS 4 — workspace packages need `@source` (see [Tailwind 4 + workspace packages](#tailwind-4--workspace-packages))
 - shadcn/ui (radix-nova style, neutral base color, TGA tokens in `src/app/globals.css`)
-
-> **Tailwind 4 + workspace packages** — Tailwind 4 only scans the consuming
-> project for class names. Any workspace package whose source uses Tailwind
-> utilities (e.g. `@mutav/ui`) must be declared with an explicit
-> `@source "../../../../packages/<pkg>/src"` in the consuming app's
-> `globals.css`, otherwise utilities used only inside the package are silently
-> dropped from the bundle (the class compiles to nothing → the element
-> renders with no width/height/etc.). When adding a new workspace package
-> with Tailwind classes, add the `@source` line at the same time. When
-> adding a class that exists only inside `@mutav/ui` to a primitive, confirm
-> that path is already in `@source`.
-
 - Convex — backend (functions in convex/)
 - Railway — deployment
 
@@ -339,6 +327,16 @@ import { api } from "@/convex/_generated/api";
 Zero tolerance: never use `any`, `as Type`, `!` (non-null assertion), `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`. Use generics, type guards, `unknown` + Zod, discriminated unions, `?.`, `??`. **Boundary exception:** assertions at serialization edges (route params, external API responses, Convex deserialization) are acceptable when tagged inline with `// hook-ok: <reason>` (e.g. `// hook-ok: route param validated by loader`). The PreToolUse `code-quality` hook surfaces every other case as an advisory.
 
 `as const` (narrowing) is allowed and encouraged for value objects — distinct from `as Type` (cast).
+
+### Tailwind 4 + workspace packages
+
+Tailwind 4 only scans the consuming project for class names. A utility used **only** inside a transpiled workspace package (e.g. `@mutav/ui`) silently compiles to nothing in the consumer's bundle — the element renders unstyled (no width/height/color/etc.). Each consuming app's `globals.css` must declare the package source explicitly:
+
+```css
+@source "../../../../packages/ui/src";
+```
+
+`apps/agency/src/app/globals.css` already has this. `apps/admin`, `apps/fund`, `apps/pay` do not — add the line the moment any of them renders a primitive whose class set isn't already covered by app code. Same rule for any new workspace package with Tailwind classes.
 
 ### Environment variables
 
