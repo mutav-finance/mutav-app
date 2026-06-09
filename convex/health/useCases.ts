@@ -1,8 +1,8 @@
-import { query } from "../_generated/server";
+import { queryWithAuth } from "../lib/auth";
 import { getMaxGuaranteeCapacityCents } from "../lib/env";
 import type { ContractAggregates, HealthTimeline } from "./domain";
 
-export const getContractAggregates = query({
+export const getContractAggregates = queryWithAuth({
   args: {},
   handler: async (): Promise<ContractAggregates> => {
     // Mock platform-wide aggregates — replace with real queries in issue #52
@@ -16,7 +16,7 @@ export const getContractAggregates = query({
   },
 });
 
-export const getTimeline = query({
+export const getTimeline = queryWithAuth({
   args: {},
   handler: async (): Promise<HealthTimeline> => {
     // Mock counts — replace with real platform-wide aggregates in production (issue #52)
