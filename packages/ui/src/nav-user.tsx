@@ -1,6 +1,7 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@mutav/ui/cn";
+import { Avatar, AvatarFallback, AvatarImage } from "@mutav/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,13 +15,8 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar";
+} from "@mutav/ui/dropdown-menu";
+import { useIsMobile } from "@mutav/ui/use-mobile";
 import {
   EllipsisVerticalIcon,
   CircleUserRoundIcon,
@@ -41,16 +37,31 @@ const LOCALE_LABELS: Record<(typeof routing.locales)[number], string> = {
   en: "English",
 };
 
-export function NavUser({
-  user,
-}: {
+// Reproduces the visual contract of <SidebarMenuButton size="lg" /> so this
+// component can live in @mutav/ui without depending on each app's local
+// sidebar.tsx. The class string mirrors `sidebarMenuButtonVariants({ size: "lg" })`
+// + the `data-[state=open]:bg-sidebar-accent ...` open-state hint the trigger
+// uses. The `group-data-[collapsible=icon]:*` selectors target the ancestor
+// `<Sidebar>` wrapper, so the icon-collapsed treatment still works.
+const TRIGGER_CLASS =
+  "peer/menu-button group/menu-button ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:font-medium [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate h-12 group-data-[collapsible=icon]:p-0!";
+
+export type NavUserProps = {
   user: {
     name: string;
     email: string;
     avatar?: string;
   };
-}) {
-  const { isMobile } = useSidebar();
+  /**
+   * URL the log-out item navigates to. Defaults to `/auth/logout` (Auth0 SDK
+   * convention). The link is a plain `<a>` so the proxy middleware clears
+   * the session cookie — client-side routing would skip it.
+   */
+  logoutHref?: string;
+};
+
+export function NavUser({ user, logoutHref = "/auth/logout" }: NavUserProps) {
+  const isMobile = useIsMobile();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const ThemeTriggerIcon = resolvedTheme === "dark" ? MoonIcon : SunIcon;
   const locale = useLocale();
@@ -61,32 +72,39 @@ export function NavUser({
     router.replace(pathname, { locale: next as (typeof routing.locales)[number] });
   };
 
+  const initials = user.name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
+    <ul data-slot="sidebar-menu" data-sidebar="menu" className="flex w-full min-w-0 flex-col gap-0">
+      <li
+        data-slot="sidebar-menu-item"
+        data-sidebar="menu-item"
+        className="group/menu-item relative"
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            <button
+              type="button"
+              data-slot="sidebar-menu-button"
+              data-sidebar="menu-button"
+              data-size="lg"
+              className={cn(TRIGGER_CLASS)}
             >
               <Avatar>
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback>
-                  {user.name
-                    .split(" ")
-                    .slice(0, 2)
-                    .map((w) => w[0])
-                    .join("")
-                    .toUpperCase()}
-                </AvatarFallback>
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
                 <span className="text-muted-foreground truncate text-xs">{user.email}</span>
               </div>
               <EllipsisVerticalIcon className="ml-auto size-4" />
-            </SidebarMenuButton>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
@@ -98,14 +116,7 @@ export function NavUser({
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar>
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback>
-                    {user.name
-                      .split(" ")
-                      .slice(0, 2)
-                      .map((w) => w[0])
-                      .join("")
-                      .toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
@@ -164,21 +175,14 @@ export function NavUser({
             </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              {/*
-               * Auth0 SDK mounts /auth/logout at the root, not under [locale],
-               * and needs a real navigation so the proxy middleware clears the
-               * session cookie. next/link's client routing would skip the
-               * middleware — keep the plain <a>.
-               */}
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a href="/auth/logout">
+              <a href={logoutHref}>
                 <LogOutIcon />
                 {t("logOut")}
               </a>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+      </li>
+    </ul>
   );
 }

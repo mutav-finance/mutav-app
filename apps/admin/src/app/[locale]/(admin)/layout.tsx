@@ -1,26 +1,21 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SiteHeader } from "@/components/site-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { ThemeProvider } from "@/providers/theme";
 import { getStaffMember } from "@/lib/auth";
 
 /**
- * `(admin)` route-group layout — the staff gate.
+ * `(admin)` route-group layout — the staff gate + shell.
  *
- * Server-side check via `getStaffMember()` (which reads the Auth0
- * session). No session → redirect to Auth0 Universal Login, with
- * `returnTo` pointing back at admin so the user lands here after
- * authentication.
+ * Server-side auth check via `getStaffMember()` (reads the Auth0 session).
+ * No session → redirect to Auth0 Universal Login with `returnTo` pointing
+ * back at admin so the user lands here after authentication.
  *
- * **Stub posture**: when `getStaffMember()` evolves (A1 milestone) to
- * also assert a `mutavStaff` Convex row keyed off the Auth0 `sub`
- * claim, signed-in-but-not-staff users will hit a different branch
- * (403 page or "request access" affordance). For now, any authenticated
- * Auth0 user is allowed in — the connection itself (`mutavStaff` with
- * mandatory MFA + IP allowlist + disabled self-signup, spec § Section 7)
- * is the first defense.
- *
- * The full chrome (sidebar, header, shell-switcher) for the staff shell
- * lands with A1 per `docs/architecture/admin.md`. This layout deliberately
- * stays bare — it owns the auth gate and a skip-link, nothing else.
+ * **A1 stub posture**: `getStaffMember()` still allows any authenticated
+ * Auth0 user — once the `mutavStaff` Convex domain lands, signed-in-but-
+ * not-staff users will hit a 403 / request-access branch instead.
  */
 export default async function AdminLayout({
   children,
@@ -34,22 +29,41 @@ export default async function AdminLayout({
 
   const member = await getStaffMember();
   if (!member) {
-    // Auth0 SDK middleware mounts `/auth/login` at the root, outside
-    // `[locale]`. `returnTo` brings the user back to the locale root
-    // after Universal Login — admin.mutav.finance's root path IS the
-    // staff landing (the entire origin is the admin shell, so there's
-    // no `/admin` subpath to navigate to).
     redirect(`/auth/login?returnTo=/${locale}`);
   }
 
+  const user = {
+    name: member.user.name ?? member.user.email ?? "Staff",
+    email: member.user.email ?? "",
+    avatar: member.user.picture ?? undefined,
+  };
+
   return (
-    <div className="bg-canvas flex h-full flex-col overflow-y-auto">
-      <a href="#main-content" className="skip-link">
-        {tA11y("skipToMain")}
-      </a>
-      <main id="main-content" data-front="mutav-staff" className="flex flex-1 flex-col">
-        {children}
-      </main>
-    </div>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+      <SidebarProvider
+        className="h-svh overflow-hidden"
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
+        <a href="#main-content" className="skip-link">
+          {tA11y("skipToMain")}
+        </a>
+        <AppSidebar variant="inset" user={user} />
+        <SidebarInset className="min-h-0">
+          <SiteHeader />
+          <main
+            id="main-content"
+            data-front="mutav-staff"
+            className="@container/main flex min-h-0 flex-1 flex-col overflow-y-auto"
+          >
+            {children}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </ThemeProvider>
   );
 }

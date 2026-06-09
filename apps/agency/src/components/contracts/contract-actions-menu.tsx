@@ -10,7 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@mutav/ui/dropdown-menu";
 
 export function ContractActionsMenu() {
   const t = useTranslations("contractDetails.rentalData");

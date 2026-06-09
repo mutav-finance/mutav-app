@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { NavCadastros } from "@/components/nav-cadastros";
 import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
+import { NavUser } from "@mutav/ui/nav-user";
 import { NavAgency } from "@/components/nav-agency";
 import { AgencySwitcher } from "@/components/agency-switcher";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
