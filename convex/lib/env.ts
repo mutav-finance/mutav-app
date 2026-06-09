@@ -86,6 +86,16 @@ export function getWaitlistAudienceId(audience: "investidor" | "imobiliaria"): s
   return process.env[key] ?? null;
 }
 
+/**
+ * Maximum aggregate guarantee the Mutav treasury can underwrite (in centavos).
+ * Defaults to R$ 5.000.000 for dev/preview. Production should set this via
+ * `bunx convex env set MAX_GUARANTEE_CAPACITY_CENTS <value>`.
+ */
+export function getMaxGuaranteeCapacityCents(): number {
+  const raw = process.env.MAX_GUARANTEE_CAPACITY_CENTS; // hook-ok: env module boundary
+  return raw ? parseInt(raw, 10) : 500_000_000;
+}
+
 export function getAppUrl(): string {
   const url = process.env.APP_URL;
   if (!url) throw new Error("APP_URL is not set");

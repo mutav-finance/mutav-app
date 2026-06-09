@@ -113,7 +113,8 @@
       "dashboard": "Painel",
       "contracts": "Contratos",
       "payments": "Faturas",
-      "delinquencies": "Inadimplências"
+      "delinquencies": "Inadimplências",
+      "health": "Mutav Health"
     },
     "cadastros": {
       "groupLabel": "Cadastros",
@@ -1118,6 +1119,37 @@
         "representanteName": "Nome do responsável obrigatório.",
         "representanteCpf": "CPF do responsável inválido."
       }
+    }
+  },
+  "health": {
+    "meta": {
+      "title": "Mutav Health — Transparência",
+      "description": "Posição de risco e treasury onchain da Mutav."
+    },
+    "heading": "Mutav Health",
+    "subheading": "Transparência da posição de risco e treasury onchain.",
+    "footer": "Dados de contratos atualizados em tempo real via Convex. Saldo treasury consultado diretamente na rede Stellar.",
+    "contracts": {
+      "ativo": "Contratos ativos",
+      "pendente": "Em análise",
+      "defaultRate": "Taxa de inadimplência"
+    },
+    "capacity": {
+      "label": "Headroom disponível",
+      "used": "{pct}% utilizado",
+      "of": "de {total}"
+    },
+    "treasury": {
+      "label": "Treasury onchain",
+      "unavailable": "Indisponível",
+      "viewExplorer": "Ver no Stellar Expert"
+    },
+    "timeline": {
+      "label": "Novos contratos",
+      "d30": "30d",
+      "d90": "90d",
+      "d180": "180d",
+      "description": "Contratos criados no período selecionado."
     }
   }
 }

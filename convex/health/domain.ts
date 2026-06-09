@@ -1,0 +1,23 @@
+export type ContractAggregates = {
+  countAtivos: number;
+  countPendentes: number;
+  sumInsuredCents: number;
+  defaultRate: number;
+  maxCapacityCents: number;
+};
+
+export type TimelinePeriod = {
+  newContracts: number;
+};
+
+export type HealthTimeline = {
+  d30: TimelinePeriod;
+  d90: TimelinePeriod;
+  d180: TimelinePeriod;
+};
+
+export type TreasurySnapshot = {
+  address: string;
+  xlmBalance: number;
+  explorerUrl: string;
+};
