@@ -7,7 +7,9 @@ export type ContractAggregates = {
 };
 
 export type TimelinePeriod = {
-  newContracts: number;
+  activeContracts: number;
+  cancelledContracts: number;
+  delinquentContracts: number;
 };
 
 export type HealthTimeline = {

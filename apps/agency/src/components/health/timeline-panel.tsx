@@ -25,43 +25,91 @@ import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { HealthTimeline } from "@convex/health/domain";
 
-type Period = "d30" | "d60" | "d90";
+type Period = "m6" | "m12";
 type Props = { timeline: HealthTimeline | null };
 
-const PERIOD_VALUES = ["d30", "d60", "d90"] as const;
+const PERIOD_VALUES = ["m6", "m12"] as const;
 function isPeriod(v: string): v is Period {
   return (PERIOD_VALUES as readonly string[]).includes(v);
 }
 
-// Mock weekly data (13 weeks back from 2026-06-09) — replace with real platform-wide
+// Mock weekly data (52 weeks back from 2026-06-09) — replace with real platform-wide
 // aggregates in production (issue #52)
 const ALL_WEEKLY_DATA = [
-  { week: "2026-03-11", newContracts: 8 },
-  { week: "2026-03-18", newContracts: 10 },
-  { week: "2026-03-25", newContracts: 9 },
-  { week: "2026-04-01", newContracts: 7 },
-  { week: "2026-04-08", newContracts: 5 },
-  { week: "2026-04-15", newContracts: 5 },
-  { week: "2026-04-22", newContracts: 6 },
-  { week: "2026-04-29", newContracts: 4 },
-  { week: "2026-05-06", newContracts: 4 },
-  { week: "2026-05-13", newContracts: 3 },
-  { week: "2026-05-20", newContracts: 3 },
-  { week: "2026-05-27", newContracts: 4 },
-  { week: "2026-06-03", newContracts: 3 },
+  { week: "2025-06-04", activeContracts: 4, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-06-11", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2025-06-18", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2025-06-25", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-07-02", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2025-07-09", activeContracts: 5, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2025-07-16", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2025-07-23", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2025-07-30", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2025-08-06", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-08-13", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-08-20", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-08-27", activeContracts: 6, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-09-03", activeContracts: 7, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-09-10", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-09-17", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-09-24", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-10-01", activeContracts: 9, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-10-08", activeContracts: 10, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-10-15", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-10-22", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-10-29", activeContracts: 11, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-11-05", activeContracts: 10, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-11-12", activeContracts: 9, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-11-19", activeContracts: 8, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-11-26", activeContracts: 7, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-12-03", activeContracts: 6, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-12-10", activeContracts: 5, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-12-17", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2025-12-24", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2025-12-31", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 0 },
+  { week: "2026-01-07", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-01-14", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-01-21", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-01-28", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-02-04", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-02-11", activeContracts: 10, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-02-18", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-02-25", activeContracts: 8, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-03-04", activeContracts: 9, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-03-11", activeContracts: 8, cancelledContracts: 1, delinquentContracts: 1 },
+  { week: "2026-03-18", activeContracts: 10, cancelledContracts: 0, delinquentContracts: 2 },
+  { week: "2026-03-25", activeContracts: 9, cancelledContracts: 2, delinquentContracts: 1 },
+  { week: "2026-04-01", activeContracts: 7, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-04-08", activeContracts: 5, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-04-15", activeContracts: 5, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-04-22", activeContracts: 6, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-04-29", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-05-06", activeContracts: 4, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-05-13", activeContracts: 3, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-05-20", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 1 },
+  { week: "2026-05-27", activeContracts: 4, cancelledContracts: 1, delinquentContracts: 0 },
+  { week: "2026-06-03", activeContracts: 3, cancelledContracts: 0, delinquentContracts: 1 },
 ];
 
-const PERIOD_WEEKS: Record<Period, number> = { d30: 4, d60: 8, d90: 13 };
+const PERIOD_WEEKS: Record<Period, number> = { m6: 26, m12: 52 };
 
 export function TimelinePanel({ timeline }: Props) {
   const t = useTranslations("health.timeline");
   const locale = useLocale();
-  const [period, setPeriod] = React.useState<Period>("d30");
+  const [period, setPeriod] = React.useState<Period>("m6");
 
   const chartConfig: ChartConfig = {
-    newContracts: {
-      label: t("seriesNew"),
-      color: "var(--color-chart-3)",
+    activeContracts: {
+      label: t("seriesActive"),
+      color: "var(--color-emerald-500)",
+    },
+    cancelledContracts: {
+      label: t("seriesCancelled"),
+      color: "var(--color-stone-400)",
+    },
+    delinquentContracts: {
+      label: t("seriesDelinquent"),
+      color: "var(--color-red-500)",
     },
     cumulativeContracts: {
       label: t("seriesCumulative"),
@@ -76,13 +124,18 @@ export function TimelinePanel({ timeline }: Props) {
 
   const chartData = React.useMemo(() => {
     const slice = ALL_WEEKLY_DATA.slice(-PERIOD_WEEKS[period]);
-    return slice.reduce<{ week: string; newContracts: number; cumulativeContracts: number }[]>(
-      (acc, entry) => {
-        const prev = acc[acc.length - 1]?.cumulativeContracts ?? 0;
-        return [...acc, { ...entry, cumulativeContracts: prev + entry.newContracts }];
-      },
-      [],
-    );
+    return slice.reduce<
+      {
+        week: string;
+        activeContracts: number;
+        cancelledContracts: number;
+        delinquentContracts: number;
+        cumulativeContracts: number;
+      }[]
+    >((acc, entry) => {
+      const prev = acc[acc.length - 1]?.cumulativeContracts ?? 0;
+      return [...acc, { ...entry, cumulativeContracts: prev + entry.activeContracts }];
+    }, []);
   }, [period]);
 
   return (
@@ -104,22 +157,16 @@ export function TimelinePanel({ timeline }: Props) {
             className="*:data-[slot=toggle-group-item]:px-4!"
           >
             <ToggleGroupItem
-              value="d30"
-              className="data-[state=on]:border-amber-500 data-[state=on]:bg-amber-500 data-[state=on]:text-white"
+              value="m6"
+              className="data-[state=on]:border-amber-500 data-[state=on]:text-amber-600"
             >
-              {t("d30")}
+              {t("m6")}
             </ToggleGroupItem>
             <ToggleGroupItem
-              value="d60"
-              className="data-[state=on]:border-amber-500 data-[state=on]:bg-amber-500 data-[state=on]:text-white"
+              value="m12"
+              className="data-[state=on]:border-amber-500 data-[state=on]:text-amber-600"
             >
-              {t("d60")}
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="d90"
-              className="data-[state=on]:border-amber-500 data-[state=on]:bg-amber-500 data-[state=on]:text-white"
-            >
-              {t("d90")}
+              {t("m12")}
             </ToggleGroupItem>
           </ToggleGroup>
         </CardAction>
@@ -148,14 +195,7 @@ export function TimelinePanel({ timeline }: Props) {
                 return weekFormatter.format(new Date(Number(year), Number(month) - 1, Number(day)));
               }}
             />
-            <YAxis
-              yAxisId="bars"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              allowDecimals={false}
-              width={24}
-            />
+            <YAxis yAxisId="bars" hide />
             <YAxis
               yAxisId="area"
               orientation="right"
@@ -182,8 +222,20 @@ export function TimelinePanel({ timeline }: Props) {
             />
             <Bar
               yAxisId="bars"
-              dataKey="newContracts"
-              fill="var(--color-newContracts)"
+              dataKey="activeContracts"
+              fill="var(--color-emerald-500)"
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              yAxisId="bars"
+              dataKey="cancelledContracts"
+              fill="var(--color-stone-400)"
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              yAxisId="bars"
+              dataKey="delinquentContracts"
+              fill="var(--color-red-500)"
               radius={[3, 3, 0, 0]}
             />
             <Area

@@ -21,9 +21,9 @@ export const getTimeline = queryWithAuth({
   handler: async (): Promise<HealthTimeline> => {
     // Mock counts — replace with real platform-wide aggregates in production (issue #52)
     return {
-      d30: { newContracts: 12 },
-      d60: { newContracts: 32 },
-      d90: { newContracts: 69 },
+      d30: { activeContracts: 12, cancelledContracts: 2, delinquentContracts: 1 },
+      d60: { activeContracts: 32, cancelledContracts: 5, delinquentContracts: 3 },
+      d90: { activeContracts: 69, cancelledContracts: 9, delinquentContracts: 6 },
     };
   },
 });

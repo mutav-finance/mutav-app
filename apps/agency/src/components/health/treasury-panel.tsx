@@ -52,7 +52,7 @@ export function TreasuryPanel({ treasury, error }: Props) {
               {truncateAddress(treasury.address)}
             </span>
             <a
-              href={treasury.explorerUrl}
+              href="https://stellar.expert/explorer/testnet/contract/CAJTKYOPDRWCQJGPUQNKD6KJ6LK6XMSHY2QLIKVR44L4KUFXXZ46WAJR?filter=interface"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary flex items-center gap-1 text-xs font-medium hover:underline"

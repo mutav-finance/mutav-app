@@ -7,6 +7,7 @@ import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { HealthPage } from "@/components/health/health-page";
+import { getAuthToken } from "@/lib/auth-token";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -24,9 +25,10 @@ export default async function HealthRoutePage() {
   let timeline: HealthTimeline | null = null;
 
   try {
+    const token = (await getAuthToken()) ?? undefined;
     [preloadedAggregates, preloadedTimeline] = await Promise.all([
-      preloadQuery(api.health.useCases.getContractAggregates, {}),
-      preloadQuery(api.health.useCases.getTimeline, {}),
+      preloadQuery(api.health.useCases.getContractAggregates, {}, { token }),
+      preloadQuery(api.health.useCases.getTimeline, {}, { token }),
     ]);
     aggregates = preloadedQueryResult(preloadedAggregates);
     timeline = preloadedQueryResult(preloadedTimeline);

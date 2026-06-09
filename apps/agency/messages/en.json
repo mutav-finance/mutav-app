@@ -114,7 +114,7 @@
       "contracts": "Contracts",
       "payments": "Invoices",
       "delinquencies": "Delinquencies",
-      "health": "Mutav Health"
+      "health": "Transparency"
     },
     "cadastros": {
       "groupLabel": "Registries",
@@ -1123,10 +1123,10 @@
   },
   "health": {
     "meta": {
-      "title": "Mutav Health — Transparency",
+      "title": "Transparency",
       "description": "Mutav risk position and onchain treasury."
     },
-    "heading": "Mutav Health",
+    "heading": "Transparency",
     "subheading": "Risk position transparency and onchain treasury.",
     "footer": "Contract data updated in real time.",
     "contracts": {
@@ -1135,22 +1135,23 @@
       "defaultRate": "Default rate"
     },
     "capacity": {
-      "label": "Fund utilization",
+      "label": "Capital utilization",
       "used": "{pct}% utilized",
       "of": "of {total}"
     },
     "treasury": {
-      "label": "Coverage fund",
+      "label": "Coverage capital",
       "unavailable": "Unavailable",
       "viewExplorer": "Verify myself on the Stellar network"
     },
     "timeline": {
-      "label": "New contracts",
-      "d30": "30d",
-      "d60": "60d",
-      "d90": "90d",
-      "description": "Contracts created in the selected period.",
-      "seriesNew": "New",
+      "label": "Contracts per week",
+      "m6": "Last 6 months",
+      "m12": "Last 12 months",
+      "description": "Weekly contract breakdown for the selected period.",
+      "seriesActive": "New",
+      "seriesCancelled": "Cancelled",
+      "seriesDelinquent": "Delinquent",
       "seriesCumulative": "Cumulative"
     }
   }
