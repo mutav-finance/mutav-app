@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@mutav/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -73,25 +74,26 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
         {/* 1. Tipo de pessoa */}
         <div className="flex flex-col gap-2">
           <Label>{t("step1.entityTypeLabel")}</Label>
-          <div className="flex gap-2">
-            {(["pf", "pj"] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() =>
-                  onChange({ entityType: type, cpf: "", cnpj: "", score: null, scoreTier: null })
-                }
-                className={cn(
-                  "flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                  data.entityType === type
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-input hover:bg-accent",
-                )}
-              >
-                {type === "pf" ? t("step1.pf") : t("step1.pj")}
-              </button>
-            ))}
-          </div>
+          <ToggleGroup
+            type="single"
+            value={data.entityType}
+            onValueChange={(v) => {
+              if (!v) return;
+              onChange({
+                entityType: v as "pf" | "pj",
+                cpf: "",
+                cnpj: "",
+                score: null,
+                scoreTier: null,
+              });
+            }}
+            variant="outline"
+            spacing={2}
+            className="w-full *:data-[slot=toggle-group-item]:flex-1"
+          >
+            <ToggleGroupItem value="pf">{t("step1.pf")}</ToggleGroupItem>
+            <ToggleGroupItem value="pj">{t("step1.pj")}</ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         {/* 2. CPF / CNPJ — sempre visível, troca conforme seleção */}
@@ -140,23 +142,20 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
         {/* 3. Tipo de imóvel */}
         <div className="flex flex-col gap-2">
           <Label>{t("property.kindLabel")}</Label>
-          <div className="flex gap-2">
-            {(["residencial", "comercial"] as const).map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                onClick={() => onChange({ propertyKind: kind })}
-                className={cn(
-                  "flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                  data.propertyKind === kind
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-input hover:bg-accent",
-                )}
-              >
-                {kind === "residencial" ? t("property.residencial") : t("property.comercial")}
-              </button>
-            ))}
-          </div>
+          <ToggleGroup
+            type="single"
+            value={data.propertyKind ?? ""}
+            onValueChange={(v) => {
+              if (!v) return;
+              onChange({ propertyKind: v as "residencial" | "comercial" });
+            }}
+            variant="outline"
+            spacing={2}
+            className="w-full *:data-[slot=toggle-group-item]:flex-1"
+          >
+            <ToggleGroupItem value="residencial">{t("property.residencial")}</ToggleGroupItem>
+            <ToggleGroupItem value="comercial">{t("property.comercial")}</ToggleGroupItem>
+          </ToggleGroup>
           {errors.propertyKind && <p className="text-destructive text-xs">{errors.propertyKind}</p>}
         </div>
 

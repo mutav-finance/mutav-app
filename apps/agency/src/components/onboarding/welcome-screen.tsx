@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
-import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { useWelcomeScreen } from "@/components/onboarding/use-welcome-screen";
 
 export function WelcomeScreen() {
@@ -32,35 +32,29 @@ export function WelcomeScreen() {
       )}
 
       {/* Seleção de tipo */}
-      <div className="mb-8 grid grid-cols-2 gap-3">
-        {(["autonomo", "empresa"] as const).map((type) => (
-          <button
-            key={type}
-            type="button"
-            aria-pressed={vm.selectedType === type}
-            onClick={() => vm.selectType(type)}
-            className={cn(
-              "cursor-pointer border px-4 py-4 text-sm font-medium transition-colors",
-              vm.selectedType === type
-                ? "border-accent bg-accent/5 text-accent"
-                : "border-text-3 bg-surface text-text hover:border-accent hover:bg-accent/5 hover:text-accent",
-            )}
-          >
-            {type === "autonomo" ? t("autonomo.title") : t("empresa.title")}
-          </button>
-        ))}
-      </div>
+      <ToggleGroup
+        type="single"
+        value={vm.selectedType ?? ""}
+        onValueChange={(v) => {
+          if (!v) return;
+          vm.selectType(v as "autonomo" | "empresa");
+        }}
+        variant="outline"
+        spacing={3}
+        className="mb-8 grid w-full grid-cols-2 *:data-[slot=toggle-group-item]:h-auto *:data-[slot=toggle-group-item]:py-4"
+      >
+        <ToggleGroupItem value="autonomo">{t("autonomo.title")}</ToggleGroupItem>
+        <ToggleGroupItem value="empresa">{t("empresa.title")}</ToggleGroupItem>
+      </ToggleGroup>
 
       {/* CTA */}
       <div className="flex flex-col items-end gap-3">
         {vm.selectedType ? (
-          <Button asChild size="sm" className="px-6">
+          <Button asChild>
             <Link href={`/onboarding/agency?type=${vm.selectedType}`}>{t("ctaButton")}</Link>
           </Button>
         ) : (
-          <Button size="sm" className="px-6" disabled>
-            {t("ctaButton")}
-          </Button>
+          <Button disabled>{t("ctaButton")}</Button>
         )}
         <span className="text-text-3 flex items-center gap-2 text-xs">
           <span aria-hidden>⏱</span>

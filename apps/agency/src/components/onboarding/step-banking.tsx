@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@mutav/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -118,29 +119,24 @@ export function StepBanking({
           <span id={accountTypeLabelId} className="text-sm font-medium">
             {t("accountTypeLabel")}
           </span>
-          <div role="group" aria-labelledby={accountTypeLabelId} className="grid grid-cols-2 gap-2">
-            {BANK_ACCOUNT_TYPE.map((type) => (
-              <button
-                key={type}
-                type="button"
-                aria-pressed={accountType === type}
-                onClick={() =>
-                  setValue("bankAccountType", type, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-                className={cn(
-                  "border px-4 py-2 text-sm font-medium transition-colors",
-                  accountType === type
-                    ? "border-accent bg-accent/5 text-accent"
-                    : "border-border text-text-2 hover:border-text-3 hover:text-text",
-                )}
-              >
-                {type === "corrente" ? t("accountTypeCorrente") : t("accountTypePoupanca")}
-              </button>
-            ))}
-          </div>
+          <ToggleGroup
+            type="single"
+            value={accountType || ""}
+            onValueChange={(v) => {
+              if (!v) return;
+              setValue("bankAccountType", v as (typeof BANK_ACCOUNT_TYPE)[number], {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+            }}
+            aria-labelledby={accountTypeLabelId}
+            variant="outline"
+            spacing={2}
+            className="grid w-full grid-cols-2"
+          >
+            <ToggleGroupItem value="corrente">{t("accountTypeCorrente")}</ToggleGroupItem>
+            <ToggleGroupItem value="poupanca">{t("accountTypePoupanca")}</ToggleGroupItem>
+          </ToggleGroup>
           {fieldError("bankAccountType") && (
             <p className="text-error text-xs" role="alert">
               {fieldError("bankAccountType")}

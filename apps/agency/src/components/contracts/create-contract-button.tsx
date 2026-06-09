@@ -6,7 +6,7 @@ import { Link } from "@mutav/i18n/navigation";
 
 export function CreateContractButton({ label }: { label: string }) {
   return (
-    <Button asChild size="sm">
+    <Button asChild>
       <Link href="/contracts/new">
         <PlusIcon data-icon="inline-start" />
         {label}

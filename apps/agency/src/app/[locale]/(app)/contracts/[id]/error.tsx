@@ -34,11 +34,7 @@ export default function ContractError({
             )}
             <div className="flex flex-wrap gap-2">
               <Button onClick={reset}>{t("retry")}</Button>
-              <Button
-                variant="outline"
-                asChild
-                className="border-primary text-primary hover:bg-accent-dim hover:text-primary bg-transparent"
-              >
+              <Button variant="outline-primary" asChild>
                 <Link href="/contracts">{t("backToContracts")}</Link>
               </Button>
             </div>

@@ -30,29 +30,36 @@ function generatePublicId(): string {
 export const getByPublicId = query({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
-    const contract = await ctx.db
+    // `.collect()` instead of `.unique()` because `publicId` carries no
+    // DB-level uniqueness constraint — seed re-runs across multiple
+    // agencies can produce collisions (e.g. publicId `1000036` seeded
+    // into both Paulista and Aprovada). We disambiguate by membership:
+    // return the first contract whose `agencyId` the caller has access
+    // to. Returns null on "no such id" AND "not a member of any owning
+    // agency" — same shape as before, no cross-agency existence leak.
+    const candidates = await ctx.db
       .query("contracts")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
-      .unique();
+      .collect();
 
-    if (!contract) {
-      return null;
+    for (const contract of candidates) {
+      try {
+        await assertAgencyAccess(ctx, contract.agencyId);
+      } catch {
+        continue;
+      }
+
+      const history = await ctx.db
+        .query("contractHistory")
+        .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
+        .order("desc")
+        // Hard cap; if contracts exceed 100 history entries we'll need pagination.
+        .take(100);
+
+      return shapeContract(contract, history);
     }
 
-    try {
-      await assertAgencyAccess(ctx, contract.agencyId);
-    } catch {
-      return null;
-    }
-
-    const history = await ctx.db
-      .query("contractHistory")
-      .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
-      .order("desc")
-      // Hard cap; if contracts exceed 100 history entries we'll need pagination.
-      .take(100);
-
-    return shapeContract(contract, history);
+    return null;
   },
 });
 

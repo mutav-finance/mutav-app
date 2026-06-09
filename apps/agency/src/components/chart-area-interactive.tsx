@@ -98,12 +98,8 @@ export function ChartAreaInteractive() {
               <SelectValue placeholder={t("last12Months")} />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              <SelectItem value="6m" className="rounded-lg">
-                {t("last6Months")}
-              </SelectItem>
-              <SelectItem value="12m" className="rounded-lg">
-                {t("last12Months")}
-              </SelectItem>
+              <SelectItem value="6m">{t("last6Months")}</SelectItem>
+              <SelectItem value="12m">{t("last12Months")}</SelectItem>
             </SelectContent>
           </Select>
         </CardAction>

@@ -10,7 +10,7 @@ import { useLocale } from "next-intl";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { isChargeable, type Payment } from "@convex/payments/domain";
 
-function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
+function MethodRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3">
       <dt className="text-muted-foreground text-sm">{label}</dt>
@@ -33,7 +33,7 @@ function ShareTenantLink({ publicId }: { publicId: string }) {
   };
 
   return (
-    <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
+    <Button variant="outline" size="sm" onClick={handleCopy}>
       {copied ? (
         <Check className="size-4" strokeWidth={1.25} />
       ) : (
@@ -54,12 +54,7 @@ function ChargeableActions({
   const t = useTranslations("paymentDetails.methodCard");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        asChild
-        size="sm"
-        variant={variant === "primary" ? "default" : "outline"}
-        className="gap-2"
-      >
+      <Button asChild size="sm" variant={variant === "primary" ? "default" : "outline"}>
         <Link href={`/pay/${payment.publicId}`} target="_blank" rel="noopener">
           {t("openCheckout")}
           <ExternalLink className="size-4" strokeWidth={1.25} />
@@ -95,7 +90,7 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
 
         {method?.kind === "boleto" && (
           <dl className="flex flex-col gap-3">
-            <FieldRow
+            <MethodRow
               label={t("barcode")}
               value={
                 method.barcode ? (
@@ -110,11 +105,11 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
 
         {method?.kind === "pix" && (
           <dl className="flex flex-col gap-3">
-            <FieldRow
+            <MethodRow
               label={t("pixKey")}
               value={<Mono className="text-xs">{method.pixKey}</Mono>}
             />
-            <FieldRow
+            <MethodRow
               label={t("txId")}
               value={
                 method.txId ? (
@@ -130,11 +125,11 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
         {method?.kind === "stellar" && (
           <div className="flex flex-col gap-4">
             <dl className="flex flex-col gap-3">
-              <FieldRow
+              <MethodRow
                 label={t("address")}
                 value={<Mono className="text-xs break-all">{method.destinationAddress}</Mono>}
               />
-              <FieldRow
+              <MethodRow
                 label={t("txHash")}
                 value={
                   method.txHash ? (

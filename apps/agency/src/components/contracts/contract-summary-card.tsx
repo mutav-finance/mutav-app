@@ -36,9 +36,6 @@ const statusTone: Record<ContractStatus, "accent" | "success" | "error" | "neutr
   cancelado: "error",
 };
 
-const imobOutline =
-  "border-primary text-primary bg-transparent hover:bg-accent-dim hover:text-primary aria-expanded:bg-accent-dim aria-expanded:text-primary";
-
 export function ContractSummaryCard({ contract }: { contract: Contract }) {
   const t = useTranslations("contractDetails.summary");
   const tStatus = useTranslations("contractDetails.status");
@@ -78,7 +75,7 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
             <div className="hidden items-center gap-2 sm:flex">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" className={imobOutline}>
+                  <Button variant="outline-primary" size="sm">
                     {t("openDelinquency")}
                   </Button>
                 </TooltipTrigger>
@@ -86,7 +83,7 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" className={imobOutline}>
+                  <Button variant="outline-primary" size="sm">
                     {t("trackDelinquencies")}
                   </Button>
                 </TooltipTrigger>
@@ -96,10 +93,9 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
                 <TooltipTrigger asChild>
                   <span className={cn(!isPending && "cursor-not-allowed")}>
                     <Button
-                      variant="outline"
+                      variant="outline-primary"
                       size="sm"
                       disabled={!isPending}
-                      className={imobOutline}
                       onClick={() => setCancelOpen(true)}
                     >
                       {t("cancelProposal")}
@@ -113,9 +109,9 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="outline"
+                  variant="outline-primary"
                   size="icon-sm"
-                  className={cn(imobOutline, "sm:hidden")}
+                  className="sm:hidden"
                   aria-label={t("actionsMenu")}
                 >
                   <MoreHorizontalIcon />
@@ -154,10 +150,11 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
               <dd>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       aria-label={t("guaranteeTooltipLabel")}
-                      className="text-foreground hover:text-primary focus-visible:text-primary inline-flex items-baseline gap-1.5 transition-colors"
+                      className="text-foreground hover:text-primary focus-visible:text-primary -mx-1 inline-flex items-baseline gap-1.5 px-1"
                     >
                       <Mono className="text-base font-medium">
                         {formatBRLCents(contract.availableGuaranteeCents)}
@@ -165,7 +162,7 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
                       <span aria-hidden className="text-2xs text-muted-foreground">
                         ⓘ
                       </span>
-                    </button>
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">{t("guaranteeTooltip")}</TooltipContent>
                 </Tooltip>

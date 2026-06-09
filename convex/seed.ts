@@ -2307,11 +2307,18 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
   const FIRST_PID = 31;
   const FEE_MULTIPLIER = 1.6;
 
-  const existingForAgency = await ctx.db
+  // Idempotency must be GLOBAL, not per-agency. publicId carries no
+  // DB-level uniqueness constraint; this range (1000031–1000036) is the
+  // single canonical Aprovada starter book — if any contract already
+  // claims it, abort regardless of which agency owns it. Earlier the
+  // check filtered by agencyId, which let `seedAprovadaContracts`
+  // populate two agencies at the same publicIds and broke
+  // `getByPublicId` (`.unique()` threw on duplicates).
+  const existingAtFirstPid = await ctx.db
     .query("contracts")
     .withIndex("by_publicId", (q) => q.eq("publicId", pid(FIRST_PID)))
-    .collect();
-  if (existingForAgency.some((c) => c.agencyId === agencyId)) {
+    .first();
+  if (existingAtFirstPid) {
     return { contractsInserted: 0, ativoCount: 0, skipped: true as const };
   }
 

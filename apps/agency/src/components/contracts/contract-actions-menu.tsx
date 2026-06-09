@@ -17,11 +17,7 @@ export function ContractActionsMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-primary text-primary hover:bg-accent-dim hover:text-primary aria-expanded:bg-accent-dim aria-expanded:text-primary bg-transparent"
-        >
+        <Button variant="outline-primary" size="sm">
           {t("actions")}
           <ChevronDownIcon data-icon="inline-end" aria-hidden />
         </Button>
