@@ -779,9 +779,12 @@
       "closeButton": "Voltar ao início"
     },
     "coverage": {
-      "heading": "Configuração de Cobertura",
-      "rentMultiplierLabel": "Defina a cobertura total",
-      "exitCostLabel": "Defina o custo de saída",
+      "heading": "Plano de Cobertura",
+      "rentCoverage": "Cobertura de aluguel",
+      "exitCoverage": "Cobertura de saída",
+      "feeRate": "Taxa mensal",
+      "rentMultiplierLabel": "Cobertura de aluguel",
+      "exitCostLabel": "Cobertura de saída",
       "coverageDesc": "{x} meses de aluguel cobertos em caso de inadimplência",
       "exitDesc": "{x} vezes o aluguel em caso de rescisão",
       "preview": {

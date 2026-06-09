@@ -1,27 +1,27 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`priceContract high tier (score >= 800), 24x/3x base multipliers 1`] = `
+exports[`priceContract high tier (score >= 800) — 9% fee 1`] = `
 {
-  "availableGuaranteeCents": 2400000,
-  "feeCents": 7500,
+  "availableGuaranteeCents": 3000000,
+  "feeCents": 9000,
   "oneTimeActivationFeeCents": 15000,
   "totalRentCents": 100000,
 }
 `;
 
-exports[`priceContract medium tier (600-799), 36x/5x mid multipliers, with condo 1`] = `
+exports[`priceContract medium tier (600-799) — 12% fee, with condo 1`] = `
 {
-  "availableGuaranteeCents": 7200000,
-  "feeCents": 21420,
+  "availableGuaranteeCents": 6000000,
+  "feeCents": 24000,
   "oneTimeActivationFeeCents": 15000,
   "totalRentCents": 215000,
 }
 `;
 
-exports[`priceContract low tier (< 600), 48x/7x max multipliers 1`] = `
+exports[`priceContract low tier (400-599) — 15% fee 1`] = `
 {
-  "availableGuaranteeCents": 14400000,
-  "feeCents": 43313,
+  "availableGuaranteeCents": 9000000,
+  "feeCents": 45000,
   "oneTimeActivationFeeCents": 15000,
   "totalRentCents": 330000,
 }
@@ -29,8 +29,8 @@ exports[`priceContract low tier (< 600), 48x/7x max multipliers 1`] = `
 
 exports[`priceContract boundary at 800 picks high tier 1`] = `
 {
-  "availableGuaranteeCents": 3600000,
-  "feeCents": 11250,
+  "availableGuaranteeCents": 4500000,
+  "feeCents": 13500,
   "oneTimeActivationFeeCents": 15000,
   "totalRentCents": 150000,
 }
@@ -38,8 +38,8 @@ exports[`priceContract boundary at 800 picks high tier 1`] = `
 
 exports[`priceContract boundary at 600 picks medium tier 1`] = `
 {
-  "availableGuaranteeCents": 3600000,
-  "feeCents": 15000,
+  "availableGuaranteeCents": 4500000,
+  "feeCents": 18000,
   "oneTimeActivationFeeCents": 15000,
   "totalRentCents": 150000,
 }

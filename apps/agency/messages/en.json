@@ -779,9 +779,12 @@
       "closeButton": "Back to home"
     },
     "coverage": {
-      "heading": "Coverage Configuration",
-      "rentMultiplierLabel": "Define total coverage",
-      "exitCostLabel": "Define exit cost",
+      "heading": "Coverage Plan",
+      "rentCoverage": "Rent coverage",
+      "exitCoverage": "Exit coverage",
+      "feeRate": "Monthly fee rate",
+      "rentMultiplierLabel": "Rent coverage",
+      "exitCostLabel": "Exit coverage",
       "coverageDesc": "{x} months of rent covered in case of default",
       "exitDesc": "{x} times the rent in case of early termination",
       "preview": {

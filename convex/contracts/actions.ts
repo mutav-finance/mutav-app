@@ -3,13 +3,50 @@
 import { v } from "convex/values";
 import { Resend } from "resend";
 import { internalAction } from "../_generated/server";
+import { internal } from "../_generated/api";
 import {
   getResendApiKey,
   getResendFromEmail,
   getAppUrl,
   getWhatsAppApiUrl,
   getWhatsAppApiKey,
+  getScoreProvider,
 } from "../lib/env";
+import { tierForScore } from "./domain";
+import { resolveProvider } from "./scoreProviders";
+
+// ─── Credit Score ────────────────────────────────────────────────────────────
+
+/**
+ * Resolves the configured provider, fetches the score, and persists via
+ * `saveCreditReport`. Provider-agnostic: add new bureaus in scoreProviders.ts.
+ */
+export const fetchCreditScore = internalAction({
+  args: { cpf: v.string(), agencyId: v.id("agencies") },
+  handler: async (ctx, { cpf, agencyId }) => {
+    const providerName = getScoreProvider();
+    const provider = resolveProvider(providerName);
+
+    let result: { score: number; providerRef?: string };
+    try {
+      result = await provider.fetchScore(cpf);
+    } catch (err) {
+      console.error(`[credit] ${provider.name} error, falling back to mock:`, err);
+      result = await resolveProvider("mock").fetchScore(cpf);
+    }
+
+    await ctx.runMutation(internal.contracts.useCases.saveCreditReport, {
+      agencyId,
+      cpf,
+      score: result.score,
+      tier: tierForScore(result.score),
+      provider: provider.name,
+      providerRef: result.providerRef,
+    });
+  },
+});
+
+// ─── Notifications ────────────────────────────────────────────────────────────
 
 type NotificationArgs = {
   publicId: string;

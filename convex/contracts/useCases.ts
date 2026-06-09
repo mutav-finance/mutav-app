@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { internalQuery, query } from "../_generated/server";
+import { internalMutation, internalQuery, query } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { hashPii } from "../lib/pii";
 import { priceContract } from "../../apps/agency/src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
 import { contractsByStatus } from "./aggregate";
@@ -260,17 +261,112 @@ export const listForCommissionByMonth = queryWithAgencyScope({
   },
 });
 
+const CREDIT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 /**
- * Mock credit-bureau score for a CPF or CNPJ. Pure computation today; the
- * real-bureau call goes here so the swap is single-file. Agency-scoped so
- * future billed lookups can be attributed and rate-limited per agency.
+ * Reads the most recent credit report for `document` (CPF or CNPJ digits)
+ * from the `tenantCreditReports` cache. Returns null if no result exists
+ * within the 24-hour TTL — the caller should trigger `requestCreditScore`
+ * to schedule a fresh lookup.
  */
-export const lookupTenantScore = queryWithAgencyScope({
+export const getCachedCreditScore = queryWithAgencyScope({
   args: { document: v.string() },
-  handler: async (_ctx, { document }) => {
+  handler: async (ctx, { document }) => {
     const digits = document.replace(/\D/g, "");
-    const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
-    return { score, tier: tierForScore(score) };
+    if (digits.length !== 11 && digits.length !== 14) return null;
+
+    const docHash = await hashPii(digits);
+    const cutoff = Date.now() - CREDIT_CACHE_TTL_MS;
+
+    const report = await ctx.db
+      .query("tenantCreditReports")
+      .withIndex("by_agency_cpf_time", (q) =>
+        q.eq("agencyId", ctx.agencyId).eq("cpfHash", docHash).gt("pulledAt", cutoff),
+      )
+      .order("desc")
+      .first();
+
+    if (!report) return null;
+    return { score: report.score, tier: report.tier };
+  },
+});
+
+/**
+ * Ensures a fresh credit score is available for `document`.
+ * - If a cached result exists within 24 h, returns `{ status: "cached" }`.
+ * - For CNPJ (PJ entities): inserts a mock score synchronously (no bureau API).
+ * - For CPF: schedules `fetchCreditScore` action; returns `{ status: "fetching" }`.
+ *   The action writes to `tenantCreditReports`, which triggers `getCachedCreditScore`
+ *   to update reactively in the wizard UI.
+ */
+export const requestCreditScore = mutationWithAgencyScope({
+  args: { document: v.string() },
+  handler: async (ctx, { document }) => {
+    const digits = document.replace(/\D/g, "");
+    if (digits.length !== 11 && digits.length !== 14) {
+      return { status: "invalid" } as const;
+    }
+
+    const docHash = await hashPii(digits);
+    const cutoff = Date.now() - CREDIT_CACHE_TTL_MS;
+
+    const cached = await ctx.db
+      .query("tenantCreditReports")
+      .withIndex("by_agency_cpf_time", (q) =>
+        q.eq("agencyId", ctx.agencyId).eq("cpfHash", docHash).gt("pulledAt", cutoff),
+      )
+      .order("desc")
+      .first();
+
+    if (cached) return { status: "cached" } as const;
+
+    // CNPJ — no bureau API in this milestone; insert deterministic mock inline
+    if (digits.length === 14) {
+      const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
+      await ctx.db.insert("tenantCreditReports", {
+        agencyId: ctx.agencyId,
+        cpfHash: docHash,
+        score,
+        tier: tierForScore(score),
+        provider: "mock",
+        pulledAt: Date.now(),
+      });
+      return { status: "inserted" } as const;
+    }
+
+    // CPF — schedule async action (BigDataCorp or mock based on SCORE_PROVIDER)
+    await ctx.scheduler.runAfter(0, internal.contracts.actions.fetchCreditScore, {
+      cpf: digits,
+      agencyId: ctx.agencyId,
+    });
+    return { status: "fetching" } as const;
+  },
+});
+
+/**
+ * Persists a resolved credit score from `fetchCreditScore`. Called via
+ * `ctx.runMutation` from the internalAction — never called directly by clients.
+ */
+export const saveCreditReport = internalMutation({
+  args: {
+    agencyId: v.id("agencies"),
+    cpf: v.string(),
+    score: v.number(),
+    tier: v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"), v.literal("negado")),
+    provider: v.string(),
+    providerRef: v.optional(v.string()),
+  },
+  handler: async (ctx, { agencyId, cpf, score, tier, provider, providerRef }) => {
+    const cpfHash = await hashPii(cpf.replace(/\D/g, ""));
+    await ctx.db.insert("tenantCreditReports", {
+      agencyId,
+      cpfHash,
+      score,
+      tier,
+      provider,
+      providerRef,
+      pulledAt: Date.now(),
+    });
   },
 });
 
@@ -305,8 +401,6 @@ export const create = mutationWithAgencyScope({
     rentCents: v.number(),
     condoCents: v.number(),
     otherFeesCents: v.number(),
-    rentMultiplier: v.union(v.literal("24x"), v.literal("36x"), v.literal("48x")),
-    exitCostMultiplier: v.union(v.literal("3x"), v.literal("5x"), v.literal("7x")),
     tenant: v.object({
       entityType: v.union(v.literal("pf"), v.literal("pj")),
       fullName: v.string(),
@@ -324,8 +418,6 @@ export const create = mutationWithAgencyScope({
       condoCents: args.condoCents,
       otherFeesCents: args.otherFeesCents,
       score: args.tenant.score,
-      rentMultiplier: args.rentMultiplier,
-      exitCostMultiplier: args.exitCostMultiplier,
     });
 
     const publicId = generatePublicId();
@@ -351,8 +443,8 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         setupInstallments: 1,
-        exitCostMultiplier: args.exitCostMultiplier,
-        rentMultiplier: args.rentMultiplier,
+        exitCostMultiplier: "5x",
+        rentMultiplier: "30x",
         payer: "inquilino",
         pviMigrationSchedule: null,
       },
@@ -403,8 +495,8 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         availableGuaranteeCents: priced.availableGuaranteeCents,
-        rentMultiplier: args.rentMultiplier,
-        exitCostMultiplier: args.exitCostMultiplier,
+        rentMultiplier: "30x",
+        exitCostMultiplier: "5x",
       },
     });
 

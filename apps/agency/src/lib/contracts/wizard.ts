@@ -1,4 +1,3 @@
-import type { ExitCostMultiplier, RentMultiplier } from "@/lib/pricing/tiers";
 import type { ScoreTier } from "@convex/contracts/domain";
 
 export type WizardData = {
@@ -22,8 +21,6 @@ export type WizardData = {
   phone: string;
   score: number | null;
   scoreTier: ScoreTier | null;
-  rentMultiplier: RentMultiplier | null;
-  exitCostMultiplier: ExitCostMultiplier | null;
 };
 
 export type WizardState = {
@@ -72,8 +69,6 @@ export const INITIAL_WIZARD_DATA: WizardData = {
   phone: "",
   score: null,
   scoreTier: null,
-  rentMultiplier: null,
-  exitCostMultiplier: null,
 };
 
 export function formatBRLCentsDisplay(cents: number): string {
