@@ -33,8 +33,11 @@ export function TreasuryPanel({ treasury, error }: Props) {
             <span className="text-muted-foreground text-base">{t("unavailable")}</span>
           ) : (
             <span>
-              {treasury?.xlmBalance.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) ?? "—"}{" "}
-              XLM
+              {treasury
+                ? Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                    treasury.brlBalanceCents / 100,
+                  )
+                : "—"}
             </span>
           )}
         </CardTitle>

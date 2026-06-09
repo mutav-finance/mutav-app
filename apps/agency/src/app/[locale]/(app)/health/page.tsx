@@ -1,6 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
+import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
+import type { ContractAggregates, HealthTimeline } from "@convex/health/domain";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
@@ -15,13 +17,22 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function HealthRoutePage() {
   const t = await getTranslations("health");
 
-  const [preloadedAggregates, preloadedTimeline] = await Promise.all([
-    preloadQuery(api.health.useCases.getContractAggregates, {}),
-    preloadQuery(api.health.useCases.getTimeline, {}),
-  ]);
+  let preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates> | null =
+    null;
+  let preloadedTimeline: Preloaded<typeof api.health.useCases.getTimeline> | null = null;
+  let aggregates: ContractAggregates | null = null;
+  let timeline: HealthTimeline | null = null;
 
-  const aggregates = preloadedQueryResult(preloadedAggregates);
-  const timeline = preloadedQueryResult(preloadedTimeline);
+  try {
+    [preloadedAggregates, preloadedTimeline] = await Promise.all([
+      preloadQuery(api.health.useCases.getContractAggregates, {}),
+      preloadQuery(api.health.useCases.getTimeline, {}),
+    ]);
+    aggregates = preloadedQueryResult(preloadedAggregates);
+    timeline = preloadedQueryResult(preloadedTimeline);
+  } catch {
+    // Convex health functions not deployed yet — render with null data
+  }
 
   return (
     <PageShell>

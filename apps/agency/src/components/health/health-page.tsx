@@ -12,22 +12,24 @@ import { TreasuryPanel } from "./treasury-panel";
 import { TimelinePanel } from "./timeline-panel";
 
 type Props = {
-  preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates>;
-  preloadedTimeline: Preloaded<typeof api.health.useCases.getTimeline>;
+  preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates> | null;
+  preloadedTimeline: Preloaded<typeof api.health.useCases.getTimeline> | null;
   initialAggregates: ContractAggregates | null;
   initialTimeline: HealthTimeline | null;
 };
 
-export function HealthPage({
-  preloadedAggregates,
-  preloadedTimeline,
-  initialAggregates,
-  initialTimeline,
-}: Props) {
-  const t = useTranslations("health");
-  const aggregates = usePreloadedQuery(preloadedAggregates);
-  const timeline = usePreloadedQuery(preloadedTimeline);
+type LiveProps = {
+  preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates>;
+  preloadedTimeline: Preloaded<typeof api.health.useCases.getTimeline>;
+};
 
+type LayoutProps = {
+  aggregates: ContractAggregates | null | undefined;
+  timeline: HealthTimeline | null | undefined;
+};
+
+function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
+  const t = useTranslations("health");
   const fetchTreasury = useAction(api.health.actions.getTreasurySnapshot);
   const [treasury, setTreasury] = React.useState<TreasurySnapshot | null>(null);
   const [treasuryError, setTreasuryError] = React.useState(false);
@@ -42,19 +44,47 @@ export function HealthPage({
     loadTreasury();
   }, []);
 
-  const agg = aggregates ?? initialAggregates;
-  const tl = timeline ?? initialTimeline;
+  const agg = aggregates ?? null;
+  const tl = timeline ?? null;
 
   return (
-    <div className="flex flex-col gap-6 px-4 lg:px-6">
-      <div className="grid gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="flex flex-col gap-4 px-4 lg:px-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <ContractsPanel aggregates={agg} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <CapacityPanel aggregates={agg} />
         <TreasuryPanel treasury={treasury} error={treasuryError} />
-        <TimelinePanel timeline={tl} />
       </div>
+
+      <TimelinePanel timeline={tl} />
 
       <p className="text-muted-foreground text-xs">{t("footer")}</p>
     </div>
   );
+}
+
+function HealthPageLive({ preloadedAggregates, preloadedTimeline }: LiveProps) {
+  const aggregates = usePreloadedQuery(preloadedAggregates);
+  const timeline = usePreloadedQuery(preloadedTimeline);
+  return <HealthPageLayout aggregates={aggregates} timeline={timeline} />;
+}
+
+export function HealthPage({
+  preloadedAggregates,
+  preloadedTimeline,
+  initialAggregates,
+  initialTimeline,
+}: Props) {
+  if (preloadedAggregates && preloadedTimeline) {
+    return (
+      <HealthPageLive
+        preloadedAggregates={preloadedAggregates}
+        preloadedTimeline={preloadedTimeline}
+      />
+    );
+  }
+
+  return <HealthPageLayout aggregates={initialAggregates} timeline={initialTimeline} />;
 }

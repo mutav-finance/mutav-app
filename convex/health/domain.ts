@@ -12,12 +12,13 @@ export type TimelinePeriod = {
 
 export type HealthTimeline = {
   d30: TimelinePeriod;
+  d60: TimelinePeriod;
   d90: TimelinePeriod;
-  d180: TimelinePeriod;
 };
 
 export type TreasurySnapshot = {
   address: string;
   xlmBalance: number;
+  brlBalanceCents: number;
   explorerUrl: string;
 };

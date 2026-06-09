@@ -1128,28 +1128,30 @@
     },
     "heading": "Mutav Health",
     "subheading": "Risk position transparency and onchain treasury.",
-    "footer": "Contract data updated in real time via Convex. Treasury balance queried directly from the Stellar network.",
+    "footer": "Contract data updated in real time.",
     "contracts": {
       "ativo": "Active contracts",
       "pendente": "Under review",
       "defaultRate": "Default rate"
     },
     "capacity": {
-      "label": "Available headroom",
+      "label": "Fund utilization",
       "used": "{pct}% utilized",
       "of": "of {total}"
     },
     "treasury": {
-      "label": "Onchain treasury",
+      "label": "Coverage fund",
       "unavailable": "Unavailable",
-      "viewExplorer": "View on Stellar Expert"
+      "viewExplorer": "Verify myself on the Stellar network"
     },
     "timeline": {
       "label": "New contracts",
       "d30": "30d",
+      "d60": "60d",
       "d90": "90d",
-      "d180": "180d",
-      "description": "Contracts created in the selected period."
+      "description": "Contracts created in the selected period.",
+      "seriesNew": "New",
+      "seriesCumulative": "Cumulative"
     }
   }
 }
