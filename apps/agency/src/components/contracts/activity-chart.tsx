@@ -87,10 +87,6 @@ export function ActivityChart({
   );
 
   const chartConfig = {
-    netActive: {
-      label: t("series.netActive"),
-      color: "var(--color-chart-1)",
-    },
     activated: {
       label: t("series.activated"),
       color: "var(--color-chart-3)",
@@ -102,6 +98,10 @@ export function ActivityChart({
     expired: {
       label: t("series.expired"),
       color: "var(--color-chart-5)",
+    },
+    netActive: {
+      label: t("series.netActive"),
+      color: "var(--color-chart-1)",
     },
   } satisfies ChartConfig;
 
@@ -221,6 +221,7 @@ export function ActivityChart({
                 stroke="var(--color-netActive)"
                 strokeWidth={2}
                 dot={false}
+                legendType="line"
               />
               <ChartLegend content={<ChartLegendContent />} />
             </ComposedChart>
