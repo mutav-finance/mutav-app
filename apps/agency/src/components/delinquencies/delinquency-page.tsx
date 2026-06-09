@@ -244,7 +244,7 @@ export function DelinquencyPage() {
               <Button variant="outline" onClick={handleClear}>
                 {t("filter.clear")}
               </Button>
-              <Button onClick={handleSearch} className="gap-2">
+              <Button onClick={handleSearch}>
                 <SearchIcon className="size-4" strokeWidth={1.5} />
                 {t("filter.search")}
               </Button>
@@ -321,11 +321,11 @@ export function DelinquencyPageActions() {
   const t = useTranslations("delinquencies");
   return (
     <>
-      <Button variant="outline" size="sm" disabled className="gap-2">
+      <Button variant="outline" size="sm" disabled>
         <FileTextIcon className="size-4" strokeWidth={1.25} />
         {t("actions.report")}
       </Button>
-      <Button variant="outline" size="sm" disabled className="gap-2">
+      <Button variant="outline" size="sm" disabled>
         <ReceiptTextIcon className="size-4" strokeWidth={1.25} />
         {t("actions.statement")}
       </Button>

@@ -134,8 +134,8 @@ function DragHandle({ id, label }: { id: number; label: string }) {
       {...attributes}
       {...listeners}
       variant="ghost"
-      size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent"
+      size="icon-sm"
+      className="text-muted-foreground hover:bg-transparent"
     >
       <GripVerticalIcon className="text-muted-foreground size-3" />
       <span className="sr-only">{label}</span>
@@ -294,11 +294,7 @@ function buildColumns(t: Translator): ColumnDef<z.infer<typeof schema>>[] {
       cell: () => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="text-muted-foreground data-[state=open]:bg-muted flex size-8"
-              size="icon"
-            >
+            <Button variant="ghost" size="icon">
               <EllipsisVerticalIcon />
               <span className="sr-only">{t("actions.openMenu")}</span>
             </Button>
@@ -556,7 +552,8 @@ export function DataTable({ data: initialData }: { data: z.infer<typeof schema>[
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button
                 variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
+                size="icon"
+                className="hidden lg:flex"
                 onClick={() => table.setPageIndex(0)}
                 disabled={!table.getCanPreviousPage()}
               >
@@ -565,7 +562,6 @@ export function DataTable({ data: initialData }: { data: z.infer<typeof schema>[
               </Button>
               <Button
                 variant="outline"
-                className="size-8"
                 size="icon"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
@@ -575,7 +571,6 @@ export function DataTable({ data: initialData }: { data: z.infer<typeof schema>[
               </Button>
               <Button
                 variant="outline"
-                className="size-8"
                 size="icon"
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
@@ -585,8 +580,8 @@ export function DataTable({ data: initialData }: { data: z.infer<typeof schema>[
               </Button>
               <Button
                 variant="outline"
-                className="hidden size-8 lg:flex"
                 size="icon"
+                className="hidden lg:flex"
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                 disabled={!table.getCanNextPage()}
               >
@@ -636,7 +631,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
+        <Button variant="link" className="w-fit px-0 text-left">
           {item.header}
         </Button>
       </DrawerTrigger>

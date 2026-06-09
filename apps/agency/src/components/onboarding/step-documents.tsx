@@ -53,31 +53,36 @@ export function StepDocuments({ agencyId, onNext, onBack }: Props) {
 
               <div className="shrink-0">
                 {status === "uploading" ? (
-                  <span className="text-text-3 font-mono text-xs">{t("uploading")}</span>
+                  <span className="text-muted-foreground text-xs">{t("uploading")}</span>
                 ) : isDone ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="xs"
                     onClick={() => vm.triggerUpload(kind)}
-                    className="text-text-3 hover:text-text font-mono text-xs"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     {t("replaceButton")}
-                  </button>
+                  </Button>
                 ) : status === "error" ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="xs"
                     onClick={() => vm.triggerUpload(kind)}
-                    className="text-error font-mono text-xs hover:opacity-80"
+                    className="text-destructive"
                   >
                     {t("retryButton")}
-                  </button>
+                  </Button>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="xs"
                     onClick={() => vm.triggerUpload(kind)}
-                    className="text-accent font-mono text-xs hover:opacity-80"
                   >
                     {t("uploadButton")}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

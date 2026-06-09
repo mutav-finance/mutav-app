@@ -6,6 +6,8 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import type { OnboardingSnapshot } from "@/components/onboarding/use-onboarding-flow";
 import {
@@ -57,14 +59,15 @@ export function StepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }:
           >
             {t("profileSection")}
           </h3>
-          <button
+          <Button
             type="button"
+            variant="link"
+            size="xs"
             onClick={() => onGoTo(1)}
             disabled={isSubmitting}
-            className="text-accent font-mono text-xs hover:opacity-80 disabled:opacity-40"
           >
             {t("editButton")}
-          </button>
+          </Button>
         </div>
         <div className="border-border divide-border divide-y border">
           <ReviewRow label={t("agencyTypeLabel")} value={agencyTypeLabel} />
@@ -93,14 +96,15 @@ export function StepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }:
           >
             {t("bankingSection")}
           </h3>
-          <button
+          <Button
             type="button"
+            variant="link"
+            size="xs"
             onClick={() => onGoTo(bankingStep)}
             disabled={isSubmitting}
-            className="text-accent font-mono text-xs hover:opacity-80 disabled:opacity-40"
           >
             {t("editButton")}
-          </button>
+          </Button>
         </div>
         <div className="border-border divide-border divide-y border">
           <ReviewRow label={t("bankLabel")} value={snapshot.bankName} />
@@ -120,19 +124,21 @@ export function StepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }:
           control={control}
           name="consentMarketing"
           render={({ field }) => (
-            <label className="flex cursor-pointer items-start gap-2.5">
-              <input
-                type="checkbox"
+            <div className="flex items-start gap-2.5">
+              <Checkbox
+                id="consent-marketing"
                 checked={field.value}
-                onChange={(e) => field.onChange(e.target.checked)}
+                onCheckedChange={(checked) => field.onChange(checked === true)}
                 onBlur={field.onBlur}
                 ref={field.ref}
                 name={field.name}
                 disabled={isSubmitting}
-                className="accent-accent mt-0.5 shrink-0"
+                className="mt-0.5"
               />
-              <span className="text-text-2 text-sm">{t("consentMarketing")}</span>
-            </label>
+              <Label htmlFor="consent-marketing" className="text-text-2 text-sm font-normal">
+                {t("consentMarketing")}
+              </Label>
+            </div>
           )}
         />
         <p className="text-text-2 text-sm">

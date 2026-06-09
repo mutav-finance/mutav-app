@@ -290,10 +290,10 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 lg:px-6">
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1">
+        <TabsList>
           {STATUS_TABS.map((tab) => (
             <TabsTrigger key={tab} value={tab}>
-              {t(`tabs.${tab}`)} <Badge variant="secondary">{counts[tab]}</Badge>
+              {t(`tabs.${tab}`)} <Badge variant="count">{counts[tab]}</Badge>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -303,11 +303,11 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder={t("search.placeholder")}
             aria-label={t("search.placeholder")}
-            className="h-8 w-[220px]"
+            className="w-[220px]"
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline">
                 <Columns3Icon data-icon="inline-start" />
                 {t("columnsButton")}
                 <ChevronDownIcon data-icon="inline-end" />
@@ -417,7 +417,8 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button
                 variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
+                size="icon"
+                className="hidden lg:flex"
                 onClick={() => table.setPageIndex(0)}
                 disabled={!table.getCanPreviousPage()}
               >
@@ -426,7 +427,6 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
               </Button>
               <Button
                 variant="outline"
-                className="size-8"
                 size="icon"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
@@ -436,7 +436,6 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
               </Button>
               <Button
                 variant="outline"
-                className="size-8"
                 size="icon"
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
@@ -446,8 +445,8 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
               </Button>
               <Button
                 variant="outline"
-                className="hidden size-8 lg:flex"
                 size="icon"
+                className="hidden lg:flex"
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                 disabled={!table.getCanNextPage()}
               >

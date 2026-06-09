@@ -8,6 +8,7 @@ import { PencilIcon } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@mutav/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -146,23 +147,19 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         {editingBlock === "property" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <EditField label={t("property.kindLabel")} className="sm:col-span-2">
-              <div className="flex gap-2">
-                {(["residencial", "comercial"] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setDraft((d) => ({ ...d, propertyKind: k }))}
-                    className={cn(
-                      "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                      draft.propertyKind === k
-                        ? "border-primary bg-primary/5 text-primary font-medium"
-                        : "border-input hover:bg-accent",
-                    )}
-                  >
-                    {k === "residencial" ? t("property.residencial") : t("property.comercial")}
-                  </button>
-                ))}
-              </div>
+              <ToggleGroup
+                type="single"
+                value={draft.propertyKind ?? ""}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  setDraft((d) => ({ ...d, propertyKind: v as "residencial" | "comercial" }));
+                }}
+                variant="outline"
+                spacing={2}
+              >
+                <ToggleGroupItem value="residencial">{t("property.residencial")}</ToggleGroupItem>
+                <ToggleGroupItem value="comercial">{t("property.comercial")}</ToggleGroupItem>
+              </ToggleGroup>
             </EditField>
             <EditField label={t("property.cep")}>
               <Input

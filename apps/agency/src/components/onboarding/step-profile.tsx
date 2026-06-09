@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@mutav/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -80,28 +81,28 @@ export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmit
           <span id="agency-type-label" className="text-sm font-medium">
             {t("typeLabel")}
           </span>
-          <div role="group" aria-labelledby="agency-type-label" className="grid grid-cols-2 gap-2">
-            {/*
-              Buttons render only when no agencyType is set yet (parent ternary).
-              Selecting one flips the parent branch to the "chosen" badge; we
-              never display a pressed state here.
-            */}
-            {(["autonomo", "empresa"] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                aria-pressed={false}
-                onClick={() => {
-                  setValue("agencyType", type, { shouldDirty: true });
-                  // Swapping type invalidates the opposite branch's identity field
-                  resetField(type === "autonomo" ? "cnpj" : "cpf", { defaultValue: "" });
-                }}
-                className="border-border text-text-2 hover:border-text-3 hover:text-text border px-4 py-3 text-sm font-medium transition-colors"
-              >
-                {type === "autonomo" ? t("typeAutonomo") : t("typeEmpresa")}
-              </button>
-            ))}
-          </div>
+          {/*
+            The group only renders when no agencyType is set; selecting one flips
+            the parent ternary to the "chosen" badge. No pressed state shown here
+            on purpose — value="" keeps every item unpressed.
+          */}
+          <ToggleGroup
+            type="single"
+            value=""
+            onValueChange={(v) => {
+              if (!v) return;
+              const next = v as "autonomo" | "empresa";
+              setValue("agencyType", next, { shouldDirty: true });
+              resetField(next === "autonomo" ? "cnpj" : "cpf", { defaultValue: "" });
+            }}
+            aria-labelledby="agency-type-label"
+            variant="outline"
+            spacing={2}
+            className="grid w-full grid-cols-2 *:data-[slot=toggle-group-item]:h-auto *:data-[slot=toggle-group-item]:py-3"
+          >
+            <ToggleGroupItem value="autonomo">{t("typeAutonomo")}</ToggleGroupItem>
+            <ToggleGroupItem value="empresa">{t("typeEmpresa")}</ToggleGroupItem>
+          </ToggleGroup>
           {fieldError("agencyType") && (
             <p className="text-error text-xs" role="alert">
               {fieldError("agencyType")}

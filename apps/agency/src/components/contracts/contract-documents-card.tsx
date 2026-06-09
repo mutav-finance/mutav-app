@@ -47,12 +47,7 @@ export function ContractDocumentsCard({ documents }: { documents: ContractDocume
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-primary text-primary hover:bg-accent-dim hover:text-primary self-start bg-transparent"
-                          disabled
-                        >
+                        <Button variant="outline-primary" size="sm" className="self-start" disabled>
                           <UploadIcon data-icon="inline-start" strokeWidth={1.25} aria-hidden />
                           {t("send")}
                         </Button>
@@ -63,12 +58,7 @@ export function ContractDocumentsCard({ documents }: { documents: ContractDocume
                   {keysWithTemplate.has(key) && (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-foreground self-start"
-                          asChild
-                        >
+                        <Button variant="ghost" size="sm" className="self-start" asChild>
                           <a href={`/templates/${key}.pdf`} download>
                             <DownloadIcon className="size-4" strokeWidth={1.25} aria-hidden />
                             <span className="sr-only">{t("downloadTemplate")}</span>
