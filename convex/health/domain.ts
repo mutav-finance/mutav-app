@@ -6,15 +6,6 @@ export type ContractAggregates = {
   maxCapacityCents: number;
 };
 
-export type TimelineWeek = {
-  weekStartISO: string;
-  activeContracts: number;
-  cancelledContracts: number;
-  delinquentContracts: number;
-};
-
-export type HealthTimeline = TimelineWeek[];
-
 export type TreasurySnapshot = {
   address: string;
   xlmBalance: number;

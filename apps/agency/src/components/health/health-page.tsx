@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import { usePreloadedQuery, useAction } from "convex/react";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { ContractAggregates, HealthTimeline, TreasurySnapshot } from "@convex/health/domain";
+import type { ActivityBucket } from "@convex/contracts/domain";
+import type { ContractAggregates, TreasurySnapshot } from "@convex/health/domain";
 import { ContractsPanel } from "./contracts-panel";
 import { CapacityPanel } from "./capacity-panel";
 import { TreasuryPanel } from "./treasury-panel";
@@ -13,19 +14,19 @@ import { TimelinePanel } from "./timeline-panel";
 
 type Props = {
   preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates> | null;
-  preloadedTimeline: Preloaded<typeof api.health.useCases.getTimeline> | null;
+  preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod> | null;
   initialAggregates: ContractAggregates | null;
-  initialTimeline: HealthTimeline | null;
+  initialTimeline: ActivityBucket[] | null;
 };
 
 type LiveProps = {
   preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates>;
-  preloadedTimeline: Preloaded<typeof api.health.useCases.getTimeline>;
+  preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod>;
 };
 
 type LayoutProps = {
   aggregates: ContractAggregates | null | undefined;
-  timeline: HealthTimeline | null | undefined;
+  timeline: ActivityBucket[] | null | undefined;
 };
 
 function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
@@ -58,7 +59,7 @@ function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
         <TreasuryPanel treasury={treasury} error={treasuryError} />
       </div>
 
-      <TimelinePanel timeline={tl} />
+      <TimelinePanel data={tl} />
 
       <p className="text-muted-foreground text-xs">{t("footer")}</p>
     </div>

@@ -1,0 +1,154 @@
+// @vitest-environment edge-runtime
+import { convexTest } from "convex-test";
+import { describe, expect, test } from "vitest";
+import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import { ativoInsuredCentsPlatform, contractsByStatusPlatform } from "./aggregate";
+import { registerContractAggregateComponents } from "../lib/testFixtures";
+import { CONTRACT_STATUS, type ContractStatus } from "./domain";
+import schema from "../schema";
+
+async function seedAgency(t: ReturnType<typeof convexTest>, cnpj: string): Promise<Id<"agencies">> {
+  return t.run((ctx) =>
+    ctx.db.insert("agencies", {
+      name: `Test ${cnpj}`,
+      cnpj,
+      agencyType: "empresa",
+      onboardingState: "active",
+      createdAt: new Date().toISOString(),
+    }),
+  );
+}
+
+type ContractSeed = {
+  agencyId: Id<"agencies">;
+  status: ContractStatus;
+  availableGuaranteeCents: number;
+};
+
+async function seedContractDirect(
+  t: ReturnType<typeof convexTest>,
+  spec: ContractSeed,
+  publicId: string,
+) {
+  return t.run((ctx) =>
+    ctx.db.insert("contracts", {
+      agencyId: spec.agencyId,
+      publicId,
+      status: spec.status,
+      activatedAt: null,
+      nextRenewalDate: "2026-12-31",
+      availableGuaranteeCents: spec.availableGuaranteeCents,
+      rental: {
+        propertyKind: "residencial",
+        rentCents: 100000,
+        condoCents: 0,
+        otherFeesCents: 0,
+        totalRentCents: 100000,
+        feeCents: 1500,
+        oneTimeActivationFeeCents: 0,
+        setupInstallments: 1,
+        exitCostMultiplier: "5x",
+        rentMultiplier: "30x",
+        payer: "inquilino",
+        pviMigrationSchedule: null,
+      },
+      property: {
+        cep: "01000000",
+        streetAndNumber: "Rua Teste, 1",
+        neighborhood: "Centro",
+        cityUF: "São Paulo/SP",
+      },
+      optional: { complement: "", tag: "", description: "" },
+      documents: [
+        { key: "rentalContract", status: "pendente" },
+        { key: "inspection", status: "pendente" },
+        { key: "policy", status: "pendente" },
+      ],
+      tenant: {
+        approvalStatus: "pendente",
+        fullName: "Test Tenant",
+        cpf: "11144477735",
+        birthDate: "1990-01-01",
+        email: "tenant@test.br",
+        phone: "11999999999",
+        termApprovedAt: null,
+      },
+    }),
+  );
+}
+
+async function platformAtivoCount(t: ReturnType<typeof convexTest>) {
+  return t.run((ctx) =>
+    contractsByStatusPlatform.count(ctx, {
+      bounds: {
+        lower: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
+        upper: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
+      },
+    }),
+  );
+}
+
+async function platformInsuredSum(t: ReturnType<typeof convexTest>) {
+  return t.run((ctx) =>
+    ativoInsuredCentsPlatform.sum(ctx, {
+      bounds: {
+        lower: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
+        upper: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
+      },
+    }),
+  );
+}
+
+describe("backfillPlatformAggregates", () => {
+  test("populates platform count and sum aggregates from raw contracts", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const agency = await seedAgency(t, "00000000000999");
+
+    await seedContractDirect(
+      t,
+      { agencyId: agency, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_00 },
+      "BF1",
+    );
+    await seedContractDirect(
+      t,
+      { agencyId: agency, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 250_00 },
+      "BF2",
+    );
+    await seedContractDirect(
+      t,
+      { agencyId: agency, status: CONTRACT_STATUS.PENDENTE, availableGuaranteeCents: 999_00 },
+      "BF3",
+    );
+
+    expect(await platformAtivoCount(t)).toBe(0);
+    expect(await platformInsuredSum(t)).toBe(0);
+
+    const first = await t.mutation(internal.contracts.backfill.backfillPlatformAggregates, {});
+    expect(first.processed).toBe(3);
+    expect(first.done).toBe(true);
+
+    expect(await platformAtivoCount(t)).toBe(2);
+    expect(await platformInsuredSum(t)).toBe(350_00);
+  });
+
+  test("idempotent — re-running after first pass is a no-op", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const agency = await seedAgency(t, "00000000001001");
+    await seedContractDirect(
+      t,
+      { agencyId: agency, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 42_00 },
+      "BF4",
+    );
+
+    await t.mutation(internal.contracts.backfill.backfillPlatformAggregates, {});
+    expect(await platformAtivoCount(t)).toBe(1);
+    expect(await platformInsuredSum(t)).toBe(42_00);
+
+    await t.mutation(internal.contracts.backfill.backfillPlatformAggregates, {});
+    expect(await platformAtivoCount(t)).toBe(1);
+    expect(await platformInsuredSum(t)).toBe(42_00);
+  });
+});

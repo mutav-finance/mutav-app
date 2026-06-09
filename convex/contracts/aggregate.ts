@@ -25,3 +25,35 @@ export const contractsByStatus = new TableAggregate<{
   namespace: (doc) => doc.agencyId,
   sortKey: (doc) => doc.status,
 });
+
+/**
+ * Un-namespaced sibling of `contractsByStatus` for platform-wide reads.
+ *
+ * `@convex-dev/aggregate`'s `Namespace` type is invariant, so we cannot widen
+ * the per-agency aggregate to also serve platform queries — two separate
+ * aggregates is the only way. Every mutation must keep both in lockstep via
+ * the helpers in `aggregateWrites.ts`.
+ */
+export const contractsByStatusPlatform = new TableAggregate<{
+  Namespace: undefined;
+  Key: ContractStatus;
+  DataModel: DataModel;
+  TableName: "contracts";
+}>(components.contractsByStatusPlatform, {
+  sortKey: (doc) => doc.status,
+});
+
+/**
+ * Platform-wide sum of `availableGuaranteeCents` keyed by status. Queried with
+ * `bounds: { lower: "ativo", upper: "ativo" }` to compute total insured
+ * exposure in O(log n) — the denominator for the capacity panel.
+ */
+export const ativoInsuredCentsPlatform = new TableAggregate<{
+  Namespace: undefined;
+  Key: ContractStatus;
+  DataModel: DataModel;
+  TableName: "contracts";
+}>(components.ativoInsuredCentsPlatform, {
+  sortKey: (doc) => doc.status,
+  sumValue: (doc) => doc.availableGuaranteeCents,
+});

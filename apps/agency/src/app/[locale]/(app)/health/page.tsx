@@ -2,7 +2,8 @@ import { getTranslations } from "next-intl/server";
 import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { ContractAggregates, HealthTimeline } from "@convex/health/domain";
+import type { ActivityBucket } from "@convex/contracts/domain";
+import type { ContractAggregates } from "@convex/health/domain";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
@@ -20,15 +21,19 @@ export default async function HealthRoutePage() {
 
   let preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates> | null =
     null;
-  let preloadedTimeline: Preloaded<typeof api.health.useCases.getTimeline> | null = null;
+  let preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod> | null = null;
   let aggregates: ContractAggregates | null = null;
-  let timeline: HealthTimeline | null = null;
+  let timeline: ActivityBucket[] | null = null;
 
   try {
     const token = (await getAuthToken()) ?? undefined;
     [preloadedAggregates, preloadedTimeline] = await Promise.all([
       preloadQuery(api.health.useCases.getContractAggregates, {}, { token }),
-      preloadQuery(api.health.useCases.getTimeline, {}, { token }),
+      preloadQuery(
+        api.contracts.useCases.getActivityByPeriod,
+        { scope: { kind: "platform" }, granularity: "week" },
+        { token },
+      ),
     ]);
     aggregates = preloadedQueryResult(preloadedAggregates);
     timeline = preloadedQueryResult(preloadedTimeline);

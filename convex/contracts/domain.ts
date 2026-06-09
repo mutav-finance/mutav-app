@@ -30,6 +30,25 @@ export const contractStatusValidator = v.union(
   v.literal(CONTRACT_STATUS.CANCELADO),
 );
 
+/**
+ * One bucket in the unified contract-activity time series. Shared between the
+ * agency dashboard (`granularity: "month"`) and the platform health timeline
+ * (`granularity: "week"`).
+ *
+ * `period` is the bucket start: `"YYYY-MM"` for month, `"YYYY-MM-DD"` (UTC
+ * Monday) for week. `netActive` is the snapshot of contracts active at the END
+ * of the period — the unified trend semantic on both charts.
+ */
+export type ActivityBucket = {
+  period: string;
+  activated: number;
+  cancelled: number;
+  expired: number;
+  netActive: number;
+};
+
+export type ActivityGranularity = "month" | "week";
+
 export type ScoreTier = "bom" | "regular" | "ruim" | "negado";
 
 export const SCORE_TIER = {
