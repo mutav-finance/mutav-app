@@ -93,7 +93,8 @@ export function getWaitlistAudienceId(audience: "investidor" | "imobiliaria"): s
  */
 export function getMaxGuaranteeCapacityCents(): number {
   const raw = process.env.MAX_GUARANTEE_CAPACITY_CENTS; // hook-ok: env module boundary
-  return raw ? parseInt(raw, 10) : 500_000_000;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  return isNaN(parsed) ? 500_000_000 : parsed;
 }
 
 export function getAppUrl(): string {

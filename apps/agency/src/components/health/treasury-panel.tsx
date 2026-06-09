@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { ExternalLinkIcon, LinkIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
@@ -17,6 +17,7 @@ function truncateAddress(address: string): string {
 
 export function TreasuryPanel({ treasury, error }: Props) {
   const t = useTranslations("health.treasury");
+  const locale = useLocale();
   const loading = !treasury && !error;
 
   return (
@@ -34,7 +35,7 @@ export function TreasuryPanel({ treasury, error }: Props) {
           ) : (
             <span>
               {treasury
-                ? Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                ? Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(
                     treasury.brlBalanceCents / 100,
                   )
                 : "—"}

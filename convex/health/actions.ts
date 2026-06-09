@@ -23,7 +23,9 @@ export const getTreasurySnapshot = action({
     const explorerUrl = `https://stellar.expert/explorer/${network}/account/${address}`;
 
     try {
-      const res = await fetch(`${horizonUrl}/accounts/${address}`);
+      const res = await fetch(`${horizonUrl}/accounts/${address}`, {
+        signal: AbortSignal.timeout(5000),
+      });
       if (!res.ok) throw new Error(`Horizon: ${res.status} ${res.statusText}`);
 
       const data = (await res.json()) as HorizonAccountResponse; // hook-ok: external API response
