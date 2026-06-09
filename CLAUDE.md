@@ -116,6 +116,18 @@ When the in-repo docs and skills aren't enough, consult:
 - Next.js 16 (App Router, src/ directory)
 - Tailwind CSS 4
 - shadcn/ui (radix-nova style, neutral base color, TGA tokens in `src/app/globals.css`)
+
+> **Tailwind 4 + workspace packages** — Tailwind 4 only scans the consuming
+> project for class names. Any workspace package whose source uses Tailwind
+> utilities (e.g. `@mutav/ui`) must be declared with an explicit
+> `@source "../../../../packages/<pkg>/src"` in the consuming app's
+> `globals.css`, otherwise utilities used only inside the package are silently
+> dropped from the bundle (the class compiles to nothing → the element
+> renders with no width/height/etc.). When adding a new workspace package
+> with Tailwind classes, add the `@source` line at the same time. When
+> adding a class that exists only inside `@mutav/ui` to a primitive, confirm
+> that path is already in `@source`.
+
 - Convex — backend (functions in convex/)
 - Railway — deployment
 
