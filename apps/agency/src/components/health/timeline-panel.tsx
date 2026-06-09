@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { cn } from "@/lib/utils";
 import { TrendingUpIcon } from "lucide-react";
 import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts";
 import {
@@ -127,7 +128,7 @@ export function TimelinePanel({ timeline }: Props) {
         {timeline === null ? <Skeleton className="h-[250px] w-full" /> : null}
         <ChartContainer
           config={chartConfig}
-          className={`aspect-auto h-[250px] w-full${timeline === null ? "hidden" : ""}`}
+          className={cn("aspect-auto h-[250px] w-full", timeline === null && "hidden")}
         >
           <ComposedChart data={chartData} barCategoryGap="20%" barGap={2}>
             <defs>
