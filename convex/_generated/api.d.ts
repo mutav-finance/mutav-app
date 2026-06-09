@@ -29,6 +29,7 @@ import type * as audit_merkle from "../audit/merkle.js";
 import type * as audit_useCases from "../audit/useCases.js";
 import type * as contracts_actions from "../contracts/actions.js";
 import type * as contracts_aggregate from "../contracts/aggregate.js";
+import type * as contracts_aggregateWrites from "../contracts/aggregateWrites.js";
 import type * as contracts_backfill from "../contracts/backfill.js";
 import type * as contracts_creditProviders from "../contracts/creditProviders.js";
 import type * as contracts_domain from "../contracts/domain.js";
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   "audit/useCases": typeof audit_useCases;
   "contracts/actions": typeof contracts_actions;
   "contracts/aggregate": typeof contracts_aggregate;
+  "contracts/aggregateWrites": typeof contracts_aggregateWrites;
   "contracts/backfill": typeof contracts_backfill;
   "contracts/creditProviders": typeof contracts_creditProviders;
   "contracts/domain": typeof contracts_domain;
@@ -154,4 +156,6 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   contractsByStatus: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatus">;
+  contractsByStatusPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatusPlatform">;
+  ativoInsuredCentsPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"ativoInsuredCentsPlatform">;
 };

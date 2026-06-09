@@ -5,7 +5,12 @@ import { PAYMENT_LINE_ITEM_KIND, PaymentMethods, PaymentStates } from "./payment
 import { generatePaymentMuxedId } from "./payments/lib/muxedId";
 import type { AgencyId } from "./agencies/domain";
 import type { ContractId } from "./contracts/domain";
-import { contractsByStatus } from "./contracts/aggregate";
+import {
+  ativoInsuredCentsPlatform,
+  contractsByStatus,
+  contractsByStatusPlatform,
+} from "./contracts/aggregate";
+import { insertContractAggregates } from "./contracts/aggregateWrites";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1619,17 +1624,19 @@ export const seedFictional = internalMutation({
       if (contract) await ctx.db.patch(contract._id, { deactivatedAt });
     }
 
-    // ── Sync aggregate ────────────────────────────────────────────────────────
-    // Clear per-agency aggregate (wipe above deleted all rows, but the
-    // aggregate B-tree is separate and may have stale entries from a prior run).
-    // Then re-populate from the freshly inserted contracts.
+    // ── Sync aggregates ───────────────────────────────────────────────────────
+    // Wipe above deleted all rows, but the aggregate B-trees are separate and
+    // may have stale entries from a prior run. Clear all three then re-insert
+    // through the central helper so they stay in lockstep.
     for (const agencyId of [paulistaId, atlanticaId, horizonteId]) {
       await contractsByStatus.clear(ctx, { namespace: agencyId });
     }
+    await contractsByStatusPlatform.clear(ctx);
+    await ativoInsuredCentsPlatform.clear(ctx);
     {
       const allContracts = await ctx.db.query("contracts").collect();
       for (const doc of allContracts) {
-        await contractsByStatus.insert(ctx, doc);
+        await insertContractAggregates(ctx, doc);
       }
     }
 
@@ -2543,7 +2550,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
 
   for (const row of inserted) {
     const doc = await ctx.db.get(row.id);
-    if (doc) await contractsByStatus.insert(ctx, doc);
+    if (doc) await insertContractAggregates(ctx, doc);
   }
 
   const ativoRows = inserted.filter((r) => r.spec.status === "ativo");

@@ -1146,14 +1146,18 @@
       "viewExplorer": "Verify myself on the Stellar network"
     },
     "timeline": {
-      "label": "Contracts per week",
+      "title": "Contracts per week",
+      "descriptionLong": "Weekly contract breakdown for the selected period.",
+      "descriptionShort": "Contracts per week",
       "m6": "Last 6 months",
       "m12": "Last 12 months",
-      "description": "Weekly contract breakdown for the selected period.",
-      "seriesActive": "New",
-      "seriesCancelled": "Cancelled",
-      "seriesDelinquent": "Delinquent",
-      "seriesCumulative": "Cumulative"
+      "selectRangeAriaLabel": "Select a range",
+      "series": {
+        "netActive": "Active contracts",
+        "activated": "Activated",
+        "cancelled": "Cancelled",
+        "expired": "Expired"
+      }
     }
   }
 }

@@ -1,6 +1,32 @@
 import type { convexTest } from "convex-test";
+import aggregateComponentSchema from "../../node_modules/@convex-dev/aggregate/src/component/schema";
+
+declare global {
+  interface ImportMeta {
+    glob(pattern: string): Record<string, () => Promise<unknown>>;
+  }
+}
 
 export const TEST_USER_SUBJECT = "auth0|test-user";
+
+/**
+ * Register the three contract aggregate components used by production code
+ * paths. Mirrors the `app.use(aggregate, { name })` calls in
+ * `convex.config.ts`. Tests that exercise mutations writing to aggregates
+ * MUST call this on their `convexTest` instance before invoking the code.
+ */
+export function registerContractAggregateComponents(t: ReturnType<typeof convexTest>): void {
+  const componentGlob = import.meta.glob(
+    "../../node_modules/@convex-dev/aggregate/src/component/**/*.ts",
+  );
+  for (const name of [
+    "contractsByStatus",
+    "contractsByStatusPlatform",
+    "ativoInsuredCentsPlatform",
+  ]) {
+    t.registerComponent(name, aggregateComponentSchema, componentGlob);
+  }
+}
 
 type SeedUserOptions = {
   subject?: string;

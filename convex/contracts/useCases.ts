@@ -5,11 +5,23 @@ import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
 import { priceContract } from "../../apps/agency/src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
-import { contractsByStatus } from "./aggregate";
+import {
+  ativoInsuredCentsPlatform,
+  contractsByStatus,
+  contractsByStatusPlatform,
+} from "./aggregate";
+import { insertContractAggregates, replaceContractAggregates } from "./aggregateWrites";
 import { CONTRACT_STATUS, tierForScore } from "./domain";
+import type { ActivityBucket } from "./domain";
+import { getMaxGuaranteeCapacityCents } from "../lib/env";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
-import { assertAgencyAccess, mutationWithAgencyScope, queryWithAgencyScope } from "../lib/auth";
+import {
+  assertAgencyAccess,
+  mutationWithAgencyScope,
+  queryWithAgencyScope,
+  queryWithAuth,
+} from "../lib/auth";
 
 function generatePublicId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -114,27 +126,39 @@ function shapeContractSummary(doc: Contract) {
   };
 }
 
+const STATUS_KEYS = [
+  CONTRACT_STATUS.ATIVO,
+  CONTRACT_STATUS.PENDENTE,
+  CONTRACT_STATUS.ENCERRADO,
+  CONTRACT_STATUS.CANCELADO,
+] as const;
+
+type StatusCounts = {
+  ativo: number;
+  pendente: number;
+  encerrado: number;
+  cancelado: number;
+};
+
+function shapeStatusCountsResult(counts: readonly number[]): StatusCounts {
+  return {
+    ativo: counts[0] ?? 0,
+    pendente: counts[1] ?? 0,
+    encerrado: counts[2] ?? 0,
+    cancelado: counts[3] ?? 0,
+  };
+}
+
 /**
- * Real-time pipeline summary for one agency.
- *
- * Returns the count of contracts in each status using the `contractsByStatus`
- * aggregate — O(log n), no full-table scan.
- *
- * Used by `section-cards.tsx` (Painel) to display KPI tiles.
+ * Per-agency status counts. O(log n) via the namespaced `contractsByStatus`
+ * aggregate. Used by `section-cards.tsx` (Painel) KPI tiles.
  */
-export const getPipelineSummary = queryWithAgencyScope({
+export const getStatusCounts = queryWithAgencyScope({
   args: {},
   handler: async (ctx) => {
-    const statuses = [
-      CONTRACT_STATUS.ATIVO,
-      CONTRACT_STATUS.PENDENTE,
-      CONTRACT_STATUS.ENCERRADO,
-      CONTRACT_STATUS.CANCELADO,
-    ] as const;
-
     const counts = await contractsByStatus.countBatch(
       ctx,
-      statuses.map((status) => ({
+      STATUS_KEYS.map((status) => ({
         namespace: ctx.agencyId,
         bounds: {
           lower: { key: status, inclusive: true },
@@ -143,58 +167,198 @@ export const getPipelineSummary = queryWithAgencyScope({
       })),
     );
 
+    return shapeStatusCountsResult(counts);
+  },
+});
+
+/**
+ * Platform-wide status counts. O(log n) via the un-namespaced
+ * `contractsByStatusPlatform` aggregate. Used by the health/transparency page.
+ */
+export const getStatusCountsGlobal = queryWithAuth({
+  args: {},
+  handler: async (ctx) => {
+    const counts = await contractsByStatusPlatform.countBatch(
+      ctx,
+      STATUS_KEYS.map((status) => ({
+        bounds: {
+          lower: { key: status, inclusive: true },
+          upper: { key: status, inclusive: true },
+        },
+      })),
+    );
+
+    return shapeStatusCountsResult(counts);
+  },
+});
+
+/**
+ * Platform-wide insured capacity. Sum of `availableGuaranteeCents` across
+ * every contract in status `ativo`, plus the configured global capacity cap.
+ * O(log n) via the `ativoInsuredCentsPlatform` aggregate.
+ */
+export const getInsuredCapacityGlobal = queryWithAuth({
+  args: {},
+  handler: async (ctx) => {
+    const sumInsuredCents = await ativoInsuredCentsPlatform.sum(ctx, {
+      bounds: {
+        lower: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
+        upper: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
+      },
+    });
+
     return {
-      ativo: counts[0] ?? 0,
-      pendente: counts[1] ?? 0,
-      encerrado: counts[2] ?? 0,
-      cancelado: counts[3] ?? 0,
+      sumInsuredCents,
+      maxCapacityCents: getMaxGuaranteeCapacityCents(),
     };
   },
 });
 
-/** Monthly contract counts for the given agency, up to the last 12 months. */
-export const countByMonth = queryWithAgencyScope({
-  args: {},
-  handler: async (ctx) => {
-    const now = new Date();
-    // Build the last 12 calendar months as "YYYY-MM" labels
-    const months: string[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push(d.toISOString().slice(0, 7));
-    }
+const ACTIVITY_MONTH_PERIODS = 12;
+const ACTIVITY_WEEK_PERIODS = 52;
 
-    const contracts = await ctx.db
-      .query("contracts")
-      .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
-      .collect();
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
 
-    return months.map((month) => {
-      let netActive = 0;
-      let activated = 0;
-      let cancelled = 0;
-      let expired = 0;
+function monthPeriodKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+}
 
-      for (const c of contracts) {
-        // activations this month
-        if (c.activatedAt && c.activatedAt.slice(0, 7) === month) activated++;
+function dayPeriodKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
 
-        // deactivations this month
-        if (c.deactivatedAt && c.deactivatedAt.slice(0, 7) === month) {
-          if (c.status === "cancelado") cancelled++;
-          else if (c.status === "encerrado") expired++;
-        }
+/**
+ * Returns the UTC Monday at 00:00:00 for the week containing `at`. ISO-8601
+ * weeks start on Monday.
+ */
+function utcMondayStart(at: Date): Date {
+  const d = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+  const daysSinceMonday = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - daysSinceMonday);
+  return d;
+}
 
-        // net active snapshot at end of month
-        if (!c.activatedAt) continue;
-        if (c.activatedAt.slice(0, 7) > month) continue;
-        const deactivated = c.deactivatedAt ?? null;
-        if (deactivated && deactivated.slice(0, 7) <= month) continue;
-        netActive++;
+type PeriodBoundary = { startISO: string; endISO: string; key: string };
+
+function buildMonthBoundaries(now: Date, count: number): PeriodBoundary[] {
+  const startOfThisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const boundaries: PeriodBoundary[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const start = new Date(
+      Date.UTC(startOfThisMonth.getUTCFullYear(), startOfThisMonth.getUTCMonth() - i, 1),
+    );
+    const end = new Date(
+      Date.UTC(startOfThisMonth.getUTCFullYear(), startOfThisMonth.getUTCMonth() - i + 1, 1),
+    );
+    boundaries.push({
+      startISO: start.toISOString(),
+      endISO: end.toISOString(),
+      key: monthPeriodKey(start),
+    });
+  }
+  return boundaries;
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function buildWeekBoundaries(now: Date, count: number): PeriodBoundary[] {
+  const currentMondayMs = utcMondayStart(now).getTime();
+  const boundaries: PeriodBoundary[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const startMs = currentMondayMs - i * WEEK_MS;
+    const endMs = startMs + WEEK_MS;
+    const start = new Date(startMs);
+    boundaries.push({
+      startISO: start.toISOString(),
+      endISO: new Date(endMs).toISOString(),
+      key: dayPeriodKey(start),
+    });
+  }
+  return boundaries;
+}
+
+type ContractTimePoint = {
+  activatedAt: string | null;
+  deactivatedAt?: string | null;
+  status: Contract["status"];
+};
+
+function bucketsForContracts(
+  contracts: readonly ContractTimePoint[],
+  boundaries: readonly PeriodBoundary[],
+): ActivityBucket[] {
+  return boundaries.map(({ startISO, endISO, key }) => {
+    let activated = 0;
+    let cancelled = 0;
+    let expired = 0;
+    let netActive = 0;
+
+    for (const c of contracts) {
+      const activatedAt = c.activatedAt;
+      const deactivatedAt = c.deactivatedAt ?? null;
+
+      if (activatedAt && activatedAt >= startISO && activatedAt < endISO) {
+        activated++;
+      }
+      if (deactivatedAt && deactivatedAt >= startISO && deactivatedAt < endISO) {
+        if (c.status === CONTRACT_STATUS.CANCELADO) cancelled++;
+        else if (c.status === CONTRACT_STATUS.ENCERRADO) expired++;
       }
 
-      return { month, netActive, activated, cancelled, expired };
-    });
+      if (!activatedAt) continue;
+      if (activatedAt >= endISO) continue;
+      if (deactivatedAt && deactivatedAt < endISO) continue;
+      netActive++;
+    }
+
+    return { period: key, activated, cancelled, expired, netActive };
+  });
+}
+
+const activityScopeValidator = v.union(
+  v.object({ kind: v.literal("agency"), agencyId: v.id("agencies") }),
+  v.object({ kind: v.literal("platform") }),
+);
+
+const activityGranularityValidator = v.union(v.literal("month"), v.literal("week"));
+
+/**
+ * Contract-activity time series, scoped to either one agency or the platform.
+ *
+ * Auth: `queryWithAuth` + inline `assertAgencyAccess` for the agency arm —
+ * since wrapper choice is static per handler, the scope discriminator is the
+ * only way to serve both consumers from a single public function.
+ *
+ * Per-agency scope uses the `by_agency_status` index to bound the scan;
+ * platform scope does a full `.collect()` by design. Time-series aggregates
+ * are deliberately deferred until the contracts table crosses ~5–10k rows.
+ */
+export const getActivityByPeriod = queryWithAuth({
+  args: {
+    scope: activityScopeValidator,
+    granularity: activityGranularityValidator,
+  },
+  handler: async (ctx, { scope, granularity }): Promise<ActivityBucket[]> => {
+    let contracts: readonly ContractTimePoint[];
+    if (scope.kind === "agency") {
+      await assertAgencyAccess(ctx, scope.agencyId);
+      contracts = await ctx.db
+        .query("contracts")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", scope.agencyId))
+        .collect();
+    } else {
+      contracts = await ctx.db.query("contracts").collect();
+    }
+
+    const now = new Date();
+    const boundaries =
+      granularity === "month"
+        ? buildMonthBoundaries(now, ACTIVITY_MONTH_PERIODS)
+        : buildWeekBoundaries(now, ACTIVITY_WEEK_PERIODS);
+
+    return bucketsForContracts(contracts, boundaries);
   },
 });
 
@@ -478,7 +642,7 @@ export const create = mutationWithAgencyScope({
 
     const doc = await ctx.db.get(contractId);
     if (!doc) throw new Error("Contract insert failed");
-    await contractsByStatus.insert(ctx, doc);
+    await insertContractAggregates(ctx, doc);
 
     await ctx.db.insert("contractHistory", {
       agencyId: ctx.agencyId,
@@ -540,7 +704,7 @@ export const cancelProposal = mutationWithAgencyScope({
 
     await ctx.db.patch(contract._id, { status: "cancelado" });
     const after = await ctx.db.get(contract._id);
-    if (after) await contractsByStatus.replace(ctx, contract, after);
+    if (after) await replaceContractAggregates(ctx, contract, after);
 
     await ctx.db.insert("contractHistory", {
       agencyId: contract.agencyId,

@@ -12,5 +12,7 @@ const app = defineApp();
  * contend on the same internal nodes.
  */
 app.use(aggregate, { name: "contractsByStatus" });
+app.use(aggregate, { name: "contractsByStatusPlatform" });
+app.use(aggregate, { name: "ativoInsuredCentsPlatform" });
 
 export default app;
