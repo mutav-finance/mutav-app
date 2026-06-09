@@ -8,6 +8,27 @@
       "skipToMain": "Pular para o conteúdo principal"
     }
   },
+  "userMenu": {
+    "account": "Conta",
+    "notifications": "Notificações",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Escuro",
+    "themeSystem": "Sistema",
+    "language": "Idioma",
+    "logOut": "Sair"
+  },
+  "nav": {
+    "main": {
+      "overview": "Visão geral",
+      "agencies": "Imobiliárias",
+      "compliance": "Compliance",
+      "defaults": "Solicitações de inadimplência",
+      "treasury": "Tesouraria",
+      "observability": "Observabilidade",
+      "nav": "NAV"
+    }
+  },
   "adminShell": {
     "placeholder": {
       "title": "Mutav admin",

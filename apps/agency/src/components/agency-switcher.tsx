@@ -9,7 +9,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@mutav/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,

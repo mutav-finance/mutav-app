@@ -7,10 +7,13 @@
   "sideEffects": false,
   "exports": {
     "./cn": "./src/cn.ts",
+    "./avatar": "./src/avatar.tsx",
     "./button": "./src/button.tsx",
     "./chart": "./src/chart.tsx",
     "./collapsible": "./src/collapsible.tsx",
+    "./dropdown-menu": "./src/dropdown-menu.tsx",
     "./mono": "./src/mono.tsx",
+    "./nav-user": "./src/nav-user.tsx",
     "./select": "./src/select.tsx",
     "./separator": "./src/separator.tsx",
     "./skeleton": "./src/skeleton.tsx",
@@ -19,6 +22,7 @@
     "./toggle-group": "./src/toggle-group.tsx",
     "./toggle": "./src/toggle.tsx",
     "./tooltip": "./src/tooltip.tsx",
+    "./use-mobile": "./src/use-mobile.ts",
     "./page/page-content": "./src/page/page-content.tsx",
     "./page/page-header": "./src/page/page-header.tsx",
     "./page/page-shell": "./src/page/page-shell.tsx",
@@ -29,6 +33,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mutav/i18n": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.8.0",
