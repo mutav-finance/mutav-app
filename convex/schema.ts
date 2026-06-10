@@ -23,14 +23,18 @@ const documentKey = v.union(
 
 const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
 
-// Mirrors `EXIT_COST_MULTIPLIER` / `RENT_MULTIPLIER` / `PAYER` in
-// `convex/contracts/domain.ts`. Kept inline because `domain.ts` imports types
-// from `_generated/dataModel`, which would form a cycle through this schema.
-// Append new literals here AND in the matching enum object in `domain.ts` —
-// the `satisfies Record<Uppercase<T>, T>` constraint there will surface drift.
+// Mirrors `EXIT_COST_MULTIPLIER` / `RENT_MULTIPLIER` in `convex/contracts/domain.ts`.
+// Kept inline because `domain.ts` imports types from `_generated/dataModel`, which
+// would form a cycle through this schema. Append new literals here AND in the matching
+// enum object in `domain.ts` — the `satisfies Record<Uppercase<T>, T>` constraint
+// there will surface drift.
+//
+// `payer` stays `v.string()` (set on the rental object directly): legacy prod rows
+// hold display-label values like "Recorrência via Imobiliária" alongside the
+// canonical "inquilino" category. Writes are still funnelled through `DEFAULT_PAYER`
+// from `domain.ts` for type discipline; the schema just doesn't reject the legacy data.
 const exitCostMultiplier = v.union(v.literal("5x"), v.literal("6x"));
 const rentMultiplier = v.literal("30x");
-const payer = v.literal("inquilino");
 
 const tenantApprovalStatus = v.union(
   v.literal("aprovado"),
@@ -248,7 +252,7 @@ export default defineSchema({
       setupInstallments: v.number(),
       exitCostMultiplier,
       rentMultiplier,
-      payer,
+      payer: v.string(),
       pviMigrationSchedule: v.union(v.string(), v.null()),
     }),
 

@@ -9,7 +9,10 @@ export type ContractStatus = Contract["status"];
 export type PropertyKind = Contract["rental"]["propertyKind"];
 export type ExitCostMultiplier = Contract["rental"]["exitCostMultiplier"];
 export type RentMultiplier = Contract["rental"]["rentMultiplier"];
-export type Payer = Contract["rental"]["payer"];
+// Decoupled from the schema: persistence is `v.string()` to tolerate legacy
+// display-label rows; this narrow union enforces write-time discipline so new
+// code can only persist canonical category values.
+export type Payer = "inquilino";
 export type DocumentKey = Contract["documents"][number]["key"];
 export type DocumentStatus = Contract["documents"][number]["status"];
 export type TenantApprovalStatus = Contract["tenant"]["approvalStatus"];
