@@ -11,7 +11,13 @@ import {
   contractsByStatusPlatform,
 } from "./aggregate";
 import { insertContractAggregates, replaceContractAggregates } from "./aggregateWrites";
-import { CONTRACT_STATUS, tierForScore } from "./domain";
+import {
+  CONTRACT_STATUS,
+  DEFAULT_EXIT_COST_MULTIPLIER,
+  DEFAULT_PAYER,
+  DEFAULT_RENT_MULTIPLIER,
+  tierForScore,
+} from "./domain";
 import type { ActivityBucket } from "./domain";
 import { getMaxGuaranteeCapacityCents } from "../lib/env";
 import { AUDIT_ACTION } from "../audit/domain";
@@ -614,9 +620,9 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "30x",
-        payer: "inquilino",
+        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
+        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
+        payer: DEFAULT_PAYER,
         pviMigrationSchedule: null,
       },
       property: args.property,
@@ -666,8 +672,11 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         availableGuaranteeCents: priced.availableGuaranteeCents,
-        rentMultiplier: "30x",
-        exitCostMultiplier: "5x",
+        // TODO: mirror the actual written values when this mutation grows to
+        // accept multipliers from args. Today these always equal the defaults
+        // written above, so audit and rental stay in lockstep.
+        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
+        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
       },
     });
 

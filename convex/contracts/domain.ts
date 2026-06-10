@@ -7,6 +7,9 @@ export type ContractHistory = Doc<"contractHistory">;
 export type ContractHistoryId = Id<"contractHistory">;
 export type ContractStatus = Contract["status"];
 export type PropertyKind = Contract["rental"]["propertyKind"];
+export type ExitCostMultiplier = Contract["rental"]["exitCostMultiplier"];
+export type RentMultiplier = Contract["rental"]["rentMultiplier"];
+export type Payer = Contract["rental"]["payer"];
 export type DocumentKey = Contract["documents"][number]["key"];
 export type DocumentStatus = Contract["documents"][number]["status"];
 export type TenantApprovalStatus = Contract["tenant"]["approvalStatus"];
@@ -70,6 +73,45 @@ export const SCORE_TIER_THRESHOLD = {
   medium: 600,
   low: 400,
 } as const;
+
+/**
+ * Allowed multiplier values applied to a contract's rent. Schema validates
+ * via `exitCostMultiplierValidator` / `rentMultiplierValidator` (strict union
+ * of literals); these enum objects are the typed source of truth for writes.
+ * Append a value here AND in the matching inline validator in `schema.ts` to
+ * grow the set — `satisfies` will surface drift at compile time.
+ */
+export const EXIT_COST_MULTIPLIER = {
+  "5X": "5x",
+  "6X": "6x",
+} as const satisfies Record<Uppercase<ExitCostMultiplier>, ExitCostMultiplier>;
+
+export const RENT_MULTIPLIER = {
+  "30X": "30x",
+} as const satisfies Record<Uppercase<RentMultiplier>, RentMultiplier>;
+
+export const exitCostMultiplierValidator = v.union(
+  v.literal(EXIT_COST_MULTIPLIER["5X"]),
+  v.literal(EXIT_COST_MULTIPLIER["6X"]),
+);
+
+export const rentMultiplierValidator = v.literal(RENT_MULTIPLIER["30X"]);
+
+export const DEFAULT_EXIT_COST_MULTIPLIER: ExitCostMultiplier = EXIT_COST_MULTIPLIER["5X"];
+export const DEFAULT_RENT_MULTIPLIER: RentMultiplier = RENT_MULTIPLIER["30X"];
+
+/**
+ * Allowed values for `contracts.rental.payer` — the party responsible for
+ * the contract's recurring fees. This is a category, not a display label;
+ * UI components translate to user-facing copy via i18n.
+ */
+export const PAYER = {
+  INQUILINO: "inquilino",
+} as const satisfies Record<Uppercase<Payer>, Payer>;
+
+export const payerValidator = v.literal(PAYER.INQUILINO);
+
+export const DEFAULT_PAYER: Payer = PAYER.INQUILINO;
 
 export function tierForScore(score: number): ScoreTier {
   if (score >= SCORE_TIER_THRESHOLD.high) return SCORE_TIER.BOM;
