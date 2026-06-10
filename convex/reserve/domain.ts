@@ -30,7 +30,7 @@ export const reserveAssetValidator = v.object({
 /**
  * Convert an unscaled i128 balance string + token decimals into BRL cents.
  * Pure integer math (BigInt) to avoid float drift on large i128 values.
- * Rounds half up.
+ * Rounds half up by magnitude (away from zero for negative inputs — a reserve balance is never negative).
  */
 export function rawBalanceToCents(rawBalance: string, decimals: number): number {
   const negative = rawBalance.startsWith("-");

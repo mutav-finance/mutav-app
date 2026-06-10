@@ -174,11 +174,13 @@ export function getStellarRpcUrl(): string {
  */
 export function getReserveBrlPeggedSymbols(): readonly string[] {
   const raw = process.env.STELLAR_RESERVE_BRL_SYMBOLS; // hook-ok: env module boundary
-  if (raw)
-    return raw
+  if (raw) {
+    const parsed = raw
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+    if (parsed.length > 0) return parsed;
+  }
   return ["BRLT", "BRL", "TBRL"];
 }
 

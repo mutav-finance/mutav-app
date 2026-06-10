@@ -4,6 +4,9 @@ import {
   getAuth0MgmtClientId,
   getAuth0MgmtClientSecret,
   getMaxGuaranteeCapacityCents,
+  getReserveContractId,
+  getStellarRpcUrl,
+  getReserveBrlPeggedSymbols,
 } from "./env";
 
 describe("getAuth0MgmtClientId", () => {
@@ -94,8 +97,6 @@ describe("getMaxGuaranteeCapacityCents", () => {
   });
 });
 
-import { getReserveContractId, getStellarRpcUrl, getReserveBrlPeggedSymbols } from "./env";
-
 describe("getReserveContractId", () => {
   const KEY = "STELLAR_RESERVE_CONTRACT_ID";
   const NET = "STELLAR_NETWORK";
@@ -177,5 +178,11 @@ describe("getStellarRpcUrl", () => {
   test("respects an explicit override", () => {
     process.env[URLK] = "https://my-rpc.example";
     expect(getStellarRpcUrl()).toBe("https://my-rpc.example");
+  });
+
+  test("defaults to mainnet Soroban RPC on public network", () => {
+    delete process.env[URLK];
+    process.env[NET] = "public";
+    expect(getStellarRpcUrl()).toBe("https://mainnet.sorobanrpc.com");
   });
 });

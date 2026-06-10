@@ -8,8 +8,10 @@ describe("rawBalanceToCents", () => {
   });
 
   test("rounds half up", () => {
-    // 15 / 10^2 = 0.15 units -> 15 cents; 1 / 10^2 = 0.01 -> 1 cent
+    // 1 / 10^2 = 0.01 units = exactly 1 cent, no rounding
     expect(rawBalanceToCents("1", 2)).toBe(1);
+    // 4 / 10^3 = 0.004 units = 0.4 cents -> rounds down to 0
+    expect(rawBalanceToCents("4", 3)).toBe(0);
     // 5 / 10^3 = 0.005 units -> 0.5 cents -> rounds to 1
     expect(rawBalanceToCents("5", 3)).toBe(1);
   });

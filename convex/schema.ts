@@ -526,6 +526,7 @@ export default defineSchema({
     .index("by_status", ["status", "anchoredAt"])
     .index("by_periodEnd", ["periodEnd"]),
 
+  // The asset object mirrors reserveAssetValidator in convex/reserve/domain.ts — kept inline here because importing an entity file into schema.ts would create a circular dependency through _generated/dataModel (same reason as agencyDocumentKind above).
   reserveSnapshots: defineTable({
     storedValueCents: v.number(),
     assets: v.array(
