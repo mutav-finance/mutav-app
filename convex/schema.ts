@@ -526,6 +526,19 @@ export default defineSchema({
     .index("by_status", ["status", "anchoredAt"])
     .index("by_periodEnd", ["periodEnd"]),
 
+  reserveSnapshots: defineTable({
+    storedValueCents: v.number(),
+    assets: v.array(
+      v.object({
+        contractAddress: v.string(),
+        symbol: v.string(),
+        decimals: v.number(),
+        rawBalance: v.string(),
+      }),
+    ),
+    capturedAt: v.number(),
+  }).index("by_capturedAt", ["capturedAt"]),
+
   // Anonymous public waitlist for the marketing site (mutav-website).
   // One row per (audience, email). Dedup is enforced in the `join` mutation
   // via the `by_email_audience` index — the table itself has no unique
