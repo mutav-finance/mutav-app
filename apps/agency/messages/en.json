@@ -1121,7 +1121,7 @@
       }
     }
   },
-  "health": {
+  "transparency": {
     "meta": {
       "title": "Transparency",
       "description": "Mutav risk position and onchain treasury."

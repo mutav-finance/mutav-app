@@ -1121,7 +1121,7 @@
       }
     }
   },
-  "health": {
+  "transparency": {
     "meta": {
       "title": "Transparência",
       "description": "Posição de risco e treasury onchain da Mutav."
