@@ -53,6 +53,8 @@ import type * as payments_lib_muxedAddress from "../payments/lib/muxedAddress.js
 import type * as payments_lib_muxedId from "../payments/lib/muxedId.js";
 import type * as payments_mutations from "../payments/mutations.js";
 import type * as payments_useCases from "../payments/useCases.js";
+import type * as reserve_domain from "../reserve/domain.js";
+import type * as reserve_useCases from "../reserve/useCases.js";
 import type * as seed from "../seed.js";
 import type * as smoke_auth0Mgmt from "../smoke/auth0Mgmt.js";
 import type * as transparency_actions from "../transparency/actions.js";
@@ -116,6 +118,8 @@ declare const fullApi: ApiFromModules<{
   "payments/lib/muxedId": typeof payments_lib_muxedId;
   "payments/mutations": typeof payments_mutations;
   "payments/useCases": typeof payments_useCases;
+  "reserve/domain": typeof reserve_domain;
+  "reserve/useCases": typeof reserve_useCases;
   seed: typeof seed;
   "smoke/auth0Mgmt": typeof smoke_auth0Mgmt;
   "transparency/actions": typeof transparency_actions;
