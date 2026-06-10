@@ -23,6 +23,15 @@ const documentKey = v.union(
 
 const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
 
+// Mirrors `EXIT_COST_MULTIPLIER` / `RENT_MULTIPLIER` / `PAYER` in
+// `convex/contracts/domain.ts`. Kept inline because `domain.ts` imports types
+// from `_generated/dataModel`, which would form a cycle through this schema.
+// Append new literals here AND in the matching enum object in `domain.ts` —
+// the `satisfies Record<Uppercase<T>, T>` constraint there will surface drift.
+const exitCostMultiplier = v.union(v.literal("5x"), v.literal("6x"));
+const rentMultiplier = v.literal("30x");
+const payer = v.literal("inquilino");
+
 const tenantApprovalStatus = v.union(
   v.literal("aprovado"),
   v.literal("pendente"),
@@ -237,9 +246,9 @@ export default defineSchema({
       feeCents: v.number(),
       oneTimeActivationFeeCents: v.number(),
       setupInstallments: v.number(),
-      exitCostMultiplier: v.literal("5x"),
-      rentMultiplier: v.literal("30x"),
-      payer: v.string(),
+      exitCostMultiplier,
+      rentMultiplier,
+      payer,
       pviMigrationSchedule: v.union(v.string(), v.null()),
     }),
 
