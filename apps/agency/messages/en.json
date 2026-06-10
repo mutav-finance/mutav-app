@@ -114,7 +114,7 @@
       "contracts": "Contracts",
       "payments": "Invoices",
       "delinquencies": "Delinquencies",
-      "health": "Transparency"
+      "transparency": "Transparency"
     },
     "cadastros": {
       "groupLabel": "Registries",

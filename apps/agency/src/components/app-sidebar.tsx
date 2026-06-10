@@ -11,7 +11,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/compone
 import {
   LayoutDashboardIcon,
   FileTextIcon,
-  HeartPulseIcon,
+  ShieldCheckIcon,
   ReceiptIcon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -27,7 +27,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
     { title: tMain("payments"), href: "/payments", icon: <ReceiptIcon /> },
     { title: tMain("delinquencies"), href: "/delinquencies", icon: <TriangleAlertIcon /> },
-    { title: tMain("health"), href: "/health", icon: <HeartPulseIcon /> },
+    { title: tMain("transparency"), href: "/transparency", icon: <ShieldCheckIcon /> },
   ];
 
   return (
