@@ -2,25 +2,25 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { usePreloadedQuery, useAction } from "convex/react";
+import { usePreloadedQuery } from "convex/react";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { ActivityBucket } from "@convex/contracts/domain";
-import type { ContractAggregates, TreasurySnapshot } from "@convex/health/domain";
+import type { ContractAggregates } from "@convex/transparency/domain";
 import { ContractsPanel } from "./contracts-panel";
 import { CapacityPanel } from "./capacity-panel";
 import { TreasuryPanel } from "./treasury-panel";
 import { TimelinePanel } from "./timeline-panel";
 
 type Props = {
-  preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates> | null;
+  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getContractAggregates> | null;
   preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod> | null;
   initialAggregates: ContractAggregates | null;
   initialTimeline: ActivityBucket[] | null;
 };
 
 type LiveProps = {
-  preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates>;
+  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getContractAggregates>;
   preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod>;
 };
 
@@ -29,21 +29,8 @@ type LayoutProps = {
   timeline: ActivityBucket[] | null | undefined;
 };
 
-function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
-  const t = useTranslations("health");
-  const fetchTreasury = useAction(api.health.actions.getTreasurySnapshot);
-  const [treasury, setTreasury] = React.useState<TreasurySnapshot | null>(null);
-  const [treasuryError, setTreasuryError] = React.useState(false);
-
-  const loadTreasury = React.useEffectEvent(() => {
-    fetchTreasury({})
-      .then(setTreasury)
-      .catch(() => setTreasuryError(true));
-  });
-
-  React.useEffect(() => {
-    loadTreasury();
-  }, []);
+function TransparencyPageLayout({ aggregates, timeline }: LayoutProps) {
+  const t = useTranslations("transparency");
 
   const agg = aggregates ?? null;
   const tl = timeline ?? null;
@@ -56,7 +43,7 @@ function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <CapacityPanel aggregates={agg} />
-        <TreasuryPanel treasury={treasury} error={treasuryError} />
+        <TreasuryPanel treasury={null} error={false} />
       </div>
 
       <TimelinePanel data={tl} />
@@ -66,13 +53,13 @@ function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
   );
 }
 
-function HealthPageLive({ preloadedAggregates, preloadedTimeline }: LiveProps) {
+function TransparencyPageLive({ preloadedAggregates, preloadedTimeline }: LiveProps) {
   const aggregates = usePreloadedQuery(preloadedAggregates);
   const timeline = usePreloadedQuery(preloadedTimeline);
-  return <HealthPageLayout aggregates={aggregates} timeline={timeline} />;
+  return <TransparencyPageLayout aggregates={aggregates} timeline={timeline} />;
 }
 
-export function HealthPage({
+export function TransparencyPage({
   preloadedAggregates,
   preloadedTimeline,
   initialAggregates,
@@ -80,12 +67,12 @@ export function HealthPage({
 }: Props) {
   if (preloadedAggregates && preloadedTimeline) {
     return (
-      <HealthPageLive
+      <TransparencyPageLive
         preloadedAggregates={preloadedAggregates}
         preloadedTimeline={preloadedTimeline}
       />
     );
   }
 
-  return <HealthPageLayout aggregates={initialAggregates} timeline={initialTimeline} />;
+  return <TransparencyPageLayout aggregates={initialAggregates} timeline={initialTimeline} />;
 }

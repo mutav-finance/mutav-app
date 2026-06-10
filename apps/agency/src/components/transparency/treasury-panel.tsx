@@ -5,7 +5,7 @@ import { ExternalLinkIcon, LinkIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
-import type { TreasurySnapshot } from "@convex/health/domain";
+import type { TreasurySnapshot } from "@convex/transparency/domain";
 
 type Props = {
   treasury: TreasurySnapshot | null;
@@ -17,7 +17,7 @@ function truncateAddress(address: string): string {
 }
 
 export function TreasuryPanel({ treasury, error }: Props) {
-  const t = useTranslations("health.treasury");
+  const t = useTranslations("transparency.treasury");
   const locale = useLocale();
   const loading = !treasury && !error;
 
