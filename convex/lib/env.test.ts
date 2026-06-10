@@ -93,3 +93,89 @@ describe("getMaxGuaranteeCapacityCents", () => {
     expect(getMaxGuaranteeCapacityCents()).toBe(500_000_000);
   });
 });
+
+import { getReserveContractId, getStellarRpcUrl, getReserveBrlPeggedSymbols } from "./env";
+
+describe("getReserveContractId", () => {
+  const KEY = "STELLAR_RESERVE_CONTRACT_ID";
+  const NET = "STELLAR_NETWORK";
+  let origId: string | undefined;
+  let origNet: string | undefined;
+  beforeEach(() => {
+    origId = process.env[KEY];
+    origNet = process.env[NET];
+  });
+  afterEach(() => {
+    if (origId === undefined) delete process.env[KEY];
+    else process.env[KEY] = origId;
+    if (origNet === undefined) delete process.env[NET];
+    else process.env[NET] = origNet;
+  });
+
+  test("returns the explicit value when set", () => {
+    process.env[KEY] = "CXYZ";
+    expect(getReserveContractId()).toBe("CXYZ");
+  });
+
+  test("falls back to the testnet reserve vault when unset on testnet", () => {
+    delete process.env[KEY];
+    delete process.env[NET];
+    expect(getReserveContractId()).toBe("CBDGKVRP5MYER3I2WZ7F2FJULFFXY3NHB5MU75VSEZHDXYJNAB3YC7Y2");
+  });
+
+  test("returns null on public network when unset (no mainnet default)", () => {
+    delete process.env[KEY];
+    process.env[NET] = "public";
+    expect(getReserveContractId()).toBeNull();
+  });
+});
+
+describe("getReserveBrlPeggedSymbols", () => {
+  const KEY = "STELLAR_RESERVE_BRL_SYMBOLS";
+  let orig: string | undefined;
+  beforeEach(() => {
+    orig = process.env[KEY];
+  });
+  afterEach(() => {
+    if (orig === undefined) delete process.env[KEY];
+    else process.env[KEY] = orig;
+  });
+
+  test("defaults to the BRL-pegged symbol set", () => {
+    delete process.env[KEY];
+    expect(getReserveBrlPeggedSymbols()).toEqual(["BRLT", "BRL", "TBRL"]);
+  });
+
+  test("parses a comma-separated override", () => {
+    process.env[KEY] = "BRLX, FOO ,BAR";
+    expect(getReserveBrlPeggedSymbols()).toEqual(["BRLX", "FOO", "BAR"]);
+  });
+});
+
+describe("getStellarRpcUrl", () => {
+  const URLK = "STELLAR_SOROBAN_RPC_URL";
+  const NET = "STELLAR_NETWORK";
+  let origUrl: string | undefined;
+  let origNet: string | undefined;
+  beforeEach(() => {
+    origUrl = process.env[URLK];
+    origNet = process.env[NET];
+  });
+  afterEach(() => {
+    if (origUrl === undefined) delete process.env[URLK];
+    else process.env[URLK] = origUrl;
+    if (origNet === undefined) delete process.env[NET];
+    else process.env[NET] = origNet;
+  });
+
+  test("defaults to testnet Soroban RPC", () => {
+    delete process.env[URLK];
+    delete process.env[NET];
+    expect(getStellarRpcUrl()).toBe("https://soroban-testnet.stellar.org");
+  });
+
+  test("respects an explicit override", () => {
+    process.env[URLK] = "https://my-rpc.example";
+    expect(getStellarRpcUrl()).toBe("https://my-rpc.example");
+  });
+});

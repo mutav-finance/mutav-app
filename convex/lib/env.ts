@@ -142,6 +142,46 @@ export function getStellarHorizonUrl(): string {
   return getStellarNetwork() === "public" ? DEFAULT_HORIZON_PUBLIC : DEFAULT_HORIZON_TESTNET;
 }
 
+const DEFAULT_RESERVE_VAULT_TESTNET = "CBDGKVRP5MYER3I2WZ7F2FJULFFXY3NHB5MU75VSEZHDXYJNAB3YC7Y2";
+const DEFAULT_SOROBAN_RPC_TESTNET = "https://soroban-testnet.stellar.org";
+const DEFAULT_SOROBAN_RPC_PUBLIC = "https://mainnet.sorobanrpc.com";
+
+/**
+ * Reserve-vault contract id. On testnet, defaults to the deployed
+ * `reserve-vault-postpivot` instance so dev/preview reads work out of the box.
+ * On `public` there is no default — returns `null` until explicitly configured,
+ * and the reserve read reports `available: false` rather than guessing.
+ */
+export function getReserveContractId(): string | null {
+  const explicit = process.env.STELLAR_RESERVE_CONTRACT_ID; // hook-ok: env module boundary
+  if (explicit) return explicit;
+  return getStellarNetwork() === "public" ? null : DEFAULT_RESERVE_VAULT_TESTNET;
+}
+
+/** Soroban RPC endpoint (distinct from Horizon). */
+export function getStellarRpcUrl(): string {
+  const explicit = process.env.STELLAR_SOROBAN_RPC_URL; // hook-ok: env module boundary
+  if (explicit) return explicit;
+  return getStellarNetwork() === "public"
+    ? DEFAULT_SOROBAN_RPC_PUBLIC
+    : DEFAULT_SOROBAN_RPC_TESTNET;
+}
+
+/**
+ * SEP-41 symbols treated as 1:1 BRL for the coverage headline. Assets outside
+ * this set still appear in the snapshot for transparency but don't contribute
+ * to the cents total (no price feed in v1).
+ */
+export function getReserveBrlPeggedSymbols(): readonly string[] {
+  const raw = process.env.STELLAR_RESERVE_BRL_SYMBOLS; // hook-ok: env module boundary
+  if (raw)
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return ["BRLT", "BRL", "TBRL"];
+}
+
 /**
  * Lazy getter for the Stellar treasury secret (`S...`) — required only
  * inside anchor actions that sign SEP-10 challenges. Throws with a
