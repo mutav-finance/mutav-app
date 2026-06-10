@@ -7,11 +7,11 @@ export type ContractHistory = Doc<"contractHistory">;
 export type ContractHistoryId = Id<"contractHistory">;
 export type ContractStatus = Contract["status"];
 export type PropertyKind = Contract["rental"]["propertyKind"];
-export type ExitCostMultiplier = Contract["rental"]["exitCostMultiplier"];
-export type RentMultiplier = Contract["rental"]["rentMultiplier"];
 // Decoupled from the schema: persistence is `v.string()` to tolerate legacy
-// display-label rows; this narrow union enforces write-time discipline so new
-// code can only persist canonical category values.
+// rows with bespoke values across these fields. The narrow unions below
+// enforce write-time discipline so new code can only persist canonical values.
+export type ExitCostMultiplier = "5x";
+export type RentMultiplier = "30x";
 export type Payer = "inquilino";
 export type DocumentKey = Contract["documents"][number]["key"];
 export type DocumentStatus = Contract["documents"][number]["status"];
@@ -78,27 +78,17 @@ export const SCORE_TIER_THRESHOLD = {
 } as const;
 
 /**
- * Allowed multiplier values applied to a contract's rent. Schema validates
- * via `exitCostMultiplierValidator` / `rentMultiplierValidator` (strict union
- * of literals); these enum objects are the typed source of truth for writes.
- * Append a value here AND in the matching inline validator in `schema.ts` to
- * grow the set — `satisfies` will surface drift at compile time.
+ * Canonical multiplier values applied to a contract's rent. Schema persists
+ * as `v.string()` to tolerate legacy rows with bespoke values; these enums
+ * are the typed source of truth for new writes.
  */
 export const EXIT_COST_MULTIPLIER = {
   "5X": "5x",
-  "6X": "6x",
 } as const satisfies Record<Uppercase<ExitCostMultiplier>, ExitCostMultiplier>;
 
 export const RENT_MULTIPLIER = {
   "30X": "30x",
 } as const satisfies Record<Uppercase<RentMultiplier>, RentMultiplier>;
-
-export const exitCostMultiplierValidator = v.union(
-  v.literal(EXIT_COST_MULTIPLIER["5X"]),
-  v.literal(EXIT_COST_MULTIPLIER["6X"]),
-);
-
-export const rentMultiplierValidator = v.literal(RENT_MULTIPLIER["30X"]);
 
 export const DEFAULT_EXIT_COST_MULTIPLIER: ExitCostMultiplier = EXIT_COST_MULTIPLIER["5X"];
 export const DEFAULT_RENT_MULTIPLIER: RentMultiplier = RENT_MULTIPLIER["30X"];
