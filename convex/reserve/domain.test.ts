@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { rawBalanceToCents, storedValueCentsFromAssets, type ReserveAsset } from "./domain";
+import {
+  assetRateBrl,
+  assetValueCents,
+  rawBalanceToCents,
+  storedValueCentsFromValuedAssets,
+  valueAssets,
+  type ReserveAsset,
+  type ReservePricing,
+} from "./domain";
 
 describe("rawBalanceToCents", () => {
   test("scales a 7-decimal balance to cents", () => {
@@ -22,18 +30,63 @@ describe("rawBalanceToCents", () => {
   });
 });
 
-describe("storedValueCentsFromAssets", () => {
-  const assets: ReserveAsset[] = [
-    { contractAddress: "C1", symbol: "BRLT", decimals: 7, rawBalance: "12345000000" }, // 1234.50
-    { contractAddress: "C2", symbol: "USDC", decimals: 7, rawBalance: "50000000" }, // 5.00 USDC (ignored)
-    { contractAddress: "C3", symbol: "BRL", decimals: 2, rawBalance: "10000" }, // 100.00
-  ];
-
-  test("sums only BRL-pegged symbols", () => {
-    expect(storedValueCentsFromAssets(assets, ["BRLT", "BRL"])).toBe(123450 + 10000);
+describe("assetValueCents", () => {
+  test("at rate 1 matches the BRL-1:1 primitive", () => {
+    expect(assetValueCents("12345000000", 7, 1)).toBe(rawBalanceToCents("12345000000", 7));
+    expect(assetValueCents("12345000000", 7, 1)).toBe(123450);
   });
 
-  test("returns 0 when no asset is pegged", () => {
-    expect(storedValueCentsFromAssets(assets, ["NONE"])).toBe(0);
+  test("converts a USD balance at a non-trivial rate", () => {
+    // 9925000 / 10^7 = 0.9925 USD * 5.5 BRL/USD = 5.45875 BRL -> 545.875 cents -> 546
+    expect(assetValueCents("9925000", 7, 5.5)).toBe(546);
+    // 100 USDC (7 decimals) = 1000000000 raw, * 5.5 = 550 BRL -> 55000 cents
+    expect(assetValueCents("1000000000", 7, 5.5)).toBe(55000);
+  });
+
+  test("handles zero", () => {
+    expect(assetValueCents("0", 7, 5.5)).toBe(0);
+  });
+});
+
+describe("assetRateBrl", () => {
+  const pricing: ReservePricing = {
+    brlSymbols: ["BRLT", "BRL"],
+    usdSymbols: ["USDC", "USDCMOCK"],
+    usdBrlRate: 5.5,
+  };
+
+  test("returns 1 for a BRL-pegged symbol", () => {
+    expect(assetRateBrl("BRLT", pricing)).toBe(1);
+  });
+
+  test("returns the USD→BRL rate for a USD-pegged symbol", () => {
+    expect(assetRateBrl("USDCMOCK", pricing)).toBe(5.5);
+  });
+
+  test("returns null for an unpriced symbol", () => {
+    expect(assetRateBrl("XLM", pricing)).toBeNull();
+  });
+});
+
+describe("valueAssets + storedValueCentsFromValuedAssets", () => {
+  const assets: ReserveAsset[] = [
+    { contractAddress: "C1", symbol: "BRLT", decimals: 7, rawBalance: "12345000000" }, // 1234.50 BRL
+    { contractAddress: "C2", symbol: "USDCMOCK", decimals: 7, rawBalance: "1000000000" }, // 100 USDC -> 550 BRL
+    { contractAddress: "C3", symbol: "XLM", decimals: 7, rawBalance: "50000000" }, // unpriced -> 0
+  ];
+  const pricing: ReservePricing = {
+    brlSymbols: ["BRLT", "BRL"],
+    usdSymbols: ["USDC", "USDCMOCK"],
+    usdBrlRate: 5.5,
+  };
+
+  test("values each asset by its symbol's rate, unpriced -> 0", () => {
+    const valued = valueAssets(assets, pricing);
+    expect(valued.map((a) => a.valueCents)).toEqual([123450, 55000, 0]);
+  });
+
+  test("sums the per-asset BRL cents", () => {
+    const valued = valueAssets(assets, pricing);
+    expect(storedValueCentsFromValuedAssets(valued)).toBe(123450 + 55000 + 0);
   });
 });

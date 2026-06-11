@@ -12,12 +12,20 @@ export type ReserveAsset = {
   rawBalance: string; // i128 balance() as an unscaled base-10 string
 };
 
+/** A reserve asset priced into BRL cents at the snapshot's FX rate (stored shape). */
+export type ReserveValuedAsset = ReserveAsset & { valueCents: number };
+
 /**
  * Outcome of a reserve read. NEVER a mock: when the contract is unconfigured
  * or the RPC read fails, `available` is false and the dashboard shows no number.
  */
 export type ReserveReadResult =
-  | { available: true; storedValueCents: number; assets: ReserveAsset[] }
+  | {
+      available: true;
+      storedValueCents: number;
+      fxUsdBrl: number;
+      assets: ReserveValuedAsset[];
+    }
   | { available: false };
 
 export const reserveAssetValidator = v.object({
@@ -25,7 +33,15 @@ export const reserveAssetValidator = v.object({
   symbol: v.string(),
   decimals: v.number(),
   rawBalance: v.string(),
+  valueCents: v.number(),
 });
+
+/** Symbol→BRL rate inputs for a single reserve read. */
+export type ReservePricing = {
+  brlSymbols: readonly string[];
+  usdSymbols: readonly string[];
+  usdBrlRate: number;
+};
 
 /**
  * Convert an unscaled i128 balance string + token decimals into BRL cents.
@@ -46,19 +62,47 @@ export function rawBalanceToCents(rawBalance: string, decimals: number): number 
 }
 
 /**
- * Sum the BRL-pegged approved assets into integer cents. Non-pegged assets are
- * ignored in the headline (no price feed in v1) but remain in the snapshot.
+ * BRL rate for an asset by symbol: 1 for BRL-pegged, the live USD→BRL rate for
+ * USD-pegged, null when no price feed applies (excluded from the headline).
  */
-export function storedValueCentsFromAssets(
-  assets: ReserveAsset[],
-  brlPeggedSymbols: readonly string[],
-): number {
-  const pegged = new Set(brlPeggedSymbols);
-  return assets.reduce(
-    (cents, asset) =>
-      pegged.has(asset.symbol)
-        ? cents + rawBalanceToCents(asset.rawBalance, asset.decimals)
-        : cents,
-    0,
-  );
+export function assetRateBrl(symbol: string, pricing: ReservePricing): number | null {
+  if (pricing.brlSymbols.includes(symbol)) return 1;
+  if (pricing.usdSymbols.includes(symbol)) return pricing.usdBrlRate;
+  return null;
+}
+
+/**
+ * Value an i128 balance into BRL cents at `rateBrl`. Quantizes the rate to
+ * micro-units so the conversion stays integer math:
+ *   cents = round(raw × rateMicro / (10^decimals × 1e4)).
+ * Note `assetValueCents(raw, dec, 1) === rawBalanceToCents(raw, dec)`.
+ */
+export function assetValueCents(rawBalance: string, decimals: number, rateBrl: number): number {
+  const negative = rawBalance.startsWith("-");
+  const digits = negative ? rawBalance.slice(1) : rawBalance;
+  const raw = BigInt(digits.length ? digits : "0");
+  const rateMicro = BigInt(Math.round(rateBrl * 1_000_000));
+  const denom = BigInt(10) ** BigInt(decimals) * BigInt(10000);
+  const num = raw * rateMicro;
+  const whole = num / denom;
+  const remainder = num % denom;
+  const rounded = remainder * BigInt(2) >= denom ? whole + BigInt(1) : whole;
+  const result = Number(rounded);
+  return negative ? -result : result;
+}
+
+/** Price every asset into BRL cents; unpriced symbols carry valueCents 0. */
+export function valueAssets(assets: ReserveAsset[], pricing: ReservePricing): ReserveValuedAsset[] {
+  return assets.map((a) => {
+    const rate = assetRateBrl(a.symbol, pricing);
+    return {
+      ...a,
+      valueCents: rate === null ? 0 : assetValueCents(a.rawBalance, a.decimals, rate),
+    };
+  });
+}
+
+/** Sum the per-asset BRL cents into the headline coverage figure. */
+export function storedValueCentsFromValuedAssets(assets: ReserveValuedAsset[]): number {
+  return assets.reduce((c, a) => c + a.valueCents, 0);
 }
