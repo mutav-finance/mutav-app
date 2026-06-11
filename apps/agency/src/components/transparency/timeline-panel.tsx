@@ -10,7 +10,7 @@ export function TimelinePanel({ data }: Props) {
     <ActivityChart
       data={data}
       granularity="week"
-      i18nNamespace="health.timeline"
+      i18nNamespace="transparency.timeline"
       rangeOptions={[
         { value: "m6", periods: 26, labelKey: "m6" },
         { value: "m12", periods: 52, labelKey: "m12" },

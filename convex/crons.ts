@@ -69,4 +69,16 @@ crons.interval(
  */
 crons.cron("daily audit anchor", "10 0 * * *", internal.audit.actions.submitDailyAnchor, {});
 
+/**
+ * Every 15 minutes. Reads the reserve vault's approved-asset balances over
+ * Soroban RPC and writes a `reserveSnapshots` row. On read failure it writes
+ * nothing, so the dashboard keeps the last good (timestamped) figure.
+ */
+crons.interval(
+  "refresh reserve snapshot",
+  { minutes: 15 },
+  internal.reserve.actions.refreshReserveSnapshot,
+  {},
+);
+
 export default crons;
