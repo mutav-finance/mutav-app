@@ -51,13 +51,14 @@ async function readReserve(): Promise<ReserveReadResult> {
     const networkPassphrase = getStellarNetwork() === "public" ? Networks.PUBLIC : Networks.TESTNET;
     const vault = new Contract(contractId);
 
-    const addresses = (await simulateRead(
+    const rawAddresses = await simulateRead(
       server,
       vault,
       "approved_assets",
       [],
       networkPassphrase,
-    )) as string[];
+    );
+    const addresses = Array.isArray(rawAddresses) ? rawAddresses.map(String) : [];
 
     const assets: ReserveAsset[] = [];
     for (const addr of addresses) {
