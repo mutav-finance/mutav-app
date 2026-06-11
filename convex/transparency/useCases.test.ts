@@ -78,4 +78,29 @@ describe("getReserveCoverage", () => {
       expect(coverage.assetCount).toBe(1);
     }
   });
+
+  test("reports unavailable when the latest snapshot has no priced value (held-but-unpriced)", async () => {
+    const reader = await authedReader();
+    // Vault holds an asset, but its symbol isn't in the BRL/USD price lists, so
+    // every valueCents is 0 → headline R$ 0,00 must show "unavailable", not a number.
+    await reader.mutation(internal.reserve.useCases.writeSnapshot, {
+      storedValueCents: 0,
+      fxUsdBrl: 5.42,
+      fxSource: "BCB_PTAX_VENDA",
+      fxQuotedAt: "2026-06-10 13:12:50",
+      assets: [
+        {
+          contractAddress: "C9",
+          symbol: "XLM",
+          decimals: 7,
+          rawBalance: "1000000000",
+          valueCents: 0,
+        },
+      ],
+      capturedAt: 1717000000000,
+    });
+    const coverage = await reader.query(api.transparency.useCases.getReserveCoverage, {});
+    expect(coverage.available).toBe(false);
+    expect(coverage.explorerUrl).toContain("/contract/");
+  });
 });
