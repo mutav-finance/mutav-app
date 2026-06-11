@@ -185,6 +185,31 @@ export function getReserveBrlPeggedSymbols(): readonly string[] {
 }
 
 /**
+ * SEP-41 symbols treated as USD-pegged. Their on-chain balance is valued in
+ * BRL at the live USD→BRL rate (see `getFxUsdBrlUrl`). Defaults cover the
+ * testnet mock (`USDCMOCK`) plus canonical `USDC`.
+ */
+export function getReserveUsdSymbols(): readonly string[] {
+  const raw = process.env.STELLAR_RESERVE_USD_SYMBOLS; // hook-ok: env module boundary
+  if (raw) {
+    const parsed = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parsed.length > 0) return parsed;
+  }
+  return ["USDC", "USDCMOCK"];
+}
+
+/**
+ * FX endpoint for the USD→BRL reference rate. Defaults to keyless Frankfurter
+ * (ECB-sourced). Production upgrade (follow-up): BCB PTAX official rate.
+ */
+export function getFxUsdBrlUrl(): string {
+  return process.env.FX_USD_BRL_URL ?? "https://api.frankfurter.app/latest?from=USD&to=BRL"; // hook-ok: env module boundary
+}
+
+/**
  * Lazy getter for the Stellar treasury secret (`S...`) — required only
  * inside anchor actions that sign SEP-10 challenges. Throws with a
  * helpful message if the env var is missing, so callers that never sign

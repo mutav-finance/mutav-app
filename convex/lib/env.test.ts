@@ -7,6 +7,8 @@ import {
   getReserveContractId,
   getStellarRpcUrl,
   getReserveBrlPeggedSymbols,
+  getReserveUsdSymbols,
+  getFxUsdBrlUrl,
 } from "./env";
 
 describe("getAuth0MgmtClientId", () => {
@@ -150,6 +152,55 @@ describe("getReserveBrlPeggedSymbols", () => {
   test("parses a comma-separated override", () => {
     process.env[KEY] = "BRLX, FOO ,BAR";
     expect(getReserveBrlPeggedSymbols()).toEqual(["BRLX", "FOO", "BAR"]);
+  });
+});
+
+describe("getReserveUsdSymbols", () => {
+  const KEY = "STELLAR_RESERVE_USD_SYMBOLS";
+  let orig: string | undefined;
+  beforeEach(() => {
+    orig = process.env[KEY];
+  });
+  afterEach(() => {
+    if (orig === undefined) delete process.env[KEY];
+    else process.env[KEY] = orig;
+  });
+
+  test("defaults to the USD-pegged symbol set", () => {
+    delete process.env[KEY];
+    expect(getReserveUsdSymbols()).toEqual(["USDC", "USDCMOCK"]);
+  });
+
+  test("parses a comma-separated override", () => {
+    process.env[KEY] = "USDC, USDX ,FOO";
+    expect(getReserveUsdSymbols()).toEqual(["USDC", "USDX", "FOO"]);
+  });
+
+  test("falls back to the default when the override parses empty", () => {
+    process.env[KEY] = " , ,";
+    expect(getReserveUsdSymbols()).toEqual(["USDC", "USDCMOCK"]);
+  });
+});
+
+describe("getFxUsdBrlUrl", () => {
+  const KEY = "FX_USD_BRL_URL";
+  let orig: string | undefined;
+  beforeEach(() => {
+    orig = process.env[KEY];
+  });
+  afterEach(() => {
+    if (orig === undefined) delete process.env[KEY];
+    else process.env[KEY] = orig;
+  });
+
+  test("defaults to the keyless Frankfurter endpoint", () => {
+    delete process.env[KEY];
+    expect(getFxUsdBrlUrl()).toBe("https://api.frankfurter.app/latest?from=USD&to=BRL");
+  });
+
+  test("respects an explicit override", () => {
+    process.env[KEY] = "https://fx.example/latest";
+    expect(getFxUsdBrlUrl()).toBe("https://fx.example/latest");
   });
 });
 
