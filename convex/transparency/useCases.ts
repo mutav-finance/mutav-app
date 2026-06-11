@@ -65,7 +65,11 @@ export const getReserveCoverage = queryWithAuth({
       .withIndex("by_capturedAt")
       .order("desc")
       .first();
-    if (!snap) return { explorerUrl, available: false };
+    // A snapshot with no priced value — empty vault, a wrong-but-responsive
+    // contract, or held assets whose symbols aren't in the BRL/USD price lists —
+    // must not surface a misleading R$ 0,00 headline. Show "unavailable" instead;
+    // the snapshot row still records the held assets for audit.
+    if (!snap || snap.storedValueCents <= 0) return { explorerUrl, available: false };
     return {
       explorerUrl,
       available: true,
