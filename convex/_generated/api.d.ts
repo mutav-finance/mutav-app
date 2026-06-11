@@ -58,7 +58,6 @@ import type * as reserve_domain from "../reserve/domain.js";
 import type * as reserve_useCases from "../reserve/useCases.js";
 import type * as seed from "../seed.js";
 import type * as smoke_auth0Mgmt from "../smoke/auth0Mgmt.js";
-import type * as transparency_actions from "../transparency/actions.js";
 import type * as transparency_domain from "../transparency/domain.js";
 import type * as transparency_useCases from "../transparency/useCases.js";
 import type * as users_domain from "../users/domain.js";
@@ -124,7 +123,6 @@ declare const fullApi: ApiFromModules<{
   "reserve/useCases": typeof reserve_useCases;
   seed: typeof seed;
   "smoke/auth0Mgmt": typeof smoke_auth0Mgmt;
-  "transparency/actions": typeof transparency_actions;
   "transparency/domain": typeof transparency_domain;
   "transparency/useCases": typeof transparency_useCases;
   "users/domain": typeof users_domain;
