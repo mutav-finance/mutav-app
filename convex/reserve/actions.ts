@@ -47,7 +47,7 @@ async function readReserve(): Promise<ReserveReadResult> {
   if (!contractId) return { available: false };
 
   try {
-    const server = new rpc.Server(getStellarRpcUrl());
+    const server = new rpc.Server(getStellarRpcUrl(), { timeout: 10_000 });
     const networkPassphrase = getStellarNetwork() === "public" ? Networks.PUBLIC : Networks.TESTNET;
     const vault = new Contract(contractId);
 
@@ -84,8 +84,10 @@ async function readReserve(): Promise<ReserveReadResult> {
 
     const storedValueCents = storedValueCentsFromAssets(assets, getReserveBrlPeggedSymbols());
     return { available: true, storedValueCents, assets };
-  } catch {
-    // RPC unreachable / contract not readable — report unavailable, never a mock.
+  } catch (err) {
+    // Non-fatal: keep the last good snapshot, report unavailable, never a mock.
+    // Logged so operators can see a persistently broken read.
+    console.error("[reserve] RPC read failed — snapshot not updated:", err);
     return { available: false };
   }
 }
