@@ -1128,7 +1128,7 @@
     },
     "heading": "Transparência",
     "subheading": "Transparência da posição de risco e treasury onchain.",
-    "footer": "Dados de contratos atualizados em tempo real.",
+    "footer": "Dados de contratos em tempo real. Reserva de cobertura lida onchain e atualizada periodicamente.",
     "contracts": {
       "ativo": "Contratos ativos",
       "pendente": "Em análise",
@@ -1139,11 +1139,11 @@
       "used": "{pct}% utilizado",
       "of": "de {total}"
     },
-    "treasury": {
-      "label": "Capital de cobertura",
-      "previewBadge": "Prévia",
+    "reserve": {
+      "label": "Reserva de cobertura",
       "unavailable": "Indisponível",
-      "viewExplorer": "Checar eu mesmo na rede Stellar"
+      "asOf": "Atualizado em {datetime}",
+      "viewExplorer": "Verificar na rede Stellar"
     },
     "timeline": {
       "title": "Contratos por semana",

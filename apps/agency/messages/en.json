@@ -1128,7 +1128,7 @@
     },
     "heading": "Transparency",
     "subheading": "Risk position transparency and onchain treasury.",
-    "footer": "Contract data updated in real time.",
+    "footer": "Contract data in real time. Coverage reserve read onchain and refreshed periodically.",
     "contracts": {
       "ativo": "Active contracts",
       "pendente": "Under review",
@@ -1139,11 +1139,11 @@
       "used": "{pct}% utilized",
       "of": "of {total}"
     },
-    "treasury": {
-      "label": "Coverage capital",
-      "previewBadge": "Preview",
+    "reserve": {
+      "label": "Coverage reserve",
       "unavailable": "Unavailable",
-      "viewExplorer": "Verify myself on the Stellar network"
+      "asOf": "As of {datetime}",
+      "viewExplorer": "Verify on the Stellar network"
     },
     "timeline": {
       "title": "Contracts per week",
