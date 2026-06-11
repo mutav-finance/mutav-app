@@ -3,6 +3,7 @@
 import { ChevronDownIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@mutav/ui/button";
+import { Eyebrow } from "@mutav/ui/eyebrow";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,9 +24,9 @@ export function ContractActionsMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <DropdownMenuLabel className="text-2xs text-muted-foreground font-mono font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as={DropdownMenuLabel} className="text-muted-foreground font-medium">
           {t("actionDisabled")}
-        </DropdownMenuLabel>
+        </Eyebrow>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>{t("actionEdit")}</DropdownMenuItem>
         <DropdownMenuItem disabled>{t("actionDuplicate")}</DropdownMenuItem>

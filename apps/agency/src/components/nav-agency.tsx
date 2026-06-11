@@ -7,7 +7,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@mutav/ui/sidebar";
 import { SidebarRoadmapItem } from "@/components/sidebar-roadmap-item";
 import { UsersIcon, BuildingIcon, BadgeDollarSignIcon } from "lucide-react";
 import { useTranslations } from "next-intl";

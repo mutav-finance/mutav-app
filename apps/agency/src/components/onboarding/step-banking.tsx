@@ -6,8 +6,8 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@mutav/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
 import { cn } from "@/lib/utils";
 import {
   BANK_ACCOUNT_TYPE,

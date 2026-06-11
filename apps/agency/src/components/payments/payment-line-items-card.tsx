@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import {
   Table,
@@ -9,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents } from "@/lib/contracts/format";
 import type { Payment } from "@convex/payments/domain";
@@ -20,9 +21,9 @@ export function PaymentLineItemsCard({ payment }: { payment: Payment }) {
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
           {t("heading")}
-        </CardTitle>
+        </Eyebrow>
       </CardHeader>
       <CardContent className="p-0">
         {payment.lineItems.length === 0 ? (

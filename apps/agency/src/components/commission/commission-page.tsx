@@ -13,17 +13,11 @@ import {
 } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
+import { Input } from "@mutav/ui/input";
 import { Mono } from "@mutav/ui/mono";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { useWorkspace } from "@/providers/workspace";
@@ -98,9 +92,9 @@ export function CommissionPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="border-b py-3">
-            <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+            <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
               {t("kpi.monthCommission")}
-            </CardTitle>
+            </Eyebrow>
           </CardHeader>
           <CardContent className="flex items-end justify-between gap-4 py-4">
             <div className="flex items-stretch gap-3">
@@ -121,9 +115,9 @@ export function CommissionPage() {
 
         <Card>
           <CardHeader className="border-b py-3">
-            <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+            <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
               {t("kpi.invoice")}
-            </CardTitle>
+            </Eyebrow>
             <CardAction>
               <Button variant="ghost" size="icon-sm" disabled aria-label={t("kpi.invoiceDownload")}>
                 <DownloadIcon className="size-4" strokeWidth={1.25} />
@@ -145,9 +139,9 @@ export function CommissionPage() {
       {/* Table */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+          <Eyebrow as="h2" className="text-muted-foreground text-xs font-medium">
             {t("table.heading")}
-          </h2>
+          </Eyebrow>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"

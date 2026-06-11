@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { Link, redirect } from "@mutav/i18n/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { Button } from "@mutav/ui/button";
+import { StatusTag } from "@mutav/ui/status-tag";
 import { resolveUserDestination } from "@/lib/user-destination";
 
 type Props = {
@@ -32,12 +33,9 @@ export default async function OnboardingStatusPage({ searchParams, params }: Pro
     <PageContent variant="narrow" className="py-16 md:py-24">
       <div className="flex flex-col items-center gap-6">
         {/* Status pill — acima da moldura */}
-        <div className="flex items-center gap-2">
-          <span className="bg-accent tga-live-square size-1.5" aria-hidden />
-          <span className="text-text-3 font-mono text-xs tracking-wide uppercase">
-            {stateLabel}
-          </span>
-        </div>
+        <StatusTag tone="info" pulse>
+          {stateLabel}
+        </StatusTag>
 
         {/* Card com moldura e fundo accent/5 */}
         <div className="border-border bg-accent/5 flex w-full flex-col items-center gap-6 rounded border p-8 text-center md:p-12">

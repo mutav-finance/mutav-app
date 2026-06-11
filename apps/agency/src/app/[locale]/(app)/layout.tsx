@@ -2,7 +2,7 @@ import { redirect as nextRedirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@mutav/ui/sidebar";
 import { Toaster } from "@mutav/ui/sonner";
 import { ThemeProvider } from "@/providers/theme";
 import { redirect } from "@mutav/i18n/navigation";

@@ -30,7 +30,7 @@ import { api } from "@convex/_generated/api";
 import type { PaymentStateKind } from "@convex/payments/domain";
 import { useWorkspace } from "@/providers/workspace";
 import { Link } from "@mutav/i18n/navigation";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@mutav/ui/badge";
 import { Button } from "@mutav/ui/button";
 import {
   DropdownMenu,
@@ -38,8 +38,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@mutav/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
 import {
   Select,
   SelectContent,
@@ -48,14 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@mutav/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { formatPeriodMonth } from "@/lib/payments/format";

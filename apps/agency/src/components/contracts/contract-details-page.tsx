@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
+import { Eyebrow } from "@mutav/ui/eyebrow";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,7 +15,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@mutav/ui/breadcrumb";
 import { Mono } from "@mutav/ui/mono";
 import { Link } from "@mutav/i18n/navigation";
 import type { api } from "@convex/_generated/api";
@@ -45,7 +46,7 @@ export function ContractDetailsPage({
         width="narrow"
         breadcrumb={
           <Breadcrumb>
-            <BreadcrumbList className="text-2xs font-mono tracking-[0.06em] uppercase">
+            <Eyebrow as={BreadcrumbList} className="text-muted-foreground">
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
                   <Link href="/">{tNav("dashboard")}</Link>
@@ -57,7 +58,7 @@ export function ContractDetailsPage({
                   <Mono>#{contract.id}</Mono>
                 </BreadcrumbPage>
               </BreadcrumbItem>
-            </BreadcrumbList>
+            </Eyebrow>
           </Breadcrumb>
         }
         title={t("heroTitle", { status: tStatus(contract.status) })}

@@ -2,8 +2,8 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { ExternalLinkIcon, LinkIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@mutav/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { TreasurySnapshot } from "@convex/health/domain";
 

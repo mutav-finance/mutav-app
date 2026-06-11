@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 
-type Props = {
+export type StepIndicatorProps = {
   current: number;
   labels: readonly string[];
   progressLabel: string;
@@ -14,7 +14,7 @@ export function StepIndicator({
   progressLabel,
   doneSuffix,
   currentSuffix,
-}: Props) {
+}: StepIndicatorProps) {
   return (
     <div role="list" aria-label={progressLabel} className="flex items-center gap-2">
       {labels.map((label, idx) => {

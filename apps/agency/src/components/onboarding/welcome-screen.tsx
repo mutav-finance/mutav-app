@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
+import { Eyebrow } from "@mutav/ui/eyebrow";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { useWelcomeScreen } from "@/components/onboarding/use-welcome-screen";
 
@@ -14,7 +15,9 @@ export function WelcomeScreen() {
     <div className="mx-auto w-full max-w-2xl px-4 py-12 md:py-20 lg:px-0">
       {/* Hero */}
       <div className="mb-12 flex flex-col items-center gap-4 text-center">
-        <p className="text-text-3 font-mono text-xs tracking-widest uppercase">{t("tag")}</p>
+        <Eyebrow as="p" className="text-text-3 text-xs tracking-widest">
+          {t("tag")}
+        </Eyebrow>
         <h1 className="text-text text-3xl leading-tight font-semibold tracking-tight md:text-4xl">
           <span className="block">{t("title")}</span>
           <span className="text-text-2 block font-normal">{t("titleLine2")}</span>

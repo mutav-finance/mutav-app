@@ -7,7 +7,7 @@ import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@mutav/ui/nav-user";
 import { NavAgency } from "@/components/nav-agency";
 import { AgencySwitcher } from "@/components/agency-switcher";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@mutav/ui/sidebar";
 import {
   LayoutDashboardIcon,
   FileTextIcon,

@@ -12,7 +12,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@mutav/ui/card";
 import {
   ChartContainer,
   ChartLegend,

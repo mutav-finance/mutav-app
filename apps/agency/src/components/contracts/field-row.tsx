@@ -1,4 +1,5 @@
-import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@mutav/ui/item";
 import { Mono } from "@mutav/ui/mono";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +40,12 @@ export function FieldRow({
 
 export function FieldGroupHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-border bg-secondary text-2xs text-muted-foreground border-b px-6 py-2 font-mono font-medium tracking-[0.06em] uppercase">
+    <Eyebrow
+      as="div"
+      className="border-border bg-secondary text-muted-foreground border-b px-6 py-2 font-medium"
+    >
       {children}
-    </div>
+    </Eyebrow>
   );
 }
 

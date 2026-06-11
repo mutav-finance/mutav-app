@@ -1,7 +1,8 @@
 import { DownloadIcon, FileTextIcon, UploadIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@mutav/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import type { ContractDocument, ContractDocumentKey, DocumentStatus } from "@/lib/contracts/types";
 import { StatusTag } from "./status-tag";
@@ -24,9 +25,9 @@ export function ContractDocumentsCard({ documents }: { documents: ContractDocume
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
           {t("heading")}
-        </CardTitle>
+        </Eyebrow>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {docKeys.map((key) => {

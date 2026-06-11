@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
+import { StepIndicator } from "@mutav/ui/step-indicator";
 import { useWorkspace } from "@/providers/workspace";
-import { StepIndicator } from "@/components/contracts/step-indicator";
 import { WizardStep1 } from "@/components/contracts/wizard-step1";
 import { WizardStep2 } from "@/components/contracts/wizard-step2";
 import { WizardStep3 } from "@/components/contracts/wizard-step3";
@@ -10,7 +11,10 @@ import { WizardStep4 } from "@/components/contracts/wizard-step4";
 import { WizardStep5 } from "@/components/contracts/wizard-step5";
 import { wizardReducer, INITIAL_WIZARD_DATA, type WizardData } from "@/lib/contracts/wizard";
 
+const CONTRACT_WIZARD_STEPS = [1, 2, 3, 4, 5] as const;
+
 export function ContractWizard() {
+  const t = useTranslations("contractNew");
   const [state, dispatch] = React.useReducer(wizardReducer, {
     step: 1,
     data: INITIAL_WIZARD_DATA,
@@ -27,9 +31,17 @@ export function ContractWizard() {
     return null;
   }
 
+  const stepLabels = CONTRACT_WIZARD_STEPS.map((n) => t(`steps.${n}`));
+
   return (
     <div className="flex flex-col gap-6">
-      <StepIndicator current={state.step} total={5} />
+      <StepIndicator
+        current={state.step}
+        labels={stepLabels}
+        progressLabel={t("stepLabel", { current: state.step, total: CONTRACT_WIZARD_STEPS.length })}
+        doneSuffix=""
+        currentSuffix=""
+      />
 
       {state.step === 1 && (
         <WizardStep1

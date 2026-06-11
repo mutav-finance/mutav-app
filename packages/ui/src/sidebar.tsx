@@ -4,18 +4,12 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 
-import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+import { useIsMobile } from "./use-mobile";
+import { cn } from "./cn";
 import { Button } from "@mutav/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "./input";
 import { Separator } from "@mutav/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./sheet";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import { PanelLeftIcon } from "lucide-react";

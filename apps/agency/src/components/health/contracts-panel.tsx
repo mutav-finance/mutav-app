@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { FileTextIcon, ClockIcon, AlertTriangleIcon } from "lucide-react";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { ContractAggregates } from "@convex/health/domain";
 

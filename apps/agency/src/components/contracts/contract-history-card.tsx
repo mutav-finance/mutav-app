@@ -4,7 +4,8 @@ import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@mutav/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@mutav/ui/collapsible";
 import { Mono } from "@mutav/ui/mono";
 import { formatDateTimeBR } from "@/lib/contracts/format";
@@ -18,9 +19,9 @@ export function ContractHistoryCard({ history }: { history: ContractHistoryEntry
     <Collapsible open={open} onOpenChange={setOpen} asChild>
       <Card>
         <CardHeader className="border-b">
-          <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+          <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
             {t("heading")}
-          </CardTitle>
+          </Eyebrow>
           <CardAction>
             <CollapsibleTrigger asChild>
               <Button

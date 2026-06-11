@@ -5,9 +5,10 @@ import { useTranslations } from "next-intl";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@mutav/ui/button";
+import { Eyebrow } from "@mutav/ui/eyebrow";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
 import { cn } from "@/lib/utils";
 import { maskCPF, maskCNPJ, maskPhone } from "@/lib/brazil";
 import {
@@ -227,9 +228,9 @@ export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmit
 
       {agencyType === "empresa" && (
         <div className="flex flex-col gap-4">
-          <span className="text-text-3 font-mono text-xs tracking-wide uppercase">
+          <Eyebrow className="text-text-3 text-xs tracking-wide">
             {t("representanteSection")}
-          </span>
+          </Eyebrow>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Controller
               control={control}

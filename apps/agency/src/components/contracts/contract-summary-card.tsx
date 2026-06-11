@@ -12,9 +12,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@mutav/ui/alert-dialog";
 import { Button } from "@mutav/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,9 +68,9 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
     <>
       <Card>
         <CardHeader className="border-b">
-          <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+          <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
             {t("heading")}
-          </CardTitle>
+          </Eyebrow>
           <CardAction className="flex items-center gap-2">
             {/* Desktop: show all buttons inline */}
             <div className="hidden items-center gap-2 sm:flex">
@@ -129,9 +130,7 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
         </CardHeader>
         <CardContent className="grid gap-4 py-4">
           <div className="flex flex-col gap-1">
-            <span className="text-2xs text-muted-foreground font-mono font-medium tracking-[0.06em] uppercase">
-              {t("idLabel")}
-            </span>
+            <Eyebrow className="text-muted-foreground font-medium">{t("idLabel")}</Eyebrow>
             <Mono className="text-foreground text-xl font-medium">{contract.id}</Mono>
           </div>
           <dl className="text-base-sm grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

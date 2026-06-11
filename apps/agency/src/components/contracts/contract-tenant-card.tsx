@@ -1,6 +1,7 @@
 import { CheckIcon, UserIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
 import type { ContractTenant } from "@/lib/contracts/types";
@@ -33,9 +34,9 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
         <div className="bg-secondary text-muted-foreground flex size-7 items-center justify-center">
           <UserIcon className="size-4" strokeWidth={1.25} aria-hidden />
         </div>
-        <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
           {t("heading")}
-        </CardTitle>
+        </Eyebrow>
         <StatusTag
           tone={approvalTone[tenant.approvalStatus]}
           label={tApproval(tenant.approvalStatus)}
@@ -71,9 +72,9 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
       {!isRejected && tenant.termApprovedAt && (
         <CardFooter className="text-2xs text-muted-foreground gap-2 px-6 py-3">
           <CheckIcon className="text-success size-4" strokeWidth={1.25} aria-hidden />
-          <span className="font-mono font-medium tracking-[0.06em] uppercase">
+          <Eyebrow className="text-2xs text-muted-foreground font-medium">
             {t("termApproved")}
-          </span>
+          </Eyebrow>
           <span aria-hidden>·</span>
           <Mono>{formatDateTimeBR(tenant.termApprovedAt)}</Mono>
         </CardFooter>

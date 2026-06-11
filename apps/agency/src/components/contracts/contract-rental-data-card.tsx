@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { formatBRLCents } from "@/lib/contracts/format";
 import type { Contract } from "@/lib/contracts/types";
 import { ContractActionsMenu } from "./contract-actions-menu";
@@ -16,9 +17,9 @@ export function ContractRentalDataCard({ contract }: { contract: Contract }) {
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
           {t("heading")}
-        </CardTitle>
+        </Eyebrow>
         <CardAction>
           <ContractActionsMenu />
         </CardAction>

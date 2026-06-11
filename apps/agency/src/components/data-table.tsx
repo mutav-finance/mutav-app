@@ -41,7 +41,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@mutav/ui/badge";
 import { Button } from "@mutav/ui/button";
 import {
   ChartContainer,
@@ -49,7 +49,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@mutav/ui/chart";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@mutav/ui/checkbox";
 import {
   Drawer,
   DrawerClose,
@@ -59,7 +59,7 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer";
+} from "@mutav/ui/drawer";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -68,8 +68,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@mutav/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
 import {
   Select,
   SelectContent,
@@ -79,14 +79,7 @@ import {
   SelectValue,
 } from "@mutav/ui/select";
 import { Separator } from "@mutav/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import {
   GripVerticalIcon,
