@@ -6,6 +6,7 @@ import {
   BASE_FEE,
   Contract,
   Networks,
+  StrKey,
   TransactionBuilder,
   rpc,
   scValToNative,
@@ -22,7 +23,8 @@ import {
 import { storedValueCentsFromAssets, type ReserveAsset, type ReserveReadResult } from "./domain";
 
 // Canonical all-zero account — valid for read-only simulation (never signed).
-const SIMULATION_SOURCE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+// Derived rather than hand-typed so the strkey checksum is always correct.
+const SIMULATION_SOURCE = StrKey.encodeEd25519PublicKey(Buffer.alloc(32));
 
 async function simulateRead(
   server: rpc.Server,
