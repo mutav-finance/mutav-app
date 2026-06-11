@@ -1143,7 +1143,8 @@
       "label": "Reserva de cobertura",
       "unavailable": "Indisponível",
       "asOf": "Atualizado em {datetime}",
-      "fx": "Cotação USD/BRL: {rate}",
+      "fx": "PTAX BCB (venda): {rate}",
+      "fxQuotedAt": "Cotada em {datetime} (BRT)",
       "viewExplorer": "Verificar na rede Stellar"
     },
     "timeline": {

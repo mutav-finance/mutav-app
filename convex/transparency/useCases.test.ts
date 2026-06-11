@@ -57,6 +57,8 @@ describe("getReserveCoverage", () => {
     await reader.mutation(internal.reserve.useCases.writeSnapshot, {
       storedValueCents: 50784300,
       fxUsdBrl: 5.42,
+      fxSource: "BCB_PTAX_VENDA",
+      fxQuotedAt: "2026-06-10 13:12:50",
       assets: [
         {
           contractAddress: "C1",

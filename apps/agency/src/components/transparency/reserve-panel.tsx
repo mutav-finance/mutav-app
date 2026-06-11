@@ -55,6 +55,11 @@ export function ReservePanel({ coverage }: Props) {
             {fxRate ? (
               <span className="text-muted-foreground text-xs">{t("fx", { rate: fxRate })}</span>
             ) : null}
+            {coverage.available && coverage.fxQuotedAt ? (
+              <span className="text-muted-foreground text-xs">
+                {t("fxQuotedAt", { datetime: coverage.fxQuotedAt })}
+              </span>
+            ) : null}
             <a
               href={coverage.explorerUrl}
               target="_blank"

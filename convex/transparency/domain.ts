@@ -11,6 +11,8 @@ export type ReserveCoverage = { explorerUrl: string } & (
       available: true;
       storedValueCents: number;
       fxUsdBrl: number;
+      fxSource: string;
+      fxQuotedAt: string;
       capturedAt: number;
       assetCount: number;
     }

@@ -1143,7 +1143,8 @@
       "label": "Coverage reserve",
       "unavailable": "Unavailable",
       "asOf": "As of {datetime}",
-      "fx": "USD/BRL rate: {rate}",
+      "fx": "BCB PTAX (ask): {rate}",
+      "fxQuotedAt": "Quoted {datetime} (BRT)",
       "viewExplorer": "Verify on the Stellar network"
     },
     "timeline": {
