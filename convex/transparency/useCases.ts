@@ -70,6 +70,7 @@ export const getReserveCoverage = queryWithAuth({
       explorerUrl,
       available: true,
       storedValueCents: snap.storedValueCents,
+      fxUsdBrl: snap.fxUsdBrl,
       capturedAt: snap.capturedAt,
       assetCount: snap.assets.length,
     };

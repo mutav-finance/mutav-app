@@ -1143,6 +1143,7 @@
       "label": "Reserva de cobertura",
       "unavailable": "Indisponível",
       "asOf": "Atualizado em {datetime}",
+      "fx": "Cotação USD/BRL: {rate}",
       "viewExplorer": "Verificar na rede Stellar"
     },
     "timeline": {

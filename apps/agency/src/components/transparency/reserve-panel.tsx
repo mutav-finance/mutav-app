@@ -19,6 +19,12 @@ export function ReservePanel({ coverage }: Props) {
       )
     : null;
 
+  const fxRate = coverage?.available
+    ? new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(
+        coverage.fxUsdBrl,
+      )
+    : null;
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -45,6 +51,9 @@ export function ReservePanel({ coverage }: Props) {
           <div className="flex flex-col gap-1.5">
             {asOf ? (
               <span className="text-muted-foreground text-xs">{t("asOf", { datetime: asOf })}</span>
+            ) : null}
+            {fxRate ? (
+              <span className="text-muted-foreground text-xs">{t("fx", { rate: fxRate })}</span>
             ) : null}
             <a
               href={coverage.explorerUrl}

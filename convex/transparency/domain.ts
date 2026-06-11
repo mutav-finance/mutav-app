@@ -7,6 +7,12 @@ export type ContractAggregates = {
 };
 
 export type ReserveCoverage = { explorerUrl: string } & (
-  | { available: true; storedValueCents: number; capturedAt: number; assetCount: number }
+  | {
+      available: true;
+      storedValueCents: number;
+      fxUsdBrl: number;
+      capturedAt: number;
+      assetCount: number;
+    }
   | { available: false }
 );

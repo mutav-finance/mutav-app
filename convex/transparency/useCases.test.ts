@@ -56,7 +56,16 @@ describe("getReserveCoverage", () => {
     const reader = await authedReader();
     await reader.mutation(internal.reserve.useCases.writeSnapshot, {
       storedValueCents: 50784300,
-      assets: [{ contractAddress: "C1", symbol: "BRLT", decimals: 7, rawBalance: "5078430000000" }],
+      fxUsdBrl: 5.42,
+      assets: [
+        {
+          contractAddress: "C1",
+          symbol: "BRLT",
+          decimals: 7,
+          rawBalance: "5078430000000",
+          valueCents: 50784300,
+        },
+      ],
       capturedAt: 1717000000000,
     });
     const coverage = await reader.query(api.transparency.useCases.getReserveCoverage, {});

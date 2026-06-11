@@ -1143,6 +1143,7 @@
       "label": "Coverage reserve",
       "unavailable": "Unavailable",
       "asOf": "As of {datetime}",
+      "fx": "USD/BRL rate: {rate}",
       "viewExplorer": "Verify on the Stellar network"
     },
     "timeline": {
