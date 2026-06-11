@@ -1253,3 +1253,69 @@ In `readReserve()`, inside the try: fetch `usdBrlRate` (so an FX failure → `{ 
 - Reload `/transparency` — coverage tile shows the BRL figure + "Cotação USD/BRL".
 
 **Verification:** `bun --filter @mutav/agency test`, `bun run typecheck`, `bun run lint`, `bun --filter @mutav/agency build` all green.
+
+---
+
+# PR 6 — Trustworthy FX source: BCB PTAX (replaces Frankfurter)
+
+**Why:** Frankfurter (ECB market feed) isn't an authoritative source for a regulated BRL product. Use **BCB PTAX** — Banco Central do Brasil's official USD/BRL reference, the rate BRL financial contracts cite. Use the **venda (ask)** leg. Store the source label + the official BCB quote timestamp in the snapshot and show them on the tile (auditability/trust).
+
+**Live API (verified):** `GET https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@di,dataFinalCotacao=@df)?@di='MM-DD-YYYY'&@df='MM-DD-YYYY'&$top=1&$orderby=dataHoraCotacao desc&$format=json` → `{ "value": [ { "cotacaoCompra": 5.1757, "cotacaoVenda": 5.1763, "dataHoraCotacao": "2026-06-10 13:12:50.036827" } ] }`. Querying a ~14-day window + `$top=1 desc` returns the latest available business-day bulletin (handles weekends/holidays).
+
+## Task 21 — env (TDD)
+`convex/lib/env.ts`: REMOVE `getFxUsdBrlUrl` (+ its tests in `env.test.ts`); ADD:
+```ts
+const DEFAULT_BCB_PTAX_BASE = "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata";
+export function getBcbPtaxBaseUrl(): string {
+  return process.env.BCB_PTAX_BASE_URL ?? DEFAULT_BCB_PTAX_BASE; // hook-ok: env module boundary
+}
+```
+Tests: default base url, override.
+
+## Task 22 — schema + PTAX fetch + action + useCases + query (one cohesive commit)
+- `convex/schema.ts` `reserveSnapshots`: add `fxSource: v.string()` and `fxQuotedAt: v.string()` (keep `fxUsdBrl`).
+- `convex/reserve/domain.ts`: `ReserveReadResult.available` gains `fxSource: string; fxQuotedAt: string`.
+- `convex/reserve/useCases.ts`: `writeSnapshot` args gain `fxSource: v.string()`, `fxQuotedAt: v.string()`.
+- `convex/reserve/actions.ts`: replace `fetchUsdBrlRate` (and `FxResponse`) with:
+```ts
+type PtaxQuote = { cotacaoCompra?: number; cotacaoVenda?: number; dataHoraCotacao?: string };
+type PtaxResponse = { value?: PtaxQuote[] };
+
+function ptaxDate(d: Date): string {
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${mm}-${dd}-${d.getUTCFullYear()}`;
+}
+
+async function fetchPtaxUsdBrl(): Promise<{ rate: number; source: string; quotedAt: string }> {
+  const now = new Date();
+  const start = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const url =
+    `${getBcbPtaxBaseUrl()}/CotacaoDolarPeriodo(dataInicial=@di,dataFinalCotacao=@df)` +
+    `?@di='${ptaxDate(start)}'&@df='${ptaxDate(now)}'&$top=1&$orderby=dataHoraCotacao%20desc&$format=json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`PTAX ${res.status} ${res.statusText}`);
+  const data = (await res.json()) as PtaxResponse; // hook-ok: external BCB PTAX API response
+  const quote = data.value?.[0];
+  const rate = quote?.cotacaoVenda;
+  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0)
+    throw new Error("PTAX: invalid venda rate");
+  const quotedAt = (quote?.dataHoraCotacao ?? "").slice(0, 19);
+  return { rate, source: "BCB_PTAX_VENDA", quotedAt };
+}
+```
+  In `readReserve()`, replace the FX call: `const { rate: usdBrlRate, source: fxSource, quotedAt: fxQuotedAt } = await fetchPtaxUsdBrl();` (still FIRST inside the try → a PTAX failure yields `{ available: false }`, never a fabricated number). Return `{ available: true, storedValueCents, fxUsdBrl: usdBrlRate, fxSource, fxQuotedAt, assets: valued }`. `refreshReserveSnapshot` passes `fxSource` + `fxQuotedAt` to `writeSnapshot`.
+
+## Task 23 — query + panel + i18n
+- `convex/transparency/domain.ts`: `ReserveCoverage` available branch gains `fxSource: string; fxQuotedAt: string`.
+- `convex/transparency/useCases.ts` `getReserveCoverage`: include `fxSource: snap.fxSource`, `fxQuotedAt: snap.fxQuotedAt`.
+- `reserve-panel.tsx`: keep the rate line but relabel via i18n; add a second muted line for the official quote time when `coverage.available && coverage.fxQuotedAt`.
+- i18n both locales `transparency.reserve`: change `fx` → pt "PTAX BCB (venda): {rate}", en "BCB PTAX (ask): {rate}"; add `fxQuotedAt` → pt "Cotada em {datetime} (BRT)", en "Quoted {datetime} (BRT)".
+- Update `convex/transparency/useCases.test.ts` + `convex/reserve/useCases.test.ts` seeds with `fxSource` + `fxQuotedAt`.
+
+## Task 24 — reset dev data + smoke
+- `bunx convex run reserve/useCases:clearSnapshots '{}'` (or empty import) → re-push schema.
+- `bunx convex run reserve/actions:refreshReserveSnapshot '{}'` → `latestSnapshot`: expect `fxSource: "BCB_PTAX_VENDA"`, `fxUsdBrl ≈ 5.176`, `fxQuotedAt` a BCB timestamp, USDCMOCK `valueCents` recomputed.
+- Reload `/transparency` — tile shows the BRL figure + "PTAX BCB (venda): …" + "Cotada em … (BRT)".
+
+**Verification:** `bun --filter @mutav/agency test`, `bun run typecheck`, `bun run lint`, `bun --filter @mutav/agency build` all green; `grep -rn "Frankfurter\|getFxUsdBrlUrl\|FxResponse\|fetchUsdBrlRate" convex apps` → no matches.
