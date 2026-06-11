@@ -1135,7 +1135,7 @@
       "defaultRate": "Default rate"
     },
     "capacity": {
-      "label": "Capital utilization",
+      "label": "Contracted capacity utilization",
       "used": "{pct}% utilized",
       "of": "of {total}"
     },

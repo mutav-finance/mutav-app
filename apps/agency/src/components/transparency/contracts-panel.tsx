@@ -38,7 +38,10 @@ export function ContractsPanel({ aggregates }: Props) {
   const t = useTranslations("transparency.contracts");
   const loading = aggregates === null;
 
-  const defaultRatePct = aggregates ? `${(aggregates.defaultRate * 100).toFixed(1)}%` : "—";
+  const defaultRatePct =
+    aggregates && aggregates.defaultRate !== null
+      ? `${(aggregates.defaultRate * 100).toFixed(1)}%`
+      : "—";
 
   return (
     <>

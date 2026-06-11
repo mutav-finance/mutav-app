@@ -36,11 +36,11 @@ export function rawBalanceToCents(rawBalance: string, decimals: number): number 
   const negative = rawBalance.startsWith("-");
   const digits = negative ? rawBalance.slice(1) : rawBalance;
   const raw = BigInt(digits.length ? digits : "0");
-  const scale = 10n ** BigInt(decimals);
-  const centsScaled = raw * 100n;
+  const scale = BigInt(10) ** BigInt(decimals);
+  const centsScaled = raw * BigInt(100);
   const whole = centsScaled / scale;
   const remainder = centsScaled % scale;
-  const rounded = remainder * 2n >= scale ? whole + 1n : whole;
+  const rounded = remainder * BigInt(2) >= scale ? whole + BigInt(1) : whole;
   const result = Number(rounded);
   return negative ? -result : result;
 }

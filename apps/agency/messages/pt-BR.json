@@ -1135,7 +1135,7 @@
       "defaultRate": "Taxa de inadimplência"
     },
     "capacity": {
-      "label": "Utilização do capital",
+      "label": "Utilização da capacidade contratada",
       "used": "{pct}% utilizado",
       "of": "de {total}"
     },

@@ -34,15 +34,13 @@ export const getContractAggregates = queryWithAuth({
       },
     });
 
-    // defaultRate is derived as 0 because the contracts schema has no
-    // `inadimplente` state yet — default tracking lands in a future PR.
-    const defaultRate = 0;
-
+    // No `inadimplente` contract state exists yet — expose null so the UI shows
+    // "—" instead of a misleading 0% on a transparency surface.
     return {
       countAtivos: countAtivos ?? 0,
       countPendentes: countPendentes ?? 0,
       sumInsuredCents,
-      defaultRate,
+      defaultRate: null,
       maxCapacityCents: getMaxGuaranteeCapacityCents(),
     };
   },

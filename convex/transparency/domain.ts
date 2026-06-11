@@ -2,7 +2,7 @@ export type ContractAggregates = {
   countAtivos: number;
   countPendentes: number;
   sumInsuredCents: number;
-  defaultRate: number;
+  defaultRate: number | null;
   maxCapacityCents: number;
 };
 
