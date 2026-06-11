@@ -27,12 +27,29 @@ async function authedReader() {
 }
 
 describe("getReserveCoverage", () => {
-  test("reports unavailable (but with an explorer url) when no snapshot exists", async () => {
+  test("reports unavailable with the testnet contract explorer url when no snapshot exists", async () => {
     const reader = await authedReader();
     const coverage = await reader.query(api.transparency.useCases.getReserveCoverage, {});
     expect(coverage.available).toBe(false);
     expect(typeof coverage.explorerUrl).toBe("string");
     expect(coverage.explorerUrl).toContain("/contract/");
+  });
+
+  test("explorer url omits /contract/ when no contract id is configured (public net, unset)", async () => {
+    const original = process.env.STELLAR_NETWORK; // hook-ok: test env manipulation for isolation
+    process.env.STELLAR_NETWORK = "public"; // hook-ok: test env manipulation for isolation
+    delete process.env.STELLAR_RESERVE_CONTRACT_ID; // hook-ok: test env manipulation for isolation
+    try {
+      const reader = await authedReader();
+      const coverage = await reader.query(api.transparency.useCases.getReserveCoverage, {});
+      expect(coverage.available).toBe(false);
+      expect(coverage.explorerUrl).not.toContain("/contract/");
+      expect(coverage.explorerUrl.endsWith("/explorer/public")).toBe(true);
+    } finally {
+      if (original === undefined)
+        delete process.env.STELLAR_NETWORK; // hook-ok: test env manipulation for isolation
+      else process.env.STELLAR_NETWORK = original; // hook-ok: test env manipulation for isolation
+    }
   });
 
   test("returns the latest snapshot when one exists", async () => {
