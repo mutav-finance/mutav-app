@@ -12,3 +12,8 @@ export type TreasurySnapshot = {
   brlBalanceCents: number;
   explorerUrl: string;
 };
+
+export type ReserveCoverage = { explorerUrl: string } & (
+  | { available: true; storedValueCents: number; capturedAt: number; assetCount: number }
+  | { available: false }
+);
