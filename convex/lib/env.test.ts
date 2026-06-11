@@ -8,7 +8,7 @@ import {
   getStellarRpcUrl,
   getReserveBrlPeggedSymbols,
   getReserveUsdSymbols,
-  getFxUsdBrlUrl,
+  getBcbPtaxBaseUrl,
 } from "./env";
 
 describe("getAuth0MgmtClientId", () => {
@@ -182,8 +182,8 @@ describe("getReserveUsdSymbols", () => {
   });
 });
 
-describe("getFxUsdBrlUrl", () => {
-  const KEY = "FX_USD_BRL_URL";
+describe("getBcbPtaxBaseUrl", () => {
+  const KEY = "BCB_PTAX_BASE_URL";
   let orig: string | undefined;
   beforeEach(() => {
     orig = process.env[KEY];
@@ -193,14 +193,16 @@ describe("getFxUsdBrlUrl", () => {
     else process.env[KEY] = orig;
   });
 
-  test("defaults to the keyless Frankfurter endpoint", () => {
+  test("defaults to the BCB PTAX olinda OData base url", () => {
     delete process.env[KEY];
-    expect(getFxUsdBrlUrl()).toBe("https://api.frankfurter.app/latest?from=USD&to=BRL");
+    expect(getBcbPtaxBaseUrl()).toBe(
+      "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata",
+    );
   });
 
   test("respects an explicit override", () => {
-    process.env[KEY] = "https://fx.example/latest";
-    expect(getFxUsdBrlUrl()).toBe("https://fx.example/latest");
+    process.env[KEY] = "https://ptax.example/odata";
+    expect(getBcbPtaxBaseUrl()).toBe("https://ptax.example/odata");
   });
 });
 

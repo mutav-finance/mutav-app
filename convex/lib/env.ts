@@ -186,7 +186,7 @@ export function getReserveBrlPeggedSymbols(): readonly string[] {
 
 /**
  * SEP-41 symbols treated as USD-pegged. Their on-chain balance is valued in
- * BRL at the live USD→BRL rate (see `getFxUsdBrlUrl`). Defaults cover the
+ * BRL at the live USD→BRL rate (see `getBcbPtaxBaseUrl`). Defaults cover the
  * testnet mock (`USDCMOCK`) plus canonical `USDC`.
  */
 export function getReserveUsdSymbols(): readonly string[] {
@@ -202,11 +202,14 @@ export function getReserveUsdSymbols(): readonly string[] {
 }
 
 /**
- * FX endpoint for the USD→BRL reference rate. Defaults to keyless Frankfurter
- * (ECB-sourced). Production upgrade (follow-up): BCB PTAX official rate.
+ * Base URL for the BCB PTAX OData service — Banco Central do Brasil's official
+ * USD/BRL reference rate (the venda/ask leg is the authoritative figure for BRL
+ * financial contracts). Env-swappable for test fixtures; defaults to the live
+ * olinda endpoint.
  */
-export function getFxUsdBrlUrl(): string {
-  return process.env.FX_USD_BRL_URL ?? "https://api.frankfurter.app/latest?from=USD&to=BRL"; // hook-ok: env module boundary
+const DEFAULT_BCB_PTAX_BASE = "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata";
+export function getBcbPtaxBaseUrl(): string {
+  return process.env.BCB_PTAX_BASE_URL ?? DEFAULT_BCB_PTAX_BASE; // hook-ok: env module boundary
 }
 
 /**
