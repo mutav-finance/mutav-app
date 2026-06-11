@@ -1159,3 +1159,97 @@ Plan complete and saved to `docs/superpowers/plans/2026-06-10-transparency-reser
 2. **Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints.
 
 Which approach?
+
+---
+
+# PR 5 — BRL valuation via FX (real per-asset conversion)
+
+**Why:** The deployed testnet vault holds `USDCMOCK` (a USD-pegged token), not a BRL asset. The v1 "BRL-pegged only" rule scored it 0. Requirement: value **every** approved asset in BRL at the current rate — USD-pegged assets convert at the live USD→BRL rate, BRL-pegged at 1:1. Store the rate + per-asset BRL value in the snapshot (auditability), and show the rate on the tile.
+
+**FX source:** keyless Frankfurter (`https://api.frankfurter.app/latest?from=USD&to=BRL`, ECB-sourced), env-swappable via `FX_USD_BRL_URL`. Production upgrade (follow-up, not this PR): BCB PTAX official reference rate.
+
+**Precision:** keep BigInt. Quantize the FX rate to micro-units (`rateMicro = round(rate × 1e6)`) so the conversion stays integer math: `cents = round(raw × rateMicro / (10^decimals × 1e4))`.
+
+## Task 16 — env getters (TDD)
+`convex/lib/env.ts` + append to `convex/lib/env.test.ts`:
+```ts
+export function getReserveUsdSymbols(): readonly string[] {
+  const raw = process.env.STELLAR_RESERVE_USD_SYMBOLS; // hook-ok: env module boundary
+  if (raw) { const p = raw.split(",").map((s) => s.trim()).filter(Boolean); if (p.length > 0) return p; }
+  return ["USDC", "USDCMOCK"];
+}
+export function getFxUsdBrlUrl(): string {
+  return process.env.FX_USD_BRL_URL ?? "https://api.frankfurter.app/latest?from=USD&to=BRL"; // hook-ok: env module boundary
+}
+```
+Tests: default symbols, CSV override, empty-parse fallback; default FX url, override.
+
+## Task 17 — domain pricing (TDD)
+`convex/reserve/domain.ts`:
+- Add `ReserveValuedAsset = ReserveAsset & { valueCents: number }`.
+- Change `ReserveReadResult.available` to `{ available: true; storedValueCents: number; fxUsdBrl: number; assets: ReserveValuedAsset[] }`.
+- Add `valueCents: v.number()` to `reserveAssetValidator` (this is the STORED asset shape).
+- Add `ReservePricing = { brlSymbols: readonly string[]; usdSymbols: readonly string[]; usdBrlRate: number }`.
+- Add:
+```ts
+export function assetRateBrl(symbol: string, pricing: ReservePricing): number | null {
+  if (pricing.brlSymbols.includes(symbol)) return 1;
+  if (pricing.usdSymbols.includes(symbol)) return pricing.usdBrlRate;
+  return null;
+}
+export function assetValueCents(rawBalance: string, decimals: number, rateBrl: number): number {
+  const negative = rawBalance.startsWith("-");
+  const digits = negative ? rawBalance.slice(1) : rawBalance;
+  const raw = BigInt(digits.length ? digits : "0");
+  const rateMicro = BigInt(Math.round(rateBrl * 1_000_000));
+  const denom = BigInt(10) ** BigInt(decimals) * BigInt(10000);
+  const num = raw * rateMicro;
+  const whole = num / denom;
+  const remainder = num % denom;
+  const rounded = remainder * BigInt(2) >= denom ? whole + BigInt(1) : whole;
+  const result = Number(rounded);
+  return negative ? -result : result;
+}
+export function valueAssets(assets: ReserveAsset[], pricing: ReservePricing): ReserveValuedAsset[] {
+  return assets.map((a) => {
+    const rate = assetRateBrl(a.symbol, pricing);
+    return { ...a, valueCents: rate === null ? 0 : assetValueCents(a.rawBalance, a.decimals, rate) };
+  });
+}
+export function storedValueCentsFromValuedAssets(assets: ReserveValuedAsset[]): number {
+  return assets.reduce((c, a) => c + a.valueCents, 0);
+}
+```
+- REMOVE the old `storedValueCentsFromAssets(assets, brlPeggedSymbols)`; keep `rawBalanceToCents` (still the BRL-1:1 primitive; note `assetValueCents(raw, dec, 1) === rawBalanceToCents(raw, dec)`).
+- Update `convex/reserve/domain.test.ts`: keep `rawBalanceToCents` cases; add `assetValueCents` (USD rate e.g. 5.5 → check cents), `assetRateBrl` (brl→1, usd→rate, other→null), `valueAssets` + `storedValueCentsFromValuedAssets` (mixed BRL+USD+unpriced).
+
+## Task 18 — schema + FX fetch + action (+clear op)
+- `convex/schema.ts` `reserveSnapshots`: add `fxUsdBrl: v.number()`; the `assets` element gains `valueCents: v.number()` (keep it identical to `reserveAssetValidator` — update the inline mirror comment).
+- `convex/reserve/useCases.ts`: `writeSnapshot` args gain `fxUsdBrl: v.number()` (assets already validated by `reserveAssetValidator` which now includes valueCents). Add `clearSnapshots` internalMutation (deletes all `reserveSnapshots` rows — used to reset dev data after the schema change; also a useful ops primitive).
+- `convex/reserve/actions.ts`: add a tagged FX fetch and wire pricing:
+```ts
+type FxResponse = { rates?: { BRL?: number } };
+async function fetchUsdBrlRate(): Promise<number> {
+  const res = await fetch(getFxUsdBrlUrl(), { signal: AbortSignal.timeout(5000) });
+  if (!res.ok) throw new Error(`FX ${res.status} ${res.statusText}`);
+  const data = (await res.json()) as FxResponse; // hook-ok: external FX API response
+  const rate = data.rates?.BRL;
+  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0) throw new Error("FX: invalid BRL rate");
+  return rate;
+}
+```
+In `readReserve()`, inside the try: fetch `usdBrlRate` (so an FX failure → `{ available: false }`, never a fabricated number), build `pricing = { brlSymbols: getReserveBrlPeggedSymbols(), usdSymbols: getReserveUsdSymbols(), usdBrlRate }`, `const valued = valueAssets(assets, pricing)`, `storedValueCents = storedValueCentsFromValuedAssets(valued)`, return `{ available: true, storedValueCents, fxUsdBrl: usdBrlRate, assets: valued }`. `refreshReserveSnapshot` passes `fxUsdBrl` to `writeSnapshot`.
+
+## Task 19 — query + panel + i18n
+- `convex/transparency/domain.ts`: `ReserveCoverage` available branch gains `fxUsdBrl: number`.
+- `convex/transparency/useCases.ts` `getReserveCoverage`: include `fxUsdBrl: snap.fxUsdBrl` in the available return.
+- `reserve-panel.tsx`: under the "as of" line, when available, render the FX rate, e.g. `t("fx", { rate })` formatted `new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(coverage.fxUsdBrl)`.
+- i18n both locales `transparency.reserve`: add `fx` (pt-BR "Cotação USD/BRL: {rate}", en "USD/BRL rate: {rate}").
+- Update `convex/transparency/useCases.test.ts` seed (`writeSnapshot`) to include `fxUsdBrl` and the new asset `valueCents` so it still typechecks/passes.
+
+## Task 20 — reset dev data + smoke
+- Run `bunx convex run reserve/useCases:clearSnapshots '{}'` (clear the pre-FX row so the new required schema fields are satisfiable).
+- Run `bunx convex run reserve/actions:refreshReserveSnapshot '{}'`, then `latestSnapshot` — expect `fxUsdBrl ≈ 5.x`, `assets[0].valueCents > 0` for USDCMOCK, `storedValueCents ≈ 992500 × rate × 100`.
+- Reload `/transparency` — coverage tile shows the BRL figure + "Cotação USD/BRL".
+
+**Verification:** `bun --filter @mutav/agency test`, `bun run typecheck`, `bun run lint`, `bun --filter @mutav/agency build` all green.
