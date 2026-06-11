@@ -16,6 +16,8 @@ describe("reserve snapshots", () => {
     await t.mutation(internal.reserve.useCases.writeSnapshot, {
       storedValueCents: 100,
       fxUsdBrl: 5.4,
+      fxSource: "BCB_PTAX_VENDA",
+      fxQuotedAt: "2026-06-10 13:12:50",
       assets: [
         {
           contractAddress: "C1",
@@ -30,6 +32,8 @@ describe("reserve snapshots", () => {
     await t.mutation(internal.reserve.useCases.writeSnapshot, {
       storedValueCents: 250,
       fxUsdBrl: 5.4,
+      fxSource: "BCB_PTAX_VENDA",
+      fxQuotedAt: "2026-06-10 13:12:50",
       assets: [
         {
           contractAddress: "C1",
@@ -52,6 +56,8 @@ describe("reserve snapshots", () => {
     await t.mutation(internal.reserve.useCases.writeSnapshot, {
       storedValueCents: 100,
       fxUsdBrl: 5.4,
+      fxSource: "BCB_PTAX_VENDA",
+      fxQuotedAt: "2026-06-10 13:12:50",
       assets: [
         {
           contractAddress: "C1",

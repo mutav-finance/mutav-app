@@ -24,6 +24,8 @@ export type ReserveReadResult =
       available: true;
       storedValueCents: number;
       fxUsdBrl: number;
+      fxSource: string;
+      fxQuotedAt: string;
       assets: ReserveValuedAsset[];
     }
   | { available: false };

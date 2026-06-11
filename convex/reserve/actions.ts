@@ -15,7 +15,7 @@ import {
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import {
-  getFxUsdBrlUrl,
+  getBcbPtaxBaseUrl,
   getReserveBrlPeggedSymbols,
   getReserveContractId,
   getReserveUsdSymbols,
@@ -29,16 +29,31 @@ import {
   type ReserveReadResult,
 } from "./domain";
 
-type FxResponse = { rates?: { BRL?: number } };
+type PtaxQuote = { cotacaoCompra?: number; cotacaoVenda?: number; dataHoraCotacao?: string };
+type PtaxResponse = { value?: PtaxQuote[] };
 
-async function fetchUsdBrlRate(): Promise<number> {
-  const res = await fetch(getFxUsdBrlUrl(), { signal: AbortSignal.timeout(5000) });
-  if (!res.ok) throw new Error(`FX ${res.status} ${res.statusText}`);
-  const data = (await res.json()) as FxResponse; // hook-ok: external FX API response
-  const rate = data.rates?.BRL;
+// BCB PTAX OData requires the US month-day-year order in the date filter.
+function ptaxDate(d: Date): string {
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${mm}-${dd}-${d.getUTCFullYear()}`;
+}
+
+async function fetchPtaxUsdBrl(): Promise<{ rate: number; source: string; quotedAt: string }> {
+  const now = new Date();
+  const start = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const url =
+    `${getBcbPtaxBaseUrl()}/CotacaoDolarPeriodo(dataInicial=@di,dataFinalCotacao=@df)` +
+    `?@di='${ptaxDate(start)}'&@df='${ptaxDate(now)}'&$top=1&$orderby=dataHoraCotacao%20desc&$format=json`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`PTAX ${res.status} ${res.statusText}`);
+  const data = (await res.json()) as PtaxResponse; // hook-ok: external BCB PTAX API response
+  const quote = data.value?.[0];
+  const rate = quote?.cotacaoVenda;
   if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0)
-    throw new Error("FX: invalid BRL rate");
-  return rate;
+    throw new Error("PTAX: invalid venda rate");
+  const quotedAt = (quote?.dataHoraCotacao ?? "").slice(0, 19);
+  return { rate, source: "BCB_PTAX_VENDA", quotedAt };
 }
 
 // Canonical all-zero account — valid for read-only simulation (never signed).
@@ -70,7 +85,7 @@ async function readReserve(): Promise<ReserveReadResult> {
   try {
     // Fetch FX first: a failure here must yield `{ available: false }` (caught
     // below) so the snapshot is never written with a fabricated rate or value.
-    const usdBrlRate = await fetchUsdBrlRate();
+    const { rate: usdBrlRate, source: fxSource, quotedAt: fxQuotedAt } = await fetchPtaxUsdBrl();
 
     const server = new rpc.Server(getStellarRpcUrl(), { timeout: 10_000 });
     const networkPassphrase = getStellarNetwork() === "public" ? Networks.PUBLIC : Networks.TESTNET;
@@ -114,7 +129,14 @@ async function readReserve(): Promise<ReserveReadResult> {
     };
     const valued = valueAssets(assets, pricing);
     const storedValueCents = storedValueCentsFromValuedAssets(valued);
-    return { available: true, storedValueCents, fxUsdBrl: usdBrlRate, assets: valued };
+    return {
+      available: true,
+      storedValueCents,
+      fxUsdBrl: usdBrlRate,
+      fxSource,
+      fxQuotedAt,
+      assets: valued,
+    };
   } catch (err) {
     // Non-fatal: keep the last good snapshot, report unavailable, never a mock.
     // Logged so operators can see a persistently broken read.
@@ -131,6 +153,8 @@ export const refreshReserveSnapshot = internalAction({
     await ctx.runMutation(internal.reserve.useCases.writeSnapshot, {
       storedValueCents: result.storedValueCents,
       fxUsdBrl: result.fxUsdBrl,
+      fxSource: result.fxSource,
+      fxQuotedAt: result.fxQuotedAt,
       assets: result.assets,
       capturedAt: Date.now(),
     });

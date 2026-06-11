@@ -6,6 +6,8 @@ export const writeSnapshot = internalMutation({
   args: {
     storedValueCents: v.number(),
     fxUsdBrl: v.number(),
+    fxSource: v.string(),
+    fxQuotedAt: v.string(),
     assets: v.array(reserveAssetValidator),
     capturedAt: v.number(),
   },

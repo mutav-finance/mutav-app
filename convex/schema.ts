@@ -530,6 +530,8 @@ export default defineSchema({
   reserveSnapshots: defineTable({
     storedValueCents: v.number(),
     fxUsdBrl: v.number(),
+    fxSource: v.string(),
+    fxQuotedAt: v.string(),
     assets: v.array(
       v.object({
         contractAddress: v.string(),
