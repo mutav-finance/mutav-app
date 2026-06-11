@@ -13,12 +13,11 @@ export function ReservePanel({ coverage }: Props) {
   const locale = useLocale();
   const loading = coverage === null || coverage === undefined;
 
-  const asOf =
-    coverage?.available && coverage.capturedAt
-      ? new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(
-          new Date(coverage.capturedAt),
-        )
-      : null;
+  const asOf = coverage?.available
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(
+        new Date(coverage.capturedAt),
+      )
+    : null;
 
   return (
     <Card>
@@ -31,7 +30,7 @@ export function ReservePanel({ coverage }: Props) {
           {loading ? (
             <Skeleton className="h-8 w-28" />
           ) : coverage.available ? (
-            Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(
+            new Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(
               coverage.storedValueCents / 100,
             )
           ) : (
