@@ -198,11 +198,16 @@
     opacity: 0.4;
   }
 }
-.tga-live-pulse {
+.tga-live-pulse,
+/* Deprecated 2026-06 — renamed from `.tga-live-square` (animation is
+   opacity-only, geometry-agnostic). Alias kept for one release cycle so
+   unmerged branches don't silently lose the animation. Remove after 2026-09. */
+.tga-live-square {
   animation: tga-live-pulse 2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .tga-live-pulse {
+  .tga-live-pulse,
+  .tga-live-square {
     animation: none;
     opacity: 1;
   }

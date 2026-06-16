@@ -112,13 +112,14 @@ function buildColumns(
       cell: ({ row }) => {
         const { status, urgency } = row.original;
         if (status === "ativo") {
-          if (urgency === "overdue") return <StatusTag tone="error" label={t("urgency.overdue")} />;
+          if (urgency === "overdue")
+            return <StatusTag tone="error">{t("urgency.overdue")}</StatusTag>;
           if (urgency === "expiring")
-            return <StatusTag tone="expiring" label={t("urgency.expiring")} />;
+            return <StatusTag tone="expiring">{t("urgency.expiring")}</StatusTag>;
           if (urgency === "critical")
-            return <StatusTag tone="caution" label={t("urgency.critical")} />;
+            return <StatusTag tone="caution">{t("urgency.critical")}</StatusTag>;
         }
-        return <StatusTag tone={statusTone[status]} label={tStatus(status)} />;
+        return <StatusTag tone={statusTone[status]}>{tStatus(status)}</StatusTag>;
       },
       filterFn: (row, columnId, value) => row.getValue(columnId) === value,
     },

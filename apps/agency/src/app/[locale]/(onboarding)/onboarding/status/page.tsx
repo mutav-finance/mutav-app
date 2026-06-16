@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { ClockIcon } from "lucide-react";
 import { Link, redirect } from "@mutav/i18n/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { Button } from "@mutav/ui/button";
@@ -32,8 +33,9 @@ export default async function OnboardingStatusPage({ searchParams, params }: Pro
   return (
     <PageContent variant="narrow" className="py-16 md:py-24">
       <div className="flex flex-col items-center gap-6">
-        {/* Status pill — acima da moldura */}
-        <StatusTag tone="neutral" pulse>
+        {/* Status pill — acima da moldura. neutral + Clock icon communicates
+            "in progress, no action required" per brand decision (no --info token). */}
+        <StatusTag tone="neutral" pulse icon={<ClockIcon className="size-3.5" />}>
           {stateLabel}
         </StatusTag>
 

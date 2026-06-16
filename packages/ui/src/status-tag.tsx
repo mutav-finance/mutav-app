@@ -22,8 +22,7 @@ const iconToneClass: Record<StatusTagTone, string> = {
 
 export type StatusTagProps = {
   tone: StatusTagTone;
-  children?: ReactNode;
-  label?: string;
+  children: ReactNode;
   pulse?: boolean;
   icon?: ReactNode;
   className?: string;
@@ -33,13 +32,11 @@ export type StatusTagProps = {
 export function StatusTag({
   tone,
   children,
-  label,
   pulse = false,
   icon,
   className,
   labelClassName,
 }: StatusTagProps) {
-  const content = children ?? label;
   return (
     <span className={cn("inline-flex items-center gap-2 align-middle", className)}>
       <span
@@ -52,7 +49,7 @@ export function StatusTag({
         </span>
       ) : null}
       <Eyebrow as="span" tone="default" className={labelClassName}>
-        {content}
+        {children}
       </Eyebrow>
     </span>
   );

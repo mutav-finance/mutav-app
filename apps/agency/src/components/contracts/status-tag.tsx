@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { StatusTag as UiStatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
 
 type Tone = "accent" | "success" | "error" | "neutral" | "expiring" | "caution";
@@ -13,18 +14,18 @@ const TONE: Record<Tone, StatusTagTone> = {
 
 export function StatusTag({
   tone,
-  label,
+  children,
   pulse = false,
   className,
 }: {
   tone: Tone;
-  label: string;
+  children: ReactNode;
   pulse?: boolean;
   className?: string;
 }) {
   return (
     <UiStatusTag tone={TONE[tone]} pulse={pulse} className={className}>
-      {label}
+      {children}
     </UiStatusTag>
   );
 }

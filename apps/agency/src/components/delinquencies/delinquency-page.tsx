@@ -282,7 +282,9 @@ export function DelinquencyPage() {
                       <Mono className="text-sm font-medium">{row.propertyId}</Mono>
                     </TableCell>
                     <TableCell>
-                      <DelinquencyStatusTag status={row.status} label={t(`status.${row.status}`)} />
+                      <DelinquencyStatusTag status={row.status}>
+                        {t(`status.${row.status}`)}
+                      </DelinquencyStatusTag>
                     </TableCell>
                     <TableCell>
                       <Mono className="text-muted-foreground text-sm">{row.noticeAt}</Mono>

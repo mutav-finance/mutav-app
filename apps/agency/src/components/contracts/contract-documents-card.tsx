@@ -70,7 +70,7 @@ export function ContractDocumentsCard({ documents }: { documents: ContractDocume
                     </Tooltip>
                   )}
                 </div>
-                <StatusTag tone={statusTone[status]} label={tStatus(status)} />
+                <StatusTag tone={statusTone[status]}>{tStatus(status)}</StatusTag>
               </div>
             </div>
           );

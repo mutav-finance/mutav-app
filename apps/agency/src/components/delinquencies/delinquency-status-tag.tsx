@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
 
 export type DelinquencyStatus = "pendencia_aberta" | "entregue" | "cancelado";
@@ -10,16 +11,16 @@ const statusTone: Record<DelinquencyStatus, StatusTagTone> = {
 
 export function DelinquencyStatusTag({
   status,
-  label,
+  children,
   className,
 }: {
   status: DelinquencyStatus;
-  label: string;
+  children: ReactNode;
   className?: string;
 }) {
   return (
     <StatusTag tone={statusTone[status]} className={className}>
-      {label}
+      {children}
     </StatusTag>
   );
 }

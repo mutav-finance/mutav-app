@@ -195,11 +195,15 @@
     opacity: 0.4;
   }
 }
-.tga-live-pulse {
+.tga-live-pulse,
+/* Deprecated 2026-06 — renamed from `.tga-live-square`. Alias kept for
+   one release cycle. Remove after 2026-09. */
+.tga-live-square {
   animation: tga-live-pulse 2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .tga-live-pulse {
+  .tga-live-pulse,
+  .tga-live-square {
     animation: none;
     opacity: 1;
   }

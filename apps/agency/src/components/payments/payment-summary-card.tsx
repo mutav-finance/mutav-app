@@ -30,9 +30,10 @@ export function PaymentSummaryCard({ payment }: { payment: Payment }) {
             <dd>
               <PaymentStateTag
                 stateKind={payment.state.kind}
-                label={tState(payment.state.kind)}
                 pulse={payment.state.kind === "pending" || payment.state.kind === "overdue"}
-              />
+              >
+                {tState(payment.state.kind)}
+              </PaymentStateTag>
             </dd>
           </div>
           <div className="flex items-center gap-3">

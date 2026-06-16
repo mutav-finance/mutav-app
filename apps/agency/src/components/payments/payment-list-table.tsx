@@ -120,9 +120,10 @@ function buildColumns(
       cell: ({ row }) => (
         <PaymentStateTag
           stateKind={row.original.state.kind}
-          label={tState(row.original.state.kind)}
           pulse={row.original.state.kind === "pending" || row.original.state.kind === "overdue"}
-        />
+        >
+          {tState(row.original.state.kind)}
+        </PaymentStateTag>
       ),
       filterFn: (row, _columnId, value) => row.original.state.kind === value,
     },

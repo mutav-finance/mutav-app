@@ -37,11 +37,9 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
         <Eyebrow as={CardTitle} size="xs" className="font-medium">
           {t("heading")}
         </Eyebrow>
-        <StatusTag
-          tone={approvalTone[tenant.approvalStatus]}
-          label={tApproval(tenant.approvalStatus)}
-          className="ml-auto"
-        />
+        <StatusTag tone={approvalTone[tenant.approvalStatus]} className="ml-auto">
+          {tApproval(tenant.approvalStatus)}
+        </StatusTag>
       </CardHeader>
       <CardContent className="flex flex-col gap-0 px-0 pb-0">
         <div className="border-border flex items-center justify-center border-b px-6 py-3 sm:py-4">

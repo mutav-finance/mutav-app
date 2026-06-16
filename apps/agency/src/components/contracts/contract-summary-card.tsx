@@ -137,11 +137,9 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
             <div className="flex items-center gap-3 sm:col-span-2">
               <dt className="text-muted-foreground">{t("currentStatus")}</dt>
               <dd>
-                <StatusTag
-                  tone={statusTone[contract.status]}
-                  label={tStatus(contract.status)}
-                  pulse={contract.status === "ativo"}
-                />
+                <StatusTag tone={statusTone[contract.status]} pulse={contract.status === "ativo"}>
+                  {tStatus(contract.status)}
+                </StatusTag>
               </dd>
             </div>
             <div className="flex flex-wrap items-baseline gap-3">
