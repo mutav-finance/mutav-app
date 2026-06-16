@@ -10,7 +10,7 @@ const convex = url ? new ConvexReactClient(url) : null;
  * Top-level Convex provider for apps/pay. Pay carries no Auth0 (spec § Section 1
  * load-bearing constraint), so this is the unauthenticated single-mode
  * variant: a bare `ConvexProvider`. The Convex queries pay consumes
- * (`api.payments.useCases.getPublicByPublicId`) are intentionally public —
+ * (`api.invoices.useCases.getPublicByPublicId`) are intentionally public —
  * gated only on the `publicId` URL bearer, never on a session.
  *
  * If `NEXT_PUBLIC_CONVEX_URL` is unset (preview deployments still being

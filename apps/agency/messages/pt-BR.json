@@ -458,10 +458,10 @@
     "subheading": "Acompanhe as faturas mensais da sua imobiliária",
     "tabs": {
       "all": "Todas",
-      "pending": "Pendentes",
-      "overdue": "Vencidas",
+      "open": "Em aberto",
+      "overdue": "Em atraso",
       "paid": "Pagas",
-      "canceled": "Canceladas"
+      "void": "Anuladas"
     },
     "columns": {
       "publicId": "ID",
@@ -642,10 +642,10 @@
     "breadcrumb": "Detalhes da Fatura",
     "heroTitle": "Fatura {state}",
     "state": {
-      "pending": "Pendente",
-      "overdue": "Vencida",
+      "open": "Em aberto",
+      "overdue": "Em atraso",
       "paid": "Paga",
-      "canceled": "Cancelada"
+      "void": "Anulada"
     },
     "method": {
       "none": "Não definida",

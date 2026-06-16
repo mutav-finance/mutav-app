@@ -34,11 +34,11 @@ export default async function CheckoutAnchorTestPage({
   params: Promise<{ publicId: string; locale: string }>;
 }) {
   const { publicId, locale } = await params;
-  const preloaded = await preloadQuery(api.payments.useCases.getPublicByPublicId, { publicId });
+  const preloaded = await preloadQuery(api.invoices.useCases.getPublicByPublicId, { publicId });
   const payment = preloadedQueryResult(preloaded);
   if (!payment) notFound();
 
-  if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
+  if (payment.state.kind === "paid" || payment.state.kind === "void") {
     redirect({ href: `/pay/${publicId}/paid`, locale });
   }
   if (payment.method?.kind === "stellar") {
@@ -59,7 +59,7 @@ export default async function CheckoutAnchorTestPage({
         <ArrowLeft className="size-3" strokeWidth={1.5} />
         {t("back")}
       </Link>
-      <CheckoutAnchorTestView paymentId={payment.paymentId} totalCents={payment.totalCents} />
+      <CheckoutAnchorTestView invoiceId={payment.invoiceId} totalCents={payment.totalCents} />
     </div>
   );
 }

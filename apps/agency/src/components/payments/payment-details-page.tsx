@@ -18,6 +18,8 @@ import {
 import { Mono } from "@mutav/ui/mono";
 import { Link } from "@mutav/i18n/navigation";
 import type { api } from "@convex/_generated/api";
+import { derivedStatus } from "@convex/invoices/domain";
+import { utcTodayDate } from "@/lib/payments/format";
 import { PaymentSummaryCard } from "./payment-summary-card";
 import { PaymentLineItemsCard } from "./payment-line-items-card";
 import { PaymentMethodCard } from "./payment-method-card";
@@ -25,7 +27,7 @@ import { PaymentMethodCard } from "./payment-method-card";
 export function PaymentDetailsPage({
   preloaded,
 }: {
-  preloaded: Preloaded<typeof api.payments.useCases.getByPublicId>;
+  preloaded: Preloaded<typeof api.invoices.useCases.getByPublicId>;
 }) {
   const payment = usePreloadedQuery(preloaded);
   if (!payment) {
@@ -58,7 +60,7 @@ export function PaymentDetailsPage({
             </Eyebrow>
           </Breadcrumb>
         }
-        title={t("heroTitle", { state: tState(payment.state.kind) })}
+        title={t("heroTitle", { state: tState(derivedStatus(payment, utcTodayDate())) })}
       />
       <PageContent variant="narrow">
         <PaymentSummaryCard payment={payment} />

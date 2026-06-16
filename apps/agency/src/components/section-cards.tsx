@@ -20,12 +20,12 @@ export function SectionCards() {
   );
 
   const nextPayment = useQuery(
-    api.payments.useCases.getNextPendingPayment,
+    api.invoices.useCases.getNextOpenInvoice,
     agencyId ? { agencyId } : "skip",
   );
 
   const overdueCount = useQuery(
-    api.payments.useCases.getOverdueCount,
+    api.invoices.useCases.getOverdueCount,
     agencyId ? { agencyId } : "skip",
   );
 

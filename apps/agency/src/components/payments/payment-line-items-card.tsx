@@ -13,9 +13,9 @@ import {
 } from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents } from "@/lib/contracts/format";
-import type { Payment } from "@convex/payments/domain";
+import type { Invoice } from "@convex/invoices/domain";
 
-export function PaymentLineItemsCard({ payment }: { payment: Payment }) {
+export function PaymentLineItemsCard({ payment }: { payment: Invoice }) {
   const t = useTranslations("paymentDetails.lineItems");
 
   return (

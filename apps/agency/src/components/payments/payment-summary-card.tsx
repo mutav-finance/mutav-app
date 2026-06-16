@@ -3,14 +3,15 @@ import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
-import { formatPeriodMonth } from "@/lib/payments/format";
-import type { Payment } from "@convex/payments/domain";
+import { formatPeriodMonth, utcTodayDate } from "@/lib/payments/format";
+import { derivedStatus, type Invoice } from "@convex/invoices/domain";
 import { PaymentStateTag } from "./payment-state-tag";
 
-export function PaymentSummaryCard({ payment }: { payment: Payment }) {
+export function PaymentSummaryCard({ payment }: { payment: Invoice }) {
   const t = useTranslations("paymentDetails.summary");
   const tState = useTranslations("paymentDetails.state");
   const tMethod = useTranslations("paymentDetails.method");
+  const status = derivedStatus(payment, utcTodayDate());
 
   return (
     <Card>
@@ -28,11 +29,8 @@ export function PaymentSummaryCard({ payment }: { payment: Payment }) {
           <div className="flex items-center gap-3">
             <dt className="text-muted-foreground">{t("state")}</dt>
             <dd>
-              <PaymentStateTag
-                stateKind={payment.state.kind}
-                pulse={payment.state.kind === "pending" || payment.state.kind === "overdue"}
-              >
-                {tState(payment.state.kind)}
+              <PaymentStateTag status={status} pulse={status === "open" || status === "overdue"}>
+                {tState(status)}
               </PaymentStateTag>
             </dd>
           </div>

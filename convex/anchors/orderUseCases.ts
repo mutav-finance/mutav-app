@@ -2,7 +2,7 @@ import { v } from "convex/values";
 
 import { internalMutation, internalQuery, query } from "../_generated/server";
 import { assertAgencyAccess } from "../lib/auth";
-import { PaymentMethods, PaymentStates } from "../payments/domain";
+import { InvoiceMethods, InvoiceStates } from "../invoices/domain";
 import { anchorProviderValidator } from "./domain";
 import { anchorOrderStatusValidator, type AnchorOrder, type AnchorOrderId } from "./orderDomain";
 
@@ -54,7 +54,7 @@ export const getByAnchorTxId = internalQuery({
 export const insertOrder = internalMutation({
   args: {
     agencyId: v.id("agencies"),
-    paymentId: v.id("payments"),
+    invoiceId: v.id("invoices"),
     provider: anchorProviderValidator,
     anchorTxId: v.string(),
     instructions: v.optional(v.any()),
@@ -88,14 +88,14 @@ export const updateOrderStatus = internalMutation({
 
 /**
  * Atomically patch the anchor order to terminal-completed AND mark its
- * parent payment paid in a single Convex transaction. Pollers previously
+ * parent invoice paid in a single Convex transaction. Pollers previously
  * issued two separate runMutation calls: if the second failed, the order
- * was flipped completed but the payment stayed pending — and the next
+ * was flipped completed but the invoice stayed open — and the next
  * poll's `isTerminal` short-circuit prevented retry forever.
  *
- * Reaches across the payments domain on purpose. Atomicity wins over
- * the usual domain boundary: payment-update logic mirrors
- * `payments/mutations.ts → markPaidByAnchor` (idempotent on anchorTxId
+ * Reaches across the invoices domain on purpose. Atomicity wins over
+ * the usual domain boundary: invoice-update logic mirrors
+ * `invoices/mutations.ts → markPaidByAnchor` (idempotent on anchorTxId
  * collision); keep them in sync if you change one.
  */
 export const completeOrderAndMarkPaid = internalMutation({
@@ -107,7 +107,7 @@ export const completeOrderAndMarkPaid = internalMutation({
     feeCents: v.optional(v.number()),
     completedAt: v.optional(v.string()),
     rawPayload: v.optional(v.any()),
-    paymentId: v.id("payments"),
+    invoiceId: v.id("invoices"),
     anchorTxId: v.string(),
     pixKey: v.string(),
     paidAt: v.string(),
@@ -122,7 +122,7 @@ export const completeOrderAndMarkPaid = internalMutation({
       feeCents,
       completedAt,
       rawPayload,
-      paymentId,
+      invoiceId,
       anchorTxId,
       pixKey,
       paidAt,
@@ -137,19 +137,19 @@ export const completeOrderAndMarkPaid = internalMutation({
       rawPayload,
     });
 
-    const payment = await ctx.db.get(paymentId);
-    if (!payment) return { paymentStatus: "not_found" as const };
+    const invoice = await ctx.db.get(invoiceId);
+    if (!invoice) return { paymentStatus: "not_found" as const };
 
-    if (payment.state.kind === "paid") {
-      const existingTxId = payment.method?.kind === "pix" ? payment.method.txId : null;
+    if (invoice.state.kind === "paid") {
+      const existingTxId = invoice.method?.kind === "pix" ? invoice.method.txId : null;
       return existingTxId === anchorTxId
         ? { paymentStatus: "already_paid" as const }
         : { paymentStatus: "duplicate_inbound" as const };
     }
 
-    await ctx.db.patch(paymentId, {
-      state: PaymentStates.paid(paidAt),
-      method: PaymentMethods.pix(pixKey, anchorTxId),
+    await ctx.db.patch(invoiceId, {
+      state: InvoiceStates.paid(paidAt),
+      method: InvoiceMethods.pix(pixKey, anchorTxId),
     });
     return { paymentStatus: "paid" as const };
   },

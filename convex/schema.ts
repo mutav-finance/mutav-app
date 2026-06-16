@@ -36,17 +36,17 @@ const tenantApprovalStatus = v.union(
   v.literal("reprovado"),
 );
 
-const paymentLineItemKind = v.union(v.literal("recurring"), v.literal("activation"));
+const invoiceLineItemKind = v.union(v.literal("recurring"), v.literal("activation"));
 
 /**
- * Discriminated union representing the lifecycle state of a payment.
+ * Discriminated union representing the lifecycle state of an invoice.
  * Each variant carries only the fields that are meaningful for that state.
+ * `overdue` is not stored — it's derived from `open` + a past `dueDate`.
  */
-const paymentState = v.union(
-  v.object({ kind: v.literal("pending") }),
+const invoiceState = v.union(
+  v.object({ kind: v.literal("open") }),
   v.object({ kind: v.literal("paid"), paidAt: v.string() }),
-  v.object({ kind: v.literal("overdue") }),
-  v.object({ kind: v.literal("canceled") }),
+  v.object({ kind: v.literal("void") }),
 );
 
 /**
@@ -57,7 +57,7 @@ const paymentState = v.union(
  * - stellar:  on-chain payment via Stellar network (XLM / USDC); txHash null until confirmed.
  * - pix:      Brazilian instant payment; txId null until confirmed.
  */
-const paymentMethod = v.union(
+const invoiceMethod = v.union(
   v.null(),
   v.object({
     kind: v.literal("boleto"),
@@ -296,23 +296,23 @@ export default defineSchema({
     message: v.string(),
   }).index("by_contract", ["contractPublicId", "at"]),
 
-  payments: defineTable({
+  invoices: defineTable({
     agencyId: v.id("agencies"),
     publicId: v.string(),
     periodMonth: v.string(),
     issuedAt: v.string(),
     dueDate: v.string(),
     totalCents: v.number(),
-    state: paymentState,
-    method: paymentMethod,
-    // 63-bit unsigned int as digit string; derives the per-payment `M…`
+    state: invoiceState,
+    method: invoiceMethod,
+    // 63-bit unsigned int as digit string; derives the per-invoice `M…`
     // address. Optional for rows created before this field existed.
     muxedId: v.optional(v.string()),
     lineItems: v.array(
       v.object({
         contractId: v.id("contracts"),
         contractPublicId: v.string(),
-        kind: paymentLineItemKind,
+        kind: invoiceLineItemKind,
         amountCents: v.number(),
         description: v.string(),
       }),
@@ -331,14 +331,14 @@ export default defineSchema({
     lastRunAt: v.string(),
   }).index("by_sourceAccount", ["sourceAccount"]),
 
-  // One row per anchor-mediated on-ramp attempt against a `payments` row.
-  // 1:N from payments (retries create new rows). On terminal `completed`,
-  // the parent payment's state flips to `paid` via `markPaidByAnchor`.
+  // One row per anchor-mediated on-ramp attempt against an `invoices` row.
+  // 1:N from invoices (retries create new rows). On terminal `completed`,
+  // the parent invoice's state flips to `paid` via `markPaidByAnchor`.
   // `rawPayload` retains the last full anchor-side transaction object for
   // debugging / audit.
   anchorOrders: defineTable({
     agencyId: v.id("agencies"),
-    paymentId: v.id("payments"),
+    invoiceId: v.id("invoices"),
     provider: anchorOrderProvider,
     anchorTxId: v.string(),
     /**
@@ -368,7 +368,7 @@ export default defineSchema({
     rawPayload: v.optional(v.any()),
   })
     .index("by_agency", ["agencyId"])
-    .index("by_payment", ["paymentId"])
+    .index("by_invoice", ["invoiceId"])
     .index("by_anchor_tx", ["anchorTxId"]),
 
   // One row per (agency × anchor provider) onboarding relationship. Embeds
@@ -457,7 +457,7 @@ export default defineSchema({
   }).index("by_documentHash", ["documentHash"]),
 
   // Hash-chained audit log of money-moving and lifecycle-changing actions.
-  // Every state-changing mutation in `payments/` and `contracts/` appends
+  // Every state-changing mutation in `invoices/` and `contracts/` appends
   // one row via `appendAuditEntry` (see `convex/audit/useCases.ts`).
   //
   // Chain invariant: every entry's `prevHash` equals the previous entry's

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { PaymentStateKind } from "@convex/payments/domain";
+import type { InvoiceDisplayStatus } from "@convex/invoices/domain";
 
 type Tone = "accent" | "success" | "error" | "neutral" | "warning";
 
@@ -11,25 +11,25 @@ const toneClass: Record<Tone, string> = {
   neutral: "bg-muted-foreground",
 };
 
-export const paymentStateTone: Record<PaymentStateKind, Tone> = {
-  pending: "accent",
+export const paymentStateTone: Record<InvoiceDisplayStatus, Tone> = {
+  open: "accent",
   overdue: "warning",
   paid: "success",
-  canceled: "neutral",
+  void: "neutral",
 };
 
 export function PaymentStateTag({
-  stateKind,
+  status,
   label,
   pulse = false,
   className,
 }: {
-  stateKind: PaymentStateKind;
+  status: InvoiceDisplayStatus;
   label: string;
   pulse?: boolean;
   className?: string;
 }) {
-  const tone = paymentStateTone[stateKind];
+  const tone = paymentStateTone[status];
   return (
     <span className={cn("inline-flex items-center gap-2 align-middle", className)}>
       <span

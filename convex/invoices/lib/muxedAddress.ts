@@ -12,9 +12,9 @@ function getBaseAccount(): Account {
 }
 
 /**
- * Derive the per-payment muxed `M…` address (SEP-23) for a given muxed-id,
+ * Derive the per-invoice muxed `M…` address (SEP-23) for a given muxed-id,
  * anchored to the Mutav treasury source account.
  */
-export function derivePaymentMuxedAddress(muxedId: string): string {
+export function deriveInvoiceMuxedAddress(muxedId: string): string {
   return new MuxedAccount(getBaseAccount(), muxedId).accountId();
 }

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 
 import { api } from "@convex/_generated/api";
-import type { PaymentStateKind } from "@convex/payments/domain";
+import { derivedStatus, type InvoiceDisplayStatus } from "@convex/invoices/domain";
 import { useWorkspace } from "@/providers/workspace";
 import { Link } from "@mutav/i18n/navigation";
 import { Badge } from "@mutav/ui/badge";
@@ -51,12 +51,12 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
-import { formatPeriodMonth } from "@/lib/payments/format";
+import { formatPeriodMonth, utcTodayDate } from "@/lib/payments/format";
 import { PaymentStateTag } from "@/components/payments/payment-state-tag";
 
-type StateTab = "all" | PaymentStateKind;
+type StateTab = "all" | InvoiceDisplayStatus;
 
-const STATE_TABS: readonly StateTab[] = ["all", "pending", "overdue", "paid", "canceled"];
+const STATE_TABS: readonly StateTab[] = ["all", "open", "overdue", "paid", "void"];
 
 function isStateTab(value: string): value is StateTab {
   return STATE_TABS.some((tab) => tab === value);
@@ -69,7 +69,7 @@ type PaymentListItem = {
   issuedAt: string;
   dueDate: string;
   totalCents: number;
-  state: { kind: PaymentStateKind } & Record<string, unknown>;
+  status: InvoiceDisplayStatus;
   method: ({ kind: string } & Record<string, unknown>) | null;
   lineItemCount: number;
 };
@@ -115,17 +115,17 @@ function buildColumns(
     },
     {
       id: "state",
-      accessorKey: "state",
+      accessorKey: "status",
       header: t("columns.state"),
       cell: ({ row }) => (
         <PaymentStateTag
-          stateKind={row.original.state.kind}
-          pulse={row.original.state.kind === "pending" || row.original.state.kind === "overdue"}
+          status={row.original.status}
+          pulse={row.original.status === "open" || row.original.status === "overdue"}
         >
-          {tState(row.original.state.kind)}
+          {tState(row.original.status)}
         </PaymentStateTag>
       ),
-      filterFn: (row, _columnId, value) => row.original.state.kind === value,
+      filterFn: (row, _columnId, value) => row.original.status === value,
     },
     {
       id: "contracts",
@@ -161,25 +161,24 @@ export function PaymentListTable() {
   const agencyId = selectedAgency?._id;
 
   const result = useQuery(
-    api.payments.useCases.listByAgency,
+    api.invoices.useCases.listByAgency,
     agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
   );
 
-  const data = React.useMemo<PaymentListItem[]>(
-    () =>
-      (result?.page ?? []).map((doc) => ({
-        id: doc.publicId,
-        agencyId: doc.agencyId,
-        periodMonth: doc.periodMonth,
-        issuedAt: doc.issuedAt,
-        dueDate: doc.dueDate,
-        totalCents: doc.totalCents,
-        state: doc.state,
-        method: doc.method,
-        lineItemCount: doc.lineItems.length,
-      })),
-    [result],
-  );
+  const data = React.useMemo<PaymentListItem[]>(() => {
+    const today = utcTodayDate();
+    return (result?.page ?? []).map((doc) => ({
+      id: doc.publicId,
+      agencyId: doc.agencyId,
+      periodMonth: doc.periodMonth,
+      issuedAt: doc.issuedAt,
+      dueDate: doc.dueDate,
+      totalCents: doc.totalCents,
+      status: derivedStatus(doc, today),
+      method: doc.method,
+      lineItemCount: doc.lineItems.length,
+    }));
+  }, [result]);
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
 
   const columns = React.useMemo(() => buildColumns(t, tState, tMethod), [t, tState, tMethod]);
@@ -234,12 +233,12 @@ export function PaymentListTable() {
   const counts = React.useMemo<Record<StateTab, number>>(() => {
     const c: Record<StateTab, number> = {
       all: data.length,
-      pending: 0,
+      open: 0,
       overdue: 0,
       paid: 0,
-      canceled: 0,
+      void: 0,
     };
-    for (const row of data) c[row.state.kind]++;
+    for (const row of data) c[row.status]++;
     return c;
   }, [data]);
   if (isLoading) {

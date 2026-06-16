@@ -12,7 +12,7 @@ export default async function PaymentPage({
   const { id } = await params;
   const token = await getAuthToken();
   const preloaded = await preloadQuery(
-    api.payments.useCases.getByPublicId,
+    api.invoices.useCases.getByPublicId,
     { publicId: id },
     token ? { token } : undefined,
   );

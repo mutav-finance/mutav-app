@@ -5,7 +5,7 @@ import type { api } from "@convex/_generated/api";
 import { PaymentAddressPaidReceipt } from "@/components/payments/flow/payment-address-paid-receipt";
 
 type Props = {
-  preloaded: Preloaded<typeof api.payments.useCases.getPublicByPublicId>;
+  preloaded: Preloaded<typeof api.invoices.useCases.getPublicByPublicId>;
   children: React.ReactNode;
 };
 

@@ -457,10 +457,10 @@
     "subheading": "Track your agency's monthly invoices",
     "tabs": {
       "all": "All",
-      "pending": "Pending",
+      "open": "Open",
       "overdue": "Overdue",
       "paid": "Paid",
-      "canceled": "Canceled"
+      "void": "Void"
     },
     "columns": {
       "publicId": "ID",
@@ -616,7 +616,7 @@
       },
       "badge": {
         "paid": "Paid",
-        "canceled": "Canceled"
+        "canceled": "Void"
       },
       "paidVia": "via {method}",
       "dueWas": "Was due on",
@@ -641,10 +641,10 @@
     "breadcrumb": "Invoice Details",
     "heroTitle": "Invoice {state}",
     "state": {
-      "pending": "Pending",
+      "open": "Open",
       "overdue": "Overdue",
       "paid": "Paid",
-      "canceled": "Canceled"
+      "void": "Void"
     },
     "method": {
       "none": "Not set",
