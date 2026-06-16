@@ -37,7 +37,7 @@ export function StepIndicator({
                     isDone ? `${label}${doneSuffix}` : isActive ? `${label}${currentSuffix}` : label
                   }
                   className={cn(
-                    "flex size-6 items-center justify-center rounded-full font-mono text-xs font-semibold",
+                    "flex size-6 items-center justify-center font-mono text-xs font-semibold",
                     isActive && "bg-accent text-canvas",
                     isDone && "bg-accent/20 text-accent",
                     !isActive && !isDone && "bg-surface-2 text-text-3",
