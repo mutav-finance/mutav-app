@@ -15,13 +15,13 @@ export function PaymentSummaryCard({ payment }: { payment: Payment }) {
   return (
     <Card>
       <CardHeader className="border-b">
-        <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
+        <Eyebrow as={CardTitle} size="xs" className="font-medium">
           {t("heading")}
         </Eyebrow>
       </CardHeader>
       <CardContent className="grid gap-4 py-4">
         <div className="flex flex-col gap-1">
-          <Eyebrow className="text-muted-foreground font-medium">{t("idLabel")}</Eyebrow>
+          <Eyebrow className="font-medium">{t("idLabel")}</Eyebrow>
           <Mono className="text-foreground text-xl font-medium">{payment.publicId}</Mono>
         </div>
         <dl className="text-base-sm grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

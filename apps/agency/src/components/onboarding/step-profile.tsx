@@ -228,7 +228,7 @@ export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmit
 
       {agencyType === "empresa" && (
         <div className="flex flex-col gap-4">
-          <Eyebrow className="text-text-3 text-xs tracking-wide">
+          <Eyebrow tone="subtle" size="xs" className="tracking-wide">
             {t("representanteSection")}
           </Eyebrow>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

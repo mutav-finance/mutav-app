@@ -74,7 +74,7 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
   return (
     <Card>
       <CardHeader className="border-b">
-        <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
+        <Eyebrow as={CardTitle} size="xs" className="font-medium">
           {t("heading")}
         </Eyebrow>
       </CardHeader>

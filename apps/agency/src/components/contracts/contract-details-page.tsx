@@ -46,7 +46,7 @@ export function ContractDetailsPage({
         width="narrow"
         breadcrumb={
           <Breadcrumb>
-            <Eyebrow as={BreadcrumbList} className="text-muted-foreground">
+            <Eyebrow as={BreadcrumbList}>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
                   <Link href="/">{tNav("dashboard")}</Link>

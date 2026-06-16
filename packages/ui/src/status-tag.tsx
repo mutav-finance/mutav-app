@@ -51,7 +51,7 @@ export function StatusTag({
           {icon}
         </span>
       ) : null}
-      <Eyebrow as="span" className={cn("text-text", labelClassName)}>
+      <Eyebrow as="span" tone="default" className={labelClassName}>
         {content}
       </Eyebrow>
     </span>

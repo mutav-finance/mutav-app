@@ -249,7 +249,7 @@ export function DelinquencyPage() {
 
       {/* Table */}
       <div className="flex flex-col gap-3">
-        <Eyebrow as="h2" className="text-muted-foreground text-xs font-medium">
+        <Eyebrow as="h2" size="xs" className="font-medium">
           {t("table.heading")}
         </Eyebrow>
 

@@ -68,7 +68,7 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
     <>
       <Card>
         <CardHeader className="border-b">
-          <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
+          <Eyebrow as={CardTitle} size="xs" className="font-medium">
             {t("heading")}
           </Eyebrow>
           <CardAction className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
         </CardHeader>
         <CardContent className="grid gap-4 py-4">
           <div className="flex flex-col gap-1">
-            <Eyebrow className="text-muted-foreground font-medium">{t("idLabel")}</Eyebrow>
+            <Eyebrow className="font-medium">{t("idLabel")}</Eyebrow>
             <Mono className="text-foreground text-xl font-medium">{contract.id}</Mono>
           </div>
           <dl className="text-base-sm grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

@@ -24,7 +24,7 @@ export function ContractActionsMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <Eyebrow as={DropdownMenuLabel} className="text-muted-foreground font-medium">
+        <Eyebrow as={DropdownMenuLabel} className="font-medium">
           {t("actionDisabled")}
         </Eyebrow>
         <DropdownMenuSeparator />

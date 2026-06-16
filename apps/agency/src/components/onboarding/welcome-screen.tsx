@@ -15,7 +15,7 @@ export function WelcomeScreen() {
     <div className="mx-auto w-full max-w-2xl px-4 py-12 md:py-20 lg:px-0">
       {/* Hero */}
       <div className="mb-12 flex flex-col items-center gap-4 text-center">
-        <Eyebrow as="p" className="text-text-3 text-xs tracking-widest">
+        <Eyebrow as="p" tone="subtle" size="xs" className="tracking-widest">
           {t("tag")}
         </Eyebrow>
         <h1 className="text-text text-3xl leading-tight font-semibold tracking-tight md:text-4xl">

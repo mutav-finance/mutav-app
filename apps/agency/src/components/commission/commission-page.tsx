@@ -92,7 +92,7 @@ export function CommissionPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="border-b py-3">
-            <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
+            <Eyebrow as={CardTitle} size="xs" className="font-medium">
               {t("kpi.monthCommission")}
             </Eyebrow>
           </CardHeader>
@@ -115,7 +115,7 @@ export function CommissionPage() {
 
         <Card>
           <CardHeader className="border-b py-3">
-            <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
+            <Eyebrow as={CardTitle} size="xs" className="font-medium">
               {t("kpi.invoice")}
             </Eyebrow>
             <CardAction>
@@ -139,7 +139,7 @@ export function CommissionPage() {
       {/* Table */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <Eyebrow as="h2" className="text-muted-foreground text-xs font-medium">
+          <Eyebrow as="h2" size="xs" className="font-medium">
             {t("table.heading")}
           </Eyebrow>
           <div className="flex items-center gap-2">

@@ -28,11 +28,7 @@ export default function ContractError({
           </CardHeader>
           <CardContent className="flex flex-col gap-4 py-4">
             <p className="text-base-sm text-muted-foreground">{t("body")}</p>
-            {error.digest && (
-              <Eyebrow as="p" className="text-muted-foreground">
-                ID · {error.digest}
-              </Eyebrow>
-            )}
+            {error.digest && <Eyebrow as="p">ID · {error.digest}</Eyebrow>}
             <div className="flex flex-wrap gap-2">
               <Button onClick={reset}>{t("retry")}</Button>
               <Button variant="outline-primary" asChild>

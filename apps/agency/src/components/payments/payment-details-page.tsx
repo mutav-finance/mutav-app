@@ -43,7 +43,7 @@ export function PaymentDetailsPage({
         width="narrow"
         breadcrumb={
           <Breadcrumb>
-            <Eyebrow as={BreadcrumbList} className="text-muted-foreground">
+            <Eyebrow as={BreadcrumbList}>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
                   <Link href="/payments">{tNav("payments")}</Link>

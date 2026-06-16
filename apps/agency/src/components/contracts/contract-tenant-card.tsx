@@ -34,7 +34,7 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
         <div className="bg-secondary text-muted-foreground flex size-7 items-center justify-center">
           <UserIcon className="size-4" strokeWidth={1.25} aria-hidden />
         </div>
-        <Eyebrow as={CardTitle} className="text-muted-foreground text-xs font-medium">
+        <Eyebrow as={CardTitle} size="xs" className="font-medium">
           {t("heading")}
         </Eyebrow>
         <StatusTag
@@ -72,9 +72,7 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
       {!isRejected && tenant.termApprovedAt && (
         <CardFooter className="text-2xs text-muted-foreground gap-2 px-6 py-3">
           <CheckIcon className="text-success size-4" strokeWidth={1.25} aria-hidden />
-          <Eyebrow className="text-2xs text-muted-foreground font-medium">
-            {t("termApproved")}
-          </Eyebrow>
+          <Eyebrow className="font-medium">{t("termApproved")}</Eyebrow>
           <span aria-hidden>·</span>
           <Mono>{formatDateTimeBR(tenant.termApprovedAt)}</Mono>
         </CardFooter>
