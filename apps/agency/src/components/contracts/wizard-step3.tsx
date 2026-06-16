@@ -5,8 +5,8 @@ import { useTranslations } from "next-intl";
 import { z } from "zod";
 import { LockIcon } from "lucide-react";
 import { Button } from "@mutav/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
 import { cn } from "@/lib/utils";
 import { type WizardData } from "@/lib/contracts/wizard";
 

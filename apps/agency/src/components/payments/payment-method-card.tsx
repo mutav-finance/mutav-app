@@ -3,7 +3,8 @@
 import { useTranslations } from "next-intl";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import { Button } from "@mutav/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { Link, getPathname } from "@mutav/i18n/navigation";
 import { useLocale } from "next-intl";
@@ -73,9 +74,9 @@ export function PaymentMethodCard({ payment }: { payment: Payment }) {
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as={CardTitle} size="xs" className="font-medium">
           {t("heading")}
-        </CardTitle>
+        </Eyebrow>
       </CardHeader>
       <CardContent className="py-4">
         {!method && (

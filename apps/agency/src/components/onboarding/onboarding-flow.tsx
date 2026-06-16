@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { StepIndicator } from "@/components/onboarding/step-indicator";
+import { StepIndicator } from "@mutav/ui/step-indicator";
 import { StepProfile } from "@/components/onboarding/step-profile";
 import { StepBanking } from "@/components/onboarding/step-banking";
 import { StepDocuments } from "@/components/onboarding/step-documents";

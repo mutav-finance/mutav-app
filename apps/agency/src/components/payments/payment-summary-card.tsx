@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { formatPeriodMonth } from "@/lib/payments/format";
@@ -14,15 +15,13 @@ export function PaymentSummaryCard({ payment }: { payment: Payment }) {
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as={CardTitle} size="xs" className="font-medium">
           {t("heading")}
-        </CardTitle>
+        </Eyebrow>
       </CardHeader>
       <CardContent className="grid gap-4 py-4">
         <div className="flex flex-col gap-1">
-          <span className="text-2xs text-muted-foreground font-mono font-medium tracking-[0.06em] uppercase">
-            {t("idLabel")}
-          </span>
+          <Eyebrow className="font-medium">{t("idLabel")}</Eyebrow>
           <Mono className="text-foreground text-xl font-medium">{payment.publicId}</Mono>
         </div>
         <dl className="text-base-sm grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -31,9 +30,10 @@ export function PaymentSummaryCard({ payment }: { payment: Payment }) {
             <dd>
               <PaymentStateTag
                 stateKind={payment.state.kind}
-                label={tState(payment.state.kind)}
                 pulse={payment.state.kind === "pending" || payment.state.kind === "overdue"}
-              />
+              >
+                {tState(payment.state.kind)}
+              </PaymentStateTag>
             </dd>
           </div>
           <div className="flex items-center gap-3">

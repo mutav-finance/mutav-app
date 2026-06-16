@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
+import { Eyebrow } from "@mutav/ui/eyebrow";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,7 +14,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@mutav/ui/breadcrumb";
 import { Mono } from "@mutav/ui/mono";
 import { Link } from "@mutav/i18n/navigation";
 import type { api } from "@convex/_generated/api";
@@ -42,7 +43,7 @@ export function PaymentDetailsPage({
         width="narrow"
         breadcrumb={
           <Breadcrumb>
-            <BreadcrumbList className="text-2xs font-mono tracking-[0.06em] uppercase">
+            <Eyebrow as={BreadcrumbList}>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
                   <Link href="/payments">{tNav("payments")}</Link>
@@ -54,7 +55,7 @@ export function PaymentDetailsPage({
                   <Mono>#{payment.publicId}</Mono>
                 </BreadcrumbPage>
               </BreadcrumbItem>
-            </BreadcrumbList>
+            </Eyebrow>
           </Breadcrumb>
         }
         title={t("heroTitle", { state: tState(payment.state.kind) })}

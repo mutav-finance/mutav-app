@@ -4,19 +4,13 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react";
 import { Button } from "@mutav/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardContent } from "@mutav/ui/card";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import {
   DelinquencyStatusTag,
   type DelinquencyStatus,
@@ -255,9 +249,9 @@ export function DelinquencyPage() {
 
       {/* Table */}
       <div className="flex flex-col gap-3">
-        <h2 className="text-muted-foreground font-mono text-xs font-medium tracking-[0.06em] uppercase">
+        <Eyebrow as="h2" size="xs" className="font-medium">
           {t("table.heading")}
-        </h2>
+        </Eyebrow>
 
         <div className="border-border rounded border">
           <Table>
@@ -288,7 +282,9 @@ export function DelinquencyPage() {
                       <Mono className="text-sm font-medium">{row.propertyId}</Mono>
                     </TableCell>
                     <TableCell>
-                      <DelinquencyStatusTag status={row.status} label={t(`status.${row.status}`)} />
+                      <DelinquencyStatusTag status={row.status}>
+                        {t(`status.${row.status}`)}
+                      </DelinquencyStatusTag>
                     </TableCell>
                     <TableCell>
                       <Mono className="text-muted-foreground text-sm">{row.noticeAt}</Mono>

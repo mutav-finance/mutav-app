@@ -1,6 +1,6 @@
 "use client";
 
-import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@mutav/ui/sidebar";
 import { SidebarRoadmapItem } from "@/components/sidebar-roadmap-item";
 import { HomeIcon, UserRoundIcon, KeyRoundIcon } from "lucide-react";
 import { useTranslations } from "next-intl";

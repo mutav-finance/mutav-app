@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenuButton, SidebarMenuItem } from "@mutav/ui/sidebar";
 
 /**
  * Sidebar item that's been scoped but not yet shipped. Visually distinct

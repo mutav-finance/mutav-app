@@ -6,8 +6,9 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Checkbox } from "@mutav/ui/checkbox";
+import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import type { OnboardingSnapshot } from "@/components/onboarding/use-onboarding-flow";
 import {
@@ -53,12 +54,13 @@ export function StepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }:
     <form className="flex flex-col gap-6" onSubmit={handleSubmit(onSubmit)} noValidate>
       <section aria-labelledby="review-profile-heading">
         <div className="mb-3 flex items-center justify-between">
-          <h3
+          <Eyebrow
+            as="h3"
             id="review-profile-heading"
-            className="text-text-3 font-mono text-xs tracking-wide uppercase"
+            className="text-text-3 text-xs tracking-wide"
           >
             {t("profileSection")}
-          </h3>
+          </Eyebrow>
           <Button
             type="button"
             variant="link"
@@ -90,12 +92,13 @@ export function StepReview({ snapshot, onSubmit, onBack, onGoTo, isSubmitting }:
 
       <section aria-labelledby="review-banking-heading">
         <div className="mb-3 flex items-center justify-between">
-          <h3
+          <Eyebrow
+            as="h3"
             id="review-banking-heading"
-            className="text-text-3 font-mono text-xs tracking-wide uppercase"
+            className="text-text-3 text-xs tracking-wide"
           >
             {t("bankingSection")}
-          </h3>
+          </Eyebrow>
           <Button
             type="button"
             variant="link"

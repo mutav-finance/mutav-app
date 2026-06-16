@@ -1,7 +1,7 @@
 "use client";
 
 import { Separator } from "@mutav/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger } from "@mutav/ui/sidebar";
 
 export function SiteHeader() {
   return (

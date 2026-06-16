@@ -2,7 +2,7 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { ExternalLinkIcon, ShieldCheckIcon } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { ReserveCoverage } from "@convex/transparency/domain";
 
