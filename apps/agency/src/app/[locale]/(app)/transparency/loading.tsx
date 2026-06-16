@@ -4,8 +4,8 @@ import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { Skeleton } from "@mutav/ui/skeleton";
 
-export default async function HealthLoading() {
-  const t = await getTranslations("health");
+export default async function TransparencyLoading() {
+  const t = await getTranslations("transparency");
 
   return (
     <PageShell>

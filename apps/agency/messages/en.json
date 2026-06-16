@@ -114,7 +114,7 @@
       "contracts": "Contracts",
       "payments": "Invoices",
       "delinquencies": "Delinquencies",
-      "health": "Transparency"
+      "transparency": "Transparency"
     },
     "cadastros": {
       "groupLabel": "Registries",
@@ -1121,29 +1121,31 @@
       }
     }
   },
-  "health": {
+  "transparency": {
     "meta": {
       "title": "Transparency",
       "description": "Mutav risk position and onchain treasury."
     },
     "heading": "Transparency",
     "subheading": "Risk position transparency and onchain treasury.",
-    "footer": "Contract data updated in real time.",
+    "footer": "Contract data in real time. Coverage reserve read onchain and refreshed periodically.",
     "contracts": {
       "ativo": "Active contracts",
       "pendente": "Under review",
       "defaultRate": "Default rate"
     },
     "capacity": {
-      "label": "Capital utilization",
+      "label": "Contracted capacity utilization",
       "used": "{pct}% utilized",
       "of": "of {total}"
     },
-    "treasury": {
-      "label": "Coverage capital",
-      "previewBadge": "Preview",
+    "reserve": {
+      "label": "Coverage reserve",
       "unavailable": "Unavailable",
-      "viewExplorer": "Verify myself on the Stellar network"
+      "asOf": "As of {datetime}",
+      "fx": "BCB PTAX (ask): {rate}",
+      "fxQuotedAt": "Quoted {datetime} (BRT)",
+      "viewExplorer": "Verify on the Stellar network"
     },
     "timeline": {
       "title": "Contracts per week",

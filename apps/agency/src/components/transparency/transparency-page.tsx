@@ -1,49 +1,39 @@
 "use client";
 
-import * as React from "react";
 import { useTranslations } from "next-intl";
-import { usePreloadedQuery, useAction } from "convex/react";
+import { usePreloadedQuery } from "convex/react";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { ActivityBucket } from "@convex/contracts/domain";
-import type { ContractAggregates, TreasurySnapshot } from "@convex/health/domain";
+import type { ContractAggregates, ReserveCoverage } from "@convex/transparency/domain";
 import { ContractsPanel } from "./contracts-panel";
 import { CapacityPanel } from "./capacity-panel";
-import { TreasuryPanel } from "./treasury-panel";
+import { ReservePanel } from "./reserve-panel";
 import { TimelinePanel } from "./timeline-panel";
 
 type Props = {
-  preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates> | null;
+  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getContractAggregates> | null;
   preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod> | null;
+  preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage> | null;
   initialAggregates: ContractAggregates | null;
   initialTimeline: ActivityBucket[] | null;
+  initialCoverage: ReserveCoverage | null;
 };
 
 type LiveProps = {
-  preloadedAggregates: Preloaded<typeof api.health.useCases.getContractAggregates>;
+  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getContractAggregates>;
   preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod>;
+  preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage>;
 };
 
 type LayoutProps = {
   aggregates: ContractAggregates | null | undefined;
   timeline: ActivityBucket[] | null | undefined;
+  coverage: ReserveCoverage | null | undefined;
 };
 
-function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
-  const t = useTranslations("health");
-  const fetchTreasury = useAction(api.health.actions.getTreasurySnapshot);
-  const [treasury, setTreasury] = React.useState<TreasurySnapshot | null>(null);
-  const [treasuryError, setTreasuryError] = React.useState(false);
-
-  const loadTreasury = React.useEffectEvent(() => {
-    fetchTreasury({})
-      .then(setTreasury)
-      .catch(() => setTreasuryError(true));
-  });
-
-  React.useEffect(() => {
-    loadTreasury();
-  }, []);
+function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps) {
+  const t = useTranslations("transparency");
 
   const agg = aggregates ?? null;
   const tl = timeline ?? null;
@@ -56,7 +46,7 @@ function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <CapacityPanel aggregates={agg} />
-        <TreasuryPanel treasury={treasury} error={treasuryError} />
+        <ReservePanel coverage={coverage} />
       </div>
 
       <TimelinePanel data={tl} />
@@ -66,26 +56,40 @@ function HealthPageLayout({ aggregates, timeline }: LayoutProps) {
   );
 }
 
-function HealthPageLive({ preloadedAggregates, preloadedTimeline }: LiveProps) {
-  const aggregates = usePreloadedQuery(preloadedAggregates);
-  const timeline = usePreloadedQuery(preloadedTimeline);
-  return <HealthPageLayout aggregates={aggregates} timeline={timeline} />;
-}
-
-export function HealthPage({
+function TransparencyPageLive({
   preloadedAggregates,
   preloadedTimeline,
+  preloadedCoverage,
+}: LiveProps) {
+  const aggregates = usePreloadedQuery(preloadedAggregates);
+  const timeline = usePreloadedQuery(preloadedTimeline);
+  const coverage = usePreloadedQuery(preloadedCoverage);
+  return <TransparencyPageLayout aggregates={aggregates} timeline={timeline} coverage={coverage} />;
+}
+
+export function TransparencyPage({
+  preloadedAggregates,
+  preloadedTimeline,
+  preloadedCoverage,
   initialAggregates,
   initialTimeline,
+  initialCoverage,
 }: Props) {
-  if (preloadedAggregates && preloadedTimeline) {
+  if (preloadedAggregates && preloadedTimeline && preloadedCoverage) {
     return (
-      <HealthPageLive
+      <TransparencyPageLive
         preloadedAggregates={preloadedAggregates}
         preloadedTimeline={preloadedTimeline}
+        preloadedCoverage={preloadedCoverage}
       />
     );
   }
 
-  return <HealthPageLayout aggregates={initialAggregates} timeline={initialTimeline} />;
+  return (
+    <TransparencyPageLayout
+      aggregates={initialAggregates}
+      timeline={initialTimeline}
+      coverage={initialCoverage}
+    />
+  );
 }

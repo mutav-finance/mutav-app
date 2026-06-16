@@ -114,7 +114,7 @@
       "contracts": "Contratos",
       "payments": "Faturas",
       "delinquencies": "Inadimplências",
-      "health": "Transparência"
+      "transparency": "Transparência"
     },
     "cadastros": {
       "groupLabel": "Cadastros",
@@ -1121,29 +1121,31 @@
       }
     }
   },
-  "health": {
+  "transparency": {
     "meta": {
       "title": "Transparência",
       "description": "Posição de risco e treasury onchain da Mutav."
     },
     "heading": "Transparência",
     "subheading": "Transparência da posição de risco e treasury onchain.",
-    "footer": "Dados de contratos atualizados em tempo real.",
+    "footer": "Dados de contratos em tempo real. Reserva de cobertura lida onchain e atualizada periodicamente.",
     "contracts": {
       "ativo": "Contratos ativos",
       "pendente": "Em análise",
       "defaultRate": "Taxa de inadimplência"
     },
     "capacity": {
-      "label": "Utilização do capital",
+      "label": "Utilização da capacidade contratada",
       "used": "{pct}% utilizado",
       "of": "de {total}"
     },
-    "treasury": {
-      "label": "Capital de cobertura",
-      "previewBadge": "Prévia",
+    "reserve": {
+      "label": "Reserva de cobertura",
       "unavailable": "Indisponível",
-      "viewExplorer": "Checar eu mesmo na rede Stellar"
+      "asOf": "Atualizado em {datetime}",
+      "fx": "PTAX BCB (venda): {rate}",
+      "fxQuotedAt": "Cotada em {datetime} (BRT)",
+      "viewExplorer": "Verificar na rede Stellar"
     },
     "timeline": {
       "title": "Contratos por semana",

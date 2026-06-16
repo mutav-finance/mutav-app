@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { FileTextIcon, ClockIcon, AlertTriangleIcon } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
-import type { ContractAggregates } from "@convex/health/domain";
+import type { ContractAggregates } from "@convex/transparency/domain";
 
 type Props = { aggregates: ContractAggregates | null };
 
@@ -35,10 +35,13 @@ function MetricCard({
 }
 
 export function ContractsPanel({ aggregates }: Props) {
-  const t = useTranslations("health.contracts");
+  const t = useTranslations("transparency.contracts");
   const loading = aggregates === null;
 
-  const defaultRatePct = aggregates ? `${(aggregates.defaultRate * 100).toFixed(1)}%` : "—";
+  const defaultRatePct =
+    aggregates && aggregates.defaultRate !== null
+      ? `${(aggregates.defaultRate * 100).toFixed(1)}%`
+      : "—";
 
   return (
     <>

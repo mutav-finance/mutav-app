@@ -1,8 +1,5 @@
 import { SCORE_TIER_THRESHOLD } from "@convex/contracts/domain";
 
-export const RENT_MULTIPLIER = "30x" as const;
-export const EXIT_COST_MULTIPLIER = "5x" as const;
-
 export const RENT_COVERAGE_MONTHS = 30;
 export const EXIT_COVERAGE_MONTHS = 5;
 

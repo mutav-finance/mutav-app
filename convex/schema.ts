@@ -23,6 +23,13 @@ const documentKey = v.union(
 
 const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
 
+// `rental.exitCostMultiplier`, `rental.rentMultiplier`, and `rental.payer` all
+// persist as `v.string()` (set directly on the rental object). Legacy prod rows
+// hold bespoke values across these fields ("6x" / "40x" / "Recorrência via
+// Imobiliária") alongside canonical ones. Writes still funnel through
+// `DEFAULT_*` constants from `convex/contracts/domain.ts` for type discipline;
+// the schema just doesn't reject the legacy data.
+
 const tenantApprovalStatus = v.union(
   v.literal("aprovado"),
   v.literal("pendente"),
@@ -237,8 +244,8 @@ export default defineSchema({
       feeCents: v.number(),
       oneTimeActivationFeeCents: v.number(),
       setupInstallments: v.number(),
-      exitCostMultiplier: v.literal("5x"),
-      rentMultiplier: v.literal("30x"),
+      exitCostMultiplier: v.string(),
+      rentMultiplier: v.string(),
       payer: v.string(),
       pviMigrationSchedule: v.union(v.string(), v.null()),
     }),
@@ -518,6 +525,24 @@ export default defineSchema({
   })
     .index("by_status", ["status", "anchoredAt"])
     .index("by_periodEnd", ["periodEnd"]),
+
+  // The asset object mirrors reserveAssetValidator in convex/reserve/domain.ts (including valueCents) — kept inline here because importing an entity file into schema.ts would create a circular dependency through _generated/dataModel (same reason as agencyDocumentKind above).
+  reserveSnapshots: defineTable({
+    storedValueCents: v.number(),
+    fxUsdBrl: v.number(),
+    fxSource: v.string(),
+    fxQuotedAt: v.string(),
+    assets: v.array(
+      v.object({
+        contractAddress: v.string(),
+        symbol: v.string(),
+        decimals: v.number(),
+        rawBalance: v.string(),
+        valueCents: v.number(),
+      }),
+    ),
+    capturedAt: v.number(),
+  }).index("by_capturedAt", ["capturedAt"]),
 
   // Anonymous public waitlist for the marketing site (mutav-website).
   // One row per (audience, email). Dedup is enforced in the `join` mutation
