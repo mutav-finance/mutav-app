@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "../../scripts/verify-convex-deploy.sh && (cd ../.. && bunx convex deploy --cmd 'cd apps/fund && bun run build') && (cd ../.. && ./scripts/run-migrations.sh)",
+  "buildCommand": "../../scripts/verify-convex-deploy.sh && (cd ../.. && bunx convex deploy --cmd 'cd apps/fund && bun run build')",
   "framework": "nextjs"
 }
