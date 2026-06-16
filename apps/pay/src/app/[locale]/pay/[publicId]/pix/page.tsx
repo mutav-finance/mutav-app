@@ -35,11 +35,11 @@ export default async function CheckoutPixPage({
   params: Promise<{ publicId: string; locale: string }>;
 }) {
   const { publicId, locale } = await params;
-  const preloaded = await preloadQuery(api.payments.useCases.getPublicByPublicId, { publicId });
+  const preloaded = await preloadQuery(api.invoices.useCases.getPublicByPublicId, { publicId });
   const payment = preloadedQueryResult(preloaded);
   if (!payment) notFound();
 
-  if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
+  if (payment.state.kind === "paid" || payment.state.kind === "void") {
     redirect({ href: `/pay/${publicId}/paid`, locale });
   }
   if (payment.method?.kind === "stellar") {
@@ -58,7 +58,7 @@ export default async function CheckoutPixPage({
         {t("back")}
       </Link>
       <CheckoutPixView
-        paymentId={payment.paymentId}
+        invoiceId={payment.invoiceId}
         agencyId={payment.agencyId}
         totalCents={payment.totalCents}
       />

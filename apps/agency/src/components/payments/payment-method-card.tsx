@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { getPayUrl } from "@/lib/env";
-import { isChargeable, type Payment } from "@convex/payments/domain";
+import { isChargeable, type Invoice } from "@convex/invoices/domain";
 
 /**
  * Absolute payment-link URL to the tenant checkout on the pay app. Cross-origin
@@ -53,7 +53,7 @@ function ChargeableActions({
   payment,
   variant,
 }: {
-  payment: Payment;
+  payment: Invoice;
   variant: "primary" | "secondary";
 }) {
   const t = useTranslations("paymentDetails.methodCard");
@@ -70,7 +70,7 @@ function ChargeableActions({
   );
 }
 
-export function PaymentMethodCard({ payment }: { payment: Payment }) {
+export function PaymentMethodCard({ payment }: { payment: Invoice }) {
   const t = useTranslations("paymentDetails.methodCard");
   const method = payment.method;
   const chargeable = isChargeable(payment.state);

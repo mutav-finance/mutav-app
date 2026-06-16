@@ -20,7 +20,7 @@ type HorizonPaymentsResponse = {
 
 /**
  * Poll the Mutav treasury account on Stellar Horizon for incoming muxed
- * payments. Decodes each `to_muxed_id`, looks up the matching pending
+ * payments. Decodes each `to_muxed_id`, looks up the matching open
  * invoice via the `by_muxedId` index, and marks it paid.
  *
  * Idempotent: cursor is persisted across runs, and `markPaidByTx` no-ops
@@ -41,7 +41,7 @@ export const checkMutavTreasuryPayments = internalAction({
     const sourceAccount = getMutavSourceAccount();
     const horizon = getStellarHorizonUrl();
 
-    const state = await ctx.runQuery(internal.payments.useCases.getStellarIndexState, {
+    const state = await ctx.runQuery(internal.invoices.useCases.getStellarIndexState, {
       sourceAccount,
     });
     const cursor = state?.cursor ?? "0";
@@ -62,13 +62,13 @@ export const checkMutavTreasuryPayments = internalAction({
       if (record.to !== sourceAccount) continue;
       if (!record.to_muxed_id || !record.to_muxed) continue;
 
-      const payment = await ctx.runQuery(internal.payments.useCases.findByMuxedId, {
+      const invoice = await ctx.runQuery(internal.invoices.useCases.findByMuxedId, {
         muxedId: record.to_muxed_id,
       });
-      if (!payment) continue;
+      if (!invoice) continue;
 
-      await ctx.runMutation(internal.payments.mutations.markPaidByTx, {
-        paymentId: payment._id,
+      await ctx.runMutation(internal.invoices.mutations.markPaidByTx, {
+        invoiceId: invoice._id,
         txHash: record.transaction_hash,
         paidAt: record.created_at,
         muxedAddress: record.to_muxed,
@@ -77,7 +77,7 @@ export const checkMutavTreasuryPayments = internalAction({
     }
 
     if (lastCursor !== cursor) {
-      await ctx.runMutation(internal.payments.mutations.setStellarIndexCursor, {
+      await ctx.runMutation(internal.invoices.mutations.setStellarIndexCursor, {
         sourceAccount,
         cursor: lastCursor,
       });

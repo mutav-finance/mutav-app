@@ -29,7 +29,7 @@ import {
 } from "../../apps/agency/src/lib/anchors/types";
 import { ASSETS } from "../../apps/agency/src/lib/stellar/assets";
 import type { AgencyId } from "../agencies/domain";
-import type { PaymentId } from "../payments/domain";
+import type { InvoiceId } from "../invoices/domain";
 import {
   getEtherfuseApiKey,
   getEtherfuseBaseUrl,
@@ -49,7 +49,7 @@ import {
   type AnchorOrderId,
 } from "./orderDomain";
 import type { AgencyBankAccountId } from "./bankAccountDomain";
-import { isChargeable } from "../payments/domain";
+import { isChargeable } from "../invoices/domain";
 
 type CurrencyStatus = "live" | "dead" | "test" | "private";
 
@@ -352,7 +352,7 @@ interface PollPixOnrampResult {
 
 /**
  * Initiate a SEP-6 (programmatic) deposit against the agency's configured
- * anchor for the given chargeable payment. Returns the persisted order;
+ * anchor for the given chargeable invoice. Returns the persisted order;
  * the UI subscribes to it reactively and renders the deposit instructions
  * (Pix QR + key/copy fields) in-app rather than handing off to the
  * anchor's hosted page.
@@ -364,11 +364,11 @@ interface PollPixOnrampResult {
  */
 export const startPixOnramp = action({
   args: {
-    paymentId: v.id("payments"),
+    invoiceId: v.id("invoices"),
     lang: v.optional(v.string()),
     // Optional for back-compat with the SEP-6 dispatch (testanchor doesn't
     // use it) and for callers that just want the first registered bank.
-    // The etherfuse branch validates that the row belongs to the payment's
+    // The etherfuse branch validates that the row belongs to the invoice's
     // agency before passing the upstream identifier to Etherfuse.
     bankAccountId: v.optional(v.id("agencyBankAccounts")),
   },
@@ -389,24 +389,24 @@ export const startPixOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartPixOnrampResult> => {
-    const payment = await ctx.runQuery(internal.payments.useCases.getByIdInternal, {
-      paymentId: args.paymentId,
+    const invoice = await ctx.runQuery(internal.invoices.useCases.getByIdInternal, {
+      invoiceId: args.invoiceId,
     });
-    if (!payment) {
+    if (!invoice) {
       return { success: false, error: { code: ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND } };
     }
-    if (!isChargeable(payment.state)) {
+    if (!isChargeable(invoice.state)) {
       return {
         success: false,
         error: {
           code: ANCHOR_START_ERROR_CODE.NOT_CHARGEABLE,
-          detail: payment.state.kind,
+          detail: invoice.state.kind,
         },
       };
     }
 
     const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
-      agencyId: payment.agencyId,
+      agencyId: invoice.agencyId,
     });
 
     // Etherfuse uses a non-SEP REST flow. Dispatch before falling through
@@ -414,9 +414,9 @@ export const startPixOnramp = action({
     // a provider that doesn't speak the protocol.
     if (providerName === "etherfuse") {
       return startEtherfusePixOnramp(ctx, {
-        paymentId: payment._id,
-        agencyId: payment.agencyId,
-        amountBRLCents: payment.totalCents,
+        invoiceId: invoice._id,
+        agencyId: invoice.agencyId,
+        amountBRLCents: invoice.totalCents,
         bankAccountId: args.bankAccountId,
       });
     }
@@ -429,8 +429,8 @@ export const startPixOnramp = action({
     const signer = getTreasurySigner();
     await client.authenticate(signer.publicKey, signer.sign);
 
-    const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
-    const tenant = await resolveTenantPrefill(ctx, payment.lineItems[0]?.contractPublicId);
+    const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
+    const tenant = await resolveTenantPrefill(ctx, invoice.lineItems[0]?.contractPublicId);
 
     try {
       const response = await client.sep6.deposit({
@@ -454,8 +454,8 @@ export const startPixOnramp = action({
       }
 
       const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
-        agencyId: payment.agencyId,
-        paymentId: payment._id,
+        agencyId: invoice.agencyId,
+        invoiceId: invoice._id,
         provider: providerName,
         anchorTxId: response.id,
         instructions: response.instructions,
@@ -478,7 +478,7 @@ export const startPixOnramp = action({
  *
  * The client UI calls this on an interval while a deposit is open. Updates
  * the `anchorOrders` row with the latest SEP-24 transaction snapshot and,
- * on terminal `completed`, marks the parent payment paid via
+ * on terminal `completed`, marks the parent invoice paid via
  * `markPaidByAnchor` (idempotent). Once the order is terminal, subsequent
  * polls short-circuit and return the order unchanged.
  */
@@ -505,7 +505,7 @@ export const pollPixOnramp = action({
       return pollEtherfusePixOnramp(ctx, {
         _id: order._id,
         anchorTxId: order.anchorTxId,
-        paymentId: order.paymentId,
+        invoiceId: order.invoiceId,
       });
     }
 
@@ -526,13 +526,13 @@ export const pollPixOnramp = action({
     };
 
     if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
-      // Order patch + payment paid in one transaction — prevents the
-      // order from flipping completed while leaving the payment pending
+      // Order patch + invoice paid in one transaction — prevents the
+      // order from flipping completed while leaving the invoice open
       // (which would short-circuit future polls at the isTerminal guard).
       await ctx.runMutation(internal.anchors.orderUseCases.completeOrderAndMarkPaid, {
         orderId: order._id,
         ...orderPatch,
-        paymentId: order.paymentId,
+        invoiceId: order.invoiceId,
         anchorTxId: order.anchorTxId,
         pixKey: tx.from ?? `anchor:${order.anchorTxId}`,
         paidAt: tx.completed_at ?? new Date().toISOString(),
@@ -562,7 +562,7 @@ export const pollPixOnramp = action({
  */
 export const startAnchorTestOnramp = action({
   args: {
-    paymentId: v.id("payments"),
+    invoiceId: v.id("invoices"),
     lang: v.optional(v.string()),
   },
   returns: v.union(
@@ -583,24 +583,24 @@ export const startAnchorTestOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartAnchorTestOnrampResult> => {
-    const payment = await ctx.runQuery(internal.payments.useCases.getByIdInternal, {
-      paymentId: args.paymentId,
+    const invoice = await ctx.runQuery(internal.invoices.useCases.getByIdInternal, {
+      invoiceId: args.invoiceId,
     });
-    if (!payment) {
+    if (!invoice) {
       return { success: false, error: { code: ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND } };
     }
-    if (!isChargeable(payment.state)) {
+    if (!isChargeable(invoice.state)) {
       return {
         success: false,
         error: {
           code: ANCHOR_START_ERROR_CODE.NOT_CHARGEABLE,
-          detail: payment.state.kind,
+          detail: invoice.state.kind,
         },
       };
     }
 
     const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
-      agencyId: payment.agencyId,
+      agencyId: invoice.agencyId,
     });
 
     const client = createAnchorClient(providerName);
@@ -609,8 +609,8 @@ export const startAnchorTestOnramp = action({
     const signer = getTreasurySigner();
     await client.authenticate(signer.publicKey, signer.sign);
 
-    const amount = brlCentsToAssetAmount(payment.totalCents, "USDC");
-    const tenant = await resolveTenantPrefill(ctx, payment.lineItems[0]?.contractPublicId);
+    const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
+    const tenant = await resolveTenantPrefill(ctx, invoice.lineItems[0]?.contractPublicId);
 
     try {
       const response = await client.sep24.deposit({
@@ -631,8 +631,8 @@ export const startAnchorTestOnramp = action({
       }
 
       const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
-        agencyId: payment.agencyId,
-        paymentId: payment._id,
+        agencyId: invoice.agencyId,
+        invoiceId: invoice._id,
         provider: providerName,
         anchorTxId: response.id,
         hostedUrl: response.url,
@@ -700,8 +700,8 @@ export const pollAnchorTestOnramp = action({
     if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
       const pixKey = tx.from ?? `anchor:${order.anchorTxId}`;
       const paidAt = tx.completed_at ?? new Date().toISOString();
-      await ctx.runMutation(internal.payments.mutations.markPaidByAnchor, {
-        paymentId: order.paymentId,
+      await ctx.runMutation(internal.invoices.mutations.markPaidByAnchor, {
+        invoiceId: order.invoiceId,
         anchorTxId: order.anchorTxId,
         pixKey,
         paidAt,
@@ -1389,7 +1389,7 @@ function etherfusePixInstructions(pixData: {
 }
 
 type EtherfuseStartContext = {
-  paymentId: PaymentId;
+  invoiceId: InvoiceId;
   agencyId: AgencyId;
   amountBRLCents: number;
   bankAccountId?: AgencyBankAccountId;
@@ -1518,7 +1518,7 @@ async function startEtherfusePixOnramp(
 
     const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
       agencyId: context.agencyId,
-      paymentId: context.paymentId,
+      invoiceId: context.invoiceId,
       provider: "etherfuse",
       anchorTxId: onramp.id,
       instructions: etherfusePixInstructions(paymentInstructions),
@@ -1550,7 +1550,7 @@ async function startEtherfusePixOnramp(
 
 async function pollEtherfusePixOnramp(
   ctx: ActionCtx,
-  order: { _id: AnchorOrderId; anchorTxId: string; paymentId: PaymentId },
+  order: { _id: AnchorOrderId; anchorTxId: string; invoiceId: InvoiceId },
 ): Promise<PollPixOnrampResult> {
   const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
@@ -1586,12 +1586,12 @@ async function pollEtherfusePixOnramp(
       tx.paymentInstructions?.type === "pix" && tx.paymentInstructions.pixKey
         ? tx.paymentInstructions.pixKey
         : `etherfuse:${order.anchorTxId}`;
-    // Order patch + payment paid in one transaction — see SEP-6 branch
+    // Order patch + invoice paid in one transaction — see SEP-6 branch
     // for why splitting these breaks retry semantics.
     await ctx.runMutation(internal.anchors.orderUseCases.completeOrderAndMarkPaid, {
       orderId: order._id,
       ...orderPatch,
-      paymentId: order.paymentId,
+      invoiceId: order.invoiceId,
       anchorTxId: order.anchorTxId,
       pixKey,
       paidAt: tx.updatedAt ?? new Date().toISOString(),

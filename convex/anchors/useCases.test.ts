@@ -66,20 +66,20 @@ describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
     const agencyId = await seedAgencyWithMembership(t, userId);
 
     const orderId = await t.run(async (ctx) => {
-      const paymentId = await ctx.db.insert("payments", {
+      const invoiceId = await ctx.db.insert("invoices", {
         agencyId,
-        publicId: "pay_test_1",
+        publicId: "inv_test_1",
         periodMonth: "2026-05",
         issuedAt: new Date().toISOString(),
         dueDate: new Date().toISOString(),
         totalCents: 10000,
-        state: { kind: "pending" },
+        state: { kind: "open" },
         method: null,
         lineItems: [],
       });
       return ctx.db.insert("anchorOrders", {
         agencyId,
-        paymentId,
+        invoiceId,
         provider: "testanchor",
         anchorTxId: "tx_test_1",
         status: "pending_user_transfer_start",
@@ -99,20 +99,20 @@ describe("anchors.orderUseCases.getOrderById (resource-by-id pattern)", () => {
     const foreignAgencyId = await seedForeignAgency(t);
 
     const orderId = await t.run(async (ctx) => {
-      const paymentId = await ctx.db.insert("payments", {
+      const invoiceId = await ctx.db.insert("invoices", {
         agencyId: foreignAgencyId,
-        publicId: "pay_foreign",
+        publicId: "inv_foreign",
         periodMonth: "2026-05",
         issuedAt: new Date().toISOString(),
         dueDate: new Date().toISOString(),
         totalCents: 10000,
-        state: { kind: "pending" },
+        state: { kind: "open" },
         method: null,
         lineItems: [],
       });
       return ctx.db.insert("anchorOrders", {
         agencyId: foreignAgencyId,
-        paymentId,
+        invoiceId,
         provider: "testanchor",
         anchorTxId: "tx_foreign",
         status: "pending_user_transfer_start",

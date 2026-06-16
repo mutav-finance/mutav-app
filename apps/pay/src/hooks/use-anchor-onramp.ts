@@ -7,7 +7,7 @@ import type { FunctionReference } from "convex/server";
 import { api } from "@convex/_generated/api";
 import type { AnchorOrder, AnchorOrderId } from "@convex/anchors/orderDomain";
 import type { AgencyBankAccountId } from "@convex/anchors/bankAccountDomain";
-import type { PaymentId } from "@convex/payments/domain";
+import type { InvoiceId } from "@convex/invoices/domain";
 
 type AnchorOrderStatus = AnchorOrder["status"];
 
@@ -40,7 +40,7 @@ type StartActionRef = FunctionReference<
   "action",
   "public",
   {
-    paymentId: PaymentId;
+    invoiceId: InvoiceId;
     lang?: string;
     bankAccountId?: AgencyBankAccountId;
   },
@@ -55,7 +55,7 @@ type PollActionRef = FunctionReference<
 >;
 
 interface UseAnchorOnrampArgs {
-  paymentId: PaymentId;
+  invoiceId: InvoiceId;
   startAction: StartActionRef;
   pollAction: PollActionRef;
   /** Forwarded as the SEP-24/SEP-6 `lang` field so the anchor renders its hosted UI in this locale. */
@@ -89,7 +89,7 @@ interface UseAnchorOnrampResult {
  * subscription are identical across providers.
  */
 export function useAnchorOnramp({
-  paymentId,
+  invoiceId,
   startAction: startActionRef,
   pollAction: pollActionRef,
   lang,
@@ -139,7 +139,7 @@ export function useAnchorOnramp({
       setIsStarting(true);
       try {
         const result = await startAction({
-          paymentId,
+          invoiceId,
           lang,
           bankAccountId: opts?.bankAccountId,
         });
@@ -157,7 +157,7 @@ export function useAnchorOnramp({
         setIsStarting(false);
       }
     },
-    [paymentId, startAction, lang],
+    [invoiceId, startAction, lang],
   );
 
   const cancel = useCallback(() => {

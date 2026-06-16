@@ -38,12 +38,18 @@ export const AUDIT_ACTION = {
   CONTRACT_CREATED: "contract.created",
   CONTRACT_CANCELED: "contract.canceled",
   CONTRACT_STATUS_UPDATED: "contract.status_updated",
-  // payments/
+  // payments/ (frozen wire values — historical rows only; never emitted by
+  // current code, kept so the hash chain still verifies pre-rename entries).
   PAYMENT_BATCH_GENERATED: "payment.batch_generated",
   PAYMENT_MARKED_OVERDUE: "payment.marked_overdue",
   PAYMENT_METHOD_SET: "payment.method_set",
   PAYMENT_PAID: "payment.paid",
   PAYMENT_RESET: "payment.reset",
+  // invoices/ (current — emitted by convex/invoices/mutations.ts).
+  INVOICE_BATCH_GENERATED: "invoice.batch_generated",
+  INVOICE_METHOD_SET: "invoice.method_set",
+  INVOICE_PAID: "invoice.paid",
+  INVOICE_RESET: "invoice.reset",
 } as const satisfies Record<string, string>;
 
 export type AuditActionKey = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -57,13 +63,17 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.PAYMENT_METHOD_SET),
   v.literal(AUDIT_ACTION.PAYMENT_PAID),
   v.literal(AUDIT_ACTION.PAYMENT_RESET),
+  v.literal(AUDIT_ACTION.INVOICE_BATCH_GENERATED),
+  v.literal(AUDIT_ACTION.INVOICE_METHOD_SET),
+  v.literal(AUDIT_ACTION.INVOICE_PAID),
+  v.literal(AUDIT_ACTION.INVOICE_RESET),
 );
 
 /**
  * Two-variant actor discriminator:
  * - `user` — human-initiated, ctx.user._id from an auth wrapper
  * - `system` — webhook/cron/scheduled-action initiated. `source` names the
- *   triggering subsystem (`anchor_webhook`, `cron_overdue_sweep`, …) for
+ *   triggering subsystem (`anchor_webhook`, `cron_monthly_billing`, …) for
  *   forensic readability when reviewing the log.
  */
 export const auditActorValidator = v.union(

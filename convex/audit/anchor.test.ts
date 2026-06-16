@@ -11,9 +11,9 @@ async function seedEntries(t: ReturnType<typeof convexTest>, count: number) {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "anchor-test" },
-        action: AUDIT_ACTION.PAYMENT_PAID,
-        resourceType: "payments",
-        resourceId: `PAY-${i}`,
+        action: AUDIT_ACTION.INVOICE_PAID,
+        resourceType: "invoices",
+        resourceId: `INV-${i}`,
         payload: { i },
       }),
     );

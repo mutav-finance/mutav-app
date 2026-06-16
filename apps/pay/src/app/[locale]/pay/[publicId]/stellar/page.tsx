@@ -45,7 +45,7 @@ export default async function CheckoutStellarPage({
   const { publicId, locale } = await params;
   const assets = getActiveAssets(getStellarNetwork());
   const [preloadedPayment, rates] = await Promise.all([
-    preloadQuery(api.payments.useCases.getPublicByPublicId, { publicId }),
+    preloadQuery(api.invoices.useCases.getPublicByPublicId, { publicId }),
     getBrlRates(assets.map((a) => a.symbol)),
   ]);
   const payment = preloadedQueryResult(preloadedPayment);
@@ -53,7 +53,7 @@ export default async function CheckoutStellarPage({
   // Hoist past notFound() so the narrowing survives the .map() closure below.
   const muxedAddress = payment.muxedAddress;
 
-  if (payment.state.kind === "paid" || payment.state.kind === "canceled") {
+  if (payment.state.kind === "paid" || payment.state.kind === "void") {
     redirect({ href: `/pay/${publicId}/paid`, locale });
   }
   if (payment.method?.kind === "pix") {

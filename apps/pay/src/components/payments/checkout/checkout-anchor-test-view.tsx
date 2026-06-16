@@ -15,10 +15,10 @@ import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onra
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
 import type { AnchorOrder } from "@convex/anchors/orderDomain";
-import type { PaymentId } from "@convex/payments/domain";
+import type { InvoiceId } from "@convex/invoices/domain";
 
 interface Props {
-  paymentId: PaymentId;
+  invoiceId: InvoiceId;
   totalCents: number;
 }
 
@@ -32,11 +32,11 @@ const POPUP_WINDOW_NAME = "mutav-anchor-deposit";
  * iframe renders empty. Instead we launch the form in a popup window and keep
  * Mutav on screen as the live progress monitor, polling the anchor for status.
  */
-export function CheckoutAnchorTestView({ paymentId, totalCents }: Props) {
+export function CheckoutAnchorTestView({ invoiceId, totalCents }: Props) {
   const t = useTranslations("checkout.anchortest");
   const locale = useLocale();
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
-    paymentId,
+    invoiceId,
     startAction: api.anchors.actions.startAnchorTestOnramp,
     pollAction: api.anchors.actions.pollAnchorTestOnramp,
     lang: locale,

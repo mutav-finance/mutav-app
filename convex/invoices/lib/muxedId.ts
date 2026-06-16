@@ -9,7 +9,7 @@ const MASK_63_BIT = MAX_BIT - BigInt(1);
  * Isolated from stellar-base so callers that only mint ids (seed, mutations)
  * don't pull the SDK into their module graph.
  */
-export function generatePaymentMuxedId(): string {
+export function generateInvoiceMuxedId(): string {
   const buffer = new BigUint64Array(1);
   crypto.getRandomValues(buffer);
   const raw = buffer[0] as bigint;

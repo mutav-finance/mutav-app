@@ -1,27 +1,27 @@
 import type { ReactNode } from "react";
 import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
-import type { PaymentStateKind } from "@convex/payments/domain";
+import type { InvoiceDisplayStatus } from "@convex/invoices/domain";
 
-export const paymentStateTone: Record<PaymentStateKind, StatusTagTone> = {
-  pending: "neutral",
+export const paymentStateTone: Record<InvoiceDisplayStatus, StatusTagTone> = {
+  open: "neutral",
   overdue: "warning-strong",
   paid: "positive",
-  canceled: "neutral",
+  void: "neutral",
 };
 
 export function PaymentStateTag({
-  stateKind,
+  status,
   children,
   pulse = false,
   className,
 }: {
-  stateKind: PaymentStateKind;
+  status: InvoiceDisplayStatus;
   children: ReactNode;
   pulse?: boolean;
   className?: string;
 }) {
   return (
-    <StatusTag tone={paymentStateTone[stateKind]} pulse={pulse} className={className}>
+    <StatusTag tone={paymentStateTone[status]} pulse={pulse} className={className}>
       {children}
     </StatusTag>
   );

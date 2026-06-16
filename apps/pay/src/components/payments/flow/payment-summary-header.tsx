@@ -5,11 +5,16 @@ import { useTranslations } from "next-intl";
 import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { PaymentStateTag } from "@/components/payments/payment-state-tag";
-import { PAYMENT_STATE_KIND } from "@convex/payments/domain";
+import { derivedStatus, INVOICE_STATE_KIND } from "@convex/invoices/domain";
 import type { api } from "@convex/_generated/api";
 
+/** Current UTC date as `YYYY-MM-DD` — matches the invoice `dueDate` format. */
+function utcTodayDate(): string {
+  return new Date().toISOString().split("T")[0]!;
+}
+
 type Props = {
-  preloaded: Preloaded<typeof api.payments.useCases.getPublicByPublicId>;
+  preloaded: Preloaded<typeof api.invoices.useCases.getPublicByPublicId>;
 };
 
 export function PaymentSummaryHeader({ preloaded }: Props) {
@@ -20,8 +25,8 @@ export function PaymentSummaryHeader({ preloaded }: Props) {
 
   if (!payment) return null;
 
-  const stateKind = payment.state.kind;
-  const isSettled = stateKind === "paid" || stateKind === "canceled";
+  const status = derivedStatus(payment, utcTodayDate());
+  const isSettled = status === "paid" || status === "void";
 
   const dateLabel =
     payment.state.kind === "paid"
@@ -34,9 +39,9 @@ export function PaymentSummaryHeader({ preloaded }: Props) {
     <section className="flex flex-col gap-3" aria-labelledby="payment-summary-heading">
       <div className="flex items-center gap-3">
         <PaymentStateTag
-          stateKind={stateKind}
-          label={tState(stateKind)}
-          pulse={stateKind === PAYMENT_STATE_KIND.PENDING}
+          status={status}
+          label={tState(status)}
+          pulse={payment.state.kind === INVOICE_STATE_KIND.OPEN}
         />
         <span className="text-2xs text-text-2 font-mono tracking-[0.06em] uppercase">
           {payment.agencyName}

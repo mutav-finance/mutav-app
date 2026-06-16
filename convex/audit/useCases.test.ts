@@ -43,6 +43,8 @@ describe("appendAuditEntry — chain construction", () => {
   test("second entry's prevHash equals first entry's entryHash", async () => {
     const t = convexTest(schema);
 
+    // Mixed history: a frozen historical `payments` row chained to a new
+    // `invoices` row — proves the chain verifies across the rename boundary.
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
@@ -57,9 +59,9 @@ describe("appendAuditEntry — chain construction", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
-        action: AUDIT_ACTION.PAYMENT_PAID,
-        resourceType: "payments",
-        resourceId: "PAY-2",
+        action: AUDIT_ACTION.INVOICE_PAID,
+        resourceType: "invoices",
+        resourceId: "INV-2",
         payload: { amount: 200 },
       }),
     );
@@ -109,9 +111,9 @@ describe("verifyChainQuery — tamper detection", () => {
       await t.run((ctx) =>
         appendAuditEntry(ctx, {
           actor: { kind: "system", source: "test" },
-          action: AUDIT_ACTION.PAYMENT_PAID,
-          resourceType: "payments",
-          resourceId: `PAY-${i}`,
+          action: AUDIT_ACTION.INVOICE_PAID,
+          resourceType: "invoices",
+          resourceId: `INV-${i}`,
           payload: { amount: i * 100 },
         }),
       );
@@ -130,9 +132,9 @@ describe("verifyChainQuery — tamper detection", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
-        action: AUDIT_ACTION.PAYMENT_PAID,
-        resourceType: "payments",
-        resourceId: "PAY-1",
+        action: AUDIT_ACTION.INVOICE_PAID,
+        resourceType: "invoices",
+        resourceId: "INV-1",
         payload: { amount: 100 },
       }),
     );
@@ -140,9 +142,9 @@ describe("verifyChainQuery — tamper detection", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
-        action: AUDIT_ACTION.PAYMENT_PAID,
-        resourceType: "payments",
-        resourceId: "PAY-2",
+        action: AUDIT_ACTION.INVOICE_PAID,
+        resourceType: "invoices",
+        resourceId: "INV-2",
         payload: { amount: 200 },
       }),
     );
@@ -167,9 +169,9 @@ describe("verifyChainQuery — tamper detection", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
-        action: AUDIT_ACTION.PAYMENT_PAID,
-        resourceType: "payments",
-        resourceId: "PAY-1",
+        action: AUDIT_ACTION.INVOICE_PAID,
+        resourceType: "invoices",
+        resourceId: "INV-1",
         payload: { amount: 100 },
       }),
     );
@@ -177,9 +179,9 @@ describe("verifyChainQuery — tamper detection", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
-        action: AUDIT_ACTION.PAYMENT_PAID,
-        resourceType: "payments",
-        resourceId: "PAY-2",
+        action: AUDIT_ACTION.INVOICE_PAID,
+        resourceType: "invoices",
+        resourceId: "INV-2",
         payload: { amount: 200 },
       }),
     );
