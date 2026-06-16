@@ -693,7 +693,7 @@
       "txHashEmpty": "Awaiting on-chain confirmation",
       "generateStellar": "Pay with Stellar",
       "openPayPage": "Open payment page",
-      "copyShareLink": "Copy link",
+      "copyShareLink": "Payment Link",
       "linkCopied": "Link copied",
       "openCheckout": "Open checkout"
     },
