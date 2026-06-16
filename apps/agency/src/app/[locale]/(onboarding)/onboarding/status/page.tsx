@@ -33,7 +33,7 @@ export default async function OnboardingStatusPage({ searchParams, params }: Pro
     <PageContent variant="narrow" className="py-16 md:py-24">
       <div className="flex flex-col items-center gap-6">
         {/* Status pill — acima da moldura */}
-        <StatusTag tone="info" pulse>
+        <StatusTag tone="neutral" pulse>
           {stateLabel}
         </StatusTag>
 

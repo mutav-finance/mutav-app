@@ -4,6 +4,12 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
 
+/* Tailwind 4 only auto-detects classes from the consuming project. Workspace
+   packages we transpile through Next.js need an explicit `@source` so utilities
+   used inside `@mutav/ui` (e.g. classes that don't appear in admin app code)
+   actually compile into the admin bundle. */
+@source "../../../../packages/ui/src";
+
 /* Exclude docs and skills dirs from Tailwind's content scan — they contain
    literal class examples (e.g. `bg-[url(...)]`) that would otherwise compile
    into broken CSS. Globs are relative to this file. */
@@ -26,6 +32,9 @@
   --color-accent-dim: var(--accent-dim);
   --color-success: var(--success);
   --color-error: var(--error);
+  --color-warning: var(--warning);
+  --color-warning-strong: var(--warning-strong);
+  --color-warning-dim: var(--warning-dim);
 
   /* shadcn aliases mapped to TGA tokens — primitives keep working */
   --color-background: var(--canvas);
@@ -138,6 +147,12 @@
   --accent-dim: #fff0d4;
   --success: #2e8b5a;
   --error: #b83232;
+  /* Warning palette — distinct from accent (which is brand/selection).
+     warning = amber "watch" (expiring, soft warning).
+     warning-strong = orange "act now" (caution, overdue). */
+  --warning: #d97706;
+  --warning-strong: #ea580c;
+  --warning-dim: #fff4e0;
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1a1a1a;
   --color-primary-foreground: #1a1a1a;
@@ -162,6 +177,9 @@
   --accent-dim: #9e6a10;
   --success: #3dab72;
   --error: #c94040;
+  --warning: #f59e0b;
+  --warning-strong: #fb923c;
+  --warning-dim: #4a2c0a;
   /* Restore canvas-on-accent for dark mode */
   --color-accent-foreground: var(--canvas);
   --color-primary-foreground: var(--canvas);
@@ -177,11 +195,11 @@
     opacity: 0.4;
   }
 }
-.tga-live-square {
+.tga-live-pulse {
   animation: tga-live-pulse 2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .tga-live-square {
+  .tga-live-pulse {
     animation: none;
     opacity: 1;
   }

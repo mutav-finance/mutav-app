@@ -7,7 +7,7 @@ export function HorizonPaymentPoller() {
 
   return (
     <div className="text-text-2 flex items-center gap-2 text-sm" role="status">
-      <span aria-hidden="true" className="tga-live-square bg-accent inline-block size-1.5" />
+      <span aria-hidden="true" className="tga-live-pulse bg-accent inline-block size-1.5" />
       <span className="font-sans">{t("pollerLabel")}</span>
     </div>
   );

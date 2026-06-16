@@ -6,7 +6,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@mutav/ui/sidebar";
 import { Link, usePathname } from "@mutav/i18n/navigation";
 
 type NavMainItem = {

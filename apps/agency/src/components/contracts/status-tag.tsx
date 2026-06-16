@@ -3,12 +3,12 @@ import { StatusTag as UiStatusTag, type StatusTagTone } from "@mutav/ui/status-t
 type Tone = "accent" | "success" | "error" | "neutral" | "expiring" | "caution";
 
 const TONE: Record<Tone, StatusTagTone> = {
-  accent: "info",
+  accent: "neutral",
   success: "positive",
   error: "critical",
   neutral: "neutral",
   expiring: "warning",
-  caution: "warning",
+  caution: "warning-strong",
 };
 
 export function StatusTag({

@@ -34,6 +34,9 @@
   --color-accent-dim: var(--accent-dim);
   --color-success: var(--success);
   --color-error: var(--error);
+  --color-warning: var(--warning);
+  --color-warning-strong: var(--warning-strong);
+  --color-warning-dim: var(--warning-dim);
 
   /* shadcn aliases mapped to TGA tokens — primitives keep working */
   --color-background: var(--canvas);
@@ -146,6 +149,12 @@
   --accent-dim: #fff0d4;
   --success: #2e8b5a;
   --error: #b83232;
+  /* Warning palette — distinct from accent (which is brand/selection).
+     warning = amber "watch" (expiring, soft warning).
+     warning-strong = orange "act now" (caution, overdue). */
+  --warning: #d97706;
+  --warning-strong: #ea580c;
+  --warning-dim: #fff4e0;
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1a1a1a;
   --color-primary-foreground: #1a1a1a;
@@ -170,12 +179,16 @@
   --accent-dim: #9e6a10;
   --success: #3dab72;
   --error: #c94040;
+  --warning: #f59e0b;
+  --warning-strong: #fb923c;
+  --warning-dim: #4a2c0a;
   /* Restore canvas-on-accent for dark mode */
   --color-accent-foreground: var(--canvas);
   --color-primary-foreground: var(--canvas);
 }
 
-/* Live amber square pulse — only ambient animation in the system */
+/* Live pulse — only ambient animation in the system. Geometry-agnostic
+   (opacity-only); the consumer chooses the shape. */
 @keyframes tga-live-pulse {
   0%,
   100% {
@@ -185,11 +198,11 @@
     opacity: 0.4;
   }
 }
-.tga-live-square {
+.tga-live-pulse {
   animation: tga-live-pulse 2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .tga-live-square {
+  .tga-live-pulse {
     animation: none;
     opacity: 1;
   }

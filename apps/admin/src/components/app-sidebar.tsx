@@ -12,7 +12,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@mutav/ui/sidebar";
 import {
   LayoutDashboardIcon,
   BuildingIcon,

@@ -2,8 +2,8 @@ import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
 import type { PaymentStateKind } from "@convex/payments/domain";
 
 export const paymentStateTone: Record<PaymentStateKind, StatusTagTone> = {
-  pending: "info",
-  overdue: "warning",
+  pending: "neutral",
+  overdue: "warning-strong",
   paid: "positive",
   canceled: "neutral",
 };

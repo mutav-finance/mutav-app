@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@mutav/ui/cn";
+import { cn } from "./cn";
 import { Avatar, AvatarFallback, AvatarImage } from "@mutav/ui/avatar";
 import {
   DropdownMenu,
