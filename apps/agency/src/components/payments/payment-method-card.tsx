@@ -6,10 +6,19 @@ import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
-import { Link, getPathname } from "@mutav/i18n/navigation";
-import { useLocale } from "next-intl";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { getPayUrl } from "@/lib/env";
 import { isChargeable, type Payment } from "@convex/payments/domain";
+
+/**
+ * Absolute payment-link URL to the tenant checkout on the pay app. Cross-origin
+ * since the split, so this is a plain anchor target — not the next-intl `Link`,
+ * and not locale-prefixed: the pay app negotiates the tenant's own locale
+ * (Accept-Language / NEXT_LOCALE cookie), which need not match the agent's.
+ */
+function paymentLinkUrl(publicId: string): string {
+  return `${getPayUrl()}/pay/${publicId}`;
+}
 
 function MethodRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -22,15 +31,10 @@ function MethodRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 function ShareTenantLink({ publicId }: { publicId: string }) {
   const t = useTranslations("paymentDetails.methodCard");
-  const locale = useLocale();
   const { copied, copy } = useCopyToClipboard(t("linkCopied"));
 
   const handleCopy = () => {
-    const path = getPathname({
-      href: `/pay/${publicId}`,
-      locale: locale as "pt-BR" | "en",
-    });
-    copy(`${window.location.origin}${path}`);
+    copy(paymentLinkUrl(publicId));
   };
 
   return (
@@ -56,10 +60,10 @@ function ChargeableActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button asChild size="sm" variant={variant === "primary" ? "default" : "outline"}>
-        <Link href={`/pay/${payment.publicId}`} target="_blank" rel="noopener">
+        <a href={paymentLinkUrl(payment.publicId)} target="_blank" rel="noopener">
           {t("openCheckout")}
           <ExternalLink className="size-4" strokeWidth={1.25} />
-        </Link>
+        </a>
       </Button>
       <ShareTenantLink publicId={payment.publicId} />
     </div>

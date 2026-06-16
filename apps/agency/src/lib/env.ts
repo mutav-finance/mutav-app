@@ -28,6 +28,18 @@ export function getAppUrl(): string {
 }
 
 /**
+ * Public URL of the tenant-facing pay app (`pay.mutav.finance`), which
+ * since the monorepo split owns the `/pay/[publicId]` checkout route.
+ * The agency app builds tenant checkout / share links against this
+ * origin — a same-origin `/pay/...` path would 404 here. Falls back to
+ * the pay app's dev port (3001) for local dev. Production sets
+ * `NEXT_PUBLIC_PAY_URL=https://pay.mutav.finance`.
+ */
+export function getPayUrl(): string {
+  return process.env.NEXT_PUBLIC_PAY_URL ?? "http://localhost:3001";
+}
+
+/**
  * Server-only base URL used by the Auth0 SDK + our `onCallback` redirect
  * construction. Distinct from `getAppUrl()` (client-facing
  * `NEXT_PUBLIC_APP_URL`): `APP_BASE_URL` is the canonical name the
