@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { INVOICE_LINE_ITEM_KIND, InvoiceMethods, InvoiceStates } from "./invoices/domain";
 import { generateInvoiceMuxedId } from "./invoices/lib/muxedId";
+import { SettlementMethods } from "./payments/domain";
 import type { AgencyId } from "./agencies/domain";
 import {
   DEFAULT_EXIT_COST_MULTIPLIER,
@@ -35,6 +36,9 @@ const DEMO_TABLES = [
   // though the seed doesn't insert orders today — keeps the wipe FK-safe if
   // a manual checkout run left orders behind.
   "providerOrders",
+  // payments FK-references invoices; wipe before invoices to avoid dangling
+  // pointers mid-wipe.
+  "payments",
   "invoices",
   "contractHistory",
   "contracts",
@@ -50,6 +54,95 @@ async function wipeDemoTables(ctx: MutationCtx) {
       for (const row of rows) await ctx.db.delete(row._id);
       rows = await ctx.db.query(table).take(200);
     }
+  }
+}
+
+type SeededInvoiceMethod =
+  | ReturnType<typeof InvoiceMethods.boleto>
+  | ReturnType<typeof InvoiceMethods.stellar>
+  | ReturnType<typeof InvoiceMethods.pix>;
+
+/**
+ * Insert a paid invoice plus its mirroring `payments` settlement row in
+ * one call. The settlement reuses the invoice's own `paidAt`, total, and
+ * method shape so seeded history matches what the dual-write path
+ * (`recordSettlement`) produces in production.
+ */
+async function seedPaidInvoice(
+  ctx: MutationCtx,
+  invoice: {
+    agencyId: AgencyId;
+    publicId: string;
+    periodMonth: string;
+    issuedAt: string;
+    dueDate: string;
+    totalCents: number;
+    paidAt: string;
+    method: SeededInvoiceMethod;
+    lineItems: Array<{
+      contractId: ContractId;
+      contractPublicId: string;
+      kind: "recurring" | "activation";
+      amountCents: number;
+      description: string;
+    }>;
+  },
+) {
+  const invoiceId = await ctx.db.insert("invoices", {
+    agencyId: invoice.agencyId,
+    publicId: invoice.publicId,
+    periodMonth: invoice.periodMonth,
+    issuedAt: invoice.issuedAt,
+    dueDate: invoice.dueDate,
+    totalCents: invoice.totalCents,
+    state: InvoiceStates.paid(invoice.paidAt),
+    method: invoice.method,
+    muxedId: generateInvoiceMuxedId(),
+    lineItems: invoice.lineItems,
+  });
+
+  const { method, externalRef } = settlementFromInvoiceMethod(invoice.method);
+
+  await ctx.db.insert("payments", {
+    agencyId: invoice.agencyId,
+    invoiceId,
+    status: "succeeded",
+    amountCents: invoice.totalCents,
+    paidAt: invoice.paidAt,
+    externalRef,
+    method,
+  });
+
+  return invoiceId;
+}
+
+/**
+ * Mirror an invoice `method` value object onto a settlement `method`,
+ * picking the on-chain/anchor reference that the dual-write path records
+ * as `externalRef` (tx hash for Stellar, anchor txId for Pix; boleto has
+ * none).
+ */
+function settlementFromInvoiceMethod(method: SeededInvoiceMethod): {
+  method: ReturnType<
+    | typeof SettlementMethods.boleto
+    | typeof SettlementMethods.stellar
+    | typeof SettlementMethods.pix
+  >;
+  externalRef: string | undefined;
+} {
+  switch (method.kind) {
+    case "boleto":
+      return { method: SettlementMethods.boleto(method.barcode), externalRef: undefined };
+    case "stellar":
+      return {
+        method: SettlementMethods.stellar(method.destinationAddress, method.txHash),
+        externalRef: method.txHash ?? undefined,
+      };
+    case "pix":
+      return {
+        method: SettlementMethods.pix(method.pixKey, method.txId),
+        externalRef: method.txId ?? undefined,
+      };
   }
 }
 
@@ -1764,174 +1857,163 @@ export const seedFictional = internalMutation({
     // ── Nov 2025 ──────────────────────────────────────────────────────────────
 
     const p2025Nov = paulistaLineItems("2025-11");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: paulistaId,
       publicId: "INV-2025-11-0100",
       periodMonth: "2025-11",
       issuedAt: "2025-11-01",
       dueDate: "2025-11-10",
       totalCents: p2025Nov.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2025-11-07T10:00:00-03:00")),
+      paidAt: d("2025-11-07T10:00:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: p2025Nov,
     });
 
     const a2025Nov = atlanticaLineItems("2025-11");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: atlanticaId,
       publicId: "INV-2025-11-0200",
       periodMonth: "2025-11",
       issuedAt: "2025-11-01",
       dueDate: "2025-11-10",
       totalCents: a2025Nov.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2025-11-08T11:00:00-03:00")),
+      paidAt: d("2025-11-08T11:00:00-03:00"),
       method: InvoiceMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202511081100abc001",
       ),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: a2025Nov,
     });
 
     const h2025Nov = horizonteLineItems("2025-11");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: horizonteId,
       publicId: "INV-2025-11-0300",
       periodMonth: "2025-11",
       issuedAt: "2025-11-01",
       dueDate: "2025-11-10",
       totalCents: h2025Nov.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2025-11-09T09:30:00-03:00")),
+      paidAt: d("2025-11-09T09:30:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: h2025Nov,
     });
 
     // ── Dec 2025 ──────────────────────────────────────────────────────────────
 
     const p2025Dec = paulistaLineItems("2025-12");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: paulistaId,
       publicId: "INV-2025-12-0100",
       periodMonth: "2025-12",
       issuedAt: "2025-12-01",
       dueDate: "2025-12-10",
       totalCents: p2025Dec.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2025-12-05T14:00:00-03:00")),
+      paidAt: d("2025-12-05T14:00:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: p2025Dec,
     });
 
     const a2025Dec = atlanticaLineItems("2025-12");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: atlanticaId,
       publicId: "INV-2025-12-0200",
       periodMonth: "2025-12",
       issuedAt: "2025-12-01",
       dueDate: "2025-12-10",
       totalCents: a2025Dec.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2025-12-08T10:00:00-03:00")),
+      paidAt: d("2025-12-08T10:00:00-03:00"),
       method: InvoiceMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202512081000abc002",
       ),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: a2025Dec,
     });
 
     const h2025Dec = horizonteLineItems("2025-12");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: horizonteId,
       publicId: "INV-2025-12-0300",
       periodMonth: "2025-12",
       issuedAt: "2025-12-01",
       dueDate: "2025-12-10",
       totalCents: h2025Dec.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2025-12-09T09:00:00-03:00")),
+      paidAt: d("2025-12-09T09:00:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: h2025Dec,
     });
 
     // ── Jan 2026 ──────────────────────────────────────────────────────────────
 
     const p2026Jan = paulistaLineItems("2026-01");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: paulistaId,
       publicId: "INV-2026-01-0100",
       periodMonth: "2026-01",
       issuedAt: "2026-01-02",
       dueDate: "2026-01-12",
       totalCents: p2026Jan.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-01-10T11:00:00-03:00")),
+      paidAt: d("2026-01-10T11:00:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: p2026Jan,
     });
 
     const a2026Jan = atlanticaLineItems("2026-01");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: atlanticaId,
       publicId: "INV-2026-01-0200",
       periodMonth: "2026-01",
       issuedAt: "2026-01-02",
       dueDate: "2026-01-12",
       totalCents: a2026Jan.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-01-09T15:00:00-03:00")),
+      paidAt: d("2026-01-09T15:00:00-03:00"),
       method: InvoiceMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202601091500abc003",
       ),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: a2026Jan,
     });
 
     const h2026Jan = horizonteLineItems("2026-01");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: horizonteId,
       publicId: "INV-2026-01-0300",
       periodMonth: "2026-01",
       issuedAt: "2026-01-02",
       dueDate: "2026-01-12",
       totalCents: h2026Jan.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-01-11T10:00:00-03:00")),
+      paidAt: d("2026-01-11T10:00:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: h2026Jan,
     });
 
     // ── Feb 2026 ──────────────────────────────────────────────────────────────
 
     const p2026Feb = paulistaLineItems("2026-02");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: paulistaId,
       publicId: "INV-2026-02-0100",
       periodMonth: "2026-02",
       issuedAt: "2026-02-02",
       dueDate: "2026-02-10",
       totalCents: p2026Feb.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-02-07T09:00:00-03:00")),
+      paidAt: d("2026-02-07T09:00:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: p2026Feb,
     });
 
     const a2026Feb = atlanticaLineItems("2026-02");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: atlanticaId,
       publicId: "INV-2026-02-0200",
       periodMonth: "2026-02",
       issuedAt: "2026-02-02",
       dueDate: "2026-02-10",
       totalCents: a2026Feb.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-02-09T14:00:00-03:00")),
+      paidAt: d("2026-02-09T14:00:00-03:00"),
       method: InvoiceMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202602091400abc004",
       ),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: a2026Feb,
     });
 
@@ -1952,33 +2034,31 @@ export const seedFictional = internalMutation({
     // ── Mar 2026 ──────────────────────────────────────────────────────────────
 
     const p2026Mar = paulistaLineItems("2026-03");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: paulistaId,
       publicId: "INV-2026-03-0100",
       periodMonth: "2026-03",
       issuedAt: "2026-03-02",
       dueDate: "2026-03-10",
       totalCents: p2026Mar.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-03-08T10:30:00-03:00")),
+      paidAt: d("2026-03-08T10:30:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: p2026Mar,
     });
 
     const a2026Mar = atlanticaLineItems("2026-03");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: atlanticaId,
       publicId: "INV-2026-03-0200",
       periodMonth: "2026-03",
       issuedAt: "2026-03-02",
       dueDate: "2026-03-10",
       totalCents: a2026Mar.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-03-09T11:00:00-03:00")),
+      paidAt: d("2026-03-09T11:00:00-03:00"),
       method: InvoiceMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202603091100abc005",
       ),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: a2026Mar,
     });
 
@@ -2000,33 +2080,31 @@ export const seedFictional = internalMutation({
     // ── Apr 2026 ──────────────────────────────────────────────────────────────
 
     const paulistaAprLineItems = paulistaLineItems("2026-04");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: paulistaId,
       publicId: "INV-2026-04-0100",
       periodMonth: "2026-04",
       issuedAt: "2026-04-01",
       dueDate: "2026-04-10",
       totalCents: paulistaAprLineItems.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-04-08T14:21:00-03:00")),
+      paidAt: d("2026-04-08T14:21:00-03:00"),
       method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: paulistaAprLineItems,
     });
 
     const atlanticaAprLineItems = atlanticaLineItems("2026-04");
-    await ctx.db.insert("invoices", {
+    await seedPaidInvoice(ctx, {
       agencyId: atlanticaId,
       publicId: "INV-2026-04-0200",
       periodMonth: "2026-04",
       issuedAt: "2026-04-01",
       dueDate: "2026-04-10",
       totalCents: atlanticaAprLineItems.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.paid(d("2026-04-09T10:00:00-03:00")),
+      paidAt: d("2026-04-09T10:00:00-03:00"),
       method: InvoiceMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202404091000abc123",
       ),
-      muxedId: generateInvoiceMuxedId(),
       lineItems: atlanticaAprLineItems,
     });
 
@@ -2574,33 +2652,31 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     }));
 
   const march = monthlyLineItems("2026-03");
-  await ctx.db.insert("invoices", {
+  await seedPaidInvoice(ctx, {
     agencyId,
     publicId: "INV-2026-03-0500",
     periodMonth: "2026-03",
     issuedAt: "2026-03-01",
     dueDate: "2026-03-10",
     totalCents: march.reduce((s, x) => s + x.amountCents, 0),
-    state: InvoiceStates.paid(d("2026-03-08T10:00:00-03:00")),
+    paidAt: d("2026-03-08T10:00:00-03:00"),
     method: InvoiceMethods.pix(
       "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b500",
       "E00038166202603081000aprov01",
     ),
-    muxedId: generateInvoiceMuxedId(),
     lineItems: march,
   });
 
   const april = monthlyLineItems("2026-04");
-  await ctx.db.insert("invoices", {
+  await seedPaidInvoice(ctx, {
     agencyId,
     publicId: "INV-2026-04-0500",
     periodMonth: "2026-04",
     issuedAt: "2026-04-01",
     dueDate: "2026-04-10",
     totalCents: april.reduce((s, x) => s + x.amountCents, 0),
-    state: InvoiceStates.paid(d("2026-04-07T11:30:00-03:00")),
+    paidAt: d("2026-04-07T11:30:00-03:00"),
     method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000005920"),
-    muxedId: generateInvoiceMuxedId(),
     lineItems: april,
   });
 

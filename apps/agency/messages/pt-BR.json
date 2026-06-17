@@ -3,6 +3,13 @@
     "title": "Mutav — Sistema de Garantia Registrada",
     "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
   },
+  "paymentStatus": {
+    "pending": "Pendente",
+    "processing": "Processando",
+    "succeeded": "Confirmado",
+    "failed": "Falhou",
+    "canceled": "Cancelado"
+  },
   "common": {
     "a11y": {
       "skipToMain": "Pular para o conteúdo principal"
@@ -695,7 +702,15 @@
       "openPayPage": "Abrir página de pagamento",
       "copyShareLink": "Link de pagamento",
       "linkCopied": "Link copiado",
-      "openCheckout": "Abrir checkout"
+      "openCheckout": "Abrir checkout",
+      "settlements": {
+        "heading": "Liquidações",
+        "method": {
+          "boleto": "Boleto",
+          "pix": "PIX",
+          "stellar": "Stellar"
+        }
+      }
     },
     "notFound": {
       "title": "Fatura não encontrada",
