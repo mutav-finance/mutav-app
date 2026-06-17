@@ -3,6 +3,13 @@
     "title": "Mutav — Registered Guarantee System",
     "description": "Dashboard for managing rental guarantees registered on-chain."
   },
+  "paymentStatus": {
+    "pending": "Pending",
+    "processing": "Processing",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "canceled": "Canceled"
+  },
   "common": {
     "a11y": {
       "skipToMain": "Skip to main content"
@@ -695,7 +702,15 @@
       "openPayPage": "Open payment page",
       "copyShareLink": "Payment Link",
       "linkCopied": "Link copied",
-      "openCheckout": "Open checkout"
+      "openCheckout": "Open checkout",
+      "settlements": {
+        "heading": "Settlements",
+        "method": {
+          "boleto": "Boleto",
+          "pix": "PIX",
+          "stellar": "Stellar"
+        }
+      }
     },
     "notFound": {
       "title": "Invoice not found",

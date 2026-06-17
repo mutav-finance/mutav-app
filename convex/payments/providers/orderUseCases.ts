@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "../../_generated/server";
 import { assertAgencyAccess } from "../../lib/auth";
 import { InvoiceMethods, InvoiceStates } from "../../invoices/domain";
+import { SettlementMethods } from "../domain";
+import { recordSettlement } from "../settlement";
 import { anchorProviderValidator } from "./domain";
 import {
   providerOrderStatusValidator,
@@ -155,6 +157,18 @@ export const completeOrderAndMarkPaid = internalMutation({
       state: InvoiceStates.paid(paidAt),
       method: InvoiceMethods.pix(pixKey, anchorTxId),
     });
+
+    await recordSettlement(ctx, {
+      agencyId: invoice.agencyId,
+      invoiceId,
+      status: "succeeded",
+      amountCents: invoice.totalCents,
+      paidAt,
+      externalRef: anchorTxId,
+      providerOrderId: orderId,
+      method: SettlementMethods.pix(pixKey, anchorTxId),
+    });
+
     return { paymentStatus: "paid" as const };
   },
 });

@@ -4,7 +4,7 @@ State capture for a fresh session to continue the `payments`→`invoices` + sett
 
 ## TL;DR — where to start
 
-The refactor is ~¾ done. **PR 2 is open as [#191](https://github.com/mutav-finance/mutav-app/pull/191) (code-only).** Next up after it merges: **PR 3** (settlement `payments` table), now also carrying the `anchorOrders`→`providerOrders` table rename (deferred from PR 2 — see scope note below). Read these first, in order:
+The refactor is nearly done. **PR 3b (this) adds the settlement `payments` table.** Only **PR 4 (NARROW — drop `invoice.method`)** remains after it. Read these first, in order:
 1. **Plan (PR sequence + decisions):** `~/.claude/plans/swift-inventing-tide.md`
 2. **Design spec (rationale, benchmarks, vocabulary map):** `docs/superpowers/specs/2026-06-16-invoice-settlement-vocabulary.md`
 3. This file (status + gotchas).
@@ -17,16 +17,18 @@ The refactor is ~¾ done. **PR 2 is open as [#191](https://github.com/mutav-fina
 | #186 | Phase 1 — functional `payments`→`invoices` rename, Stripe statuses (`open`/`paid`/`void`, `overdue` derived), additive audit | ✅ merged |
 | #187 | `@convex-dev/migrations` tooling + run-on-deploy | ✅ merged |
 | #189 | PR 1 — agency UI cosmetic (route `/invoices`, `invoice-*` components, `invoiceList`/`invoiceDetails` i18n) | ✅ merged |
-| **PR 2** | `anchors/` → `payments/providers/` (code-only domain move + api-path rename) + **fix `listByAgency`** (bearer-gated `listBanksForInvoice`) | 🔵 **open [#191](https://github.com/mutav-finance/mutav-app/pull/191)** |
-| PR 3 | Settlement `payments` table — WIDEN + migrate + dual-write; **+ `anchorOrders`→`providerOrders` table rename** (folded in from PR 2) | ⏳ **next** |
-| PR 4 | Drop `invoice.method` — NARROW | ⏳ |
+| #191 | PR 2 — `anchors/` → `payments/providers/` domain move + bearer-gated `listBanksForInvoice` (closed the `listByAgency` boundary) | ✅ merged |
+| #192 | Make `regression-greps` checks 2–5 actually gate (subshell exit-code bug) | ✅ merged |
+| #193 | PR 3a — `anchorOrders`→`providerOrders` table + symbol rename (pre-launch hard rename) | ✅ merged |
+| **PR 3b** | Settlement `payments` table — schema + `convex/payments/{domain,settlement,useCases}.ts`, dual-write in `markPaidByTx`/`markPaidByAnchor`/`completeOrderAndMarkPaid`, seed settlement rows, agency `invoice-method-card` read, PAYMENT_STATUS i18n | 🔵 **this PR** |
+| PR 4 | Drop `invoice.method` — NARROW | ⏳ **next** |
 
-### PR 2 scope decision (2026-06-17)
-PR 2 shipped **code-only** to stay single-deploy-safe and avoid a standalone migration cycle. Two items the plan listed under PR 2 were **deferred**:
-- **`anchorOrders`→`providerOrders` table rename** → **PR 3.** A Draau/prod-safe table rename can't drop the old table in the same deploy that copies its rows (Convex validates schema-at-rest *before* the build-time `migrations:runAll`), so per the documented 2-PR `schemaValidation:false`→migrate→narrow convention it needs its own widen/narrow. PR 3 is already a schema PR and introduces the `providerOrders`↔settlement-row link, so the rename belongs there.
-- **`registry.ts` `kind` field** → deferred until a non-anchor provider exists (no consumer yet; the plan's own end-state says `src/lib/anchors/` stays untouched).
+### Migration approach changed to wipe+reseed (2026-06-17)
+Pre-launch, so PR 3a/3b use **wipe+reseed** rather than in-place data migrations (user's call): schema changes directly, no `runAll` backfills. Prod (`fastidious-swordfish-9`) + CI preview deployments are empty so the new schema applies cleanly; `_generated` table types auto-derive from `typeof schema` (no codegen). A context-specific override of the documented 2-PR migrate-in-place convention, not a general reversal.
 
-`main` HEAD at handoff: `1329e96` (PR 1) → PR 2 branched from `bfa81c9` (#190). PR 2 worktree: `.claude/worktrees/feat/payments-providers` (remove after merge). `feat/bigdatacorp-integration` + `feat/screening-phase-1` are unrelated.
+> **⚠️ PENDING OPERATIONAL STEP (after PR 3b merges):** the persistent **dev deployment** (+ Draau's local) still run the pre-rename schema. Run a wipe+reseed (`clearAll`→`seedPreview`, or `convex dev` reseed) **from the main checkout** (never a worktree — that pushes to shared dev) to pick up `providerOrders` + the seeded `payments` settlement rows.
+
+`feat/bigdatacorp-integration` + `feat/screening-phase-1` are unrelated worktrees.
 
 ## Phase-2 decisions (locked — see plan for detail)
 - Invoice → `paid` on **first `succeeded` settlement** (no partial payments).

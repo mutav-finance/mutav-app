@@ -2,13 +2,17 @@
 
 import { useTranslations } from "next-intl";
 import { Copy, Check, ExternalLink } from "lucide-react";
+import { useQuery } from "convex/react";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { formatBRLCents } from "@/lib/contracts/format";
 import { getPayUrl } from "@/lib/env";
+import { api } from "@convex/_generated/api";
 import { isChargeable, type Invoice } from "@convex/invoices/domain";
+import type { Payment } from "@convex/payments/domain";
 
 /**
  * Absolute payment-link URL to the tenant checkout on the pay app. Cross-origin
@@ -66,6 +70,42 @@ function ChargeableActions({
         </a>
       </Button>
       <ShareTenantLink publicId={payment.publicId} />
+    </div>
+  );
+}
+
+function SettlementRow({ settlement }: { settlement: Payment }) {
+  const t = useTranslations("invoiceDetails.methodCard.settlements");
+  const tStatus = useTranslations("paymentStatus");
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-foreground text-sm">{t(`method.${settlement.method.kind}`)}</span>
+      <div className="flex items-baseline gap-3">
+        <Mono className="text-muted-foreground text-xs">
+          {formatBRLCents(settlement.amountCents)}
+        </Mono>
+        <span className="text-muted-foreground text-xs">{tStatus(settlement.status)}</span>
+      </div>
+    </div>
+  );
+}
+
+function SettlementList({ invoiceId }: { invoiceId: Invoice["_id"] }) {
+  const t = useTranslations("invoiceDetails.methodCard.settlements");
+  const settlements = useQuery(api.payments.useCases.listByInvoice, { invoiceId });
+
+  if (!settlements || settlements.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex flex-col gap-2 border-t pt-4">
+      <Eyebrow size="xs" className="text-muted-foreground font-medium">
+        {t("heading")}
+      </Eyebrow>
+      <div className="flex flex-col gap-2">
+        {settlements.map((settlement) => (
+          <SettlementRow key={settlement._id} settlement={settlement} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -148,6 +188,8 @@ export function InvoiceMethodCard({ payment }: { payment: Invoice }) {
             {chargeable && <ChargeableActions payment={payment} variant="secondary" />}
           </div>
         )}
+
+        <SettlementList invoiceId={payment._id} />
       </CardContent>
     </Card>
   );

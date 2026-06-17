@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
+import { SettlementMethods } from "../payments/domain";
+import { recordSettlement } from "../payments/settlement";
 import { INVOICE_LINE_ITEM_KIND, InvoiceMethods, InvoiceStates, isChargeable } from "./domain";
 import { generateInvoiceMuxedId } from "./lib/muxedId";
 
@@ -222,6 +224,16 @@ export const markPaidByTx = internalMutation({
       method: InvoiceMethods.stellar(muxedAddress, txHash),
     });
 
+    await recordSettlement(ctx, {
+      agencyId: invoice.agencyId,
+      invoiceId,
+      status: "succeeded",
+      amountCents: invoice.totalCents,
+      paidAt,
+      externalRef: txHash,
+      method: SettlementMethods.stellar(muxedAddress, txHash),
+    });
+
     await appendAuditEntry(ctx, {
       actor: { kind: "system", source: "stellar_indexer" },
       action: AUDIT_ACTION.INVOICE_PAID,
@@ -269,6 +281,16 @@ export const markPaidByAnchor = internalMutation({
     await ctx.db.patch(invoiceId, {
       state: InvoiceStates.paid(paidAt),
       method: InvoiceMethods.pix(pixKey, anchorTxId),
+    });
+
+    await recordSettlement(ctx, {
+      agencyId: invoice.agencyId,
+      invoiceId,
+      status: "succeeded",
+      amountCents: invoice.totalCents,
+      paidAt,
+      externalRef: anchorTxId,
+      method: SettlementMethods.pix(pixKey, anchorTxId),
     });
 
     await appendAuditEntry(ctx, {

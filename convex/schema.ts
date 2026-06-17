@@ -75,6 +75,31 @@ const invoiceMethod = v.union(
   }),
 );
 
+const paymentStatus = v.union(
+  v.literal("pending"),
+  v.literal("processing"),
+  v.literal("succeeded"),
+  v.literal("failed"),
+  v.literal("canceled"),
+);
+
+const settlementMethod = v.union(
+  v.object({
+    kind: v.literal("boleto"),
+    barcode: v.union(v.string(), v.null()),
+  }),
+  v.object({
+    kind: v.literal("stellar"),
+    destinationAddress: v.string(),
+    txHash: v.union(v.string(), v.null()),
+  }),
+  v.object({
+    kind: v.literal("pix"),
+    pixKey: v.string(),
+    txId: v.union(v.string(), v.null()),
+  }),
+);
+
 const memberRole = v.union(v.literal("owner"), v.literal("admin"), v.literal("member"));
 
 const agencyType = v.union(v.literal("autonomo"), v.literal("empresa"));
@@ -322,6 +347,22 @@ export default defineSchema({
     .index("by_state_kind", ["state.kind"])
     .index("by_publicId", ["publicId"])
     .index("by_muxedId", ["muxedId"]),
+
+  // Settlement record — one row per settlement attempt against an invoice;
+  // idempotent on externalRef.
+  payments: defineTable({
+    agencyId: v.id("agencies"),
+    invoiceId: v.id("invoices"),
+    status: paymentStatus,
+    amountCents: v.number(),
+    paidAt: v.optional(v.string()),
+    externalRef: v.optional(v.string()),
+    providerOrderId: v.optional(v.id("providerOrders")),
+    method: settlementMethod,
+  })
+    .index("by_invoice", ["invoiceId"])
+    .index("by_agency", ["agencyId"])
+    .index("by_externalRef", ["externalRef"]),
 
   // Singleton row tracking the latest Horizon paging token seen by the
   // treasury polling action. Inserted lazily on first run.
