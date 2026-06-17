@@ -74,6 +74,19 @@ gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | b
 
 Implementation-level concerns live alongside: [`docs/auth.md`](docs/auth.md) (Convex function wrappers), [`docs/stellar-anchors.md`](docs/stellar-anchors.md) (anchor SEP integration), [`docs/key-management-guide.md`](docs/key-management-guide.md) (hands-on key handling — read before touching `process.env` or adding a new secret), [`docs/test-personas.md`](docs/test-personas.md) (pre-provisioned Auth0 dev accounts for testing each user state). When adding a new surface or domain, update the README catalogs before writing code. When adding a new public mutation that touches funds or accounts, consult [`docs/architecture/compliance.md`](docs/architecture/compliance.md) for the gating contract.
 
+### Test accounts (dev tenant only)
+
+Four pre-provisioned Auth0 personas for testing each user state. **Dev tenant only** (`dev-ay46ib0hhi1mdwpw.us.auth0.com` — localhost, Vercel previews, `mutav-app.vercel.app`); invalidated when the `mutav-prod` tenant is cut (#119). All share password **`MutavDev2026!`**, all `email_verified`. Full details + reseed/rotation in [`docs/test-personas.md`](docs/test-personas.md); persona↔subject binding lives in `convex/seed.ts`.
+
+| Persona                   | Email                       | Seeded state               | Lands on                                |
+| ------------------------- | --------------------------- | -------------------------- | --------------------------------------- |
+| System admin (Mutav team) | `systemadmin@mutav.finance` | `isStaff: true`, no agency | `/onboarding`                           |
+| Agency owner              | `agencyowner@mutav.finance` | active agency              | `/` (dashboard)                         |
+| Pending user              | `pendinguser@mutav.finance` | under_review agency        | `/onboarding/status?state=under_review` |
+| New user                  | `newuser@mutav.finance`     | none                       | `/onboarding`                           |
+
+Reseed personas (idempotent): `bunx convex run seed:seedTestPersonas`.
+
 ## Stellar concepts
 
 Mutav settles guarantees on Stellar and moves BRL ↔ token via anchors. Before touching anchor code, read the in-repo docs:
