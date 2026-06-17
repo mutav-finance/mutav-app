@@ -29,7 +29,7 @@ import type {
   AgencyBankAccount,
   AgencyBankAccountId,
 } from "@convex/payments/providers/bankAccountDomain";
-import type { AnchorOrder } from "@convex/payments/providers/orderDomain";
+import type { ProviderOrder } from "@convex/payments/providers/orderDomain";
 import type { InvoiceId } from "@convex/invoices/domain";
 
 interface Props {
@@ -341,7 +341,7 @@ function LoadedPanel({
   totalCents,
   phase,
 }: {
-  order: AnchorOrder;
+  order: ProviderOrder;
   totalCents: number;
   phase: AnchorOnrampPhase;
 }) {

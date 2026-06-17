@@ -4,14 +4,18 @@ import { internalMutation, internalQuery, query } from "../../_generated/server"
 import { assertAgencyAccess } from "../../lib/auth";
 import { InvoiceMethods, InvoiceStates } from "../../invoices/domain";
 import { anchorProviderValidator } from "./domain";
-import { anchorOrderStatusValidator, type AnchorOrder, type AnchorOrderId } from "./orderDomain";
+import {
+  providerOrderStatusValidator,
+  type ProviderOrder,
+  type ProviderOrderId,
+} from "./orderDomain";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 // Null on miss-or-forbidden so cross-agency existence doesn't leak.
 export const getOrderById = query({
-  args: { orderId: v.id("anchorOrders") },
-  handler: async (ctx, args): Promise<AnchorOrder | null> => {
+  args: { orderId: v.id("providerOrders") },
+  handler: async (ctx, args): Promise<ProviderOrder | null> => {
     const order = await ctx.db.get(args.orderId);
     if (!order) return null;
 
@@ -28,8 +32,8 @@ export const getOrderById = query({
 // Companion for `pollPixOnramp` (webhook) + `pollAnchorTestOnramp` (UI),
 // both of which run without user identity.
 export const getOrderByIdInternal = internalQuery({
-  args: { orderId: v.id("anchorOrders") },
-  handler: async (ctx, args): Promise<AnchorOrder | null> => {
+  args: { orderId: v.id("providerOrders") },
+  handler: async (ctx, args): Promise<ProviderOrder | null> => {
     return ctx.db.get(args.orderId);
   },
 });
@@ -41,9 +45,9 @@ export const getOrderByIdInternal = internalQuery({
  */
 export const getByAnchorTxId = internalQuery({
   args: { anchorTxId: v.string() },
-  handler: async (ctx, args): Promise<AnchorOrder | null> => {
+  handler: async (ctx, args): Promise<ProviderOrder | null> => {
     return ctx.db
-      .query("anchorOrders")
+      .query("providerOrders")
       .withIndex("by_anchor_tx", (q) => q.eq("anchorTxId", args.anchorTxId))
       .unique();
   },
@@ -60,11 +64,11 @@ export const insertOrder = internalMutation({
     instructions: v.optional(v.any()),
     how: v.optional(v.string()),
     hostedUrl: v.optional(v.string()),
-    status: anchorOrderStatusValidator,
+    status: providerOrderStatusValidator,
   },
-  returns: v.id("anchorOrders"),
-  handler: async (ctx, args): Promise<AnchorOrderId> => {
-    return ctx.db.insert("anchorOrders", {
+  returns: v.id("providerOrders"),
+  handler: async (ctx, args): Promise<ProviderOrderId> => {
+    return ctx.db.insert("providerOrders", {
       ...args,
       createdAt: new Date().toISOString(),
     });
@@ -73,8 +77,8 @@ export const insertOrder = internalMutation({
 
 export const updateOrderStatus = internalMutation({
   args: {
-    orderId: v.id("anchorOrders"),
-    status: anchorOrderStatusValidator,
+    orderId: v.id("providerOrders"),
+    status: providerOrderStatusValidator,
     amountInCents: v.optional(v.number()),
     amountOutCents: v.optional(v.number()),
     feeCents: v.optional(v.number()),
@@ -100,8 +104,8 @@ export const updateOrderStatus = internalMutation({
  */
 export const completeOrderAndMarkPaid = internalMutation({
   args: {
-    orderId: v.id("anchorOrders"),
-    status: anchorOrderStatusValidator,
+    orderId: v.id("providerOrders"),
+    status: providerOrderStatusValidator,
     amountInCents: v.optional(v.number()),
     amountOutCents: v.optional(v.number()),
     feeCents: v.optional(v.number()),

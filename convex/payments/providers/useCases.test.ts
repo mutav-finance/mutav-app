@@ -143,7 +143,7 @@ describe("payments.providers.orderUseCases.getOrderById (resource-by-id pattern)
         method: null,
         lineItems: [],
       });
-      return ctx.db.insert("anchorOrders", {
+      return ctx.db.insert("providerOrders", {
         agencyId,
         invoiceId,
         provider: "testanchor",
@@ -178,7 +178,7 @@ describe("payments.providers.orderUseCases.getOrderById (resource-by-id pattern)
         method: null,
         lineItems: [],
       });
-      return ctx.db.insert("anchorOrders", {
+      return ctx.db.insert("providerOrders", {
         agencyId: foreignAgencyId,
         invoiceId,
         provider: "testanchor",

@@ -336,7 +336,7 @@ export default defineSchema({
   // the parent invoice's state flips to `paid` via `markPaidByAnchor`.
   // `rawPayload` retains the last full anchor-side transaction object for
   // debugging / audit.
-  anchorOrders: defineTable({
+  providerOrders: defineTable({
     agencyId: v.id("agencies"),
     invoiceId: v.id("invoices"),
     provider: anchorOrderProvider,
