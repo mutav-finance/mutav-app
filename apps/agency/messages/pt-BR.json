@@ -112,7 +112,7 @@
       "createContract": "Criar Contrato",
       "dashboard": "Painel",
       "contracts": "Contratos",
-      "payments": "Faturas",
+      "invoices": "Faturas",
       "delinquencies": "Inadimplências",
       "transparency": "Transparência"
     },
@@ -449,7 +449,7 @@
       "lastPage": "Última página"
     }
   },
-  "paymentList": {
+  "invoiceList": {
     "meta": {
       "title": "Faturas | Mutav",
       "description": "Faturas mensais da imobiliária"
@@ -634,7 +634,7 @@
       "backToDashboard": "Voltar ao painel"
     }
   },
-  "paymentDetails": {
+  "invoiceDetails": {
     "meta": {
       "title": "Fatura {id} | Mutav",
       "description": "Detalhes da fatura"

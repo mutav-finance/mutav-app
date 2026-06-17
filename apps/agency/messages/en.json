@@ -112,7 +112,7 @@
       "createContract": "Create Contract",
       "dashboard": "Dashboard",
       "contracts": "Contracts",
-      "payments": "Invoices",
+      "invoices": "Invoices",
       "delinquencies": "Delinquencies",
       "transparency": "Transparency"
     },
@@ -449,7 +449,7 @@
       "lastPage": "Last page"
     }
   },
-  "paymentList": {
+  "invoiceList": {
     "meta": {
       "title": "Invoices | Mutav",
       "description": "Monthly invoices for the agency"
@@ -634,7 +634,7 @@
       "backToDashboard": "Back to dashboard"
     }
   },
-  "paymentDetails": {
+  "invoiceDetails": {
     "meta": {
       "title": "Invoice {id} | Mutav",
       "description": "Invoice details"

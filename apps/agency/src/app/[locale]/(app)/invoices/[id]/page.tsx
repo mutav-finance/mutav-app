@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
 import { api } from "@convex/_generated/api";
-import { PaymentDetailsPage } from "@/components/payments/payment-details-page";
+import { InvoiceDetailsPage } from "@/components/invoices/invoice-details-page";
 import { getAuthToken } from "@/lib/auth-token";
 
-export default async function PaymentPage({
+export default async function InvoicePage({
   params,
 }: {
   params: Promise<{ id: string; locale: string }>;
@@ -20,5 +20,5 @@ export default async function PaymentPage({
   if (!payment) {
     notFound();
   }
-  return <PaymentDetailsPage preloaded={preloaded} />;
+  return <InvoiceDetailsPage preloaded={preloaded} />;
 }

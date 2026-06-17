@@ -25,7 +25,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navMain = [
     { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
     { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
-    { title: tMain("payments"), href: "/payments", icon: <ReceiptIcon /> },
+    { title: tMain("invoices"), href: "/invoices", icon: <ReceiptIcon /> },
     { title: tMain("delinquencies"), href: "/delinquencies", icon: <TriangleAlertIcon /> },
     { title: tMain("transparency"), href: "/transparency", icon: <ShieldCheckIcon /> },
   ];

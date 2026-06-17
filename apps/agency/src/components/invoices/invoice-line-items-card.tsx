@@ -15,8 +15,8 @@ import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents } from "@/lib/contracts/format";
 import type { Invoice } from "@convex/invoices/domain";
 
-export function PaymentLineItemsCard({ payment }: { payment: Invoice }) {
-  const t = useTranslations("paymentDetails.lineItems");
+export function InvoiceLineItemsCard({ payment }: { payment: Invoice }) {
+  const t = useTranslations("invoiceDetails.lineItems");
 
   return (
     <Card>
