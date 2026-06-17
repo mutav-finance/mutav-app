@@ -86,9 +86,11 @@ raw_id=$(rg -n 'Id<"[^"]+">' "${SRC_GLOB[@]}" 2>/dev/null \
   | grep -v 'convex/lib/storage\.ts' || true)
 
 if [[ -n "$raw_id" ]]; then
-  echo "$raw_id" | while IFS= read -r line; do
+  # Here-string (not `echo | while`) so fail()'s exit_code=1 runs in this
+  # shell, not a pipe subshell where it would be silently discarded.
+  while IFS= read -r line; do
     fail "$line — use the exported alias from the entity file (e.g. AgencyId, PaymentId)"
-  done
+  done <<< "$raw_id"
 else
   pass "no raw Id<> outside entity files"
 fi
@@ -106,9 +108,9 @@ raw_doc=$(rg -n 'Doc<"[^"]+">' "${SRC_GLOB[@]}" 2>/dev/null \
   | grep -v 'orderDomain\.ts' || true)
 
 if [[ -n "$raw_doc" ]]; then
-  echo "$raw_doc" | while IFS= read -r line; do
+  while IFS= read -r line; do
     fail "$line — use the exported alias from the entity file (e.g. AnchorOrder, AgencyBankAccount)"
-  done
+  done <<< "$raw_doc"
 else
   pass "no raw Doc<> outside entity files"
 fi
@@ -120,15 +122,23 @@ section "4. no separate validators.ts files"
 
 validator_files=$(find convex/ -name 'validators.ts' -not -path '*/_generated/*' 2>/dev/null || true)
 if [[ -n "$validator_files" ]]; then
-  echo "$validator_files" | while IFS= read -r f; do
+  while IFS= read -r f; do
     fail "$f — validators belong in {domain}/domain.ts next to the value objects"
-  done
+  done <<< "$validator_files"
 else
   pass "no validators.ts files"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. process.env.* only in env boundary files
+#
+# KNOWN-INERT: `rg --type tsx` is not a built-in ripgrep type ("unrecognized
+# file type: tsx"), so this rg call currently errors and matches nothing —
+# the check always passes regardless of real violations. Fixing it (e.g.
+# `--type-add 'tsx:*.tsx'`) is deferred to its own PR because it surfaces a
+# policy decision (test files legitimately manipulate process.env) plus a few
+# real source hits to refactor onto the env getters. The loop below is already
+# here-string-correct so it will gate the moment the type bug is fixed.
 # ─────────────────────────────────────────────────────────────────────────────
 section "5. process.env outside env boundary"
 
@@ -140,9 +150,9 @@ env_violations=$(rg -n --type ts --type tsx 'process\.env\.' "${SRC_GLOB[@]}" 2>
   | grep -vE '^[^:]+:[0-9]+:\s*\*' || true)  # skip JSDoc comment lines
 
 if [[ -n "$env_violations" ]]; then
-  echo "$env_violations" | while IFS= read -r line; do
+  while IFS= read -r line; do
     fail "$line — read env vars via apps/agency/src/lib/env.ts or convex/lib/env.ts only"
-  done
+  done <<< "$env_violations"
 else
   pass "no process.env outside env boundary files"
 fi

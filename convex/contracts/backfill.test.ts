@@ -2,13 +2,13 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { AgencyId } from "../agencies/domain";
 import { ativoInsuredCentsPlatform, contractsByStatusPlatform } from "./aggregate";
 import { registerContractAggregateComponents } from "../lib/testFixtures";
 import { CONTRACT_STATUS, type ContractStatus } from "./domain";
 import schema from "../schema";
 
-async function seedAgency(t: ReturnType<typeof convexTest>, cnpj: string): Promise<Id<"agencies">> {
+async function seedAgency(t: ReturnType<typeof convexTest>, cnpj: string): Promise<AgencyId> {
   return t.run((ctx) =>
     ctx.db.insert("agencies", {
       name: `Test ${cnpj}`,
@@ -21,7 +21,7 @@ async function seedAgency(t: ReturnType<typeof convexTest>, cnpj: string): Promi
 }
 
 type ContractSeed = {
-  agencyId: Id<"agencies">;
+  agencyId: AgencyId;
   status: ContractStatus;
   availableGuaranteeCents: number;
 };

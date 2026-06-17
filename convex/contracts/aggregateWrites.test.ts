@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import type { Id } from "../_generated/dataModel";
+import type { AgencyId } from "../agencies/domain";
 import {
   ativoInsuredCentsPlatform,
   contractsByStatus,
@@ -13,10 +13,10 @@ import {
   replaceContractAggregates,
 } from "./aggregateWrites";
 import { registerContractAggregateComponents } from "../lib/testFixtures";
-import { CONTRACT_STATUS, type ContractStatus } from "./domain";
+import { CONTRACT_STATUS, type ContractId, type ContractStatus } from "./domain";
 import schema from "../schema";
 
-type SeedAgency = Id<"agencies">;
+type SeedAgency = AgencyId;
 
 async function seedAgency(t: ReturnType<typeof convexTest>, cnpj: string): Promise<SeedAgency> {
   return t.run((ctx) =>
@@ -42,7 +42,7 @@ async function seedContract(
   t: ReturnType<typeof convexTest>,
   spec: ContractSeed,
   publicId: string,
-): Promise<Id<"contracts">> {
+): Promise<ContractId> {
   return t.run((ctx) =>
     ctx.db.insert("contracts", {
       agencyId: spec.agencyId,

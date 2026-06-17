@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { AgencyId } from "../agencies/domain";
 import {
   registerContractAggregateComponents,
   seedAgencyWithMembership,
@@ -22,7 +22,7 @@ async function seedSecondAgency(
   t: ReturnType<typeof convexTest>,
   userId: SeededUserId,
   cnpj: string,
-): Promise<Id<"agencies">> {
+): Promise<AgencyId> {
   return t.run(async (ctx) => {
     const agencyId = await ctx.db.insert("agencies", {
       name: `Test Agency ${cnpj}`,
@@ -42,7 +42,7 @@ async function seedSecondAgency(
 }
 
 type ContractSeed = {
-  agencyId: Id<"agencies">;
+  agencyId: AgencyId;
   status: ContractStatus;
   availableGuaranteeCents: number;
   activatedAt?: string | null;
