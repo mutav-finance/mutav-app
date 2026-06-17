@@ -104,6 +104,19 @@ bwb keeps a `.self-improvement/lessons.md` updated after every user correction, 
 
 Code that predates a current convention and needs migrating.
 
+## Convex data migrations (tooling — installed)
+
+`@convex-dev/migrations` is installed and wired into deploy. Use it for any breaking schema change against existing data — **do not** wipe + reseed.
+
+- **`convex/migrations.ts`** holds the `Migrations` instance and `runAll` (an ordered runner anchored by a no-op `noop` sentinel so it is always valid). Define each migration with `migrations.define({ table, migrateOne })` and append its `internal.migrations.<name>` to `runAll`.
+- **`scripts/run-migrations.sh`** runs `migrations:runAll` and is chained after `convex deploy` in every app's `vercel.json`. So every deploy (prod + preview) backfills data in place, and every developer's own dev deployment self-heals on `convex dev` after pulling a widen PR — no per-person manual cleanup.
+- **Pattern: widen → migrate → narrow, split across two PRs:**
+  1. **Widen PR** — set `defineSchema(tables, { schemaValidation: false })` (or add the new field as optional), define the migration, append it to `runAll`. Deploy → migration backfills.
+  2. **Narrow PR** — re-enable `schemaValidation: true`, drop transitional/old fields, remove migration scaffolding.
+- Test with `bunx convex run migrations:<name> '{"dryRun": true}'` before shipping. Status: `bunx convex run --component migrations lib:getStatus --watch`.
+
+The Phase-1 `payments`→`invoices` rename shipped via **wipe + reseed** instead (pre-launch, disposable dev data, before this tooling landed). A dev who pulled that rename and hits the `anchorOrders.invoiceId` schema-push error catches up once with: clear `anchorOrders` + `payments` (`convex import --replace` empty), `convex dev --once`, `bunx convex run seed:seedPreview`.
+
 ## Money fields → integer cents
 
 **Rule:** money is stored as integer cents (`*Cents: v.number()`). See CLAUDE.md → Domain conventions (Brazil) → Money.

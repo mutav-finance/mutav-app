@@ -53,6 +53,7 @@ import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_stellarSigner from "../lib/stellarSigner.js";
 import type * as lib_storage from "../lib/storage.js";
 import type * as lib_testFixtures from "../lib/testFixtures.js";
+import type * as migrations from "../migrations.js";
 import type * as reserve_actions from "../reserve/actions.js";
 import type * as reserve_domain from "../reserve/domain.js";
 import type * as reserve_useCases from "../reserve/useCases.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   "lib/stellarSigner": typeof lib_stellarSigner;
   "lib/storage": typeof lib_storage;
   "lib/testFixtures": typeof lib_testFixtures;
+  migrations: typeof migrations;
   "reserve/actions": typeof reserve_actions;
   "reserve/domain": typeof reserve_domain;
   "reserve/useCases": typeof reserve_useCases;
@@ -159,6 +161,7 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
+  migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
   contractsByStatus: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatus">;
   contractsByStatusPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatusPlatform">;
   ativoInsuredCentsPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"ativoInsuredCentsPlatform">;
