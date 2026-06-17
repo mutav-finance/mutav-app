@@ -30,7 +30,7 @@ function MethodRow({ label, value }: { label: string; value: React.ReactNode }) 
 }
 
 function ShareTenantLink({ publicId }: { publicId: string }) {
-  const t = useTranslations("paymentDetails.methodCard");
+  const t = useTranslations("invoiceDetails.methodCard");
   const { copied, copy } = useCopyToClipboard(t("linkCopied"));
 
   const handleCopy = () => {
@@ -56,7 +56,7 @@ function ChargeableActions({
   payment: Invoice;
   variant: "primary" | "secondary";
 }) {
-  const t = useTranslations("paymentDetails.methodCard");
+  const t = useTranslations("invoiceDetails.methodCard");
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button asChild size="sm" variant={variant === "primary" ? "default" : "outline"}>
@@ -70,8 +70,8 @@ function ChargeableActions({
   );
 }
 
-export function PaymentMethodCard({ payment }: { payment: Invoice }) {
-  const t = useTranslations("paymentDetails.methodCard");
+export function InvoiceMethodCard({ payment }: { payment: Invoice }) {
+  const t = useTranslations("invoiceDetails.methodCard");
   const method = payment.method;
   const chargeable = isChargeable(payment.state);
 

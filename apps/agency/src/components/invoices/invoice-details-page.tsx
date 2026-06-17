@@ -19,12 +19,12 @@ import { Mono } from "@mutav/ui/mono";
 import { Link } from "@mutav/i18n/navigation";
 import type { api } from "@convex/_generated/api";
 import { derivedStatus } from "@convex/invoices/domain";
-import { utcTodayDate } from "@/lib/payments/format";
-import { PaymentSummaryCard } from "./payment-summary-card";
-import { PaymentLineItemsCard } from "./payment-line-items-card";
-import { PaymentMethodCard } from "./payment-method-card";
+import { utcTodayDate } from "@/lib/invoices/format";
+import { InvoiceSummaryCard } from "./invoice-summary-card";
+import { InvoiceLineItemsCard } from "./invoice-line-items-card";
+import { InvoiceMethodCard } from "./invoice-method-card";
 
-export function PaymentDetailsPage({
+export function InvoiceDetailsPage({
   preloaded,
 }: {
   preloaded: Preloaded<typeof api.invoices.useCases.getByPublicId>;
@@ -34,9 +34,9 @@ export function PaymentDetailsPage({
     notFound();
   }
 
-  const t = useTranslations("paymentDetails");
+  const t = useTranslations("invoiceDetails");
   const tNav = useTranslations("nav.main");
-  const tState = useTranslations("paymentDetails.state");
+  const tState = useTranslations("invoiceDetails.state");
 
   return (
     <PageShell>
@@ -48,7 +48,7 @@ export function PaymentDetailsPage({
             <Eyebrow as={BreadcrumbList}>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link href="/payments">{tNav("payments")}</Link>
+                  <Link href="/invoices">{tNav("invoices")}</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
@@ -63,9 +63,9 @@ export function PaymentDetailsPage({
         title={t("heroTitle", { state: tState(derivedStatus(payment, utcTodayDate())) })}
       />
       <PageContent variant="narrow">
-        <PaymentSummaryCard payment={payment} />
-        <PaymentLineItemsCard payment={payment} />
-        <PaymentMethodCard payment={payment} />
+        <InvoiceSummaryCard payment={payment} />
+        <InvoiceLineItemsCard payment={payment} />
+        <InvoiceMethodCard payment={payment} />
       </PageContent>
     </PageShell>
   );

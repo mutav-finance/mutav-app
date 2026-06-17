@@ -3,14 +3,14 @@ import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
-import { formatPeriodMonth, utcTodayDate } from "@/lib/payments/format";
+import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
 import { derivedStatus, type Invoice } from "@convex/invoices/domain";
-import { PaymentStateTag } from "./payment-state-tag";
+import { InvoiceStatusTag } from "./invoice-status-tag";
 
-export function PaymentSummaryCard({ payment }: { payment: Invoice }) {
-  const t = useTranslations("paymentDetails.summary");
-  const tState = useTranslations("paymentDetails.state");
-  const tMethod = useTranslations("paymentDetails.method");
+export function InvoiceSummaryCard({ payment }: { payment: Invoice }) {
+  const t = useTranslations("invoiceDetails.summary");
+  const tState = useTranslations("invoiceDetails.state");
+  const tMethod = useTranslations("invoiceDetails.method");
   const status = derivedStatus(payment, utcTodayDate());
 
   return (
@@ -29,9 +29,9 @@ export function PaymentSummaryCard({ payment }: { payment: Invoice }) {
           <div className="flex items-center gap-3">
             <dt className="text-muted-foreground">{t("state")}</dt>
             <dd>
-              <PaymentStateTag status={status} pulse={status === "open" || status === "overdue"}>
+              <InvoiceStatusTag status={status} pulse={status === "open" || status === "overdue"}>
                 {tState(status)}
-              </PaymentStateTag>
+              </InvoiceStatusTag>
             </dd>
           </div>
           <div className="flex items-center gap-3">

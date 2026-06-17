@@ -51,8 +51,8 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
-import { formatPeriodMonth, utcTodayDate } from "@/lib/payments/format";
-import { PaymentStateTag } from "@/components/payments/payment-state-tag";
+import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
+import { InvoiceStatusTag } from "@/components/invoices/invoice-status-tag";
 
 type StateTab = "all" | InvoiceDisplayStatus;
 
@@ -62,7 +62,7 @@ function isStateTab(value: string): value is StateTab {
   return STATE_TABS.some((tab) => tab === value);
 }
 
-type PaymentListItem = {
+type InvoiceListItem = {
   id: string;
   agencyId: string;
   periodMonth: string;
@@ -75,10 +75,10 @@ type PaymentListItem = {
 };
 
 function buildColumns(
-  t: ReturnType<typeof useTranslations<"paymentList">>,
-  tState: ReturnType<typeof useTranslations<"paymentDetails.state">>,
-  tMethod: ReturnType<typeof useTranslations<"paymentDetails.method">>,
-): ColumnDef<PaymentListItem>[] {
+  t: ReturnType<typeof useTranslations<"invoiceList">>,
+  tState: ReturnType<typeof useTranslations<"invoiceDetails.state">>,
+  tMethod: ReturnType<typeof useTranslations<"invoiceDetails.method">>,
+): ColumnDef<InvoiceListItem>[] {
   return [
     {
       id: "publicId",
@@ -86,7 +86,7 @@ function buildColumns(
       header: t("columns.publicId"),
       cell: ({ row }) => (
         <Link
-          href={`/payments/${row.original.id}`}
+          href={`/invoices/${row.original.id}`}
           className="text-foreground font-mono hover:underline"
         >
           {row.original.id}
@@ -118,12 +118,12 @@ function buildColumns(
       accessorKey: "status",
       header: t("columns.state"),
       cell: ({ row }) => (
-        <PaymentStateTag
+        <InvoiceStatusTag
           status={row.original.status}
           pulse={row.original.status === "open" || row.original.status === "overdue"}
         >
           {tState(row.original.status)}
-        </PaymentStateTag>
+        </InvoiceStatusTag>
       ),
       filterFn: (row, _columnId, value) => row.original.status === value,
     },
@@ -152,10 +152,10 @@ function buildColumns(
   ];
 }
 
-export function PaymentListTable() {
-  const t = useTranslations("paymentList");
-  const tState = useTranslations("paymentDetails.state");
-  const tMethod = useTranslations("paymentDetails.method");
+export function InvoiceListTable() {
+  const t = useTranslations("invoiceList");
+  const tState = useTranslations("invoiceDetails.state");
+  const tMethod = useTranslations("invoiceDetails.method");
 
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
@@ -165,7 +165,7 @@ export function PaymentListTable() {
     agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
   );
 
-  const data = React.useMemo<PaymentListItem[]>(() => {
+  const data = React.useMemo<InvoiceListItem[]>(() => {
     const today = utcTodayDate();
     return (result?.page ?? []).map((doc) => ({
       id: doc.publicId,
