@@ -59,6 +59,7 @@ export default async function CheckoutPixPage({
       </Link>
       <CheckoutPixView
         invoiceId={payment.invoiceId}
+        invoicePublicId={publicId}
         agencyId={payment.agencyId}
         totalCents={payment.totalCents}
       />

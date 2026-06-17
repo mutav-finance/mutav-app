@@ -40,6 +40,11 @@ SRC_GLOB=(apps/agency/src convex)
 #      ctx.auth.getUserIdentity() and throws on miss.
 #    - convex/waitlist/useCases.ts: anonymous public submission endpoint
 #      called from the marketing site — no JWT, no agency.
+#    - convex/payments/providers/bankAccountUseCases.ts: listBanksForInvoice
+#      is the tenant-checkout bearer query — no JWT and no client-supplied
+#      agencyId; it resolves the owning agency from the invoice publicId
+#      (the bearer) server-side, same model as invoices.getPublicByPublicId.
+#      (listByAgency in the same file uses the queryWithAgencyScope wrapper.)
 # ─────────────────────────────────────────────────────────────────────────────
 section "1. bare public mutation/query without auth"
 
@@ -54,6 +59,9 @@ for file in $files_with_bare; do
     continue
   fi
   if [[ "$file" == "convex/waitlist/useCases.ts" ]]; then
+    continue
+  fi
+  if [[ "$file" == "convex/payments/providers/bankAccountUseCases.ts" ]]; then
     continue
   fi
   # File must call assertAgencyAccess somewhere (resource-by-id pattern)

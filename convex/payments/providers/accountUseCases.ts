@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery } from "../../_generated/server";
 import { anchorProviderValidator } from "./domain";
 import {
   ANCHOR_ONBOARDING_STATUS,

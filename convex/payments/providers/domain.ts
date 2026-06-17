@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import {
   ANCHOR_PROVIDER_NAMES,
   type AnchorProviderName,
-} from "../../apps/agency/src/lib/anchors/registry";
+} from "../../../apps/agency/src/lib/anchors/registry";
 
 // ─── Provider value object ────────────────────────────────────────────────────
 

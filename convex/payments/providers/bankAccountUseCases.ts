@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 
-import { internalMutation, internalQuery } from "../_generated/server";
-import { queryWithAgencyScope } from "../lib/auth";
+import { internalMutation, internalQuery, query } from "../../_generated/server";
+import { queryWithAgencyScope } from "../../lib/auth";
 import {
   agencyBankAccountTypeValidator,
   type AgencyBankAccount,
@@ -16,6 +16,25 @@ export const listByAgency = queryWithAgencyScope({
     return ctx.db
       .query("agencyBankAccounts")
       .withIndex("by_agency", (q) => q.eq("agencyId", ctx.agencyId))
+      .collect();
+  },
+});
+
+// Tenant checkout (`apps/pay`) bank picker. The high-entropy invoice
+// `publicId` is the bearer: resolve it to the owning agency server-side
+// so the no-auth payer never supplies an `agencyId` and cannot enumerate
+// another agency's banks. Unknown publicId → empty list (no existence leak).
+export const listBanksForInvoice = query({
+  args: { invoicePublicId: v.string() },
+  handler: async (ctx, { invoicePublicId }): Promise<AgencyBankAccount[]> => {
+    const invoice = await ctx.db
+      .query("invoices")
+      .withIndex("by_publicId", (q) => q.eq("publicId", invoicePublicId))
+      .unique();
+    if (!invoice) return [];
+    return ctx.db
+      .query("agencyBankAccounts")
+      .withIndex("by_agency", (q) => q.eq("agencyId", invoice.agencyId))
       .collect();
   },
 });

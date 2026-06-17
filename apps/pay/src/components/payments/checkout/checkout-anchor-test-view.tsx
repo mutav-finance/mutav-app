@@ -14,7 +14,7 @@ import {
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
-import type { AnchorOrder } from "@convex/anchors/orderDomain";
+import type { AnchorOrder } from "@convex/payments/providers/orderDomain";
 import type { InvoiceId } from "@convex/invoices/domain";
 
 interface Props {
@@ -37,8 +37,8 @@ export function CheckoutAnchorTestView({ invoiceId, totalCents }: Props) {
   const locale = useLocale();
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
     invoiceId,
-    startAction: api.anchors.actions.startAnchorTestOnramp,
-    pollAction: api.anchors.actions.pollAnchorTestOnramp,
+    startAction: api.payments.providers.actions.startAnchorTestOnramp,
+    pollAction: api.payments.providers.actions.pollAnchorTestOnramp,
     lang: locale,
   });
 

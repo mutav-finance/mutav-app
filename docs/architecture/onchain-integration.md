@@ -40,7 +40,7 @@ Two strategies. Pick one per phase; design the swap point so the switch is local
 - Action upserts into Convex tables, keyed by deterministic ids `(chain, fundId, …)`
 - Each table carries a `chain`, `lastIndexerCursor`, and `lastUpdatedAt` so the UI can surface staleness per chain
 
-This matches the existing pattern in [`convex/anchors/actions.ts`](../../convex/anchors/actions.ts) (`pollAnchorTestOnramp`, `pollPixOnramp`). The infrastructure exists; the fund-state action is a new entry alongside, generalized to be per-chain.
+This matches the existing pattern in [`convex/payments/providers/actions.ts`](../../convex/payments/providers/actions.ts) (`pollAnchorTestOnramp`, `pollPixOnramp`). The infrastructure exists; the fund-state action is a new entry alongside, generalized to be per-chain.
 
 **Why polling for v1:**
 

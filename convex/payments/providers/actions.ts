@@ -12,33 +12,36 @@ import {
 import { v } from "convex/values";
 
 import type { GenericActionCtx } from "convex/server";
-import { action, internalAction } from "../_generated/server";
-import { internal } from "../_generated/api";
-import type { DataModel } from "../_generated/dataModel";
+import { action, internalAction } from "../../_generated/server";
+import { internal } from "../../_generated/api";
+import type { DataModel } from "../../_generated/dataModel";
 
 type ActionCtx = GenericActionCtx<DataModel>;
 import {
   createAnchorClient,
   getAnchorProvider,
   STELLAR_NETWORK_PASSPHRASES,
-} from "../../apps/agency/src/lib/anchors/registry";
-import { SepApiError, type TransactionStatus } from "../../apps/agency/src/lib/anchors/sep/types";
+} from "../../../apps/agency/src/lib/anchors/registry";
+import {
+  SepApiError,
+  type TransactionStatus,
+} from "../../../apps/agency/src/lib/anchors/sep/types";
 import {
   AnchorError,
   type TransactionStatus as AnchorTransactionStatus,
-} from "../../apps/agency/src/lib/anchors/types";
-import { ASSETS } from "../../apps/agency/src/lib/stellar/assets";
-import type { AgencyId } from "../agencies/domain";
-import type { InvoiceId } from "../invoices/domain";
+} from "../../../apps/agency/src/lib/anchors/types";
+import { ASSETS } from "../../../apps/agency/src/lib/stellar/assets";
+import type { AgencyId } from "../../agencies/domain";
+import type { InvoiceId } from "../../invoices/domain";
 import {
   getEtherfuseApiKey,
   getEtherfuseBaseUrl,
   getStellarHorizonUrl,
   getStellarNetwork,
   getTreasurySecret,
-} from "../lib/env";
-import { decryptSecret, encryptSecret } from "../lib/secrets";
-import { getTreasurySigner } from "../lib/stellarSigner";
+} from "../../lib/env";
+import { decryptSecret, encryptSecret } from "../../lib/secrets";
+import { getTreasurySigner } from "../../lib/stellarSigner";
 import { ANCHOR_ONBOARDING_STATUS, type AnchorAccountId } from "./accountDomain";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
@@ -49,7 +52,7 @@ import {
   type AnchorOrderId,
 } from "./orderDomain";
 import type { AgencyBankAccountId } from "./bankAccountDomain";
-import { isChargeable } from "../invoices/domain";
+import { isChargeable } from "../../invoices/domain";
 
 type CurrencyStatus = "live" | "dead" | "test" | "private";
 
@@ -118,9 +121,12 @@ export const discoverCapabilities = internalAction({
     }),
   }),
   handler: async (ctx, args): Promise<AnchorCapabilities> => {
-    const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
-      agencyId: args.agencyId,
-    });
+    const providerName = await ctx.runQuery(
+      internal.payments.providers.useCases.getProviderForAgency,
+      {
+        agencyId: args.agencyId,
+      },
+    );
     const provider = getAnchorProvider(providerName);
     const expectedPassphrase = STELLAR_NETWORK_PASSPHRASES[provider.network];
 
@@ -405,9 +411,12 @@ export const startPixOnramp = action({
       };
     }
 
-    const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
-      agencyId: invoice.agencyId,
-    });
+    const providerName = await ctx.runQuery(
+      internal.payments.providers.useCases.getProviderForAgency,
+      {
+        agencyId: invoice.agencyId,
+      },
+    );
 
     // Etherfuse uses a non-SEP REST flow. Dispatch before falling through
     // to the SEP-6 path so we never try to instantiate a SEP client for
@@ -453,7 +462,7 @@ export const startPixOnramp = action({
         };
       }
 
-      const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+      const orderId = await ctx.runMutation(internal.payments.providers.orderUseCases.insertOrder, {
         agencyId: invoice.agencyId,
         invoiceId: invoice._id,
         provider: providerName,
@@ -490,9 +499,12 @@ export const pollPixOnramp = action({
     terminal: v.boolean(),
   }),
   handler: async (ctx, args): Promise<PollPixOnrampResult> => {
-    const order = await ctx.runQuery(internal.anchors.orderUseCases.getOrderByIdInternal, {
-      orderId: args.orderId,
-    });
+    const order = await ctx.runQuery(
+      internal.payments.providers.orderUseCases.getOrderByIdInternal,
+      {
+        orderId: args.orderId,
+      },
+    );
     if (!order) throw new Error(`Anchor order ${args.orderId} not found`);
 
     if (isTerminal(order.status)) {
@@ -529,7 +541,7 @@ export const pollPixOnramp = action({
       // Order patch + invoice paid in one transaction — prevents the
       // order from flipping completed while leaving the invoice open
       // (which would short-circuit future polls at the isTerminal guard).
-      await ctx.runMutation(internal.anchors.orderUseCases.completeOrderAndMarkPaid, {
+      await ctx.runMutation(internal.payments.providers.orderUseCases.completeOrderAndMarkPaid, {
         orderId: order._id,
         ...orderPatch,
         invoiceId: order.invoiceId,
@@ -538,7 +550,7 @@ export const pollPixOnramp = action({
         paidAt: tx.completed_at ?? new Date().toISOString(),
       });
     } else {
-      await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+      await ctx.runMutation(internal.payments.providers.orderUseCases.updateOrderStatus, {
         orderId: order._id,
         ...orderPatch,
       });
@@ -599,9 +611,12 @@ export const startAnchorTestOnramp = action({
       };
     }
 
-    const providerName = await ctx.runQuery(internal.anchors.useCases.getProviderForAgency, {
-      agencyId: invoice.agencyId,
-    });
+    const providerName = await ctx.runQuery(
+      internal.payments.providers.useCases.getProviderForAgency,
+      {
+        agencyId: invoice.agencyId,
+      },
+    );
 
     const client = createAnchorClient(providerName);
     await client.initialize();
@@ -630,7 +645,7 @@ export const startAnchorTestOnramp = action({
         };
       }
 
-      const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+      const orderId = await ctx.runMutation(internal.payments.providers.orderUseCases.insertOrder, {
         agencyId: invoice.agencyId,
         invoiceId: invoice._id,
         provider: providerName,
@@ -665,9 +680,12 @@ export const pollAnchorTestOnramp = action({
     terminal: v.boolean(),
   }),
   handler: async (ctx, args): Promise<PollPixOnrampResult> => {
-    const order = await ctx.runQuery(internal.anchors.orderUseCases.getOrderByIdInternal, {
-      orderId: args.orderId,
-    });
+    const order = await ctx.runQuery(
+      internal.payments.providers.orderUseCases.getOrderByIdInternal,
+      {
+        orderId: args.orderId,
+      },
+    );
     if (!order) throw new Error(`Anchor order ${args.orderId} not found`);
 
     if (isTerminal(order.status)) {
@@ -687,7 +705,7 @@ export const pollAnchorTestOnramp = action({
     const tx = await client.sep24.getTransaction(order.anchorTxId);
     const status = normalizeSep24Status(tx.status);
 
-    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+    await ctx.runMutation(internal.payments.providers.orderUseCases.updateOrderStatus, {
       orderId: order._id,
       status,
       amountInCents: brlToCents(tx.amount_in),
@@ -766,10 +784,13 @@ export const provisionAgencyEtherfuseAccount = internalAction({
     alreadyProvisioned: v.boolean(),
   }),
   handler: async (ctx, args): Promise<ProvisionAgencyEtherfuseAccountResult> => {
-    const existing = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
-      agencyId: args.agencyId,
-      provider: "etherfuse",
-    });
+    const existing = await ctx.runQuery(
+      internal.payments.providers.accountUseCases.getByAgencyAndProvider,
+      {
+        agencyId: args.agencyId,
+        provider: "etherfuse",
+      },
+    );
     if (existing && existing.data.provider !== "etherfuse") {
       throw new Error(
         `anchorAccounts ${existing._id} has provider=etherfuse but data.provider=${existing.data.provider}`,
@@ -803,13 +824,16 @@ export const provisionAgencyEtherfuseAccount = internalAction({
       // Persist first — if the Stellar submit below throws after the
       // account is created on-chain, we still hold the secret and can
       // recover by re-running this action (the retry branch above).
-      accountId = await ctx.runMutation(internal.anchors.accountUseCases.insertEtherfuseAccount, {
-        agencyId: args.agencyId,
-        customerId: randomUUID(),
-        bankAccountId: randomUUID(),
-        publicKey,
-        encryptedSecret,
-      });
+      accountId = await ctx.runMutation(
+        internal.payments.providers.accountUseCases.insertEtherfuseAccount,
+        {
+          agencyId: args.agencyId,
+          customerId: randomUUID(),
+          bankAccountId: randomUUID(),
+          publicKey,
+          encryptedSecret,
+        },
+      );
     }
 
     const treasury = Keypair.fromSecret(getTreasurySecret());
@@ -860,10 +884,13 @@ export const provisionAgencyEtherfuseAccount = internalAction({
       }
     }
 
-    await ctx.runMutation(internal.anchors.accountUseCases.markEtherfuseProvisioningHash, {
-      accountId,
-      provisioningTxHash: transactionHash,
-    });
+    await ctx.runMutation(
+      internal.payments.providers.accountUseCases.markEtherfuseProvisioningHash,
+      {
+        accountId,
+        provisioningTxHash: transactionHash,
+      },
+    );
 
     return {
       accountId,
@@ -977,15 +1004,18 @@ async function performEtherfuseOnboarding(
   // Step 1: provision Stellar proxy account (idempotent). Discard the
   // return value — we re-read the row in Step 2 to also handle the
   // already-provisioned case uniformly.
-  await ctx.runAction(internal.anchors.actions.provisionAgencyEtherfuseAccount, {
+  await ctx.runAction(internal.payments.providers.actions.provisionAgencyEtherfuseAccount, {
     agencyId: args.agencyId,
   });
 
   // Step 2: load the row we just wrote (or already had) for UUIDs.
-  const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
-    agencyId: args.agencyId,
-    provider: "etherfuse",
-  });
+  const account = await ctx.runQuery(
+    internal.payments.providers.accountUseCases.getByAgencyAndProvider,
+    {
+      agencyId: args.agencyId,
+      provider: "etherfuse",
+    },
+  );
   if (!account || account.data.provider !== "etherfuse") {
     throw new Error(`Failed to load anchorAccounts row for agency ${args.agencyId}`);
   }
@@ -1007,7 +1037,7 @@ async function performEtherfuseOnboarding(
   // Step 3: instantiate client + register the trio with Etherfuse.
   // EtherfuseClient is imported lazily to keep startup-cost out of the
   // hot path for actions that don't touch Etherfuse.
-  const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
+  const { EtherfuseClient } = await import("../../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
     apiKey: getEtherfuseApiKey(),
     baseUrl: getEtherfuseBaseUrl(),
@@ -1063,9 +1093,12 @@ async function performEtherfuseOnboarding(
 
   // Step 6: flip the row's onboarding status + kyc state in one
   // transaction — see markEtherfuseOnboardingApproved.
-  await ctx.runMutation(internal.anchors.accountUseCases.markEtherfuseOnboardingApproved, {
-    accountId: account._id,
-  });
+  await ctx.runMutation(
+    internal.payments.providers.accountUseCases.markEtherfuseOnboardingApproved,
+    {
+      accountId: account._id,
+    },
+  );
 
   return {
     accountId: account._id,
@@ -1202,10 +1235,13 @@ export const syncEtherfuseBankAccounts = action({
     }),
   ),
   handler: async (ctx, args): Promise<SyncEtherfuseBankAccountsResult> => {
-    const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
-      agencyId: args.agencyId,
-      provider: "etherfuse",
-    });
+    const account = await ctx.runQuery(
+      internal.payments.providers.accountUseCases.getByAgencyAndProvider,
+      {
+        agencyId: args.agencyId,
+        provider: "etherfuse",
+      },
+    );
     if (!account || account.data.provider !== "etherfuse" || !account.externalId) {
       return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
     }
@@ -1219,7 +1255,8 @@ export const syncEtherfuseBankAccounts = action({
       };
     }
 
-    const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
+    const { EtherfuseClient } =
+      await import("../../../apps/agency/src/lib/anchors/etherfuse/index");
     const client = new EtherfuseClient({
       apiKey: getEtherfuseApiKey(),
       baseUrl: getEtherfuseBaseUrl(),
@@ -1243,7 +1280,7 @@ export const syncEtherfuseBankAccounts = action({
 
     const summaries: BankAccountSummary[] = [];
     for (const remote of pixOnly) {
-      await ctx.runMutation(internal.anchors.bankAccountUseCases.upsertFromEtherfuse, {
+      await ctx.runMutation(internal.payments.providers.bankAccountUseCases.upsertFromEtherfuse, {
         agencyId: args.agencyId,
         anchorAccountId: account._id,
         externalBankAccountId: remote.id,
@@ -1259,10 +1296,13 @@ export const syncEtherfuseBankAccounts = action({
         accountHolderName: remote.accountHolderName,
       });
     }
-    await ctx.runMutation(internal.anchors.bankAccountUseCases.removeMissingExternalIds, {
-      agencyId: args.agencyId,
-      keepExternalIds: summaries.map((s) => s.externalBankAccountId),
-    });
+    await ctx.runMutation(
+      internal.payments.providers.bankAccountUseCases.removeMissingExternalIds,
+      {
+        agencyId: args.agencyId,
+        keepExternalIds: summaries.map((s) => s.externalBankAccountId),
+      },
+    );
 
     return { success: true, data: { count: summaries.length, accounts: summaries } };
   },
@@ -1296,15 +1336,19 @@ export const getEtherfuseBankRegistrationUrl = action({
     }),
   ),
   handler: async (ctx, args): Promise<GetEtherfuseBankRegistrationUrlResult> => {
-    const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
-      agencyId: args.agencyId,
-      provider: "etherfuse",
-    });
+    const account = await ctx.runQuery(
+      internal.payments.providers.accountUseCases.getByAgencyAndProvider,
+      {
+        agencyId: args.agencyId,
+        provider: "etherfuse",
+      },
+    );
     if (!account || account.data.provider !== "etherfuse" || !account.externalId) {
       return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
     }
 
-    const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
+    const { EtherfuseClient } =
+      await import("../../../apps/agency/src/lib/anchors/etherfuse/index");
     const client = new EtherfuseClient({
       apiKey: getEtherfuseApiKey(),
       baseUrl: getEtherfuseBaseUrl(),
@@ -1399,10 +1443,13 @@ async function startEtherfusePixOnramp(
   ctx: ActionCtx,
   context: EtherfuseStartContext,
 ): Promise<StartPixOnrampResult> {
-  const account = await ctx.runQuery(internal.anchors.accountUseCases.getByAgencyAndProvider, {
-    agencyId: context.agencyId,
-    provider: "etherfuse",
-  });
+  const account = await ctx.runQuery(
+    internal.payments.providers.accountUseCases.getByAgencyAndProvider,
+    {
+      agencyId: context.agencyId,
+      provider: "etherfuse",
+    },
+  );
   if (!account || account.data.provider !== "etherfuse") {
     return {
       success: false,
@@ -1436,7 +1483,7 @@ async function startEtherfusePixOnramp(
   // letting Etherfuse return its opaque "Proxy account not found".
   let externalBankAccountId: string;
   if (context.bankAccountId) {
-    const bank = await ctx.runQuery(internal.anchors.bankAccountUseCases.getById, {
+    const bank = await ctx.runQuery(internal.payments.providers.bankAccountUseCases.getById, {
       bankAccountId: context.bankAccountId,
     });
     if (!bank || bank.agencyId !== context.agencyId) {
@@ -1450,9 +1497,12 @@ async function startEtherfusePixOnramp(
     }
     externalBankAccountId = bank.externalBankAccountId;
   } else {
-    const banks = await ctx.runQuery(internal.anchors.bankAccountUseCases.listByAgencyInternal, {
-      agencyId: context.agencyId,
-    });
+    const banks = await ctx.runQuery(
+      internal.payments.providers.bankAccountUseCases.listByAgencyInternal,
+      {
+        agencyId: context.agencyId,
+      },
+    );
     if (banks.length === 0) {
       return {
         success: false,
@@ -1464,7 +1514,7 @@ async function startEtherfusePixOnramp(
     externalBankAccountId = banks[0]!.externalBankAccountId;
   }
 
-  const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
+  const { EtherfuseClient } = await import("../../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
     apiKey: getEtherfuseApiKey(),
     baseUrl: getEtherfuseBaseUrl(),
@@ -1516,7 +1566,7 @@ async function startEtherfusePixOnramp(
       };
     }
 
-    const orderId = await ctx.runMutation(internal.anchors.orderUseCases.insertOrder, {
+    const orderId = await ctx.runMutation(internal.payments.providers.orderUseCases.insertOrder, {
       agencyId: context.agencyId,
       invoiceId: context.invoiceId,
       provider: "etherfuse",
@@ -1552,7 +1602,7 @@ async function pollEtherfusePixOnramp(
   ctx: ActionCtx,
   order: { _id: AnchorOrderId; anchorTxId: string; invoiceId: InvoiceId },
 ): Promise<PollPixOnrampResult> {
-  const { EtherfuseClient } = await import("../../apps/agency/src/lib/anchors/etherfuse/index");
+  const { EtherfuseClient } = await import("../../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
     apiKey: getEtherfuseApiKey(),
     baseUrl: getEtherfuseBaseUrl(),
@@ -1564,7 +1614,7 @@ async function pollEtherfusePixOnramp(
     // Etherfuse 404 — the order doesn't exist on their side anymore.
     // Persist as terminal ERROR so the poller stops retrying instead
     // of throwing forever and pinning the row in a pending state.
-    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+    await ctx.runMutation(internal.payments.providers.orderUseCases.updateOrderStatus, {
       orderId: order._id,
       status: ANCHOR_ORDER_STATUS.ERROR,
     });
@@ -1588,7 +1638,7 @@ async function pollEtherfusePixOnramp(
         : `etherfuse:${order.anchorTxId}`;
     // Order patch + invoice paid in one transaction — see SEP-6 branch
     // for why splitting these breaks retry semantics.
-    await ctx.runMutation(internal.anchors.orderUseCases.completeOrderAndMarkPaid, {
+    await ctx.runMutation(internal.payments.providers.orderUseCases.completeOrderAndMarkPaid, {
       orderId: order._id,
       ...orderPatch,
       invoiceId: order.invoiceId,
@@ -1597,7 +1647,7 @@ async function pollEtherfusePixOnramp(
       paidAt: tx.updatedAt ?? new Date().toISOString(),
     });
   } else {
-    await ctx.runMutation(internal.anchors.orderUseCases.updateOrderStatus, {
+    await ctx.runMutation(internal.payments.providers.orderUseCases.updateOrderStatus, {
       orderId: order._id,
       ...orderPatch,
     });
