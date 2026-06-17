@@ -49,32 +49,6 @@ const invoiceState = v.union(
   v.object({ kind: v.literal("void") }),
 );
 
-/**
- * Discriminated union representing the chosen payment method.
- * null = agency has not yet selected a method (invoice issued, awaiting choice).
- *
- * - boleto:   traditional Brazilian bank slip; barcode null until PSP registers it.
- * - stellar:  on-chain payment via Stellar network (XLM / USDC); txHash null until confirmed.
- * - pix:      Brazilian instant payment; txId null until confirmed.
- */
-const invoiceMethod = v.union(
-  v.null(),
-  v.object({
-    kind: v.literal("boleto"),
-    barcode: v.union(v.string(), v.null()),
-  }),
-  v.object({
-    kind: v.literal("stellar"),
-    destinationAddress: v.string(),
-    txHash: v.union(v.string(), v.null()),
-  }),
-  v.object({
-    kind: v.literal("pix"),
-    pixKey: v.string(),
-    txId: v.union(v.string(), v.null()),
-  }),
-);
-
 const paymentStatus = v.union(
   v.literal("pending"),
   v.literal("processing"),
@@ -329,7 +303,6 @@ export default defineSchema({
     dueDate: v.string(),
     totalCents: v.number(),
     state: invoiceState,
-    method: invoiceMethod,
     // 63-bit unsigned int as digit string; derives the per-invoice `M…`
     // address. Optional for rows created before this field existed.
     muxedId: v.optional(v.string()),

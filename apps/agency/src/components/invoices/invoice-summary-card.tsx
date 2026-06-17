@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
-import { derivedStatus, type Invoice } from "@convex/invoices/domain";
+import { derivedStatus, type ResolvedInvoice } from "@convex/invoices/domain";
 import { InvoiceStatusTag } from "./invoice-status-tag";
 
-export function InvoiceSummaryCard({ payment }: { payment: Invoice }) {
+export function InvoiceSummaryCard({ payment }: { payment: ResolvedInvoice }) {
   const t = useTranslations("invoiceDetails.summary");
   const tState = useTranslations("invoiceDetails.state");
   const tMethod = useTranslations("invoiceDetails.method");

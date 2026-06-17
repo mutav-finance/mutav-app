@@ -26,7 +26,6 @@ describe("payments.settlement.recordSettlement (idempotency)", () => {
         dueDate: new Date().toISOString(),
         totalCents: 10000,
         state: { kind: "open" },
-        method: null,
         lineItems: [],
       }),
     );
@@ -73,7 +72,6 @@ describe("payments.useCases.listByInvoice (scoping)", () => {
         dueDate: new Date().toISOString(),
         totalCents: 10000,
         state: { kind: "open" },
-        method: null,
         lineItems: [],
       });
       await ctx.db.insert("payments", {
@@ -110,7 +108,6 @@ describe("payments.useCases.listByInvoice (scoping)", () => {
         dueDate: new Date().toISOString(),
         totalCents: 10000,
         state: { kind: "open" },
-        method: null,
         lineItems: [],
       });
       await ctx.db.insert("payments", {
@@ -146,7 +143,6 @@ describe("payments dual-write (markPaidByTx)", () => {
         dueDate: new Date().toISOString(),
         totalCents: 10000,
         state: { kind: "open" },
-        method: null,
         lineItems: [],
       }),
     );
@@ -168,5 +164,64 @@ describe("payments dual-write (markPaidByTx)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe("succeeded");
     expect(rows[0].externalRef).toBe(txHash);
+  });
+});
+
+describe("payments idempotency (markPaidByTx replays)", () => {
+  test("a same-txHash replay short-circuits to already_paid without a duplicate settlement", async () => {
+    const t = convexTest(schema);
+    const { userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const invoiceId = await t.run((ctx) =>
+      ctx.db.insert("invoices", {
+        agencyId,
+        publicId: "INV-idem-replay-1",
+        periodMonth: "2026-05",
+        issuedAt: new Date().toISOString(),
+        dueDate: new Date().toISOString(),
+        totalCents: 10000,
+        state: { kind: "open" },
+        lineItems: [],
+      }),
+    );
+
+    const txHash = "tx_idem_replay_1";
+    const paidArgs = {
+      invoiceId,
+      txHash,
+      paidAt: new Date().toISOString(),
+      muxedAddress: "MDEST",
+    };
+
+    const first = await t.mutation(internal.invoices.mutations.markPaidByTx, paidArgs);
+    expect(first.status).toBe("paid");
+
+    const replay = await t.mutation(internal.invoices.mutations.markPaidByTx, paidArgs);
+    expect(replay.status).toBe("already_paid");
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query("payments")
+        .withIndex("by_invoice", (q) => q.eq("invoiceId", invoiceId))
+        .collect(),
+    );
+    expect(rows).toHaveLength(1);
+
+    // A different txHash against an already-paid invoice is a duplicate inbound,
+    // not a second settlement.
+    const otherTx = await t.mutation(internal.invoices.mutations.markPaidByTx, {
+      ...paidArgs,
+      txHash: "tx_idem_replay_2",
+    });
+    expect(otherTx.status).toBe("duplicate_inbound");
+
+    const rowsAfter = await t.run((ctx) =>
+      ctx.db
+        .query("payments")
+        .withIndex("by_invoice", (q) => q.eq("invoiceId", invoiceId))
+        .collect(),
+    );
+    expect(rowsAfter).toHaveLength(1);
   });
 });

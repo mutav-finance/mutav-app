@@ -11,7 +11,7 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { getPayUrl } from "@/lib/env";
 import { api } from "@convex/_generated/api";
-import { isChargeable, type Invoice } from "@convex/invoices/domain";
+import { isChargeable, type Invoice, type ResolvedInvoice } from "@convex/invoices/domain";
 import type { Payment } from "@convex/payments/domain";
 
 /**
@@ -110,7 +110,7 @@ function SettlementList({ invoiceId }: { invoiceId: Invoice["_id"] }) {
   );
 }
 
-export function InvoiceMethodCard({ payment }: { payment: Invoice }) {
+export function InvoiceMethodCard({ payment }: { payment: ResolvedInvoice }) {
   const t = useTranslations("invoiceDetails.methodCard");
   const method = payment.method;
   const chargeable = isChargeable(payment.state);

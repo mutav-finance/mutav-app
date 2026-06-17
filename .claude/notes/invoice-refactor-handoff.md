@@ -4,7 +4,7 @@ State capture for a fresh session to continue the `payments`→`invoices` + sett
 
 ## TL;DR — where to start
 
-The refactor is nearly done. **PR 3b (this) adds the settlement `payments` table.** Only **PR 4 (NARROW — drop `invoice.method`)** remains after it. Read these first, in order:
+**The refactor is COMPLETE** as of PR 4 (this) — `invoice.method` is dropped; method derives from the succeeded settlement row. The bill (`invoices`) and settlement (`payments`) are fully split. Historical reference, in order:
 1. **Plan (PR sequence + decisions):** `~/.claude/plans/swift-inventing-tide.md`
 2. **Design spec (rationale, benchmarks, vocabulary map):** `docs/superpowers/specs/2026-06-16-invoice-settlement-vocabulary.md`
 3. This file (status + gotchas).
@@ -20,8 +20,9 @@ The refactor is nearly done. **PR 3b (this) adds the settlement `payments` table
 | #191 | PR 2 — `anchors/` → `payments/providers/` domain move + bearer-gated `listBanksForInvoice` (closed the `listByAgency` boundary) | ✅ merged |
 | #192 | Make `regression-greps` checks 2–5 actually gate (subshell exit-code bug) | ✅ merged |
 | #193 | PR 3a — `anchorOrders`→`providerOrders` table + symbol rename (pre-launch hard rename) | ✅ merged |
-| **PR 3b** | Settlement `payments` table — schema + `convex/payments/{domain,settlement,useCases}.ts`, dual-write in `markPaidByTx`/`markPaidByAnchor`/`completeOrderAndMarkPaid`, seed settlement rows, agency `invoice-method-card` read, PAYMENT_STATUS i18n | 🔵 **this PR** |
-| PR 4 | Drop `invoice.method` — NARROW | ⏳ **next** |
+| #194 | PR 3b — settlement `payments` table + dual-write + seed + `invoice-method-card` read + PAYMENT_STATUS i18n | ✅ merged |
+| #195 | Fix latent `run-migrations` prod deploy-key auth (`--prod`) — unblocked prod deploys | ✅ merged |
+| **PR 4** | Drop `invoice.method` (NARROW) — method derives from the succeeded settlement row (`resolveInvoiceMethod`); 3 dual-writers' already-paid idempotency now dedupes on settlement `by_externalRef`; dead `setPaymentMethod` removed | 🔵 **this PR (final)** |
 
 ### Migration approach changed to wipe+reseed (2026-06-17)
 Pre-launch, so PR 3a/3b use **wipe+reseed** rather than in-place data migrations (user's call): schema changes directly, no `runAll` backfills. Prod (`fastidious-swordfish-9`) + CI preview deployments are empty so the new schema applies cleanly; `_generated` table types auto-derive from `typeof schema` (no codegen). A context-specific override of the documented 2-PR migrate-in-place convention, not a general reversal.

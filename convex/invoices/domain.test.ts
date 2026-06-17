@@ -52,7 +52,6 @@ describe("getOverdueCount — open + past-due counts as overdue", () => {
         periodMonth: "2026-04",
         issuedAt: "2026-04-01",
         totalCents: 1000,
-        method: null,
         lineItems: [],
       };
       // Overdue: open + past due date.

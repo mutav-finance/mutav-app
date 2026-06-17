@@ -1,18 +1,22 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { SettlementMethod } from "../payments/domain";
 
 export type Invoice = Doc<"invoices">;
 export type InvoiceId = Id<"invoices">;
+
+/**
+ * An invoice enriched with its settlement `method`, resolved at read time
+ * from the succeeded `payments` row. `method` is no longer stored on the
+ * invoice itself, so reads that need it (detail/list shapes) return this.
+ */
+export type ResolvedInvoice = Invoice & { method: SettlementMethod | null };
 export type InvoiceLineItem = Invoice["lineItems"][number];
 export type InvoiceLineItemKind = InvoiceLineItem["kind"];
 
 /** Discriminated union — the lifecycle state of an invoice. */
 export type InvoiceState = Invoice["state"];
 export type InvoiceStateKind = InvoiceState["kind"];
-
-/** Discriminated union — the chosen payment method, or null if not yet selected. */
-export type InvoiceMethod = Invoice["method"];
-export type InvoiceMethodKind = NonNullable<InvoiceMethod>["kind"];
 
 /**
  * Display status for an invoice — the stored state kinds plus the derived
@@ -29,14 +33,6 @@ export const INVOICE_STATE_KIND = {
   VOID: "void",
 } as const satisfies Record<Uppercase<InvoiceStateKind>, InvoiceStateKind>;
 
-// ─── Method constants ─────────────────────────────────────────────────────────
-
-export const INVOICE_METHOD_KIND = {
-  BOLETO: "boleto",
-  STELLAR: "stellar",
-  PIX: "pix",
-} as const satisfies Record<Uppercase<InvoiceMethodKind>, InvoiceMethodKind>;
-
 // ─── Line item constants ──────────────────────────────────────────────────────
 
 export const INVOICE_LINE_ITEM_KIND = {
@@ -52,12 +48,6 @@ export const invoiceStateKindValidator = v.union(
   v.literal(INVOICE_STATE_KIND.VOID),
 );
 
-export const invoiceMethodKindValidator = v.union(
-  v.literal(INVOICE_METHOD_KIND.BOLETO),
-  v.literal(INVOICE_METHOD_KIND.STELLAR),
-  v.literal(INVOICE_METHOD_KIND.PIX),
-);
-
 export const invoiceLineItemKindValidator = v.union(
   v.literal(INVOICE_LINE_ITEM_KIND.RECURRING),
   v.literal(INVOICE_LINE_ITEM_KIND.ACTIVATION),
@@ -70,28 +60,6 @@ export const InvoiceStates = {
   open: (): Extract<InvoiceState, { kind: "open" }> => ({ kind: "open" }),
   paid: (paidAt: string): Extract<InvoiceState, { kind: "paid" }> => ({ kind: "paid", paidAt }),
   voided: (): Extract<InvoiceState, { kind: "void" }> => ({ kind: "void" }),
-} as const;
-
-// ─── Method constructors (type-safe helpers) ──────────────────────────────────
-
-export const InvoiceMethods = {
-  boleto: (barcode: string | null = null): Extract<InvoiceMethod, { kind: "boleto" }> => ({
-    kind: "boleto",
-    barcode,
-  }),
-  stellar: (
-    destinationAddress: string,
-    txHash: string | null = null,
-  ): Extract<InvoiceMethod, { kind: "stellar" }> => ({
-    kind: "stellar",
-    destinationAddress,
-    txHash,
-  }),
-  pix: (pixKey: string, txId: string | null = null): Extract<InvoiceMethod, { kind: "pix" }> => ({
-    kind: "pix",
-    pixKey,
-    txId,
-  }),
 } as const;
 
 // ─── Predicates ───────────────────────────────────────────────────────────────

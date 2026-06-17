@@ -2,7 +2,7 @@ import { v } from "convex/values";
 
 import { internalMutation, internalQuery, query } from "../../_generated/server";
 import { assertAgencyAccess } from "../../lib/auth";
-import { InvoiceMethods, InvoiceStates } from "../../invoices/domain";
+import { InvoiceStates } from "../../invoices/domain";
 import { SettlementMethods } from "../domain";
 import { recordSettlement } from "../settlement";
 import { anchorProviderValidator } from "./domain";
@@ -147,15 +147,17 @@ export const completeOrderAndMarkPaid = internalMutation({
     if (!invoice) return { paymentStatus: "not_found" as const };
 
     if (invoice.state.kind === "paid") {
-      const existingTxId = invoice.method?.kind === "pix" ? invoice.method.txId : null;
-      return existingTxId === anchorTxId
+      const existing = await ctx.db
+        .query("payments")
+        .withIndex("by_externalRef", (q) => q.eq("externalRef", anchorTxId))
+        .first();
+      return existing
         ? { paymentStatus: "already_paid" as const }
         : { paymentStatus: "duplicate_inbound" as const };
     }
 
     await ctx.db.patch(invoiceId, {
       state: InvoiceStates.paid(paidAt),
-      method: InvoiceMethods.pix(pixKey, anchorTxId),
     });
 
     await recordSettlement(ctx, {

@@ -4,7 +4,7 @@ import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import { SettlementMethods } from "../payments/domain";
 import { recordSettlement } from "../payments/settlement";
-import { INVOICE_LINE_ITEM_KIND, InvoiceMethods, InvoiceStates, isChargeable } from "./domain";
+import { INVOICE_LINE_ITEM_KIND, InvoiceStates } from "./domain";
 import { generateInvoiceMuxedId } from "./lib/muxedId";
 
 /**
@@ -16,7 +16,8 @@ import { generateInvoiceMuxedId } from "./lib/muxedId";
  * - Contracts whose `_creationTime` falls within the period also get an
  *   `activation` line item (oneTimeActivationFeeCents).
  * - Idempotent: skips agencies that already have a record for the period.
- * - `state` starts as `open`; `method` is `null` until the agency chooses one.
+ * - `state` starts as `open`; the payment method is derived from the
+ *   settlement row once the invoice is paid.
  * - `dueDate` is always the 10th of the billing month.
  *
  * Call manually:
@@ -110,7 +111,6 @@ export const generateMonthlyInvoices = internalMutation({
         dueDate,
         totalCents,
         state: InvoiceStates.open(),
-        method: null,
         muxedId: generateInvoiceMuxedId(),
         lineItems,
       });
@@ -142,65 +142,12 @@ export const generateMonthlyInvoices = internalMutation({
 });
 
 /**
- * Choose a payment method for an existing open invoice. Exposed as
- * internal so the agency-facing action layer controls validation.
- */
-export const setPaymentMethod = internalMutation({
-  args: {
-    invoiceId: v.id("invoices"),
-    method: v.union(
-      v.object({ kind: v.literal("boleto") }),
-      v.object({ kind: v.literal("stellar"), destinationAddress: v.string() }),
-      v.object({ kind: v.literal("pix"), pixKey: v.string() }),
-    ),
-  },
-  handler: async (ctx, { invoiceId, method }) => {
-    const invoice = await ctx.db.get(invoiceId);
-    if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
-
-    if (!isChargeable(invoice.state)) {
-      throw new Error(`Cannot change method on an invoice in state "${invoice.state.kind}"`);
-    }
-
-    let newMethod: NonNullable<(typeof invoice)["method"]>;
-
-    switch (method.kind) {
-      case "boleto":
-        newMethod = InvoiceMethods.boleto(null);
-        break;
-      case "stellar":
-        newMethod = InvoiceMethods.stellar(method.destinationAddress);
-        break;
-      case "pix":
-        newMethod = InvoiceMethods.pix(method.pixKey);
-        break;
-    }
-
-    await ctx.db.patch(invoiceId, { method: newMethod });
-
-    await appendAuditEntry(ctx, {
-      actor: { kind: "system", source: "checkout_action" },
-      action: AUDIT_ACTION.INVOICE_METHOD_SET,
-      resourceType: "invoices",
-      resourceId: invoice.publicId,
-      payload: {
-        invoiceId,
-        agencyId: invoice.agencyId,
-        methodKind: newMethod.kind,
-      },
-    });
-
-    return { invoiceId, method: newMethod };
-  },
-});
-
-/**
  * Idempotent mark-as-paid. Called by the Horizon reconciler when an
  * incoming Stellar payment matches an open invoice's muxed-id.
  *
  * No-ops if the invoice is already paid with the same txHash (re-runs
  * after restart are safe). Records the muxed `M…` destination + tx hash
- * on `method` and moves state to `paid` with the observed timestamp.
+ * on the settlement row and moves state to `paid` with the observed timestamp.
  */
 export const markPaidByTx = internalMutation({
   args: {
@@ -214,14 +161,17 @@ export const markPaidByTx = internalMutation({
     if (!invoice) return { invoiceId, status: "not_found" as const };
 
     if (invoice.state.kind === "paid") {
-      const existingTx = invoice.method?.kind === "stellar" ? invoice.method.txHash : null;
-      if (existingTx === txHash) return { invoiceId, status: "already_paid" as const };
-      return { invoiceId, status: "duplicate_inbound" as const };
+      const existing = await ctx.db
+        .query("payments")
+        .withIndex("by_externalRef", (q) => q.eq("externalRef", txHash))
+        .first();
+      return existing
+        ? { invoiceId, status: "already_paid" as const }
+        : { invoiceId, status: "duplicate_inbound" as const };
     }
 
     await ctx.db.patch(invoiceId, {
       state: InvoiceStates.paid(paidAt),
-      method: InvoiceMethods.stellar(muxedAddress, txHash),
     });
 
     await recordSettlement(ctx, {
@@ -258,8 +208,8 @@ export const markPaidByTx = internalMutation({
  * order reaches `completed`.
  *
  * No-ops if the invoice is already paid via the same anchor txId. Records
- * the anchor's reported PIX key + anchor transaction ID on `method` and
- * moves state to `paid` with the observed timestamp.
+ * the anchor's reported PIX key + anchor transaction ID on the settlement
+ * row and moves state to `paid` with the observed timestamp.
  */
 export const markPaidByAnchor = internalMutation({
   args: {
@@ -273,14 +223,17 @@ export const markPaidByAnchor = internalMutation({
     if (!invoice) return { invoiceId, status: "not_found" as const };
 
     if (invoice.state.kind === "paid") {
-      const existingTxId = invoice.method?.kind === "pix" ? invoice.method.txId : null;
-      if (existingTxId === anchorTxId) return { invoiceId, status: "already_paid" as const };
-      return { invoiceId, status: "duplicate_inbound" as const };
+      const existing = await ctx.db
+        .query("payments")
+        .withIndex("by_externalRef", (q) => q.eq("externalRef", anchorTxId))
+        .first();
+      return existing
+        ? { invoiceId, status: "already_paid" as const }
+        : { invoiceId, status: "duplicate_inbound" as const };
     }
 
     await ctx.db.patch(invoiceId, {
       state: InvoiceStates.paid(paidAt),
-      method: InvoiceMethods.pix(pixKey, anchorTxId),
     });
 
     await recordSettlement(ctx, {
@@ -312,7 +265,7 @@ export const markPaidByAnchor = internalMutation({
 });
 
 /**
- * Dev-only: flip an invoice back to `open` and clear `method`. Used to
+ * Dev-only: flip an invoice back to `open`. Used to
  * rerun the demo flow against an already-paid invoice. The Horizon cursor
  * is not rewound, so the original tx is NOT re-discovered — only NEW
  * incoming payments to the muxed address re-mark this invoice paid.
@@ -330,7 +283,6 @@ export const resetInvoiceToOpen = internalMutation({
     const previousState = invoice.state.kind;
     await ctx.db.patch(invoice._id, {
       state: InvoiceStates.open(),
-      method: null,
     });
 
     await appendAuditEntry(ctx, {
