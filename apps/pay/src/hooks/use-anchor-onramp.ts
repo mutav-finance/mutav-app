@@ -5,8 +5,8 @@ import { useAction, useQuery } from "convex/react";
 import type { FunctionReference } from "convex/server";
 
 import { api } from "@convex/_generated/api";
-import type { AnchorOrder, AnchorOrderId } from "@convex/anchors/orderDomain";
-import type { AgencyBankAccountId } from "@convex/anchors/bankAccountDomain";
+import type { AnchorOrder, AnchorOrderId } from "@convex/payments/providers/orderDomain";
+import type { AgencyBankAccountId } from "@convex/payments/providers/bankAccountDomain";
 import type { InvoiceId } from "@convex/invoices/domain";
 
 type AnchorOrderStatus = AnchorOrder["status"];
@@ -102,7 +102,8 @@ export function useAnchorOnramp({
   const pollAction = useAction(pollActionRef);
 
   const order =
-    useQuery(api.anchors.orderUseCases.getOrderById, orderId ? { orderId } : "skip") ?? null;
+    useQuery(api.payments.providers.orderUseCases.getOrderById, orderId ? { orderId } : "skip") ??
+    null;
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 

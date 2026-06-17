@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 
 // ─── Type aliases ─────────────────────────────────────────────────────────────
 

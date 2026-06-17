@@ -25,12 +25,16 @@ import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onra
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
-import type { AgencyBankAccount, AgencyBankAccountId } from "@convex/anchors/bankAccountDomain";
-import type { AnchorOrder } from "@convex/anchors/orderDomain";
+import type {
+  AgencyBankAccount,
+  AgencyBankAccountId,
+} from "@convex/payments/providers/bankAccountDomain";
+import type { AnchorOrder } from "@convex/payments/providers/orderDomain";
 import type { InvoiceId } from "@convex/invoices/domain";
 
 interface Props {
   invoiceId: InvoiceId;
+  invoicePublicId: string;
   agencyId: AgencyId;
   totalCents: number;
 }
@@ -48,15 +52,17 @@ interface Props {
  * one we'd get an opaque "Proxy account not found" from their API.
  * Gating up front makes the requirement legible to the operator.
  */
-export function CheckoutPixView({ invoiceId, agencyId, totalCents }: Props) {
+export function CheckoutPixView({ invoiceId, invoicePublicId, agencyId, totalCents }: Props) {
   const t = useTranslations("checkout.pix");
   const locale = useLocale();
-  const banks = useQuery(api.anchors.bankAccountUseCases.listByAgency, { agencyId });
+  const banks = useQuery(api.payments.providers.bankAccountUseCases.listBanksForInvoice, {
+    invoicePublicId,
+  });
   const [started, setStarted] = useState(false);
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
     invoiceId,
-    startAction: api.anchors.actions.startPixOnramp,
-    pollAction: api.anchors.actions.pollPixOnramp,
+    startAction: api.payments.providers.actions.startPixOnramp,
+    pollAction: api.payments.providers.actions.pollPixOnramp,
     lang: locale,
   });
 
@@ -107,8 +113,10 @@ function PreFlight({
   onConfirm: (bankAccountId: AgencyBankAccountId) => void;
 }) {
   const t = useTranslations("checkout.pix.bankSelection");
-  const getRegistrationUrl = useAction(api.anchors.actions.getEtherfuseBankRegistrationUrl);
-  const sync = useAction(api.anchors.actions.syncEtherfuseBankAccounts);
+  const getRegistrationUrl = useAction(
+    api.payments.providers.actions.getEtherfuseBankRegistrationUrl,
+  );
+  const sync = useAction(api.payments.providers.actions.syncEtherfuseBankAccounts);
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
