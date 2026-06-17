@@ -1,9 +1,9 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, type MutationCtx } from "./_generated/server";
-import { INVOICE_LINE_ITEM_KIND, InvoiceMethods, InvoiceStates } from "./invoices/domain";
+import { INVOICE_LINE_ITEM_KIND, InvoiceStates } from "./invoices/domain";
 import { generateInvoiceMuxedId } from "./invoices/lib/muxedId";
-import { SettlementMethods } from "./payments/domain";
+import { SettlementMethods, type SettlementMethod } from "./payments/domain";
 import type { AgencyId } from "./agencies/domain";
 import {
   DEFAULT_EXIT_COST_MULTIPLIER,
@@ -57,11 +57,6 @@ async function wipeDemoTables(ctx: MutationCtx) {
   }
 }
 
-type SeededInvoiceMethod =
-  | ReturnType<typeof InvoiceMethods.boleto>
-  | ReturnType<typeof InvoiceMethods.stellar>
-  | ReturnType<typeof InvoiceMethods.pix>;
-
 /**
  * Insert a paid invoice plus its mirroring `payments` settlement row in
  * one call. The settlement reuses the invoice's own `paidAt`, total, and
@@ -78,7 +73,7 @@ async function seedPaidInvoice(
     dueDate: string;
     totalCents: number;
     paidAt: string;
-    method: SeededInvoiceMethod;
+    method: SettlementMethod;
     lineItems: Array<{
       contractId: ContractId;
       contractPublicId: string;
@@ -96,12 +91,9 @@ async function seedPaidInvoice(
     dueDate: invoice.dueDate,
     totalCents: invoice.totalCents,
     state: InvoiceStates.paid(invoice.paidAt),
-    method: invoice.method,
     muxedId: generateInvoiceMuxedId(),
     lineItems: invoice.lineItems,
   });
-
-  const { method, externalRef } = settlementFromInvoiceMethod(invoice.method);
 
   await ctx.db.insert("payments", {
     agencyId: invoice.agencyId,
@@ -109,40 +101,26 @@ async function seedPaidInvoice(
     status: "succeeded",
     amountCents: invoice.totalCents,
     paidAt: invoice.paidAt,
-    externalRef,
-    method,
+    externalRef: externalRefForSettlement(invoice.method),
+    method: invoice.method,
   });
 
   return invoiceId;
 }
 
 /**
- * Mirror an invoice `method` value object onto a settlement `method`,
- * picking the on-chain/anchor reference that the dual-write path records
- * as `externalRef` (tx hash for Stellar, anchor txId for Pix; boleto has
+ * Pick the on-chain/anchor reference that the dual-write path records as
+ * `externalRef` (tx hash for Stellar, anchor txId for Pix; boleto has
  * none).
  */
-function settlementFromInvoiceMethod(method: SeededInvoiceMethod): {
-  method: ReturnType<
-    | typeof SettlementMethods.boleto
-    | typeof SettlementMethods.stellar
-    | typeof SettlementMethods.pix
-  >;
-  externalRef: string | undefined;
-} {
+function externalRefForSettlement(method: SettlementMethod): string | undefined {
   switch (method.kind) {
     case "boleto":
-      return { method: SettlementMethods.boleto(method.barcode), externalRef: undefined };
+      return undefined;
     case "stellar":
-      return {
-        method: SettlementMethods.stellar(method.destinationAddress, method.txHash),
-        externalRef: method.txHash ?? undefined,
-      };
+      return method.txHash ?? undefined;
     case "pix":
-      return {
-        method: SettlementMethods.pix(method.pixKey, method.txId),
-        externalRef: method.txId ?? undefined,
-      };
+      return method.txId ?? undefined;
   }
 }
 
@@ -1865,7 +1843,7 @@ export const seedFictional = internalMutation({
       dueDate: "2025-11-10",
       totalCents: p2025Nov.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2025-11-07T10:00:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: p2025Nov,
     });
 
@@ -1878,7 +1856,7 @@ export const seedFictional = internalMutation({
       dueDate: "2025-11-10",
       totalCents: a2025Nov.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2025-11-08T11:00:00-03:00"),
-      method: InvoiceMethods.pix(
+      method: SettlementMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202511081100abc001",
       ),
@@ -1894,7 +1872,7 @@ export const seedFictional = internalMutation({
       dueDate: "2025-11-10",
       totalCents: h2025Nov.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2025-11-09T09:30:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: h2025Nov,
     });
 
@@ -1909,7 +1887,7 @@ export const seedFictional = internalMutation({
       dueDate: "2025-12-10",
       totalCents: p2025Dec.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2025-12-05T14:00:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: p2025Dec,
     });
 
@@ -1922,7 +1900,7 @@ export const seedFictional = internalMutation({
       dueDate: "2025-12-10",
       totalCents: a2025Dec.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2025-12-08T10:00:00-03:00"),
-      method: InvoiceMethods.pix(
+      method: SettlementMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202512081000abc002",
       ),
@@ -1938,7 +1916,7 @@ export const seedFictional = internalMutation({
       dueDate: "2025-12-10",
       totalCents: h2025Dec.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2025-12-09T09:00:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: h2025Dec,
     });
 
@@ -1953,7 +1931,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-01-12",
       totalCents: p2026Jan.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-01-10T11:00:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: p2026Jan,
     });
 
@@ -1966,7 +1944,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-01-12",
       totalCents: a2026Jan.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-01-09T15:00:00-03:00"),
-      method: InvoiceMethods.pix(
+      method: SettlementMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202601091500abc003",
       ),
@@ -1982,7 +1960,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-01-12",
       totalCents: h2026Jan.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-01-11T10:00:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: h2026Jan,
     });
 
@@ -1997,7 +1975,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-02-10",
       totalCents: p2026Feb.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-02-07T09:00:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: p2026Feb,
     });
 
@@ -2010,7 +1988,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-02-10",
       totalCents: a2026Feb.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-02-09T14:00:00-03:00"),
-      method: InvoiceMethods.pix(
+      method: SettlementMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202602091400abc004",
       ),
@@ -2026,7 +2004,6 @@ export const seedFictional = internalMutation({
       dueDate: "2026-02-10",
       totalCents: h2026Feb.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
-      method: null,
       muxedId: generateInvoiceMuxedId(),
       lineItems: h2026Feb,
     });
@@ -2042,7 +2019,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-03-10",
       totalCents: p2026Mar.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-03-08T10:30:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: p2026Mar,
     });
 
@@ -2055,7 +2032,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-03-10",
       totalCents: a2026Mar.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-03-09T11:00:00-03:00"),
-      method: InvoiceMethods.pix(
+      method: SettlementMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202603091100abc005",
       ),
@@ -2071,7 +2048,6 @@ export const seedFictional = internalMutation({
       dueDate: "2026-03-10",
       totalCents: h2026Mar.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
-      method: null,
       muxedId: generateInvoiceMuxedId(),
       lineItems: h2026Mar,
     });
@@ -2088,7 +2064,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-04-10",
       totalCents: paulistaAprLineItems.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-04-08T14:21:00-03:00"),
-      method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
+      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
       lineItems: paulistaAprLineItems,
     });
 
@@ -2101,7 +2077,7 @@ export const seedFictional = internalMutation({
       dueDate: "2026-04-10",
       totalCents: atlanticaAprLineItems.reduce((s, x) => s + x.amountCents, 0),
       paidAt: d("2026-04-09T10:00:00-03:00"),
-      method: InvoiceMethods.pix(
+      method: SettlementMethods.pix(
         "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
         "E00038166202404091000abc123",
       ),
@@ -2117,7 +2093,6 @@ export const seedFictional = internalMutation({
       dueDate: "2026-04-10",
       totalCents: horizonteAprLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
-      method: null,
       muxedId: generateInvoiceMuxedId(),
       lineItems: horizonteAprLineItems,
     });
@@ -2131,7 +2106,6 @@ export const seedFictional = internalMutation({
       dueDate: "2026-05-10",
       totalCents: paulistaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
-      method: null,
       muxedId: generateInvoiceMuxedId(),
       lineItems: paulistaMayLineItems,
     });
@@ -2145,7 +2119,6 @@ export const seedFictional = internalMutation({
       dueDate: "2026-05-10",
       totalCents: atlanticaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
-      method: null,
       muxedId: generateInvoiceMuxedId(),
       lineItems: atlanticaMayLineItems,
     });
@@ -2159,7 +2132,6 @@ export const seedFictional = internalMutation({
       dueDate: "2026-05-10",
       totalCents: horizonteMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
-      method: null,
       muxedId: generateInvoiceMuxedId(),
       lineItems: horizonteMayLineItems,
     });
@@ -2206,7 +2178,6 @@ export const seedFictional = internalMutation({
         dueDate: "2026-05-20",
         totalCents: t.amountCents,
         state: InvoiceStates.open(),
-        method: null,
         muxedId: generateInvoiceMuxedId(),
         lineItems: [
           {
@@ -2660,7 +2631,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     dueDate: "2026-03-10",
     totalCents: march.reduce((s, x) => s + x.amountCents, 0),
     paidAt: d("2026-03-08T10:00:00-03:00"),
-    method: InvoiceMethods.pix(
+    method: SettlementMethods.pix(
       "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b500",
       "E00038166202603081000aprov01",
     ),
@@ -2676,7 +2647,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     dueDate: "2026-04-10",
     totalCents: april.reduce((s, x) => s + x.amountCents, 0),
     paidAt: d("2026-04-07T11:30:00-03:00"),
-    method: InvoiceMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000005920"),
+    method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000005920"),
     lineItems: april,
   });
 
@@ -2689,7 +2660,6 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     dueDate: "2026-05-10",
     totalCents: may.reduce((s, x) => s + x.amountCents, 0),
     state: InvoiceStates.open(),
-    method: null,
     muxedId: generateInvoiceMuxedId(),
     lineItems: may,
   });

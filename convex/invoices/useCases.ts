@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 import { assertAgencyAccess, queryWithAgencyScope } from "../lib/auth";
-import { isChargeable, isOverdue } from "./domain";
+import type { SettlementMethod } from "../payments/domain";
+import { isChargeable, isOverdue, type InvoiceId } from "./domain";
 import { deriveInvoiceMuxedAddress } from "./lib/muxedAddress";
 
 /** Current UTC date as a `YYYY-MM-DD` string for due-date comparison. */
@@ -10,14 +12,38 @@ function utcToday(): string {
   return new Date().toISOString().split("T")[0]!;
 }
 
+/**
+ * Derive an invoice's payment method from its succeeded settlement row.
+ * `method` is no longer stored on the invoice — it lives on the settlement
+ * `payments` row recorded when the invoice was paid.
+ */
+async function resolveInvoiceMethod(
+  ctx: QueryCtx,
+  invoiceId: InvoiceId,
+): Promise<SettlementMethod | null> {
+  const settlements = await ctx.db
+    .query("payments")
+    .withIndex("by_invoice", (q) => q.eq("invoiceId", invoiceId))
+    .collect();
+  return settlements.find((p) => p.status === "succeeded")?.method ?? null;
+}
+
 export const listByAgency = queryWithAgencyScope({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
-    return ctx.db
+    const result = await ctx.db
       .query("invoices")
       .withIndex("by_agency_period", (q) => q.eq("agencyId", ctx.agencyId))
       .order("desc")
       .paginate(args.paginationOpts);
+
+    const page = await Promise.all(
+      result.page.map(async (inv) => ({
+        ...inv,
+        method: await resolveInvoiceMethod(ctx, inv._id),
+      })),
+    );
+    return { ...result, page };
   },
 });
 
@@ -40,7 +66,7 @@ export const getById = query({
       return null;
     }
 
-    return invoice;
+    return { ...invoice, method: await resolveInvoiceMethod(ctx, invoice._id) };
   },
 });
 
@@ -64,7 +90,7 @@ export const getByPublicId = query({
       return null;
     }
 
-    return invoice;
+    return { ...invoice, method: await resolveInvoiceMethod(ctx, invoice._id) };
   },
 });
 
@@ -99,7 +125,7 @@ export const getPublicByPublicId = query({
       dueDate: invoice.dueDate,
       totalCents: invoice.totalCents,
       state: invoice.state,
-      method: invoice.method,
+      method: await resolveInvoiceMethod(ctx, invoice._id),
       muxedAddress,
     };
   },

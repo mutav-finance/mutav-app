@@ -1,11 +1,11 @@
 import { useTranslations } from "next-intl";
 import { Check, ExternalLink } from "lucide-react";
 import { Mono } from "@mutav/ui/mono";
-import type { Invoice } from "@convex/invoices/domain";
+import type { SettlementMethod } from "@convex/payments/domain";
 
 type Props = {
   paidAt: string;
-  method: Invoice["method"];
+  method: SettlementMethod | null;
 };
 
 const TESTNET_TX_BASE = "https://stellar.expert/explorer/testnet/tx";

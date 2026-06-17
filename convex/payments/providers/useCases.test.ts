@@ -103,7 +103,6 @@ describe("payments.providers.bankAccountUseCases.listBanksForInvoice (tenant bea
         dueDate: new Date().toISOString(),
         totalCents: 10000,
         state: { kind: "open" },
-        method: null,
         lineItems: [],
       });
     });
@@ -140,7 +139,6 @@ describe("payments.providers.orderUseCases.getOrderById (resource-by-id pattern)
         dueDate: new Date().toISOString(),
         totalCents: 10000,
         state: { kind: "open" },
-        method: null,
         lineItems: [],
       });
       return ctx.db.insert("providerOrders", {
@@ -175,7 +173,6 @@ describe("payments.providers.orderUseCases.getOrderById (resource-by-id pattern)
         dueDate: new Date().toISOString(),
         totalCents: 10000,
         state: { kind: "open" },
-        method: null,
         lineItems: [],
       });
       return ctx.db.insert("providerOrders", {
