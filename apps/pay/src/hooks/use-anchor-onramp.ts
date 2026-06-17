@@ -5,14 +5,14 @@ import { useAction, useQuery } from "convex/react";
 import type { FunctionReference } from "convex/server";
 
 import { api } from "@convex/_generated/api";
-import type { AnchorOrder, AnchorOrderId } from "@convex/payments/providers/orderDomain";
+import type { ProviderOrder, ProviderOrderId } from "@convex/payments/providers/orderDomain";
 import type { AgencyBankAccountId } from "@convex/payments/providers/bankAccountDomain";
 import type { InvoiceId } from "@convex/invoices/domain";
 
-type AnchorOrderStatus = AnchorOrder["status"];
+type ProviderOrderStatus = ProviderOrder["status"];
 
 const POLL_INTERVAL_MS = 5_000;
-const TERMINAL_STATUSES: ReadonlySet<AnchorOrderStatus> = new Set([
+const TERMINAL_STATUSES: ReadonlySet<ProviderOrderStatus> = new Set([
   "completed",
   "refunded",
   "expired",
@@ -33,7 +33,7 @@ export interface AnchorStartErrorPayload {
 }
 
 type StartActionResult =
-  | { success: true; data: { orderId: AnchorOrderId; anchorTxId: string; hostedUrl?: string } }
+  | { success: true; data: { orderId: ProviderOrderId; anchorTxId: string; hostedUrl?: string } }
   | { success: false; error: AnchorStartErrorPayload };
 
 type StartActionRef = FunctionReference<
@@ -50,8 +50,8 @@ type StartActionRef = FunctionReference<
 type PollActionRef = FunctionReference<
   "action",
   "public",
-  { orderId: AnchorOrderId },
-  { orderId: AnchorOrderId; status: AnchorOrderStatus; terminal: boolean }
+  { orderId: ProviderOrderId },
+  { orderId: ProviderOrderId; status: ProviderOrderStatus; terminal: boolean }
 >;
 
 interface UseAnchorOnrampArgs {
@@ -73,7 +73,7 @@ interface StartOpts {
 
 interface UseAnchorOnrampResult {
   phase: AnchorOnrampPhase;
-  order: AnchorOrder | null;
+  order: ProviderOrder | null;
   /** Structured error from the start action (code is stable, suitable for i18n lookup). */
   error: AnchorStartErrorPayload | null;
   start: (opts?: StartOpts) => Promise<void>;
@@ -85,7 +85,7 @@ interface UseAnchorOnrampResult {
 /**
  * View-model hook for any anchor on-ramp flow (SEP-6 inline Pix, SEP-24
  * hosted UI, future Etherfuse, …). Parameterized by which start/poll action
- * pair to call — the lifecycle, polling cadence, and `anchorOrders`
+ * pair to call — the lifecycle, polling cadence, and `providerOrders`
  * subscription are identical across providers.
  */
 export function useAnchorOnramp({
@@ -94,7 +94,7 @@ export function useAnchorOnramp({
   pollAction: pollActionRef,
   lang,
 }: UseAnchorOnrampArgs): UseAnchorOnrampResult {
-  const [orderId, setOrderId] = useState<AnchorOrderId | null>(null);
+  const [orderId, setOrderId] = useState<ProviderOrderId | null>(null);
   const [startError, setStartError] = useState<AnchorStartErrorPayload | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -194,7 +194,7 @@ function derivePhase({
 }: {
   isStarting: boolean;
   startError: AnchorStartErrorPayload | null;
-  order: AnchorOrder | null;
+  order: ProviderOrder | null;
 }): AnchorOnrampPhase {
   if (startError) return "failed";
   if (isStarting) return "starting";

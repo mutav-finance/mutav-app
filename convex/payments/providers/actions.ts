@@ -45,11 +45,11 @@ import { getTreasurySigner } from "../../lib/stellarSigner";
 import { ANCHOR_ONBOARDING_STATUS, type AnchorAccountId } from "./accountDomain";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
-  ANCHOR_ORDER_STATUS,
-  anchorOrderStatusValidator,
+  PROVIDER_ORDER_STATUS,
+  providerOrderStatusValidator,
   isTerminal,
-  type AnchorOrderStatus,
-  type AnchorOrderId,
+  type ProviderOrderStatus,
+  type ProviderOrderId,
 } from "./orderDomain";
 import type { AgencyBankAccountId } from "./bankAccountDomain";
 import { isChargeable } from "../../invoices/domain";
@@ -187,34 +187,34 @@ export const discoverCapabilities = internalAction({
  * predictable transitions and future non-SEP providers (Etherfuse) can map
  * onto the same shape.
  */
-function normalizeSep24Status(sepStatus: TransactionStatus): AnchorOrderStatus {
+function normalizeSep24Status(sepStatus: TransactionStatus): ProviderOrderStatus {
   switch (sepStatus) {
     case "incomplete":
-      return ANCHOR_ORDER_STATUS.INCOMPLETE;
+      return PROVIDER_ORDER_STATUS.INCOMPLETE;
     case "pending_user_transfer_start":
     case "pending_user":
-      return ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START;
+      return PROVIDER_ORDER_STATUS.PENDING_USER_TRANSFER_START;
     case "pending_user_transfer_complete":
-      return ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_COMPLETE;
+      return PROVIDER_ORDER_STATUS.PENDING_USER_TRANSFER_COMPLETE;
     case "pending_stellar":
     case "pending_trust":
-      return ANCHOR_ORDER_STATUS.PENDING_STELLAR;
+      return PROVIDER_ORDER_STATUS.PENDING_STELLAR;
     case "pending_anchor":
     case "pending_external":
     case "pending_customer_info_update":
     case "pending_transaction_info_update":
     case "pending_sender":
     case "pending_receiver":
-      return ANCHOR_ORDER_STATUS.PENDING_ANCHOR;
+      return PROVIDER_ORDER_STATUS.PENDING_ANCHOR;
     case "completed":
-      return ANCHOR_ORDER_STATUS.COMPLETED;
+      return PROVIDER_ORDER_STATUS.COMPLETED;
     case "refunded":
-      return ANCHOR_ORDER_STATUS.REFUNDED;
+      return PROVIDER_ORDER_STATUS.REFUNDED;
     case "expired":
-      return ANCHOR_ORDER_STATUS.EXPIRED;
+      return PROVIDER_ORDER_STATUS.EXPIRED;
     case "error":
     case "no_market":
-      return ANCHOR_ORDER_STATUS.ERROR;
+      return PROVIDER_ORDER_STATUS.ERROR;
   }
 }
 
@@ -340,19 +340,19 @@ function classifySepError(err: SepApiError): AnchorStartError {
 }
 
 type StartPixOnrampResult =
-  | { success: true; data: { orderId: AnchorOrderId; anchorTxId: string } }
+  | { success: true; data: { orderId: ProviderOrderId; anchorTxId: string } }
   | { success: false; error: AnchorStartError };
 
 type StartAnchorTestOnrampResult =
   | {
       success: true;
-      data: { orderId: AnchorOrderId; anchorTxId: string; hostedUrl: string };
+      data: { orderId: ProviderOrderId; anchorTxId: string; hostedUrl: string };
     }
   | { success: false; error: AnchorStartError };
 
 interface PollPixOnrampResult {
-  orderId: AnchorOrderId;
-  status: AnchorOrderStatus;
+  orderId: ProviderOrderId;
+  status: ProviderOrderStatus;
   terminal: boolean;
 }
 
@@ -382,7 +382,7 @@ export const startPixOnramp = action({
     v.object({
       success: v.literal(true),
       data: v.object({
-        orderId: v.id("anchorOrders"),
+        orderId: v.id("providerOrders"),
         anchorTxId: v.string(),
       }),
     }),
@@ -469,7 +469,7 @@ export const startPixOnramp = action({
         anchorTxId: response.id,
         instructions: response.instructions,
         how: response.how,
-        status: ANCHOR_ORDER_STATUS.INCOMPLETE,
+        status: PROVIDER_ORDER_STATUS.INCOMPLETE,
       });
 
       return { success: true, data: { orderId, anchorTxId: response.id } };
@@ -486,16 +486,16 @@ export const startPixOnramp = action({
  * Poll the anchor for the current state of an in-flight on-ramp order.
  *
  * The client UI calls this on an interval while a deposit is open. Updates
- * the `anchorOrders` row with the latest SEP-24 transaction snapshot and,
+ * the `providerOrders` row with the latest SEP-24 transaction snapshot and,
  * on terminal `completed`, marks the parent invoice paid via
  * `markPaidByAnchor` (idempotent). Once the order is terminal, subsequent
  * polls short-circuit and return the order unchanged.
  */
 export const pollPixOnramp = action({
-  args: { orderId: v.id("anchorOrders") },
+  args: { orderId: v.id("providerOrders") },
   returns: v.object({
-    orderId: v.id("anchorOrders"),
-    status: anchorOrderStatusValidator,
+    orderId: v.id("providerOrders"),
+    status: providerOrderStatusValidator,
     terminal: v.boolean(),
   }),
   handler: async (ctx, args): Promise<PollPixOnrampResult> => {
@@ -537,7 +537,7 @@ export const pollPixOnramp = action({
       rawPayload: tx,
     };
 
-    if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
+    if (status === PROVIDER_ORDER_STATUS.COMPLETED) {
       // Order patch + invoice paid in one transaction — prevents the
       // order from flipping completed while leaving the invoice open
       // (which would short-circuit future polls at the isTerminal guard).
@@ -581,7 +581,7 @@ export const startAnchorTestOnramp = action({
     v.object({
       success: v.literal(true),
       data: v.object({
-        orderId: v.id("anchorOrders"),
+        orderId: v.id("providerOrders"),
         anchorTxId: v.string(),
         hostedUrl: v.string(),
       }),
@@ -651,7 +651,7 @@ export const startAnchorTestOnramp = action({
         provider: providerName,
         anchorTxId: response.id,
         hostedUrl: response.url,
-        status: ANCHOR_ORDER_STATUS.INCOMPLETE,
+        status: PROVIDER_ORDER_STATUS.INCOMPLETE,
       });
 
       return {
@@ -673,10 +673,10 @@ export const startAnchorTestOnramp = action({
  * difference is the SEP-24 transfer endpoint vs SEP-6.
  */
 export const pollAnchorTestOnramp = action({
-  args: { orderId: v.id("anchorOrders") },
+  args: { orderId: v.id("providerOrders") },
   returns: v.object({
-    orderId: v.id("anchorOrders"),
-    status: anchorOrderStatusValidator,
+    orderId: v.id("providerOrders"),
+    status: providerOrderStatusValidator,
     terminal: v.boolean(),
   }),
   handler: async (ctx, args): Promise<PollPixOnrampResult> => {
@@ -715,7 +715,7 @@ export const pollAnchorTestOnramp = action({
       rawPayload: tx,
     });
 
-    if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
+    if (status === PROVIDER_ORDER_STATUS.COMPLETED) {
       const pixKey = tx.from ?? `anchor:${order.anchorTxId}`;
       const paidAt = tx.completed_at ?? new Date().toISOString();
       await ctx.runMutation(internal.invoices.mutations.markPaidByAnchor, {
@@ -1383,21 +1383,21 @@ export const getEtherfuseBankRegistrationUrl = action({
  * refunded | canceled`) into this smaller set before returning, so this
  * mapping only needs to handle the 7-value abstraction.
  */
-function normalizeEtherfuseStatus(status: AnchorTransactionStatus): AnchorOrderStatus {
+function normalizeEtherfuseStatus(status: AnchorTransactionStatus): ProviderOrderStatus {
   switch (status) {
     case "pending":
-      return ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START;
+      return PROVIDER_ORDER_STATUS.PENDING_USER_TRANSFER_START;
     case "processing":
-      return ANCHOR_ORDER_STATUS.PENDING_ANCHOR;
+      return PROVIDER_ORDER_STATUS.PENDING_ANCHOR;
     case "completed":
-      return ANCHOR_ORDER_STATUS.COMPLETED;
+      return PROVIDER_ORDER_STATUS.COMPLETED;
     case "failed":
     case "cancelled":
-      return ANCHOR_ORDER_STATUS.ERROR;
+      return PROVIDER_ORDER_STATUS.ERROR;
     case "expired":
-      return ANCHOR_ORDER_STATUS.EXPIRED;
+      return PROVIDER_ORDER_STATUS.EXPIRED;
     case "refunded":
-      return ANCHOR_ORDER_STATUS.REFUNDED;
+      return PROVIDER_ORDER_STATUS.REFUNDED;
   }
 }
 
@@ -1572,7 +1572,7 @@ async function startEtherfusePixOnramp(
       provider: "etherfuse",
       anchorTxId: onramp.id,
       instructions: etherfusePixInstructions(paymentInstructions),
-      status: ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START,
+      status: PROVIDER_ORDER_STATUS.PENDING_USER_TRANSFER_START,
     });
 
     return { success: true, data: { orderId, anchorTxId: onramp.id } };
@@ -1600,7 +1600,7 @@ async function startEtherfusePixOnramp(
 
 async function pollEtherfusePixOnramp(
   ctx: ActionCtx,
-  order: { _id: AnchorOrderId; anchorTxId: string; invoiceId: InvoiceId },
+  order: { _id: ProviderOrderId; anchorTxId: string; invoiceId: InvoiceId },
 ): Promise<PollPixOnrampResult> {
   const { EtherfuseClient } = await import("../../../apps/agency/src/lib/anchors/etherfuse/index");
   const client = new EtherfuseClient({
@@ -1616,9 +1616,9 @@ async function pollEtherfusePixOnramp(
     // of throwing forever and pinning the row in a pending state.
     await ctx.runMutation(internal.payments.providers.orderUseCases.updateOrderStatus, {
       orderId: order._id,
-      status: ANCHOR_ORDER_STATUS.ERROR,
+      status: PROVIDER_ORDER_STATUS.ERROR,
     });
-    return { orderId: order._id, status: ANCHOR_ORDER_STATUS.ERROR, terminal: true };
+    return { orderId: order._id, status: PROVIDER_ORDER_STATUS.ERROR, terminal: true };
   }
 
   const status = normalizeEtherfuseStatus(tx.status);
@@ -1631,7 +1631,7 @@ async function pollEtherfusePixOnramp(
     rawPayload: tx,
   };
 
-  if (status === ANCHOR_ORDER_STATUS.COMPLETED) {
+  if (status === PROVIDER_ORDER_STATUS.COMPLETED) {
     const pixKey =
       tx.paymentInstructions?.type === "pix" && tx.paymentInstructions.pixKey
         ? tx.paymentInstructions.pixKey

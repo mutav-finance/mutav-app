@@ -3,9 +3,9 @@ import type { Doc, Id } from "../../_generated/dataModel";
 
 // ─── Type aliases ─────────────────────────────────────────────────────────────
 
-export type AnchorOrder = Doc<"anchorOrders">;
-export type AnchorOrderId = Id<"anchorOrders">;
-export type AnchorOrderStatus = AnchorOrder["status"];
+export type ProviderOrder = Doc<"providerOrders">;
+export type ProviderOrderId = Id<"providerOrders">;
+export type ProviderOrderStatus = ProviderOrder["status"];
 
 // ─── Status value object ──────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ export type AnchorOrderStatus = AnchorOrder["status"];
  *
  * Terminal: `completed`, `refunded`, `expired`, `error`.
  */
-export const ANCHOR_ORDER_STATUS = {
+export const PROVIDER_ORDER_STATUS = {
   INCOMPLETE: "incomplete",
   PENDING_USER_TRANSFER_START: "pending_user_transfer_start",
   PENDING_USER_TRANSFER_COMPLETE: "pending_user_transfer_complete",
@@ -26,33 +26,33 @@ export const ANCHOR_ORDER_STATUS = {
   REFUNDED: "refunded",
   EXPIRED: "expired",
   ERROR: "error",
-} as const satisfies Record<Uppercase<string>, AnchorOrderStatus>;
+} as const satisfies Record<Uppercase<string>, ProviderOrderStatus>;
 
-export const anchorOrderStatusValidator = v.union(
-  v.literal(ANCHOR_ORDER_STATUS.INCOMPLETE),
-  v.literal(ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_START),
-  v.literal(ANCHOR_ORDER_STATUS.PENDING_USER_TRANSFER_COMPLETE),
-  v.literal(ANCHOR_ORDER_STATUS.PENDING_ANCHOR),
-  v.literal(ANCHOR_ORDER_STATUS.PENDING_STELLAR),
-  v.literal(ANCHOR_ORDER_STATUS.COMPLETED),
-  v.literal(ANCHOR_ORDER_STATUS.REFUNDED),
-  v.literal(ANCHOR_ORDER_STATUS.EXPIRED),
-  v.literal(ANCHOR_ORDER_STATUS.ERROR),
+export const providerOrderStatusValidator = v.union(
+  v.literal(PROVIDER_ORDER_STATUS.INCOMPLETE),
+  v.literal(PROVIDER_ORDER_STATUS.PENDING_USER_TRANSFER_START),
+  v.literal(PROVIDER_ORDER_STATUS.PENDING_USER_TRANSFER_COMPLETE),
+  v.literal(PROVIDER_ORDER_STATUS.PENDING_ANCHOR),
+  v.literal(PROVIDER_ORDER_STATUS.PENDING_STELLAR),
+  v.literal(PROVIDER_ORDER_STATUS.COMPLETED),
+  v.literal(PROVIDER_ORDER_STATUS.REFUNDED),
+  v.literal(PROVIDER_ORDER_STATUS.EXPIRED),
+  v.literal(PROVIDER_ORDER_STATUS.ERROR),
 );
 
 // ─── Predicates ───────────────────────────────────────────────────────────────
 
-const TERMINAL_STATUSES: ReadonlySet<AnchorOrderStatus> = new Set([
-  ANCHOR_ORDER_STATUS.COMPLETED,
-  ANCHOR_ORDER_STATUS.REFUNDED,
-  ANCHOR_ORDER_STATUS.EXPIRED,
-  ANCHOR_ORDER_STATUS.ERROR,
+const TERMINAL_STATUSES: ReadonlySet<ProviderOrderStatus> = new Set([
+  PROVIDER_ORDER_STATUS.COMPLETED,
+  PROVIDER_ORDER_STATUS.REFUNDED,
+  PROVIDER_ORDER_STATUS.EXPIRED,
+  PROVIDER_ORDER_STATUS.ERROR,
 ]);
 
-export function isTerminal(status: AnchorOrderStatus): boolean {
+export function isTerminal(status: ProviderOrderStatus): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
-export function isSuccess(status: AnchorOrderStatus): boolean {
-  return status === ANCHOR_ORDER_STATUS.COMPLETED;
+export function isSuccess(status: ProviderOrderStatus): boolean {
+  return status === PROVIDER_ORDER_STATUS.COMPLETED;
 }

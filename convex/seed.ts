@@ -31,10 +31,10 @@ const d = (s: string) => s;
  * dangling pointers mid-wipe.
  */
 const DEMO_TABLES = [
-  // anchorOrders FK-references invoices; wipe attempts before invoices even
+  // providerOrders FK-references invoices; wipe attempts before invoices even
   // though the seed doesn't insert orders today — keeps the wipe FK-safe if
   // a manual checkout run left orders behind.
-  "anchorOrders",
+  "providerOrders",
   "invoices",
   "contractHistory",
   "contracts",
