@@ -4,7 +4,7 @@ State capture for a fresh session to continue the `payments`→`invoices` + sett
 
 ## TL;DR — where to start
 
-The refactor is ~⅔ done. **4 PRs merged to `main`; 3 remain.** Next up: **PR 2** (generalize `convex/anchors/` → `payments/providers/` + fix the `listByAgency` boundary). Read these first, in order:
+The refactor is ~¾ done. **PR 2 is open as [#191](https://github.com/mutav-finance/mutav-app/pull/191) (code-only).** Next up after it merges: **PR 3** (settlement `payments` table), now also carrying the `anchorOrders`→`providerOrders` table rename (deferred from PR 2 — see scope note below). Read these first, in order:
 1. **Plan (PR sequence + decisions):** `~/.claude/plans/swift-inventing-tide.md`
 2. **Design spec (rationale, benchmarks, vocabulary map):** `docs/superpowers/specs/2026-06-16-invoice-settlement-vocabulary.md`
 3. This file (status + gotchas).
@@ -17,11 +17,16 @@ The refactor is ~⅔ done. **4 PRs merged to `main`; 3 remain.** Next up: **PR 2
 | #186 | Phase 1 — functional `payments`→`invoices` rename, Stripe statuses (`open`/`paid`/`void`, `overdue` derived), additive audit | ✅ merged |
 | #187 | `@convex-dev/migrations` tooling + run-on-deploy | ✅ merged |
 | #189 | PR 1 — agency UI cosmetic (route `/invoices`, `invoice-*` components, `invoiceList`/`invoiceDetails` i18n) | ✅ merged |
-| **PR 2** | `anchors/` → `payments/providers/`, `anchorOrders`→`providerOrders`, **fix `listByAgency`** (bearer-gated `listBanksForInvoice`) | ⏳ **next** |
-| PR 3 | Settlement `payments` table — WIDEN + migrate + dual-write | ⏳ |
+| **PR 2** | `anchors/` → `payments/providers/` (code-only domain move + api-path rename) + **fix `listByAgency`** (bearer-gated `listBanksForInvoice`) | 🔵 **open [#191](https://github.com/mutav-finance/mutav-app/pull/191)** |
+| PR 3 | Settlement `payments` table — WIDEN + migrate + dual-write; **+ `anchorOrders`→`providerOrders` table rename** (folded in from PR 2) | ⏳ **next** |
 | PR 4 | Drop `invoice.method` — NARROW | ⏳ |
 
-`main` HEAD at handoff: `1329e96` (PR 1). Working tree: on `main`, clean. No active worktrees for this work (the rename worktrees were removed; `feat/bigdatacorp-integration` + `feat/screening-phase-1` are unrelated).
+### PR 2 scope decision (2026-06-17)
+PR 2 shipped **code-only** to stay single-deploy-safe and avoid a standalone migration cycle. Two items the plan listed under PR 2 were **deferred**:
+- **`anchorOrders`→`providerOrders` table rename** → **PR 3.** A Draau/prod-safe table rename can't drop the old table in the same deploy that copies its rows (Convex validates schema-at-rest *before* the build-time `migrations:runAll`), so per the documented 2-PR `schemaValidation:false`→migrate→narrow convention it needs its own widen/narrow. PR 3 is already a schema PR and introduces the `providerOrders`↔settlement-row link, so the rename belongs there.
+- **`registry.ts` `kind` field** → deferred until a non-anchor provider exists (no consumer yet; the plan's own end-state says `src/lib/anchors/` stays untouched).
+
+`main` HEAD at handoff: `1329e96` (PR 1) → PR 2 branched from `bfa81c9` (#190). PR 2 worktree: `.claude/worktrees/feat/payments-providers` (remove after merge). `feat/bigdatacorp-integration` + `feat/screening-phase-1` are unrelated.
 
 ## Phase-2 decisions (locked — see plan for detail)
 - Invoice → `paid` on **first `succeeded` settlement** (no partial payments).
