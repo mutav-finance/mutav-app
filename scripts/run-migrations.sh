@@ -29,5 +29,14 @@ HOST="${HOST#http://}"
 DEPLOY_NAME="${HOST%%.*}"
 
 echo "run-migrations: deployment=${DEPLOY_NAME} — running migrations:runAll"
-bunx convex run --deployment "${DEPLOY_NAME}" migrations:runAll
+# `--deployment <name>` resolves the target via the team_and_project endpoint,
+# which accepts preview deploy keys but rejects prod ones
+# (UnexpectedAuthHeaderFormat). In production, target the project's production
+# deployment through the deploy key directly with `--prod`; previews keep the
+# name-based path (their ephemeral deployment isn't `--prod`).
+if [ "${VERCEL_ENV:-}" = "production" ]; then
+  bunx convex run --prod migrations:runAll
+else
+  bunx convex run --deployment "${DEPLOY_NAME}" migrations:runAll
+fi
 echo "✓ run-migrations: migrations up to date."
