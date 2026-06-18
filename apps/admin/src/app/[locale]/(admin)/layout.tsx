@@ -13,9 +13,9 @@ import { getStaffMember } from "@/lib/auth";
  * No session → redirect to Auth0 Universal Login with `returnTo` pointing
  * back at admin so the user lands here after authentication.
  *
- * **A1 stub posture**: `getStaffMember()` still allows any authenticated
- * Auth0 user — once the `mutavStaff` Convex domain lands, signed-in-but-
- * not-staff users will hit a 403 / request-access branch instead.
+ * `getStaffMember()` is fail-closed: it returns `null` for both the
+ * not-signed-in case and the signed-in-but-not-staff case (no `mutavStaff`
+ * row in Convex), so both fall through to the Universal Login redirect.
  */
 export default async function AdminLayout({
   children,
@@ -36,8 +36,8 @@ export default async function AdminLayout({
   // past `??`, leaving the avatar to render "UNDEFINED" initials. `||` on
   // a trimmed value falls through to the next fallback.
   const user = {
-    name: member.user.name?.trim() || member.user.email?.trim() || "Staff",
-    email: member.user.email?.trim() || "",
+    name: member.session.user.name?.trim() || member.session.user.email?.trim() || "Staff",
+    email: member.session.user.email?.trim() || "",
     // Intentionally omit `picture`. Staff sessions can return social-provider
     // URLs (Gravatar, googleusercontent) that don't match the staff CSP
     // `img-src` allowlist; rather than widening the allowlist on a high-

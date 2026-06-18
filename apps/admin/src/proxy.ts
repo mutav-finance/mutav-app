@@ -15,9 +15,9 @@ const handleI18nRouting = createMiddleware(routing);
  * from the Auth0 response are folded into the i18n response when the
  * request doesn't hit an auth route.
  *
- * The matcher excludes `/api/*` because future API routes (Convex token
- * bridge, internal handlers) read the session via `auth0.getSession()`
- * directly and don't need the proxy redirect logic to run.
+ * The matcher excludes `/api/auth/convex-token` because that route reads
+ * the session via `auth0.getSession()` directly and doesn't need the
+ * proxy redirect logic to run first.
  */
 export async function proxy(request: NextRequest) {
   const authRes = await auth0.middleware(request);
@@ -40,5 +40,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|_vercel|.*\\..*).*)"],
+  matcher: ["/((?!_next/static|_next/image|_vercel|api/auth/convex-token|.*\\..*).*)"],
 };

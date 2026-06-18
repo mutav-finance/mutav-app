@@ -11,9 +11,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently --names \"web,cvx\" --prefix-colors \"cyan,magenta\" --kill-others-on-fail \"bun run dev:web\" \"bun run dev:convex\"",
+    "dev": "concurrently --names \"web,pay,adm,cvx\" --prefix-colors \"cyan,green,yellow,magenta\" --kill-others-on-fail \"bun run dev:web\" \"bun run dev:pay\" \"bun run dev:admin\" \"bun run dev:convex\"",
     "dev:web": "bun --filter @mutav/agency dev",
     "dev:pay": "bun --filter @mutav/pay dev",
+    "dev:admin": "bun --filter @mutav/admin dev",
     "dev:convex": "convex dev",
     "build": "turbo run build",
     "start": "bun --filter @mutav/agency start",
