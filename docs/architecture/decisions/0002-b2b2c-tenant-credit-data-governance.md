@@ -29,7 +29,7 @@ This is a working decision on **conservative assumptions**; the items in _Open q
 ## Architectural consequences (what gets stored)
 
 - `processingBasisRecords` — purpose · legalBasis · termsVersion · collecting-agency · data-sharing-agreement ref · timestamp.
-- **Purpose tags promoted onto `creditRiskSignals`** — underwriting vs model-training are distinct, separately-based events.
+- **Purpose tags promoted onto `creditAnalysisSignals`** — underwriting vs model-training are distinct, separately-based events.
 - `tenantOutcomes` — default/claim/cure labels (in scope while keyed by `subjectHash`; own `model_training` basis). Phase B capture.
 - **Anonymization boundary** → out-of-scope `trainingCorpus`, architecturally separate from the operational store. Phase B build.
 - **Art. 20 reasons record** keyed by `policyVersion`.
@@ -44,7 +44,7 @@ See [underwriting.md](../underwriting.md) for the full data model and module map
 3. Gestor vs consulente line under Lei 12.414 for an internal-only dataset; where sharing crosses it.
 4. Is model-training a "compatible finalidade," or a new purpose needing its own basis/disclosure?
 5. Anonymization standard to clear Art. 12 reversibility for a credit-outcome corpus.
-6. Retention ceiling (LGPD minimization) vs floor (CVM 5-yr) for `creditRiskSignals` + `tenantOutcomes` (ties to [#114](https://github.com/mutav-finance/mutav-app/issues/114)).
+6. Retention ceiling (LGPD minimization) vs floor (CVM 5-yr) for `creditAnalysisSignals` + `tenantOutcomes` (ties to [#114](https://github.com/mutav-finance/mutav-app/issues/114)).
 7. Art. 20 explainability depth (given ANPD NT 12/2025) + the human-review path for adverse tiers.
 8. Exact cross-agency aggregation disclosure + per-agency data-sharing agreements.
 9. Cross-border (US-hosted Convex) constraints on credit data beyond generic SCCs.
