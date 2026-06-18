@@ -62,7 +62,7 @@ The Auth0 swap is documented in [`../auth.md`](../auth.md). Pre-Auth0, all human
 
 The app is a single Next.js deployment that hosts four distinct shells via App Router route groups. Each shell has its own layout, sidebar, identity model, and role gate. They share zero UI chrome — the visual separation reflects the actor separation.
 
-Today all four shells coexist in one Next.js deployment. The [monorepo migration](../superpowers/specs/2026-05-31-monorepo-migration-design.md) moves each shell into its own persona app over PRs 2–7; the **Future home** column shows the target.
+Today all four shells coexist in one Next.js deployment. The [monorepo migration](monorepo-migration.md) moves each shell into its own persona app over PRs 2–7; the **Future home** column shows the target.
 
 | Shell                | Route group  | Layout owns                                         | Gate                                   | Future home              | Status                                   |
 | -------------------- | ------------ | --------------------------------------------------- | -------------------------------------- | ------------------------ | ---------------------------------------- |
@@ -77,7 +77,7 @@ Mutav-internal users who also hold agency memberships flip between `(app)` and `
 
 ## App catalog
 
-The Shell catalog describes _how the UI is organized_; the App catalog describes _where the deployable units live_. Post-migration the app layer is a Turborepo monorepo with one Next.js app per audience, each on its own origin. See [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) for the decisions (origin isolation, single-Convex, cookie posture), and the [migration spec](../superpowers/specs/2026-05-31-monorepo-migration-design.md) for the staged-PR sequence.
+The Shell catalog describes _how the UI is organized_; the App catalog describes _where the deployable units live_. Post-migration the app layer is a Turborepo monorepo with one Next.js app per audience, each on its own origin. See [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) for the decisions (origin isolation, single-Convex, cookie posture), and the [migration spec](monorepo-migration.md) for the staged-PR sequence.
 
 | App           | Origin                | Hosts shell                       | Auth                                                                   | Cookie posture                                                           | Status            |
 | ------------- | --------------------- | --------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------- |
@@ -110,7 +110,7 @@ Convex domain folders are the system's bounded contexts. Existing domains are li
 
 **Promotion rule** (from CLAUDE.md): new domains start as a single file and split into `domain.ts` + `useCases.ts` (+ `mutations.ts` / `actions.ts` as needed) the moment they gain a second non-trivial function.
 
-**Cross-reference to `mutav-stellar#57`.** The consolidation issue sketches Convex modules as `agencies · investments · fundMgmt · payments · compliance`. `agencies`, `payments`, and `compliance` carry over with the same names. `investments` and `fundMgmt` are **not** adopted as domain names: their conceptual scope is split across `fundState` (per-chain NAV/AUM/redemption-queue mirror), `nav` (proposals + safeguards), `contracts` (rental contracts), and `mutavStaff` (treasury sub-role). When a `#57` reader hits "where is `investments`?" — it's the union of those four. [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) (decision 7) and the [migration spec](../superpowers/specs/2026-05-31-monorepo-migration-design.md) § Section 3 walk through the disposition for each `#57` name.
+**Cross-reference to `mutav-stellar#57`.** The consolidation issue sketches Convex modules as `agencies · investments · fundMgmt · payments · compliance`. `agencies`, `payments`, and `compliance` carry over with the same names. `investments` and `fundMgmt` are **not** adopted as domain names: their conceptual scope is split across `fundState` (per-chain NAV/AUM/redemption-queue mirror), `nav` (proposals + safeguards), `contracts` (rental contracts), and `mutavStaff` (treasury sub-role). When a `#57` reader hits "where is `investments`?" — it's the union of those four. [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) (decision 7) and the [migration spec](monorepo-migration.md) § Section 3 walk through the disposition for each `#57` name.
 
 ## Trust boundaries
 

@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Define how `mutav-app/` becomes a Turborepo monorepo with one persona app per audience plus the shared **Mutav API** (Convex backend), reconciling the `mutav-stellar#57` proposal against the catalogs already in [`docs/architecture/README.md`](../../architecture/README.md). The output of this spec is the contract the implementation plan will follow; it commits to scope, sequence, and trust posture, and explicitly defers anything that needs its own design effort.
+Define how `mutav-app/` becomes a Turborepo monorepo with one persona app per audience plus the shared **Mutav API** (Convex backend), reconciling the `mutav-stellar#57` proposal against the catalogs already in [`docs/architecture/README.md`](README.md). The output of this spec is the contract the implementation plan will follow; it commits to scope, sequence, and trust posture, and explicitly defers anything that needs its own design effort.
 
 ## Mental model
 
@@ -71,7 +71,7 @@ mutav-app/                          # Turborepo root
 
 These are the architectural rules the implementation plan must preserve:
 
-- **Convex is single.** The hash-chained audit log + Merkle anchor (per [`reliability.md` § Audit log integrity](../../architecture/reliability.md)) requires a single writer. Per-app backends are explicitly rejected. If Convex has an incident, all four apps degrade together — that is the acknowledged trade-off.
+- **Convex is single.** The hash-chained audit log + Merkle anchor (per [`reliability.md` § Audit log integrity](reliability.md)) requires a single writer. Per-app backends are explicitly rejected. If Convex has an incident, all four apps degrade together — that is the acknowledged trade-off.
 - **All cookies are `Host-Only`** (no `Domain=.mutav.finance`). A staff cookie on `admin.mutav.finance` cannot be sent to `agency`, `fund`, or `pay`. This forecloses cookie-scoping attacks and forces explicit cross-origin auth handoff if it's ever needed.
 - **`mutavStaff` Auth0 connection is administratively distinct** from the agency-staff connection, with mandatory MFA enforced at the Auth0 rule level. Escalation path documented (Section 7): separate Auth0 tenant if BACEN/CVM diligence requires it.
 - **`apps/pay/` carries no Auth0 SDK code.** The dependency stays scoped to apps that actually use it. Defends against phishing UI and limits the blast radius of a future Auth0 vulnerability.
@@ -183,7 +183,7 @@ Eight PRs, in order. Each PR leaves `main` deployable and independently revertab
 
 ## Section 3 — Convex domain reconciliation
 
-The existing [Domain catalog](../../architecture/README.md#domain-catalog) wins, in full. The `#57` sketch is not adopted and not aliased.
+The existing [Domain catalog](README.md#domain-catalog) wins, in full. The `#57` sketch is not adopted and not aliased.
 
 | `#57`'s name | Disposition | Where the concept lives today |
 |---|---|---|
@@ -193,7 +193,7 @@ The existing [Domain catalog](../../architecture/README.md#domain-catalog) wins,
 | `payments` | Carries over | `convex/payments/` (shipped) |
 | `compliance` | Carries over (already planned) | `convex/compliance/` (planned) |
 
-The migration plan lands a one-paragraph cross-reference in [`docs/architecture/README.md` § Domain catalog](../../architecture/README.md#domain-catalog) explaining the mapping for future readers of `#57`. No code-level aliases; no rename of any existing domain.
+The migration plan lands a one-paragraph cross-reference in [`docs/architecture/README.md` § Domain catalog](README.md#domain-catalog) explaining the mapping for future readers of `#57`. No code-level aliases; no rename of any existing domain.
 
 ## Section 4 — `mutav-fund` fold-in checkpoints
 
@@ -315,12 +315,12 @@ Called out explicitly so absence is not mistaken for an oversight:
 - **Wallet-kit selection** — its own spec; blocks `apps/fund/` real-investor flows
 - **`apps/marketing/`** — its own milestone (CMS choice, content sourcing)
 - **`apps/docs/`** — its own milestone (Nextra vs Mintlify vs in-Next)
-- **`apps/admin/` A1–A6 surface** — its own milestone (per [`admin.md`](../../architecture/admin.md))
+- **`apps/admin/` A1–A6 surface** — its own milestone (per [`admin.md`](admin.md))
 - **HW-wallet flow inside `apps/admin/`** — depends on `apps/admin/` scaffold landing first; tracked separately
 - **6 Convex Action implementations** (mutav-app#141–#146) — separate issues, picked up after this plan + the KMS-Action runbook (`mutav-stellar#41`) both land
 - **KMS-Action runbook** — [`mutav-stellar#41`](https://github.com/mutav-finance/mutav-stellar/issues/41)
 - **DNS provisioning** — downstream ops; the plan commits subdomain mapping, not registrar/CNAME steps
-- **Convex US-hosted vs LGPD residency** — already in [`regulatory.md`](../../architecture/regulatory.md); no change from the migration
+- **Convex US-hosted vs LGPD residency** — already in [`regulatory.md`](regulatory.md); no change from the migration
 - **Branch-protection bypass cleanup** — non-institutional pattern noted; deferred to a separate cleanup follow-up
 - **External secrets manager** — deferred per Section 5
 
@@ -331,7 +331,7 @@ Key decisions, with the rationale anchored to existing docs:
 1. **Per-app subdomains** for the four persona apps. Origin isolation is the institutional default for fintech / RWA / custody platforms (Stripe, Anchorage, BitGo, every DeFi interface). Route-group split rejected.
 2. **Tenant pay extracted to `apps/pay/` on its own origin.** Cookie scope (Auth0 cookie isolation), phishing posture (`pay.` reads cleanly to tenants), and BACEN 4.658 cyber-resilience floor all point the same way. The existing README anticipates the same pattern for `admin` ("future migration to `admin.mutav.app` is documented as a security-driven trigger"); the same logic generalizes.
 3. **`mutavStaff` Auth0 connection administratively distinct** from agency staff. Mandatory MFA + IP allowlist; tenant separation as escalation. Matches Stripe / Anchorage staff IdP separation.
-4. **Convex stays at the repo root, single deployment.** Load-bearing: the hash-chained audit log + Merkle anchor (per [`reliability.md` § Audit log integrity](../../architecture/reliability.md)) requires a single writer. Multi-Convex setups don't exist as a product.
+4. **Convex stays at the repo root, single deployment.** Load-bearing: the hash-chained audit log + Merkle anchor (per [`reliability.md` § Audit log integrity](reliability.md)) requires a single writer. Multi-Convex setups don't exist as a product.
 5. **Workspace-first, packages-on-demand** migration strategy (Section 2). YAGNI on package boundaries — extract only when there's a real second consumer. Avoids speculative package design that doesn't survive contact with real apps.
 6. **Existing Convex domain catalog wins.** `#57`'s `investments` / `fundMgmt` are conceptually split across `fundState` / `nav` / `contracts` / `mutavStaff`. No renames; one paragraph of cross-reference added.
 7. **`mutav-fund` archive gated on three checkpoints** (Section 4) — including wallet-kit spec resolution and feature-parity audit. No premature archive.
@@ -348,7 +348,7 @@ Each of these is a downstream spec or issue, tracked here so the migration plan 
 | Wallet-kit selection | TBD | Blocked on this spec; needs CVE audit, smart-account-vs-hot-wallet posture |
 | `apps/marketing/` scoping | TBD | Net-new app; CMS choice + content sourcing |
 | `apps/docs/` scoping | TBD | Net-new app; Nextra vs Mintlify decision |
-| `apps/admin/` A1–A6 build-out | Per [`admin.md`](../../architecture/admin.md) | Blocked on PR 7 of this spec |
+| `apps/admin/` A1–A6 build-out | Per [`admin.md`](admin.md) | Blocked on PR 7 of this spec |
 | HW-wallet flow in `apps/admin/` | TBD | Blocked on PR 7 of this spec |
 | Convex Action implementations (#141–#146) | API team | Blocked on this spec + `mutav-stellar#41` |
 | KMS-Action runbook | mutav-stellar#41 | In flight |
@@ -358,11 +358,11 @@ Each of these is a downstream spec or issue, tracked here so the migration plan 
 
 ## References
 
-- [`docs/architecture/README.md`](../../architecture/README.md) — Domain catalog, Shell catalog, Trust boundaries (authoritative for naming)
-- [`docs/architecture/admin.md`](../../architecture/admin.md) — `(admin)` shell, A1–A6 pillars
-- [`docs/architecture/reliability.md`](../../architecture/reliability.md) — Audit log integrity (load-bearing for single-Convex decision)
-- [`docs/architecture/regulatory.md`](../../architecture/regulatory.md) — BACEN/CVM/LGPD floor
-- [`docs/architecture/security.md`](../../architecture/security.md) — Secrets and PII crypto model
+- [`docs/architecture/README.md`](README.md) — Domain catalog, Shell catalog, Trust boundaries (authoritative for naming)
+- [`docs/architecture/admin.md`](admin.md) — `(admin)` shell, A1–A6 pillars
+- [`docs/architecture/reliability.md`](reliability.md) — Audit log integrity (load-bearing for single-Convex decision)
+- [`docs/architecture/regulatory.md`](regulatory.md) — BACEN/CVM/LGPD floor
+- [`docs/architecture/security.md`](security.md) — Secrets and PII crypto model
 - [`mutav-finance/mutav-stellar#57`](https://github.com/mutav-finance/mutav-stellar/issues/57) — Source of the consolidation proposal being reconciled
 - [`mutav-finance/mutav-stellar#41`](https://github.com/mutav-finance/mutav-stellar/issues/41) — KMS-Action runbook (downstream)
 - [`mutav-finance/mutav-app#139`](https://github.com/mutav-finance/mutav-app/issues/139) — This planning effort

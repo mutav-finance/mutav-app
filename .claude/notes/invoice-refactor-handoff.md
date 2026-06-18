@@ -6,7 +6,7 @@ State capture for a fresh session to continue the `payments`→`invoices` + sett
 
 **The refactor is COMPLETE** as of PR 4 (this) — `invoice.method` is dropped; method derives from the succeeded settlement row. The bill (`invoices`) and settlement (`payments`) are fully split. Historical reference, in order:
 1. **Plan (PR sequence + decisions):** `~/.claude/plans/swift-inventing-tide.md`
-2. **Design spec (rationale, benchmarks, vocabulary map):** `docs/superpowers/specs/2026-06-16-invoice-settlement-vocabulary.md`
+2. **Design spec (rationale, benchmarks, vocabulary map):** was `docs/superpowers/specs/2026-06-16-invoice-settlement-vocabulary.md` — no longer tracked (superpowers is transient scratch; see git history).
 3. This file (status + gotchas).
 
 ## Status

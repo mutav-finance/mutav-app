@@ -178,7 +178,7 @@ Each **imobiliária maps to one Auth0 Organization**, mirrored 1:1 to one Convex
 
 **Migration tolerance (no breaking moment).** `queryWithAgencyScope` / `mutationWithAgencyScope` MUST tolerate both shapes during rollout: `agencies.auth0OrgId === undefined` (legacy agency → fall back to the Convex `memberships` projection) and `auth0OrgId === "org_…"` (prefer the JWT Org claim). Schema has landed: `agencies.auth0OrgId` + `by_auth0OrgId` index, `users.isStaff`.
 
-> Decision origin (Option C staff flag + Org-name-no-PII): brainstorm spec `docs/superpowers/specs/2026-05-26-auth0-orgs-onboarding-experience-design.md` (transient). This section is the durable record.
+> Decision origin (Option C staff flag + Org-name-no-PII): this section is the durable record (the brainstorm spec was transient and is no longer tracked).
 
 ## Strict compliance — the rule
 
