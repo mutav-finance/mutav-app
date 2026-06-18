@@ -23,6 +23,15 @@ const documentKey = v.union(
 
 const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
 
+// Canonical `mutavStaffRoleValidator` lives in `convex/mutavStaff/domain.ts`;
+// inlined here to avoid the entity-file → `_generated/dataModel` circular import.
+const mutavStaffRole = v.union(
+  v.literal("admin"),
+  v.literal("compliance"),
+  v.literal("support"),
+  v.literal("treasury"),
+);
+
 // `rental.exitCostMultiplier`, `rental.rentMultiplier`, and `rental.payer` all
 // persist as `v.string()` (set directly on the rental object). Legacy prod rows
 // hold bespoke values across these fields ("6x" / "40x" / "Recorrência via
@@ -223,6 +232,18 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_agency", ["agencyId"])
     .index("by_user_agency", ["userId", "agencyId"]),
+
+  // Mutav-internal staff capability grants. One row per (user, role); a person
+  // holding multiple capabilities has multiple rows. Distinct from
+  // `memberships` (agency-scoped) — staff act across all agencies with no
+  // agency context. See convex/mutavStaff/domain.ts.
+  mutavStaff: defineTable({
+    userId: v.id("users"),
+    role: mutavStaffRole,
+    createdAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_role", ["userId", "role"]),
 
   contracts: defineTable({
     agencyId: v.id("agencies"),
