@@ -37,13 +37,13 @@ test("recordSignal is idempotent within a window", async () => {
     windowKey: "d100",
     pulledAt: 100 * 24 * 60 * 60 * 1000,
   };
-  const first = await t.mutation(internal.creditRisk.useCases.recordSignal, base);
-  const second = await t.mutation(internal.creditRisk.useCases.recordSignal, {
+  const first = await t.mutation(internal.creditAnalysis.useCases.recordSignal, base);
+  const second = await t.mutation(internal.creditAnalysis.useCases.recordSignal, {
     ...base,
     correlationId: "corr-2",
   });
   expect(second).toBe(first);
-  const rows = await t.run((ctx) => ctx.db.query("creditRiskSignals").collect());
+  const rows = await t.run((ctx) => ctx.db.query("creditAnalysisSignals").collect());
   expect(rows).toHaveLength(1);
 });
 
@@ -52,7 +52,7 @@ test("getFreshAssessment respects the TTL window", async () => {
   const agencyId = await seedAgency(t);
   const now = 1_000_000_000_000;
   await t.run((ctx) =>
-    ctx.db.insert("creditRiskAssessments", {
+    ctx.db.insert("creditAnalysisAssessments", {
       agencyId,
       subjectType: "tenant",
       subjectHash: "hash-2",
@@ -64,13 +64,13 @@ test("getFreshAssessment respects the TTL window", async () => {
       assessedAt: now - 1000,
     }),
   );
-  const fresh = await t.query(internal.creditRisk.useCases.getFreshAssessment, {
+  const fresh = await t.query(internal.creditAnalysis.useCases.getFreshAssessment, {
     agencyId,
     subjectHash: "hash-2",
     notBefore: now - 5000,
   });
   expect(fresh?.tier).toBe("bom");
-  const stale = await t.query(internal.creditRisk.useCases.getFreshAssessment, {
+  const stale = await t.query(internal.creditAnalysis.useCases.getFreshAssessment, {
     agencyId,
     subjectHash: "hash-2",
     notBefore: now,
@@ -82,7 +82,7 @@ test("recordAssessment accepts an unavailable result with no score payload", asy
   const t = convexTest(schema);
   const agencyId = await seedAgency(t);
   const now = 1_000_000_000_000;
-  await t.mutation(internal.creditRisk.useCases.recordAssessment, {
+  await t.mutation(internal.creditAnalysis.useCases.recordAssessment, {
     agencyId,
     subjectType: "tenant",
     subjectHash: "hash-3",
@@ -91,7 +91,7 @@ test("recordAssessment accepts an unavailable result with no score payload", asy
     status: "unavailable",
     assessedAt: now,
   });
-  const fresh = await t.query(internal.creditRisk.useCases.getFreshAssessment, {
+  const fresh = await t.query(internal.creditAnalysis.useCases.getFreshAssessment, {
     agencyId,
     subjectHash: "hash-3",
     notBefore: now - 1,

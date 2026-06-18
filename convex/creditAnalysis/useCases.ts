@@ -3,7 +3,11 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { AgencyId } from "../agencies/domain";
 import { scoreTierValidator } from "../contracts/domain";
-import type { CreditRiskAssessment, CreditRiskAssessmentId, CreditRiskSignalId } from "./domain";
+import type {
+  CreditAnalysisAssessment,
+  CreditAnalysisAssessmentId,
+  CreditAnalysisSignalId,
+} from "./domain";
 import {
   capabilityValidator,
   creditScoreNormalizedValidator,
@@ -25,9 +29,9 @@ export const recordSignal = internalMutation({
     windowKey: v.string(),
     pulledAt: v.number(),
   },
-  handler: async (ctx, args): Promise<CreditRiskSignalId> => {
+  handler: async (ctx, args): Promise<CreditAnalysisSignalId> => {
     const existing = await ctx.db
-      .query("creditRiskSignals")
+      .query("creditAnalysisSignals")
       .withIndex("by_idempotency", (q) =>
         q
           .eq("agencyId", args.agencyId)
@@ -41,7 +45,7 @@ export const recordSignal = internalMutation({
     // fresh correlationId) share the existing row rather than re-paying the
     // provider. correlationId is intentionally not part of the key.
     if (existing) return existing._id;
-    return ctx.db.insert("creditRiskSignals", args);
+    return ctx.db.insert("creditAnalysisSignals", args);
   },
 });
 
@@ -51,14 +55,14 @@ export const recordAssessment = internalMutation({
     subjectType: subjectTypeValidator,
     subjectHash: v.string(),
     policyVersion: v.string(),
-    signalIds: v.array(v.id("creditRiskSignals")),
+    signalIds: v.array(v.id("creditAnalysisSignals")),
     status: v.union(v.literal("ok"), v.literal("unavailable")),
     score: v.optional(v.number()),
     tier: v.optional(scoreTierValidator),
     assessedAt: v.number(),
   },
-  handler: async (ctx, args): Promise<CreditRiskAssessmentId> => {
-    return ctx.db.insert("creditRiskAssessments", args);
+  handler: async (ctx, args): Promise<CreditAnalysisAssessmentId> => {
+    return ctx.db.insert("creditAnalysisAssessments", args);
   },
 });
 
@@ -69,9 +73,9 @@ export async function findFreshAssessment(
     subjectHash: string;
     notBefore: number;
   },
-): Promise<CreditRiskAssessment | null> {
+): Promise<CreditAnalysisAssessment | null> {
   return ctx.db
-    .query("creditRiskAssessments")
+    .query("creditAnalysisAssessments")
     .withIndex("by_agency_subject_time", (q) =>
       q
         .eq("agencyId", args.agencyId)

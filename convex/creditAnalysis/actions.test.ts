@@ -28,14 +28,14 @@ async function seedAgency(t: ReturnType<typeof convexTest>): Promise<AgencyId> {
 test("runCreditAnalysis (mock provider) writes one signal + an ok assessment", async () => {
   const t = convexTest(schema);
   const agencyId = await seedAgency(t);
-  await t.action(internal.creditRisk.actions.runCreditAnalysis, {
+  await t.action(internal.creditAnalysis.actions.runCreditAnalysis, {
     agencyId,
     subjectType: "tenant",
     document: "12345678901",
     capability: "credit_score",
   });
-  const signals = await t.run((ctx) => ctx.db.query("creditRiskSignals").collect());
-  const assessments = await t.run((ctx) => ctx.db.query("creditRiskAssessments").collect());
+  const signals = await t.run((ctx) => ctx.db.query("creditAnalysisSignals").collect());
+  const assessments = await t.run((ctx) => ctx.db.query("creditAnalysisAssessments").collect());
   expect(signals).toHaveLength(1);
   expect(signals[0].provider).toBe("mock");
   expect(signals[0].status).toBe("ok");
@@ -54,11 +54,11 @@ test("runCreditAnalysis is idempotent on signals within a day window", async () 
     document: "12345678901",
     capability: "credit_score" as const,
   };
-  await t.action(internal.creditRisk.actions.runCreditAnalysis, args);
-  await t.action(internal.creditRisk.actions.runCreditAnalysis, args);
-  const signals = await t.run((ctx) => ctx.db.query("creditRiskSignals").collect());
+  await t.action(internal.creditAnalysis.actions.runCreditAnalysis, args);
+  await t.action(internal.creditAnalysis.actions.runCreditAnalysis, args);
+  const signals = await t.run((ctx) => ctx.db.query("creditAnalysisSignals").collect());
   expect(signals).toHaveLength(1);
   // Signals dedupe within the window; assessments are append-only snapshots.
-  const assessments = await t.run((ctx) => ctx.db.query("creditRiskAssessments").collect());
+  const assessments = await t.run((ctx) => ctx.db.query("creditAnalysisAssessments").collect());
   expect(assessments).toHaveLength(2);
 });

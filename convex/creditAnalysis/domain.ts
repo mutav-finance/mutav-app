@@ -2,10 +2,10 @@ import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { type ScoreTier, tierForScore } from "../contracts/domain";
 
-export type CreditRiskSignal = Doc<"creditRiskSignals">;
-export type CreditRiskSignalId = Id<"creditRiskSignals">;
-export type CreditRiskAssessment = Doc<"creditRiskAssessments">;
-export type CreditRiskAssessmentId = Id<"creditRiskAssessments">;
+export type CreditAnalysisSignal = Doc<"creditAnalysisSignals">;
+export type CreditAnalysisSignalId = Id<"creditAnalysisSignals">;
+export type CreditAnalysisAssessment = Doc<"creditAnalysisAssessments">;
+export type CreditAnalysisAssessmentId = Id<"creditAnalysisAssessments">;
 
 export type Capability = "credit_score";
 export const CAPABILITY = { CREDIT_SCORE: "credit_score" } as const satisfies Record<
@@ -51,7 +51,7 @@ export type ProviderSignal =
     }
   | { status: "error"; provider: string; capability: Capability; error: string };
 
-export interface CreditRiskProvider {
+export interface CreditAnalysisProvider {
   readonly name: string;
   readonly capabilities: readonly Capability[];
   query(req: ProviderRequest): Promise<ProviderSignal>;

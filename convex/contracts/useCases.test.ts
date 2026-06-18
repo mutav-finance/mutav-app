@@ -262,7 +262,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
     expect(result.status).toBe("invalid");
   });
 
-  test("CNPJ (14-digit) also routes through creditRisk and yields a cached score", async () => {
+  test("CNPJ (14-digit) also routes through creditAnalysis and yields a cached score", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);

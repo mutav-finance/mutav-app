@@ -9,7 +9,7 @@ import {
   subjectTypeValidator,
   windowKeyForDay,
   type ProviderSignal,
-  type CreditRiskSignalId,
+  type CreditAnalysisSignalId,
 } from "./domain";
 import { resolveCreditProviders } from "./registry";
 
@@ -38,9 +38,9 @@ export const runCreditAnalysis = internalAction({
         : { status: "error", provider: providers[i].name, capability, error: String(r.reason) },
     );
 
-    const signalIds: CreditRiskSignalId[] = [];
+    const signalIds: CreditAnalysisSignalId[] = [];
     for (const signal of signals) {
-      const id = await ctx.runMutation(internal.creditRisk.useCases.recordSignal, {
+      const id = await ctx.runMutation(internal.creditAnalysis.useCases.recordSignal, {
         agencyId,
         subjectType,
         subjectHash,
@@ -58,7 +58,7 @@ export const runCreditAnalysis = internalAction({
     }
 
     const derived = deriveCreditAnalysis(signals);
-    await ctx.runMutation(internal.creditRisk.useCases.recordAssessment, {
+    await ctx.runMutation(internal.creditAnalysis.useCases.recordAssessment, {
       agencyId,
       subjectType,
       subjectHash,

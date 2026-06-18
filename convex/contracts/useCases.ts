@@ -17,8 +17,8 @@ import {
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
 } from "./domain";
-import { findFreshAssessment } from "../creditRisk/useCases";
-import { CAPABILITY, SUBJECT_TYPE } from "../creditRisk/domain";
+import { findFreshAssessment } from "../creditAnalysis/useCases";
+import { CAPABILITY, SUBJECT_TYPE } from "../creditAnalysis/domain";
 import type { ActivityBucket } from "./domain";
 import { getMaxGuaranteeCapacityCents } from "../lib/env";
 import { AUDIT_ACTION } from "../audit/domain";
@@ -485,7 +485,7 @@ export const requestCreditScore = mutationWithAgencyScope({
     // meanwhile.
     if (fresh) return { status: "cached" } as const;
 
-    await ctx.scheduler.runAfter(0, internal.creditRisk.actions.runCreditAnalysis, {
+    await ctx.scheduler.runAfter(0, internal.creditAnalysis.actions.runCreditAnalysis, {
       agencyId: ctx.agencyId,
       subjectType: SUBJECT_TYPE.TENANT,
       document: digits,

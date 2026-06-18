@@ -574,9 +574,9 @@ export default defineSchema({
     .index("by_email_audience", ["email", "audience"])
     .index("by_audience_ts", ["audience", "ts"]),
 
-  // DEPRECATED (creditRisk Phase 1): superseded by `creditRiskAssessments`.
+  // DEPRECATED (creditAnalysis Phase 1): superseded by `creditAnalysisAssessments`.
   // No longer written or read — the tenant credit path now runs through the
-  // creditRisk domain. Kept defined to avoid a "table has documents" push
+  // creditAnalysis domain. Kept defined to avoid a "table has documents" push
   // failure; drop via a follow-up migration once existing rows are cleared.
   // See docs/architecture/underwriting.md.
   // Per-agency credit report cache. `cpfHash` is HMAC-SHA256 of the digits;
@@ -591,7 +591,7 @@ export default defineSchema({
     pulledAt: v.number(),
   }).index("by_agency_cpf_time", ["agencyId", "cpfHash", "pulledAt"]),
 
-  // ── Credit risk (vendor-neutral credit-analysis signals) ──────────────────
+  // ── Credit analysis (vendor-neutral default-risk signals) ─────────────────
   // Append-only. One row per (provider × capability × pull). `subjectHash` is
   // HMAC-SHA256 of the CPF/CNPJ digits (same key as `tenantCreditReports`).
   // `windowKey` is the UTC-day idempotency bucket; `by_idempotency` is
@@ -599,7 +599,7 @@ export default defineSchema({
   // table-wide unique constraint, which Convex doesn't provide). No raw vendor
   // payload in Phase 1 (credit_score normalizes to a number); KYB raw lands
   // encrypted in Phase 2.
-  creditRiskSignals: defineTable({
+  creditAnalysisSignals: defineTable({
     agencyId: v.id("agencies"),
     subjectType: v.union(v.literal("tenant"), v.literal("agency"), v.literal("investor")),
     subjectHash: v.string(),
@@ -623,12 +623,12 @@ export default defineSchema({
 
   // Derived, reproducible credit-analysis snapshot. `signalIds` records exactly
   // which signals fed the result; `policyVersion` records the aggregation policy.
-  creditRiskAssessments: defineTable({
+  creditAnalysisAssessments: defineTable({
     agencyId: v.id("agencies"),
     subjectType: v.union(v.literal("tenant"), v.literal("agency"), v.literal("investor")),
     subjectHash: v.string(),
     policyVersion: v.string(),
-    signalIds: v.array(v.id("creditRiskSignals")),
+    signalIds: v.array(v.id("creditAnalysisSignals")),
     status: v.union(v.literal("ok"), v.literal("unavailable")),
     score: v.optional(v.number()),
     tier: v.optional(
