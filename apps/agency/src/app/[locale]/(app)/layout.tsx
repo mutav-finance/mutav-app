@@ -7,6 +7,8 @@ import { Toaster } from "@mutav/ui/sonner";
 import { ThemeProvider } from "@/providers/theme";
 import { redirect } from "@mutav/i18n/navigation";
 import { resolveUserDestination } from "@/lib/user-destination";
+import { buildCrossAppUrl } from "@/lib/cross-app";
+import { getAdminUrl } from "@/lib/env";
 
 /**
  * Server-side guard. Resolves the user's canonical destination and
@@ -25,6 +27,12 @@ export default async function AppLayout({
   const dest = await resolveUserDestination();
   if (dest.kind === "login") {
     nextRedirect("/auth/login");
+  }
+  if (dest.kind === "staff") {
+    // Cross-origin jump to the admin app — built from a trusted env base,
+    // so `next/navigation` redirect with an absolute URL, NOT the
+    // next-intl wrapper (which is same-origin only).
+    nextRedirect(buildCrossAppUrl(getAdminUrl(), locale));
   }
   if (dest.kind === "onboarding-welcome") {
     redirect({ href: "/onboarding", locale });

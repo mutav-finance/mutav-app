@@ -70,3 +70,14 @@ export function getAuth0Domain(): string | null {
 export function getAuth0Connection(): string {
   return process.env.AUTH0_CONNECTION ?? "mutavStaff";
 }
+
+/**
+ * Public URL of the agency app (`app.mutav.finance`). The admin staff gate
+ * bounces an authenticated-but-not-staff user here (cross-app, cross-origin
+ * — Phase D) rather than looping them back to Universal Login. Falls back
+ * to the agency dev port (3000) for local dev. Production sets
+ * `NEXT_PUBLIC_AGENCY_URL=https://app.mutav.finance`.
+ */
+export function getAgencyUrl(): string {
+  return process.env.NEXT_PUBLIC_AGENCY_URL ?? "http://localhost:3000";
+}
