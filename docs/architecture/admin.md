@@ -72,7 +72,7 @@ Same component, two render modes. Visible only when the current user has at leas
 
 ### Subdomain split — committed by monorepo migration
 
-The earlier version of this document deferred the subdomain split to "when a trigger fires." The [monorepo migration](../superpowers/specs/2026-05-31-monorepo-migration-design.md) (mutav-app#139) commits to `admin.mutav.finance` from day 1 instead — origin isolation is the institutional default for staff IdP surfaces (Stripe, Anchorage, BitGo, every regulated fintech), not a deferred response to a single trigger.
+The earlier version of this document deferred the subdomain split to "when a trigger fires." The monorepo migration ([ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md), [mutav-app#139](https://github.com/mutav-finance/mutav-app/issues/139)) commits to `admin.mutav.finance` from day 1 instead — origin isolation is the institutional default for staff IdP surfaces (Stripe, Anchorage, BitGo, every regulated fintech), not a deferred response to a single trigger.
 
 The cumulative rationale:
 
