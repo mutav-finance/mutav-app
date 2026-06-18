@@ -574,11 +574,13 @@ export default defineSchema({
     .index("by_email_audience", ["email", "audience"])
     .index("by_audience_ts", ["audience", "ts"]),
 
-  // Per-agency credit report cache. One row per lookup; never mutated after
-  // insert. The `cpfHash` is HMAC-SHA256 of the CPF/CNPJ digits (same key as
-  // `claimedDocuments`) so we can index without storing plaintext PII.
-  // `pulledAt` is a unix ms timestamp — used for the 24-hour cache window.
-  // `providerRef` is the bureau's own query ID for audit/dispute trail.
+  // DEPRECATED (creditAnalysis Phase 1): superseded by `creditAnalysisAssessments`.
+  // No longer written or read — the tenant credit path now runs through the
+  // creditAnalysis domain. Kept defined to avoid a "table has documents" push
+  // failure; drop via a follow-up migration once existing rows are cleared.
+  // See docs/architecture/underwriting.md.
+  // Per-agency credit report cache. `cpfHash` is HMAC-SHA256 of the digits;
+  // `providerRef` is the bureau's query id; `pulledAt` drives the 24h window.
   tenantCreditReports: defineTable({
     agencyId: v.id("agencies"),
     cpfHash: v.string(),
@@ -588,4 +590,50 @@ export default defineSchema({
     providerRef: v.optional(v.string()),
     pulledAt: v.number(),
   }).index("by_agency_cpf_time", ["agencyId", "cpfHash", "pulledAt"]),
+
+  // ── Credit analysis (vendor-neutral default-risk signals) ─────────────────
+  // Append-only. One row per (provider × capability × pull). `subjectHash` is
+  // HMAC-SHA256 of the CPF/CNPJ digits (same key as `tenantCreditReports`).
+  // `windowKey` is the UTC-day idempotency bucket; `by_idempotency` is
+  // agencyId-scoped (the prefix the Convex range query requires — not a
+  // table-wide unique constraint, which Convex doesn't provide). No raw vendor
+  // payload in Phase 1 (credit_score normalizes to a number); KYB raw lands
+  // encrypted in Phase 2.
+  creditAnalysisSignals: defineTable({
+    agencyId: v.id("agencies"),
+    subjectType: v.union(v.literal("tenant"), v.literal("agency"), v.literal("investor")),
+    subjectHash: v.string(),
+    capability: v.union(v.literal("credit_score")),
+    provider: v.string(),
+    status: v.union(v.literal("ok"), v.literal("error")),
+    normalized: v.optional(v.object({ score: v.number(), scale: v.number() })),
+    error: v.optional(v.string()),
+    vendorRef: v.optional(v.string()),
+    correlationId: v.string(),
+    windowKey: v.string(),
+    pulledAt: v.number(),
+  })
+    .index("by_idempotency", ["agencyId", "subjectHash", "capability", "provider", "windowKey"])
+    .index("by_agency_subject_capability_time", [
+      "agencyId",
+      "subjectHash",
+      "capability",
+      "pulledAt",
+    ]),
+
+  // Derived, reproducible credit-analysis snapshot. `signalIds` records exactly
+  // which signals fed the result; `policyVersion` records the aggregation policy.
+  creditAnalysisAssessments: defineTable({
+    agencyId: v.id("agencies"),
+    subjectType: v.union(v.literal("tenant"), v.literal("agency"), v.literal("investor")),
+    subjectHash: v.string(),
+    policyVersion: v.string(),
+    signalIds: v.array(v.id("creditAnalysisSignals")),
+    status: v.union(v.literal("ok"), v.literal("unavailable")),
+    score: v.optional(v.number()),
+    tier: v.optional(
+      v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"), v.literal("negado")),
+    ),
+    assessedAt: v.number(),
+  }).index("by_agency_subject_time", ["agencyId", "subjectHash", "assessedAt"]),
 });
