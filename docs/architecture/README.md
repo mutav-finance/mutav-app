@@ -13,7 +13,7 @@
 
 - [`admin.md`](admin.md) — Mutav Admin (Mutav-internal staff surface, pillars A1–A6 scoped per entity)
 - [`investor.md`](investor.md) — Investor portal (per-chain wallet-authenticated, KYC-gated by level, tranche selection at deposit, dual KYC regime for BR investors)
-- [`underwriting.md`](underwriting.md) — Tenant underwriting pipeline (verify → credit analysis → offer products); the `compliance` (verification) / `creditRisk` (credit analysis) / `products` (catalog) / `contracts` (coverage decision) composition.
+- [`underwriting.md`](underwriting.md) — Tenant underwriting pipeline (verify → credit analysis → offer products); the `compliance` (verification) / `creditAnalysis` (credit analysis) / `products` (catalog) / `contracts` (coverage decision) composition.
 
 **Cross-cutting:**
 

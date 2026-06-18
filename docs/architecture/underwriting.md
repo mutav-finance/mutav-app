@@ -15,10 +15,10 @@ Mutav is **B2B2C**: agencies (B2B) collect a tenant's (B2C) data and submit it; 
 The pipeline is three **independent, reusable capability modules** composed by contract creation:
 
 ```
-compliance/   VERIFICATION (KYC/identity)     → verifications          reusable: tenant · agency KYB · investor KYC
-creditRisk/   CREDIT ANALYSIS (default risk)  → creditRiskAssessments  capability-typed bureau providers → score/tier
-products/     CATALOG (guarantee products)    → products               admin-managed; global `enabled` capacity switch
-contracts/    COMPOSITION → coverageDecisions  (verify + creditRisk ∩ enabled catalog → eligible product set)
+compliance/      VERIFICATION (KYC/identity)     → verifications              reusable: tenant · agency KYB · investor KYC
+creditAnalysis/  CREDIT ANALYSIS (default risk)  → creditAnalysisAssessments  capability-typed bureau providers → score/tier
+products/        CATALOG (guarantee products)    → products                   admin-managed; global `enabled` capacity switch
+contracts/       COMPOSITION → coverageDecisions  (verify + creditAnalysis ∩ enabled catalog → eligible product set)
 ```
 
 **Separation of concerns is the core idea:** verification (identity/KYC) is a reusable asset valuable beyond credit; credit analysis is a graded risk; the _coverage decision_ (which products) is underwriting — owned by the composition, not by either capability. None of the three modules knows about the others; the composition wires them.
@@ -32,7 +32,7 @@ contracts/    COMPOSITION → coverageDecisions  (verify + creditRisk ∩ enable
 | D3  | Protocol-health gate      | **Hybrid** — per-tenant risk gates the set ∩ a coarse global `enabled` switch (reserve-coverage stress)                                                                             |
 | D4  | Verify vs risk            | **Separate** concerns/artifacts; verification is a hard gate (fail → decline)                                                                                                       |
 | D5  | Verification home         | **`convex/compliance/`** KYC vendor abstraction (`startVerification/getStatus/getRef/revoke`)                                                                                       |
-| D6  | Risk module name          | **`convex/creditRisk/`** (renamed from `screening`); UI term = "credit analysis"; disambiguated from compliance's AML _risk classification_                                         |
+| D6  | Risk module name          | **`convex/creditAnalysis/`** (renamed from `screening`); UI term = "credit analysis"; disambiguated from compliance's AML _risk classification_                                     |
 | D7  | Data controller           | **Mutav-BR is controller**; agency is collection point / co-controller; bureau is processor/separate controller — [ADR 0002](decisions/0002-b2b2c-tenant-credit-data-governance.md) |
 | D8  | Legal basis (operational) | **Art. 7, X "proteção do crédito"** (no consent) + legítimo-interesse backstop                                                                                                      |
 | D9  | Proprietary-dataset basis | **Separate purpose** — legítimo-interesse + LIA, or anonymization — never the underwriting basis                                                                                    |
@@ -43,7 +43,7 @@ contracts/    COMPOSITION → coverageDecisions  (verify + creditRisk ∩ enable
 ## Modules
 
 - **`compliance/` — verification.** Vendor providers behind `startVerification/getStatus/getRef/revoke`. Produces `verifications` keyed by `subjectHash`, freshness-windowed, reusable app-wide. Sensitive KYC payloads stay at the vendor; store summary + `vendorRef`.
-- **`creditRisk/` — credit analysis** (renamed from `screening`). Capability-typed providers (`bigdatacorp`, …) → `creditRiskSignals` (immutable) → `creditRiskAssessments` (score → tier; the "credit analysis"). Purpose-neutral, subject-keyed, reusable across contracts within an agency.
+- **`creditAnalysis/` — credit analysis** (renamed from `screening`). Capability-typed providers (`bigdatacorp`, …) → `creditAnalysisSignals` (immutable) → `creditAnalysisAssessments` (score → tier; the "credit analysis"). Purpose-neutral, subject-keyed, reusable across contracts within an agency.
 - **`products/` — catalog.** Admin-managed guarantee products: terms bundle + `minTier` eligibility + `requiresVerified` + global `enabled` switch.
 - **`contracts/` — composition.** `runTenantUnderwriting`: verify ∥ credit-analyze (reuse fresh) → gate on verified → intersect `enabled` catalog by `minTier` → write one `coverageDecision` (+ Art. 20 reasons).
 
@@ -51,13 +51,13 @@ contracts/    COMPOSITION → coverageDecisions  (verify + creditRisk ∩ enable
 
 **Operational (in LGPD scope — pseudonymized via `subjectHash`):**
 
-| Table                   | Domain     | Shape (essential)                                                                                                                                                                                       |
-| ----------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verifications`         | compliance | `subjectType, subjectHash, provider, status(pending\|verified\|failed), vendorRef, reasons[]?, verifiedAt, expiresAt, requestedByAgencyId?`                                                             |
-| `creditRiskSignals`     | creditRisk | append-only; `agencyId, subjectType, subjectHash, capability, provider, status, normalized{score,scale}?, error?, vendorRef?, correlationId, windowKey, pulledAt`                                       |
-| `creditRiskAssessments` | creditRisk | `agencyId, subjectType, subjectHash, policyVersion, signalIds[], status(ok\|unavailable), score?, tier?, assessedAt`                                                                                    |
-| `products`              | products   | `slug, name, terms{rentMultiplier, exitCostMultiplier, feeCents, oneTimeActivationFeeCents, coverageCapCents}, minTier, requiresVerified, enabled, effectiveFrom/To?`                                   |
-| `coverageDecisions`     | contracts  | `contractRef, agencyId, subjectType, subjectHash, verificationId, creditRiskAssessmentId, outcome(offered\|declined), eligibleProductIds[], recommendedProductId?, reasons[], policyVersion, decidedAt` |
+| Table                       | Domain         | Shape (essential)                                                                                                                                                                                           |
+| --------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verifications`             | compliance     | `subjectType, subjectHash, provider, status(pending\|verified\|failed), vendorRef, reasons[]?, verifiedAt, expiresAt, requestedByAgencyId?`                                                                 |
+| `creditAnalysisSignals`     | creditAnalysis | append-only; `agencyId, subjectType, subjectHash, capability, provider, status, normalized{score,scale}?, error?, vendorRef?, correlationId, windowKey, pulledAt`                                           |
+| `creditAnalysisAssessments` | creditAnalysis | `agencyId, subjectType, subjectHash, policyVersion, signalIds[], status(ok\|unavailable), score?, tier?, assessedAt`                                                                                        |
+| `products`                  | products       | `slug, name, terms{rentMultiplier, exitCostMultiplier, feeCents, oneTimeActivationFeeCents, coverageCapCents}, minTier, requiresVerified, enabled, effectiveFrom/To?`                                       |
+| `coverageDecisions`         | contracts      | `contractRef, agencyId, subjectType, subjectHash, verificationId, creditAnalysisAssessmentId, outcome(offered\|declined), eligibleProductIds[], recommendedProductId?, reasons[], policyVersion, decidedAt` |
 
 **Compliance substrate (new — required by the controller/dataset posture; see [ADR 0002](decisions/0002-b2b2c-tenant-credit-data-governance.md)):**
 
@@ -70,7 +70,7 @@ contracts/    COMPOSITION → coverageDecisions  (verify + creditRisk ∩ enable
 ## Data flow (at "agency submits tenant, continue")
 
 1. `runTenantUnderwriting` records a `processingBasisRecord` (purpose `tenant_underwriting`, basis `protecao_credito`).
-2. Runs `verify(subject)` (compliance) ∥ `assessCredit(subject)` (creditRisk), reusing fresh results within their windows.
+2. Runs `verify(subject)` (compliance) ∥ `assessCredit(subject)` (creditAnalysis), reusing fresh results within their windows.
 3. Gate: not `verified` → `coverageDecision{outcome: declined, reasons}`.
 4. Else intersect `enabled` catalog by `tier ≥ minTier` → `eligibleProductIds` + `recommended` + reasons → one `coverageDecision` linked to the contract, with an Art. 20 reasons record.
 5. Agency picks a product → its terms populate the contract's `rental` bundle.
@@ -79,12 +79,12 @@ contracts/    COMPOSITION → coverageDecisions  (verify + creditRisk ∩ enable
 
 ## Phasing
 
-- **Phase A — operational underwriting (buildable now).** verify → credit analysis → products → coverage decision on the `proteção ao crédito` basis, with compliance seams (purpose tags, `processingBasisRecords`, Art. 20 reasons). Slices: A1 `screening→creditRisk` rename+trim · A2 `products` catalog · A3 `compliance/` verification · A4 `contracts/` composition + `coverageDecisions`.
+- **Phase A — operational underwriting (buildable now).** verify → credit analysis → products → coverage decision on the `proteção ao crédito` basis, with compliance seams (purpose tags, `processingBasisRecords`, Art. 20 reasons). Slices: A1 `screening→creditAnalysis` rename+trim · A2 `products` catalog · A3 `compliance/` verification · A4 `contracts/` composition + `coverageDecisions`.
 - **Phase B — proprietary dataset (capture-early, build-later, counsel-gated).** Write `tenantOutcomes` from day one; defer the anonymization pipeline + `trainingCorpus` + proprietary scoring model until data volume + counsel sign-off. See [ADR 0002](decisions/0002-b2b2c-tenant-credit-data-governance.md) § Open questions for counsel.
 
 ## Status / disposition
 
-- `creditRisk` provider+signal engine is built (originally `convex/screening/`, PR #188) and is being renamed/trimmed in slice A1.
+- `creditAnalysis` provider+signal engine is built, renamed, and trimmed (slice A1, PR #188; originally `convex/screening/`).
 - `compliance/verification`, `products`, the `contracts` composition, and the compliance substrate are not yet built.
 
 ## Related reading
