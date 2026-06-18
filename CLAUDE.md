@@ -313,7 +313,7 @@ Strict-compliance rule (enforced in review):
 - **Identity-only exception:** `queryWithAuth` / `mutationWithAuth` for handlers that don't have a natural agency (e.g. listing the current user's own agencies).
 - **Internal writers (`internalMutation` / `internalQuery`):** no wrapper — auth was already enforced by the public caller.
 - **Actions (`ActionCtx`):** no DB access for membership lookup; use `requireIdentity(ctx)` + an `internalQuery` for membership. Per-action wrappers may come later.
-- **Calling wrapped functions from actions:** `ctx.runQuery(api.X.wrapped, …)` inherits the action's identity — fine when the action runs from an authenticated dashboard route, **broken post-Auth0** when the action runs from a tenant/public/webhook context. For those, route through an `internal.X.Y` companion (e.g. `payments.getByIdInternal`, `contracts.getByPublicIdInternal`). When wrapping a new domain, grep `ctx\.runQuery(api\.<domain>\.` and fix every tenant-facing hit. See [`docs/auth.md`](docs/auth.md) for the full pattern.
+- **Calling wrapped functions from actions:** `ctx.runQuery(api.X.wrapped, …)` inherits the action's identity — fine when the action runs from an authenticated dashboard route, **broken post-Auth0** when the action runs from a tenant/public/webhook context. For those, route through an `internal.X.Y` companion (e.g. `invoices.getByIdInternal`, `contracts.getByPublicIdInternal`). When wrapping a new domain, grep `ctx\.runQuery(api\.<domain>\.` and fix every tenant-facing hit. See [`docs/auth.md`](docs/auth.md) for the full pattern.
 
 Pre-Auth0, `resolveCurrentUser` looks up the hardcoded `dev-user` row. When Auth0 lands, that one function in `convex/lib/auth.ts` swaps to `ctx.auth.getUserIdentity()` and every wrapped handler migrates at once. Do not add per-handler auth shims that would need to be undone on the swap.
 
@@ -482,12 +482,12 @@ Each Convex domain folder (`convex/{domain}/`) is a bounded context. Keep the bo
 
 **One concern per domain**
 
-| Domain       | Owns                                           | Does NOT own                       |
-| ------------ | ---------------------------------------------- | ---------------------------------- |
-| `users/`     | Identity, profile, user resolution             | Roles, org membership, auth tokens |
-| `agencies/`  | Organization data, membership, roles           | User profile fields, contract data |
-| `contracts/` | Rental lifecycle, documents, tenant, history   | Payment state, agency billing      |
-| `payments/`  | Invoice lifecycle, line items, payment methods | Contract status, tenant info       |
+| Domain       | Owns                                                                 | Does NOT own                                                |
+| ------------ | -------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `users/`     | Identity, profile, user resolution                                   | Roles, org membership, auth tokens                          |
+| `agencies/`  | Organization data, membership, roles                                 | User profile fields, contract data                          |
+| `contracts/` | Rental lifecycle, documents, tenant, history                         | Payment state, agency billing                               |
+| `invoices/`  | Invoice lifecycle (the bill), line items, status (`overdue` derived) | Settlement/payment processing, contract status, tenant info |
 
 When a query needs data from two domains (e.g. membership + user info), the enrichment belongs in the domain that drives the use case — `agencies/useCases.ts` enriches membership rows with user data because the agency domain drives the members list. The user domain does not reach into memberships.
 

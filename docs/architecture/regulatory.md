@@ -46,6 +46,18 @@ This narrows the field to BR-native providers (Unico, Caf, Datavalid, Didit) or 
 
 Out of scope architecturally but operationally required: a documented privacy policy declaring the cross-border transfer to Convex, the KYC vendor processor relationship, the data retention schedule, the erasure procedure, **and the cross-entity data flow** (which PII goes from `Mutav-BR` to `Mutav-Fund` for investor onboarding). These are legal artifacts; the architecture must enable them.
 
+### Tenant credit data — B2B2C controller model + proprietary dataset
+
+In the B2B2C underwriting flow (agency collects the tenant's data; Mutav verifies + credit-analyzes + offers products), **`Mutav-BR` is the data controller** (it sets the underwriting _finalidade_); the agency is the collection point / co-controller; the bureau is processor or separate controller. This makes a **cross-agency proprietary credit dataset** lawful in principle, on conditions. Working assumptions (counsel-pending):
+
+- **Underwriting basis** = LGPD **Art. 7, X "proteção do crédito"** (no consent), legítimo-interesse + LIA as backstop. CPF/credit history are not sensitive data (Art. 11 does not gate).
+- **Proprietary dataset** is a **distinct purpose** (Art. 6 I) — its own basis (legítimo-interesse + LIA) or anonymization; never the underwriting basis.
+- `subjectHash = HMAC(CPF)` is **pseudonymization (in scope)**, not anonymization. A training corpus is out of LGPD scope (and survives erasure) only behind a **true anonymization boundary**.
+- **No third-party sharing** of scores/data (keeps Mutav a _consulente_, not a _gestor_ under Lei 12.414/2011 / LC 166/2019).
+- **Art. 20** automated-decision review/explanation: persist a reasons record (criteria + human-in-loop flag).
+
+Full decision record, architectural consequences (basis records, purpose tags, `tenantOutcomes`, anonymization boundary, Art. 20 reasons), and the **9 open questions for counsel** are in [`decisions/0002-b2b2c-tenant-credit-data-governance.md`](decisions/0002-b2b2c-tenant-credit-data-governance.md); the pipeline is in [`underwriting.md`](underwriting.md).
+
 ## BCB Resolução 519/2025 — KYC and VASP authorization
 
 BCB 519/2025 (in force 2025) consolidated Brazilian crypto regulation. The KYC floor it sets is non-negotiable for any consumer-facing crypto service operating in Brazil.

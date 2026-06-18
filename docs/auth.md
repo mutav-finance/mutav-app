@@ -148,8 +148,6 @@ Two callsites:
 
 Both halves are gated on the same env presence, so a mismatched config can't silently downgrade auth.
 
-### Multi-entity Auth0 consideration
-
 ### Multi-entity Auth0 consideration (deferred to per-entity rollout)
 
 The three-entity model from [`architecture/entities.md`](architecture/entities.md) (`Mutav-BR` + `Mutav-Fund` + `Mutav-Mgmt`) shows up at Auth0-swap time as a question about Auth0 application / tenant topology:
@@ -160,6 +158,27 @@ The three-entity model from [`architecture/entities.md`](architecture/entities.m
 For v1 the single-application option is correct — same operations team serves all three entities, cross-entity roles are normal, and the entity scope lives in the `mutavStaff` row, not in the IDP. Revisit only if entity-level operational separation makes the single-tenant ergonomics painful.
 
 Worth noting in this doc because the Auth0 swap PR is the natural moment to commit to the topology and accidentally choosing wrong creates churn.
+
+## Auth0 Organizations — agency identity model
+
+Each **imobiliária maps to one Auth0 Organization**, mirrored 1:1 to one Convex `agencies` row; each **corretor is one Auth0 user** mirrored to one `users` row. **Membership is canonical in Auth0** (the Org's member list + Org role `owner`/`admin`/`member`); the Convex `memberships` row is a **cached projection** synced at login/provisioning. Mutav-internal staff are Auth0 users with **no Organization** + `users.isStaff: true`.
+
+| Concept     | Auth0                 | Convex (projection)        |
+| ----------- | --------------------- | -------------------------- |
+| Imobiliária | Organization          | `agencies` row             |
+| Corretor    | User                  | `users` row                |
+| Membership  | Org member + Org role | `memberships` row (cached) |
+| Mutav staff | User, no Org          | `users.isStaff: true`      |
+
+**Org naming (no PII).** Auth0 Org `name = ag-<convex agency _id>` (globally unique, stable across renames, carries no PII); `display_name = agencies.name`; `metadata = { cnpj_hmac, agency_type, created_at }`, where `cnpj_hmac` uses the same HMAC pepper as `claimedDocuments` / `hashPii`. Never put the CNPJ or agency name in the Org `name`.
+
+**JWT claim shape.** An Auth0 Post-Login Action injects `https://mutav.com/orgs` = `[{ id, display_name, role }]` (the user's agencies + role). When the user logs in scoped to exactly one Org (`?organization=…`), the native `org_id` claim is also present. **Wrappers prefer the custom `…/orgs` claim and fall back to native `org_id`.**
+
+**Staff identity = Option C (Convex flag), for now.** Staff authority is a `users.isStaff` boolean checked by `queryWithStaff` / `mutationWithStaff`; granted by flipping the flag (no Auth0 change). **Graduate to Auth0 Roles (Option B)** when any of these holds: staff count exceeds ~10; granular per-permission roles are needed (auditor / regional-admin); or an external auditor / compliance officer needs scoped, time-limited access. Estimated 12–18 months out.
+
+**Migration tolerance (no breaking moment).** `queryWithAgencyScope` / `mutationWithAgencyScope` MUST tolerate both shapes during rollout: `agencies.auth0OrgId === undefined` (legacy agency → fall back to the Convex `memberships` projection) and `auth0OrgId === "org_…"` (prefer the JWT Org claim). Schema has landed: `agencies.auth0OrgId` + `by_auth0OrgId` index, `users.isStaff`.
+
+> Decision origin (Option C staff flag + Org-name-no-PII): brainstorm spec `docs/superpowers/specs/2026-05-26-auth0-orgs-onboarding-experience-design.md` (transient). This section is the durable record.
 
 ## Strict compliance — the rule
 
