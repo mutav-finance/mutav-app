@@ -40,6 +40,17 @@ export function getPayUrl(): string {
 }
 
 /**
+ * Public URL of the staff-facing admin app (`admin.mutav.finance`). The
+ * agency post-login guard sends a Mutav-org user with no active agency
+ * here (cross-app, cross-origin redirect — Phase D). Falls back to the
+ * admin dev port (3003) for local dev. Production sets
+ * `NEXT_PUBLIC_ADMIN_URL=https://admin.mutav.finance`.
+ */
+export function getAdminUrl(): string {
+  return process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3003";
+}
+
+/**
  * Server-only base URL used by the Auth0 SDK + our `onCallback` redirect
  * construction. Distinct from `getAppUrl()` (client-facing
  * `NEXT_PUBLIC_APP_URL`): `APP_BASE_URL` is the canonical name the
