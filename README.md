@@ -80,7 +80,7 @@ the repo root.
 
 Each app has its own Vercel project rooted at `apps/<name>` and its own
 hostname. Cookies are `Host-Only` so a session never crosses subdomains
-(see [spec § Section 1](docs/superpowers/specs/2026-05-31-monorepo-migration-design.md)).
+(see [spec § Section 1](docs/architecture/monorepo-migration.md)).
 
 ### Packages
 

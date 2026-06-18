@@ -1,6 +1,6 @@
 # Mutav monorepo — CODEOWNERS
 #
-# Per the spec at docs/superpowers/specs/2026-05-31-monorepo-migration-design.md
+# Per the spec at docs/architecture/monorepo-migration.md
 # § Section 6, every app and every package has its own ownership rule.
 # Team handles are placeholders — see spec § Section 10 follow-up.
 

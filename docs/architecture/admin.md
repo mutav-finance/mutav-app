@@ -44,7 +44,7 @@ Today the wrappers resolve identity to a hardcoded `dev-user`. The same `dev-use
 
 ### Same domain, separate route group (pre-migration)
 
-> This section describes the **pre-migration** state. After PR 7 of the [monorepo migration](../superpowers/specs/2026-05-31-monorepo-migration-design.md), `(admin)/admin/*` moves to `apps/admin/` on its own origin (`admin.mutav.finance`) with a separate Auth0 connection. See § Subdomain split below.
+> This section describes the **pre-migration** state. After PR 7 of the [monorepo migration](monorepo-migration.md), `(admin)/admin/*` moves to `apps/admin/` on its own origin (`admin.mutav.finance`) with a separate Auth0 connection. See § Subdomain split below.
 
 `(admin)/admin/*` lives in the same Next.js deployment as `(app)/*`. Shared session (one Auth0 login covers both), shared infrastructure (one Vercel project, one Convex deployment), zero duplicated code paths.
 

@@ -38,7 +38,7 @@ All data flows from [`src/components/investor/fund-data.ts`](../../src/component
 
 This is intentional. The UI was built ahead of the onchain infrastructure so the portfolio and deposit/redeem flows could be validated visually before contracts and indexer were in place. The target architecture below is how this becomes real.
 
-> **Migration note.** After PRs 4–5 of the [monorepo migration](../superpowers/specs/2026-05-31-monorepo-migration-design.md), this shell moves to `apps/fund/` on its own origin (`fund.mutav.finance`). The route group structure stays identical; only the deployable home and the origin change. Wallet-kit selection is deferred to a separate spec, so `apps/fund/` ships without a wallet kit at PR 4; the existing investor portal stays in `apps/agency/` until that spec resolves and the port lands. The fold-in from the soft-deprecated [`mutav-fund/`](https://github.com/mutav-finance/mutav-fund) repo follows the wallet-kit port; the archive trigger is documented in spec § Section 4.
+> **Migration note.** After PRs 4–5 of the [monorepo migration](monorepo-migration.md), this shell moves to `apps/fund/` on its own origin (`fund.mutav.finance`). The route group structure stays identical; only the deployable home and the origin change. Wallet-kit selection is deferred to a separate spec, so `apps/fund/` ships without a wallet kit at PR 4; the existing investor portal stays in `apps/agency/` until that spec resolves and the port lands. The fold-in from the soft-deprecated [`mutav-fund/`](https://github.com/mutav-finance/mutav-fund) repo follows the wallet-kit port; the archive trigger is documented in spec § Section 4.
 
 ## Wallet as identity (per chain)
 

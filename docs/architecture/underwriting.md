@@ -2,7 +2,7 @@
 
 **Status:** Design accepted (2026-06-17); Phase A buildable, Phase B counsel-gated.
 **Decision record:** data-governance decisions in [ADR 0002](decisions/0002-b2b2c-tenant-credit-data-governance.md). Architecture decisions D1–D12 below.
-**Tracking:** tier→product mapping [#184](https://github.com/mutav-finance/mutav-app/issues/184). Brainstorm origin: `docs/superpowers/specs/2026-06-17-tenant-underwriting-architecture-design.md` (transient).
+**Tracking:** tier→product mapping [#184](https://github.com/mutav-finance/mutav-app/issues/184). This doc is the durable record.
 
 ## Purpose
 

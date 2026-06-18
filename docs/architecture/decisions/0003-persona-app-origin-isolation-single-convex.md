@@ -1,6 +1,6 @@
 # ADR 0003 — Persona-app origin isolation on a single-Convex monorepo
 
-**Status:** Accepted (2026-05-31) · **Phase:** monorepo migration ([#139](https://github.com/mutav-finance/mutav-app/issues/139)) · **Staged-PR sequence:** [`../../superpowers/specs/2026-05-31-monorepo-migration-design.md`](../../superpowers/specs/2026-05-31-monorepo-migration-design.md) (transient plan)
+**Status:** Accepted (2026-05-31) · **Phase:** monorepo migration ([#139](https://github.com/mutav-finance/mutav-app/issues/139)) · **Staged-PR sequence:** [monorepo-migration.md](../monorepo-migration.md)
 
 ## Context
 
