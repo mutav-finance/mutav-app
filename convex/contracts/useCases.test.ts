@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
 import {
@@ -196,6 +196,91 @@ describe("getInsuredCapacityGlobal", () => {
     const result = await asUser.query(api.contracts.useCases.getInsuredCapacityGlobal, {});
     expect(result.sumInsuredCents).toBe(350_00);
     expect(result.maxCapacityCents).toBeGreaterThan(0);
+  });
+});
+
+describe("requestCreditScore / getCachedCreditScore", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("scheduling a CPF makes the score readable via getCachedCreditScore after actions run", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const req = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+      agencyId,
+      document: "12345678901",
+    });
+    expect(req.status).toBe("fetching");
+
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const cached = await asUser.query(api.contracts.useCases.getCachedCreditScore, {
+      agencyId,
+      document: "12345678901",
+    });
+    expect(cached).not.toBeNull();
+    expect(cached?.tier).toBeDefined();
+  });
+
+  test("returns cached status when a fresh assessment already exists", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const first = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+      agencyId,
+      document: "12345678901",
+    });
+    expect(first.status).toBe("fetching");
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const second = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+      agencyId,
+      document: "12345678901",
+    });
+    expect(second.status).toBe("cached");
+  });
+
+  test("returns invalid for a malformed document string", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+      agencyId,
+      document: "123",
+    });
+    expect(result.status).toBe("invalid");
+  });
+
+  test("CNPJ (14-digit) also routes through screening and yields a cached score", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const req = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+      agencyId,
+      document: "12345678000190",
+    });
+    expect(req.status).toBe("fetching");
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const cached = await asUser.query(api.contracts.useCases.getCachedCreditScore, {
+      agencyId,
+      document: "12345678000190",
+    });
+    expect(cached).not.toBeNull();
+    expect(cached?.score).toBeGreaterThan(0);
   });
 });
 

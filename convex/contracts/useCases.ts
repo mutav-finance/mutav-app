@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { internalMutation, internalQuery, query } from "../_generated/server";
+import { internalQuery, query } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
 import { priceContract } from "../../apps/agency/src/lib/pricing/contract";
@@ -16,8 +16,9 @@ import {
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
-  tierForScore,
 } from "./domain";
+import { findFreshAssessment } from "../screening/useCases";
+import { CAPABILITY, SCREENING_PURPOSE, SUBJECT_TYPE } from "../screening/domain";
 import type { ActivityBucket } from "./domain";
 import { getMaxGuaranteeCapacityCents } from "../lib/env";
 import { AUDIT_ACTION } from "../audit/domain";
@@ -440,42 +441,24 @@ export const listForCommissionByMonth = queryWithAgencyScope({
 
 const CREDIT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-/**
- * Reads the most recent credit report for `document` (CPF or CNPJ digits)
- * from the `tenantCreditReports` cache. Returns null if no result exists
- * within the 24-hour TTL — the caller should trigger `requestCreditScore`
- * to schedule a fresh lookup.
- */
 export const getCachedCreditScore = queryWithAgencyScope({
   args: { document: v.string() },
   handler: async (ctx, { document }) => {
     const digits = document.replace(/\D/g, "");
     if (digits.length !== 11 && digits.length !== 14) return null;
 
-    const docHash = await hashPii(digits);
-    const cutoff = Date.now() - CREDIT_CACHE_TTL_MS;
-
-    const report = await ctx.db
-      .query("tenantCreditReports")
-      .withIndex("by_agency_cpf_time", (q) =>
-        q.eq("agencyId", ctx.agencyId).eq("cpfHash", docHash).gt("pulledAt", cutoff),
-      )
-      .order("desc")
-      .first();
-
-    if (!report) return null;
-    return { score: report.score, tier: report.tier };
+    const subjectHash = await hashPii(digits);
+    const assessment = await findFreshAssessment(ctx, {
+      agencyId: ctx.agencyId,
+      subjectHash,
+      purpose: SCREENING_PURPOSE.TENANT_UNDERWRITING,
+      notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
+    });
+    if (!assessment || assessment.status !== "ok" || !assessment.result) return null;
+    return { score: assessment.result.score, tier: assessment.result.tier };
   },
 });
 
-/**
- * Ensures a fresh credit score is available for `document`.
- * - If a cached result exists within 24 h, returns `{ status: "cached" }`.
- * - For CNPJ (PJ entities): inserts a mock score synchronously (no bureau API).
- * - For CPF: schedules `fetchCreditScore` action; returns `{ status: "fetching" }`.
- *   The action writes to `tenantCreditReports`, which triggers `getCachedCreditScore`
- *   to update reactively in the wizard UI.
- */
 export const requestCreditScore = mutationWithAgencyScope({
   args: { document: v.string() },
   handler: async (ctx, { document }) => {
@@ -484,66 +467,27 @@ export const requestCreditScore = mutationWithAgencyScope({
       return { status: "invalid" } as const;
     }
 
-    const docHash = await hashPii(digits);
-    const cutoff = Date.now() - CREDIT_CACHE_TTL_MS;
-
-    const cached = await ctx.db
-      .query("tenantCreditReports")
-      .withIndex("by_agency_cpf_time", (q) =>
-        q.eq("agencyId", ctx.agencyId).eq("cpfHash", docHash).gt("pulledAt", cutoff),
-      )
-      .order("desc")
-      .first();
-
-    if (cached) return { status: "cached" } as const;
-
-    // CNPJ — no bureau API in this milestone; insert deterministic mock inline
-    if (digits.length === 14) {
-      const score = (parseInt(digits.slice(-4), 10) % 601) + 300;
-      await ctx.db.insert("tenantCreditReports", {
-        agencyId: ctx.agencyId,
-        cpfHash: docHash,
-        score,
-        tier: tierForScore(score),
-        provider: "mock",
-        pulledAt: Date.now(),
-      });
-      return { status: "inserted" } as const;
-    }
-
-    // CPF — schedule async action (BigDataCorp or mock based on SCORE_PROVIDER)
-    await ctx.scheduler.runAfter(0, internal.contracts.actions.fetchCreditScore, {
-      cpf: digits,
+    const subjectHash = await hashPii(digits);
+    const fresh = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
+      subjectHash,
+      purpose: SCREENING_PURPOSE.TENANT_UNDERWRITING,
+      notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
+    });
+    // Any fresh assessment gates re-scheduling — including an `unavailable`
+    // one. Re-running the pull re-charges the provider, so a transient outage
+    // is not retried until the TTL expires; getCachedCreditScore returns null
+    // meanwhile.
+    if (fresh) return { status: "cached" } as const;
+
+    await ctx.scheduler.runAfter(0, internal.screening.actions.runScreening, {
+      agencyId: ctx.agencyId,
+      subjectType: SUBJECT_TYPE.TENANT,
+      document: digits,
+      capability: CAPABILITY.CREDIT_SCORE,
+      purpose: SCREENING_PURPOSE.TENANT_UNDERWRITING,
     });
     return { status: "fetching" } as const;
-  },
-});
-
-/**
- * Persists a resolved credit score from `fetchCreditScore`. Called via
- * `ctx.runMutation` from the internalAction — never called directly by clients.
- */
-export const saveCreditReport = internalMutation({
-  args: {
-    agencyId: v.id("agencies"),
-    cpf: v.string(),
-    score: v.number(),
-    tier: v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"), v.literal("negado")),
-    provider: v.string(),
-    providerRef: v.optional(v.string()),
-  },
-  handler: async (ctx, { agencyId, cpf, score, tier, provider, providerRef }) => {
-    const cpfHash = await hashPii(cpf.replace(/\D/g, ""));
-    await ctx.db.insert("tenantCreditReports", {
-      agencyId,
-      cpfHash,
-      score,
-      tier,
-      provider,
-      providerRef,
-      pulledAt: Date.now(),
-    });
   },
 });
 

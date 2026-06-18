@@ -1,8 +1,9 @@
 /**
  * Which score bureau provider to use for tenant score lookups.
  * Defaults to "mock" so deployments without credentials still work.
- * Any registered provider name is valid — unknown values fall back to "mock"
- * inside `resolveProvider()` in `convex/contracts/scoreProviders.ts`.
+ * An unknown (non-empty) value THROWS in `resolveCreditProviders()`
+ * (`convex/screening/registry.ts`) — there is no silent fallback, so a typo
+ * surfaces loudly rather than fabricating a score.
  *
  *   bunx convex env set SCORE_PROVIDER cpfcnpj
  *   bunx convex env set SCORE_PROVIDER bigdatacorp
