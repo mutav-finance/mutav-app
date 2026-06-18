@@ -3,7 +3,7 @@ import {
   DEFAULT_CREDIT_SCALE,
   type ProviderRequest,
   type ProviderSignal,
-  type ScreeningProvider,
+  type CreditRiskProvider,
 } from "../domain";
 
 /** Deterministic dev score in [300, 900] from the last 4 document digits. */
@@ -13,7 +13,7 @@ export function mockScoreFor(document: string): number {
   return (parseInt(digits.slice(-4), 10) % 601) + 300;
 }
 
-export const mockProvider: ScreeningProvider = {
+export const mockProvider: CreditRiskProvider = {
   name: "mock",
   capabilities: [CAPABILITY.CREDIT_SCORE],
   async query(req: ProviderRequest): Promise<ProviderSignal> {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { windowKeyForDay, deriveTenantUnderwriting, type ProviderSignal } from "./domain";
+import { windowKeyForDay, deriveCreditAnalysis, type ProviderSignal } from "./domain";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -12,7 +12,7 @@ describe("windowKeyForDay", () => {
   });
 });
 
-describe("deriveTenantUnderwriting", () => {
+describe("deriveCreditAnalysis", () => {
   const ok = (score: number): ProviderSignal => ({
     status: "ok",
     provider: "mock",
@@ -27,14 +27,14 @@ describe("deriveTenantUnderwriting", () => {
   };
 
   test("no ok signals → unavailable", () => {
-    expect(deriveTenantUnderwriting([err]).status).toBe("unavailable");
+    expect(deriveCreditAnalysis([err]).status).toBe("unavailable");
   });
   test("maps the primary ok signal's score to a tier", () => {
-    const out = deriveTenantUnderwriting([ok(850), err]);
-    expect(out).toEqual({ status: "ok", result: { score: 850, tier: "bom" } });
+    const out = deriveCreditAnalysis([ok(850), err]);
+    expect(out).toEqual({ status: "ok", score: 850, tier: "bom" });
   });
   test("score at the high threshold maps to 'bom'", () => {
-    const out = deriveTenantUnderwriting([ok(800)]);
-    expect(out).toEqual({ status: "ok", result: { score: 800, tier: "bom" } });
+    const out = deriveCreditAnalysis([ok(800)]);
+    expect(out).toEqual({ status: "ok", score: 800, tier: "bom" });
   });
 });

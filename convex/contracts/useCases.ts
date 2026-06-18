@@ -17,8 +17,8 @@ import {
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
 } from "./domain";
-import { findFreshAssessment } from "../screening/useCases";
-import { CAPABILITY, SCREENING_PURPOSE, SUBJECT_TYPE } from "../screening/domain";
+import { findFreshAssessment } from "../creditRisk/useCases";
+import { CAPABILITY, SUBJECT_TYPE } from "../creditRisk/domain";
 import type { ActivityBucket } from "./domain";
 import { getMaxGuaranteeCapacityCents } from "../lib/env";
 import { AUDIT_ACTION } from "../audit/domain";
@@ -451,11 +451,17 @@ export const getCachedCreditScore = queryWithAgencyScope({
     const assessment = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
       subjectHash,
-      purpose: SCREENING_PURPOSE.TENANT_UNDERWRITING,
       notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
     });
-    if (!assessment || assessment.status !== "ok" || !assessment.result) return null;
-    return { score: assessment.result.score, tier: assessment.result.tier };
+    if (
+      !assessment ||
+      assessment.status !== "ok" ||
+      assessment.score == null ||
+      assessment.tier == null
+    ) {
+      return null;
+    }
+    return { score: assessment.score, tier: assessment.tier };
   },
 });
 
@@ -471,7 +477,6 @@ export const requestCreditScore = mutationWithAgencyScope({
     const fresh = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
       subjectHash,
-      purpose: SCREENING_PURPOSE.TENANT_UNDERWRITING,
       notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
     });
     // Any fresh assessment gates re-scheduling — including an `unavailable`
@@ -480,12 +485,11 @@ export const requestCreditScore = mutationWithAgencyScope({
     // meanwhile.
     if (fresh) return { status: "cached" } as const;
 
-    await ctx.scheduler.runAfter(0, internal.screening.actions.runScreening, {
+    await ctx.scheduler.runAfter(0, internal.creditRisk.actions.runCreditAnalysis, {
       agencyId: ctx.agencyId,
       subjectType: SUBJECT_TYPE.TENANT,
       document: digits,
       capability: CAPABILITY.CREDIT_SCORE,
-      purpose: SCREENING_PURPOSE.TENANT_UNDERWRITING,
     });
     return { status: "fetching" } as const;
   },

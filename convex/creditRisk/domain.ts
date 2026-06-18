@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { type ScoreTier, scoreTierValidator, tierForScore } from "../contracts/domain";
+import { type ScoreTier, tierForScore } from "../contracts/domain";
 
-export type ScreeningSignal = Doc<"screeningSignals">;
-export type ScreeningSignalId = Id<"screeningSignals">;
-export type ScreeningAssessment = Doc<"screeningAssessments">;
-export type ScreeningAssessmentId = Id<"screeningAssessments">;
+export type CreditRiskSignal = Doc<"creditRiskSignals">;
+export type CreditRiskSignalId = Id<"creditRiskSignals">;
+export type CreditRiskAssessment = Doc<"creditRiskAssessments">;
+export type CreditRiskAssessmentId = Id<"creditRiskAssessments">;
 
 export type Capability = "credit_score";
 export const CAPABILITY = { CREDIT_SCORE: "credit_score" } as const satisfies Record<
@@ -26,13 +26,7 @@ export const subjectTypeValidator = v.union(
   v.literal(SUBJECT_TYPE.INVESTOR),
 );
 
-export type ScreeningPurpose = "tenant_underwriting";
-export const SCREENING_PURPOSE = {
-  TENANT_UNDERWRITING: "tenant_underwriting",
-} as const satisfies Record<string, ScreeningPurpose>;
-export const screeningPurposeValidator = v.literal(SCREENING_PURPOSE.TENANT_UNDERWRITING);
-
-export const POLICY_VERSION = { TENANT_UNDERWRITING: "tenant_underwriting_v1" } as const;
+export const POLICY_VERSION = { CREDIT_ANALYSIS: "credit_analysis_v1" } as const;
 export const DEFAULT_CREDIT_SCALE = 1000;
 
 export type SignalStatus = "ok" | "error";
@@ -40,13 +34,6 @@ export type AssessmentStatus = "ok" | "unavailable";
 
 export type CreditScoreNormalized = { score: number; scale: number };
 export const creditScoreNormalizedValidator = v.object({ score: v.number(), scale: v.number() });
-
-/** Validator for a `tenant_underwriting` assessment result. Tier is sourced
- * from contracts (the underwriting consumer owns the tier vocabulary). */
-export const tenantUnderwritingResultValidator = v.object({
-  score: v.number(),
-  tier: scoreTierValidator,
-});
 
 export type ProviderRequest = {
   subjectType: SubjectType;
@@ -64,7 +51,7 @@ export type ProviderSignal =
     }
   | { status: "error"; provider: string; capability: Capability; error: string };
 
-export interface ScreeningProvider {
+export interface CreditRiskProvider {
   readonly name: string;
   readonly capabilities: readonly Capability[];
   query(req: ProviderRequest): Promise<ProviderSignal>;
@@ -78,13 +65,13 @@ export function windowKeyForDay(timestampMs: number): string {
   return `d${Math.floor(timestampMs / DAY_MS)}`;
 }
 
-export type TenantUnderwritingResult = { score: number; tier: ScoreTier };
+export type CreditAnalysisResult = { score: number; tier: ScoreTier };
 
-/** Consumer (contracts/underwriting) aggregation policy — pure. Phase 1 uses a
- * single primary provider; takes the first ok signal. */
-export function deriveTenantUnderwriting(
+/** Pure credit-analysis derivation. Phase: single primary provider — first ok
+ * signal wins. */
+export function deriveCreditAnalysis(
   signals: readonly ProviderSignal[],
-): { status: "ok"; result: TenantUnderwritingResult } | { status: "unavailable" } {
+): { status: "ok"; score: number; tier: ScoreTier } | { status: "unavailable" } {
   const ok = signals.filter(
     (s): s is Extract<ProviderSignal, { status: "ok" }> => s.status === "ok",
   );
@@ -92,6 +79,7 @@ export function deriveTenantUnderwriting(
   if (!primary) return { status: "unavailable" };
   return {
     status: "ok",
-    result: { score: primary.normalized.score, tier: tierForScore(primary.normalized.score) },
+    score: primary.normalized.score,
+    tier: tierForScore(primary.normalized.score),
   };
 }

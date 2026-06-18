@@ -4,7 +4,7 @@ import {
   DEFAULT_CREDIT_SCALE,
   type ProviderRequest,
   type ProviderSignal,
-  type ScreeningProvider,
+  type CreditRiskProvider,
 } from "../domain";
 
 /** "501-700" → 600 (midpoint); "1000" → 1000; unparseable → null. */
@@ -18,7 +18,7 @@ export function parseScoreRange(range: string): number | null {
 }
 
 // Pacote 13 — CPF Risco. GET https://api.cpfcnpj.com.br/{token}/13/{cpf}
-export const cpfCnpjProvider: ScreeningProvider = {
+export const cpfCnpjProvider: CreditRiskProvider = {
   name: "cpfcnpj",
   capabilities: [CAPABILITY.CREDIT_SCORE],
   async query(req: ProviderRequest): Promise<ProviderSignal> {

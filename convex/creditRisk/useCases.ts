@@ -2,18 +2,12 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { AgencyId } from "../agencies/domain";
-import type {
-  ScreeningAssessment,
-  ScreeningAssessmentId,
-  ScreeningSignalId,
-  ScreeningPurpose,
-} from "./domain";
+import { scoreTierValidator } from "../contracts/domain";
+import type { CreditRiskAssessment, CreditRiskAssessmentId, CreditRiskSignalId } from "./domain";
 import {
   capabilityValidator,
   creditScoreNormalizedValidator,
-  screeningPurposeValidator,
   subjectTypeValidator,
-  tenantUnderwritingResultValidator,
 } from "./domain";
 
 export const recordSignal = internalMutation({
@@ -31,9 +25,9 @@ export const recordSignal = internalMutation({
     windowKey: v.string(),
     pulledAt: v.number(),
   },
-  handler: async (ctx, args): Promise<ScreeningSignalId> => {
+  handler: async (ctx, args): Promise<CreditRiskSignalId> => {
     const existing = await ctx.db
-      .query("screeningSignals")
+      .query("creditRiskSignals")
       .withIndex("by_idempotency", (q) =>
         q
           .eq("agencyId", args.agencyId)
@@ -47,7 +41,7 @@ export const recordSignal = internalMutation({
     // fresh correlationId) share the existing row rather than re-paying the
     // provider. correlationId is intentionally not part of the key.
     if (existing) return existing._id;
-    return ctx.db.insert("screeningSignals", args);
+    return ctx.db.insert("creditRiskSignals", args);
   },
 });
 
@@ -56,15 +50,15 @@ export const recordAssessment = internalMutation({
     agencyId: v.id("agencies"),
     subjectType: subjectTypeValidator,
     subjectHash: v.string(),
-    purpose: screeningPurposeValidator,
     policyVersion: v.string(),
-    signalIds: v.array(v.id("screeningSignals")),
+    signalIds: v.array(v.id("creditRiskSignals")),
     status: v.union(v.literal("ok"), v.literal("unavailable")),
-    result: v.optional(tenantUnderwritingResultValidator),
-    decidedAt: v.number(),
+    score: v.optional(v.number()),
+    tier: v.optional(scoreTierValidator),
+    assessedAt: v.number(),
   },
-  handler: async (ctx, args): Promise<ScreeningAssessmentId> => {
-    return ctx.db.insert("screeningAssessments", args);
+  handler: async (ctx, args): Promise<CreditRiskAssessmentId> => {
+    return ctx.db.insert("creditRiskAssessments", args);
   },
 });
 
@@ -73,18 +67,16 @@ export async function findFreshAssessment(
   args: {
     agencyId: AgencyId;
     subjectHash: string;
-    purpose: ScreeningPurpose;
     notBefore: number;
   },
-): Promise<ScreeningAssessment | null> {
+): Promise<CreditRiskAssessment | null> {
   return ctx.db
-    .query("screeningAssessments")
-    .withIndex("by_agency_subject_purpose_time", (q) =>
+    .query("creditRiskAssessments")
+    .withIndex("by_agency_subject_time", (q) =>
       q
         .eq("agencyId", args.agencyId)
         .eq("subjectHash", args.subjectHash)
-        .eq("purpose", args.purpose)
-        .gt("decidedAt", args.notBefore),
+        .gt("assessedAt", args.notBefore),
     )
     .order("desc")
     .first();
@@ -94,7 +86,6 @@ export const getFreshAssessment = internalQuery({
   args: {
     agencyId: v.id("agencies"),
     subjectHash: v.string(),
-    purpose: screeningPurposeValidator,
     notBefore: v.number(),
   },
   handler: (ctx, args) => findFreshAssessment(ctx, args),

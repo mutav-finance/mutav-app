@@ -37,13 +37,13 @@ test("recordSignal is idempotent within a window", async () => {
     windowKey: "d100",
     pulledAt: 100 * 24 * 60 * 60 * 1000,
   };
-  const first = await t.mutation(internal.screening.useCases.recordSignal, base);
-  const second = await t.mutation(internal.screening.useCases.recordSignal, {
+  const first = await t.mutation(internal.creditRisk.useCases.recordSignal, base);
+  const second = await t.mutation(internal.creditRisk.useCases.recordSignal, {
     ...base,
     correlationId: "corr-2",
   });
   expect(second).toBe(first);
-  const rows = await t.run((ctx) => ctx.db.query("screeningSignals").collect());
+  const rows = await t.run((ctx) => ctx.db.query("creditRiskSignals").collect());
   expect(rows).toHaveLength(1);
 });
 
@@ -52,54 +52,51 @@ test("getFreshAssessment respects the TTL window", async () => {
   const agencyId = await seedAgency(t);
   const now = 1_000_000_000_000;
   await t.run((ctx) =>
-    ctx.db.insert("screeningAssessments", {
+    ctx.db.insert("creditRiskAssessments", {
       agencyId,
       subjectType: "tenant",
       subjectHash: "hash-2",
-      purpose: "tenant_underwriting",
-      policyVersion: "tenant_underwriting_v1",
+      policyVersion: "credit_analysis_v1",
       signalIds: [],
       status: "ok",
-      result: { score: 800, tier: "bom" },
-      decidedAt: now - 1000,
+      score: 800,
+      tier: "bom",
+      assessedAt: now - 1000,
     }),
   );
-  const fresh = await t.query(internal.screening.useCases.getFreshAssessment, {
+  const fresh = await t.query(internal.creditRisk.useCases.getFreshAssessment, {
     agencyId,
     subjectHash: "hash-2",
-    purpose: "tenant_underwriting",
     notBefore: now - 5000,
   });
-  expect(fresh?.result?.tier).toBe("bom");
-  const stale = await t.query(internal.screening.useCases.getFreshAssessment, {
+  expect(fresh?.tier).toBe("bom");
+  const stale = await t.query(internal.creditRisk.useCases.getFreshAssessment, {
     agencyId,
     subjectHash: "hash-2",
-    purpose: "tenant_underwriting",
     notBefore: now,
   });
   expect(stale).toBeNull();
 });
 
-test("recordAssessment accepts an unavailable result with no result payload", async () => {
+test("recordAssessment accepts an unavailable result with no score payload", async () => {
   const t = convexTest(schema);
   const agencyId = await seedAgency(t);
   const now = 1_000_000_000_000;
-  await t.mutation(internal.screening.useCases.recordAssessment, {
+  await t.mutation(internal.creditRisk.useCases.recordAssessment, {
     agencyId,
     subjectType: "tenant",
     subjectHash: "hash-3",
-    purpose: "tenant_underwriting",
-    policyVersion: "tenant_underwriting_v1",
+    policyVersion: "credit_analysis_v1",
     signalIds: [],
     status: "unavailable",
-    decidedAt: now,
+    assessedAt: now,
   });
-  const fresh = await t.query(internal.screening.useCases.getFreshAssessment, {
+  const fresh = await t.query(internal.creditRisk.useCases.getFreshAssessment, {
     agencyId,
     subjectHash: "hash-3",
-    purpose: "tenant_underwriting",
     notBefore: now - 1,
   });
   expect(fresh?.status).toBe("unavailable");
-  expect(fresh?.result).toBeUndefined();
+  expect(fresh?.score).toBeUndefined();
+  expect(fresh?.tier).toBeUndefined();
 });

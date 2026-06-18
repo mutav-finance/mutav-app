@@ -5,24 +5,22 @@ import { hashPii } from "../lib/pii";
 import {
   POLICY_VERSION,
   capabilityValidator,
-  deriveTenantUnderwriting,
-  screeningPurposeValidator,
+  deriveCreditAnalysis,
   subjectTypeValidator,
   windowKeyForDay,
   type ProviderSignal,
-  type ScreeningSignalId,
+  type CreditRiskSignalId,
 } from "./domain";
 import { resolveCreditProviders } from "./registry";
 
-export const runScreening = internalAction({
+export const runCreditAnalysis = internalAction({
   args: {
     agencyId: v.id("agencies"),
     subjectType: subjectTypeValidator,
     document: v.string(),
     capability: capabilityValidator,
-    purpose: screeningPurposeValidator,
   },
-  handler: async (ctx, { agencyId, subjectType, document, capability, purpose }) => {
+  handler: async (ctx, { agencyId, subjectType, document, capability }) => {
     const digits = document.replace(/\D/g, "");
     const subjectHash = await hashPii(digits);
     const now = Date.now();
@@ -40,9 +38,9 @@ export const runScreening = internalAction({
         : { status: "error", provider: providers[i].name, capability, error: String(r.reason) },
     );
 
-    const signalIds: ScreeningSignalId[] = [];
+    const signalIds: CreditRiskSignalId[] = [];
     for (const signal of signals) {
-      const id = await ctx.runMutation(internal.screening.useCases.recordSignal, {
+      const id = await ctx.runMutation(internal.creditRisk.useCases.recordSignal, {
         agencyId,
         subjectType,
         subjectHash,
@@ -59,17 +57,17 @@ export const runScreening = internalAction({
       signalIds.push(id);
     }
 
-    const derived = deriveTenantUnderwriting(signals);
-    await ctx.runMutation(internal.screening.useCases.recordAssessment, {
+    const derived = deriveCreditAnalysis(signals);
+    await ctx.runMutation(internal.creditRisk.useCases.recordAssessment, {
       agencyId,
       subjectType,
       subjectHash,
-      purpose,
-      policyVersion: POLICY_VERSION.TENANT_UNDERWRITING,
+      policyVersion: POLICY_VERSION.CREDIT_ANALYSIS,
       signalIds,
       status: derived.status,
-      result: derived.status === "ok" ? derived.result : undefined,
-      decidedAt: now,
+      score: derived.status === "ok" ? derived.score : undefined,
+      tier: derived.status === "ok" ? derived.tier : undefined,
+      assessedAt: now,
     });
   },
 });

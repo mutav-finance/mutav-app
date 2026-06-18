@@ -4,7 +4,7 @@ import {
   DEFAULT_CREDIT_SCALE,
   type ProviderRequest,
   type ProviderSignal,
-  type ScreeningProvider,
+  type CreditRiskProvider,
 } from "../domain";
 
 const AUTH_URL = "https://plataforma.bigdatacorp.com.br/tokens/generate";
@@ -48,7 +48,7 @@ export function extractBigDataCorpScore(json: unknown, dataset: string): number 
   return typeof raw === "number" ? raw : null;
 }
 
-export const bigDataCorpProvider: ScreeningProvider = {
+export const bigDataCorpProvider: CreditRiskProvider = {
   name: "bigdatacorp",
   capabilities: [CAPABILITY.CREDIT_SCORE],
   async query(req: ProviderRequest): Promise<ProviderSignal> {

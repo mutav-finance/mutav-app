@@ -2,7 +2,7 @@
  * Which score bureau provider to use for tenant score lookups.
  * Defaults to "mock" so deployments without credentials still work.
  * An unknown (non-empty) value THROWS in `resolveCreditProviders()`
- * (`convex/screening/registry.ts`) — there is no silent fallback, so a typo
+ * (`convex/creditRisk/registry.ts`) — there is no silent fallback, so a typo
  * surfaces loudly rather than fabricating a score.
  *
  *   bunx convex env set SCORE_PROVIDER cpfcnpj
