@@ -60,8 +60,9 @@ Sign `cover_default` with the **OZ Smart Account M-of-N passkey threshold at the
 ### 5. Idempotency, trigger, reconciliation — the settled spine _(two-way · confidence: high)_
 
 - **Idempotency:** `drawId = canonical(guaranteeId, coveragePeriod)` (UTC billing-month string, mirroring invoices' `periodMonth`); `ref_hash = SHA-256(drawId)` **derived, never an input**. A `coverageDraw` table with a `by_idempotency` index on `(guaranteeId, coveragePeriod)`; the guard is **read-before-insert in one mutation** (`initiateCoverageDraw`), mirroring `creditAnalysis.recordSignal` (`creditAnalysis/useCases.ts:33-48`). First initiation wins → a default never mints a second `ref_hash`.
+- **Amount (precision):** the withdraw `i128` is computed by a **new BigInt-only `centsToBaseUnits(cents, decimals)` write helper** — **not** the existing `rawBalanceToCents`/`assetValueCents`, which return a JS `Number` (display/read-path only, round-down). No value-moving amount may round-trip through a `Number`/float (preserves the integer-money invariant). _(Caught by the doc-grounded re-run; the read helpers end in `return … Number(rounded)`.)_
 - **Trigger:** two-stage, signal-separated-from-draw. A staff member initiates against a contract whose invoices are overdue (derived `overdue` status is the eligibility gate); a cron **may surface candidates but must not auto-initiate** a value-moving draw in the pilot.
-- **Reconciliation:** a scheduled `internalAction` (~15 min, aligned to the reserve refresh) reads on-chain `Withdrawn` events by `ref_hash` (read-only simulation) and compares the off-chain ledger to chain; a mismatch (submitted-but-no-event after grace, or orphan on-chain event) **trips a fail-closed circuit breaker** blocking new initiation/submission.
+- **Reconciliation:** a scheduled `internalAction` (~15 min, aligned to the reserve refresh) polls `rpc.getEvents(topics=[withdraw, ref_hash])` with a **persisted watermark**, matches by `ref_hash`, and verifies asset/amount/destination from the event data vec; a mismatch (submitted-but-no-event after grace, or orphan on-chain event) **trips a fail-closed circuit breaker** blocking new initiation/submission. **Bounded by RPC `getEvents` retention (~24 h, max 7-day, no streaming)** — a longer outage exceeds the window and requires a dedicated indexer (revisit trigger). _(Surfaced by the doc-grounded re-run, via the `data` skill / RPC docs.)_
 - **Alternatives:** external-id idempotency on the submit tx hash (not deterministic pre-submit); on-chain dedup (rejected — vault doesn't); fully-automated auto-draw (rejected for pilot — human-in-the-loop on every capital movement); amount/timestamp reconciliation (weaker than `ref_hash`); alert-only, no breaker (rejected).
 - **Trade-off accepted:** a manual staff-initiated trigger (throughput for a human gate + smaller blast radius).
 - **Revisit if:** the pilot needs automated/high-volume draw initiation (pair with OE4's deferred amount-rules/timelocks).
@@ -84,13 +85,21 @@ The decisions were re-read together against the constraints; the rule "more-foun
 5. **OE5 reconciliation cron + circuit breaker** last (needs submitted rows + indexed events).
 6. **OE3 audit companions** (system-actor `internalMutation`s) wired into the compose/submit/reconcile Actions as each is built.
 
-## Stellar-doc grounding & refinements (2026-06-19)
+## Stellar-doc grounding (re-run, 2026-06-19)
 
-The decision run's external **Stellar** grounding was thin (the `standardsFound` records came back empty for OE1–OE3). Verified post-hoc against the installed Stellar `dapp` expert skill + the Smart Account Kit / OpenZeppelin docs. The core decisions **hold** — `smart-account-kit` is real (`kalepail/smart-account-kit` + OpenZeppelin `stellar-contracts`; `SmartAccountKit` + `IndexedDBStorage` + Context Rules + threshold multisig over secp256r1 passkeys), and compose-separately-from-sign is the supported flow. Three refinements fold in:
+The decision run was **re-executed with the official Stellar docs + the installed Stellar expert skills as the mandated guideline** (the first pass's external `standardsFound` came back empty for the Stellar decisions). The core decisions **held** and are now cited to primary sources:
 
-1. **Submit locus (refines OE3).** The kit's `signAndSubmit` **signs _and_ submits client-side**. So the flow is: Convex **composes** (key-free, via the OE2 builder) → `apps/admin` **signs _and_ submits** the passkey-quorum tx via the kit → Convex records the returned tx hash and transitions `submitted`, then reconciles. This **removes the planned Convex submit Action** and its round-trip; the `submitted` transition becomes a hash-recording mutation, not a submit. The compose/reconcile Actions and their system-actor audit companions stay.
-2. **Fee sponsorship (new operational requirement).** A passkey Smart Account needs XLM for fees, or fee-bump sponsorship via the **OpenZeppelin Relayer / Stellar Channels Service** (Launchtube is deprecated). Decide before build: fund the admin Smart Account with XLM, or route `cover_default` submission through the OZ Relayer for gasless. **Revisit trigger:** add to OE1's watch-list.
-3. **Deployment prerequisites (refines OE1).** The kit requires a configured **WebAuthn verifier contract address** + **account-WASM hash** (plus the network passphrase/RPC). These are pilot setup tasks alongside passkey enrollment + the quorum ceremony.
+- **OE1 (signing):** [dapp skill § Smart Accounts](../../.claude/skills/dapp/SKILL.md) · [OpenZeppelin Stellar Contracts](https://developers.stellar.org/docs/tools/openzeppelin-contracts) · [Contract (custom) accounts](https://developers.stellar.org/docs/build/guides/contract-accounts) · [OpenZeppelin Relayer](https://developers.stellar.org/docs/tools/openzeppelin-relayer) — confirms `smart-account-kit` (`kalepail/smart-account-kit`) + OZ `stellar-contracts`, M-of-N passkey (secp256r1) thresholds via Context Rules, and that `__check_auth` enforces the quorum **on-chain**.
+- **OE2 (compose):** [Invoke a contract (SDK)](https://developers.stellar.org/docs/build/guides/transactions/invoke-contract-tx-sdk) + `data` skill — confirms key-free `assembleTransaction` compose feeding the kit's signer.
+- **OE4 (authorization):** [Soroban authorization](https://developers.stellar.org/docs/learn/fundamentals/contract-development/authorization) + [multisig](https://developers.stellar.org/docs/learn/fundamentals/transactions/signatures-multisig).
+
+Three refinements emerged **natively (cited)** in the re-run and are folded in:
+
+1. **Submit locus (refines OE3) — folded into the sequencing above.** The kit's `signAndSubmit` **signs _and_ submits client-side**, so the planned Convex _submit Action is removed_: `apps/admin` signs+submits the passkey-quorum tx; Convex reaches `submitted` only by **recording the client-returned tx hash** through the treasury-gated transition mutation (audit inline, user actor). Compose + reconcile stay Actions with system-actor audit companions.
+2. **Fee sponsorship (operational, decide before build).** A passkey Smart Account holds no XLM — either **fund the admin Smart Account with XLM** or route submission through the **OpenZeppelin Relayer / Stellar Channels Service** (Launchtube deprecated). Added to OE1's watch-list.
+3. **Deployment prerequisites (refines OE1).** The kit needs a configured **WebAuthn verifier contract address** + **account-WASM hash** (+ network passphrase/RPC) — pilot setup alongside passkey enrollment + the quorum ceremony.
+
+The re-run also caught **two code-verified findings** the first pass missed — folded into OE5 above: the **cents→base-unit write helper** (the existing `reserve/domain.ts` helpers return a `Number`, unsafe for a value-moving amount) and the **`rpc.getEvents` retention bound** on reconciliation.
 
 ## Consequences
 
@@ -100,4 +109,4 @@ The decision run's external **Stellar** grounding was thin (the `standardsFound`
 
 ---
 
-_Method: senior-engineering-decision workflow (run `wf_3ae84f5a-e7b`) — triage (constraints/invariants/ordering) → sequential fan-out (internal context + deep research + driver scoring + decide-carrying-priors) → convergence loop. Decision drivers: correctness · security (weighted) · reversibility · time-to-ship · operational cost · team familiarity._
+_Method: senior-engineering-decision workflow (run `wf_3ae84f5a-e7b`, re-grounded against the official Stellar docs + installed expert skills) — triage (constraints/invariants/ordering) → sequential fan-out (internal context + deep research + driver scoring + decide-carrying-priors) → convergence loop. Decision drivers: correctness · security (weighted) · reversibility · time-to-ship · operational cost · team familiarity._
