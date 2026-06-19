@@ -84,6 +84,14 @@ The decisions were re-read together against the constraints; the rule "more-foun
 5. **OE5 reconciliation cron + circuit breaker** last (needs submitted rows + indexed events).
 6. **OE3 audit companions** (system-actor `internalMutation`s) wired into the compose/submit/reconcile Actions as each is built.
 
+## Stellar-doc grounding & refinements (2026-06-19)
+
+The decision run's external **Stellar** grounding was thin (the `standardsFound` records came back empty for OE1–OE3). Verified post-hoc against the installed Stellar `dapp` expert skill + the Smart Account Kit / OpenZeppelin docs. The core decisions **hold** — `smart-account-kit` is real (`kalepail/smart-account-kit` + OpenZeppelin `stellar-contracts`; `SmartAccountKit` + `IndexedDBStorage` + Context Rules + threshold multisig over secp256r1 passkeys), and compose-separately-from-sign is the supported flow. Three refinements fold in:
+
+1. **Submit locus (refines OE3).** The kit's `signAndSubmit` **signs _and_ submits client-side**. So the flow is: Convex **composes** (key-free, via the OE2 builder) → `apps/admin` **signs _and_ submits** the passkey-quorum tx via the kit → Convex records the returned tx hash and transitions `submitted`, then reconciles. This **removes the planned Convex submit Action** and its round-trip; the `submitted` transition becomes a hash-recording mutation, not a submit. The compose/reconcile Actions and their system-actor audit companions stay.
+2. **Fee sponsorship (new operational requirement).** A passkey Smart Account needs XLM for fees, or fee-bump sponsorship via the **OpenZeppelin Relayer / Stellar Channels Service** (Launchtube is deprecated). Decide before build: fund the admin Smart Account with XLM, or route `cover_default` submission through the OZ Relayer for gasless. **Revisit trigger:** add to OE1's watch-list.
+3. **Deployment prerequisites (refines OE1).** The kit requires a configured **WebAuthn verifier contract address** + **account-WASM hash** (plus the network passphrase/RPC). These are pilot setup tasks alongside passkey enrollment + the quorum ceremony.
+
 ## Consequences
 
 - Commits the pilot to the OZ Smart Account admin model (and its v0.7.2 audit obligation) and to taking a pinned `@mutav-finance/mutav-stellar` dependency for the withdraw builder.
