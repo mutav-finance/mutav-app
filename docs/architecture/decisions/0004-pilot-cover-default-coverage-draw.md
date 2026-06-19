@@ -41,20 +41,27 @@ Sign `cover_default` with the **OZ Smart Account M-of-N passkey threshold at the
 - **Trade-off accepted:** a split integration (audited SDK for writes, raw RPC for reads) and its short-term inconsistency, for getting the value-moving encoding into the audited package now without regressing the working read path.
 - **Revisit if:** the read path needs something raw RPC can't express cleanly (e.g. `Withdrawn`-event decoding for reconciliation) → port reads into the SDK then.
 
-### 3. End-to-end flow — a six-state `coverageDraw` state machine _(two-way · confidence: high)_
+### 3. End-to-end flow — a lightweight idempotent draw ledger (not a durable approval workflow) _(two-way · confidence: high)_
 
-`pending → approved → composed → signing → submitted → reconciled`. Transitions split by Convex ctx capability: **mutation** transitions (`initiate`, `approve`) run in `mutationWith*` wrappers and write audit inline via the injected `appendStaffAudit` (user actor); **action** transitions (`compose`, `submit`, `reconcile`) route their audit through a **companion `internalMutation`** with the `{ kind: "system", source }` actor (because `appendAuditEntry` requires a `MutationCtx` and cannot run inside an Action). Compose uses the OE2 SDK builder (destination from an env allowlist); signing is the only off-Convex step; submit is a key-free Action with a terminal-state no-op guard.
+The flow is plain, gated only at the two correct loci (OE4): **in-panel staff (Auth0) → Convex composes the withdraw XDR (key-free, OE2 builder, destination from an env allowlist) → the admin's Smart Account passkey quorum signs + submits client-side (kit `signAndSubmit`) → Convex records the returned tx hash + reconciles.** A `coverageDraw` row exists for idempotency, audit correlation, and reconciliation — its states collapse to `initiated → submitted → reconciled`. There is **no separate Convex `approved` gate** (the wallet signature is the approval) and **no durable multi-step approval orchestration**.
 
-- **Alternatives:** KMS signing (violates the custody boundary); client-side compose (contradicts "Convex composes").
-- **Trade-off accepted:** a six-state ledger and a two-round-trip signing handoff, for vault-absent idempotency, per-transition audit, and resumability across the async signature.
-- **Revisit if:** OE4 needs more states, stage-2 KMS lands, the signed XDR stops being opaque to Convex, or review flags the unsigned-XDR round-trip.
+Audit (correctness, not auth) is written at each Convex write: the `initiate` and record-hash transitions are `*WithMutavStaff` mutations writing `appendStaffAudit` (user actor); the reconcile Action routes audit through a **companion `internalMutation`** with the `{ kind: "system", source }` actor (`appendAuditEntry` can't run inside an Action).
 
-### 4. Approval model — two complementary, non-identical gates _(two-way · confidence: high)_
+- **Alternatives:** a six-state durable approval workflow with a Convex `approved` gate (rejected as over-complication — see OE4; the wallet is the gate); KMS signing (violates the custody boundary); client-side compose (contradicts "Convex composes, never signs").
+- **Trade-off accepted:** the `submitted` transition is just hash bookkeeping on the client-returned result, not a Convex broadcast — so Convex never sees a signed XDR and never re-broadcasts.
+- **Revisit if:** stage-2 KMS lands (operator path), or per-amount/timelock approval needs reintroduce explicit states.
 
-(A) A **Convex fail-closed `treasury`-role gate** authorizes the _workflow_: `initiate`/`approve` check `hasExactRole(roles, "treasury")` — `treasury` is **off-ladder**, so it is checked with `hasExactRole`, **never** `meetsMinRole`, inside a `mutationWithMutavStaff` handler. (B) The **on-chain OZ Smart Account 2-of-3 passkey quorum** (a Context Rule enforced by `__check_auth`) authorizes the _withdraw_. The classic-G-account "collect signatures in Convex" proposal-queue model (`regulatory.md:291-303`) does **not** apply to the vault admin and must not be implemented here. Per-amount thresholds + timelocks are deferred (pure Context-Rule additions later); mainnet target is 3-of-5.
+### 4. Authorization — two tiers, no second Convex gate _(two-way · confidence: high)_
 
-- **Alternatives:** a single admin (rejected — the admin is a Smart Account); Convex faking/counting the quorum (rejected — the real M-of-N is the on-chain `__check_auth`); 3-of-5 now (deferred to mainnet); per-amount/timelock now (deferred, reconfigurable).
-- **Trade-off accepted:** a flat 2-of-3 with no per-amount escalation/timelock for the pilot — weaker than the 3-of-5 target but still "no single signer," with the gaps being later Context-Rule additions.
+**Don't over-complicate: the admin panel is gated by Auth0; reserve operations are gated by the wallet signature.** Two tiers, each at its correct locus:
+
+- **Tier 1 — panel + backend management (Auth0 / `mutavStaff`).** Opening the admin panel and any action that **moves no on-chain value** (KYC/KYB review, onboarding approve/reject, internal management, backend parameter changes) is gated solely by the just-shipped Auth0 + `mutavStaff` access (#202–#205).
+- **Tier 2 — reserve / treasury on-chain ops (the wallet signature).** `cover_default` / reserve withdraws are authorized by the **OZ Smart Account M-of-N passkey quorum**, enforced **on-chain by `__check_auth`**. The signature _is_ the authority.
+
+**Convex does NOT add a co-equal authorization gate for the money move.** Composing an unsigned XDR moves nothing, so the compose mutation only needs Tier-1 panel access (a `*WithMutavStaff` wrapper — "you're staff"); `treasury` is simply the panel role that can _see/trigger_ the reserve screen, **not** a money-move authority. The classic-G-account "collect signatures in Convex" model (`regulatory.md:291-303`) does **not** apply. Pilot quorum 2-of-3; per-amount thresholds + timelocks + the 3-of-5 mainnet target are later Context-Rule additions (no vault change).
+
+- **Alternatives:** a Convex `treasury`-role gate as a _second co-equal authorization_ on the draw (rejected as over-complication — the wallet quorum already is the authority; a gate on an unsigned-XDR compose authorizes nothing); a single admin (rejected — the admin is a Smart Account); Convex counting the quorum (rejected — the real M-of-N is on-chain `__check_auth`).
+- **Trade-off accepted:** a flat 2-of-3 with no per-amount escalation/timelock for the pilot, and `treasury` as panel-RBAC-only — simpler, with the gaps being later Context-Rule additions.
 - **Revisit if:** mainnet cutover (→ 3-of-5 + amount rules + timelock), the v0.7.2 audit forcing an admin swap, or an inability to field three distinct signers.
 
 ### 5. Idempotency, trigger, reconciliation — the settled spine _(two-way · confidence: high)_
@@ -75,13 +82,15 @@ The decisions were re-read together against the constraints; the rule "more-foun
 2. **OE3 audit in Actions.** `appendStaffAudit`/`appendAuditEntry` require a `MutationCtx` and cannot run inside an Action. → Action transitions route audit through a companion `internalMutation` (system actor).
 3. **OE4 `treasury` gate vs `mutationWithMutavRole`.** That factory only accepts a `MutavLadderRole`, which excludes `treasury` by design. → The gate is an inline `hasExactRole(roles, "treasury")` check inside a `mutationWithMutavStaff` handler.
 
+> **Simplification (2026-06-19, post-converge).** Conflicts 1 & 3 originally produced a _Convex `treasury` authorization gate_ co-equal with the on-chain quorum. That was over-built: composing an unsigned XDR authorizes no money movement, so §4 was simplified to the **two-tier model** — Auth0/`mutavStaff` gates the panel (Tier 1), the wallet quorum is the _sole_ money authority (Tier 2), and `treasury` is panel-RBAC only. Conflict 2 (audit-in-Actions) stands unchanged.
+
 ## Build sequencing
 
 0. **Pre-work:** reconcile the CLAUDE.md authority row ("hardware wallet inside `apps/admin`" → "OZ Smart Account M-of-N passkeys at the vault admin address") so docs match the deployed contract.
 1. **OE2 write builder** (`reserveVault.ts buildReserveWithdrawOp`) — ratifies the contract's arg shape.
 2. **OE1 signing surface** in `apps/admin` (depends on OE2's XDR shape) — `smart-account-kit` passkey enroll + 2-of-3 quorum.
-3. **OE3 state machine + OE5 idempotency** together (table/states + `by_idempotency` guard + `ref_hash` derivation on `initiate`).
-4. **OE4 Convex `treasury` gate** on `initiate`/`approve`; the on-chain quorum (step 2) is the independent second gate.
+3. **OE3 draw ledger + OE5 idempotency** together (the `coverageDraw` table + `by_idempotency` guard + `ref_hash` derivation on `initiate`, behind a `*WithMutavStaff` panel gate).
+4. **OE4 — no extra gate to build:** Tier-1 panel access is the existing `mutavStaff` wrapper; Tier-2 authority is the on-chain quorum from step 2. (`treasury` stays panel-RBAC for who sees the reserve screen.)
 5. **OE5 reconciliation cron + circuit breaker** last (needs submitted rows + indexed events).
 6. **OE3 audit companions** (system-actor `internalMutation`s) wired into the compose/submit/reconcile Actions as each is built.
 
