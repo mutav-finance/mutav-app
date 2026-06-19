@@ -1,4 +1,7 @@
 {
+  "shellSwitcher": {
+    "toAdmin": "Staff console"
+  },
   "meta": {
     "title": "Mutav — Registered Guarantee System",
     "description": "Dashboard for managing rental guarantees registered on-chain."

@@ -215,8 +215,12 @@ export default defineSchema({
     name: v.string(),
     email: v.string(),
     createdAt: v.string(),
-    // True for Mutav internal staff members (who admin the system,
-    // approve agencies, etc). False/absent for regular users (corretores).
+    // DEPRECATED — superseded by the `mutavStaff` table (one row per staff
+    // role, aud-bound at the Convex boundary). No code reads or writes this
+    // field anymore. Left in the schema (optional) only to avoid the
+    // deploy-order trap: narrowing it out while rows still carry it fails
+    // schema validation before in-deploy migrations run. Remove via a
+    // standalone clear-then-narrow migration once all deployments are clean.
     isStaff: v.optional(v.boolean()),
   })
     .index("by_publicId", ["publicId"])

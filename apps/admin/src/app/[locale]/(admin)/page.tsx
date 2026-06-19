@@ -1,25 +1,26 @@
-import { getTranslations } from "next-intl/server";
+import { preloadQuery } from "convex/nextjs";
+import { api } from "@convex/_generated/api";
+import { getStaffMember } from "@/lib/auth";
+import { ReviewQueue } from "@/components/review-queue";
 
 /**
- * Placeholder landing for apps/admin. The full staff shell (sidebar,
- * header, A1–A6 navigation) lands with the A1 milestone per
- * `docs/architecture/admin.md`. This page exists so the empty origin
- * renders something coherent and the Auth0 gate has somewhere to drop
- * users on a successful sign-in.
+ * Onboarding review queue — the staff landing for apps/admin.
+ *
+ * Re-checks the staff gate here, not only in the `(admin)` layout: App Router
+ * renders the layout and page concurrently, so the layout's `redirect()` does
+ * NOT stop this server component from running its async body. Without the
+ * guard, the aud-bound `preloadQuery` would fire — and throw — for an
+ * anonymous or non-staff request before the redirect lands. Only a confirmed
+ * staff member reaches the preload, with their Auth0 id token as the bearer.
  */
-export default async function AdminPlaceholderPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "adminShell.placeholder" });
+export default async function AdminReviewQueuePage() {
+  const gate = await getStaffMember();
+  if (gate.kind !== "staff") return null;
 
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-      <p className="text-text-2 mb-4 font-mono text-xs tracking-widest uppercase">MUTAV</p>
-      <h1 className="text-text mb-3 text-2xl font-semibold tracking-tight">{t("title")}</h1>
-      <p className="text-text-2 max-w-md text-sm">{t("subtitle")}</p>
-    </div>
-  );
+  const token = gate.session.tokenSet.idToken;
+  if (!token) return null;
+
+  const preloaded = await preloadQuery(api.mutavStaff.useCases.listPendingReviews, {}, { token });
+
+  return <ReviewQueue preloaded={preloaded} />;
 }

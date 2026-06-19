@@ -34,5 +34,38 @@
       "title": "Mutav admin",
       "subtitle": "Pilares A1–A6 pendentes — esta é a casca vazia do shell de staff."
     }
+  },
+  "adminReview": {
+    "title": "Fila de aprovação",
+    "subtitle": "Imobiliárias aguardando análise de KYC/KYB.",
+    "empty": "Nenhuma submissão pendente.",
+    "submittedAt": "Enviado em",
+    "documentsLabel": "Documentos",
+    "approve": "Aprovar",
+    "reject": "Rejeitar",
+    "rejectDialogTitle": "Rejeitar submissão",
+    "rejectDialogDescription": "Informe o motivo da rejeição (opcional, mas recomendado).",
+    "rejectReasonPlaceholder": "Motivo da rejeição",
+    "confirmReject": "Confirmar rejeição",
+    "cancel": "Cancelar",
+    "approved": "Submissão aprovada.",
+    "rejected": "Submissão rejeitada.",
+    "state": {
+      "submitted": "Enviado",
+      "under_review": "Em análise"
+    },
+    "docKind": {
+      "documento_empresa": "Documento da empresa",
+      "responsavel_id": "Documento do responsável"
+    },
+    "errors": {
+      "NOT_FOUND": "Imobiliária não encontrada.",
+      "NOT_REVIEWABLE": "Submissão não está em estado revisável.",
+      "documentUnavailable": "Documento indisponível.",
+      "unexpected": "Algo deu errado. Tente novamente."
+    }
+  },
+  "shellSwitcher": {
+    "backToAgency": "Voltar para Imobiliárias"
   }
 }

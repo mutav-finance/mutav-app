@@ -34,5 +34,38 @@
       "title": "Mutav admin",
       "subtitle": "A1–A6 pillars pending — this is the empty staff shell."
     }
+  },
+  "adminReview": {
+    "title": "Approval queue",
+    "subtitle": "Agencies awaiting KYC/KYB review.",
+    "empty": "No pending submissions.",
+    "submittedAt": "Submitted on",
+    "documentsLabel": "Documents",
+    "approve": "Approve",
+    "reject": "Reject",
+    "rejectDialogTitle": "Reject submission",
+    "rejectDialogDescription": "Provide a reason for rejection (optional but recommended).",
+    "rejectReasonPlaceholder": "Rejection reason",
+    "confirmReject": "Confirm rejection",
+    "cancel": "Cancel",
+    "approved": "Submission approved.",
+    "rejected": "Submission rejected.",
+    "state": {
+      "submitted": "Submitted",
+      "under_review": "Under review"
+    },
+    "docKind": {
+      "documento_empresa": "Company document",
+      "responsavel_id": "Responsible party ID"
+    },
+    "errors": {
+      "NOT_FOUND": "Agency not found.",
+      "NOT_REVIEWABLE": "Submission is not in a reviewable state.",
+      "documentUnavailable": "Document unavailable.",
+      "unexpected": "Something went wrong. Please try again."
+    }
+  },
+  "shellSwitcher": {
+    "backToAgency": "Back to agencies"
   }
 }

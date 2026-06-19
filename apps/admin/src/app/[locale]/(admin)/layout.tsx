@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@mutav/ui/sidebar";
+import { Toaster } from "@mutav/ui/sonner";
 import { ThemeProvider } from "@/providers/theme";
 import { getStaffMember } from "@/lib/auth";
 import { buildCrossAppUrl } from "@/lib/cross-app";
@@ -84,6 +85,7 @@ export default async function AdminLayout({
             {children}
           </main>
         </SidebarInset>
+        <Toaster />
       </SidebarProvider>
     </ThemeProvider>
   );
