@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
 import schema from "../schema";
 import type { MutavStaffRole } from "./domain";
@@ -10,13 +10,6 @@ import type { MutavStaffRole } from "./domain";
 // (Tier-1 panel access). The wrappers ignore `aud` — these are just labels.
 const ADMIN_AUD = "admin-client-id";
 const AGENCY_AUD = "agency-client-id";
-
-beforeEach(() => {
-  vi.stubEnv("AUTH0_ADMIN_CLIENT_ID", ADMIN_AUD);
-});
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 type T = ReturnType<typeof convexTest>;
 
