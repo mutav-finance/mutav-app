@@ -17,11 +17,11 @@ The web3 portal currently in [`mutav-finance/mutav-fund`](https://github.com/mut
 
 **Authority model** — which key signs what:
 
-| Key                | Where it lives                                | Signs                                                                                     |
-| ------------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| **Operator** (hot) | KMS-backed Convex Action                      | Routine fund ops — partner inflows, redemption processing, yield/fee accrual, TTL renewal |
-| **Admin** (cold)   | Hardware wallet inside `apps/admin/`          | Parameter changes, `cover_default`, partner whitelist, pause, admin handover              |
-| **Investor**       | User wallet inside `apps/fund/` (client-side) | Deposit, request/cancel redemption, SEP-41 token ops                                      |
+| Key                | Where it lives                                                                           | Signs                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Operator** (hot) | KMS-backed Convex Action                                                                 | Routine fund ops — partner inflows, redemption processing, yield/fee accrual, TTL renewal |
+| **Admin** (cold)   | OZ Smart Account (M-of-N passkeys) at the vault admin address, driven from `apps/admin/` | Parameter changes, `cover_default`, partner whitelist, pause, admin handover              |
+| **Investor**       | User wallet inside `apps/fund/` (client-side)                                            | Deposit, request/cancel redemption, SEP-41 token ops                                      |
 
 **Status: planning, not yet built.** The monorepo scaffold, persona-app split, and Convex Action implementations are a separate planning effort tracked at [`#139`](https://github.com/mutav-finance/mutav-app/issues/139). Until that plan lands, the **current Next.js layout below remains authoritative**. Don't pre-emptively scaffold `apps/*` or rename existing Convex domains without going through the plan.
 
