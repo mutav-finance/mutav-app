@@ -47,7 +47,11 @@ export default async function RootLayout({
   setRequestLocale(locale);
 
   return (
-    <html lang={locale} className={`${inter.variable} h-svh overflow-hidden antialiased`}>
+    <html
+      lang={locale}
+      className={`${inter.variable} h-svh overflow-hidden antialiased`}
+      suppressHydrationWarning
+    >
       <body className="flex h-svh flex-col overflow-hidden">
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
