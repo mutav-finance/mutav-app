@@ -1,5 +1,8 @@
 import { Auth0Client } from "@auth0/nextjs-auth0/server";
-import { getAuth0Connection } from "@/lib/env";
+import { ConvexHttpClient } from "convex/browser";
+import { NextResponse } from "next/server";
+import { api } from "@convex/_generated/api";
+import { getAppBaseUrl, getAuth0Connection, getConvexUrl } from "@/lib/env";
 
 /**
  * Singleton Auth0 client for apps/admin.
@@ -29,16 +32,67 @@ import { getAuth0Connection } from "@/lib/env";
  *    + `secure` settings here lock down the rest of the load-bearing
  *    cookie posture (spec § Section 1).
  *
- * The Convex bridge that exists in apps/agency's Auth0 client
- * (`onCallback` → `getOrCreateByIdentity`) is intentionally NOT mirrored
- * here. The `mutavStaff` Convex domain doesn't exist yet — it's an A1
- * milestone. When the domain lands, this client gains an `onCallback`
- * hook that provisions a `mutavStaff` row keyed off the Auth0 `sub` claim
- * and gated on the user's Auth0 group membership.
+ * The `onCallback` hook is the first-login provisioning point, mirroring
+ * apps/agency's client: it provisions the Convex `users` row
+ * (`getOrCreateByIdentity`) and then additively grants any staff roles
+ * carried in the Auth0 roles claim (`mutavStaff.syncFromIdentity`). It
+ * fails OPEN — provisioning errors are caught and logged, login still
+ * completes — because the real staff gate is downstream in `getStaffMember()`
+ * (`lib/auth.ts`), which reads the resulting `mutavStaff` row and redirects
+ * non-staff users. `syncFromIdentity` is aud-bound to the admin Auth0 client
+ * and fails closed until that client exists; the catch swallows that too.
  */
 export const auth0 = new Auth0Client({
   authorizationParameters: {
     connection: getAuth0Connection(),
+  },
+  async onCallback(error, context, session) {
+    const baseUrl = getAppBaseUrl();
+
+    if (error) {
+      // `error` is `SdkError | null` per the SDK signature — `name`, `code`,
+      // `message`, `cause` are all on the prototype chain (SdkError extends
+      // Error). `cause` is `unknown` per Error.cause; narrow with a type
+      // guard before reading message.
+      const cause = error.cause;
+      const causeMsg =
+        cause instanceof Error
+          ? cause.message
+          : typeof cause === "object" && cause !== null && "message" in cause
+            ? String(cause.message)
+            : null;
+      console.error("[auth0.onCallback] error:", {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        cause,
+      });
+      return NextResponse.redirect(
+        new URL(`/auth/login?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
+      );
+    }
+
+    if (session) {
+      try {
+        const convexUrl = getConvexUrl();
+        const idToken = session.tokenSet.idToken;
+        if (convexUrl && idToken) {
+          const convex = new ConvexHttpClient(convexUrl);
+          convex.setAuth(idToken);
+          await convex.mutation(api.users.useCases.getOrCreateByIdentity, {});
+          await convex.mutation(api.mutavStaff.useCases.syncFromIdentity, {});
+        }
+      } catch (err) {
+        // Fail OPEN: log and continue. The staff gate in `getStaffMember()`
+        // (`lib/auth.ts`) is the real defense — it reads the `mutavStaff`
+        // row and redirects non-staff users. `syncFromIdentity` is aud-bound
+        // to the admin Auth0 client and fails closed until that client
+        // exists; that throw lands here and is swallowed too.
+        console.error("[auth0.onCallback] Convex provisioning failed:", err);
+      }
+    }
+
+    return NextResponse.redirect(new URL(context.returnTo ?? "/", baseUrl));
   },
   // Spec § Section 5: shorter session lifetime for staff. 12h absolute,
   // 30min inactivity. SDK enforces these on session-cookie save / rolling

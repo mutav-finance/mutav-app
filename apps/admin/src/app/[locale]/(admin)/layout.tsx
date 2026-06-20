@@ -3,19 +3,28 @@ import { getTranslations } from "next-intl/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@mutav/ui/sidebar";
+import { Toaster } from "@mutav/ui/sonner";
 import { ThemeProvider } from "@/providers/theme";
 import { getStaffMember } from "@/lib/auth";
+import { buildCrossAppUrl } from "@/lib/cross-app";
+import { getAgencyUrl } from "@/lib/env";
 
 /**
  * `(admin)` route-group layout — the staff gate + shell.
  *
- * Server-side auth check via `getStaffMember()` (reads the Auth0 session).
- * No session → redirect to Auth0 Universal Login with `returnTo` pointing
- * back at admin so the user lands here after authentication.
+ * Server-side auth check via `getStaffMember()`, routing its three-way
+ * result (loop-free by construction):
  *
- * **A1 stub posture**: `getStaffMember()` still allows any authenticated
- * Auth0 user — once the `mutavStaff` Convex domain lands, signed-in-but-
- * not-staff users will hit a 403 / request-access branch instead.
+ * - `anonymous` → Auth0 Universal Login (same-origin), `returnTo` back at
+ *   admin so the user lands here after authentication.
+ * - `not-staff` → the AGENCY app ORIGIN (cross-origin), NOT login — an
+ *   authenticated non-staff user has a home there. Bouncing to the agency
+ *   origin (which never redirects back to admin for a non-staff-with-agency
+ *   user) means no guard pair points at each other.
+ * - `staff` → render the shell.
+ *
+ * Fail-closed: a session-decrypt or staff-fetch error resolves to
+ * `anonymous`, so a possibly-staff user is never bounced out of admin.
  */
 export default async function AdminLayout({
   children,
@@ -27,17 +36,23 @@ export default async function AdminLayout({
   const { locale } = await params;
   const tA11y = await getTranslations({ locale, namespace: "common.a11y" });
 
-  const member = await getStaffMember();
-  if (!member) {
+  const result = await getStaffMember();
+  if (result.kind === "anonymous") {
     redirect(`/auth/login?returnTo=/${locale}`);
+  }
+  if (result.kind === "not-staff") {
+    // Cross-origin bounce to the agency app — absolute URL from a trusted
+    // env base, so `next/navigation` redirect (the next-intl wrapper is
+    // same-origin only).
+    redirect(buildCrossAppUrl(getAgencyUrl(), locale));
   }
 
   // Empty strings are valid Auth0 claim values (`name: ""`) and would slip
   // past `??`, leaving the avatar to render "UNDEFINED" initials. `||` on
   // a trimmed value falls through to the next fallback.
   const user = {
-    name: member.user.name?.trim() || member.user.email?.trim() || "Staff",
-    email: member.user.email?.trim() || "",
+    name: result.session.user.name?.trim() || result.session.user.email?.trim() || "Staff",
+    email: result.session.user.email?.trim() || "",
     // Intentionally omit `picture`. Staff sessions can return social-provider
     // URLs (Gravatar, googleusercontent) that don't match the staff CSP
     // `img-src` allowlist; rather than widening the allowlist on a high-
@@ -70,6 +85,7 @@ export default async function AdminLayout({
             {children}
           </main>
         </SidebarInset>
+        <Toaster />
       </SidebarProvider>
     </ThemeProvider>
   );

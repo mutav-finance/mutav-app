@@ -1,4 +1,7 @@
 {
+  "shellSwitcher": {
+    "toAdmin": "Console da equipe"
+  },
   "meta": {
     "title": "Mutav — Sistema de Garantia Registrada",
     "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."

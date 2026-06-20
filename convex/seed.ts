@@ -2211,7 +2211,6 @@ const PERSONAS: Record<
     email: string;
     subject: string;
     name: string;
-    isStaff?: boolean;
     staffRoles?: Array<"admin" | "compliance" | "support" | "treasury">;
     agency: { name: string; cnpj: string; state: "active" | "under_review" } | null;
   }
@@ -2220,7 +2219,6 @@ const PERSONAS: Record<
     email: "systemadmin@mutav.finance",
     subject: "auth0|6a150df6a100fbf318f393c0",
     name: "Mutav Team",
-    isStaff: true,
     staffRoles: ["admin"],
     agency: null,
   },
@@ -2269,9 +2267,8 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   let userId;
   if (byEmail) {
     userId = byEmail._id;
-    const patch: { subject?: string; isStaff?: boolean } = {};
+    const patch: { subject?: string } = {};
     if (!byEmail.subject) patch.subject = persona.subject;
-    if (persona.isStaff && !byEmail.isStaff) patch.isStaff = true;
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(userId, patch);
     }
@@ -2282,7 +2279,6 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
       name: persona.name,
       email: persona.email,
       createdAt: now,
-      isStaff: persona.isStaff,
     });
   }
 
