@@ -1,15 +1,9 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
+import { formatUsd } from "@/lib/format/usd";
 import type { PROTOCOL_STATS } from "./fund-data";
 
 type ProtocolStats = typeof PROTOCOL_STATS;
 type Variant = "wide" | "narrow";
-
-function formatUsd(value: number): string {
-  if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
-  }
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
-}
 
 function KpiCell({ label, value }: { label: string; value: string }) {
   return (

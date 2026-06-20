@@ -1,4 +1,4 @@
-import { routing } from "@mutav/i18n/routing";
+import { routing } from "./routing";
 
 /**
  * Builds a cross-app (cross-origin) absolute URL from a TRUSTED env base

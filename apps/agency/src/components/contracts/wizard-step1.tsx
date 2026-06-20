@@ -6,14 +6,10 @@ import { Button } from "@mutav/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
-import { cn } from "@/lib/utils";
-import {
-  isValidCPF,
-  isValidCNPJ,
-  parseBRLInput,
-  formatBRLCentsDisplay,
-  type WizardData,
-} from "@/lib/contracts/wizard";
+import { cn } from "@mutav/ui/cn";
+import { isValidCPF, isValidCNPJ, parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
+import { maskCPF, maskCNPJ } from "@mutav/i18n/brazil";
+import { formatBRLCents } from "@/lib/contracts/format";
 
 type Props = {
   data: WizardData;
@@ -104,16 +100,7 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
               placeholder={t("tenant.cpfPlaceholder")}
               maxLength={14}
               onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, "").slice(0, 11);
-                const masked =
-                  raw.length > 9
-                    ? `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6, 9)}-${raw.slice(9)}`
-                    : raw.length > 6
-                      ? `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6)}`
-                      : raw.length > 3
-                        ? `${raw.slice(0, 3)}.${raw.slice(3)}`
-                        : raw;
-                onChange({ cpf: masked, score: null, scoreTier: null });
+                onChange({ cpf: maskCPF(e.target.value), score: null, scoreTier: null });
               }}
             />
           </Field>
@@ -124,16 +111,7 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
               placeholder={t("step1.cnpjPlaceholder")}
               maxLength={18}
               onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, "").slice(0, 14);
-                let masked = raw;
-                if (raw.length > 12)
-                  masked = `${raw.slice(0, 2)}.${raw.slice(2, 5)}.${raw.slice(5, 8)}/${raw.slice(8, 12)}-${raw.slice(12)}`;
-                else if (raw.length > 8)
-                  masked = `${raw.slice(0, 2)}.${raw.slice(2, 5)}.${raw.slice(5, 8)}/${raw.slice(8)}`;
-                else if (raw.length > 5)
-                  masked = `${raw.slice(0, 2)}.${raw.slice(2, 5)}.${raw.slice(5)}`;
-                else if (raw.length > 2) masked = `${raw.slice(0, 2)}.${raw.slice(2)}`;
-                onChange({ cnpj: masked, score: null, scoreTier: null });
+                onChange({ cnpj: maskCNPJ(e.target.value), score: null, scoreTier: null });
               }}
             />
           </Field>
@@ -209,7 +187,7 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
 
         <div className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2">
           <span className="text-muted-foreground text-sm">{t("rent.total")}</span>
-          <span className="font-mono font-medium">{formatBRLCentsDisplay(totalRentCents)}</span>
+          <span className="font-mono font-medium">{formatBRLCents(totalRentCents)}</span>
         </div>
       </section>
 

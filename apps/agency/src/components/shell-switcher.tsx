@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ShieldCheckIcon } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
-import { buildCrossAppUrl } from "@/lib/cross-app";
+import { buildCrossAppUrl } from "@mutav/i18n/cross-app";
 import { getAdminUrl } from "@/lib/env";
 
 /**

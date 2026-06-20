@@ -3,7 +3,7 @@
 import { usePreloadedQuery, type Preloaded } from "convex/react";
 import { useTranslations } from "next-intl";
 import { Mono } from "@mutav/ui/mono";
-import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR, formatPaidAtBR } from "@/lib/contracts/format";
 import { PaymentStateTag } from "@/components/payments/payment-state-tag";
 import { derivedStatus, INVOICE_STATE_KIND } from "@convex/invoices/domain";
 import type { api } from "@convex/_generated/api";
@@ -30,7 +30,7 @@ export function PaymentSummaryHeader({ preloaded }: Props) {
 
   const dateLabel =
     payment.state.kind === "paid"
-      ? formatPaidAt(payment.state.paidAt)
+      ? formatPaidAtBR(payment.state.paidAt)
       : formatDateBR(payment.dueDate);
   const dateLabelText =
     payment.state.kind === "paid" ? tSummary("paidAtLabel") : tSummary("dueLabel");
@@ -66,17 +66,4 @@ export function PaymentSummaryHeader({ preloaded }: Props) {
       </div>
     </section>
   );
-}
-
-function formatPaidAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(date);
 }

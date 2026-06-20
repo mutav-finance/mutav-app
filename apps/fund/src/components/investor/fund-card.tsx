@@ -1,5 +1,6 @@
 import { Button } from "@mutav/ui/button";
 import { Link } from "@mutav/i18n/navigation";
+import { formatUsd } from "@/lib/format/usd";
 import { RISK_COLOR } from "./fund-data";
 import type { Fund } from "./fund-data";
 
@@ -8,13 +9,6 @@ const RISK_LABEL: Record<Fund["risk"], string> = {
   medium: "Med Risk",
   high: "High Risk",
 };
-
-function formatUsd(value: number): string {
-  if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
-  }
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
-}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (

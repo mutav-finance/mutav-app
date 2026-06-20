@@ -8,7 +8,7 @@ import { Button } from "@mutav/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import {
   BANK_ACCOUNT_TYPE,
   BANKING_FORM_DEFAULTS,

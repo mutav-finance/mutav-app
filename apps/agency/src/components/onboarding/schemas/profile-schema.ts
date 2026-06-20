@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isValidCPF, isValidCNPJ } from "@/lib/brazil";
+import { isValidCPF, isValidCNPJ } from "@mutav/i18n/brazil";
 
 // Error codes — the i18n layer in the component maps these to translated
 // strings via `onboarding.profile.errors.<code>`. Mirrors the server-side

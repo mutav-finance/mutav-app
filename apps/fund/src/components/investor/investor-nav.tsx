@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import { Link, usePathname } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 

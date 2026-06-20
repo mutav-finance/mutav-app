@@ -1,11 +1,12 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import { Button } from "@mutav/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@mutav/ui/select";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { ProtocolKpiStrip } from "./protocol-kpi-strip";
+import { SwapDivider } from "./swap-divider";
 import { useDepositWidget } from "./use-deposit-widget";
 import { isAssetSymbol } from "@/lib/stellar/assets";
 import { FUNDS, RISK_COLOR, PROTOCOL_STATS, isFundId } from "./fund-data";
@@ -46,22 +47,8 @@ function FundShowcase() {
   );
 }
 
-function SwapDivider() {
-  return (
-    <div className="border-border relative border-t">
-      <span className="bg-surface text-text-3 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 font-mono text-xs">
-        ↓
-      </span>
-    </div>
-  );
-}
-
 export function DepositPage({ initialFund }: { initialFund: string | undefined }) {
-  const validFundId = (
-    initialFund === "MTVL" || initialFund === "MTVM" || initialFund === "MTVH"
-      ? initialFund
-      : "MTVL"
-  ) satisfies FundId;
+  const validFundId: FundId = initialFund && isFundId(initialFund) ? initialFund : "MTVL";
 
   const w = useDepositWidget(validFundId);
 

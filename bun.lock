@@ -70,6 +70,7 @@
       "name": "@mutav/admin",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/app-shell": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
@@ -81,6 +82,7 @@
       "name": "@mutav/agency",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/app-shell": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
@@ -92,6 +94,7 @@
       "name": "@mutav/fund",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/app-shell": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
@@ -103,11 +106,28 @@
       "name": "@mutav/pay",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/app-shell": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
       "devDependencies": {
         "@mutav/tsconfig": "workspace:*",
+      },
+    },
+    "packages/app-shell": {
+      "name": "@mutav/app-shell",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@mutav/tsconfig": "workspace:*",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "typescript": "^5",
+      },
+      "peerDependencies": {
+        "@auth0/nextjs-auth0": "^4.20.0",
+        "convex": "^1.39.1",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
       },
     },
     "packages/i18n": {
@@ -466,6 +486,8 @@
     "@mutav/admin": ["@mutav/admin@workspace:apps/admin"],
 
     "@mutav/agency": ["@mutav/agency@workspace:apps/agency"],
+
+    "@mutav/app-shell": ["@mutav/app-shell@workspace:packages/app-shell"],
 
     "@mutav/fund": ["@mutav/fund@workspace:apps/fund"],
 

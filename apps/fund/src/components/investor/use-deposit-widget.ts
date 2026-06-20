@@ -1,12 +1,10 @@
 import { useState } from "react";
 import type { AssetSymbol } from "@/lib/stellar/assets";
-import { applyInvestorFee } from "@/lib/pricing/investor";
+import { applyInvestorFee, XLM_PRICE_USD } from "@/lib/pricing/investor";
 import { FUNDS } from "./fund-data";
 import type { Fund, FundId } from "./fund-data";
 
 export type InputToken = AssetSymbol;
-
-const XLM_PRICE_USD = 0.1234;
 
 function toInputUsd(amount: number, token: InputToken): number {
   return token === "XLM" ? amount * XLM_PRICE_USD : amount;

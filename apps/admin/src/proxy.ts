@@ -22,11 +22,8 @@ const handleI18nRouting = createMiddleware(routing);
 export async function proxy(request: NextRequest) {
   const authRes = await auth0.middleware(request);
 
-  if (request.nextUrl.pathname.startsWith("/auth/")) {
-    return authRes;
-  }
-
-  if (request.nextUrl.pathname.startsWith("/api/")) {
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/auth/") || pathname.startsWith("/api/")) {
     return authRes;
   }
 

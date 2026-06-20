@@ -11,8 +11,9 @@ import { Button } from "@mutav/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
-import { cn } from "@/lib/utils";
-import { formatBRLCentsDisplay, parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
+import { cn } from "@mutav/ui/cn";
+import { parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
+import { formatBRLCents } from "@/lib/contracts/format";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
 import { RENT_COVERAGE_MONTHS, EXIT_COVERAGE_MONTHS } from "@/lib/pricing/tiers";
@@ -304,29 +305,25 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             <div className="flex flex-1 flex-col gap-0.5">
               <ReviewRow
                 label={t("rent.rent")}
-                value={formatBRLCentsDisplay(data.rentCents)}
+                value={formatBRLCents(data.rentCents)}
                 mono
                 missing={m.has("rentCents")}
               />
               {data.otherFeesCents > 0 && (
                 <ReviewRow
                   label={t("rent.otherFees")}
-                  value={formatBRLCentsDisplay(data.otherFeesCents)}
+                  value={formatBRLCents(data.otherFeesCents)}
                   mono
                 />
               )}
             </div>
             <div className="flex flex-1 flex-col gap-0.5">
               {data.condoCents > 0 && (
-                <ReviewRow
-                  label={t("rent.condo")}
-                  value={formatBRLCentsDisplay(data.condoCents)}
-                  mono
-                />
+                <ReviewRow label={t("rent.condo")} value={formatBRLCents(data.condoCents)} mono />
               )}
               <ReviewRow
                 label={t("rent.total")}
-                value={formatBRLCentsDisplay(totalRentCents)}
+                value={formatBRLCents(totalRentCents)}
                 mono
                 highlight
               />
@@ -436,12 +433,12 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             <div className="flex flex-1 flex-col gap-0.5">
               <ReviewRow
                 label={t("coverage.preview.fee")}
-                value={formatBRLCentsDisplay(preview.feeCents)}
+                value={formatBRLCents(preview.feeCents)}
                 mono
               />
               <ReviewRow
                 label={t("coverage.preview.activationFee")}
-                value={formatBRLCentsDisplay(preview.oneTimeActivationFeeCents)}
+                value={formatBRLCents(preview.oneTimeActivationFeeCents)}
                 mono
               />
             </div>
@@ -453,7 +450,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         <div className="bg-surface-2 flex items-center justify-between px-4 py-3">
           <span className="text-muted-foreground text-base">{t("coverage.summary.guarantee")}</span>
           <span className="font-mono text-base font-semibold">
-            {formatBRLCentsDisplay(commission.totalCents)}
+            {formatBRLCents(commission.totalCents)}
           </span>
         </div>
       )}

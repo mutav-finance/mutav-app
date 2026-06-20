@@ -4,17 +4,8 @@ import { Suspense, use, useCallback, useEffect, useEffectEvent, useMemo, useStat
 import { useLocale, useTranslations } from "next-intl";
 import { useAction, useQuery } from "convex/react";
 import QRCode from "qrcode";
-import {
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Copy,
-  Check,
-  ChevronDown,
-  ExternalLink,
-  RefreshCcw,
-  Plus,
-} from "lucide-react";
+import { Loader2, Copy, Check, ChevronDown, ExternalLink, RefreshCcw, Plus } from "lucide-react";
+import { AmountHero, CompletedBlock, FailedBlock } from "./checkout-blocks";
 
 import { Button } from "@mutav/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@mutav/ui/collapsible";
@@ -162,7 +153,8 @@ function PreFlight({
     return <PreFlightSkeleton message={t("loading")} />;
   }
 
-  if (banks.length === 0) {
+  const firstBank = banks[0];
+  if (firstBank === undefined) {
     return (
       <BanksEmptyState
         adding={adding}
@@ -174,7 +166,7 @@ function PreFlight({
     );
   }
 
-  const effectiveSelected = selectedId ?? banks[0]!._id;
+  const effectiveSelected = selectedId ?? firstBank._id;
   return (
     <BankPicker
       banks={banks}
@@ -392,14 +384,6 @@ function LoadedPanel({
 
 // ─── Shared shell pieces ──────────────────────────────────────────────────────
 
-function AmountHero({ brl }: { brl: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 pb-1">
-      <p className="text-foreground text-3xl font-medium tabular-nums md:text-4xl">{brl}</p>
-    </div>
-  );
-}
-
 function AwaitingStatus({ message }: { message: string }) {
   return (
     <div className="text-muted-foreground flex items-center justify-center gap-2 pt-1">
@@ -426,24 +410,6 @@ function CheckoutSkeleton({ brl, message }: { brl: string; message: string }) {
         <Skeleton className="size-8" />
       </div>
       <AwaitingStatus message={message} />
-    </div>
-  );
-}
-
-function CompletedBlock({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-12">
-      <CheckCircle2 className="text-foreground size-12" strokeWidth={1.25} />
-      <p className="text-foreground text-sm font-medium tracking-wide uppercase">{message}</p>
-    </div>
-  );
-}
-
-function FailedBlock({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-12">
-      <AlertCircle className="text-destructive size-12" strokeWidth={1.25} />
-      <p className="text-foreground max-w-prose text-center text-xs">{message}</p>
     </div>
   );
 }
@@ -524,7 +490,7 @@ function parsePixInstructions(
     return null;
   };
 
-  const qrField = findField("pix_qr_code", "pix_br_code", "br_code", "qr_code") ?? null;
+  const qrField = findField("pix_qr_code", "pix_br_code", "br_code", "qr_code");
   const copyField =
     findField("pix_copia_cola", "pix_copia_e_cola", "copia_e_cola", "pix_copy_paste") ?? qrField;
 

@@ -7,7 +7,7 @@ import { LockIcon } from "lucide-react";
 import { Button } from "@mutav/ui/button";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import { type WizardData } from "@/lib/contracts/wizard";
 
 type Props = {

@@ -71,14 +71,10 @@ export const INITIAL_WIZARD_DATA: WizardData = {
   scoreTier: null,
 };
 
-export function formatBRLCentsDisplay(cents: number): string {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
-}
-
 export function parseBRLInput(raw: string): number {
   const clean = raw.replace(/[^\d,]/g, "").replace(",", ".");
   const reais = parseFloat(clean);
   return isNaN(reais) ? 0 : Math.round(reais * 100);
 }
 
-export { isValidCPF, isValidCNPJ } from "@/lib/brazil";
+export { isValidCPF, isValidCNPJ } from "@mutav/i18n/brazil";
