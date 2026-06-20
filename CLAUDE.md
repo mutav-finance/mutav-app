@@ -23,9 +23,7 @@ The web3 portal currently in [`mutav-finance/mutav-fund`](https://github.com/mut
 | **Admin** (cold)   | OZ Smart Account (M-of-N passkeys) at the vault admin address, driven from `apps/admin/` | Parameter changes, `cover_default`, partner whitelist, pause, admin handover              |
 | **Investor**       | User wallet inside `apps/fund/` (client-side)                                            | Deposit, request/cancel redemption, SEP-41 token ops                                      |
 
-**Status: planning, not yet built.** The monorepo scaffold, persona-app split, and Convex Action implementations are a separate planning effort tracked at [`#139`](https://github.com/mutav-finance/mutav-app/issues/139). Until that plan lands, the **current Next.js layout below remains authoritative**. Don't pre-emptively scaffold `apps/*` or rename existing Convex domains without going through the plan.
-
-> **Reconciliation note for `#57`**: that issue sketches `apps/{marketing,agency,fund,admin,docs}` and Convex modules `agencies · investments · fundMgmt · payments · compliance`. Neither sketch 1:1 with what this repo already has (see [`docs/architecture/README.md`](docs/architecture/README.md) § Shell catalog and § Domain catalog). The migration plan reconciles them — it does not unilaterally adopt `#57`'s names.
+**Status: monorepo is live.** The Turborepo split has landed — the persona apps are scaffolded under `apps/` and shared code is extracted into `packages/` (see [§ Monorepo layout](#monorepo-layout) below). The on-chain pieces (KMS-backed operator Convex Action, the `apps/admin/` hardware-wallet authority path) are still being implemented; the Convex backend stays at the **repo root** in `convex/`, shared by every app. Migration history and the staged-PR sequence live in [`docs/architecture/monorepo-migration.md`](docs/architecture/monorepo-migration.md); the reconciliation against [`#57`](https://github.com/mutav-finance/mutav-stellar/issues/57)'s app/module sketch is in [`docs/architecture/README.md`](docs/architecture/README.md) (§ Shell catalog, § App catalog, § Domain catalog).
 
 ## Shared docs
 
@@ -92,10 +90,10 @@ Reseed personas (idempotent): `bunx convex run seed:seedTestPersonas`.
 Mutav settles guarantees on Stellar and moves BRL ↔ token via anchors. Before touching anchor code, read the in-repo docs:
 
 - [`docs/stellar-anchors.md`](docs/stellar-anchors.md) — what an anchor is, which SEPs Mutav uses (SEP-1, 10, 12, 6, 24, 31, 38), how a Pix on-ramp flows end-to-end
-- [`src/lib/anchors/README.md`](src/lib/anchors/README.md) — the foundation library: when to use the SEP modules vs the `Anchor` interface, how to implement a new provider client
-- [`src/lib/anchors/sep/README.md`](src/lib/anchors/sep/README.md) — per-SEP API reference for the framework-agnostic protocol modules
-- [`src/lib/anchors/testanchor/README.md`](src/lib/anchors/testanchor/README.md) — reference SEP client composed against `testanchor.stellar.org`; copy this as the starting point for a new SEP-compliant client
-- [`src/lib/anchors/registry.ts`](src/lib/anchors/registry.ts) — single source of truth for which providers Mutav supports; **always resolve anchor clients through here**, never import a provider client directly outside the library
+- [`apps/agency/src/lib/anchors/README.md`](apps/agency/src/lib/anchors/README.md) — the foundation library: when to use the SEP modules vs the `Anchor` interface, how to implement a new provider client
+- [`apps/agency/src/lib/anchors/sep/README.md`](apps/agency/src/lib/anchors/sep/README.md) — per-SEP API reference for the framework-agnostic protocol modules
+- [`apps/agency/src/lib/anchors/testanchor/README.md`](apps/agency/src/lib/anchors/testanchor/README.md) — reference SEP client composed against `testanchor.stellar.org`; copy this as the starting point for a new SEP-compliant client
+- [`apps/agency/src/lib/anchors/registry.ts`](apps/agency/src/lib/anchors/registry.ts) — single source of truth for which providers Mutav supports; **always resolve anchor clients through here**, never import a provider client directly outside the library
 - [`convex/payments/providers/`](convex/payments/providers/) — Convex domain that wraps the registry: `getProviderForAgency` (per-agency provider lookup, currently a stub) + `discoverCapabilities` action (uses the registry end-to-end). Stellar anchors are one provider kind under the settlement (`payments`) domain.
 
 ### Installed expert skills
@@ -126,11 +124,12 @@ When the in-repo docs and skills aren't enough, consult:
 
 ## Stack
 
-- Next.js 16 (App Router, src/ directory)
+- Turborepo monorepo — persona apps under `apps/*`, shared code under `packages/*`, Convex backend at the repo root in `convex/` (see [§ Monorepo layout](#monorepo-layout))
+- Next.js 16 (App Router, `src/` directory **per app**, e.g. `apps/agency/src/app/`)
 - Tailwind CSS 4 — workspace packages need `@source` (see [Tailwind 4 + workspace packages](#tailwind-4--workspace-packages))
-- shadcn/ui (radix-nova style, neutral base color, TGA tokens in `src/app/globals.css`)
-- Convex — backend (functions in convex/)
-- Railway — deployment
+- shadcn/ui (radix-nova style, neutral base color, TGA tokens in each app's `src/app/globals.css`)
+- Convex — backend (functions in `convex/`, root-level, shared by every app)
+- Railway / Vercel — deployment (one project per app)
 
 > Stellar wallet connection: removed pending a vetted, low-CVE replacement.
 > Earlier `@creit.tech/stellar-wallets-kit` pulled in 9 critical vulns via
@@ -138,12 +137,36 @@ When the in-repo docs and skills aren't enough, consult:
 
 ## Architecture
 
-### App Router structure
+### Monorepo layout
 
-Next.js App Router pages live under `src/app/[locale]/...`. The `[locale]` segment is consumed by next-intl. The `(app)` route group holds authenticated dashboard routes.
+Turborepo workspace (`workspaces: ["apps/*", "packages/*"]`). One Next.js app per audience, each deployed to its own origin; the Convex backend is **shared and lives at the repo root**, not inside any app.
 
 ```
-src/app/
+mutav-app/
+├── apps/
+│   ├── agency/      # app.mutav.finance  — agency dashboard (Auth0, agency membership)
+│   ├── pay/         # pay.mutav.finance  — tenant payment (no Auth0; publicId bearer)
+│   ├── fund/        # fund.mutav.finance — investor portal (wallet-as-identity)
+│   └── admin/       # admin.mutav.finance — Mutav staff console (Auth0 mutavStaff connection)
+├── packages/
+│   ├── ui/          # @mutav/ui     — shadcn primitives, page primitives, cn, theme provider
+│   ├── i18n/        # @mutav/i18n   — next-intl routing/navigation, cross-app URLs, Brazil formatters
+│   ├── app-shell/   # @mutav/app-shell — shared Convex providers (Auth0-backed + public)
+│   ├── wallet/      # @mutav/wallet — wallet-kit integration (in progress)
+│   └── tsconfig/    # @mutav/tsconfig — shared TS base configs
+└── convex/          # Mutav API — shared backend (functions, schema, generated types)
+```
+
+**Dependency rule:** apps depend on `packages/*` (never the reverse), and `packages/*` never depend on `apps/*`. Third-party deps are pinned **once at the root** `package.json` (single-version policy) and hoisted; apps/packages declare only `@mutav/*` workspace deps plus their own peers. Packages export per-file subpaths (`@mutav/ui/button`, `@mutav/i18n/brazil`) — **no barrel files**. A package consumed by an app must be listed in that app's `next.config.ts` `transpilePackages`.
+
+**What's shared vs app-local:** truly cross-app code (UI primitives, locale/region utilities, the Convex provider bridge) lives in `packages/*`. App-specific shells, route groups, env getters, and providers stay in each app's `src/`. When you find yourself copy-pasting a file between two apps, that's the signal to promote it to a package — see how `cn`/`theme` landed in `@mutav/ui`, `cross-app`/`brazil` in `@mutav/i18n`, and the Convex providers in `@mutav/app-shell`.
+
+### App Router structure (per app)
+
+Each app's Next.js App Router pages live under `apps/<app>/src/app/[locale]/...`. The `[locale]` segment is consumed by next-intl. Route groups name the shell (`(app)` for the agency dashboard, `(admin)` for the staff console, `(public)` for tenant payment, `(investor)` for the fund portal).
+
+```
+apps/agency/src/app/
 ├── [locale]/
 │   ├── layout.tsx              # root layout, locale-aware metadata
 │   └── (app)/                  # dashboard route group
@@ -156,20 +179,24 @@ src/app/
 
 ### Folder responsibilities
 
-| Path                 | Holds                                                                          | Does NOT hold                                    |
-| -------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `src/app/`           | Next.js route files (`page.tsx`, `layout.tsx`, `error.tsx`, `loading.tsx`)     | Reusable components, business logic              |
-| `src/components/`    | Feature components (organized by domain) + `components/ui/` for shadcn         | Page-only logic, server code                     |
-| `src/components/ui/` | shadcn primitives — generated, edit only when extending the registry           | Domain components                                |
-| `src/hooks/`         | Reusable client hooks (data fetching, view models if shared across components) | Convex queries (those import via api directly)   |
-| `src/providers/`     | Client React providers (Convex, theme, etc.)                                   | Pure utilities                                   |
-| `src/lib/`           | Cross-cutting utilities used by both client and server (e.g. `result.ts`)      | UI components, Convex functions                  |
-| `src/i18n/`          | next-intl `routing`, `navigation`, `request` config                            | Message strings (those live in `messages/`)      |
-| `convex/`            | Convex backend functions, schema, generated types                              | Client code, UI                                  |
-| `convex/lib/`        | Convex-side shared utilities (validators, custom function wrappers)            | Domain-specific business rules                   |
-| `messages/`          | `pt-BR.json`, `en.json` — namespaced i18n strings                              | Component-scoped strings (use `useTranslations`) |
+Paths below are **relative to each app** (`apps/<app>/`), except `convex/` and `packages/` which are repo-root.
 
-**Promotion rule:** types and helpers used in only one domain belong in that domain — promote to a shared folder only when genuinely cross-cutting.
+| Path                      | Holds                                                                          | Does NOT hold                                    |
+| ------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `src/app/`                | Next.js route files (`page.tsx`, `layout.tsx`, `error.tsx`, `loading.tsx`)     | Reusable components, business logic              |
+| `src/components/`         | Feature components (organized by domain)                                       | Page-only logic, server code, shared primitives  |
+| `src/hooks/`              | Reusable client hooks (data fetching, view models if shared across components) | Convex queries (those import via api directly)   |
+| `src/providers/`          | App-local React providers + thin wrappers over `packages/*` providers          | Pure utilities, cross-app providers              |
+| `src/lib/`                | App-local cross-cutting utilities (e.g. `env.ts`, `result.ts`)                 | Cross-app code (promote to a package), UI        |
+| `src/i18n/`               | next-intl `request` config (imports routing/navigation from `@mutav/i18n`)     | Message strings (those live in `messages/`)      |
+| `messages/`               | `pt-BR.json`, `en.json` — namespaced i18n strings, **per app**                 | Component-scoped strings (use `useTranslations`) |
+| `packages/ui/src/`        | shadcn primitives, page primitives (`@mutav/ui/page/*`), `cn`, theme provider  | App-specific components, domain logic            |
+| `packages/i18n/src/`      | next-intl routing/navigation, `cross-app`, Brazil formatters (`brazil`)        | Message strings, UI                              |
+| `packages/app-shell/src/` | Shared Convex client providers (Auth0-backed + public variants)                | App env reads (passed in as props)               |
+| `convex/`                 | Convex backend functions, schema, generated types (root, shared)               | Client code, UI                                  |
+| `convex/lib/`             | Convex-side shared utilities (validators, custom function wrappers)            | Domain-specific business rules                   |
+
+**Promotion rule:** types and helpers used in only one domain belong in that domain; code copy-pasted across apps belongs in a `packages/*` package. Promote only when genuinely cross-cutting.
 
 ### Convex backend organization
 
@@ -192,7 +219,7 @@ The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outs
 
 ### Layout primitives
 
-Every page wraps content in three composable primitives from `@/components/page/*`. **Don't roll a custom page wrapper** — extend the primitives if your case doesn't fit.
+Every page wraps content in three composable primitives from `@mutav/ui/page/*` (`page-shell`, `page-header`, `page-content`). **Don't roll a custom page wrapper** — extend the primitives if your case doesn't fit.
 
 - **`<PageShell>`** — outer 3-level wrapper. Provides `@container/main` and the project's vertical rhythm (`gap-4 md:gap-6`, `py-4 md:py-6`). Always wraps the entire page.
 - **`<PageHeader title subtitle? variant? width? breadcrumb? actions? />`** — title row with two typography variants:
@@ -204,7 +231,7 @@ Every page wraps content in three composable primitives from `@/components/page/
   - `narrow` — `max-w-(--page-content-max-width)` (4xl, 56rem) with `px-4 lg:px-6`. For cards, forms, prose, detail pages.
   - `wide` — `max-w-(--page-wide-max-width)` (screen-2xl, 96rem) with `px-4 lg:px-6`. For wide tables that should still cap on ultra-wide screens.
 
-Width tokens live in `src/app/globals.css` alongside `--header-height` and `--sidebar-width`:
+Width tokens live in each app's `src/app/globals.css` alongside `--header-height` and `--sidebar-width`:
 
 ```css
 --page-content-max-width: 56rem; /* 4xl — narrow content */
@@ -328,11 +355,11 @@ import type { Doc } from "../_generated/dataModel";
 import { contractStatusValidator } from "./domain";
 ```
 
-Client code uses the `@/convex/...` alias:
+Client code in an app uses the `@convex/...` alias (each app's tsconfig maps `@convex/*` → `../../convex/*`; `@/*` → that app's `./src/*`):
 
 ```typescript
-// Inside src/components/...
-import { api } from "@/convex/_generated/api";
+// Inside apps/<app>/src/components/...
+import { api } from "@convex/_generated/api";
 ```
 
 ### TypeScript escape hatches
@@ -349,16 +376,16 @@ Tailwind 4 only scans the consuming project for class names. A utility used **on
 @source "../../../../packages/ui/src";
 ```
 
-`apps/agency/src/app/globals.css` already has this. `apps/admin`, `apps/fund`, `apps/pay` do not — add the line the moment any of them renders a primitive whose class set isn't already covered by app code. Same rule for any new workspace package with Tailwind classes.
+All four apps (`agency`, `admin`, `fund`, `pay`) already declare `@source "../../../../packages/ui/src"` in their `globals.css`. Add the same line for **any new workspace package that ships Tailwind classes** — and the moment an app first renders a primitive from such a package whose class set isn't already covered by app code. (`@mutav/app-shell` ships providers with no markup, so it needs no `@source`.)
 
 ### Environment variables
 
 Never read `process.env` directly in domain code, components, or Convex functions. Centralize:
 
 - **Server (Convex):** `convex/lib/env.ts` exports an eager `getEnv()` for non-secret config and lazy getter functions (e.g. `getResendApiKey()`) for secrets. Lazy access prevents Convex from flagging vars as required during deploy when they aren't actually called.
-- **Client:** `src/lib/env.ts` exports typed getters for `NEXT_PUBLIC_*` vars. Anything not prefixed `NEXT_PUBLIC_` is invisible to the browser bundle — don't try to read it from client code.
+- **Client:** each app's `src/lib/env.ts` exports typed getters for `NEXT_PUBLIC_*` vars. Anything not prefixed `NEXT_PUBLIC_` is invisible to the browser bundle — don't try to read it from client code. Shared `packages/*` never read `process.env` — apps pass env values in (e.g. `@mutav/app-shell`'s Convex providers take `convexUrl`/`auth0Domain` as props).
 
-Boundary exception: `convex/lib/env.ts` and `src/lib/env.ts` are themselves the only files allowed to touch `process.env` directly. If a caller needs a new env var, add a getter there.
+Boundary exception: `convex/lib/env.ts` and each app's `src/lib/env.ts` are the only files allowed to touch `process.env` directly. If a caller needs a new env var, add a getter there.
 
 ### Validation at boundaries
 
@@ -507,7 +534,7 @@ When a query needs data from two domains (e.g. membership + user info), the enri
 **Workspace / multi-tenancy**
 
 - Every resource table carries `agencyId` — all scoped queries use the `by_agency_*` composite index.
-- `WorkspaceContext` (`src/providers/workspace.tsx`) is the frontend's single source of `selectedAgencyId`. All list queries receive it as an argument — never read `localStorage` directly from a component.
+- `WorkspaceContext` (`apps/agency/src/providers/workspace.tsx`) is the agency frontend's single source of `selectedAgencyId`. All list queries receive it as an argument — never read `localStorage` directly from a component.
 - Server side, the auth wrappers in `convex/lib/auth.ts` resolve identity and assert membership; handlers do not re-check. Pre-Auth0 the wrappers fall back to a hardcoded `dev-user` row, mirroring `DEV_USER_PUBLIC_ID` on the client. The Auth0 swap is a single function in `convex/lib/auth.ts` (see [`docs/auth.md`](docs/auth.md)) plus removing `DEV_USER_PUBLIC_ID` from `workspace.tsx` — no per-handler edits.
 
 ### Deferred conventions

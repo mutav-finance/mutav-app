@@ -60,31 +60,33 @@ The Auth0 swap is documented in [`../auth.md`](../auth.md). Pre-Auth0, all human
 
 ## Shell catalog
 
-The app is a single Next.js deployment that hosts four distinct shells via App Router route groups. Each shell has its own layout, sidebar, identity model, and role gate. They share zero UI chrome — the visual separation reflects the actor separation.
+The app layer is a Turborepo monorepo with one Next.js app per audience (`apps/agency`, `apps/pay`, `apps/fund`, `apps/admin`), each hosting a distinct shell via App Router route groups. Each shell has its own layout, sidebar, identity model, and role gate. They share zero UI chrome — the visual separation reflects the actor separation.
 
-Today all four shells coexist in one Next.js deployment. The [monorepo migration](monorepo-migration.md) moves each shell into its own persona app over PRs 2–7; the **Future home** column shows the target.
+The [monorepo migration](monorepo-migration.md) that split the original single deployment into these per-app units has landed; the **Home** column names each shell's app.
 
-| Shell                | Route group  | Layout owns                                         | Gate                                   | Future home              | Status                                   |
-| -------------------- | ------------ | --------------------------------------------------- | -------------------------------------- | ------------------------ | ---------------------------------------- |
-| **Agency dashboard** | `(app)`      | `AppSidebar`, agency switcher, NavMain/NavAgency    | Auth + agency membership               | `apps/agency/`           | Shipped                                  |
-| **Tenant payment**   | `(public)`   | Minimal chrome, no auth UI                          | `publicId` validity + contract status  | `apps/pay/` (own origin) | Shipped                                  |
-| **Investor portal**  | `(investor)` | Investor nav (no agency context)                    | Wallet-connected (KYC-gated per route) | `apps/fund/`             | UI shipped, data + auth mocked           |
-| **Mutav Admin**      | `(admin)`    | `AdminSidebar` (Mutav branding, no agency switcher) | `mutavStaff` row exists                | `apps/admin/`            | **Planned** — see [`admin.md`](admin.md) |
+| Shell                | Route group  | Layout owns                                         | Gate                                   | Home                     | Status                                                                                  |
+| -------------------- | ------------ | --------------------------------------------------- | -------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| **Agency dashboard** | `(app)`      | `AppSidebar`, agency switcher, NavMain/NavAgency    | Auth + agency membership               | `apps/agency/`           | Shipped — live                                                                          |
+| **Tenant payment**   | `(public)`   | Minimal chrome, no auth UI                          | `publicId` validity + contract status  | `apps/pay/` (own origin) | Built — deploy pending                                                                  |
+| **Investor portal**  | `(investor)` | Investor nav (no agency context)                    | Wallet-connected (KYC-gated per route) | `apps/fund/`             | UI built, data + auth mocked — deploy pending                                           |
+| **Mutav Admin**      | `(admin)`    | `AdminSidebar` (Mutav branding, no agency switcher) | `mutavStaff` row exists                | `apps/admin/`            | Shell + onboarding review built; A1–A6 pillars placeholder — see [`admin.md`](admin.md) |
 
-Pre-migration, the two authenticated shells (`(app)` and `(admin)`) coexist on the same domain. Post-migration, each shell sits on its own origin (`app.mutav.finance`, `pay.mutav.finance`, `fund.mutav.finance`, `admin.mutav.finance`); the per-app deployment model is described in the App catalog below.
+Each shell now sits in its own app on its own origin (`app.mutav.finance`, `pay.mutav.finance`, `fund.mutav.finance`, `admin.mutav.finance`); the per-app deployment model is described in the App catalog below.
 
-Mutav-internal users who also hold agency memberships flip between `(app)` and `(admin)` via a shell-switcher in the user menu. They do not see the admin sidebar while inside `(app)`, and vice versa. Post-migration the switcher becomes a cross-origin link (cookies are `Host-Only` per the [Non-trust-boundary principles](#non-trust-boundary-principles), so a fresh Auth0 session is required on each origin).
+Mutav-internal users who also hold agency memberships flip between the agency app and the admin app via a shell-switcher in the user menu. They do not see the admin sidebar while inside the agency app, and vice versa. The switcher is a cross-origin link (cookies are `Host-Only` per the [Non-trust-boundary principles](#non-trust-boundary-principles), so a fresh Auth0 session is required on each origin).
 
 ## App catalog
 
-The Shell catalog describes _how the UI is organized_; the App catalog describes _where the deployable units live_. Post-migration the app layer is a Turborepo monorepo with one Next.js app per audience, each on its own origin. See [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) for the decisions (origin isolation, single-Convex, cookie posture), and the [migration spec](monorepo-migration.md) for the staged-PR sequence.
+The Shell catalog describes _how the UI is organized_; the App catalog describes _where the deployable units live_. The app layer is a Turborepo monorepo with one Next.js app per audience, each on its own origin. See [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) for the decisions (origin isolation, single-Convex, cookie posture), and the [migration spec](monorepo-migration.md) for the staged-PR history.
 
-| App           | Origin                | Hosts shell                       | Auth                                                                   | Cookie posture                                                           | Status            |
-| ------------- | --------------------- | --------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------- |
-| `apps/agency` | `app.mutav.finance`   | `(app)` + (today) `(public)/pay/` | Auth0 (agency connection) + agency membership                          | `Host-Only, SameSite=Strict, Secure, HttpOnly`                           | Planned (PR 2)    |
-| `apps/pay`    | `pay.mutav.finance`   | `(public)/pay/[publicId]/*`       | None — `publicId` bearer in URL                                        | No session cookie; only short-lived `__Host-` CSRF token if forms appear | Planned (PR 3)    |
-| `apps/fund`   | `fund.mutav.finance`  | `(investor)`                      | Wallet-as-identity (per chain)                                         | No Auth0 cookie; wallet session in `localStorage` scoped to origin       | Planned (PRs 4–5) |
-| `apps/admin`  | `admin.mutav.finance` | `(admin)`                         | Auth0 (separate `mutavStaff` connection, mandatory MFA + IP allowlist) | `Host-Only, SameSite=Strict, Secure, HttpOnly`; shorter session lifetime | Planned (PR 7)    |
+| App           | Origin                | Hosts shell                 | Auth                                                                   | Cookie posture                                                           | Status                                        |
+| ------------- | --------------------- | --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------- |
+| `apps/agency` | `app.mutav.finance`   | `(app)`                     | Auth0 (agency connection) + agency membership                          | `Host-Only, SameSite=Strict, Secure, HttpOnly`                           | Built — live                                  |
+| `apps/pay`    | `pay.mutav.finance`   | `(public)/pay/[publicId]/*` | None — `publicId` bearer in URL                                        | No session cookie; only short-lived `__Host-` CSRF token if forms appear | Built — deploy + attach pending               |
+| `apps/fund`   | `fund.mutav.finance`  | `(investor)`                | Wallet-as-identity (per chain)                                         | No Auth0 cookie; wallet session in `localStorage` scoped to origin       | Built (data mocked) — deploy + attach pending |
+| `apps/admin`  | `admin.mutav.finance` | `(admin)`                   | Auth0 (separate `mutavStaff` connection, mandatory MFA + IP allowlist) | `Host-Only, SameSite=Strict, Secure, HttpOnly`; shorter session lifetime | Built — deploy + attach pending               |
+
+Shared code lives in `packages/*`: `@mutav/ui` (shadcn + page primitives, `cn`, theme provider), `@mutav/i18n` (next-intl routing/navigation, cross-app URLs, Brazil formatters), `@mutav/app-shell` (Convex client providers), `@mutav/wallet`, `@mutav/tsconfig`. Apps depend on packages, never the reverse.
 
 The four apps share a **single Convex deployment** at the repo root (the Mutav API). The single-writer rule is load-bearing — the hash-chained audit log + Merkle anchor in [`reliability.md`](reliability.md) § Audit log integrity requires it. Per-app backends are explicitly rejected.
 
