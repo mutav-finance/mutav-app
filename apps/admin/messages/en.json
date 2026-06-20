@@ -32,7 +32,8 @@
   "adminShell": {
     "placeholder": {
       "title": "Mutav admin",
-      "subtitle": "A1–A6 pillars pending — this is the empty staff shell."
+      "subtitle": "A1–A6 pillars pending — this is the empty staff shell.",
+      "pillarPending": "Not built yet — coming in a later milestone."
     }
   },
   "adminReview": {
