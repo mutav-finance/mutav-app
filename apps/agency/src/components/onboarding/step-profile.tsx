@@ -9,8 +9,8 @@ import { Eyebrow } from "@mutav/ui/eyebrow";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
-import { cn } from "@/lib/utils";
-import { maskCPF, maskCNPJ, maskPhone } from "@/lib/brazil";
+import { cn } from "@mutav/ui/cn";
+import { maskCPF, maskCNPJ, maskPhone } from "@mutav/i18n/brazil";
 import {
   PROFILE_FORM_DEFAULTS,
   profileSchema,

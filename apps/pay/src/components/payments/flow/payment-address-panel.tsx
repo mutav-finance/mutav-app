@@ -12,7 +12,6 @@ import { HorizonPaymentPoller } from "@/components/payments/flow/horizon-payment
 export type AssetOption = {
   code: string;
   label: string;
-  amountCanonical: string;
   amountDisplay: string;
   sep7Uri: string;
 };

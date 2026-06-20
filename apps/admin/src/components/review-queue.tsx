@@ -34,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@mutav/ui/alert-dialog";
 import { DownloadIcon } from "lucide-react";
-import { maskCNPJ } from "@/lib/brazil";
+import { maskCNPJ } from "@mutav/i18n/brazil";
 
 type PendingAgency = FunctionReturnType<typeof api.mutavStaff.useCases.listPendingReviews>[number];
 

@@ -7,9 +7,10 @@ import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
 import { Link } from "@mutav/i18n/navigation";
 import { Skeleton } from "@mutav/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import { useWorkspace } from "@/providers/workspace";
-import { formatBRLCentsDisplay, type WizardData } from "@/lib/contracts/wizard";
+import { type WizardData } from "@/lib/contracts/wizard";
+import { formatBRLCents } from "@/lib/contracts/format";
 import type { ScoreTier } from "@convex/contracts/domain";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
@@ -187,7 +188,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
                   {t("simulation.approvedValueLabel")}
                 </span>
                 <span className="font-mono text-2xl font-bold">
-                  {formatBRLCentsDisplay(data.rentCents)}
+                  {formatBRLCents(data.rentCents)}
                 </span>
               </div>
             )}
@@ -221,22 +222,20 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             <SummaryRow
               label={t("coverage.summary.exitCost")}
               value={
-                data.rentCents > 0
-                  ? formatBRLCentsDisplay(EXIT_COVERAGE_MONTHS * data.rentCents)
-                  : null
+                data.rentCents > 0 ? formatBRLCents(EXIT_COVERAGE_MONTHS * data.rentCents) : null
               }
             />
             <SummaryRow
               label={t("coverage.summary.fee")}
-              value={preview ? formatBRLCentsDisplay(preview.feeCents) : null}
+              value={preview ? formatBRLCents(preview.feeCents) : null}
             />
             <SummaryRow
               label={t("coverage.summary.commission")}
-              value={commission ? formatBRLCentsDisplay(commission.commissionCents) : null}
+              value={commission ? formatBRLCents(commission.commissionCents) : null}
             />
             <SummaryRow
               label={t("coverage.summary.guarantee")}
-              value={commission ? formatBRLCentsDisplay(commission.totalCents) : null}
+              value={commission ? formatBRLCents(commission.totalCents) : null}
               highlight
             />
           </div>

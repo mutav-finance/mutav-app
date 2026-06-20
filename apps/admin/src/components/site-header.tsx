@@ -5,7 +5,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { Separator } from "@mutav/ui/separator";
 import { SidebarTrigger } from "@mutav/ui/sidebar";
 import { Button } from "@mutav/ui/button";
-import { buildCrossAppUrl } from "@/lib/cross-app";
+import { buildCrossAppUrl } from "@mutav/i18n/cross-app";
 import { getAgencyUrl } from "@/lib/env";
 
 export function SiteHeader() {

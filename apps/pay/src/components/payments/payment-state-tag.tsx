@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import type { InvoiceDisplayStatus } from "@convex/invoices/domain";
 
 type Tone = "accent" | "success" | "error" | "neutral" | "warning";
@@ -11,7 +11,7 @@ const toneClass: Record<Tone, string> = {
   neutral: "bg-muted-foreground",
 };
 
-export const paymentStateTone: Record<InvoiceDisplayStatus, Tone> = {
+const paymentStateTone: Record<InvoiceDisplayStatus, Tone> = {
   open: "accent",
   overdue: "warning",
   paid: "success",

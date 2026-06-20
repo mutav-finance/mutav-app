@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@mutav/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import { DOCUMENT_KINDS, useStepDocuments } from "@/components/onboarding/use-step-documents";
 
 // Documents step is structurally different from the form-shaped steps

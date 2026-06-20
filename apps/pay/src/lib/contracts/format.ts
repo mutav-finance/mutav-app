@@ -27,3 +27,17 @@ export function formatDateTimeBR(iso: string): string {
     minute: "2-digit",
   }).format(date);
 }
+
+/** Like {@link formatDateTimeBR} but pinned to São Paulo time — for paid-at timestamps. */
+export function formatPaidAtBR(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(date);
+}

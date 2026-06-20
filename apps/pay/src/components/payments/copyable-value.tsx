@@ -4,7 +4,7 @@ import { Copy, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Mono } from "@mutav/ui/mono";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 
 type Props = {
   display?: React.ReactNode;

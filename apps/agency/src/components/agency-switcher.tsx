@@ -12,7 +12,7 @@ import {
 } from "@mutav/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@mutav/ui/sidebar";
 import { useWorkspace } from "@/providers/workspace";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Proprietário",

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";

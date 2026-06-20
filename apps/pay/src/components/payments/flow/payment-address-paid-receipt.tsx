@@ -1,6 +1,8 @@
 import { useTranslations } from "next-intl";
 import { Check, ExternalLink } from "lucide-react";
 import { Mono } from "@mutav/ui/mono";
+import { formatPaidAtBR } from "@/lib/contracts/format";
+import { getStellarNetwork } from "@/lib/stellar/network";
 import type { SettlementMethod } from "@convex/payments/domain";
 
 type Props = {
@@ -12,15 +14,14 @@ const TESTNET_TX_BASE = "https://stellar.expert/explorer/testnet/tx";
 const PUBLIC_TX_BASE = "https://stellar.expert/explorer/public/tx";
 
 function explorerTxUrl(txHash: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_STELLAR_NETWORK === "public" ? PUBLIC_TX_BASE : TESTNET_TX_BASE;
+  const base = getStellarNetwork() === "stellar-mainnet" ? PUBLIC_TX_BASE : TESTNET_TX_BASE;
   return `${base}/${txHash}`;
 }
 
 export function PaymentAddressPaidReceipt({ paidAt, method }: Props) {
   const t = useTranslations("paymentFlow.receipt");
   const txHash = method?.kind === "stellar" ? method.txHash : null;
-  const paidAtDisplay = formatPaidAt(paidAt);
+  const paidAtDisplay = formatPaidAtBR(paidAt);
 
   return (
     <section
@@ -68,17 +69,4 @@ export function PaymentAddressPaidReceipt({ paidAt, method }: Props) {
       </dl>
     </section>
   );
-}
-
-function formatPaidAt(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  }).format(date);
 }

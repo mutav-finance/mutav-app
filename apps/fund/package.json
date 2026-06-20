@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@mutav/app-shell": "workspace:*",
     "@mutav/i18n": "workspace:*",
     "@mutav/ui": "workspace:*"
   },

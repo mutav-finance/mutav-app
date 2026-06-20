@@ -6,7 +6,6 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    "./cn": "./src/cn.ts",
     "./alert-dialog": "./src/alert-dialog.tsx",
     "./avatar": "./src/avatar.tsx",
     "./badge": "./src/badge.tsx",
@@ -15,6 +14,7 @@
     "./card": "./src/card.tsx",
     "./chart": "./src/chart.tsx",
     "./checkbox": "./src/checkbox.tsx",
+    "./cn": "./src/cn.ts",
     "./collapsible": "./src/collapsible.tsx",
     "./drawer": "./src/drawer.tsx",
     "./dropdown-menu": "./src/dropdown-menu.tsx",
@@ -24,6 +24,11 @@
     "./label": "./src/label.tsx",
     "./mono": "./src/mono.tsx",
     "./nav-user": "./src/nav-user.tsx",
+    "./page/page-content": "./src/page/page-content.tsx",
+    "./page/page-header": "./src/page/page-header.tsx",
+    "./page/page-shell": "./src/page/page-shell.tsx",
+    "./public/public-footer": "./src/public/public-footer.tsx",
+    "./public/public-shell": "./src/public/public-shell.tsx",
     "./select": "./src/select.tsx",
     "./separator": "./src/separator.tsx",
     "./sheet": "./src/sheet.tsx",
@@ -34,15 +39,11 @@
     "./step-indicator": "./src/step-indicator.tsx",
     "./table": "./src/table.tsx",
     "./tabs": "./src/tabs.tsx",
-    "./toggle-group": "./src/toggle-group.tsx",
+    "./theme": "./src/theme.tsx",
     "./toggle": "./src/toggle.tsx",
+    "./toggle-group": "./src/toggle-group.tsx",
     "./tooltip": "./src/tooltip.tsx",
-    "./use-mobile": "./src/use-mobile.ts",
-    "./page/page-content": "./src/page/page-content.tsx",
-    "./page/page-header": "./src/page/page-header.tsx",
-    "./page/page-shell": "./src/page/page-shell.tsx",
-    "./public/public-footer": "./src/public/public-footer.tsx",
-    "./public/public-shell": "./src/public/public-shell.tsx"
+    "./use-mobile": "./src/use-mobile.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

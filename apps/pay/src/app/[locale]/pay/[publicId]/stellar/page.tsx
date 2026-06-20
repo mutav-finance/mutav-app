@@ -71,7 +71,6 @@ export default async function CheckoutStellarPage({
     return {
       code: asset.symbol,
       label: asset.label[labelLocale],
-      amountCanonical: amount.canonical,
       amountDisplay: amount.display,
       sep7Uri: buildSep7PayUri({
         destination: muxedAddress,

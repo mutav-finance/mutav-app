@@ -1,5 +1,8 @@
 export const INVESTOR_FEE_RATE = 0.003;
 
+/** Frozen demo XLM/USD rate; v1.1 will read a price feed. */
+export const XLM_PRICE_USD = 0.1234;
+
 export type InvestorFeeBreakdown = {
   feeUsd: number;
   netUsd: number;

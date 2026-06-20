@@ -1,7 +1,7 @@
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@mutav/ui/item";
 import { Mono } from "@mutav/ui/mono";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 
 export function FieldRow({
   label,

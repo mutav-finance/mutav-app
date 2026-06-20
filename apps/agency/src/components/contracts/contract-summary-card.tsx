@@ -24,7 +24,7 @@ import {
 } from "@mutav/ui/dropdown-menu";
 import { Mono } from "@mutav/ui/mono";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn } from "@mutav/ui/cn";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import type { Contract, ContractStatus } from "@/lib/contracts/types";
 import { api } from "@convex/_generated/api";

@@ -1,0 +1,26 @@
+{
+  "name": "@mutav/app-shell",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./convex-auth-provider": "./src/convex-auth-provider.tsx",
+    "./convex-public-provider": "./src/convex-public-provider.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@auth0/nextjs-auth0": "^4.20.0",
+    "convex": "^1.39.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@mutav/tsconfig": "workspace:*",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

@@ -9,7 +9,7 @@ Derive all document and field types from the Convex schema. Never define types m
 
 ## Project structure
 
-The Convex backend lives at the project root in `convex/`. There is no monorepo wrapper. Imports inside `convex/` use **relative paths** (the `@` alias is not available in the Convex module resolver). Imports from client code (`src/`) use the `@/convex/...` alias.
+The Convex backend lives at the **repo root** in `convex/`, shared by every persona app in the Turborepo (`apps/agency`, `apps/pay`, `apps/fund`, `apps/admin`) — it is not nested inside any app. Imports inside `convex/` use **relative paths** (the `@` alias is not available in the Convex module resolver). Client code in an app (`apps/<app>/src/`) imports generated types via the `@convex/...` alias (e.g. `@convex/_generated/api`).
 
 ```
 convex/

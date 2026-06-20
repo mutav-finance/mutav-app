@@ -4,10 +4,10 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@mutav/ui/sidebar";
 import { Toaster } from "@mutav/ui/sonner";
-import { ThemeProvider } from "@/providers/theme";
+import { ThemeProvider } from "@mutav/ui/theme";
 import { redirect } from "@mutav/i18n/navigation";
 import { resolveUserDestination } from "@/lib/user-destination";
-import { buildCrossAppUrl } from "@/lib/cross-app";
+import { buildCrossAppUrl } from "@mutav/i18n/cross-app";
 import { getAdminUrl } from "@/lib/env";
 
 /**
