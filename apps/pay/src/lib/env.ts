@@ -40,3 +40,12 @@ export function getAppUrl(): string {
 export function getConvexUrl(): string | null {
   return process.env.NEXT_PUBLIC_CONVEX_URL ?? null;
 }
+
+/**
+ * Raw `NEXT_PUBLIC_STELLAR_NETWORK` value (e.g. `"public"`), or undefined when
+ * unset. Mapped to a `ChainNetwork` by `getStellarNetwork()` in
+ * `lib/stellar/network.ts` — the env read stays here per the boundary rule.
+ */
+export function getStellarNetworkEnv(): string | undefined {
+  return process.env.NEXT_PUBLIC_STELLAR_NETWORK;
+}

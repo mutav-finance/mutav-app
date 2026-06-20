@@ -140,6 +140,7 @@
         "@mutav/tsconfig": "workspace:*",
         "@types/react": "^19",
         "typescript": "^5",
+        "vitest": "^4.1.6",
       },
       "peerDependencies": {
         "next": "^16.0.0",
