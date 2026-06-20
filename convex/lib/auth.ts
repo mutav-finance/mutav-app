@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import type { UserIdentity } from "convex/server";
 import { customMutation, customQuery } from "convex-helpers/server/customFunctions";
 import { mutation, query } from "../_generated/server";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
@@ -9,7 +8,6 @@ import type { AppendAuditEntryInput } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import { meetsMinRole } from "../mutavStaff/domain";
 import type { MutavLadderRole, MutavStaffRole } from "../mutavStaff/domain";
-import { getAuth0AdminClientId } from "./env";
 
 /**
  * Authenticated identity helpers + per-handler wrappers.
@@ -147,39 +145,18 @@ export const mutationWithAgencyScope = customMutation(mutation, {
 // `ctx.mutavStaffRoles` (never `ctx.agencyId`). They are mutually exclusive
 // with `*WithAgencyScope`.
 //
-// LOAD-BEARING SECURITY: every staff wrapper binds to the admin app's audience.
-// Agency and admin are two Auth0 apps on one Convex deployment (two providers
-// in auth.config.ts), and identity is keyed on `subject` — so without this
-// bind, an agency-app token for a human who also holds a `mutavStaff` row would
-// be a valid credential for staff functions. The aud-bind makes the dedicated
-// admin app (confidential, MFA, short session) actually mean something at the
-// Convex boundary. When admin isn't wired (empty admin client id), it denies
-// all staff access (fail-closed).
+// AUTHORIZATION (two-tier model — ADR 0004 §4): these wrappers are the Tier-1
+// gate — "an authenticated staff member with a mutavStaff row". They do NOT
+// bind to the admin app's token audience: Convex does not surface the JWT `aud`
+// claim on the identity (only subject/issuer/profile claims), so an aud-bind is
+// infeasible here. Tier-2 value moves (cover_default) are authorized by the
+// on-chain wallet signature, never by these wrappers. If a "came through the
+// hardened admin app" signal is ever required, inject a custom claim via the
+// admin Auth0 Action (#206) and assert it here — Convex DOES forward custom claims.
 
 type StaffAuditInput = Omit<AppendAuditEntryInput, "actor">;
 
-/**
- * Asserts the presenting token was issued to the admin Auth0 application.
- * Auth0 `aud` is the client id (a string), or an array when multiple audiences
- * are requested — accept either shape. Reads a deserialized JWT claim via the
- * `UserIdentity` index signature; narrowed with runtime guards, no cast.
- */
-function assertAdminAudience(identity: UserIdentity): void {
-  const adminAud = getAuth0AdminClientId();
-  const aud = identity.aud;
-  const ok =
-    adminAud !== "" && (aud === adminAud || (Array.isArray(aud) && aud.includes(adminAud)));
-  if (!ok) {
-    throw new ForbiddenError("Staff capability requires an admin-app session");
-  }
-}
-
 async function resolveStaffUser(ctx: DbCtx): Promise<{ user: User; roles: MutavStaffRole[] }> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new UnauthenticatedError("Authentication required");
-  }
-  assertAdminAudience(identity);
   const user = await resolveCurrentUser(ctx);
   const staffRows = await ctx.db
     .query("mutavStaff")

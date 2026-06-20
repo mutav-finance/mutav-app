@@ -1,22 +1,15 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
 import schema from "../schema";
 import type { MutavStaffRole } from "./domain";
 
-// The admin app's audience. The aud-bind asserts the presenting token carries
-// THIS as its `aud`. A token from any other app (e.g. the agency SPA) must not
-// reach staff capabilities even with a valid staff subject.
+// Opaque identity values for withIdentity. The aud-bind was removed (Convex
+// doesn't surface `aud` at runtime); the staff gate is the mutavStaff row
+// (Tier-1 panel access). The wrappers ignore `aud` — these are just labels.
 const ADMIN_AUD = "admin-client-id";
 const AGENCY_AUD = "agency-client-id";
-
-beforeEach(() => {
-  vi.stubEnv("AUTH0_ADMIN_CLIENT_ID", ADMIN_AUD);
-});
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 type T = ReturnType<typeof convexTest>;
 
@@ -52,34 +45,14 @@ async function seedSubmittedAgency(t: T, cnpj = "00000000000123") {
   );
 }
 
-describe("aud-bind (load-bearing)", () => {
-  test("an agency-aud token with a valid staff subject is REJECTED", async () => {
+describe("staff gate (Tier-1 panel access)", () => {
+  test("a staff member with a mutavStaff row is allowed", async () => {
     const t = convexTest(schema);
     await seedStaff(t, "auth0|staff", ["admin"]);
     const agencyId = await seedSubmittedAgency(t);
 
-    // Same human, same staff row — but the token came from the agency app.
-    const asAgencyToken = t.withIdentity({ subject: "auth0|staff", aud: AGENCY_AUD });
-    await expect(
-      asAgencyToken.mutation(api.mutavStaff.useCases.reviewOnboarding, {
-        agencyId,
-        decision: "approved",
-      }),
-    ).rejects.toThrow();
-
-    // And the read surface is equally closed.
-    await expect(
-      asAgencyToken.query(api.mutavStaff.useCases.listPendingReviews, {}),
-    ).rejects.toThrow();
-  });
-
-  test("an admin-aud token with a staff row is ALLOWED", async () => {
-    const t = convexTest(schema);
-    await seedStaff(t, "auth0|staff", ["admin"]);
-    const agencyId = await seedSubmittedAgency(t);
-
-    const asAdmin = t.withIdentity({ subject: "auth0|staff", aud: ADMIN_AUD });
-    const result = await asAdmin.mutation(api.mutavStaff.useCases.reviewOnboarding, {
+    const asStaff = t.withIdentity({ subject: "auth0|staff" });
+    const result = await asStaff.mutation(api.mutavStaff.useCases.reviewOnboarding, {
       agencyId,
       decision: "approved",
     });
@@ -89,14 +62,16 @@ describe("aud-bind (load-bearing)", () => {
     expect(agency?.onboardingState).toBe("active");
   });
 
-  test("the admin aud is fail-closed when AUTH0_ADMIN_CLIENT_ID is the placeholder", async () => {
-    vi.stubEnv("AUTH0_ADMIN_CLIENT_ID", "__SET_BEFORE_LAUNCH__:dev");
+  test("token audience is not part of the gate (Convex doesn't surface aud)", async () => {
+    // Two-tier model: panel access = the mutavStaff row, not the token's app of
+    // origin. A both-role staff member is authorized for the panel regardless
+    // of which app minted the token. Money moves (cover_default) are gated by
+    // the on-chain wallet signature, not here.
     const t = convexTest(schema);
-    await seedStaff(t, "auth0|staff", ["admin"]);
-
-    // No real admin aud configured ⇒ no token can satisfy the bind.
-    const asAdmin = t.withIdentity({ subject: "auth0|staff", aud: "__SET_BEFORE_LAUNCH__:dev" });
-    await expect(asAdmin.query(api.mutavStaff.useCases.listPendingReviews, {})).rejects.toThrow();
+    await seedStaff(t, "auth0|staff", ["compliance"]);
+    const asAnyApp = t.withIdentity({ subject: "auth0|staff", aud: AGENCY_AUD });
+    const queue = await asAnyApp.query(api.mutavStaff.useCases.listPendingReviews, {});
+    expect(Array.isArray(queue)).toBe(true);
   });
 });
 

@@ -378,11 +378,12 @@ export function getAuth0ClientId(): string {
  * `auth.config.ts`, so the var must be present on every deployment; the value
  * may be empty when admin auth isn't wired on this deployment).
  *
- * Load-bearing for security: the `mutavStaff` wrappers in `convex/lib/auth.ts`
- * assert the presenting token's audience equals THIS value before granting any
- * staff capability — so a token minted by the agency app (different `aud`) can
- * never exercise staff powers, even for a human who holds both roles. When the
- * sentinel is empty, that assertion fails closed (no staff access at all).
+ * Used ONLY to register the second `auth.config.ts` provider, so a token minted
+ * by the dedicated admin Auth0 app (its own `aud`) passes Convex JWT validation.
+ * It is NOT a capability gate: Convex doesn't surface the JWT `aud` claim on the
+ * identity, so the `mutavStaff` wrappers cannot (and no longer) assert it — the
+ * staff gate is the `mutavStaff` row (two-tier model, see `convex/lib/auth.ts`
+ * and ADR 0004 §4). Empty/placeholder = admin provider not registered.
  */
 export function getAuth0AdminClientId(): string {
   const raw = process.env.AUTH0_ADMIN_CLIENT_ID ?? "";
