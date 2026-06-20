@@ -1,4 +1,4 @@
-import { getAuth0ClientId, getAuth0Domain } from "./lib/env";
+import { getAuth0AdminClientId, getAuth0ClientId, getAuth0Domain } from "./lib/env";
 
 /**
  * Convex auth providers — Auth0 JWT verification.
@@ -22,6 +22,7 @@ import { getAuth0ClientId, getAuth0Domain } from "./lib/env";
  */
 const domain = getAuth0Domain();
 const applicationID = getAuth0ClientId();
+const adminApplicationID = getAuth0AdminClientId();
 
 // Normalize the domain to an https:// origin. Accepts:
 //   - bare host (`tenant.auth0.com`) — most common, recommended
@@ -38,9 +39,23 @@ function normalizeAuth0Issuer(value: string): string {
   return `https://${value}`;
 }
 
+// Agency and admin are two Auth0 applications in the SAME tenant: they share
+// the issuer (`domain`) and differ only by `applicationID` (the JWT `aud`).
+// Convex matches a token against the provider whose `applicationID` equals the
+// token's audience, so the two entries never collide. Each is included only
+// when its client id is configured on this deployment (empty sentinel = off),
+// keeping both fail-closed and independent — adding admin never disturbs
+// agency auth.
 const authConfig = {
   providers:
-    domain && applicationID ? [{ domain: normalizeAuth0Issuer(domain), applicationID }] : [],
+    domain && applicationID
+      ? [
+          { domain: normalizeAuth0Issuer(domain), applicationID },
+          ...(adminApplicationID
+            ? [{ domain: normalizeAuth0Issuer(domain), applicationID: adminApplicationID }]
+            : []),
+        ]
+      : [],
 };
 
 export default authConfig;

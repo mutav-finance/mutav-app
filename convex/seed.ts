@@ -2212,6 +2212,7 @@ const PERSONAS: Record<
     subject: string;
     name: string;
     isStaff?: boolean;
+    staffRoles?: Array<"admin" | "compliance" | "support" | "treasury">;
     agency: { name: string; cnpj: string; state: "active" | "under_review" } | null;
   }
 > = {
@@ -2220,6 +2221,7 @@ const PERSONAS: Record<
     subject: "auth0|6a150df6a100fbf318f393c0",
     name: "Mutav Team",
     isStaff: true,
+    staffRoles: ["admin"],
     agency: null,
   },
   agencyowner: {
@@ -2282,6 +2284,17 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
       createdAt: now,
       isStaff: persona.isStaff,
     });
+  }
+
+  // Idempotently grant declared Mutav-staff roles (one row per role).
+  for (const role of persona.staffRoles ?? []) {
+    const existing = await ctx.db
+      .query("mutavStaff")
+      .withIndex("by_user_role", (q) => q.eq("userId", userId).eq("role", role))
+      .unique();
+    if (!existing) {
+      await ctx.db.insert("mutavStaff", { userId, role, createdAt: now });
+    }
   }
 
   if (!persona.agency) {

@@ -1,9 +1,15 @@
 import { v } from "convex/values";
+import type { UserIdentity } from "convex/server";
 import { customMutation, customQuery } from "convex-helpers/server/customFunctions";
 import { mutation, query } from "../_generated/server";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import type { User } from "../users/domain";
 import type { Membership } from "../agencies/domain";
+import type { AppendAuditEntryInput } from "../audit/domain";
+import { appendAuditEntry } from "../audit/useCases";
+import { meetsMinRole } from "../mutavStaff/domain";
+import type { MutavLadderRole, MutavStaffRole } from "../mutavStaff/domain";
+import { getAuth0AdminClientId } from "./env";
 
 /**
  * Authenticated identity helpers + per-handler wrappers.
@@ -133,6 +139,113 @@ export const mutationWithAgencyScope = customMutation(mutation, {
     return { ctx: { user, membership, agencyId }, args: {} };
   },
 });
+
+// ─── Mutav staff wrappers ────────────────────────────────────────────────────
+//
+// Staff (Mutav-org) authorization. Distinct from the agency wrappers: staff act
+// across ALL agencies with no agency context, so these inject `ctx.user` +
+// `ctx.mutavStaffRoles` (never `ctx.agencyId`). They are mutually exclusive
+// with `*WithAgencyScope`.
+//
+// LOAD-BEARING SECURITY: every staff wrapper binds to the admin app's audience.
+// Agency and admin are two Auth0 apps on one Convex deployment (two providers
+// in auth.config.ts), and identity is keyed on `subject` — so without this
+// bind, an agency-app token for a human who also holds a `mutavStaff` row would
+// be a valid credential for staff functions. The aud-bind makes the dedicated
+// admin app (confidential, MFA, short session) actually mean something at the
+// Convex boundary. When admin isn't wired (empty admin client id), it denies
+// all staff access (fail-closed).
+
+type StaffAuditInput = Omit<AppendAuditEntryInput, "actor">;
+
+/**
+ * Asserts the presenting token was issued to the admin Auth0 application.
+ * Auth0 `aud` is the client id (a string), or an array when multiple audiences
+ * are requested — accept either shape. Reads a deserialized JWT claim via the
+ * `UserIdentity` index signature; narrowed with runtime guards, no cast.
+ */
+function assertAdminAudience(identity: UserIdentity): void {
+  const adminAud = getAuth0AdminClientId();
+  const aud = identity.aud;
+  const ok =
+    adminAud !== "" && (aud === adminAud || (Array.isArray(aud) && aud.includes(adminAud)));
+  if (!ok) {
+    throw new ForbiddenError("Staff capability requires an admin-app session");
+  }
+}
+
+async function resolveStaffUser(ctx: DbCtx): Promise<{ user: User; roles: MutavStaffRole[] }> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new UnauthenticatedError("Authentication required");
+  }
+  assertAdminAudience(identity);
+  const user = await resolveCurrentUser(ctx);
+  const staffRows = await ctx.db
+    .query("mutavStaff")
+    .withIndex("by_user", (q) => q.eq("userId", user._id))
+    .collect();
+  if (staffRows.length === 0) {
+    throw new ForbiddenError("Not a Mutav staff member");
+  }
+  return { user, roles: staffRows.map((row) => row.role) };
+}
+
+/** Any-staff gate (≥1 mutavStaff row). Injects `ctx.user`, `ctx.mutavStaffRoles`. */
+export const queryWithMutavStaff = customQuery(query, {
+  args: {},
+  input: async (ctx) => {
+    const { user, roles } = await resolveStaffUser(ctx);
+    return { ctx: { user, mutavStaffRoles: roles }, args: {} };
+  },
+});
+
+/**
+ * Any-staff mutation gate. Injects `ctx.user`, `ctx.mutavStaffRoles`, and
+ * `ctx.appendStaffAudit(input)` — a hash-chained audit append with the actor
+ * pre-bound to the resolved staff user (the actor can't be forgotten or
+ * spoofed; the handler supplies only action/resource/payload).
+ */
+export const mutationWithMutavStaff = customMutation(mutation, {
+  args: {},
+  input: async (ctx) => {
+    const { user, roles } = await resolveStaffUser(ctx);
+    const appendStaffAudit = (input: StaffAuditInput) =>
+      appendAuditEntry(ctx, { actor: { kind: "user", userId: user._id }, ...input });
+    return { ctx: { user, mutavStaffRoles: roles, appendStaffAudit }, args: {} };
+  },
+});
+
+/**
+ * Role-gated staff wrappers. `minRole` is checked against the operational
+ * ladder (`support` < `compliance` < `admin`) via `meetsMinRole`; treasury is
+ * off-ladder and never satisfies an operational gate. Fail-closed.
+ */
+export const queryWithMutavRole = ({ minRole }: { minRole: MutavLadderRole }) =>
+  customQuery(query, {
+    args: {},
+    input: async (ctx) => {
+      const { user, roles } = await resolveStaffUser(ctx);
+      if (!meetsMinRole(roles, minRole)) {
+        throw new ForbiddenError(`Requires '${minRole}' role or higher`);
+      }
+      return { ctx: { user, mutavStaffRoles: roles }, args: {} };
+    },
+  });
+
+export const mutationWithMutavRole = ({ minRole }: { minRole: MutavLadderRole }) =>
+  customMutation(mutation, {
+    args: {},
+    input: async (ctx) => {
+      const { user, roles } = await resolveStaffUser(ctx);
+      if (!meetsMinRole(roles, minRole)) {
+        throw new ForbiddenError(`Requires '${minRole}' role or higher`);
+      }
+      const appendStaffAudit = (input: StaffAuditInput) =>
+        appendAuditEntry(ctx, { actor: { kind: "user", userId: user._id }, ...input });
+      return { ctx: { user, mutavStaffRoles: roles, appendStaffAudit }, args: {} };
+    },
+  });
 
 // ─── Lower-level helpers (kept for non-DB ctx and existing callers) ──────────
 
