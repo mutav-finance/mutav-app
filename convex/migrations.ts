@@ -17,6 +17,21 @@ export const noop = migrations.define({
 });
 
 /**
+ * Step 1 of removing the deprecated `users.isStaff` flag (superseded by the
+ * `mutavStaff` table). Clears the field from every `users` doc so a follow-up PR
+ * can narrow it out of the schema without hitting the deploy-order trap (Convex
+ * validates the narrowed schema against data at rest before in-deploy migrations
+ * run). Schema is unchanged here — `isStaff` stays optional until that step-2 PR.
+ *
+ * Returning `undefined` for an already-clean doc skips the write, so re-runs on
+ * deploy are no-ops. See issue #207 and the `convex/schema.ts` deprecation note.
+ */
+export const clearUsersIsStaff = migrations.define({
+  table: "users",
+  migrateOne: (_ctx, user) => (user.isStaff === undefined ? undefined : { isStaff: undefined }),
+});
+
+/**
  * Ordered runner of all data migrations. Chained after `convex deploy` in every
  * app's `vercel.json` (`scripts/run-migrations.sh`), so each deploy backfills
  * data in place — no wipe/reseed, and every developer's own dev deployment
@@ -29,4 +44,7 @@ export const noop = migrations.define({
  * `internal.migrations.<name>` here. In the NARROW PR re-enable strict
  * validation and drop the transitional fields.
  */
-export const runAll = migrations.runner([internal.migrations.noop]);
+export const runAll = migrations.runner([
+  internal.migrations.noop,
+  internal.migrations.clearUsersIsStaff,
+]);
