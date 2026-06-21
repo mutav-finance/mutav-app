@@ -1,6 +1,7 @@
 import { Migrations } from "@convex-dev/migrations";
 import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
+import { DEFAULT_TENANT_ENTITY_TYPE } from "./contracts/domain";
 
 export const migrations = new Migrations<DataModel>(components.migrations);
 
@@ -32,6 +33,23 @@ export const clearUsersIsStaff = migrations.define({
 });
 
 /**
+ * Step 1 of #60 (make `contracts.tenant` a discriminated union on `entityType`).
+ * Backfills `tenant.entityType` to `"pf"` on every contract that predates the
+ * field, so a follow-up PR can narrow `tenant` into a `v.union` with a required
+ * `entityType` literal without tripping the deploy-order trap. Returning
+ * `undefined` for docs that already carry an `entityType` skips the write, so
+ * re-runs on deploy are no-ops. `tenant` is patched as a whole object (Convex
+ * patch merges only at the top level), spreading the existing value.
+ */
+export const backfillTenantEntityType = migrations.define({
+  table: "contracts",
+  migrateOne: (_ctx, contract) =>
+    contract.tenant.entityType === undefined
+      ? { tenant: { ...contract.tenant, entityType: DEFAULT_TENANT_ENTITY_TYPE } }
+      : undefined,
+});
+
+/**
  * Ordered runner of all data migrations. Chained after `convex deploy` in every
  * app's `vercel.json` (`scripts/run-migrations.sh`), so each deploy backfills
  * data in place — no wipe/reseed, and every developer's own dev deployment
@@ -47,4 +65,5 @@ export const clearUsersIsStaff = migrations.define({
 export const runAll = migrations.runner([
   internal.migrations.noop,
   internal.migrations.clearUsersIsStaff,
+  internal.migrations.backfillTenantEntityType,
 ]);
