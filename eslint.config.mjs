@@ -1,6 +1,7 @@
 import { defineConfig } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import walletLintPlugin from "@mutav/wallet/lint";
 
 const eslintConfig = defineConfig([
   // Ignore patterns must be in their own object to take effect globally
@@ -44,6 +45,31 @@ const eslintConfig = defineConfig([
   },
   ...nextVitals,
   ...nextTs,
+  // Custom wallet-kit security guards (spec § Section 6).
+  // `no-allow-all-modules` is the primary CVE mitigation — the original
+  // 9 critical CVEs came from `allowAllModules()` bundling Trezor/Hot/NEAR
+  // adapters. `no-restricted-imports` is the belt-and-suspenders backstop
+  // in case the custom rule misses an edge case.
+  {
+    plugins: {
+      "@mutav/wallet": walletLintPlugin,
+    },
+    rules: {
+      "@mutav/wallet/no-allow-all-modules": "error",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@creit.tech/stellar-wallets-kit",
+              importNames: ["allowAllModules"],
+              message: "Forbidden — see spec § Section 2.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
