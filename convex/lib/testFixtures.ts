@@ -1,5 +1,6 @@
 import type { convexTest } from "convex-test";
 import aggregateComponentSchema from "../../node_modules/@convex-dev/aggregate/src/component/schema";
+import migrationsComponentSchema from "../../node_modules/@convex-dev/migrations/src/component/schema";
 
 declare global {
   interface ImportMeta {
@@ -26,6 +27,19 @@ export function registerContractAggregateComponents(t: ReturnType<typeof convexT
   ]) {
     t.registerComponent(name, aggregateComponentSchema, componentGlob);
   }
+}
+
+/**
+ * Register the `@convex-dev/migrations` component used by the deploy-time
+ * migration runner. Mirrors `app.use(migrations)` in `convex.config.ts`. Tests
+ * that run a `migrations.define`-based migration MUST call this on their
+ * `convexTest` instance before invoking it.
+ */
+export function registerMigrationsComponent(t: ReturnType<typeof convexTest>): void {
+  const componentGlob = import.meta.glob(
+    "../../node_modules/@convex-dev/migrations/src/component/**/*.ts",
+  );
+  t.registerComponent("migrations", migrationsComponentSchema, componentGlob);
 }
 
 type SeedUserOptions = {
