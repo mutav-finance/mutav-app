@@ -44,7 +44,7 @@ Today the wrappers resolve identity to a hardcoded `dev-user`. The same `dev-use
 
 ### Same domain, separate route group (pre-migration)
 
-> This section describes the **pre-migration** state. After PR 7 of the [monorepo migration](monorepo-migration.md), `(admin)/admin/*` moves to `apps/admin/` on its own origin (`admin.mutav.finance`) with a separate Auth0 connection. See § Subdomain split below.
+> This section describes the **pre-migration** state. After PR 7 of the [monorepo migration](monorepo-migration.md), `(admin)/admin/*` moves to `apps/admin/` on its own origin (`admin.mutav.finance`), authenticating against the **same single Auth0 application** as the agency app (one client id / `aud`, one Convex provider) through a distinct `mutavStaff` connection — not a separate Auth0 application (see [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) § #215 amendment). See § Subdomain split below.
 
 `(admin)/admin/*` lives in the same Next.js deployment as `(app)/*`. Shared session (one Auth0 login covers both), shared infrastructure (one Vercel project, one Convex deployment), zero duplicated code paths.
 
@@ -77,10 +77,10 @@ The earlier version of this document deferred the subdomain split to "when a tri
 The cumulative rationale:
 
 - **Cookie isolation.** A staff Auth0 cookie set on the agency origin (`app.mutav.finance`) is reachable from any subpath of that origin, including a future tenant-facing route or an embed. `Host-Only` cookies on `admin.mutav.finance` (per the [README's Non-trust-boundary principles](README.md#non-trust-boundary-principles)) foreclose that class of attack.
-- **Separate Auth0 connection.** The migration commits to a `mutavStaff` Auth0 connection that is administratively distinct from the agency-staff connection — mandatory MFA at the Auth0 rule level, IP allowlist, shorter session lifetime, disabled self-signup. Escalation path to a separate Auth0 tenant remains open if BACEN/CVM diligence requires it.
+- **Distinct staff connection on the shared app.** Staff authenticate through a `mutavStaff` Auth0 connection that is administratively distinct from the agency-staff connection — mandatory MFA (a Post-Login Action, applied to all logins), shorter session lifetime, disabled self-signup (no IP allowlist — decided in [#206](https://github.com/mutav-finance/mutav-app/issues/206)). This is a connection + policy on the **single** Auth0 application, **not** a separate application: `aud` is not a capability gate (the staff gate is the `mutavStaff` row), so a dedicated admin `aud` was dropped in [#215](https://github.com/mutav-finance/mutav-app/pull/215). Escalation to a separate Auth0 _tenant_ remains open if BACEN/CVM diligence requires it.
 - **Audit-surface separation.** `mutavStaff` actions land in the hash-chained audit log ([`reliability.md`](reliability.md) § Audit log integrity) the same as agency actions, but their origin is now distinguishable in IP / TLS metadata, simplifying forensic separation.
 
-The migration cost (one extra Vercel project, DNS, separate Auth0 connection) is paid by the monorepo migration's PR 7. The shell-switcher in `nav-user.tsx` (see § Shell-switcher above) becomes a cross-origin link post-migration; users authenticate separately on each origin because cookies do not cross.
+The migration cost (one extra Vercel project, DNS, a distinct `mutavStaff` connection on the shared Auth0 app) is paid by the monorepo migration's PR 7. The shell-switcher in `nav-user.tsx` (see § Shell-switcher above) becomes a cross-origin link post-migration; users authenticate separately on each origin because cookies do not cross.
 
 ## Auth wrapper integration
 

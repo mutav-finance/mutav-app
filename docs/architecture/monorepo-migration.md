@@ -10,13 +10,13 @@ Define how `mutav-app/` becomes a Turborepo monorepo with one persona app per au
 
 ## Mental model
 
-| Concept | Realized as |
-|---|---|
-| Persona app | One Next.js app under `apps/<name>/`, deployed to its own subdomain, with its own Vercel project |
-| Mutav API | A single shared Convex deployment at the repo root (`convex/`) consumed by every app |
-| Shared UI / config / types | `packages/*` — populated only when a second app actually consumes the code (YAGNI) |
-| Persona identity | Per-app, per-origin — Auth0 (agency / admin connections, administratively distinct) or wallet (fund) or none (tenant pay) |
-| Trust boundary | An app's origin. Cookies are `Host-Only` so a session never crosses subdomains |
+| Concept                    | Realized as                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Persona app                | One Next.js app under `apps/<name>/`, deployed to its own subdomain, with its own Vercel project                          |
+| Mutav API                  | A single shared Convex deployment at the repo root (`convex/`) consumed by every app                                      |
+| Shared UI / config / types | `packages/*` — populated only when a second app actually consumes the code (YAGNI)                                        |
+| Persona identity           | Per-app, per-origin — Auth0 (agency / admin connections, administratively distinct) or wallet (fund) or none (tenant pay) |
+| Trust boundary             | An app's origin. Cookies are `Host-Only` so a session never crosses subdomains                                            |
 
 The persona apps are origin-isolated by design. Cookie scope, CSP, and per-app deploys all derive from that.
 
@@ -60,12 +60,12 @@ mutav-app/                          # Turborepo root
 
 ### Origin / trust / auth posture
 
-| App | Origin | Auth | Cookie posture |
-|---|---|---|---|
-| `apps/agency/` | `app.mutav.finance` | Auth0 (agency connection) + agency membership | `Host-Only, SameSite=Strict, Secure, HttpOnly` |
-| `apps/pay/` | `pay.mutav.finance` | None (`publicId` bearer in URL) | No session cookie; only short-lived `__Host-` CSRF token if forms appear |
-| `apps/fund/` | `fund.mutav.finance` | Wallet-as-identity (per chain) | No Auth0 cookie; wallet session in `localStorage` scoped to origin |
-| `apps/admin/` | `admin.mutav.finance` | Auth0 (separate `mutavStaff` connection, mandatory MFA) | `Host-Only, SameSite=Strict, Secure, HttpOnly`; shorter session lifetime |
+| App            | Origin                | Auth                                                    | Cookie posture                                                           |
+| -------------- | --------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `apps/agency/` | `app.mutav.finance`   | Auth0 (agency connection) + agency membership           | `Host-Only, SameSite=Strict, Secure, HttpOnly`                           |
+| `apps/pay/`    | `pay.mutav.finance`   | None (`publicId` bearer in URL)                         | No session cookie; only short-lived `__Host-` CSRF token if forms appear |
+| `apps/fund/`   | `fund.mutav.finance`  | Wallet-as-identity (per chain)                          | No Auth0 cookie; wallet session in `localStorage` scoped to origin       |
+| `apps/admin/`  | `admin.mutav.finance` | Auth0 (separate `mutavStaff` connection, mandatory MFA) | `Host-Only, SameSite=Strict, Secure, HttpOnly`; shorter session lifetime |
 
 ### Load-bearing constraints
 
@@ -78,12 +78,12 @@ These are the architectural rules the implementation plan must preserve:
 
 ### Subdomain mapping
 
-| App | Hostname (committed) |
-|---|---|
+| App            | Hostname (committed)                     |
+| -------------- | ---------------------------------------- |
 | `apps/agency/` | `app.mutav.finance` (current; preserved) |
-| `apps/pay/` | `pay.mutav.finance` (new) |
-| `apps/fund/` | `fund.mutav.finance` (new) |
-| `apps/admin/` | `admin.mutav.finance` (new) |
+| `apps/pay/`    | `pay.mutav.finance` (new)                |
+| `apps/fund/`   | `fund.mutav.finance` (new)               |
+| `apps/admin/`  | `admin.mutav.finance` (new)              |
 
 DNS registrar / CNAME work is downstream of this spec and tracked in the implementation plan.
 
@@ -170,28 +170,28 @@ Eight PRs, in order. Each PR leaves `main` deployable and independently revertab
 
 ### Sequencing summary
 
-| PR | Purpose | LOC est. | Reverts cleanly |
-|---|---|---|---|
-| 1 | Workspace foundation | ~150 | Yes |
-| 2 | `apps/agency/` move | ~2k (mostly file relocations) | Yes |
-| 3 | Extract `apps/pay/` | ~400 | Yes |
-| 4 | Scaffold `apps/fund/` | ~250 | Yes |
-| 5 | Move `(investor)` | ~600 | Yes |
-| 6 | Packages extraction | ~500 | Yes |
-| 7 | Scaffold `apps/admin/` | ~300 | Yes |
-| 8 | CI gating | ~100 | Yes |
+| PR  | Purpose                | LOC est.                      | Reverts cleanly |
+| --- | ---------------------- | ----------------------------- | --------------- |
+| 1   | Workspace foundation   | ~150                          | Yes             |
+| 2   | `apps/agency/` move    | ~2k (mostly file relocations) | Yes             |
+| 3   | Extract `apps/pay/`    | ~400                          | Yes             |
+| 4   | Scaffold `apps/fund/`  | ~250                          | Yes             |
+| 5   | Move `(investor)`      | ~600                          | Yes             |
+| 6   | Packages extraction    | ~500                          | Yes             |
+| 7   | Scaffold `apps/admin/` | ~300                          | Yes             |
+| 8   | CI gating              | ~100                          | Yes             |
 
 ## Section 3 — Convex domain reconciliation
 
 The existing [Domain catalog](README.md#domain-catalog) wins, in full. The `#57` sketch is not adopted and not aliased.
 
-| `#57`'s name | Disposition | Where the concept lives today |
-|---|---|---|
-| `agencies` | Carries over (same name, same scope) | `convex/agencies/` (shipped) |
+| `#57`'s name  | Disposition                                                     | Where the concept lives today                                                                                                    |
+| ------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `agencies`    | Carries over (same name, same scope)                            | `convex/agencies/` (shipped)                                                                                                     |
 | `investments` | **Rejected.** Concept is split across multiple existing domains | `fundState` (per-chain mirror), `nav` (proposals + safeguards), `contracts` (rental contracts), `mutavStaff` (treasury sub-role) |
-| `fundMgmt` | **Rejected.** Same reason | Same split as above |
-| `payments` | Carries over | `convex/payments/` (shipped) |
-| `compliance` | Carries over (already planned) | `convex/compliance/` (planned) |
+| `fundMgmt`    | **Rejected.** Same reason                                       | Same split as above                                                                                                              |
+| `payments`    | Carries over                                                    | `convex/payments/` (shipped)                                                                                                     |
+| `compliance`  | Carries over (already planned)                                  | `convex/compliance/` (planned)                                                                                                   |
 
 The migration plan lands a one-paragraph cross-reference in [`docs/architecture/README.md` § Domain catalog](README.md#domain-catalog) explaining the mapping for future readers of `#57`. No code-level aliases; no rename of any existing domain.
 
@@ -199,10 +199,10 @@ The migration plan lands a one-paragraph cross-reference in [`docs/architecture/
 
 `mutav-fund` is a separate repo today. Its content folds into `apps/fund/` across three checkpoints; archive happens only when all three are complete.
 
-| Checkpoint | When | Trigger |
-|---|---|---|
-| 1. `apps/fund/` exists with `(investor)` routes | After PR 5 of this spec lands | Mechanical |
-| 2. Wallet kit is selected and ported | After a separate wallet-kit selection spec resolves AND its implementation PR lands in `apps/fund/` | Spec-gated |
+| Checkpoint                                             | When                                                                                                    | Trigger     |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- | ----------- |
+| 1. `apps/fund/` exists with `(investor)` routes        | After PR 5 of this spec lands                                                                           | Mechanical  |
+| 2. Wallet kit is selected and ported                   | After a separate wallet-kit selection spec resolves AND its implementation PR lands in `apps/fund/`     | Spec-gated  |
 | 3. Feature parity with current `mutav-fund` deployment | After a parity audit confirms `apps/fund/` covers every flow the live `mutav-fund/` portal serves today | Audit-gated |
 
 **Archive trigger** for `mutav-fund` = all three checkpoints complete. Until then, `mutav-fund` stays soft-deprecated per the existing banner. The repo does not archive prematurely; we have no rollback if `apps/fund/` lags.
@@ -215,11 +215,11 @@ The migration plan lands a one-paragraph cross-reference in [`docs/architecture/
 
 Vercel Team Environment Variables for v1. Three classes:
 
-| Class | Examples | Scope |
-|---|---|---|
-| Shared across all apps | `NEXT_PUBLIC_CONVEX_URL`, Stellar RPC URLs | Team env var, available to every project |
-| Per-app | Auth0 client ID/secret (agency), Auth0 client ID/secret (admin), wallet kit env (fund) | Project env var, never shared |
-| Build-only | `CONVEX_DEPLOY_KEY` | Lives only in the env of the app that runs the Convex CLI (`apps/agency/` by convention) |
+| Class                  | Examples                                                                               | Scope                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Shared across all apps | `NEXT_PUBLIC_CONVEX_URL`, Stellar RPC URLs                                             | Team env var, available to every project                                                 |
+| Per-app                | Auth0 client ID/secret (agency), Auth0 client ID/secret (admin), wallet kit env (fund) | Project env var, never shared                                                            |
+| Build-only             | `CONVEX_DEPLOY_KEY`                                                                    | Lives only in the env of the app that runs the Convex CLI (`apps/agency/` by convention) |
 
 `process.env` access still goes through `convex/lib/env.ts` (Convex side) and `<app>/src/lib/env.ts` (client side) per existing convention. Those two file roles now live as: `convex/lib/env.ts` at the repo root; one `src/lib/env.ts` per app.
 
@@ -293,12 +293,12 @@ Team handles are placeholders; the structure is what's committed. Picking actual
 ### Separate connections, same Auth0 tenant — v1 baseline
 
 - **Agency staff** authenticate through the existing Auth0 connection (Username-Password-Authentication + google-oauth2) consumed by `apps/agency/`.
-- **`mutavStaff`** authenticate through a **separate Auth0 connection** consumed only by `apps/admin/`. This connection:
-  - Requires MFA at the Auth0 rule level (no opt-out)
-  - Has IP allowlist gating (corporate egress or VPN)
+- **`mutavStaff`** authenticate through a **distinct Auth0 connection** (not a separate Auth0 _application_ — see the [ADR 0003](decisions/0003-persona-app-origin-isolation-single-convex.md) #215 amendment; all surfaces share one application / `aud` / Convex provider). This connection:
+  - Requires MFA via a Post-Login Action (no opt-out)
   - Has a shorter session lifetime (Section 5)
   - Disables self-signup; `mutavStaff` users are provisioned manually
-- Both connections live in the same Auth0 tenant, so existing dev/staging/prod tenant separation is preserved.
+  - **No IP allowlist** (decided in [#206](https://github.com/mutav-finance/mutav-app/issues/206))
+- Both connections live on the same Auth0 application in the same tenant, so existing dev/staging/prod tenant separation is preserved.
 
 ### Escalation trigger — tenant separation
 
@@ -330,7 +330,7 @@ Key decisions, with the rationale anchored to existing docs:
 
 1. **Per-app subdomains** for the four persona apps. Origin isolation is the institutional default for fintech / RWA / custody platforms (Stripe, Anchorage, BitGo, every DeFi interface). Route-group split rejected.
 2. **Tenant pay extracted to `apps/pay/` on its own origin.** Cookie scope (Auth0 cookie isolation), phishing posture (`pay.` reads cleanly to tenants), and BACEN 4.658 cyber-resilience floor all point the same way. The existing README anticipates the same pattern for `admin` ("future migration to `admin.mutav.app` is documented as a security-driven trigger"); the same logic generalizes.
-3. **`mutavStaff` Auth0 connection administratively distinct** from agency staff. Mandatory MFA + IP allowlist; tenant separation as escalation. Matches Stripe / Anchorage staff IdP separation.
+3. **`mutavStaff` Auth0 connection administratively distinct** from agency staff (a connection on the single shared Auth0 application, not a separate app — #215). Mandatory MFA (no IP allowlist — #206); separate-_tenant_ separation as escalation. Matches Stripe / Anchorage staff IdP separation.
 4. **Convex stays at the repo root, single deployment.** Load-bearing: the hash-chained audit log + Merkle anchor (per [`reliability.md` § Audit log integrity](reliability.md)) requires a single writer. Multi-Convex setups don't exist as a product.
 5. **Workspace-first, packages-on-demand** migration strategy (Section 2). YAGNI on package boundaries — extract only when there's a real second consumer. Avoids speculative package design that doesn't survive contact with real apps.
 6. **Existing Convex domain catalog wins.** `#57`'s `investments` / `fundMgmt` are conceptually split across `fundState` / `nav` / `contracts` / `mutavStaff`. No renames; one paragraph of cross-reference added.
@@ -343,18 +343,18 @@ Key decisions, with the rationale anchored to existing docs:
 
 Each of these is a downstream spec or issue, tracked here so the migration plan reader has a single index:
 
-| Item | Owner | Status |
-|---|---|---|
-| Wallet-kit selection | TBD | Blocked on this spec; needs CVE audit, smart-account-vs-hot-wallet posture |
-| `apps/marketing/` scoping | TBD | Net-new app; CMS choice + content sourcing |
-| `apps/docs/` scoping | TBD | Net-new app; Nextra vs Mintlify decision |
-| `apps/admin/` A1–A6 build-out | Per [`admin.md`](admin.md) | Blocked on PR 7 of this spec |
-| HW-wallet flow in `apps/admin/` | TBD | Blocked on PR 7 of this spec |
-| Convex Action implementations (#141–#146) | API team | Blocked on this spec + `mutav-stellar#41` |
-| KMS-Action runbook | mutav-stellar#41 | In flight |
-| External secrets manager migration | TBD | Trigger: BACEN/CVM diligence OR KMS work landing |
-| Branch-protection bypass cleanup | TBD | Operational hygiene, separate from migration |
-| GitHub team handles for CODEOWNERS | TBD | Cosmetic; resolves before PR 1 merges |
+| Item                                      | Owner                      | Status                                                                     |
+| ----------------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
+| Wallet-kit selection                      | TBD                        | Blocked on this spec; needs CVE audit, smart-account-vs-hot-wallet posture |
+| `apps/marketing/` scoping                 | TBD                        | Net-new app; CMS choice + content sourcing                                 |
+| `apps/docs/` scoping                      | TBD                        | Net-new app; Nextra vs Mintlify decision                                   |
+| `apps/admin/` A1–A6 build-out             | Per [`admin.md`](admin.md) | Blocked on PR 7 of this spec                                               |
+| HW-wallet flow in `apps/admin/`           | TBD                        | Blocked on PR 7 of this spec                                               |
+| Convex Action implementations (#141–#146) | API team                   | Blocked on this spec + `mutav-stellar#41`                                  |
+| KMS-Action runbook                        | mutav-stellar#41           | In flight                                                                  |
+| External secrets manager migration        | TBD                        | Trigger: BACEN/CVM diligence OR KMS work landing                           |
+| Branch-protection bypass cleanup          | TBD                        | Operational hygiene, separate from migration                               |
+| GitHub team handles for CODEOWNERS        | TBD                        | Cosmetic; resolves before PR 1 merges                                      |
 
 ## References
 

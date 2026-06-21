@@ -21,6 +21,8 @@ This ADR records the **decisions**; the staged-PR sequence and migration mechani
 9. **Vercel Team Environment Variables for v1**, with a documented trigger to migrate to an external secrets manager.
 10. **Per-app CI test + deploy gating** via `turbo-ignore` / `turbo --filter`; per-app CODEOWNERS land in the first migration PR.
 
+> **Amendment (2026-06-21, [#215](https://github.com/mutav-finance/mutav-app/pull/215)) — re: #3.** One Auth0 **application** backs the whole monorepo. Every Auth0-authenticated surface (agency + admin today; `fund` if/when it adopts Auth0 — it is wallet-as-identity today) shares one client id / `aud`, validated by a **single** Convex provider (`convex/auth.config.ts`). The separate admin Auth0 _application_ explored in [#206](https://github.com/mutav-finance/mutav-app/issues/206) (its own `aud` via `AUTH0_ADMIN_CLIENT_ID`) is **dropped**: `aud` was never a capability gate — Convex doesn't surface the claim, so the staff gate is the `mutavStaff` row ([ADR 0004](0004-pilot-cover-default-coverage-draw.md) §4). Decision #3's staff hardening is preserved as a **distinct `mutavStaff` connection + a mandatory-MFA Post-Login Action on that single application** (no IP allowlist — decided in #206; no self-signup; shorter session) — not a separate application. The separate-_tenant_ escalation path still stands. `pay` remains Auth0-free.
+
 ## Consequences
 
 **Positive:** origin isolation contains the blast radius of an Auth0 or admin compromise (trust boundary #10) without splitting the backend; the single-Convex rule keeps the audit log's single-writer invariant intact; the catalog-wins decision avoids a disruptive rename.
