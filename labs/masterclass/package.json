@@ -1,0 +1,34 @@
+{
+  "name": "masterclass-labs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hands-on labs for Wlad Mendes' Stellar masterclass — not part of the Mutav app bundle.",
+  "scripts": {
+    "keypair": "bun run lib/generate-keypair.ts",
+    "1:multi-op": "bun run 01-sdk-advanced/01-multi-op.ts",
+    "1:fee-bump": "bun run 01-sdk-advanced/02-fee-bump.ts",
+    "1:sponsored": "bun run 01-sdk-advanced/03-sponsored-trustlines.ts",
+    "1:zero-friction": "bun run 01-sdk-advanced/04-zero-friction-onboarding.ts",
+    "2:smoke": "bun run 02-etherfuse/01-smoke-test.ts",
+    "2:customer": "bun run 02-etherfuse/02-customer-setup.ts",
+    "2:renew-url": "bun run 02-etherfuse/02b-renew-onboarding-url.ts",
+    "2:finalize": "bun run 02-etherfuse/02c-finalize-onboarding.ts",
+    "2:onramp": "bun run 02-etherfuse/03-onramp.ts",
+    "2:poll": "bun run 02-etherfuse/04-poll-order.ts",
+    "2:offramp": "bun run 02-etherfuse/05-offramp.ts",
+    "2:webhook": "bun run 02-etherfuse/06-webhook-server.ts",
+    "2:webhook:register": "bun run 02-etherfuse/06b-register-webhook.ts",
+    "3:soroswap": "bun run 03-defi/01-soroswap-quote.ts",
+    "3:blend": "bun run 03-defi/02-blend-pools.ts",
+    "3:defindex": "bun run 03-defi/03-defindex-vault.ts"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^15.1.0",
+    "canonicalize": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}
