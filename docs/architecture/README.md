@@ -86,7 +86,7 @@ The Shell catalog describes _how the UI is organized_; the App catalog describes
 | `apps/fund`   | `fund.mutav.finance`  | `(investor)`                | Wallet-as-identity (per chain); any future Auth0 use = the shared app | No Auth0 cookie; wallet session in `localStorage` scoped to origin       | Built (data mocked) — deploy + attach pending |
 | `apps/admin`  | `admin.mutav.finance` | `(admin)`                   | Auth0 (shared app; `mutavStaff` connection + mandatory-MFA Action)    | `Host-Only, SameSite=Strict, Secure, HttpOnly`; shorter session lifetime | Built — deploy + attach pending               |
 
-Shared code lives in `packages/*`: `@mutav/ui` (shadcn + page primitives, `cn`, theme provider), `@mutav/i18n` (next-intl routing/navigation, cross-app URLs, Brazil formatters), `@mutav/app-shell` (Convex client providers), `@mutav/wallet`, `@mutav/tsconfig`. Apps depend on packages, never the reverse.
+Shared code lives in `packages/*`: `@mutav/ui` (shadcn + page primitives, `cn`, theme provider), `@mutav/i18n` (next-intl routing/navigation, cross-app URLs, Brazil formatters), `@mutav/app-shell` (Convex client providers), `@mutav/wallet` (per-surface Stellar signing — `browser` for fund/agency, `ledger` for admin; see [ADR 0005](decisions/0005-wallet-signing-architecture.md)), `@mutav/tsconfig`. Apps depend on packages, never the reverse.
 
 The four apps share a **single Convex deployment** at the repo root (the Mutav API). The single-writer rule is load-bearing — the hash-chained audit log + Merkle anchor in [`reliability.md`](reliability.md) § Audit log integrity requires it. Per-app backends are explicitly rejected.
 
