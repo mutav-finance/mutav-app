@@ -373,30 +373,6 @@ export function getAuth0ClientId(): string {
 }
 
 /**
- * Auth0 client id of the dedicated **admin** application. Same empty-sentinel
- * shape as `getAuth0ClientId` (it's the second provider scanned out of
- * `auth.config.ts`, so the var must be present on every deployment; the value
- * may be empty when admin auth isn't wired on this deployment).
- *
- * Used ONLY to register the second `auth.config.ts` provider, so a token minted
- * by the dedicated admin Auth0 app (its own `aud`) passes Convex JWT validation.
- * It is NOT a capability gate: Convex doesn't surface the JWT `aud` claim on the
- * identity, so the `mutavStaff` wrappers cannot (and no longer) assert it — the
- * staff gate is the `mutavStaff` row (two-tier model, see `convex/lib/auth.ts`
- * and ADR 0004 §4). Empty/placeholder = admin provider not registered.
- */
-export function getAuth0AdminClientId(): string {
-  const raw = process.env.AUTH0_ADMIN_CLIENT_ID ?? "";
-  // Convex's deploy-time analyzer rejects an *empty* value for a referenced
-  // env var ("used in auth config file but its value was not set"), so the
-  // "admin not wired on this deployment" state uses a non-empty placeholder —
-  // the same `__SET_BEFORE_LAUNCH__` convention as CONVEX_DEPLOY_KEY — which we
-  // normalize back to the empty off-sentinel here.
-  if (raw.startsWith("__SET_BEFORE_LAUNCH__")) return "";
-  return raw;
-}
-
-/**
  * Auth0 Management API M2M client id. Different from `getAuth0ClientId()` —
  * that one is the public Application id used by end-user JWTs; this one is
  * the dedicated M2M app's id used only by Convex actions calling

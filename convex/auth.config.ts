@@ -1,4 +1,4 @@
-import { getAuth0AdminClientId, getAuth0ClientId, getAuth0Domain } from "./lib/env";
+import { getAuth0ClientId, getAuth0Domain } from "./lib/env";
 
 /**
  * Convex auth providers — Auth0 JWT verification.
@@ -22,7 +22,6 @@ import { getAuth0AdminClientId, getAuth0ClientId, getAuth0Domain } from "./lib/e
  */
 const domain = getAuth0Domain();
 const applicationID = getAuth0ClientId();
-const adminApplicationID = getAuth0AdminClientId();
 
 // Normalize the domain to an https:// origin. Accepts:
 //   - bare host (`tenant.auth0.com`) — most common, recommended
@@ -39,23 +38,16 @@ function normalizeAuth0Issuer(value: string): string {
   return `https://${value}`;
 }
 
-// Agency and admin are two Auth0 applications in the SAME tenant: they share
-// the issuer (`domain`) and differ only by `applicationID` (the JWT `aud`).
-// Convex matches a token against the provider whose `applicationID` equals the
-// token's audience, so the two entries never collide. Each is included only
-// when its client id is configured on this deployment (empty sentinel = off),
-// keeping both fail-closed and independent — adding admin never disturbs
-// agency auth.
+// A single Auth0 application backs every authenticated surface (agency, fund,
+// admin): they share both the issuer (`domain`) and the `applicationID` (the
+// JWT `aud`), so one provider validates them all. (`pay` is publicId-bearer —
+// no Auth0.) Authorization is NOT by `aud`: Convex doesn't surface the claim,
+// so the staff gate is the `mutavStaff` row, not a separate admin application
+// (see `convex/lib/auth.ts` and ADR 0004 §4). Fail-closed: an unset client id
+// registers no provider, so every authenticated request throws.
 const authConfig = {
   providers:
-    domain && applicationID
-      ? [
-          { domain: normalizeAuth0Issuer(domain), applicationID },
-          ...(adminApplicationID
-            ? [{ domain: normalizeAuth0Issuer(domain), applicationID: adminApplicationID }]
-            : []),
-        ]
-      : [],
+    domain && applicationID ? [{ domain: normalizeAuth0Issuer(domain), applicationID }] : [],
 };
 
 export default authConfig;
