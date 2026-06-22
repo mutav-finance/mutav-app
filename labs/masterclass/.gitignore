@@ -1,0 +1,7 @@
+.env
+node_modules/
+*.log
+
+# Local state from lab scripts (customerId, bankAccountId, etc.).
+.data/*
+!.data/.gitkeep

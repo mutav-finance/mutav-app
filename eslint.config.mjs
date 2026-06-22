@@ -20,6 +20,11 @@ const eslintConfig = defineConfig([
       // Local agent tooling — not project source.
       ".claude/**",
       ".agents/**",
+      // Standalone Stellar/Etherfuse learning lab — self-contained (own
+      // package.json + tsconfig, run with its own `bun install`). Dev tooling
+      // and reference scripts, not project source, so app conventions and the
+      // strict lint gate don't apply.
+      "labs/**",
       // Vendored Etherfuse client — kept verbatim from regional-starter-pack
       // so upstream pulls stay clean-diff. Same for the operator-run sandbox
       // smoke test (vendored shape, not production code). The same client is
