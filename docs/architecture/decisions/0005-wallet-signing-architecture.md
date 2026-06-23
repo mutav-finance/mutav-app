@@ -1,83 +1,91 @@
-# ADR 0005 — Wallet-signing architecture: one `@mutav/wallet`, per-surface posture
+# ADR 0005 — Wallet-signing architecture: one kit, account-side multisig
 
-**Status:** Accepted (2026-06-22) · **Supersedes** the [#157](https://github.com/mutav-finance/mutav-app/pull/157) draft spec · Resolves the "vetted, low-CVE replacement" deferred in `CLAUDE.md` when `@creit.tech/stellar-wallets-kit` was removed (9 critical CVEs via unused Trezor/HOT/NEAR adapters).
+**Status:** Accepted, **evolving** (2026-06-22) — the wallet integration is firm; the admin-authority _account model_ (native multisig vs contract account) and the vault standard alignment are under active investigation (see § Open). **Supersedes** the [#157](https://github.com/mutav-finance/mutav-app/pull/157) draft · resolves the "vetted, low-CVE replacement" deferred in `CLAUDE.md` when `@creit.tech/stellar-wallets-kit` was removed (9 CVEs via unused Trezor/HOT/NEAR adapters).
 
 ## Context
 
-`mutav-app` has **three transaction-signing surfaces** with different trust postures, plus one that signs nothing:
+`mutav-app` has **three signing surfaces** plus one that signs nothing:
 
-| Surface       | Who         | Signs                                                                                                                                                                                          | Posture                             |
-| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `apps/admin`  | Mutav staff | reserve-vault `cover_default`, treasury-adjacent ops (pilot §D / [#201](https://github.com/mutav-finance/mutav-app/issues/201), [#208](https://github.com/mutav-finance/mutav-app/issues/208)) | **hardware wallet** — highest value |
-| `apps/fund`   | investors   | deposits / redemptions; wallet-as-identity, per-chain `(chain, address)`                                                                                                                       | browser wallet — **stage-2**        |
-| `apps/agency` | agencies    | agency-side signing (if/when it lands) — same UX as fund                                                                                                                                       | browser wallet                      |
-| `apps/pay`    | tenants     | nothing                                                                                                                                                                                        | `publicId` bearer — **no wallet**   |
+| Surface       | Who         | Signs                                                                                                                      | Posture                           |
+| ------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `apps/admin`  | Mutav staff | reserve-vault `cover_default`, treasury, params (pilot §D / [#201](https://github.com/mutav-finance/mutav-app/issues/201)) | **M-of-N quorum**, cold           |
+| `apps/fund`   | investors   | deposit / redeem; wallet-as-identity, per-chain                                                                            | browser wallet — **stage-2**      |
+| `apps/agency` | agencies    | agency-side signing if/when it lands                                                                                       | browser wallet (same as fund)     |
+| `apps/pay`    | tenants     | nothing                                                                                                                    | `publicId` bearer — **no wallet** |
 
-The earlier `@creit.tech/stellar-wallets-kit` integration was removed (2026-05) after **9 critical CVEs** pulled in transitively by `allowAllModules()` — the Trezor / HOT / NEAR adapters we never invoked. The browser flow here is modeled on [`wmendes/stellar-album-2026`](https://github.com/wmendes/stellar-album-2026) (`frontend/src/lib/wallet.ts`): a clean ~80-line `connect` / `restore` / `disconnect` / `signTransaction` pattern. **The album uses `allowAllModules()`; we explicitly do not** — that is the single change that makes the kit safe to re-adopt.
+Two reference implementations inform this, both Stellar:
 
-The #157 draft reached the right per-surface decision but over-built the guardrail (a bespoke ESLint rule + test) and went stale (the `docs/superpowers/specs/` → `docs/architecture/` rename plus a lockfile conflict). This ADR supersedes it; the implementation starts fresh from the album pattern with our two decisions applied (explicit modules; admin off the browser kit).
+- [`wmendes/stellar-album-2026`](https://github.com/wmendes/stellar-album-2026) — a clean `connect/restore/disconnect/sign` pattern, **but uses `allowAllModules()`** (the exact CVE source — rejected).
+- **[`mutav-finance/mutav-pulse`](https://github.com/mutav-finance/mutav-pulse)** — our own Stellar-hackathon reserve vault. It already uses **Stellar Wallets Kit v2.3.0 with explicit modules** (Freighter/Albedo/xBull imported by subpath — no `allowAllModules`), a `makeSignTransaction()` that plugs into Soroban **contract bindings**, a `signAndSubmit()` raw-XDR path, and a `WalletProvider`/`useWallet()` context. **This is the reference implementation for `@mutav/wallet`.**
+
+**Corrected misstep:** the first draft of this ADR (and #157) specified a separate Ledger-direct (`hw-app-str` + WebHID) path for admin. Unnecessary — Freighter (and others) already back a Ledger, and the real admin security is the **multisig quorum**, not the signing transport.
 
 ## Decision
 
-1. **One package, two independent entry points.** `@mutav/wallet` exports `@mutav/wallet/browser` (fund + agency) and `@mutav/wallet/ledger` (admin) with **zero shared runtime code**, so `apps/admin` tree-shakes the browser kit — and its CVE surface — to nothing. Per-file subpaths, no barrel (monorepo package rule).
+### A. Wallet integration — firm
 
-2. **Browser surfaces use explicit modules only — never `allowAllModules()`.** `@mutav/wallet/browser` wraps `@creit.tech/stellar-wallets-kit` with a hard-coded list: `[FreighterModule, LobstrModule, XBullModule]`, Freighter the default highlight. Trezor / HOT / WalletConnect / NEAR are not bundled — they are the CVE source and need peer deps / a WalletConnect `projectId` we don't want.
+1. **One `@mutav/wallet` for every signing surface**, built on **Stellar Wallets Kit v2** with **explicit modules only** (`new FreighterModule()` etc. imported by subpath; **never `allowAllModules()`**). Mirrors `mutav-pulse/frontend/lib/wallet.ts`. **No separate `ledger/` package** — hardware is per-admin via Freighter+Ledger.
+2. **API mirrors mutav-pulse:**
+   - `connect()` / `disconnect()` (kit v2: `StellarWalletsKit.init(...)` once, `authModal()` → `{ address }`).
+   - `makeSignTransaction(address)` → a `signTransaction` fn compatible with stellar-sdk `ContractClient` / `AssembledTransaction.signAndSend()` — the **Soroban-bindings** path.
+   - `signAndSubmit(xdr)` → kit-sign → `rpc.sendTransaction` → poll to SUCCESS, for raw XDR outside bindings.
+   - `WalletProvider` / `useWallet()` context → `{ address, connecting, error, connect, disconnect, signAndSubmit }`.
+3. **No custom lint rule.** v2's explicit-subpath imports mean `allowAllModules` is simply never imported; a one-line `no-restricted-imports` on it is belt-and-suspenders — not #157's bespoke ESLint package.
+4. **`pay` stays wallet-free** (mirrors the no-Auth0-SDK posture in [ADR 0003](0003-persona-app-origin-isolation-single-convex.md) #2).
+5. **Target [SEP-43](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0043.md) (Standard Web Wallet API).** Stellar Wallets Kit aligns with it; keep our wrapper's surface SEP-43-shaped so new wallets drop in without app changes.
 
-3. **Browser API mirrors the album.** `connect()` opens the kit modal → `setWallet(id)` → `getAddress()`; persists only the **wallet id** (never keys) in `localStorage`; `restore()` silently re-establishes on load; `disconnect()` clears it; `signTransaction(xdr)` delegates to `kit.signTransaction`. Keys never leave the wallet.
+### B. Admin authority — quorum is account-side, not frontend (firm direction; pilot account model open)
 
-4. **Admin uses Ledger-direct.** `@mutav/wallet/ledger` uses `@ledgerhq/hw-app-str` over a WebHID transport — **no `@creit.tech` dependency at all**. This is the hardware-wallet authority path for `cover_default` and admin signing (the cold-key role in the authority model — see `CLAUDE.md` § Authority model and [ADR 0004](0004-pilot-cover-default-coverage-draw.md) §4).
+6. **Admin signing is M-of-N multisig; the quorum lives in the account/contract, signed by admins' personal connected wallets** (the same kit). An admin holds two independent things — a `mutavStaff` row (Tier-1 panel access) **and** a personal pubkey enrolled as a multisig signer (Tier-2 money authority) — exactly [ADR 0004](0004-pilot-cover-default-coverage-draw.md) §4's two-tier model. Onboarding/offboarding an admin's money authority = add/remove their signer.
+7. **Two horizons** (per Stellar's own contract-account guidance: classic = "simplest path"; contract account = when you need "on-chain rules such as spend caps, allow lists, or timelocks"):
+   - **Native Stellar multisig** (`G…` account, N signers, threshold M) — no contract; the pilot-fastest path to a real `cover_default` quorum.
+   - **Soroban contract account** (`C…`, OpenZeppelin smart account) — when on-chain **policy** is wanted (per-draw spend caps, timelocks, allowlists, passkeys). This is the mutav-pulse `vault`/`policy`/`registry` pattern and the `CLAUDE.md` "OZ Smart Account" end-state.
 
-5. **Guardrail is `no-restricted-imports`, not a custom rule.** ESLint forbids importing `allowAllModules` from the kit and forbids the heavy adapter packages (`@trezor/*`, `@hot-labs/*`, NEAR) repo-wide. Lighter than #157's bespoke rule, same protection; the constraint is small enough to live in `eslint.config.mjs`.
+   **The frontend wallet code is identical for both** — each admin signs with their wallet; only the account/contract differs. So we build the integration once and evolve the _account_ later without touching app code.
 
-6. **`apps/pay` stays wallet-free** — `publicId` bearer, no wallet SDK in its dependency list (mirrors the no-Auth0-SDK posture in [ADR 0003](0003-persona-app-origin-isolation-single-convex.md) #2).
+8. **Multi-party signing coordination** uses Stellar standards: [SEP-7](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0007.md) (URI signing requests), [SEP-19](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0019.md) (bootstrapping multisig submission), [SEP-21](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0021.md) (on-chain signature sharing) — collect M signatures on the same XDR, submit when threshold met. [SEP-30](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0030.md) for multi-party admin-key recovery. If admin authority is a contract account, authenticate it with [SEP-45](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0045.md) (web auth for `C…` accounts), alongside SEP-10 for classic accounts.
 
-7. **Multi-chain-ready.** Identity is chain-namespaced `(chain, address)` from day one (Stellar v1; Solana / EVM later are one adapter file each). No cross-chain identity unification — consistent with [`investor.md`](../investor.md) and trust boundary #2 in [`README.md`](../README.md).
+### C. Vault alignment — firm direction (detail deferred)
+
+9. **The reserve vault targets [SEP-56](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0056.md) (Tokenized Vault Standard)** — deposit underlying → mint shares; extends [SEP-41](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0041.md) (Soroban token). SEP-56 is OpenZeppelin-authored, the Soroban analog of ERC-4626, and is what mutav-pulse's vault targets — making DeFindex/Soroswap/Blend yield composable. Detailed vault design is **out of scope for this wallet ADR** (own vault ADR).
 
 ## Result (target shape)
 
 ```
-packages/wallet/
-├── package.json                 # exports "./browser" and "./ledger" subpaths
-├── src/
-│   ├── browser/
-│   │   ├── kit.ts               # StellarWalletsKit, modules: [Freighter, Lobstr, XBull]
-│   │   └── session.ts           # connect / restore / disconnect / signTransaction (album pattern)
-│   └── ledger/
-│       └── signer.ts            # hw-app-str + WebHID: getAddress / signTransaction
+packages/wallet/                    # @mutav/wallet — one package, Stellar Wallets Kit v2
+├── package.json                    # deps: @creit.tech/stellar-wallets-kit@^2, @stellar/stellar-sdk@^15
+└── src/
+    ├── kit.ts                      # StellarWalletsKit.init({ modules: [Freighter, xBull, Lobstr/Albedo] })
+    ├── session.ts                  # connect / disconnect / signAndSubmit  (mutav-pulse pattern)
+    ├── signer.ts                   # makeSignTransaction(address) for Soroban ContractClient bindings
+    └── provider.tsx                # WalletProvider + useWallet() context
 ```
 
-**Public surface (per the album):**
-
-```ts
-// @mutav/wallet/browser
-connect(): Promise<string>            // opens picker, returns address, persists wallet id
-restore(): Promise<string | null>     // silent reconnect on load, or null
-disconnect(): void                    // forget saved session
-signTransaction(xdr): Promise<{ signedTxXdr: string }>
-
-// @mutav/wallet/ledger
-getAddress(): Promise<string>
-signTransaction(xdr): Promise<{ signedTxXdr: string }>
-```
-
-- **Deps:** add `@creit.tech/stellar-wallets-kit` (browser) + `@ledgerhq/hw-app-str` and `@ledgerhq/hw-transport-webhid` (ledger), pinned once at root (single-version policy). No `allowAllModules` adapter packages.
-- **Wiring:** `apps/fund` + `apps/agency` consume `@mutav/wallet/browser`; `apps/admin` consumes `@mutav/wallet/ledger`. Each lists `@mutav/wallet` in `next.config.ts` `transpilePackages`.
-- **Sequencing (pilot-first):** ship **`ledger/` first** — it is the pilot's load-bearing signing path (reserve-vault `cover_default`, §208 §D / #201). `browser/` follows for fund/agency (fund is stage-2 per the pilot scope).
+- **Consumed by** `apps/fund` + `apps/agency` + `apps/admin` (each lists `@mutav/wallet` in `transpilePackages`). `pay`: none.
+- **No** `allowAllModules` adapter packages, **no** `hw-app-str`/WebHID.
+- **Admin account:** native multisig (pilot candidate) **or** OZ contract account (end-state) — Decision #7; identical wallet code either way.
 
 ## Consequences
 
-**Positive:** the CVE surface that forced the original removal is gone (explicit modules); admin signing is physically isolated from browser-wallet code (a kit CVE cannot reach staff/treasury signing); the browser API is a proven ~80-line pattern; one package serves all signing surfaces with two tree-shakable entry points.
+**Positive:** the CVE surface that forced the removal is gone by construction (explicit subpath module imports); one wallet integration serves all surfaces; admin security is the _quorum_ (compromising one admin's wallet can't act alone) rather than a special transport; the `makeSignTransaction` path wires straight into Soroban vault bindings; standards-aligned (SEP-43/45/56/7/19/21/30).
 
-**Negative / cost:** re-adopts a previously-removed dependency — the explicit-modules line is load-bearing and must be held (hence the lint guard). Ledger + WebHID requires a Chromium-family browser; the admin runbook documents the support matrix. The browser kit's own transitive advisories must be watched on every bump.
+**Negative / cost:** re-adopts a previously-removed dependency — hold the explicit-modules line and watch transitive advisories on every kit bump. Multi-party signing needs a coordination surface in `apps/admin` (propose → collect M sigs → submit).
 
 ## Alternatives rejected
 
-- **`allowAllModules()`** (the album's default) — re-introduces the 9-CVE adapter surface; the entire reason for #157 and this ADR.
-- **#157's custom `no-allow-all-modules` ESLint rule** — over-built; `no-restricted-imports` covers it with no package to maintain.
-- **Separate per-surface wallet packages** — unnecessary; one package with two tree-shakable entry points achieves the admin/browser isolation.
-- **Keep wallet code app-local** — would duplicate the kit setup across fund + agency; promote to a package per the monorepo rule.
-- **Smart-account / passkey wallets, Wallet Standard adapter, OZ Relayer (gasless)** — deferred to a later iteration; the chain-namespaced shape leaves room for them.
+- **`allowAllModules()`** (album + dapp-skill default) — the 9-CVE adapter surface.
+- **A dedicated `@mutav/wallet/ledger` (`hw-app-str` + WebHID) path** — Freighter+Ledger covers hardware with zero bespoke code.
+- **#157's custom `no-allow-all-modules` ESLint rule** — moot under v2 explicit imports.
+- **Separate per-surface wallet packages** — one package serves all; the quorum is an account concern.
+
+## Open / under investigation
+
+- **Pilot admin authority:** native Stellar multisig vs Soroban contract account (drives #201 / §D).
+- **Module set:** Freighter + xBull + (Lobstr and/or Albedo).
+- **SEP-56 vault** contract design — separate vault ADR.
+- **SEP-43 conformance** of the `@mutav/wallet` wrapper surface.
+- Confirm Stellar Wallets Kit **v2** API + any peer-dep/CVE deltas vs the removed version.
 
 ## Supersedes
 
-[#157](https://github.com/mutav-finance/mutav-app/pull/157) — its per-surface decision is adopted here; its scaffolding (custom lint rule, stale docs location, lockfile churn) is dropped in favor of a fresh build on the album pattern. Close #157 as superseded once this lands.
+[#157](https://github.com/mutav-finance/mutav-app/pull/157) — its per-surface intent is adopted; its scaffolding (Ledger path, custom lint rule, stale docs location) is dropped in favor of the mutav-pulse pattern. Close #157 once this lands.
