@@ -94,15 +94,21 @@ export function getStellarNetwork(): "testnet" | "public" {
 }
 
 /**
- * Soroban RPC URL. Defaults to the public testnet RPC; mainnet must set
- * `NEXT_PUBLIC_STELLAR_RPC_URL` to a provider endpoint (no public mainnet RPC).
+ * Soroban RPC URL. Testnet defaults to the public RPC (which the `next.config`
+ * CSP `connect-src` allows). There is no public mainnet RPC — and a provider
+ * host would be blocked by the CSP unless added there — so mainnet REQUIRES
+ * `NEXT_PUBLIC_STELLAR_RPC_URL`. Shipping a CSP-blocked default would let a
+ * privileged tx get signed and then fail to submit; fail loud at config instead.
  */
 export function getStellarRpcUrl(): string {
   const override = process.env.NEXT_PUBLIC_STELLAR_RPC_URL;
   if (override) return override;
-  return getStellarNetwork() === "public"
-    ? "https://mainnet.sorobanrpc.com"
-    : "https://soroban-testnet.stellar.org";
+  if (getStellarNetwork() === "public") {
+    throw new Error(
+      "NEXT_PUBLIC_STELLAR_RPC_URL must be set for the public network, and its host added to next.config CSP connect-src",
+    );
+  }
+  return "https://soroban-testnet.stellar.org";
 }
 
 /** Network passphrase — a stable protocol constant derived from the network. */

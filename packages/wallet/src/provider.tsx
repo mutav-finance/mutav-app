@@ -10,7 +10,11 @@
  */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { initWalletKit, type WalletNetwork } from "./kit";
-import { connect as kitConnect, disconnect as kitDisconnect } from "./session";
+import {
+  connect as kitConnect,
+  disconnect as kitDisconnect,
+  restore as kitRestore,
+} from "./session";
 import { signAndSubmit as kitSignAndSubmit } from "./signer";
 
 export interface WalletContextValue {
@@ -34,6 +38,15 @@ export type WalletProviderProps = {
   network: WalletNetwork;
   rpcUrl: string;
   networkPassphrase: string;
+  /**
+   * Whether to reflect the kit's auto-restored session across reloads.
+   * - `true` (default): on mount, reconcile React state with the kit's restored
+   *   session (investor surfaces — keeps the user connected across reloads).
+   * - `false`: clear any restored session on mount so connecting is always an
+   *   explicit gesture (high-security surfaces like admin). The kit otherwise
+   *   silently keeps a live, signable session that the UI wouldn't show.
+   */
+  persistSession?: boolean;
   children: ReactNode;
 };
 
@@ -41,6 +54,7 @@ export function WalletProvider({
   network,
   rpcUrl,
   networkPassphrase,
+  persistSession = true,
   children,
 }: WalletProviderProps) {
   const [address, setAddress] = useState<string | null>(null);
@@ -49,7 +63,22 @@ export function WalletProvider({
 
   useEffect(() => {
     initWalletKit(network);
-  }, [network]);
+    let cancelled = false;
+    if (persistSession) {
+      // Reconcile React state with the kit's (possibly auto-restored) session.
+      void kitRestore().then((addr) => {
+        if (!cancelled && addr) setAddress(addr);
+      });
+    } else {
+      // Never silently inherit an auto-restored live session on this surface —
+      // clear it so the kit and UI agree that nothing is connected until the
+      // user explicitly connects.
+      void kitDisconnect();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [network, persistSession]);
 
   const connect = useCallback(async () => {
     setConnecting(true);
@@ -66,10 +95,9 @@ export function WalletProvider({
   }, [network]);
 
   const disconnect = useCallback(() => {
-    kitDisconnect().catch((err) => {
-      console.error("[@mutav/wallet] disconnect error:", err);
-    });
-    setAddress(null);
+    // Clear UI state only after the kit has actually torn down its session, so
+    // the UI never reports "disconnected" while a live kit session lingers.
+    void kitDisconnect().finally(() => setAddress(null));
   }, []);
 
   const signAndSubmit = useCallback(

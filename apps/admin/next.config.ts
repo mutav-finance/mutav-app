@@ -50,11 +50,13 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  // `https://*.stellar.org` — Soroban RPC + Horizon for wallet signing/submit
-  // (testnet: soroban-testnet.stellar.org). Freighter/xBull are browser
-  // extensions (postMessage, no network origin), so only the RPC is needed
-  // here. A mainnet RPC on a provider domain must be added when it lands.
-  "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://*.auth0.com https://*.stellar.org",
+  // `soroban-testnet.stellar.org` — the exact Soroban RPC the wallet signs/
+  // submits against (pinned, not a `*.stellar.org` wildcard). Freighter/xBull
+  // are browser extensions (postMessage, no network origin), so only the RPC is
+  // needed. When mainnet lands, add the chosen provider's RPC host here AND set
+  // `NEXT_PUBLIC_STELLAR_RPC_URL` (the env getter throws otherwise) — keep the
+  // two in lock-step so a signed tx is never blocked at submit.
+  "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://*.auth0.com https://soroban-testnet.stellar.org",
   "frame-ancestors 'none'",
   "form-action 'self' https://*.auth0.com",
   "base-uri 'self'",

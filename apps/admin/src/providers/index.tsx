@@ -14,6 +14,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           network={getStellarNetwork()}
           rpcUrl={getStellarRpcUrl()}
           networkPassphrase={getStellarNetworkPassphrase()}
+          // Staff surface: never silently inherit an auto-restored wallet
+          // session — require an explicit connect each page-load (ADR 0005).
+          persistSession={false}
         >
           <TooltipProvider>{children}</TooltipProvider>
         </WalletProvider>

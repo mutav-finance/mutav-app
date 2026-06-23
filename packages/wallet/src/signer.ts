@@ -21,6 +21,30 @@ export type SignTransaction = (
 ) => Promise<{ signedTxXdr: string; signerAddress?: string }>;
 
 /**
+ * Pre-sign safety: parse the XDR under the expected network passphrase (rejects
+ * malformed / mis-encoded envelopes early) and, when the signer is known, assert
+ * the transaction's source account is that signer — so a tampered or
+ * wrong-source XDR is not signed blind. The wallet's own review UI is the second
+ * line; this is the programmatic first line. Fee-bump envelopes (no `source`
+ * getter) are passed through — admin ops are plain transactions.
+ */
+function assertSignable(xdr: string, networkPassphrase: string, address?: string | null): void {
+  let tx;
+  try {
+    tx = TransactionBuilder.fromXDR(xdr, networkPassphrase);
+  } catch (err) {
+    throw new Error(
+      `refusing to sign: XDR did not parse under the expected network — ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+  if (address && "source" in tx && tx.source !== address) {
+    throw new Error(`refusing to sign: tx source ${tx.source} != connected signer ${address}`);
+  }
+}
+
+/**
  * A `signTransaction` function for stellar-sdk contract bindings. Pass it as the
  * `signTransaction` option when constructing a generated `Client`.
  */
@@ -28,11 +52,15 @@ export function makeSignTransaction(
   networkPassphrase: string,
   address?: string | null,
 ): SignTransaction {
-  return async (xdr, opts) =>
-    StellarWalletsKit.signTransaction(xdr, {
-      networkPassphrase: opts?.networkPassphrase ?? networkPassphrase,
-      address: opts?.address ?? address ?? undefined,
+  return async (xdr, opts) => {
+    const passphrase = opts?.networkPassphrase ?? networkPassphrase;
+    const signer = opts?.address ?? address ?? undefined;
+    assertSignable(xdr, passphrase, signer);
+    return StellarWalletsKit.signTransaction(xdr, {
+      networkPassphrase: passphrase,
+      address: signer,
     });
+  };
 }
 
 export type SubmitConfig = {
@@ -49,10 +77,14 @@ export type SubmitConfig = {
  * (via `makeSignTransaction`) when working through generated contract clients.
  */
 export async function signAndSubmit(xdr: string, config: SubmitConfig): Promise<string> {
-  const { signedTxXdr } = await StellarWalletsKit.signTransaction(xdr, {
+  assertSignable(xdr, config.networkPassphrase, config.address);
+  const { signedTxXdr, signerAddress } = await StellarWalletsKit.signTransaction(xdr, {
     networkPassphrase: config.networkPassphrase,
     address: config.address ?? undefined,
   });
+  if (config.address && signerAddress && signerAddress !== config.address) {
+    throw new Error(`signed by ${signerAddress}, expected ${config.address}`);
+  }
 
   const server = new StellarRpc.Server(config.rpcUrl, { allowHttp: false });
   const tx = TransactionBuilder.fromXDR(signedTxXdr, config.networkPassphrase);
