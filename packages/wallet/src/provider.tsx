@@ -16,6 +16,7 @@ import {
   restore as kitRestore,
 } from "./session";
 import { signAndSubmit as kitSignAndSubmit, signMessage as kitSignMessage } from "./signer";
+import { proveOwnership as kitProveOwnership } from "./ownership";
 
 export interface WalletContextValue {
   /** Connected Stellar public key, or null. */
@@ -30,6 +31,12 @@ export interface WalletContextValue {
   disconnect(): void;
   /** Sign an arbitrary message (SEP-53); returns the signature. No tx/fee. */
   signMessage(message: string): Promise<string>;
+  /**
+   * Prove control of the connected wallet via a signed challenge tx and verify
+   * the signature against the address. Returns true iff verified. Client-side
+   * only — not a server trust boundary (see ownership.ts).
+   */
+  proveOwnership(): Promise<boolean>;
   /** Sign + submit a raw XDR; returns the confirmed tx hash. */
   signAndSubmit(xdr: string): Promise<string>;
 }
@@ -110,6 +117,11 @@ export function WalletProvider({
     [networkPassphrase, address],
   );
 
+  const proveOwnership = useCallback(async () => {
+    if (!address) throw new Error("wallet not connected");
+    return kitProveOwnership(address, networkPassphrase);
+  }, [address, networkPassphrase]);
+
   const signAndSubmit = useCallback(
     (xdr: string) => kitSignAndSubmit(xdr, { rpcUrl, networkPassphrase, address }),
     [rpcUrl, networkPassphrase, address],
@@ -117,7 +129,16 @@ export function WalletProvider({
 
   return (
     <WalletContext.Provider
-      value={{ address, connecting, error, connect, disconnect, signMessage, signAndSubmit }}
+      value={{
+        address,
+        connecting,
+        error,
+        connect,
+        disconnect,
+        signMessage,
+        proveOwnership,
+        signAndSubmit,
+      }}
     >
       {children}
     </WalletContext.Provider>

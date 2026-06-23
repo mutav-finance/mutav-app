@@ -9,6 +9,7 @@
     "./kit": "./src/kit.ts",
     "./session": "./src/session.ts",
     "./signer": "./src/signer.ts",
+    "./ownership": "./src/ownership.ts",
     "./provider": "./src/provider.tsx"
   },
   "scripts": {

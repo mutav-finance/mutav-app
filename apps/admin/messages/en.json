@@ -73,8 +73,8 @@
     "connect": "Connect wallet",
     "connecting": "Connecting…",
     "disconnect": "Disconnect",
-    "sign": "Sign (test)",
-    "signing": "Signing…",
-    "signed": "Signed ✓"
+    "verify": "Verify ownership",
+    "verifying": "Verifying…",
+    "verified": "Verified ✓"
   }
 }

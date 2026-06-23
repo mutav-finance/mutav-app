@@ -73,8 +73,8 @@
     "connect": "Conectar carteira",
     "connecting": "Conectando…",
     "disconnect": "Desconectar",
-    "sign": "Assinar (teste)",
-    "signing": "Assinando…",
-    "signed": "Assinado ✓"
+    "verify": "Verificar titularidade",
+    "verifying": "Verificando…",
+    "verified": "Titularidade ✓"
   }
 }

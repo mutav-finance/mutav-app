@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { CheckIcon, PenLineIcon, WalletIcon } from "lucide-react";
+import { ShieldCheckIcon, ShieldIcon, WalletIcon } from "lucide-react";
 import { Button } from "@mutav/ui/button";
 import { useWallet } from "@mutav/wallet/provider";
 
@@ -13,15 +13,16 @@ const truncate = (address: string) => `${address.slice(0, 4)}…${address.slice(
  * (Freighter — hardware-optional via Ledger — or xBull); that key is one signer
  * of the vault's M-of-N admin multisig (ADR 0005).
  *
- * The "Sign (test)" action signs a throwaway SEP-53 message (no transaction, no
- * fee) — it prompts the wallet so the signing path can be verified before any
- * on-chain operation (cover_default) is wired.
+ * "Verify ownership" signs a SEP-10-style challenge transaction and verifies the
+ * signature against the connected address — proving the admin controls the key.
+ * Client-side only here; binding the wallet to the staff identity (enrolling it
+ * as a signer) is a server-verified step (see ownership.ts).
  */
 export function ConnectWallet() {
   const t = useTranslations("wallet");
-  const { address, connecting, error, connect, disconnect, signMessage } = useWallet();
-  const [signing, setSigning] = useState(false);
-  const [signed, setSigned] = useState(false);
+  const { address, connecting, error, connect, disconnect, proveOwnership } = useWallet();
+  const [verifying, setVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
 
   if (address) {
     return (
@@ -30,24 +31,23 @@ export function ConnectWallet() {
           {truncate(address)}
         </span>
         <Button
-          variant="outline"
+          variant={verified ? "outline" : "default"}
           size="sm"
-          disabled={signing}
+          disabled={verifying}
           onClick={async () => {
-            setSigning(true);
-            setSigned(false);
+            setVerifying(true);
+            setVerified(false);
             try {
-              await signMessage(`Mutav Admin · teste de assinatura · ${new Date().toISOString()}`);
-              setSigned(true);
+              setVerified(await proveOwnership());
             } catch {
-              // Rejected / wallet error — the wallet surfaces it; leave un-signed.
+              // Rejected / wallet error — the wallet surfaces it; stay unverified.
             } finally {
-              setSigning(false);
+              setVerifying(false);
             }
           }}
         >
-          {signed ? <CheckIcon /> : <PenLineIcon />}
-          {signed ? t("signed") : signing ? t("signing") : t("sign")}
+          {verified ? <ShieldCheckIcon /> : <ShieldIcon />}
+          {verified ? t("verified") : verifying ? t("verifying") : t("verify")}
         </Button>
         <Button variant="ghost" size="sm" onClick={disconnect}>
           {t("disconnect")}
