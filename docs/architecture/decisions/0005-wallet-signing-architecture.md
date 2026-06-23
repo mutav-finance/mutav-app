@@ -43,7 +43,17 @@ Two reference implementations inform this, both Stellar:
 
    **The frontend wallet code is identical for both** — each admin signs with their wallet; only the account/contract differs. So we build the integration once and evolve the _account_ later without touching app code.
 
+   **Decided (2026-06-22): native Stellar multisig for the pilot.** The mutav-pulse `policy`/`vault` contracts gate every privileged call with `Self::admin(e).require_auth()` on a stored `Admin: Address`, which accepts a `G…` multisig **or** a `C…` contract account with **zero contract changes**. Because the protocol policy (coverage ratios, `cover_default` eligibility, the solvency invariant) already lives in the `policy` contract, the admin account only needs to be an **M-of-N quorum** — native multisig is sufficient and simplest. The OZ contract account is a drop-in upgrade (`set_admin` to a `C…`) if admin-account-level policy (per-signer weights, timelocks, passkeys) is later wanted.
+
 8. **Multi-party signing coordination** uses Stellar standards: [SEP-7](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0007.md) (URI signing requests), [SEP-19](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0019.md) (bootstrapping multisig submission), [SEP-21](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0021.md) (on-chain signature sharing) — collect M signatures on the same XDR, submit when threshold met. [SEP-30](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0030.md) for multi-party admin-key recovery. If admin authority is a contract account, authenticate it with [SEP-45](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0045.md) (web auth for `C…` accounts), alongside SEP-10 for classic accounts.
+
+### B′. Pilot mechanics — how the native-multisig admin is wired
+
+Grounded in the mutav-pulse contracts + `bootstrap.sh`:
+
+- **Admin is set at deploy** via the constructor: `__constructor(e, admin: Address)` (`stellar contract deploy … --admin <ADDRESS>`). Simplest path — deploy with `admin = <native multisig G…>` directly; or deploy with a bootstrap key, run setup (`set_vault` / `set_policy` / `add_strategy`), then hand off.
+- **Handoff / rotation** uses `set_admin(new_admin: Address)`, which requires the _current_ admin to `require_auth()`. CLI: `stellar contract invoke --id <POLICY> --source <current-admin> -- set_admin --new_admin <multisig>`. App: the generated binding `policy.set_admin({ new_admin }).signAndSend()`, signed by the current admin via `makeSignTransaction`. After handoff, even `set_admin` itself needs the quorum.
+- **Signing coordination is the one genuinely new app surface.** Once admin = a multisig, a single `signAndSend()` adds only _one_ signature and won't meet the threshold. `apps/admin` must build+simulate the op (`cover_default`, `set_admin`, …), have **each required admin sign the same envelope** (`makeSignTransaction`), and submit once **M** signatures are collected — the SEP-7 / SEP-19 flow. Everything else (contract auth, handoff) works as-is.
 
 ### C. Vault alignment — firm direction (detail deferred)
 
@@ -80,7 +90,7 @@ packages/wallet/                    # @mutav/wallet — one package, Stellar Wal
 
 ## Open / under investigation
 
-- **Pilot admin authority:** native Stellar multisig vs Soroban contract account (drives #201 / §D).
+- ~~Pilot admin authority: native multisig vs contract account~~ → **decided: native multisig** (§B Decision #7). Remaining is operational: the signer set (which admin pubkeys) and the `M`/`N` threshold.
 - **Module set:** Freighter + xBull + (Lobstr and/or Albedo).
 - **SEP-56 vault** contract design — separate vault ADR.
 - **SEP-43 conformance** of the `@mutav/wallet` wrapper surface.
