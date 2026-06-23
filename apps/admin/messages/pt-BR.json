@@ -68,5 +68,10 @@
   },
   "shellSwitcher": {
     "backToAgency": "Voltar para Imobiliárias"
+  },
+  "wallet": {
+    "connect": "Conectar carteira",
+    "connecting": "Conectando…",
+    "disconnect": "Desconectar"
   }
 }

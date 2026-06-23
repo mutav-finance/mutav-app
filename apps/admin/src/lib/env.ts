@@ -81,3 +81,33 @@ export function getAuth0Connection(): string {
 export function getAgencyUrl(): string {
   return process.env.NEXT_PUBLIC_AGENCY_URL ?? "http://localhost:3000";
 }
+
+// ─── Stellar (wallet signing) ────────────────────────────────────────────────
+//
+// Config passed into `@mutav/wallet`'s WalletProvider (the package never reads
+// env itself). Pilot runs on testnet; `set NEXT_PUBLIC_STELLAR_NETWORK=public`
+// + a provider RPC URL when going mainnet.
+
+/** Which Stellar network the admin signs against. Defaults to testnet. */
+export function getStellarNetwork(): "testnet" | "public" {
+  return process.env.NEXT_PUBLIC_STELLAR_NETWORK === "public" ? "public" : "testnet";
+}
+
+/**
+ * Soroban RPC URL. Defaults to the public testnet RPC; mainnet must set
+ * `NEXT_PUBLIC_STELLAR_RPC_URL` to a provider endpoint (no public mainnet RPC).
+ */
+export function getStellarRpcUrl(): string {
+  const override = process.env.NEXT_PUBLIC_STELLAR_RPC_URL;
+  if (override) return override;
+  return getStellarNetwork() === "public"
+    ? "https://mainnet.sorobanrpc.com"
+    : "https://soroban-testnet.stellar.org";
+}
+
+/** Network passphrase — a stable protocol constant derived from the network. */
+export function getStellarNetworkPassphrase(): string {
+  return getStellarNetwork() === "public"
+    ? "Public Global Stellar Network ; September 2015"
+    : "Test SDF Network ; September 2015";
+}

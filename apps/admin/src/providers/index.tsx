@@ -2,13 +2,21 @@
 
 import { Auth0Provider } from "@auth0/nextjs-auth0";
 import { TooltipProvider } from "@mutav/ui/tooltip";
+import { WalletProvider } from "@mutav/wallet/provider";
 import { ConvexClientProvider } from "./convex";
+import { getStellarNetwork, getStellarNetworkPassphrase, getStellarRpcUrl } from "@/lib/env";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <Auth0Provider>
       <ConvexClientProvider>
-        <TooltipProvider>{children}</TooltipProvider>
+        <WalletProvider
+          network={getStellarNetwork()}
+          rpcUrl={getStellarRpcUrl()}
+          networkPassphrase={getStellarNetworkPassphrase()}
+        >
+          <TooltipProvider>{children}</TooltipProvider>
+        </WalletProvider>
       </ConvexClientProvider>
     </Auth0Provider>
   );

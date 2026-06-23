@@ -68,5 +68,10 @@
   },
   "shellSwitcher": {
     "backToAgency": "Back to agencies"
+  },
+  "wallet": {
+    "connect": "Connect wallet",
+    "connecting": "Connecting…",
+    "disconnect": "Disconnect"
   }
 }

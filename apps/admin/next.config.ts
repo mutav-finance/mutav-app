@@ -50,7 +50,11 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://*.auth0.com",
+  // `https://*.stellar.org` — Soroban RPC + Horizon for wallet signing/submit
+  // (testnet: soroban-testnet.stellar.org). Freighter/xBull are browser
+  // extensions (postMessage, no network origin), so only the RPC is needed
+  // here. A mainnet RPC on a provider domain must be added when it lands.
+  "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://*.auth0.com https://*.stellar.org",
   "frame-ancestors 'none'",
   "form-action 'self' https://*.auth0.com",
   "base-uri 'self'",
@@ -85,7 +89,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Workspace packages ship TypeScript / TSX source; Next.js must transpile
   // them through SWC on the way into the build.
-  transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui"],
+  transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui", "@mutav/wallet"],
   async headers() {
     return [
       {
