@@ -48,7 +48,10 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // `stellar.creit.tech` — the Stellar Wallets Kit serves its wallet-picker
+  // icons from this CDN (`<img src=https://stellar.creit.tech/wallet-icons/…>`);
+  // without it the modal renders broken icons. Images only (no script).
+  "img-src 'self' data: blob: https://stellar.creit.tech",
   "font-src 'self' data:",
   // `soroban-testnet.stellar.org` — the exact Soroban RPC the wallet signs/
   // submits against (pinned, not a `*.stellar.org` wildcard). Freighter/xBull

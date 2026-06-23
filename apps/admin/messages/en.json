@@ -72,6 +72,9 @@
   "wallet": {
     "connect": "Connect wallet",
     "connecting": "Connecting…",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "sign": "Sign (test)",
+    "signing": "Signing…",
+    "signed": "Signed ✓"
   }
 }

@@ -15,7 +15,7 @@ import {
   disconnect as kitDisconnect,
   restore as kitRestore,
 } from "./session";
-import { signAndSubmit as kitSignAndSubmit } from "./signer";
+import { signAndSubmit as kitSignAndSubmit, signMessage as kitSignMessage } from "./signer";
 
 export interface WalletContextValue {
   /** Connected Stellar public key, or null. */
@@ -28,6 +28,8 @@ export interface WalletContextValue {
   connect(): Promise<void>;
   /** Disconnect the active wallet. */
   disconnect(): void;
+  /** Sign an arbitrary message (SEP-53); returns the signature. No tx/fee. */
+  signMessage(message: string): Promise<string>;
   /** Sign + submit a raw XDR; returns the confirmed tx hash. */
   signAndSubmit(xdr: string): Promise<string>;
 }
@@ -100,6 +102,14 @@ export function WalletProvider({
     void kitDisconnect().finally(() => setAddress(null));
   }, []);
 
+  const signMessage = useCallback(
+    async (message: string) => {
+      const { signedMessage } = await kitSignMessage(message, networkPassphrase, address);
+      return signedMessage;
+    },
+    [networkPassphrase, address],
+  );
+
   const signAndSubmit = useCallback(
     (xdr: string) => kitSignAndSubmit(xdr, { rpcUrl, networkPassphrase, address }),
     [rpcUrl, networkPassphrase, address],
@@ -107,7 +117,7 @@ export function WalletProvider({
 
   return (
     <WalletContext.Provider
-      value={{ address, connecting, error, connect, disconnect, signAndSubmit }}
+      value={{ address, connecting, error, connect, disconnect, signMessage, signAndSubmit }}
     >
       {children}
     </WalletContext.Provider>

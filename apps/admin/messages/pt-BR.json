@@ -72,6 +72,9 @@
   "wallet": {
     "connect": "Conectar carteira",
     "connecting": "Conectando…",
-    "disconnect": "Desconectar"
+    "disconnect": "Desconectar",
+    "sign": "Assinar (teste)",
+    "signing": "Assinando…",
+    "signed": "Assinado ✓"
   }
 }

@@ -63,6 +63,23 @@ export function makeSignTransaction(
   };
 }
 
+/**
+ * Sign an arbitrary message (SEP-53) — no transaction, no fee, no submission.
+ * Prompts the wallet to sign, proving control of the connected key. Useful for
+ * ownership proofs / sign-in challenges and for verifying the signing path works
+ * before any on-chain operation is wired.
+ */
+export async function signMessage(
+  message: string,
+  networkPassphrase: string,
+  address?: string | null,
+): Promise<{ signedMessage: string; signerAddress?: string }> {
+  return StellarWalletsKit.signMessage(message, {
+    networkPassphrase,
+    address: address ?? undefined,
+  });
+}
+
 export type SubmitConfig = {
   rpcUrl: string;
   networkPassphrase: string;
