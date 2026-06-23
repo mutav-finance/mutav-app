@@ -73,8 +73,6 @@
     "connect": "Conectar carteira",
     "connecting": "Conectando…",
     "disconnect": "Desconectar",
-    "verify": "Verificar titularidade",
-    "verifying": "Verificando…",
-    "verified": "Titularidade ✓"
+    "verified": "Titularidade verificada"
   }
 }

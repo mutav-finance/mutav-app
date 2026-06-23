@@ -21,6 +21,8 @@ import { proveOwnership as kitProveOwnership } from "./ownership";
 export interface WalletContextValue {
   /** Connected Stellar public key, or null. */
   address: string | null;
+  /** True iff the connected wallet proved ownership (signed-challenge verified). */
+  verified: boolean;
   /** True while a connect/disconnect is in flight. */
   connecting: boolean;
   /** Last connect error message, or null. */
@@ -56,6 +58,13 @@ export type WalletProviderProps = {
    *   silently keeps a live, signable session that the UI wouldn't show.
    */
   persistSession?: boolean;
+  /**
+   * When true, `connect()` immediately proves ownership: after the wallet is
+   * picked it signs a challenge transaction and verifies the signature, all as
+   * one gesture. If the proof fails or is rejected, the connection is rolled
+   * back (no half-connected state). High-security surfaces (admin) set this.
+   */
+  verifyOwnershipOnConnect?: boolean;
   children: ReactNode;
 };
 
@@ -64,9 +73,11 @@ export function WalletProvider({
   rpcUrl,
   networkPassphrase,
   persistSession = true,
+  verifyOwnershipOnConnect = false,
   children,
 }: WalletProviderProps) {
   const [address, setAddress] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +104,15 @@ export function WalletProvider({
     setConnecting(true);
     try {
       const addr = await kitConnect(network);
+      // Use the fresh address (state hasn't committed yet this tick).
+      if (verifyOwnershipOnConnect) {
+        const ok = await kitProveOwnership(addr, networkPassphrase);
+        if (!ok) {
+          await kitDisconnect();
+          throw new Error("wallet ownership could not be verified");
+        }
+        setVerified(true);
+      }
       setAddress(addr);
       setError(null);
     } catch (err) {
@@ -101,12 +121,15 @@ export function WalletProvider({
     } finally {
       setConnecting(false);
     }
-  }, [network]);
+  }, [network, verifyOwnershipOnConnect, networkPassphrase]);
 
   const disconnect = useCallback(() => {
     // Clear UI state only after the kit has actually torn down its session, so
     // the UI never reports "disconnected" while a live kit session lingers.
-    void kitDisconnect().finally(() => setAddress(null));
+    void kitDisconnect().finally(() => {
+      setAddress(null);
+      setVerified(false);
+    });
   }, []);
 
   const signMessage = useCallback(
@@ -131,6 +154,7 @@ export function WalletProvider({
     <WalletContext.Provider
       value={{
         address,
+        verified,
         connecting,
         error,
         connect,

@@ -17,6 +17,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           // Staff surface: never silently inherit an auto-restored wallet
           // session — require an explicit connect each page-load (ADR 0005).
           persistSession={false}
+          // Connecting a staff wallet immediately proves ownership (signs a
+          // challenge) — one gesture, no half-connected state.
+          verifyOwnershipOnConnect
         >
           <TooltipProvider>{children}</TooltipProvider>
         </WalletProvider>
