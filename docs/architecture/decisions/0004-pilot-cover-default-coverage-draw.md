@@ -2,6 +2,8 @@
 
 **Status:** Accepted (2026-06-19) · **Phase:** Pilot ([#208](https://github.com/mutav-finance/mutav-app/issues/208)) · **Anchor:** [#201](https://github.com/mutav-finance/mutav-app/issues/201) (reserve-vault coverage draw) · **Builds on:** [ADR 0003](0003-persona-app-origin-isolation-single-convex.md), staff-access cascade (#202–#205)
 
+> **Evolved-in-part by [ADR 0005](0005-wallet-signing-architecture.md) (2026-06-22):** the cold-authority **account model** below specifies an OZ Smart Account with M-of-N passkeys. ADR 0005 supersedes that point — the pilot uses **classic native Stellar multisig** (signed by each admin's personal connected wallet), with the **OZ smart account as a later drop-in upgrade**. The rest of this ADR (the two-tier authorization split, the compose→sign→submit→reconcile flow, the `coverageDraw` lifecycle) stands.
+
 ## Context
 
 The pilot draws guarantee coverage from the **stage-1 reserve-vault** (managed in `apps/admin`); the stage-2 fund and the operator-runtime cluster are out of scope. The single missing piece is the **`cover_default` coverage-draw path** — turning a tenant default into an on-chain reserve withdrawal — and it is unbuilt today: the `@mutav-finance/mutav-stellar` SDK is **not** a dependency (reserve state is read via hand-rolled raw Soroban RPC in `convex/reserve/actions.ts`), and `apps/admin` is a near-stub with no reserve or signing surface.
