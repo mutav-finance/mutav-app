@@ -5,7 +5,8 @@
   "dependencies": {
     "@mutav/app-shell": "workspace:*",
     "@mutav/i18n": "workspace:*",
-    "@mutav/ui": "workspace:*"
+    "@mutav/ui": "workspace:*",
+    "@mutav/wallet": "workspace:*"
   },
   "devDependencies": {
     "@mutav/tsconfig": "workspace:*"

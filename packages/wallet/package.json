@@ -1,0 +1,31 @@
+{
+  "name": "@mutav/wallet",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./kit": "./src/kit.ts",
+    "./session": "./src/session.ts",
+    "./signer": "./src/signer.ts",
+    "./ownership": "./src/ownership.ts",
+    "./provider": "./src/provider.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@creit.tech/stellar-wallets-kit": "^2.3.0",
+    "@stellar/stellar-sdk": "^15.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@mutav/tsconfig": "workspace:*",
+    "@types/react": "^19",
+    "typescript": "^5"
+  }
+}

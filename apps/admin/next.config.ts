@@ -48,9 +48,18 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // `stellar.creit.tech` — the Stellar Wallets Kit serves its wallet-picker
+  // icons from this CDN (`<img src=https://stellar.creit.tech/wallet-icons/…>`);
+  // without it the modal renders broken icons. Images only (no script).
+  "img-src 'self' data: blob: https://stellar.creit.tech",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://*.auth0.com",
+  // `soroban-testnet.stellar.org` — the exact Soroban RPC the wallet signs/
+  // submits against (pinned, not a `*.stellar.org` wildcard). Freighter/xBull
+  // are browser extensions (postMessage, no network origin), so only the RPC is
+  // needed. When mainnet lands, add the chosen provider's RPC host here AND set
+  // `NEXT_PUBLIC_STELLAR_RPC_URL` (the env getter throws otherwise) — keep the
+  // two in lock-step so a signed tx is never blocked at submit.
+  "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://*.auth0.com https://soroban-testnet.stellar.org",
   "frame-ancestors 'none'",
   "form-action 'self' https://*.auth0.com",
   "base-uri 'self'",
@@ -85,7 +94,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Workspace packages ship TypeScript / TSX source; Next.js must transpile
   // them through SWC on the way into the build.
-  transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui"],
+  transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui", "@mutav/wallet"],
   async headers() {
     return [
       {
