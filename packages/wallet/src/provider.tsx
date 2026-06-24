@@ -83,11 +83,14 @@ export function WalletProvider({
 
   useEffect(() => {
     initWalletKit(network);
-    let cancelled = false;
     if (persistSession) {
       // Reconcile React state with the kit's (possibly auto-restored) session.
+      // No cancelled-flag guard: network/persistSession are static per surface
+      // (never change at runtime), and a post-unmount setState is a no-op in
+      // React 19. setState stays inside the async callback (not synchronous in
+      // the effect) per react-hooks/set-state-in-effect.
       void kitRestore().then((addr) => {
-        if (!cancelled && addr) setAddress(addr);
+        if (addr) setAddress(addr);
       });
     } else {
       // Never silently inherit an auto-restored live session on this surface —
@@ -95,9 +98,6 @@ export function WalletProvider({
       // user explicitly connects.
       void kitDisconnect();
     }
-    return () => {
-      cancelled = true;
-    };
   }, [network, persistSession]);
 
   const connect = useCallback(async () => {
@@ -142,7 +142,9 @@ export function WalletProvider({
 
   const proveOwnership = useCallback(async () => {
     if (!address) throw new Error("wallet not connected");
-    return kitProveOwnership(address, networkPassphrase);
+    const ok = await kitProveOwnership(address, networkPassphrase);
+    setVerified(ok);
+    return ok;
   }, [address, networkPassphrase]);
 
   const signAndSubmit = useCallback(
