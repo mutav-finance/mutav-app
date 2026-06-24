@@ -57,7 +57,12 @@ async function verifyEtherfuseSignature(
     false,
     ["sign"],
   );
-  const sigBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(canonical));
+  // Copy into a fresh ArrayBuffer-backed view: depending on whether @types/node
+  // or the DOM lib's TextEncoder wins (resolution differs across bun hoisting),
+  // encode() can return Uint8Array<ArrayBufferLike>, which doesn't satisfy
+  // crypto.subtle.sign's BufferSource (ArrayBuffer). new Uint8Array(...) pins it.
+  const data = new Uint8Array(new TextEncoder().encode(canonical));
+  const sigBuffer = await crypto.subtle.sign("HMAC", key, data);
   const expected = `sha256=${toHex(sigBuffer)}`;
   return constantTimeEqualBytes(
     new TextEncoder().encode(expected),
