@@ -8,13 +8,15 @@ import { Button } from "@mutav/ui/button";
 import { Link } from "@mutav/i18n/navigation";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { cn } from "@mutav/ui/cn";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
+import { CheckIcon } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
 import { type WizardData } from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
 import type { ScoreTier } from "@convex/contracts/domain";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
-import { RENT_COVERAGE_MONTHS, EXIT_COVERAGE_MONTHS, SCORE_TIER_RATE } from "@/lib/pricing/tiers";
+import { EXIT_COVERAGE_MONTHS, SCORE_TIER_RATE } from "@/lib/pricing/tiers";
 
 type Props = {
   data: WizardData;
@@ -53,6 +55,10 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
 
   const requestScore = useMutation(api.contracts.useCases.requestCreditScore);
   const [requestedFor, setRequestedFor] = React.useState<string | null>(null);
+
+  // Both plans are identical for now — selection is UI-only until the "+"
+  // tier gains distinct coverage. Default to "plus" (the recommended option).
+  const [selectedPlan, setSelectedPlan] = React.useState<"basic" | "plus">("plus");
 
   const scoreResult = useQuery(
     api.contracts.useCases.getCachedCreditScore,
@@ -196,22 +202,28 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
         )}
       </section>
 
-      {/* Fixed plan + pricing — only when approved and score loaded */}
-      {!isLoading && !isNegado && (
-        <section className="flex flex-col gap-4 rounded-lg border p-4 md:p-6">
-          <h2 className="text-base font-semibold">{t("coverage.heading")}</h2>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <PlanRow label={t("coverage.rentCoverage")} value={`${RENT_COVERAGE_MONTHS}x`} />
-            <PlanRow label={t("coverage.exitCoverage")} value={`${EXIT_COVERAGE_MONTHS}x`} />
-            {scoreTier && scoreTier !== "negado" && (
-              <PlanRow
-                label={t("coverage.feeRate")}
-                value={`${(TIER_FEE_RATE[scoreTier] * 100).toFixed(0)}%`}
-              />
-            )}
-          </div>
-        </section>
+      {/* Coverage plans — two selectable cards; "+" carries a subtle premium accent */}
+      {!isLoading && !isNegado && scoreTier && scoreTier !== "negado" && (
+        <div
+          role="radiogroup"
+          aria-label={t("coverage.planLabel")}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+        >
+          <CoveragePlanCard
+            planName={t("coverage.planBasic")}
+            feeRatePct={TIER_FEE_RATE[scoreTier] * 100}
+            selected={selectedPlan === "basic"}
+            onSelect={() => setSelectedPlan("basic")}
+          />
+          <CoveragePlanCard
+            planName={t("coverage.planPlus")}
+            feeRatePct={TIER_FEE_RATE[scoreTier] * 100}
+            selected={selectedPlan === "plus"}
+            emphasized
+            includesPrestamista
+            onSelect={() => setSelectedPlan("plus")}
+          />
+        </div>
       )}
 
       {/* Summary block */}
@@ -257,6 +269,105 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+function CoveragePlanCard({
+  planName,
+  feeRatePct,
+  selected,
+  onSelect,
+  emphasized = false,
+  includesPrestamista = false,
+}: {
+  planName: string;
+  feeRatePct: number;
+  selected: boolean;
+  onSelect: () => void;
+  emphasized?: boolean;
+  includesPrestamista?: boolean;
+}) {
+  const t = useTranslations("contractNew.coverage");
+  return (
+    <div
+      role="radio"
+      aria-checked={selected}
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        // Ignore keys bubbling from inner controls (e.g. the info button).
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={cn(
+        "group relative flex cursor-pointer flex-col gap-4 rounded-lg border p-4 text-left transition-all duration-200 md:p-6",
+        "hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-md",
+        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+        // Subtle premium accent for the "+" plan, present even when unselected.
+        emphasized && !selected && "border-primary/40 bg-primary/[0.03] shadow-sm",
+        selected && "border-primary ring-primary/60 bg-primary/[0.04] ring-1",
+      )}
+    >
+      {/* Radio indicator — reinforces that the card is a choice. */}
+      <span
+        aria-hidden
+        className={cn(
+          "absolute top-4 right-4 flex size-5 items-center justify-center rounded-full border-2 transition-colors",
+          selected
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-muted-foreground/30 group-hover:border-primary/50",
+        )}
+      >
+        {selected && <CheckIcon className="size-3" strokeWidth={3} />}
+      </span>
+
+      <div className="flex flex-col gap-0.5 pr-8">
+        <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          {t("planLabel")}
+        </span>
+        <h2 className="text-base font-semibold uppercase">{planName}</h2>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="bg-muted/50 flex flex-col gap-1 rounded-md p-3">
+          <span className="text-sm font-semibold">{t("rentCoverageFull")}</span>
+          <span className="text-muted-foreground text-xs">{t("rentCoverageIncludes")}</span>
+        </div>
+        <PlanRow label={t("exitCoverage")} value={`${EXIT_COVERAGE_MONTHS}x`} />
+        {includesPrestamista && (
+          <div className="bg-primary/[0.06] flex items-center justify-between gap-2 rounded-md p-3">
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              {t("prestamistaLabel")}
+              <PrestamistaInfo />
+            </span>
+            <span className="text-primary text-sm font-semibold">{t("included")}</span>
+          </div>
+        )}
+        <PlanRow label={t("feeRate")} value={`${feeRatePct.toFixed(0)}%`} />
+      </div>
+    </div>
+  );
+}
+
+function PrestamistaInfo() {
+  const t = useTranslations("contractNew.coverage");
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("prestamistaInfoAria")}
+          onClick={(e) => e.stopPropagation()}
+          className="text-muted-foreground hover:border-foreground/50 hover:text-foreground focus-visible:ring-ring flex size-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px] leading-none font-bold transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        >
+          ?
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-56">{t("prestamistaTooltip")}</TooltipContent>
+    </Tooltip>
   );
 }
 
