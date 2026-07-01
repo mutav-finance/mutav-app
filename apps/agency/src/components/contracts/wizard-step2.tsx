@@ -346,7 +346,7 @@ function CoveragePlanCard({
             <span className="text-primary text-sm font-semibold">{t("included")}</span>
           </div>
         )}
-        <PlanRow label={t("feeRate")} value={`${feeRatePct.toFixed(0)}%`} />
+        <PlanRow label={t("feeRate")} value={`${feeRatePct.toFixed(0)}%`} emphasized />
       </div>
     </div>
   );
@@ -371,11 +371,26 @@ function PrestamistaInfo() {
   );
 }
 
-function PlanRow({ label, value }: { label: string; value: string }) {
+function PlanRow({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: string;
+  emphasized?: boolean;
+}) {
   return (
-    <div className="bg-muted/50 flex flex-col gap-1 rounded-md p-3">
+    <div
+      className={cn(
+        "bg-muted/50 flex flex-col gap-1 rounded-md p-3",
+        emphasized && "items-end text-right",
+      )}
+    >
       <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="font-mono text-sm font-semibold">{value}</span>
+      <span className={cn("font-mono font-semibold", emphasized ? "text-base" : "text-sm")}>
+        {value}
+      </span>
     </div>
   );
 }
