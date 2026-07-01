@@ -7,9 +7,9 @@ import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
 import { cn } from "@mutav/ui/cn";
-import { isValidCPF, isValidCNPJ, parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
+import { isValidCPF, isValidCNPJ, type WizardData } from "@/lib/contracts/wizard";
 import { maskCPF, maskCNPJ } from "@mutav/i18n/brazil";
-import { formatBRLCents } from "@/lib/contracts/format";
+import { formatBRLCents, formatCentsPlain } from "@/lib/contracts/format";
 
 type Props = {
   data: WizardData;
@@ -22,22 +22,6 @@ type Errors = Partial<Record<string, string>>;
 export function WizardStep1({ data, onChange, onNext }: Props) {
   const t = useTranslations("contractNew");
   const [errors, setErrors] = React.useState<Errors>({});
-  const [rentInput, setRentInput] = React.useState(
-    data.rentCents > 0 ? (data.rentCents / 100).toFixed(2).replace(".", ",") : "",
-  );
-  const [condoInput, setCondoInput] = React.useState(
-    data.condoCents > 0 ? (data.condoCents / 100).toFixed(2).replace(".", ",") : "",
-  );
-  const [otherInput, setOtherInput] = React.useState(
-    data.otherFeesCents > 0 ? (data.otherFeesCents / 100).toFixed(2).replace(".", ",") : "",
-  );
-
-  const handleCurrencyBlur = (
-    raw: string,
-    field: "rentCents" | "condoCents" | "otherFeesCents",
-  ) => {
-    onChange({ [field]: parseBRLInput(raw) });
-  };
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
 
@@ -159,27 +143,24 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("rent.rent")} error={errors.rentCents}>
             <CurrencyInput
-              value={rentInput}
-              onChange={setRentInput}
-              onBlur={(v) => handleCurrencyBlur(v, "rentCents")}
+              cents={data.rentCents}
+              onChange={(cents) => onChange({ rentCents: cents })}
               placeholder={t("rent.placeholder")}
             />
           </Field>
 
           <Field label={t("rent.condo")}>
             <CurrencyInput
-              value={condoInput}
-              onChange={setCondoInput}
-              onBlur={(v) => handleCurrencyBlur(v, "condoCents")}
+              cents={data.condoCents}
+              onChange={(cents) => onChange({ condoCents: cents })}
               placeholder={t("rent.placeholder")}
             />
           </Field>
 
           <Field label={t("rent.otherFees")}>
             <CurrencyInput
-              value={otherInput}
-              onChange={setOtherInput}
-              onBlur={(v) => handleCurrencyBlur(v, "otherFeesCents")}
+              cents={data.otherFeesCents}
+              onChange={(cents) => onChange({ otherFeesCents: cents })}
               placeholder={t("rent.placeholder")}
             />
           </Field>
@@ -219,16 +200,16 @@ function Field({
 }
 
 function CurrencyInput({
-  value,
+  cents,
   onChange,
-  onBlur,
   placeholder,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  onBlur: (v: string) => void;
+  cents: number;
+  onChange: (cents: number) => void;
   placeholder?: string;
 }) {
+  const display = cents > 0 ? formatCentsPlain(cents) : "";
+
   return (
     <div className="relative">
       <span className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 text-sm select-none">
@@ -236,11 +217,13 @@ function CurrencyInput({
       </span>
       <Input
         className="pl-8"
-        value={value}
+        value={display}
         placeholder={placeholder}
-        inputMode="decimal"
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={(e) => onBlur(e.target.value)}
+        inputMode="numeric"
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "");
+          onChange(digits ? Number.parseInt(digits, 10) : 0);
+        }}
       />
     </div>
   );
