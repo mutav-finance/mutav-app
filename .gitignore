@@ -75,5 +75,8 @@ docs/superpowers/
 
 .claude/scheduled_tasks.lock
 
+# /board-sync generated reports (regenerated each run)
+.claude/reports/
+
 # Codex agent runtime (not used; sibling of .claude installed by stellar-build)
 .codex/
