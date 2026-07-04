@@ -17,12 +17,27 @@ requer "ok" (muta os repos), mas não notifica ninguém.
 
 ## Padrão de labels (o nosso padrão)
 
-Derivado do esquema namespaced do `mutav-pulse`. Toda issue aberta no board deve ter:
+Derivado do esquema namespaced do `mutav-pulse`. Toda issue **de trabalho** aberta no board deve ter:
 
 - **type** (exatamente 1): `bug` · `enhancement` · `documentation` · `security`
 - **priority** (exatamente 1): `priority:high` · `priority:med` · `priority:low`
 - **area** (≥1, recomendado): `area:contracts` · `area:frontend` · `area:docs` · `area:business`
 - **owner** (opcional): `owner:cto` · `owner:ceo`
+
+**Itens estruturais (epic / story) são isentos de `priority`** — não priorizamos
+esse nível. As labels `epic` e `pilot` são reconhecidas (não contam como
+`NONSTANDARD`). `pilot` marca o horizonte do piloto (cross-repo); a data-alvo
+vive no milestone **Pilot** (mutav-app).
+
+## Modelo de PM (o que o motor audita além de labels)
+
+- **Árvore:** Epic (tema permanente) → Story (entregável) → sub-issue (trabalho).
+  Toda issue de trabalho deve ter um pai; issues soltas são **órfãs** (gap).
+- **Sprint = Iteration "Summit Sprint":** rastreada no **nó-folha** (sub-issue, ou
+  a própria story se for task-only). Story-com-subs **e** suas subs juntas no
+  sprint = **duplicação** (deve ser 0).
+- **Repos fora de escopo** (`mutav-pulse`, `mutav-fund`, `mutav-solana`) não são
+  auto-adicionados ao board.
 
 ## Passos
 
@@ -59,10 +74,21 @@ Derivado do esquema namespaced do `mutav-pulse`. Toda issue aberta no board deve
    (Rode `--dry-run` primeiro para mostrar o que seria criado.) Só execute a
    versão real após o "ok". Criar labels não notifica ninguém, mas muta os repos.
 
-5. **Gaps e próximos passos**: sintetize em uma lista priorizada — o que está
-   bloqueando a governança do board (ex.: labels-padrão ausentes), issues
-   resolvidas mas não fechadas, milestones sem cobertura, áreas sem owner.
-   Termine com 3–5 ações concretas e ordenadas.
+5. **Integridade da estrutura** (findings novos): reporte e proponha ação —
+   - `orphans`: issues de trabalho **sem pai** na árvore (fora de qualquer
+     epic/story). Destaque as `pilot: true` (prioridade). Proponha encaixá-las
+     num epic/story existente.
+   - `sprintDuplications`: story-container no sprint junto das suas subs —
+     proponha **tirar a story do sprint** (as subs cobrem). Deve ser 0.
+   - `pilotCoverageGaps`: itens do horizonte `pilot` fora da árvore (subconjunto
+     de `orphans`). O tracker `#208` aparece aqui por ser topo — é esperado.
+   - `skippedOutOfScope`: issues novas de repos fora de escopo que **não** foram
+     adicionadas — só liste, não aja sem "ok".
+
+6. **Gaps e próximos passos**: sintetize em uma lista priorizada — o que está
+   bloqueando a governança do board (labels-padrão ausentes, órfãos pilot,
+   duplicação de sprint, milestones sem cobertura). Termine com 3–5 ações
+   concretas e ordenadas.
 
 ## Regras
 

@@ -30,6 +30,15 @@ const REPOS = [
   "brand",
 ];
 
+// Out-of-scope repos: absorbed / deprecating / off-focus. Their new open issues
+// are NOT auto-added to the board (they'd only clutter it); they're reported
+// separately for review. Items from these repos already on the board still sync.
+const DEPRIORITIZED_REPOS = new Set([
+  `${OWNER}/mutav-pulse`,   // hackathon; learnings ported into the protocol repos
+  `${OWNER}/mutav-fund`,    // soft-deprecating into mutav-app/apps/fund
+  `${OWNER}/mutav-solana`,  // Solana impl; off current (Stellar) focus
+]);
+
 // --- Label standard (derived from mutav-pulse's namespaced scheme) ----------
 const TYPE_LABELS = ["bug", "enhancement", "documentation", "security"];
 const PRIORITY_LABELS = ["priority:high", "priority:med", "priority:low"];
@@ -39,6 +48,7 @@ const OWNER_LABELS = ["owner:cto", "owner:ceo"];
 const ALLOWED_MODIFIERS = [
   "duplicate", "invalid", "wontfix", "question", "help wanted", "good first issue",
   "lgpd", "stage-2", "operator-runtime", "pulso", "gate",
+  "epic", "pilot",
 ];
 const STALE_DAYS = 30;
 
@@ -92,11 +102,15 @@ function fetchBoardItems() {
             nodes {
               id
               status: fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+              iteration: fieldValueByName(name:"Iteration") { ... on ProjectV2ItemFieldIterationValue { title iterationId } }
               content {
                 __typename
                 ... on Issue {
                   number title url state stateReason updatedAt
                   repository { nameWithOwner }
+                  milestone { title }
+                  parent { number repository { nameWithOwner } }
+                  subIssues { totalCount }
                   labels(first:40) { nodes { name } }
                   closedByPullRequestsReferences(first:5) { nodes { number url } }
                 }
@@ -116,6 +130,8 @@ function fetchBoardItems() {
       items.push({
         itemId: n.id,
         status: n.status?.name ?? null,
+        iterationId: n.iteration?.iterationId ?? null,
+        iterationTitle: n.iteration?.title ?? null,
         type: n.content.__typename,
         number: n.content.number,
         title: n.content.title,
@@ -124,6 +140,9 @@ function fetchBoardItems() {
         stateReason: n.content.stateReason ?? null,
         updatedAt: n.content.updatedAt,
         repo: n.content.repository.nameWithOwner,
+        milestone: n.content.milestone?.title ?? null,
+        parentKey: n.content.parent ? `${n.content.parent.repository.nameWithOwner}#${n.content.parent.number}` : null,
+        subCount: n.content.subIssues?.totalCount ?? 0,
         labels: (n.content.labels?.nodes ?? []).map((l) => l.name),
         closingPRs: (n.content.closedByPullRequestsReferences?.nodes ?? []).map((p) => ({ number: p.number, url: p.url })),
       });
@@ -158,13 +177,15 @@ function fetchOpenIssues() {
 }
 
 // --- Label-standard audit ---------------------------------------------------
-function auditLabels(labels) {
+function auditLabels(labels, isStructural = false) {
   const has = (set) => labels.some((l) => set.includes(l));
   const types = labels.filter((l) => TYPE_LABELS.includes(l));
   const problems = [];
   if (types.length === 0) problems.push({ code: "MISSING_TYPE", severity: "error" });
   if (types.length > 1) problems.push({ code: "MULTIPLE_TYPE", severity: "warn", detail: types.join(", ") });
-  if (!has(PRIORITY_LABELS)) problems.push({ code: "MISSING_PRIORITY", severity: "error" });
+  // Epics and Stories are structural (planning) items — we deliberately do not
+  // prioritize them, so the priority requirement does not apply.
+  if (!isStructural && !has(PRIORITY_LABELS)) problems.push({ code: "MISSING_PRIORITY", severity: "error" });
   if (!has(AREA_LABELS)) problems.push({ code: "MISSING_AREA", severity: "warn" });
   const known = [...TYPE_LABELS, ...PRIORITY_LABELS, ...AREA_LABELS, ...OWNER_LABELS, ...ALLOWED_MODIFIERS];
   const unknown = labels.filter((l) => !known.includes(l));
@@ -216,16 +237,27 @@ function closingCommentBody(item) {
   return `🔄 **Atualização do board** — esta issue foi fechada e movida para **Done** no [Mutav Project](${BOARD_URL}).${prRef}\n\n_Comentário automático via \`/board-sync\`._`;
 }
 
+// Structural items (epics / stories) are exempt from the priority requirement.
+const STRUCTURAL_RE = /^(EPIC|Story)\b/;
+function isStructuralItem(item) {
+  return (item.labels ?? []).includes("epic") || STRUCTURAL_RE.test(item.title ?? "");
+}
+
 function main() {
   const ids = resolveProject();
   const board = fetchBoardItems();
   const openIssues = fetchOpenIssues();
 
   const boardKeys = new Set(board.map((b) => `${b.repo}#${b.number}`));
-  const openKeys = new Set(openIssues.map((o) => `${o.repo}#${o.number}`));
 
   // 1) ADD: open issues not on the board -> add + Backlog.
-  const toAdd = openIssues.filter((o) => !boardKeys.has(`${o.repo}#${o.number}`));
+  //    Out-of-scope repos are not auto-added (they'd only clutter the board);
+  //    their new open issues are surfaced in the report for a human to triage.
+  const notOnBoard = openIssues.filter((o) => !boardKeys.has(`${o.repo}#${o.number}`));
+  const toAdd = notOnBoard.filter((o) => !DEPRIORITIZED_REPOS.has(o.repo));
+  const skippedOutOfScope = notOnBoard
+    .filter((o) => DEPRIORITIZED_REPOS.has(o.repo))
+    .map((o) => `${o.repo}#${o.number}`);
   const added = [];
   for (const o of toAdd) {
     if (DRY_RUN) { added.push(`${o.repo}#${o.number}`); continue; }
@@ -255,7 +287,7 @@ function main() {
   ];
   const labelViolations = [];
   for (const b of openBoardIssues) {
-    const problems = auditLabels(b.labels);
+    const problems = auditLabels(b.labels, isStructuralItem(b));
     if (problems.length > 0) {
       labelViolations.push({ key: `${b.repo}#${b.number}`, title: b.title, url: b.url, labels: b.labels, problems });
     }
@@ -263,6 +295,38 @@ function main() {
 
   // 4) Repos missing the standard label definitions.
   const repoLabelGaps = fetchRepoLabelGaps();
+
+  // 4b) Structure integrity — epic -> story -> sub-issue tree + Summit sprint.
+  const openBoard = board.filter((b) => b.state === "OPEN" && b.type === "Issue");
+  const boardByKey = new Map(board.map((b) => [`${b.repo}#${b.number}`, b]));
+
+  // Orphans: open leaf issues with no parent, not an epic, and no sub-issues of
+  // their own (trackers are exempt) — i.e. not attached to the epic/story tree.
+  const orphans = openBoard
+    .filter((b) => !b.parentKey && !b.labels.includes("epic") && b.subCount === 0)
+    .map((b) => ({
+      key: `${b.repo}#${b.number}`, title: b.title, url: b.url,
+      pilot: b.labels.includes("pilot") || b.milestone === "Pilot",
+    }));
+
+  // Sprint duplication: a parent sitting in the same iteration as its child —
+  // the parent is redundant in the sprint (track the child, not the container).
+  const dupParents = new Map();
+  for (const b of openBoard) {
+    if (!b.iterationId || !b.parentKey) continue;
+    const parent = boardByKey.get(b.parentKey);
+    if (parent && parent.iterationId === b.iterationId) {
+      const prev = dupParents.get(b.parentKey);
+      dupParents.set(b.parentKey, {
+        key: b.parentKey, title: parent.title, url: parent.url,
+        childrenInSprint: [...(prev?.childrenInSprint ?? []), `${b.repo}#${b.number}`],
+      });
+    }
+  }
+  const sprintDuplications = [...dupParents.values()];
+
+  // Pilot coverage: pilot-horizon issues (label or milestone) not in the tree.
+  const pilotCoverageGaps = orphans.filter((o) => o.pilot);
 
   // 5) Resolution candidates.
   const resolvedClosed = toDone.map((b) => ({ key: `${b.repo}#${b.number}`, title: b.title, url: b.url, stateReason: b.stateReason }));
@@ -278,16 +342,24 @@ function main() {
       boardItems: board.length,
       openIssues: openIssues.length,
       added: added.length,
+      skippedOutOfScope: skippedOutOfScope.length,
       markedDone: toDone.length,
       commentsPosted: DRY_RUN ? 0 : toDone.length,
       reopenedReset: reopened.length,
       labelViolations: labelViolations.length,
+      orphans: orphans.length,
+      sprintDuplications: sprintDuplications.length,
+      pilotCoverageGaps: pilotCoverageGaps.length,
       staleCandidates: stale.length,
     },
     standard: { TYPE_LABELS, PRIORITY_LABELS, AREA_LABELS, OWNER_LABELS },
     added,
+    skippedOutOfScope,
     markedDone: resolvedClosed,
     labelViolations,
+    orphans,
+    sprintDuplications,
+    pilotCoverageGaps,
     repoLabelGaps,
     staleCandidates: stale,
   };
@@ -306,7 +378,11 @@ function main() {
   console.log(`  marked Done:      ${t.markedDone}`);
   console.log(`  comments posted:  ${t.commentsPosted}${DRY_RUN ? " (dry-run: none)" : ""}`);
   console.log(`  reopened reset:   ${t.reopenedReset}`);
+  console.log(`  out-of-scope new: ${t.skippedOutOfScope} (not added)`);
   console.log(`  label violations: ${t.labelViolations}`);
+  console.log(`  orphans (no tree):${t.orphans}`);
+  console.log(`  sprint dup:       ${t.sprintDuplications}`);
+  console.log(`  pilot gaps:       ${t.pilotCoverageGaps}`);
   console.log(`  stale candidates: ${t.staleCandidates} (>= ${STALE_DAYS}d)`);
   console.log(`FINDINGS ${reportPath}`);
 }
