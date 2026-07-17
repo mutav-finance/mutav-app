@@ -95,179 +95,118 @@ async function seedAgencyFor(t: ReturnType<typeof setup>, cnpj: string): Promise
   );
 }
 
-async function seedContract(
-  t: ReturnType<typeof setup>,
+async function seedTenantRow(t: ReturnType<typeof setup>, taxId: string) {
+  return t.run((ctx) =>
+    ctx.db.insert("tenants", {
+      entityType: "pf",
+      taxId,
+      fullName: "Test Tenant",
+      birthDate: "1990-01-01",
+      email: "tenant@test.br",
+      phone: "11999999999",
+    }),
+  );
+}
+
+const CONTRACT_BASE = {
+  status: "pendente",
+  activatedAt: null,
+  nextRenewalDate: "2026-12-31",
+  availableGuaranteeCents: 100000,
+  rental: {
+    propertyKind: "residencial",
+    rentCents: 100000,
+    condoCents: 0,
+    otherFeesCents: 0,
+    totalRentCents: 100000,
+    feeCents: 1500,
+    oneTimeActivationFeeCents: 0,
+    setupInstallments: 1,
+    exitCostMultiplier: "5x",
+    rentMultiplier: "30x",
+    payer: "inquilino",
+    pviMigrationSchedule: null,
+  },
+  property: {
+    cep: "01000000",
+    streetAndNumber: "Rua Teste, 1",
+    neighborhood: "Centro",
+    cityUF: "São Paulo/SP",
+  },
+  optional: { complement: "", tag: "", description: "" },
+  documents: [{ key: "rentalContract", status: "pendente" }],
+} as const;
+
+type StragglerOverrides = {
+  tenantId?: unknown;
+  embeddedScore?: number;
+  topLevelScore?: number;
+};
+
+/**
+ * Seed a straggler row still carrying the dropped embedded `tenant` +
+ * `tenantCpf` fields. Uses the loosely-typed `convexTest` surface (same
+ * pattern as contracts/backfill.test.ts) so the legacy shape can be
+ * written without casts; runtime accepts it because the narrowed schema
+ * ships with `schemaValidation: false` until the cleanup completes.
+ */
+async function seedStragglerContract(
+  t: ReturnType<typeof convexTest>,
   agencyId: AgencyId,
   publicId: string,
-  entityType: "pf" | "pj" | undefined,
+  overrides: StragglerOverrides = {},
 ) {
   return t.run((ctx) =>
     ctx.db.insert("contracts", {
+      ...CONTRACT_BASE,
       agencyId,
       publicId,
+      ...(overrides.tenantId === undefined ? {} : { tenantId: overrides.tenantId }),
+      ...(overrides.tenantId === undefined
+        ? {}
+        : { tenantApproval: { status: "pendente", termApprovedAt: null } }),
+      ...(overrides.topLevelScore === undefined ? {} : { score: overrides.topLevelScore }),
       tenantCpf: "11144477735",
-      status: "pendente",
-      activatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: 100000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 100000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 100000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "30x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [{ key: "rentalContract", status: "pendente" }],
       tenant: {
         approvalStatus: "pendente",
+        entityType: "pf",
         fullName: "Test Tenant",
         cpf: "11144477735",
         birthDate: "1990-01-01",
         email: "tenant@test.br",
         phone: "11999999999",
         termApprovedAt: null,
-        ...(entityType === undefined ? {} : { entityType }),
+        ...(overrides.embeddedScore === undefined ? {} : { score: overrides.embeddedScore }),
       },
     }),
   );
 }
 
-async function runBackfillEntityType(t: ReturnType<typeof setup>) {
-  await t.mutation(internal.migrations.backfillTenantEntityType, {});
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
-}
-
-describe("backfillTenantEntityType", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  test("defaults a missing tenant.entityType to 'pf' without touching other fields", async () => {
-    const t = setup();
-    const agencyId = await seedAgencyFor(t, "00000000000111");
-    const id = await seedContract(t, agencyId, "C-NO-ENTITY", undefined);
-
-    await runBackfillEntityType(t);
-
-    const after = await t.run((ctx) => ctx.db.get(id));
-    expect(after?.tenant.entityType).toBe("pf");
-    expect(after?.tenant.cpf).toBe("11144477735");
-    expect(after?.tenant.fullName).toBe("Test Tenant");
-  });
-
-  test("leaves an explicit entityType ('pj') untouched", async () => {
-    const t = setup();
-    const agencyId = await seedAgencyFor(t, "00000000000222");
-    const id = await seedContract(t, agencyId, "C-PJ", "pj");
-
-    await runBackfillEntityType(t);
-
-    const after = await t.run((ctx) => ctx.db.get(id));
-    expect(after?.tenant.entityType).toBe("pj");
-  });
-
-  test("backfills a mixed batch and is idempotent on re-run", async () => {
-    const t = setup();
-    const agencyId = await seedAgencyFor(t, "00000000000333");
-    const missingId = await seedContract(t, agencyId, "C-MISSING", undefined);
-    const pjId = await seedContract(t, agencyId, "C-PJ2", "pj");
-
-    await runBackfillEntityType(t);
-    await runBackfillEntityType(t);
-
-    const missing = await t.run((ctx) => ctx.db.get(missingId));
-    const pj = await t.run((ctx) => ctx.db.get(pjId));
-    expect(missing?.tenant.entityType).toBe("pf");
-    expect(pj?.tenant.entityType).toBe("pj");
-  });
-});
-
-type LegacyTenantOverrides = {
-  cpf?: string;
-  cnpj?: string;
-  fullName?: string;
-  entityType?: "pf" | "pj";
-  approvalStatus?: "aprovado" | "pendente" | "reprovado";
-  termApprovedAt?: string | null;
-  birthDate?: string;
-};
-
-async function seedLegacyContract(
-  t: ReturnType<typeof setup>,
+/** Registry-only row in the narrowed shape — the migration must not touch it. */
+async function seedCleanContract(
+  t: ReturnType<typeof convexTest>,
   agencyId: AgencyId,
   publicId: string,
-  overrides: LegacyTenantOverrides = {},
+  args: { tenantId: unknown; score: number },
 ) {
-  const cpf = overrides.cpf ?? "11144477735";
   return t.run((ctx) =>
     ctx.db.insert("contracts", {
+      ...CONTRACT_BASE,
       agencyId,
       publicId,
-      tenantCpf: cpf,
-      status: "pendente",
-      activatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: 100000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 100000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 100000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "30x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [{ key: "rentalContract", status: "pendente" }],
-      tenant: {
-        approvalStatus: overrides.approvalStatus ?? "pendente",
-        fullName: overrides.fullName ?? "Test Tenant",
-        cpf,
-        birthDate: overrides.birthDate ?? "1990-01-01",
-        email: "tenant@test.br",
-        phone: "11999999999",
-        termApprovedAt: overrides.termApprovedAt ?? null,
-        ...(overrides.entityType === undefined ? {} : { entityType: overrides.entityType }),
-        ...(overrides.cnpj === undefined ? {} : { cnpj: overrides.cnpj }),
-      },
+      tenantId: args.tenantId,
+      tenantApproval: { status: "pendente", termApprovedAt: null },
+      score: args.score,
     }),
   );
 }
 
-async function runRegistryBackfill(t: ReturnType<typeof setup>) {
-  await t.mutation(internal.migrations.backfillContractTenantRegistry, {});
+async function runClearEmbeddedTenant(t: ReturnType<typeof setup>) {
+  await t.mutation(internal.migrations.clearContractEmbeddedTenant, {});
   await t.finishAllScheduledFunctions(vi.runAllTimers);
 }
 
-describe("backfillContractTenantRegistry", () => {
+describe("clearContractEmbeddedTenant", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -275,118 +214,85 @@ describe("backfillContractTenantRegistry", () => {
     vi.useRealTimers();
   });
 
-  const CPF_A = "52998224725";
-  const CPF_B = "11144477735";
-
-  test("dedups by taxId: first-created name wins, conflict audit-logged, all rows linked", async () => {
+  test("strips tenant/tenantCpf from a linked straggler and promotes the embedded score", async () => {
     const t = setup();
     const agencyId = await seedAgencyFor(t, "00000000000444");
-    const firstId = await seedLegacyContract(t, agencyId, "R-1", {
-      cpf: CPF_A,
-      fullName: "Alice Original",
-      approvalStatus: "aprovado",
-      termApprovedAt: "2025-03-01T10:00:00-03:00",
-    });
-    const conflictId = await seedLegacyContract(t, agencyId, "R-2", {
-      cpf: CPF_A,
-      fullName: "Alice Divergente",
-    });
-    const otherId = await seedLegacyContract(t, agencyId, "R-3", {
-      cpf: CPF_B,
-      fullName: "Bruno Distinto",
+    const tenantId = await seedTenantRow(t, "11144477735");
+    const id = await seedStragglerContract(t, agencyId, "S-1", {
+      tenantId,
+      embeddedScore: 700,
     });
 
-    await runRegistryBackfill(t);
+    await runClearEmbeddedTenant(t);
 
-    const tenants = await t.run((ctx) => ctx.db.query("tenants").collect());
-    expect(tenants).toHaveLength(2);
-    const tenantA = tenants.find((row) => row.taxId === CPF_A);
-    const tenantB = tenants.find((row) => row.taxId === CPF_B);
-    expect(tenantA?.fullName).toBe("Alice Original");
-    expect(tenantB?.fullName).toBe("Bruno Distinto");
-
-    const audit = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
-    expect(audit).toHaveLength(1);
-    expect(audit[0].action).toBe("tenant.data_conflict");
-    expect(audit[0].actor).toEqual({
-      kind: "system",
-      source: "migrations.backfillContractTenantRegistry",
-    });
-
-    const first = await t.run((ctx) => ctx.db.get(firstId));
-    const conflict = await t.run((ctx) => ctx.db.get(conflictId));
-    const other = await t.run((ctx) => ctx.db.get(otherId));
-    expect(first?.tenantId).toBe(tenantA?._id);
-    expect(conflict?.tenantId).toBe(tenantA?._id);
-    expect(other?.tenantId).toBe(tenantB?._id);
-    expect(first?.tenantApproval).toEqual({
-      status: "aprovado",
-      termApprovedAt: "2025-03-01T10:00:00-03:00",
-    });
-    expect(conflict?.tenantApproval).toEqual({ status: "pendente", termApprovedAt: null });
+    const after = await t.run((ctx) => ctx.db.get(id));
+    expect(after).not.toBeNull();
+    if (!after) return;
+    expect(Object.keys(after)).not.toContain("tenant");
+    expect(Object.keys(after)).not.toContain("tenantCpf");
+    expect(after.score).toBe(700);
+    expect(after.tenantId).toBe(tenantId);
+    expect(after.tenantApproval).toEqual({ status: "pendente", termApprovedAt: null });
+    expect(after.publicId).toBe("S-1");
+    expect(after.status).toBe("pendente");
+    expect(after.rental).toEqual(CONTRACT_BASE.rental);
+    expect(after.property).toEqual(CONTRACT_BASE.property);
+    expect(after.optional).toEqual(CONTRACT_BASE.optional);
+    expect(after.documents).toEqual(CONTRACT_BASE.documents);
+    expect(after.availableGuaranteeCents).toBe(100000);
+    expect(after.nextRenewalDate).toBe("2026-12-31");
+    expect(after.activatedAt).toBeNull();
   });
 
-  test("second run is a no-op (no new tenants, no new audit entries)", async () => {
+  test("an existing top-level score wins over the embedded one", async () => {
     const t = setup();
     const agencyId = await seedAgencyFor(t, "00000000000555");
-    await seedLegacyContract(t, agencyId, "R-10", { cpf: CPF_A, fullName: "Alice Original" });
-    await seedLegacyContract(t, agencyId, "R-11", { cpf: CPF_A, fullName: "Alice Divergente" });
+    const tenantId = await seedTenantRow(t, "11144477735");
+    const id = await seedStragglerContract(t, agencyId, "S-2", {
+      tenantId,
+      embeddedScore: 700,
+      topLevelScore: 810,
+    });
 
-    await runRegistryBackfill(t);
-    const tenantsAfterFirst = await t.run((ctx) => ctx.db.query("tenants").collect());
-    const auditAfterFirst = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+    await runClearEmbeddedTenant(t);
 
-    await runRegistryBackfill(t);
-    const tenantsAfterSecond = await t.run((ctx) => ctx.db.query("tenants").collect());
-    const auditAfterSecond = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
-
-    expect(tenantsAfterSecond).toEqual(tenantsAfterFirst);
-    expect(auditAfterSecond).toEqual(auditAfterFirst);
+    const after = await t.run((ctx) => ctx.db.get(id));
+    expect(after?.score).toBe(810);
+    expect(after ? Object.keys(after) : []).not.toContain("tenant");
   });
 
-  test("skips a row with a checksum-invalid tax id without throwing", async () => {
+  test("second run is a no-op and an already-clean row is untouched", async () => {
     const t = setup();
     const agencyId = await seedAgencyFor(t, "00000000000666");
-    const invalidId = await seedLegacyContract(t, agencyId, "R-20", {
-      cpf: "11111111111",
-      fullName: "Legacy Inválido",
-    });
+    const tenantId = await seedTenantRow(t, "11144477735");
+    const stragglerId = await seedStragglerContract(t, agencyId, "S-3", { tenantId });
+    const cleanId = await seedCleanContract(t, agencyId, "S-CLEAN", { tenantId, score: 640 });
+    const cleanBefore = await t.run((ctx) => ctx.db.get(cleanId));
 
-    await runRegistryBackfill(t);
+    await runClearEmbeddedTenant(t);
+    const afterFirst = await t.run((ctx) => ctx.db.get(stragglerId));
 
-    const after = await t.run((ctx) => ctx.db.get(invalidId));
-    expect(after?.tenantId).toBeUndefined();
-    expect(after?.tenantApproval).toBeUndefined();
-    expect(await t.run((ctx) => ctx.db.query("tenants").collect())).toHaveLength(0);
+    await runClearEmbeddedTenant(t);
+    const afterSecond = await t.run((ctx) => ctx.db.get(stragglerId));
+    const cleanAfter = await t.run((ctx) => ctx.db.get(cleanId));
+
+    expect(afterSecond).toEqual(afterFirst);
+    expect(cleanAfter).toEqual(cleanBefore);
   });
 
-  test("legacy pj row with the CNPJ in the cpf field links via the fallback", async () => {
+  test("a straggler without a registry link throws instead of dropping data", async () => {
     const t = setup();
     const agencyId = await seedAgencyFor(t, "00000000000777");
-    const pjId = await seedLegacyContract(t, agencyId, "R-30", {
-      cpf: "11444777000161",
-      fullName: "Empresa Legada Ltda",
-      entityType: "pj",
-      birthDate: "",
-    });
+    const orphanId = await seedStragglerContract(t, agencyId, "S-ORPHAN", {});
+    const before = await t.run((ctx) => ctx.db.get(orphanId));
 
-    await runRegistryBackfill(t);
+    // The @convex-dev/migrations runner traps the thrown guard into a failed
+    // migration status doc instead of re-raising, so assert on that status —
+    // and that the orphan row was left byte-for-byte untouched (no data loss).
+    const status = await t.mutation(internal.migrations.clearContractEmbeddedTenant, {});
+    expect(JSON.stringify(status)).toMatch(/backfillContractTenantRegistry/);
 
-    const after = await t.run((ctx) => ctx.db.get(pjId));
-    const tenants = await t.run((ctx) => ctx.db.query("tenants").collect());
-    expect(tenants).toHaveLength(1);
-    expect(tenants[0]).toMatchObject({ entityType: "pj", taxId: "11444777000161" });
-    expect(tenants[0].entityType === "pj" ? tenants[0].contactCpf : "sentinel").toBeUndefined();
-    expect(after?.tenantId).toBe(tenants[0]._id);
-  });
-
-  test("widen safety: a fully legacy-shaped contract row passes schema validation", async () => {
-    const t = setup();
-    const agencyId = await seedAgencyFor(t, "00000000000888");
-    const id = await seedLegacyContract(t, agencyId, "R-40", {});
-    const row = await t.run((ctx) => ctx.db.get(id));
-    expect(row?.tenantId).toBeUndefined();
-    expect(row?.tenantApproval).toBeUndefined();
-    expect(row?.tenant.cpf).toBe("11144477735");
+    const after = await t.run((ctx) => ctx.db.get(orphanId));
+    expect(after).toEqual(before);
   });
 });

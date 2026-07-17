@@ -1,8 +1,6 @@
 import { Migrations } from "@convex-dev/migrations";
 import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
-import { DEFAULT_TENANT_ENTITY_TYPE } from "./contracts/domain";
-import { buildTenantRegistryPatch } from "./tenants/useCases";
 
 export const migrations = new Migrations<DataModel>(components.migrations);
 
@@ -33,42 +31,80 @@ export const clearUsersIsStaff = migrations.define({
   migrateOne: (_ctx, user) => (user.isStaff === undefined ? undefined : { isStaff: undefined }),
 });
 
-/**
- * Step 1 of #60 (make `contracts.tenant` a discriminated union on `entityType`).
- * Backfills `tenant.entityType` to `"pf"` on every contract that predates the
- * field, so a follow-up PR can narrow `tenant` into a `v.union` with a required
- * `entityType` literal without tripping the deploy-order trap. Returning
- * `undefined` for docs that already carry an `entityType` skips the write, so
- * re-runs on deploy are no-ops. `tenant` is patched as a whole object (Convex
- * patch merges only at the top level), spreading the existing value.
- */
-export const backfillTenantEntityType = migrations.define({
-  table: "contracts",
-  migrateOne: (_ctx, contract) =>
-    contract.tenant.entityType === undefined
-      ? { tenant: { ...contract.tenant, entityType: DEFAULT_TENANT_ENTITY_TYPE } }
-      : undefined,
-});
+type LegacyEmbeddedTenantProbe = {
+  hasLegacyFields: boolean;
+  hasRegistryLink: boolean;
+  embeddedScore: number | undefined;
+};
 
 /**
- * Widen-phase backfill of the tenant registry (2026-07-17 spec): walks
- * contracts in `_creationTime` order and links each to a `tenants` row
- * resolved from the embedded tenant via `getOrCreateTenant` — so dedup is
- * first-created-wins (later conflicting fullName/birthDate values are
- * audit-logged by the helper, contacts last-write-win), and the contract
- * is patched with `tenantId` + `tenantApproval` mirrored from the embedded
- * approval fields. Rows already carrying `tenantId` are skipped
- * (idempotent re-runs); rows whose embedded tenant cannot be normalized
- * (checksum-invalid document, pf without birthDate) stay legacy-only —
- * the widened schema tolerates them until the data is corrected.
+ * `in`-operator probe over the raw doc: the narrowed schema no longer types
+ * the legacy embedded `tenant`/`tenantCpf` fields, so any straggler data is
+ * only reachable as `unknown`.
  */
-export const backfillContractTenantRegistry = migrations.define({
+function probeLegacyEmbeddedTenant(doc: object): LegacyEmbeddedTenantProbe {
+  const hasLegacyFields =
+    ("tenant" in doc && doc.tenant !== undefined) ||
+    ("tenantCpf" in doc && doc.tenantCpf !== undefined);
+  const hasRegistryLink =
+    "tenantId" in doc &&
+    doc.tenantId !== undefined &&
+    "tenantApproval" in doc &&
+    doc.tenantApproval !== undefined;
+
+  let embeddedScore: number | undefined;
+  if ("tenant" in doc) {
+    const embedded: unknown = doc.tenant;
+    if (typeof embedded === "object" && embedded !== null && "score" in embedded) {
+      const score: unknown = embedded.score;
+      if (typeof score === "number") embeddedScore = score;
+    }
+  }
+
+  return { hasLegacyFields, hasRegistryLink, embeddedScore };
+}
+
+/**
+ * Narrow-phase cleanup of the tenant-registry migration: strips the orphaned
+ * embedded `tenant`/`tenantCpf` fields left at rest by the widen phase
+ * (`backfillContractTenantRegistry`, retired from this file once it completed
+ * everywhere — the deploy gate for this PR). Preserves the embedded
+ * `tenant.score` as the contract-level `score` snapshot.
+ *
+ * `db.replace` with the enumerated schema fields is the removal mechanism —
+ * a patch can't unset fields the schema no longer types. A straggler that
+ * still lacks its registry link cannot be auto-fixed and throws: the deploy
+ * gate asserts zero such rows before this migration runs.
+ */
+export const clearContractEmbeddedTenant = migrations.define({
   table: "contracts",
-  migrateOne: async (ctx, contract) =>
-    buildTenantRegistryPatch(ctx, contract, {
-      kind: "system",
-      source: "migrations.backfillContractTenantRegistry",
-    }),
+  migrateOne: async (ctx, contract) => {
+    const probe = probeLegacyEmbeddedTenant(contract);
+    if (!probe.hasLegacyFields) return undefined;
+    if (!probe.hasRegistryLink) {
+      throw new Error(
+        `Contract ${contract.publicId} still carries embedded tenant data but no tenantId/` +
+          `tenantApproval — run the widen-phase backfillContractTenantRegistry (PR A) on this ` +
+          `deployment before deploying the narrowed schema`,
+      );
+    }
+    await ctx.db.replace(contract._id, {
+      agencyId: contract.agencyId,
+      publicId: contract.publicId,
+      tenantId: contract.tenantId,
+      tenantApproval: contract.tenantApproval,
+      score: contract.score ?? probe.embeddedScore,
+      status: contract.status,
+      activatedAt: contract.activatedAt,
+      deactivatedAt: contract.deactivatedAt,
+      nextRenewalDate: contract.nextRenewalDate,
+      availableGuaranteeCents: contract.availableGuaranteeCents,
+      rental: contract.rental,
+      property: contract.property,
+      optional: contract.optional,
+      documents: contract.documents,
+    });
+  },
 });
 
 /**
@@ -82,11 +118,13 @@ export const backfillContractTenantRegistry = migrations.define({
  * `schemaValidation: false` (or add the new field as optional), define the
  * migration with `migrations.define({ table, migrateOne })`, and append its
  * `internal.migrations.<name>` here. In the NARROW PR re-enable strict
- * validation and drop the transitional fields.
+ * validation and drop the transitional fields. Completed widen-phase
+ * migrations whose code can no longer compile against the narrowed schema
+ * (`backfillTenantEntityType`, `backfillContractTenantRegistry`) are removed
+ * once the deploy gate confirms they ran everywhere.
  */
 export const runAll = migrations.runner([
   internal.migrations.noop,
   internal.migrations.clearUsersIsStaff,
-  internal.migrations.backfillTenantEntityType,
-  internal.migrations.backfillContractTenantRegistry,
+  internal.migrations.clearContractEmbeddedTenant,
 ]);
