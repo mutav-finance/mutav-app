@@ -47,6 +47,7 @@ import type * as lib_result from "../lib/result.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_stellarSigner from "../lib/stellarSigner.js";
 import type * as lib_storage from "../lib/storage.js";
+import type * as lib_taxId from "../lib/taxId.js";
 import type * as lib_testFixtures from "../lib/testFixtures.js";
 import type * as migrations from "../migrations.js";
 import type * as mutavStaff_domain from "../mutavStaff/domain.js";
@@ -60,6 +61,7 @@ import type * as payments_providers_bankAccountUseCases from "../payments/provid
 import type * as payments_providers_domain from "../payments/providers/domain.js";
 import type * as payments_providers_orderDomain from "../payments/providers/orderDomain.js";
 import type * as payments_providers_orderUseCases from "../payments/providers/orderUseCases.js";
+import type * as payments_providers_tenantPrefill from "../payments/providers/tenantPrefill.js";
 import type * as payments_providers_useCases from "../payments/providers/useCases.js";
 import type * as payments_providers_webhookUseCases from "../payments/providers/webhookUseCases.js";
 import type * as payments_settlement from "../payments/settlement.js";
@@ -125,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   "lib/secrets": typeof lib_secrets;
   "lib/stellarSigner": typeof lib_stellarSigner;
   "lib/storage": typeof lib_storage;
+  "lib/taxId": typeof lib_taxId;
   "lib/testFixtures": typeof lib_testFixtures;
   migrations: typeof migrations;
   "mutavStaff/domain": typeof mutavStaff_domain;
@@ -138,6 +141,7 @@ declare const fullApi: ApiFromModules<{
   "payments/providers/domain": typeof payments_providers_domain;
   "payments/providers/orderDomain": typeof payments_providers_orderDomain;
   "payments/providers/orderUseCases": typeof payments_providers_orderUseCases;
+  "payments/providers/tenantPrefill": typeof payments_providers_tenantPrefill;
   "payments/providers/useCases": typeof payments_providers_useCases;
   "payments/providers/webhookUseCases": typeof payments_providers_webhookUseCases;
   "payments/settlement": typeof payments_settlement;
