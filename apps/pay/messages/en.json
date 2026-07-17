@@ -852,7 +852,7 @@
   "paymentFlow": {
     "meta": {
       "title": "Pay with Stellar — {publicId}",
-      "description": "Pay your TGA invoice via the Stellar network."
+      "description": "Pay your Mutav invoice via the Stellar network."
     },
     "shell": {
       "brand": "mutav",
