@@ -8,7 +8,9 @@ import {
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
+  type Contract,
   type ContractId,
+  type TenantApprovalStatus,
 } from "./contracts/domain";
 import {
   ativoInsuredCentsPlatform,
@@ -16,7 +18,8 @@ import {
   contractsByStatusPlatform,
 } from "./contracts/aggregate";
 import { insertContractAggregates } from "./contracts/aggregateWrites";
-import { buildTenantRegistryPatch } from "./tenants/useCases";
+import { normalizeEmbeddedTenant, type EmbeddedTenantSnapshot } from "./tenants/domain";
+import { getOrCreateTenant } from "./tenants/useCases";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,21 +63,48 @@ async function wipeDemoTables(ctx: MutationCtx) {
 }
 
 /**
- * Link every unlinked contract to the tenant registry — same helper (and
- * therefore same dedup/conflict semantics) as
- * `migrations.backfillContractTenantRegistry`, so seeded deployments come
- * up already registry-linked while KEEPING the legacy embedded fields.
- * Idempotent: contracts already carrying `tenantId` are skipped.
+ * Seed-local tenant block: the wizard-era embedded shape plus the
+ * contract-level approval/score fields, kept so the seed data reads like
+ * one self-contained record per contract.
  */
-async function linkContractsToTenantRegistry(ctx: MutationCtx) {
-  const contracts = await ctx.db.query("contracts").collect();
-  for (const contract of contracts) {
-    const patch = await buildTenantRegistryPatch(ctx, contract, {
-      kind: "system",
-      source: "seed.linkContractsToTenantRegistry",
-    });
-    if (patch) await ctx.db.patch(contract._id, patch);
+type SeedTenantBlock = EmbeddedTenantSnapshot & {
+  approvalStatus: TenantApprovalStatus;
+  termApprovedAt: string | null;
+  score?: number;
+};
+
+type SeedContractSpec = Omit<
+  Contract,
+  "_id" | "_creationTime" | "tenantId" | "tenantApproval" | "score"
+> & { tenant: SeedTenantBlock };
+
+/**
+ * Registry-only contract insert: resolves (or creates) the `tenants` row
+ * through `getOrCreateTenant` — same dedup / last-write-wins / conflict
+ * audit-logging semantics as `contracts.create` — then writes the contract
+ * with the required `tenantId` + `tenantApproval` link and the
+ * contract-level `score` snapshot. Seed data must be checksum-valid, so a
+ * non-normalizable tenant throws instead of silently skipping.
+ */
+async function insertSeedContract(ctx: MutationCtx, spec: SeedContractSpec): Promise<ContractId> {
+  const { tenant, ...contract } = spec;
+  const input = normalizeEmbeddedTenant(tenant);
+  if (!input) {
+    throw new Error(`Seed tenant for contract ${contract.publicId} failed tax-id normalization`);
   }
+  const result = await getOrCreateTenant(ctx, {
+    input,
+    actor: { kind: "system", source: "seed" },
+  });
+  if (!result.success) {
+    throw new Error(`Seed tenant for contract ${contract.publicId}: ${result.message}`);
+  }
+  return ctx.db.insert("contracts", {
+    ...contract,
+    tenantId: result.data.tenantId,
+    tenantApproval: { status: tenant.approvalStatus, termApprovedAt: tenant.termApprovedAt },
+    score: tenant.score,
+  });
 }
 
 /**
@@ -271,7 +301,7 @@ async function seedFictional(
 
     // ── Contracts — Imobiliária Paulista (15) ─────────────────────────────────    // 12 ativo, 2 pendente, 1 encerrado
 
-    const p1 = await ctx.db.insert("contracts", {
+    const p1 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(1),
       status: "ativo",
@@ -317,7 +347,7 @@ async function seedFictional(
       },
     });
 
-    const p2 = await ctx.db.insert("contracts", {
+    const p2 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(2),
       status: "ativo",
@@ -363,7 +393,7 @@ async function seedFictional(
       },
     });
 
-    const p3 = await ctx.db.insert("contracts", {
+    const p3 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(3),
       status: "ativo",
@@ -414,7 +444,7 @@ async function seedFictional(
       },
     });
 
-    const p4 = await ctx.db.insert("contracts", {
+    const p4 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(4),
       status: "ativo",
@@ -460,7 +490,7 @@ async function seedFictional(
       },
     });
 
-    const p5 = await ctx.db.insert("contracts", {
+    const p5 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(5),
       status: "ativo",
@@ -511,7 +541,7 @@ async function seedFictional(
       },
     });
 
-    const p6 = await ctx.db.insert("contracts", {
+    const p6 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(6),
       status: "ativo",
@@ -557,7 +587,7 @@ async function seedFictional(
       },
     });
 
-    const p7 = await ctx.db.insert("contracts", {
+    const p7 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(7),
       status: "ativo",
@@ -603,7 +633,7 @@ async function seedFictional(
       },
     });
 
-    const p8 = await ctx.db.insert("contracts", {
+    const p8 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(8),
       status: "ativo",
@@ -649,7 +679,7 @@ async function seedFictional(
       },
     });
 
-    const p9 = await ctx.db.insert("contracts", {
+    const p9 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(9),
       status: "ativo",
@@ -695,7 +725,7 @@ async function seedFictional(
       },
     });
 
-    const p10 = await ctx.db.insert("contracts", {
+    const p10 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(10),
       status: "ativo",
@@ -746,7 +776,7 @@ async function seedFictional(
       },
     });
 
-    const p11 = await ctx.db.insert("contracts", {
+    const p11 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(11),
       status: "ativo",
@@ -792,7 +822,7 @@ async function seedFictional(
       },
     });
 
-    const p12 = await ctx.db.insert("contracts", {
+    const p12 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(12),
       status: "ativo",
@@ -838,7 +868,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(13),
       status: "pendente",
@@ -884,7 +914,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(14),
       status: "pendente",
@@ -931,7 +961,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(15),
       status: "encerrado",
@@ -980,7 +1010,7 @@ async function seedFictional(
     // ── Contracts — Imobiliária Atlântica (12) ────────────────────────────────
     // 8 ativo, 2 pendente, 1 encerrado, 1 cancelado
 
-    const a1 = await ctx.db.insert("contracts", {
+    const a1 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(16),
       status: "ativo",
@@ -1026,7 +1056,7 @@ async function seedFictional(
       },
     });
 
-    const a2 = await ctx.db.insert("contracts", {
+    const a2 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(17),
       status: "ativo",
@@ -1077,7 +1107,7 @@ async function seedFictional(
       },
     });
 
-    const a3 = await ctx.db.insert("contracts", {
+    const a3 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(18),
       status: "ativo",
@@ -1123,7 +1153,7 @@ async function seedFictional(
       },
     });
 
-    const a4 = await ctx.db.insert("contracts", {
+    const a4 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(19),
       status: "ativo",
@@ -1169,7 +1199,7 @@ async function seedFictional(
       },
     });
 
-    const a5 = await ctx.db.insert("contracts", {
+    const a5 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(20),
       status: "ativo",
@@ -1216,7 +1246,7 @@ async function seedFictional(
       },
     });
 
-    const a6 = await ctx.db.insert("contracts", {
+    const a6 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(21),
       status: "ativo",
@@ -1262,7 +1292,7 @@ async function seedFictional(
       },
     });
 
-    const a7 = await ctx.db.insert("contracts", {
+    const a7 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(22),
       status: "ativo",
@@ -1308,7 +1338,7 @@ async function seedFictional(
       },
     });
 
-    const a8 = await ctx.db.insert("contracts", {
+    const a8 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(23),
       status: "ativo",
@@ -1359,7 +1389,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(24),
       status: "pendente",
@@ -1405,7 +1435,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(25),
       status: "pendente",
@@ -1452,7 +1482,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(26),
       status: "encerrado",
@@ -1498,7 +1528,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(27),
       status: "cancelado",
@@ -1547,7 +1577,7 @@ async function seedFictional(
     // ── Contracts — Horizonte Imóveis (3) ─────────────────────────────────────
     // 2 ativo, 1 pendente
 
-    const h1 = await ctx.db.insert("contracts", {
+    const h1 = await insertSeedContract(ctx, {
       agencyId: horizonteId,
       publicId: pid(28),
       status: "ativo",
@@ -1593,7 +1623,7 @@ async function seedFictional(
       },
     });
 
-    const h2 = await ctx.db.insert("contracts", {
+    const h2 = await insertSeedContract(ctx, {
       agencyId: horizonteId,
       publicId: pid(29),
       status: "ativo",
@@ -1644,7 +1674,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: horizonteId,
       publicId: pid(30),
       status: "pendente",
@@ -2227,8 +2257,6 @@ async function seedFictional(
       });
     }
 
-    await linkContractsToTenantRegistry(ctx);
-
     return {
       agencies: { paulistaId, atlanticaId, horizonteId },
       contractCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
@@ -2601,10 +2629,9 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     const feeCents = Math.round(spec.rentCents * FEE_MULTIPLIER);
     const isApproved = spec.status !== "pendente";
 
-    const id = await ctx.db.insert("contracts", {
+    const id = await insertSeedContract(ctx, {
       agencyId,
       publicId,
-      tenantCpf: spec.tenant.cpf.replace(/\D/g, ""),
       status: spec.status,
       activatedAt: spec.activatedAt,
       deactivatedAt: spec.deactivatedAt,
@@ -2718,8 +2745,6 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       message: `Criada Solicitação #${r.publicId} — ${r.spec.tenant.fullName}, aluguel R$ ${(r.spec.rentCents / 100).toLocaleString("pt-BR")}.`,
     });
   }
-
-  await linkContractsToTenantRegistry(ctx);
 
   return { contractsInserted: inserted.length, ativoCount: ativoRows.length };
 }

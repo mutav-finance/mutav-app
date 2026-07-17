@@ -81,32 +81,32 @@ describe("seedReset", () => {
     expect(paulista + atlantica + horizonte).toBe(30);
   });
 
-  test("registers tenants and dual-writes tenantId onto seeded contracts", async () => {
+  test("registers tenants and links every seeded contract by tenantId", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
 
     // The registry must be populated — seedFictional + populateAprovadaBook
-    // run every contract's embedded tenant through getOrCreateTenant.
+    // run every contract's tenant block through getOrCreateTenant.
     expect(await tenantCount(t)).toBeGreaterThan(0);
 
-    // WIDEN dual-write: every seeded contract carries the registry link
-    // (tenantId + tenantApproval) alongside the still-required embedded tenant.
-    // Guards against linkContractsToTenantRegistry being dropped.
+    // Registry-only: every seeded contract carries the registry link
+    // (tenantId + tenantApproval) and no embedded tenant — the narrowed
+    // schema dropped the embedded fields, so the link is the only tenant ref.
     const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
     const linked = await t.run(async (ctx) => {
       const rows = await ctx.db
         .query("contracts")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovadaId))
         .collect();
+      const resolvedTenants = await Promise.all(rows.map((r) => ctx.db.get(r.tenantId)));
       return {
         total: rows.length,
-        withTenantId: rows.filter((r) => r.tenantId !== undefined).length,
-        withApproval: rows.filter((r) => r.tenantApproval !== undefined).length,
+        withResolvableTenant: resolvedTenants.filter((tenant) => tenant !== null).length,
       };
     });
     expect(linked.total).toBeGreaterThan(0);
-    expect(linked.withTenantId).toBe(linked.total);
-    expect(linked.withApproval).toBe(linked.total);
+    // The tenantId link must resolve to a real registry row for every contract.
+    expect(linked.withResolvableTenant).toBe(linked.total);
   });
 
   test("seeds all four personas with the correct staff / agency state", async () => {
