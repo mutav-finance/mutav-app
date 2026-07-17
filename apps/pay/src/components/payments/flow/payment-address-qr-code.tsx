@@ -13,7 +13,7 @@ type Props = {
 
 /**
  * Server-rendered SVG QR code for the SEP-7 payment URI. Monochrome,
- * 0px-radius, 1px-bordered to honor TGA Precision Brutalism. Carries
+ * 0px-radius, 1px-bordered to honor MUTAV Precision Brutalism. Carries
  * `<title>` and `<desc>` so screen readers announce both the payment
  * amount and an alternative path (paste the address).
  *

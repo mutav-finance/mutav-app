@@ -1,8 +1,9 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "sgr-app",
+      "name": "mutav-app",
       "dependencies": {
         "@auth0/nextjs-auth0": "^4.20.0",
         "@convex-dev/aggregate": "^0.2.1",

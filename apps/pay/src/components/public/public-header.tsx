@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { Mono } from "@mutav/ui/mono";
 
 /**
- * Public payment portal header. TGA wordmark on the left, invoice public id
+ * Public payment portal header. MUTAV wordmark on the left, invoice public id
  * on the right (the agency user is the audience — they're paying their
  * own invoice, so the right-hand label confirms which one).
  */

@@ -127,7 +127,7 @@ When the in-repo docs and skills aren't enough, consult:
 - Turborepo monorepo — persona apps under `apps/*`, shared code under `packages/*`, Convex backend at the repo root in `convex/` (see [§ Monorepo layout](#monorepo-layout))
 - Next.js 16 (App Router, `src/` directory **per app**, e.g. `apps/agency/src/app/`)
 - Tailwind CSS 4 — workspace packages need `@source` (see [Tailwind 4 + workspace packages](#tailwind-4--workspace-packages))
-- shadcn/ui (radix-nova style, neutral base color, TGA tokens in each app's `src/app/globals.css`)
+- shadcn/ui (radix-nova style, neutral base color, MUTAV tokens in each app's `src/app/globals.css`)
 - Convex — backend (functions in `convex/`, root-level, shared by every app)
 - Railway / Vercel — deployment (one project per app)
 
