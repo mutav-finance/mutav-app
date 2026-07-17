@@ -848,6 +848,9 @@
       "submitting": "Creating...",
       "missingFields": "Fill in all required fields before confirming.",
       "errorToast": "Failed to create contract. Please try again.",
+      "errors": {
+        "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again."
+      },
       "editBlock": "Edit",
       "saveBlock": "Save",
       "cancelBlock": "Cancel"

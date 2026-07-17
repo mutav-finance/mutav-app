@@ -122,7 +122,12 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
           score: data.score,
         },
       });
-      onComplete(result.publicId);
+      if (!result.success) {
+        toast.error(t(`review.errors.${result.error.code}`));
+        setIsSubmitting(false);
+        return;
+      }
+      onComplete(result.data.publicId);
     } catch {
       toast.error(t("review.errorToast"));
       setIsSubmitting(false);

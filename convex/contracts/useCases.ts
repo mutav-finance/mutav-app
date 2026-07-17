@@ -17,6 +17,9 @@ import {
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
 } from "./domain";
+import { normalizeEmbeddedTenant, TENANT_ERROR_CODE } from "../tenants/domain";
+import { getOrCreateTenant } from "../tenants/useCases";
+import type { Result } from "../lib/result";
 import { findFreshAssessment } from "../creditAnalysis/useCases";
 import { CAPABILITY, SUBJECT_TYPE } from "../creditAnalysis/domain";
 import type { ActivityBucket } from "./domain";
@@ -508,7 +511,18 @@ export const lookupTenantByCpf = queryWithAgencyScope({
   },
 });
 
-/** Create a new contract with server-side fee calculation. */
+type CreateContractSuccessResult = { publicId: string };
+type CreateContractErrorResult = { code: typeof TENANT_ERROR_CODE.INVALID_TAX_ID };
+
+/**
+ * Create a new contract with server-side fee calculation.
+ *
+ * Dual-write (registry widen phase): resolves the tenant registry row via
+ * `getOrCreateTenant` and stores `tenantId` + `tenantApproval` while STILL
+ * writing the legacy embedded `tenant` + `tenantCpf` exactly as before —
+ * legacy readers are untouched until the narrow PR. The tax-id checksum
+ * rejection is the only error Result and happens before any write.
+ */
 export const create = mutationWithAgencyScope({
   args: {
     property: v.object({
@@ -537,7 +551,31 @@ export const create = mutationWithAgencyScope({
       score: v.number(),
     }),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<Result<CreateContractSuccessResult, CreateContractErrorResult>> => {
+    const registryInput = normalizeEmbeddedTenant(args.tenant);
+    if (!registryInput) {
+      return {
+        success: false,
+        error: { code: TENANT_ERROR_CODE.INVALID_TAX_ID },
+        message: "Tenant tax ID failed checksum validation",
+      };
+    }
+
+    const tenantResult = await getOrCreateTenant(ctx, {
+      input: registryInput,
+      actor: { kind: "user", userId: ctx.user._id },
+    });
+    if (!tenantResult.success) {
+      return {
+        success: false,
+        error: { code: TENANT_ERROR_CODE.INVALID_TAX_ID },
+        message: tenantResult.message,
+      };
+    }
+
     const priced = priceContract({
       rentCents: args.rentCents,
       condoCents: args.condoCents,
@@ -555,6 +593,8 @@ export const create = mutationWithAgencyScope({
       agencyId: ctx.agencyId,
       publicId,
       tenantCpf: args.tenant.cpf,
+      tenantId: tenantResult.data.tenantId,
+      tenantApproval: { status: "pendente", termApprovedAt: null },
       status: "pendente",
       activatedAt: null,
       nextRenewalDate,
@@ -638,7 +678,7 @@ export const create = mutationWithAgencyScope({
       feeCents: priced.feeCents,
     });
 
-    return { publicId };
+    return { success: true, data: { publicId }, message: "Contract created" };
   },
 });
 
