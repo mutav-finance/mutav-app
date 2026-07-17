@@ -13,8 +13,14 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return { title: t("title"), description: t("description") };
 }
 
-export default async function DelinquenciesRoutePage() {
+export default async function DelinquenciesRoutePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const t = await getTranslations("delinquencies");
+  const params = await searchParams;
+  const contractParam = typeof params.contract === "string" ? params.contract : "";
 
   return (
     <PageShell>
@@ -24,7 +30,7 @@ export default async function DelinquenciesRoutePage() {
         actions={<DelinquencyPageActions />}
       />
       <PageContent variant="full">
-        <DelinquencyPage />
+        <DelinquencyPage initialContractFilter={contractParam} />
       </PageContent>
     </PageShell>
   );

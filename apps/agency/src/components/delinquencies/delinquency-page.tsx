@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react";
+import { usePaginatedQuery } from "convex/react";
+import { SearchIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react";
+import { api } from "@convex/_generated/api";
+import type { DelinquencyStatus } from "@convex/delinquencies/domain";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent } from "@mutav/ui/card";
@@ -11,66 +14,48 @@ import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
-import {
-  DelinquencyStatusTag,
-  type DelinquencyStatus,
-} from "@/components/delinquencies/delinquency-status-tag";
-import { formatBRLCents } from "@/lib/contracts/format";
+import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-status-tag";
+import { useWorkspace } from "@/providers/workspace";
+import { formatBRLCents, formatDateTimeBR } from "@/lib/contracts/format";
 
-type DelinquencyRow = {
-  propertyId: string;
-  status: DelinquencyStatus;
-  noticeAt: string;
-  amountCents: number;
-  updatedAmountCents: number;
-};
+const STATUS_FILTERS = ["all", "open", "under_review", "provisioned", "paid", "closed"] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
 
-const MOCK_ROWS: DelinquencyRow[] = [
-  {
-    propertyId: "2014489",
-    status: "pendencia_aberta",
-    noticeAt: "26/11/2026 às 09:19",
-    amountCents: 345862,
-    updatedAmountCents: 345862,
-  },
-  {
-    propertyId: "2052106",
-    status: "pendencia_aberta",
-    noticeAt: "24/03/2026 às 18:14",
-    amountCents: 1381556,
-    updatedAmountCents: 1430784,
-  },
-  {
-    propertyId: "3871005",
-    status: "entregue",
-    noticeAt: "30/03/2026 às 23:09",
-    amountCents: 489250,
-    updatedAmountCents: 545111,
-  },
-];
-
-function parseNoticeDate(noticeAt: string): string {
-  const [datePart] = noticeAt.split(" às ");
-  const [dd, mm, yyyy] = datePart.split("/");
-  return `${yyyy}-${mm}-${dd}`;
+function isStatusFilter(value: string): value is StatusFilter {
+  return STATUS_FILTERS.some((status) => status === value);
 }
 
-export function DelinquencyPage() {
+const PAGE_SIZE = 50;
+
+type Filters = {
+  contract: string;
+  tenantName: string;
+  status: StatusFilter;
+  order: string;
+  dateFrom: string;
+  dateTo: string;
+  amountFrom: string;
+  amountTo: string;
+};
+
+export function DelinquencyPage({
+  initialContractFilter = "",
+}: {
+  initialContractFilter?: string;
+}) {
   const t = useTranslations("delinquencies");
 
-  const [property, setProperty] = React.useState("");
+  const [contract, setContract] = React.useState(initialContractFilter);
   const [tenantName, setTenantName] = React.useState("");
-  const [tenantCpf, setTenantCpf] = React.useState("");
-  const [status, setStatus] = React.useState("all");
+  const [status, setStatus] = React.useState<StatusFilter>("all");
   const [order, setOrder] = React.useState("date");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
   const [amountFrom, setAmountFrom] = React.useState("");
   const [amountTo, setAmountTo] = React.useState("");
-  const [activeFilters, setActiveFilters] = React.useState({
-    property: "",
+  const [activeFilters, setActiveFilters] = React.useState<Filters>({
+    contract: initialContractFilter,
     tenantName: "",
-    tenantCpf: "",
     status: "all",
     order: "date",
     dateFrom: "",
@@ -79,11 +64,29 @@ export function DelinquencyPage() {
     amountTo: "",
   });
 
+  const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
+  const agencyId = selectedAgency?._id;
+
+  const serverStatus: DelinquencyStatus | undefined =
+    activeFilters.status === "all" ? undefined : activeFilters.status;
+
+  const {
+    results,
+    status: queryStatus,
+    loadMore,
+  } = usePaginatedQuery(
+    api.delinquencies.useCases.listByAgency,
+    agencyId ? { agencyId, ...(serverStatus ? { status: serverStatus } : {}) } : "skip",
+    { initialNumItems: PAGE_SIZE },
+  );
+
+  const isLoading =
+    workspaceLoading || (agencyId !== undefined && queryStatus === "LoadingFirstPage");
+
   function handleSearch() {
     setActiveFilters({
-      property,
+      contract,
       tenantName,
-      tenantCpf,
       status,
       order,
       dateFrom,
@@ -94,9 +97,8 @@ export function DelinquencyPage() {
   }
 
   function handleClear() {
-    setProperty("");
+    setContract("");
     setTenantName("");
-    setTenantCpf("");
     setStatus("all");
     setOrder("date");
     setDateFrom("");
@@ -104,9 +106,8 @@ export function DelinquencyPage() {
     setAmountFrom("");
     setAmountTo("");
     setActiveFilters({
-      property: "",
+      contract: "",
       tenantName: "",
-      tenantCpf: "",
       status: "all",
       order: "date",
       dateFrom: "",
@@ -123,21 +124,28 @@ export function DelinquencyPage() {
   const amountFromCents = activeFilters.amountFrom ? Number(activeFilters.amountFrom) * 100 : null;
   const amountToCents = activeFilters.amountTo ? Number(activeFilters.amountTo) * 100 : null;
 
-  const filtered = MOCK_ROWS.filter((r) => {
-    if (activeFilters.property && !r.propertyId.includes(activeFilters.property)) return false;
-    if (activeFilters.status !== "all" && r.status !== activeFilters.status) return false;
-    const noticeDate = parseNoticeDate(r.noticeAt);
-    if (activeFilters.dateFrom && noticeDate < activeFilters.dateFrom) return false;
-    if (activeFilters.dateTo && noticeDate > activeFilters.dateTo) return false;
-    if (amountFromCents !== null && r.amountCents < amountFromCents) return false;
-    if (amountToCents !== null && r.amountCents > amountToCents) return false;
+  const filtered = results.filter((row) => {
+    if (activeFilters.contract && !row.contractPublicId.includes(activeFilters.contract)) {
+      return false;
+    }
+    if (
+      activeFilters.tenantName &&
+      !row.tenantFullName.toLowerCase().includes(activeFilters.tenantName.toLowerCase())
+    ) {
+      return false;
+    }
+    const openedDate = row.openedAt.slice(0, 10);
+    if (activeFilters.dateFrom && openedDate < activeFilters.dateFrom) return false;
+    if (activeFilters.dateTo && openedDate > activeFilters.dateTo) return false;
+    if (amountFromCents !== null && row.amountCents < amountFromCents) return false;
+    if (amountToCents !== null && row.amountCents > amountToCents) return false;
     return true;
   });
 
   const sorted = [...filtered].sort((a, b) => {
     if (activeFilters.order === "amount") return b.amountCents - a.amountCents;
     if (activeFilters.order === "status") return a.status.localeCompare(b.status);
-    return parseNoticeDate(a.noticeAt).localeCompare(parseNoticeDate(b.noticeAt));
+    return a.openedAt.localeCompare(b.openedAt);
   });
 
   return (
@@ -146,13 +154,13 @@ export function DelinquencyPage() {
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-col gap-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">{t("filter.property")}</Label>
+                <Label className="text-xs">{t("filter.contract")}</Label>
                 <Input
-                  placeholder={t("filter.propertyPlaceholder")}
-                  value={property}
-                  onChange={(e) => setProperty(e.target.value)}
+                  placeholder={t("filter.contractPlaceholder")}
+                  value={contract}
+                  onChange={(e) => setContract(e.target.value)}
                   onKeyDown={handleKeyDown}
                 />
               </div>
@@ -166,25 +174,23 @@ export function DelinquencyPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">{t("filter.tenantCpf")}</Label>
-                <Input
-                  placeholder="000.000.000-00"
-                  value={tenantCpf}
-                  onChange={(e) => setTenantCpf(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">{t("filter.status")}</Label>
-                <Select value={status} onValueChange={setStatus}>
+                <Select
+                  value={status}
+                  onValueChange={(value) => {
+                    if (isStatusFilter(value)) setStatus(value);
+                  }}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t("filter.statusAll")}</SelectItem>
-                    <SelectItem value="pendencia_aberta">{t("status.pendencia_aberta")}</SelectItem>
-                    <SelectItem value="entregue">{t("status.entregue")}</SelectItem>
-                    <SelectItem value="cancelado">{t("status.cancelado")}</SelectItem>
+                    {STATUS_FILTERS.filter((s) => s !== "all").map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {t(`status.${s}`)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -257,19 +263,27 @@ export function DelinquencyPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("table.col.property")}</TableHead>
+                <TableHead>{t("table.col.contract")}</TableHead>
+                <TableHead>{t("table.col.tenant")}</TableHead>
                 <TableHead>{t("table.col.status")}</TableHead>
-                <TableHead>{t("table.col.noticeAt")}</TableHead>
+                <TableHead>{t("table.col.openedAt")}</TableHead>
                 <TableHead className="text-right">{t("table.col.amount")}</TableHead>
-                <TableHead className="text-right">{t("table.col.updatedAmount")}</TableHead>
-                <TableHead className="text-center">{t("table.col.action")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sorted.length === 0 ? (
+              {isLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={5}
+                    className="text-muted-foreground py-10 text-center text-sm"
+                  >
+                    {t("table.loading")}
+                  </TableCell>
+                </TableRow>
+              ) : sorted.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
                     className="text-muted-foreground py-10 text-center text-sm"
                   >
                     {t("table.empty")}
@@ -277,30 +291,25 @@ export function DelinquencyPage() {
                 </TableRow>
               ) : (
                 sorted.map((row) => (
-                  <TableRow key={`${row.propertyId}-${row.noticeAt}`}>
+                  <TableRow key={row.publicId}>
                     <TableCell>
-                      <Mono className="text-sm font-medium">{row.propertyId}</Mono>
+                      <Mono className="text-sm font-medium">{row.contractPublicId}</Mono>
                     </TableCell>
+                    <TableCell className="text-sm">{row.tenantFullName}</TableCell>
                     <TableCell>
                       <DelinquencyStatusTag status={row.status}>
                         {t(`status.${row.status}`)}
                       </DelinquencyStatusTag>
                     </TableCell>
                     <TableCell>
-                      <Mono className="text-muted-foreground text-sm">{row.noticeAt}</Mono>
+                      <Mono className="text-muted-foreground text-sm">
+                        {formatDateTimeBR(row.openedAt)}
+                      </Mono>
                     </TableCell>
                     <TableCell className="text-right">
                       <Mono className="text-sm font-semibold">
                         {formatBRLCents(row.amountCents)}
                       </Mono>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Mono className="text-sm">{formatBRLCents(row.updatedAmountCents)}</Mono>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button variant="ghost" size="icon-sm" disabled aria-label={t("table.view")}>
-                        <EyeIcon className="size-4" strokeWidth={1.25} />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -308,6 +317,14 @@ export function DelinquencyPage() {
             </TableBody>
           </Table>
         </div>
+
+        {queryStatus === "CanLoadMore" && (
+          <div className="flex justify-center">
+            <Button variant="outline" size="sm" onClick={() => loadMore(PAGE_SIZE)}>
+              {t("table.loadMore")}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

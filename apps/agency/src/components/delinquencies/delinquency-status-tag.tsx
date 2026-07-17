@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
+import type { DelinquencyStatus } from "@convex/delinquencies/domain";
 import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
 
-export type DelinquencyStatus = "pendencia_aberta" | "entregue" | "cancelado";
-
 const statusTone: Record<DelinquencyStatus, StatusTagTone> = {
-  pendencia_aberta: "warning",
-  entregue: "positive",
-  cancelado: "neutral",
+  open: "warning",
+  under_review: "warning-strong",
+  provisioned: "critical",
+  paid: "positive",
+  closed: "neutral",
 };
 
 export function DelinquencyStatusTag({
