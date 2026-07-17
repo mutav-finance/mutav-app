@@ -261,5 +261,3 @@ export function parseBRLInput(raw: string): number {
   const reais = parseFloat(clean);
   return isNaN(reais) ? 0 : Math.round(reais * 100);
 }
-
-export { isValidCPF, isValidCNPJ } from "@mutav/i18n/brazil";
