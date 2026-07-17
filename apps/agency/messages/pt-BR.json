@@ -880,6 +880,7 @@
       "birthDateFuture": "Data de nascimento não pode ser futura",
       "birthDateInvalid": "Data inválida",
       "emailInvalid": "E-mail inválido",
+      "phoneInvalid": "Telefone inválido",
       "coverageRequired": "Selecione uma cobertura",
       "exitRequired": "Selecione um custo de saída"
     }
