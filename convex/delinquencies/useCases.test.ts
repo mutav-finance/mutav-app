@@ -9,84 +9,24 @@ import {
   seedForeignAgency,
   setupAuthenticatedUser,
 } from "../lib/testFixtures";
-import { insertContractAggregates } from "../contracts/aggregateWrites";
-import { CONTRACT_STATUS, type ContractStatus } from "../contracts/domain";
+import { CONTRACT_STATUS } from "../contracts/domain";
+import { DELINQUENCY_RESOLUTION, DELINQUENCY_STATUS } from "./domain";
+import { applyDelinquencyTransition } from "./transitions";
 import {
-  DELINQUENCY_RESOLUTION,
-  DELINQUENCY_STATUS,
-  type DelinquencyResolution,
-  type DelinquencyStatus,
-} from "./domain";
+  STAFF_ADMIN_SUBJECT,
+  seedAndIndexContract,
+  seedStaffActor,
+  staffAdvance,
+  type Actor,
+} from "./testSupport";
 import schema from "../schema";
-
-type ContractSeed = {
-  agencyId: AgencyId;
-  status: ContractStatus;
-  availableGuaranteeCents: number;
-  tenantFullName?: string;
-};
-
-async function seedAndIndexContract(
-  t: ReturnType<typeof convexTest>,
-  spec: ContractSeed,
-  publicId: string,
-) {
-  return t.run(async (ctx) => {
-    const id = await ctx.db.insert("contracts", {
-      agencyId: spec.agencyId,
-      publicId,
-      status: spec.status,
-      activatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: spec.availableGuaranteeCents,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 100000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 100000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "30x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "pendente" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
-      ],
-      tenant: {
-        approvalStatus: "pendente",
-        fullName: spec.tenantFullName ?? "Test Tenant",
-        cpf: "11144477735",
-        birthDate: "1990-01-01",
-        email: "tenant@test.br",
-        phone: "11999999999",
-        termApprovedAt: null,
-      },
-    });
-    const doc = await ctx.db.get(id);
-    if (!doc) throw new Error("seed lost");
-    await insertContractAggregates(ctx, doc);
-    return id;
-  });
-}
 
 async function setup() {
   const t = convexTest(schema);
   registerContractAggregateComponents(t);
   const { asUser, userId } = await setupAuthenticatedUser(t);
   const agencyId = await seedAgencyWithMembership(t, userId);
+  const { asStaff } = await seedStaffActor(t, STAFF_ADMIN_SUBJECT, ["admin"]);
   const getGuaranteeCents = (contractPublicId: string): Promise<number> =>
     t.run(async (ctx) => {
       const contract = await ctx.db
@@ -103,26 +43,7 @@ async function setup() {
         .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
         .unique(),
     );
-  return { t, asUser, agencyId, getGuaranteeCents, getDelinquencyRow };
-}
-
-type Actor = ReturnType<ReturnType<typeof convexTest>["withIdentity"]>;
-
-async function advance(
-  asUser: Actor,
-  agencyId: AgencyId,
-  publicId: string,
-  status: DelinquencyStatus,
-  resolution?: DelinquencyResolution,
-) {
-  const result = await asUser.mutation(api.delinquencies.useCases.updateStatus, {
-    agencyId,
-    publicId,
-    status,
-    ...(resolution === undefined ? {} : { resolution }),
-  });
-  expect(result.success).toBe(true);
-  return result;
+  return { t, asUser, asStaff, agencyId, getGuaranteeCents, getDelinquencyRow };
 }
 
 async function openDelinquency(
@@ -269,15 +190,15 @@ describe("open", () => {
   });
 
   test("second open while a delinquency is provisioned → DELINQUENCY_ALREADY_OPEN", async () => {
-    const { t, asUser, agencyId } = await setup();
+    const { t, asUser, asStaff, agencyId } = await setup();
     await seedAndIndexContract(
       t,
       { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
       "CTR-D7",
     );
     const publicId = await openDelinquency(asUser, agencyId, "CTR-D7", 10_000);
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PROVISIONED);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.PROVISIONED);
 
     const second = await asUser.mutation(api.delinquencies.useCases.open, {
       agencyId,
@@ -295,13 +216,11 @@ describe("open", () => {
       "CTR-D8",
     );
     const publicId = await openDelinquency(asUser, agencyId, "CTR-D8", 10_000);
-    await advance(
-      asUser,
+    const closed = await asUser.mutation(api.delinquencies.useCases.closeAsCured, {
       agencyId,
       publicId,
-      DELINQUENCY_STATUS.CLOSED,
-      DELINQUENCY_RESOLUTION.CURED,
-    );
+    });
+    expect(closed.success).toBe(true);
 
     const reopened = await asUser.mutation(api.delinquencies.useCases.open, {
       agencyId,
@@ -365,168 +284,22 @@ describe("open", () => {
   });
 });
 
-describe("updateStatus", () => {
-  test("illegal transitions are rejected and leave state untouched", async () => {
+describe("closeAsCured", () => {
+  test("succeeds from open — resolution 'cured', closedAt set, guarantee untouched", async () => {
     const { t, asUser, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
     await seedAndIndexContract(
       t,
       { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
-      "CTR-U1",
+      "CTR-C1",
     );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U1", 30_000);
+    const publicId = await openDelinquency(asUser, agencyId, "CTR-C1", 10_000);
 
-    const result = await asUser.mutation(api.delinquencies.useCases.updateStatus, {
+    const result = await asUser.mutation(api.delinquencies.useCases.closeAsCured, {
       agencyId,
       publicId,
-      status: DELINQUENCY_STATUS.PROVISIONED,
     });
-    expect(result).toMatchObject({ success: false, error: { code: "ILLEGAL_TRANSITION" } });
-
-    const row = await getDelinquencyRow(publicId);
-    expect(row?.status).toBe(DELINQUENCY_STATUS.OPEN);
-    expect(await getGuaranteeCents("CTR-U1")).toBe(100_000);
-  });
-
-  test("unknown publicId → NOT_FOUND", async () => {
-    const { asUser, agencyId } = await setup();
-    const result = await asUser.mutation(api.delinquencies.useCases.updateStatus, {
-      agencyId,
-      publicId: "DLQ-NOPE",
-      status: DELINQUENCY_STATUS.UNDER_REVIEW,
-    });
-    expect(result).toMatchObject({ success: false, error: { code: "NOT_FOUND" } });
-  });
-
-  test("provisioning decrements the guarantee; paying keeps the decrement", async () => {
-    const { t, asUser, agencyId, getGuaranteeCents } = await setup();
-    await seedAndIndexContract(
-      t,
-      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
-      "CTR-U2",
-    );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U2", 30_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
-    expect(await getGuaranteeCents("CTR-U2")).toBe(100_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PROVISIONED);
-    expect(await getGuaranteeCents("CTR-U2")).toBe(70_000);
-    const capacityAfterProvision = await asUser.query(
-      api.contracts.useCases.getInsuredCapacityGlobal,
-      {},
-    );
-    expect(capacityAfterProvision.sumInsuredCents).toBe(70_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PAID);
-    expect(await getGuaranteeCents("CTR-U2")).toBe(70_000);
-    const capacityAfterPaid = await asUser.query(
-      api.contracts.useCases.getInsuredCapacityGlobal,
-      {},
-    );
-    expect(capacityAfterPaid.sumInsuredCents).toBe(70_000);
-  });
-
-  test("decrement floors at zero and paid keeps the applied decrement", async () => {
-    const { t, asUser, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
-    await seedAndIndexContract(
-      t,
-      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 20_000 },
-      "CTR-U3",
-    );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U3", 20_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PROVISIONED);
-    expect(await getGuaranteeCents("CTR-U3")).toBe(0);
-
-    const provisioned = await getDelinquencyRow(publicId);
-    expect(provisioned?.appliedGuaranteeDecrementCents).toBe(20_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PAID);
-    expect(await getGuaranteeCents("CTR-U3")).toBe(0);
-    const paid = await getDelinquencyRow(publicId);
-    expect(paid?.appliedGuaranteeDecrementCents).toBe(20_000);
-  });
-
-  test("provisioned → closed releases the earmark and records resolution 'denied'", async () => {
-    const { t, asUser, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
-    await seedAndIndexContract(
-      t,
-      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
-      "CTR-U5",
-    );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U5", 30_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PROVISIONED);
-    expect(await getGuaranteeCents("CTR-U5")).toBe(70_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.CLOSED);
-    expect(await getGuaranteeCents("CTR-U5")).toBe(100_000);
-    const capacity = await asUser.query(api.contracts.useCases.getInsuredCapacityGlobal, {});
-    expect(capacity.sumInsuredCents).toBe(100_000);
-
-    const row = await getDelinquencyRow(publicId);
-    expect(row?.status).toBe(DELINQUENCY_STATUS.CLOSED);
-    expect(row?.resolution).toBe(DELINQUENCY_RESOLUTION.DENIED);
-    expect(row?.closedAt).not.toBeNull();
-  });
-
-  test("paid → closed records resolution 'paid_out' and keeps the decrement", async () => {
-    const { t, asUser, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
-    await seedAndIndexContract(
-      t,
-      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
-      "CTR-U6",
-    );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U6", 30_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PROVISIONED);
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.PAID);
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.CLOSED);
-
-    expect(await getGuaranteeCents("CTR-U6")).toBe(70_000);
-    const row = await getDelinquencyRow(publicId);
-    expect(row?.resolution).toBe(DELINQUENCY_RESOLUTION.PAID_OUT);
-  });
-
-  test.each([DELINQUENCY_RESOLUTION.CURED, DELINQUENCY_RESOLUTION.DENIED])(
-    "closing from open with caller-supplied '%s' records it",
-    async (resolution) => {
-      const { t, asUser, agencyId, getDelinquencyRow } = await setup();
-      await seedAndIndexContract(
-        t,
-        { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
-        "CTR-U7",
-      );
-      const publicId = await openDelinquency(asUser, agencyId, "CTR-U7", 10_000);
-
-      await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.CLOSED, resolution);
-      const row = await getDelinquencyRow(publicId);
-      expect(row?.status).toBe(DELINQUENCY_STATUS.CLOSED);
-      expect(row?.resolution).toBe(resolution);
-    },
-  );
-
-  test("closing from under_review with 'cured' records it and leaves the guarantee untouched", async () => {
-    const { t, asUser, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
-    await seedAndIndexContract(
-      t,
-      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 50_000 },
-      "CTR-U8",
-    );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U8", 10_000);
-
-    await advance(asUser, agencyId, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
-    await advance(
-      asUser,
-      agencyId,
-      publicId,
-      DELINQUENCY_STATUS.CLOSED,
-      DELINQUENCY_RESOLUTION.CURED,
-    );
-    expect(await getGuaranteeCents("CTR-U8")).toBe(50_000);
+    expect(result.success).toBe(true);
+    expect(await getGuaranteeCents("CTR-C1")).toBe(100_000);
 
     const row = await getDelinquencyRow(publicId);
     expect(row?.status).toBe(DELINQUENCY_STATUS.CLOSED);
@@ -534,41 +307,184 @@ describe("updateStatus", () => {
     expect(row?.closedAt).not.toBeNull();
   });
 
-  test("closing from open without a resolution is rejected", async () => {
-    const { t, asUser, agencyId, getDelinquencyRow } = await setup();
+  test("succeeds from under_review — resolution 'cured', guarantee untouched", async () => {
+    const { t, asUser, asStaff, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
     await seedAndIndexContract(
       t,
-      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
-      "CTR-U9",
+      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 50_000 },
+      "CTR-C2",
     );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U9", 10_000);
+    const publicId = await openDelinquency(asUser, agencyId, "CTR-C2", 10_000);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
 
-    const result = await asUser.mutation(api.delinquencies.useCases.updateStatus, {
+    const result = await asUser.mutation(api.delinquencies.useCases.closeAsCured, {
       agencyId,
       publicId,
-      status: DELINQUENCY_STATUS.CLOSED,
     });
-    expect(result).toMatchObject({ success: false, error: { code: "ILLEGAL_TRANSITION" } });
+    expect(result.success).toBe(true);
+    expect(await getGuaranteeCents("CTR-C2")).toBe(50_000);
+
     const row = await getDelinquencyRow(publicId);
-    expect(row?.status).toBe(DELINQUENCY_STATUS.OPEN);
+    expect(row?.status).toBe(DELINQUENCY_STATUS.CLOSED);
+    expect(row?.resolution).toBe(DELINQUENCY_RESOLUTION.CURED);
   });
 
-  test("closing from open with caller-supplied 'paid_out' is rejected", async () => {
+  test("appends a status-updated audit entry", async () => {
     const { t, asUser, agencyId } = await setup();
     await seedAndIndexContract(
       t,
       { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
-      "CTR-U10",
+      "CTR-C3",
     );
-    const publicId = await openDelinquency(asUser, agencyId, "CTR-U10", 10_000);
+    const publicId = await openDelinquency(asUser, agencyId, "CTR-C3", 10_000);
+    await asUser.mutation(api.delinquencies.useCases.closeAsCured, { agencyId, publicId });
 
-    const result = await asUser.mutation(api.delinquencies.useCases.updateStatus, {
+    const entries = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+    expect(entries.some((e) => e.action === "delinquency.status_updated")).toBe(true);
+  });
+
+  test("on a provisioned row → ILLEGAL_TRANSITION and the earmark is NOT released", async () => {
+    const { t, asUser, asStaff, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
+      "CTR-C4",
+    );
+    const publicId = await openDelinquency(asUser, agencyId, "CTR-C4", 30_000);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.PROVISIONED);
+    expect(await getGuaranteeCents("CTR-C4")).toBe(70_000);
+
+    const result = await asUser.mutation(api.delinquencies.useCases.closeAsCured, {
       agencyId,
       publicId,
-      status: DELINQUENCY_STATUS.CLOSED,
-      resolution: DELINQUENCY_RESOLUTION.PAID_OUT,
     });
     expect(result).toMatchObject({ success: false, error: { code: "ILLEGAL_TRANSITION" } });
+    expect(await getGuaranteeCents("CTR-C4")).toBe(70_000);
+    const row = await getDelinquencyRow(publicId);
+    expect(row?.status).toBe(DELINQUENCY_STATUS.PROVISIONED);
+  });
+
+  test("on a paid row → ILLEGAL_TRANSITION", async () => {
+    const { t, asUser, asStaff, agencyId, getDelinquencyRow } = await setup();
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
+      "CTR-C5",
+    );
+    const publicId = await openDelinquency(asUser, agencyId, "CTR-C5", 10_000);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.PROVISIONED);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.PAID);
+
+    const result = await asUser.mutation(api.delinquencies.useCases.closeAsCured, {
+      agencyId,
+      publicId,
+    });
+    expect(result).toMatchObject({ success: false, error: { code: "ILLEGAL_TRANSITION" } });
+    const row = await getDelinquencyRow(publicId);
+    expect(row?.status).toBe(DELINQUENCY_STATUS.PAID);
+  });
+
+  test("unknown publicId → NOT_FOUND", async () => {
+    const { asUser, agencyId } = await setup();
+    const result = await asUser.mutation(api.delinquencies.useCases.closeAsCured, {
+      agencyId,
+      publicId: "DLQ-NOPE",
+    });
+    expect(result).toMatchObject({ success: false, error: { code: "NOT_FOUND" } });
+  });
+
+  test("foreign-agency delinquency → NOT_FOUND (no existence leak)", async () => {
+    const { t, asUser, agencyId } = await setup();
+    const foreignAgencyId = await seedForeignAgency(t);
+    const foreignContractId = await seedAndIndexContract(
+      t,
+      {
+        agencyId: foreignAgencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 100_000,
+      },
+      "CTR-C6",
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.insert("delinquencies", {
+        contractId: foreignContractId,
+        agencyId: foreignAgencyId,
+        publicId: "DLQ-FOREIGN-C",
+        status: DELINQUENCY_STATUS.OPEN,
+        amountCents: 9_000,
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        appliedGuaranteeDecrementCents: null,
+        resolution: null,
+      });
+    });
+
+    const result = await asUser.mutation(api.delinquencies.useCases.closeAsCured, {
+      agencyId,
+      publicId: "DLQ-FOREIGN-C",
+    });
+    expect(result).toMatchObject({ success: false, error: { code: "NOT_FOUND" } });
+  });
+});
+
+describe("transitions (direct) — paths with no public surface yet", () => {
+  test("paid → closed records resolution 'paid_out' and keeps the decrement", async () => {
+    const { t, asUser, asStaff, agencyId, getGuaranteeCents, getDelinquencyRow } = await setup();
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
+      "CTR-T1",
+    );
+    const publicId = await openDelinquency(asUser, agencyId, "CTR-T1", 30_000);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.UNDER_REVIEW);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.PROVISIONED);
+    await staffAdvance(asStaff, publicId, DELINQUENCY_STATUS.PAID);
+
+    await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("delinquencies")
+        .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
+        .unique();
+      if (!row) throw new Error("row missing");
+      const result = await applyDelinquencyTransition(ctx, {
+        row,
+        toStatus: DELINQUENCY_STATUS.CLOSED,
+      });
+      if (!result.success) throw new Error("direct close failed");
+    });
+
+    expect(await getGuaranteeCents("CTR-T1")).toBe(70_000);
+    const row = await getDelinquencyRow(publicId);
+    expect(row?.status).toBe(DELINQUENCY_STATUS.CLOSED);
+    expect(row?.resolution).toBe(DELINQUENCY_RESOLUTION.PAID_OUT);
+  });
+
+  test("closing from open with 'paid_out' is rejected by the state machine", async () => {
+    const { t, asUser, agencyId, getDelinquencyRow } = await setup();
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
+      "CTR-T2",
+    );
+    const publicId = await openDelinquency(asUser, agencyId, "CTR-T2", 10_000);
+
+    await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("delinquencies")
+        .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
+        .unique();
+      if (!row) throw new Error("row missing");
+      const result = await applyDelinquencyTransition(ctx, {
+        row,
+        toStatus: DELINQUENCY_STATUS.CLOSED,
+        resolution: DELINQUENCY_RESOLUTION.PAID_OUT,
+      });
+      expect(result).toMatchObject({ success: false, error: { code: "ILLEGAL_TRANSITION" } });
+    });
+    const row = await getDelinquencyRow(publicId);
+    expect(row?.status).toBe(DELINQUENCY_STATUS.OPEN);
   });
 });
 
@@ -632,7 +548,7 @@ describe("listByAgency", () => {
   });
 
   test("status filter returns only matching rows", async () => {
-    const { t, asUser, agencyId } = await setup();
+    const { t, asUser, asStaff, agencyId } = await setup();
     await seedAndIndexContract(
       t,
       { agencyId, status: CONTRACT_STATUS.ATIVO, availableGuaranteeCents: 100_000 },
@@ -647,8 +563,8 @@ describe("listByAgency", () => {
     await openDelinquency(asUser, agencyId, "CTR-L3A", 10_000);
     const secondPublicId = await openDelinquency(asUser, agencyId, "CTR-L3B", 20_000);
 
-    await advance(asUser, agencyId, secondPublicId, DELINQUENCY_STATUS.UNDER_REVIEW);
-    await advance(asUser, agencyId, secondPublicId, DELINQUENCY_STATUS.PROVISIONED);
+    await staffAdvance(asStaff, secondPublicId, DELINQUENCY_STATUS.UNDER_REVIEW);
+    await staffAdvance(asStaff, secondPublicId, DELINQUENCY_STATUS.PROVISIONED);
 
     const provisioned = await asUser.query(api.delinquencies.useCases.listByAgency, {
       agencyId,

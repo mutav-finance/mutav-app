@@ -297,7 +297,9 @@
         "NOT_PENDING": "Apenas propostas pendentes podem ser canceladas.",
         "UNEXPECTED": "Erro inesperado. Tente novamente.",
         "CONTRACT_NOT_ACTIVE": "Apenas contratos ativos podem ter inadimplência aberta.",
-        "INVALID_AMOUNT": "Informe um valor válido maior que zero."
+        "INVALID_AMOUNT": "Informe um valor válido maior que zero.",
+        "DELINQUENCY_ALREADY_OPEN": "Já existe uma inadimplência em andamento para este contrato.",
+        "AMOUNT_EXCEEDS_GUARANTEE": "O valor excede a garantia disponível do contrato."
       },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",

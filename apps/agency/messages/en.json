@@ -297,7 +297,9 @@
         "NOT_PENDING": "Only pending proposals can be cancelled.",
         "UNEXPECTED": "Unexpected error. Please try again.",
         "CONTRACT_NOT_ACTIVE": "Only active contracts can have a delinquency opened.",
-        "INVALID_AMOUNT": "Enter a valid amount greater than zero."
+        "INVALID_AMOUNT": "Enter a valid amount greater than zero.",
+        "DELINQUENCY_ALREADY_OPEN": "A delinquency is already in progress for this contract.",
+        "AMOUNT_EXCEEDS_GUARANTEE": "The amount exceeds the contract's available guarantee."
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this contract",

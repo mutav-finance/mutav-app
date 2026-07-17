@@ -8,8 +8,8 @@ import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import {
   DELINQUENCY_ERROR_CODE,
+  DELINQUENCY_RESOLUTION,
   DELINQUENCY_STATUS,
-  delinquencyResolutionValidator,
   delinquencyStatusValidator,
   type Delinquency,
   type DelinquencyStatus,
@@ -130,19 +130,18 @@ export const open = mutationWithAgencyScope({
   },
 });
 
-type UpdateDelinquencyStatusSuccessResult = { publicId: string; status: DelinquencyStatus };
-type UpdateDelinquencyStatusErrorResult = DelinquencyTransitionError;
+type CloseAsCuredSuccessResult = { publicId: string; status: DelinquencyStatus };
+type CloseAsCuredErrorResult = DelinquencyTransitionError;
 
-export const updateStatus = mutationWithAgencyScope({
-  args: {
-    publicId: v.string(),
-    status: delinquencyStatusValidator,
-    resolution: v.optional(delinquencyResolutionValidator),
-  },
+// The ONLY closing transition under agency authority. Everything else
+// (under_review, provisioned, paid, close-as-denied) is staff authority in
+// `adminUseCases.ts` — see docs/architecture/admin.md §A3.
+export const closeAsCured = mutationWithAgencyScope({
+  args: { publicId: v.string() },
   handler: async (
     ctx,
     args,
-  ): Promise<Result<UpdateDelinquencyStatusSuccessResult, UpdateDelinquencyStatusErrorResult>> => {
+  ): Promise<Result<CloseAsCuredSuccessResult, CloseAsCuredErrorResult>> => {
     const row = await ctx.db
       .query("delinquencies")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
@@ -158,10 +157,22 @@ export const updateStatus = mutationWithAgencyScope({
       };
     }
 
+    // Load-bearing guard, checked BEFORE delegation: the state machine
+    // silently converts provisioned→closed into resolution 'denied' + earmark
+    // release, and paid→closed into 'paid_out' — both are staff authority and
+    // must never be reachable through this agency-facing mutation.
+    if (row.status !== DELINQUENCY_STATUS.OPEN && row.status !== DELINQUENCY_STATUS.UNDER_REVIEW) {
+      return {
+        success: false,
+        error: { code: DELINQUENCY_ERROR_CODE.ILLEGAL_TRANSITION },
+        message: "Only open or under-review delinquencies can be closed as cured",
+      };
+    }
+
     const transition = await applyDelinquencyTransition(ctx, {
       row,
-      toStatus: args.status,
-      resolution: args.resolution ?? null,
+      toStatus: DELINQUENCY_STATUS.CLOSED,
+      resolution: DELINQUENCY_RESOLUTION.CURED,
     });
     if (!transition.success) return transition;
 
@@ -184,8 +195,8 @@ export const updateStatus = mutationWithAgencyScope({
 
     return {
       success: true,
-      data: { publicId: row.publicId, status: args.status },
-      message: "Delinquency status updated",
+      data: { publicId: row.publicId, status: DELINQUENCY_STATUS.CLOSED },
+      message: "Delinquency closed as cured",
     };
   },
 });
