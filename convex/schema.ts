@@ -249,10 +249,51 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_role", ["userId", "role"]),
 
+  // Tenant registry — one row per national tax ID (CPF for pf, CNPJ for pj),
+  // digits-only, globally unique via the `getOrCreateTenant` check-then-insert
+  // (OCC-serialized on the `by_taxId` read set). Literals inlined here for the
+  // same circular-dependency reason as `agencyDocumentKind` above; canonical
+  // validators live in `convex/tenants/domain.ts`. Plaintext-digits index is
+  // acceptable pilot-stage; swaps to the security.md `by_taxIdHash` sidecar
+  // when the PII encryption migration (#94/#95) lands.
+  tenants: defineTable(
+    v.union(
+      v.object({
+        entityType: v.literal("pf"),
+        taxId: v.string(),
+        fullName: v.string(),
+        birthDate: v.string(),
+        email: v.string(),
+        phone: v.string(),
+      }),
+      v.object({
+        entityType: v.literal("pj"),
+        taxId: v.string(),
+        fullName: v.string(),
+        contactCpf: v.optional(v.string()),
+        email: v.string(),
+        phone: v.string(),
+      }),
+    ),
+  ).index("by_taxId", ["taxId"]),
+
   contracts: defineTable({
     agencyId: v.id("agencies"),
     publicId: v.string(),
     tenantCpf: v.optional(v.string()),
+    // Registry link (widen phase of the tenant-registry migration). Optional
+    // until every deployment has run `backfillContractTenantRegistry`; the
+    // narrow PR makes it required and drops the embedded `tenant`/`tenantCpf`.
+    tenantId: v.optional(v.id("tenants")),
+    // Per-contract relationship state — approval belongs to a contract, not
+    // to the person. Mirrors the embedded `tenant.approvalStatus`/
+    // `termApprovedAt` during the dual-write window.
+    tenantApproval: v.optional(
+      v.object({
+        status: tenantApprovalStatus,
+        termApprovedAt: v.union(v.string(), v.null()),
+      }),
+    ),
     status: contractStatus,
     activatedAt: v.union(v.string(), v.null()),
     deactivatedAt: v.optional(v.union(v.string(), v.null())),

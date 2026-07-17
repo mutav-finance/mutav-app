@@ -55,25 +55,15 @@ export type ActivityBucket = {
 
 export type ActivityGranularity = "month" | "week";
 
-export type TenantEntityType = "pf" | "pj";
-
-/**
- * Whether a contract's tenant is a natural person (`pf`) or a legal entity
- * (`pj`). Currently persisted as an optional field on `contracts.tenant`;
- * #60 will promote it to the discriminator of a `v.union` once every doc
- * carries it (backfilled by `migrations.backfillTenantEntityType`).
- */
-export const TENANT_ENTITY_TYPE = {
-  PF: "pf",
-  PJ: "pj",
-} as const satisfies Record<Uppercase<TenantEntityType>, TenantEntityType>;
-
-export const tenantEntityTypeValidator = v.union(
-  v.literal(TENANT_ENTITY_TYPE.PF),
-  v.literal(TENANT_ENTITY_TYPE.PJ),
-);
-
-export const DEFAULT_TENANT_ENTITY_TYPE: TenantEntityType = TENANT_ENTITY_TYPE.PF;
+// Transitional re-export: the entity-type family moved to the tenants
+// registry domain (`convex/tenants/domain.ts`). Kept here so existing
+// consumers compile until the narrow PR (#245) retargets their imports.
+export {
+  TENANT_ENTITY_TYPE,
+  tenantEntityTypeValidator,
+  DEFAULT_TENANT_ENTITY_TYPE,
+} from "../tenants/domain";
+export type { TenantEntityType } from "../tenants/domain";
 
 export type ScoreTier = "bom" | "regular" | "ruim" | "negado";
 

@@ -52,6 +52,10 @@ export const AUDIT_ACTION = {
   INVOICE_RESET: "invoice.reset",
   // mutavStaff/ (admin onboarding review — emitted by convex/mutavStaff/useCases.ts).
   ONBOARDING_REVIEWED: "onboarding.reviewed",
+  // tenants/ (registry re-encounter with conflicting identity fields —
+  // emitted by convex/tenants/useCases.ts for staff review; the registry
+  // value is NOT overwritten).
+  TENANT_DATA_CONFLICT: "tenant.data_conflict",
 } as const satisfies Record<string, string>;
 
 export type AuditActionKey = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -70,6 +74,7 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.INVOICE_PAID),
   v.literal(AUDIT_ACTION.INVOICE_RESET),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
+  v.literal(AUDIT_ACTION.TENANT_DATA_CONFLICT),
 );
 
 /**
