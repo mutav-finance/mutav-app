@@ -213,6 +213,26 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   }
 }
 
+export type ReviewBlockKind = "property" | "rental" | "tenant";
+
+export type EditingState =
+  | { kind: "viewing" }
+  | { kind: "editing"; block: ReviewBlockKind; draft: DraftWizardData };
+
+export const WIZARD_VIEWING: EditingState = { kind: "viewing" };
+
+export function startBlockEdit(block: ReviewBlockKind, data: DraftWizardData): EditingState {
+  return { kind: "editing", block, draft: { ...data } };
+}
+
+export function patchBlockDraft(
+  state: EditingState,
+  patch: Partial<DraftWizardData>,
+): EditingState {
+  if (state.kind !== "editing") return state;
+  return { ...state, draft: { ...state.draft, ...patch } };
+}
+
 export const INITIAL_WIZARD_DATA: DraftWizardData = {
   entityType: "",
   propertyKind: "",

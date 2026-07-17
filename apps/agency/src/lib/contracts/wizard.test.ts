@@ -2,8 +2,12 @@ import { describe, expect, test } from "vitest";
 import {
   isPropertyKind,
   isTenantEntityType,
+  patchBlockDraft,
+  startBlockEdit,
   validateWizard,
+  WIZARD_VIEWING,
   type DraftWizardData,
+  type ReviewBlockKind,
 } from "@/lib/contracts/wizard";
 
 const VALID_PF_DRAFT: DraftWizardData = {
@@ -109,6 +113,50 @@ describe("validateWizard", () => {
     expect(result.success).toBe(false);
     if (result.success) throw new Error("expected failure");
     expect(result.error).toContainEqual({ code: "scoreRequired", field: "score" });
+  });
+});
+
+describe("EditingState", () => {
+  test("startBlockEdit copies the full data into a distinct draft", () => {
+    const state = startBlockEdit("property", VALID_PF_DRAFT);
+    expect(state.kind).toBe("editing");
+    if (state.kind !== "editing") throw new Error("expected editing state");
+    expect(state.block).toBe("property");
+    expect(state.draft).toEqual(VALID_PF_DRAFT);
+    expect(state.draft).not.toBe(VALID_PF_DRAFT);
+  });
+
+  test("startBlockEdit sets the matching block discriminant for every block kind", () => {
+    const blocks: ReviewBlockKind[] = ["property", "rental", "tenant"];
+    for (const block of blocks) {
+      const state = startBlockEdit(block, VALID_PF_DRAFT);
+      if (state.kind !== "editing") throw new Error("expected editing state");
+      expect(state.block).toBe(block);
+    }
+  });
+
+  test("patchBlockDraft merges the patch immutably", () => {
+    const state = startBlockEdit("tenant", VALID_PF_DRAFT);
+    if (state.kind !== "editing") throw new Error("expected editing state");
+    const before = state.draft;
+
+    const patched = patchBlockDraft(state, { email: "novo@example.com" });
+    if (patched.kind !== "editing") throw new Error("expected editing state");
+    expect(patched.draft.email).toBe("novo@example.com");
+    expect(patched.draft.fullName).toBe(VALID_PF_DRAFT.fullName);
+    expect(before.email).toBe(VALID_PF_DRAFT.email);
+  });
+
+  test("patchBlockDraft on the viewing state is a no-op", () => {
+    const result = patchBlockDraft(WIZARD_VIEWING, { email: "ignored@example.com" });
+    expect(result).toEqual({ kind: "viewing" });
+  });
+
+  test("start → patch round-trip yields data with only the patched fields changed", () => {
+    const state = startBlockEdit("rental", VALID_PF_DRAFT);
+    const patched = patchBlockDraft(state, { rentCents: 300_000 });
+    if (patched.kind !== "editing") throw new Error("expected editing state");
+    expect(patched.draft).toEqual({ ...VALID_PF_DRAFT, rentCents: 300_000 });
   });
 });
 
