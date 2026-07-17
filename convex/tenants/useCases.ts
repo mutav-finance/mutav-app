@@ -3,9 +3,12 @@ import type { MutationCtx } from "../_generated/server";
 import type { Result } from "../lib/result";
 import { AUDIT_ACTION, auditActorValidator, type AuditActor } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
+import type { TenantApprovalStatus } from "../contracts/domain";
 import {
+  normalizeEmbeddedTenant,
   tenantInputValidator,
   validateTaxId,
+  type EmbeddedTenantSnapshot,
   type Tenant,
   type TenantErrorCode,
   type TenantId,
@@ -109,3 +112,47 @@ export const getOrCreate = internalMutation({
   args: { input: tenantInputValidator, actor: auditActorValidator },
   handler: async (ctx, args): Promise<GetOrCreateTenantResult> => getOrCreateTenant(ctx, args),
 });
+
+type LegacyTenantContract = {
+  tenantId?: TenantId;
+  tenant: EmbeddedTenantSnapshot & {
+    approvalStatus: TenantApprovalStatus;
+    termApprovedAt: string | null;
+  };
+};
+
+export type TenantRegistryPatch = {
+  tenantId: TenantId;
+  tenantApproval: { status: TenantApprovalStatus; termApprovedAt: string | null };
+};
+
+/**
+ * Compute the registry-link patch for one legacy contract, resolving (or
+ * creating) its `tenants` row from the embedded data. Returns `undefined`
+ * when the contract already carries `tenantId` (idempotency) or when the
+ * embedded tenant cannot be normalized without fabricating data — such
+ * rows stay legacy-only, which the widened schema tolerates. Shared by
+ * `migrations.backfillContractTenantRegistry` and the seed so dedup and
+ * conflict-logging semantics cannot drift.
+ */
+export async function buildTenantRegistryPatch(
+  ctx: MutationCtx,
+  contract: LegacyTenantContract,
+  actor: AuditActor,
+): Promise<TenantRegistryPatch | undefined> {
+  if (contract.tenantId !== undefined) return undefined;
+
+  const input = normalizeEmbeddedTenant(contract.tenant);
+  if (!input) return undefined;
+
+  const result = await getOrCreateTenant(ctx, { input, actor });
+  if (!result.success) return undefined;
+
+  return {
+    tenantId: result.data.tenantId,
+    tenantApproval: {
+      status: contract.tenant.approvalStatus,
+      termApprovedAt: contract.tenant.termApprovedAt,
+    },
+  };
+}

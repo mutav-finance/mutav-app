@@ -2,6 +2,7 @@ import { Migrations } from "@convex-dev/migrations";
 import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 import { DEFAULT_TENANT_ENTITY_TYPE } from "./contracts/domain";
+import { buildTenantRegistryPatch } from "./tenants/useCases";
 
 export const migrations = new Migrations<DataModel>(components.migrations);
 
@@ -50,6 +51,27 @@ export const backfillTenantEntityType = migrations.define({
 });
 
 /**
+ * Widen-phase backfill of the tenant registry (2026-07-17 spec): walks
+ * contracts in `_creationTime` order and links each to a `tenants` row
+ * resolved from the embedded tenant via `getOrCreateTenant` — so dedup is
+ * first-created-wins (later conflicting fullName/birthDate values are
+ * audit-logged by the helper, contacts last-write-win), and the contract
+ * is patched with `tenantId` + `tenantApproval` mirrored from the embedded
+ * approval fields. Rows already carrying `tenantId` are skipped
+ * (idempotent re-runs); rows whose embedded tenant cannot be normalized
+ * (checksum-invalid document, pf without birthDate) stay legacy-only —
+ * the widened schema tolerates them until the data is corrected.
+ */
+export const backfillContractTenantRegistry = migrations.define({
+  table: "contracts",
+  migrateOne: async (ctx, contract) =>
+    buildTenantRegistryPatch(ctx, contract, {
+      kind: "system",
+      source: "migrations.backfillContractTenantRegistry",
+    }),
+});
+
+/**
  * Ordered runner of all data migrations. Chained after `convex deploy` in every
  * app's `vercel.json` (`scripts/run-migrations.sh`), so each deploy backfills
  * data in place — no wipe/reseed, and every developer's own dev deployment
@@ -66,4 +88,5 @@ export const runAll = migrations.runner([
   internal.migrations.noop,
   internal.migrations.clearUsersIsStaff,
   internal.migrations.backfillTenantEntityType,
+  internal.migrations.backfillContractTenantRegistry,
 ]);
