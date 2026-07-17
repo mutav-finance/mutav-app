@@ -7,13 +7,19 @@ import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
 import { cn } from "@mutav/ui/cn";
-import { isValidCPF, isValidCNPJ, type WizardData } from "@/lib/contracts/wizard";
+import {
+  isPropertyKind,
+  isTenantEntityType,
+  isValidCPF,
+  isValidCNPJ,
+  type DraftWizardData,
+} from "@/lib/contracts/wizard";
 import { maskCPF, maskCNPJ } from "@mutav/i18n/brazil";
 import { formatBRLCents, formatCentsPlain } from "@/lib/contracts/format";
 
 type Props = {
-  data: WizardData;
-  onChange: (patch: Partial<WizardData>) => void;
+  data: DraftWizardData;
+  onChange: (patch: Partial<DraftWizardData>) => void;
   onNext: () => void;
 };
 
@@ -58,9 +64,9 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
             type="single"
             value={data.entityType}
             onValueChange={(v) => {
-              if (!v) return;
+              if (!isTenantEntityType(v)) return;
               onChange({
-                entityType: v as "pf" | "pj",
+                entityType: v,
                 cpf: "",
                 cnpj: "",
                 score: null,
@@ -108,8 +114,8 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
             type="single"
             value={data.propertyKind ?? ""}
             onValueChange={(v) => {
-              if (!v) return;
-              onChange({ propertyKind: v as "residencial" | "comercial" });
+              if (!isPropertyKind(v)) return;
+              onChange({ propertyKind: v });
             }}
             variant="outline"
             spacing={2}

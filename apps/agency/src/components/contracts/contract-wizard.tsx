@@ -9,7 +9,7 @@ import { WizardStep2 } from "@/components/contracts/wizard-step2";
 import { WizardStep3 } from "@/components/contracts/wizard-step3";
 import { WizardStep4 } from "@/components/contracts/wizard-step4";
 import { WizardStep5 } from "@/components/contracts/wizard-step5";
-import { wizardReducer, INITIAL_WIZARD_DATA, type WizardData } from "@/lib/contracts/wizard";
+import { wizardReducer, INITIAL_WIZARD_DATA, type DraftWizardData } from "@/lib/contracts/wizard";
 
 const CONTRACT_WIZARD_STEPS = [1, 2, 3, 4, 5] as const;
 
@@ -23,7 +23,7 @@ export function ContractWizard() {
   const { selectedAgency } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
-  const patch = React.useCallback((p: Partial<WizardData>) => {
+  const patch = React.useCallback((p: Partial<DraftWizardData>) => {
     dispatch({ type: "PATCH", patch: p });
   }, []);
 

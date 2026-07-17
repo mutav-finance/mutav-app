@@ -12,16 +12,21 @@ import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
 import { cn } from "@mutav/ui/cn";
-import { parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
+import {
+  isPropertyKind,
+  parseBRLInput,
+  validateWizard,
+  type DraftWizardData,
+} from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
 import { RENT_COVERAGE_MONTHS, EXIT_COVERAGE_MONTHS } from "@/lib/pricing/tiers";
 
 type Props = {
-  data: WizardData;
+  data: DraftWizardData;
   agencyId: AgencyId;
-  onChange: (patch: Partial<WizardData>) => void;
+  onChange: (patch: Partial<DraftWizardData>) => void;
   onComplete: (publicId: string) => void;
   onBack: () => void;
 };
@@ -30,31 +35,13 @@ type EditingBlock = "property" | "rental" | "tenant" | null;
 
 type MissingFields = Set<string>;
 
-function getMissingFields(data: WizardData): MissingFields {
-  const missing = new Set<string>();
-  if (!data.propertyKind) missing.add("propertyKind");
-  if (!data.rentCents) missing.add("rentCents");
-  if (data.score === null) missing.add("score");
-  if (!data.fullName.trim()) missing.add("fullName");
-  if (data.entityType === "pf" && !data.birthDate) missing.add("birthDate");
-  if (!data.email.trim()) missing.add("email");
-  if (!data.phone.trim()) missing.add("phone");
-  if (!data.cep.trim()) missing.add("cep");
-  if (!data.street.trim()) missing.add("street");
-  if (!data.addressNumber.trim()) missing.add("addressNumber");
-  if (!data.neighborhood.trim()) missing.add("neighborhood");
-  if (!data.city.trim()) missing.add("city");
-  if (!data.uf.trim()) missing.add("uf");
-  return missing;
-}
-
 export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Props) {
   const t = useTranslations("contractNew");
   const createContract = useMutation(api.contracts.useCases.create);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [missing, setMissing] = React.useState<MissingFields>(new Set());
   const [editingBlock, setEditingBlock] = React.useState<EditingBlock>(null);
-  const [draft, setDraft] = React.useState<Partial<WizardData>>({});
+  const [draft, setDraft] = React.useState<Partial<DraftWizardData>>({});
 
   const preview =
     data.rentCents > 0 && data.score !== null
@@ -86,52 +73,79 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
   }
 
   const handleSubmit = async () => {
-    const missingFields = getMissingFields(data);
-    if (missingFields.size > 0) {
-      setMissing(missingFields);
-      toast.error(t("review.missingFields"));
+    const validation = validateWizard(data);
+    if (!validation.success) {
+      const invalidFields = new Set<string>();
+      for (const error of validation.error) {
+        if (error.field) invalidFields.add(error.field);
+      }
+      setMissing(invalidFields);
+      const firstCode = validation.error[0]?.code;
+      toast.error(firstCode ? t(`validation.${firstCode}`) : t("review.missingFields"));
       return;
     }
     setMissing(new Set());
+    const { tenant, ...validated } = validation.data;
 
-    if (!data.propertyKind || !data.entityType || data.score === null) return;
+    // create() takes a flat tenant wire shape (cpf + birthDate always present,
+    // cnpj optional) and normalizes it into the registry. The validated tenant
+    // is a pf/pj union — flatten it here, discriminating on entityType so the
+    // adaptation stays cast-free. A pj carries no cpf/birthDate, so send "".
+    const tenantWire =
+      tenant.entityType === "pj"
+        ? {
+            entityType: tenant.entityType,
+            fullName: tenant.fullName,
+            cpf: "",
+            cnpj: tenant.cnpj,
+            birthDate: "",
+            email: tenant.email,
+            phone: tenant.phone,
+            score: tenant.score,
+          }
+        : {
+            entityType: tenant.entityType,
+            fullName: tenant.fullName,
+            cpf: tenant.cpf,
+            cnpj: undefined,
+            birthDate: tenant.birthDate,
+            email: tenant.email,
+            phone: tenant.phone,
+            score: tenant.score,
+          };
 
     setIsSubmitting(true);
+    let result: Awaited<ReturnType<typeof createContract>>;
     try {
-      const result = await createContract({
+      result = await createContract({
         agencyId,
         property: {
-          cep: data.cep.replace(/\D/g, ""),
-          streetAndNumber: `${data.street}, ${data.addressNumber}`,
-          neighborhood: data.neighborhood,
-          cityUF: `${data.city} / ${data.uf}`,
+          cep: validated.cep,
+          streetAndNumber: `${validated.street}, ${validated.addressNumber}`,
+          neighborhood: validated.neighborhood,
+          cityUF: `${validated.city} / ${validated.uf}`,
         },
-        optional: { complement: data.complement, tag: "", description: "" },
-        propertyKind: data.propertyKind,
-        rentCents: data.rentCents,
-        condoCents: data.condoCents,
-        otherFeesCents: data.otherFeesCents,
-        tenant: {
-          entityType: data.entityType,
-          fullName: data.fullName,
-          cpf: data.cpf.replace(/\D/g, ""),
-          cnpj: data.entityType === "pj" ? data.cnpj.replace(/\D/g, "") : undefined,
-          birthDate: data.birthDate,
-          email: data.email,
-          phone: data.phone,
-          score: data.score,
-        },
+        optional: { complement: validated.complement, tag: "", description: "" },
+        propertyKind: validated.propertyKind,
+        rentCents: validated.rentCents,
+        condoCents: validated.condoCents,
+        otherFeesCents: validated.otherFeesCents,
+        tenant: tenantWire,
       });
-      if (!result.success) {
-        toast.error(t(`review.errors.${result.error.code}`));
-        setIsSubmitting(false);
-        return;
-      }
-      onComplete(result.data.publicId);
     } catch {
+      // Transport-level failures only (arg-validator/auth throw at the wire);
+      // domain failures arrive as Result codes below.
       toast.error(t("review.errorToast"));
       setIsSubmitting(false);
+      return;
     }
+
+    if (!result.success) {
+      toast.error(t(`review.errors.${result.error.code}`));
+      setIsSubmitting(false);
+      return;
+    }
+    onComplete(result.data.publicId);
   };
 
   const m = missing;
@@ -157,8 +171,8 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 type="single"
                 value={draft.propertyKind ?? ""}
                 onValueChange={(v) => {
-                  if (!v) return;
-                  setDraft((d) => ({ ...d, propertyKind: v as "residencial" | "comercial" }));
+                  if (!isPropertyKind(v)) return;
+                  setDraft((d) => ({ ...d, propertyKind: v }));
                 }}
                 variant="outline"
                 spacing={2}

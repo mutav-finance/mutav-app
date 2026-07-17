@@ -8,11 +8,11 @@ import { Button } from "@mutav/ui/button";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
 import { cn } from "@mutav/ui/cn";
-import { type WizardData } from "@/lib/contracts/wizard";
+import { type DraftWizardData } from "@/lib/contracts/wizard";
 
 type Props = {
-  data: WizardData;
-  onChange: (patch: Partial<WizardData>) => void;
+  data: DraftWizardData;
+  onChange: (patch: Partial<DraftWizardData>) => void;
   onNext: () => void;
   onBack: () => void;
 };
