@@ -20,7 +20,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* TGA semantic — exposed as Tailwind utilities */
+  /* MUTAV semantic — exposed as Tailwind utilities */
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -36,7 +36,7 @@
   --color-warning-strong: var(--warning-strong);
   --color-warning-dim: var(--warning-dim);
 
-  /* shadcn aliases mapped to TGA tokens — primitives keep working */
+  /* shadcn aliases mapped to MUTAV tokens — primitives keep working */
   --color-background: var(--canvas);
   --color-foreground: var(--text);
   --color-card: var(--surface);
@@ -55,7 +55,7 @@
   --color-input: var(--border);
   --color-ring: var(--accent);
 
-  /* Sidebar — surfaces & accent mapped to TGA */
+  /* Sidebar — surfaces & accent mapped to MUTAV */
   --color-sidebar: var(--surface);
   --color-sidebar-foreground: var(--text);
   --color-sidebar-primary: var(--accent);
@@ -78,7 +78,7 @@
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
   --font-heading: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
 
-  /* TGA typography scale — single source of truth, mirrors tga.yml#typography.scale */
+  /* MUTAV typography scale — single source of truth, mirrors mutav.yml#typography.scale */
   --text-2xs: 0.6875rem; /* 11px */
   --text-2xs--line-height: 1rem;
   --text-2xs--letter-spacing: 0.03em;
@@ -87,7 +87,7 @@
   --text-xs--line-height: 1.125rem;
   --text-xs--letter-spacing: 0.01em;
 
-  --text-sm: 0.8125rem; /* 13px (TGA-specific; ≠ Tailwind 14) */
+  --text-sm: 0.8125rem; /* 13px (MUTAV-specific; ≠ Tailwind 14) */
   --text-sm--line-height: 1.25rem;
   --text-sm--letter-spacing: 0.01em;
 
@@ -107,7 +107,7 @@
   --text-2xl--line-height: 2rem;
   --text-2xl--letter-spacing: -0.01em;
 
-  --text-3xl: 1.75rem; /* 28px (TGA-specific; ≠ Tailwind 30) */
+  --text-3xl: 1.75rem; /* 28px (MUTAV-specific; ≠ Tailwind 30) */
   --text-3xl--line-height: 2rem;
   --text-3xl--letter-spacing: -0.01em;
 
@@ -186,7 +186,7 @@
 }
 
 /* Live amber square pulse — only ambient animation in the system */
-@keyframes tga-live-pulse {
+@keyframes mutav-live-pulse {
   0%,
   100% {
     opacity: 1;
@@ -195,13 +195,16 @@
     opacity: 0.4;
   }
 }
+.mutav-live-pulse,
+/* Deprecated aliases, kept one release cycle. Remove after 2026-09.
+   `.tga-live-square` renamed 2026-06; `.tga-live-pulse` renamed 2026-07
+   with the TGA→MUTAV brand rename. */
 .tga-live-pulse,
-/* Deprecated 2026-06 — renamed from `.tga-live-square`. Alias kept for
-   one release cycle. Remove after 2026-09. */
 .tga-live-square {
-  animation: tga-live-pulse 2s linear infinite;
+  animation: mutav-live-pulse 2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
+  .mutav-live-pulse,
   .tga-live-pulse,
   .tga-live-square {
     animation: none;

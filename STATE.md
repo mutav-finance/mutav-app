@@ -5,7 +5,7 @@
 
 ## What this repo is
 
-`mutav-app` is the Turborepo monorepo holding every web surface for the **MUTAV protocol** (SGR — onchain rental-guarantee infrastructure for Brazil) plus the **Mutav API** (Convex backend). It consumes the `@mutav-finance/mutav-stellar` SDK to settle guarantees on Stellar via the `Fund` contract. See the workspace [`../CLAUDE.md`](../CLAUDE.md) for the multi-repo picture.
+`mutav-app` is the Turborepo monorepo holding every web surface for the **MUTAV protocol** (onchain rental-guarantee infrastructure for Brazil) plus the **Mutav API** (Convex backend). It consumes the `@mutav-finance/mutav-stellar` SDK to settle guarantees on Stellar via the `Fund` contract. See the workspace [`../CLAUDE.md`](../CLAUDE.md) for the multi-repo picture.
 
 ## Status at a glance
 
@@ -69,7 +69,7 @@ DNS: `mutav.finance` zone on Vercel with a wildcard `* ALIAS`, so `fund.mutav.fi
 
 ## Related repos / parallel work
 
-- **`mutav-pulse`** (`mutav-finance/mutav-pulse`) — a **PULSO hackathon** submission (Brazil track, Stellar/Soroban): a POC of the **decentralized** version of the fund / guarantee system (SGR). The trust-minimized counterpart to this repo's Web2 `apps/fund` — the decentralized fund work is happening **there**, not in `apps/fund`, for now.
+- **`mutav-pulse`** (`mutav-finance/mutav-pulse`) — a **PULSO hackathon** submission (Brazil track, Stellar/Soroban): a POC of the **decentralized** version of the fund / guarantee system. The trust-minimized counterpart to this repo's Web2 `apps/fund` — the decentralized fund work is happening **there**, not in `apps/fund`, for now.
   - **Contracts** (`contracts/`, Soroban/Rust) — modular design: `interfaces` (shared `Guarantee` + cross-contract client traits), `registry` (writer-gated store), `vault` (custody: OZ-fungible shares, NAV with virtual-offset anti-inflation, surplus-gated redemption queue, strategy allocator, policy-gated `disburse`/`collect_premium`), `policy` (swappable premium-gated underwriting brain), `strategy` trait + `adapter-defindex` (real DeFindex yield) + mock doubles. Onchain solvency invariant `stable_assets ≥ coverage_required` enforced re-entrancy-safely; SEP-0056 vault conformance. 23 unit tests. Build wasm with `stellar contract build` (not `cargo build`). Live strategy slot currently runs a mock.
   - **Frontend** (`frontend/`, Next.js 16 + React 19) — investor app **MUTAV Reserve** (`/earn`, `/earn/transparency`, `/earn/defi`) + admin-gated operator cockpit **MUTAV Protocol** (`/protocol`). Frontend holds **no keys**: signing is via **Stellar Wallets Kit v2.3.0** (`lib/wallet.ts` — `connect()` authModal → `signTransaction`), with investor txs in `lib/tx.ts` and admin ops (e.g. `sign_guarantee`) in `lib/admin-tx.ts`. Typed bindings generated from the deployed contracts (`bindings/{vault,policy,registry}`). 10 vitest tests.
   - Deployed + seeded on **Stellar testnet**; vault/policy/registry live. Status as of 2026-06-22: three plans complete on `main`, demo-ready.

@@ -13,7 +13,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 
-const STORAGE_KEY = "sgr:selectedAgencyId";
+const STORAGE_KEY = "mutav:selectedAgencyId";
 
 /**
  * Derived from the Convex return type so additions to the server-side projection

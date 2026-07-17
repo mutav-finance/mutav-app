@@ -32,7 +32,7 @@ apps/admin/messages/
 .superpowers/
 docs/superpowers/
 
-# Brand assets — STYLE.md and tga.yml are the canonical source of truth
+# Brand assets — STYLE.md and mutav.yml are the canonical source of truth
 # for design tokens. Reformatting can break the YAML structure that
 # downstream skills consume.
 .design/

@@ -25,7 +25,7 @@ They must NOT:
 
 ## Current state of `useQuery` in this project
 
-SGR currently uses raw `useQuery` from `convex/react`. That hook returns `undefined` for both loading and error states, requiring manual derivation. This is a known temporary state — a shared `useQuery` wrapper that exposes `{ data, isPending, isError, error }` is on the deferred conventions list (install `convex-helpers`, build wrapper using `makeUseQueryWithStatus`).
+Mutav currently uses raw `useQuery` from `convex/react`. That hook returns `undefined` for both loading and error states, requiring manual derivation. This is a known temporary state — a shared `useQuery` wrapper that exposes `{ data, isPending, isError, error }` is on the deferred conventions list (install `convex-helpers`, build wrapper using `makeUseQueryWithStatus`).
 
 Until the wrapper exists, data hooks should still **return a normalized shape** so consumers depend on the shape, not on the underlying Convex behavior:
 

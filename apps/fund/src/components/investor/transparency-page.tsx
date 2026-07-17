@@ -272,7 +272,7 @@ function AgencyTable() {
 function LastUpdated() {
   return (
     <div className="flex items-center gap-2">
-      <span className="bg-success tga-live-pulse size-1.5" aria-hidden />
+      <span className="bg-success mutav-live-pulse size-1.5" aria-hidden />
       <span className="text-text-3 font-mono text-xs">Last updated May 16, 2026 · 14:23 UTC</span>
     </div>
   );

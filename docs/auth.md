@@ -248,4 +248,4 @@ New work in those domains should adopt the wrapper as part of the change; don't 
 - [convex-helpers customFunctions](https://stack.convex.dev/custom-functions) — upstream pattern
 - [`convex/lib/auth.ts`](../convex/lib/auth.ts) — implementation
 - [`convex/contracts/useCases.ts`](../convex/contracts/useCases.ts) — reference consumers
-- Issue [#58](https://github.com/mutav-finance/sgr-app/issues/58) — original spec
+- Issue [#58](https://github.com/mutav-finance/mutav-app/issues/58) — original spec

@@ -2,9 +2,9 @@
 
 **Audited:** 2026-05-06
 **Front:** Imobiliárias (light canvas, default theme — `:root` in `globals.css`)
-**Baseline:** TGA brand contract (`brand/branding/tga/patterns/STYLE.md`)
+**Baseline:** MUTAV brand contract (`brand/branding/mutav/patterns/STYLE.md`)
 **Screenshots:** not captured (no dev server on :3000)
-**Method:** code audit against TGA tokens, three-layer hierarchy law, and hard constraints.
+**Method:** code audit against MUTAV tokens, three-layer hierarchy law, and hard constraints.
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## BLOCK-level violations (must fix before ship)
 
-The TGA contract names six absolute "never" rules. This page violates four of them.
+The MUTAV contract names six absolute "never" rules. This page violates four of them.
 
 | Rule                                                        | Where                                                                                            | Severity                                                                                                                                                                                                                        |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -83,7 +83,7 @@ The TGA contract names six absolute "never" rules. This page violates four of th
 
 7. **Tenant card check-mark uses raw emerald.** `contract-tenant-card.tsx:57` `text-emerald-500` → `text-[var(--success)]`. Also at `:39` and `:26` the avatar circles use `rounded-full` and `rounded-2xl` — drop both, use `size-7` / `size-20` as plain squares with `bg-[var(--surface-2)] text-[var(--text-2)]`.
 
-8. **History card title is sky-blue.** `contract-history-card.tsx:22` `text-sky-700 dark:text-sky-400` is outside the palette entirely. Replace with `text-[var(--text)]` (or `font-display font-bold` if this is the section's declaration anchor). No blue exists in the TGA system.
+8. **History card title is sky-blue.** `contract-history-card.tsx:22` `text-sky-700 dark:text-sky-400` is outside the palette entirely. Replace with `text-[var(--text)]` (or `font-display font-bold` if this is the section's declaration anchor). No blue exists in the MUTAV system.
 
 9. **Status badge in summary uses `rounded-full` dot.** `contract-summary-card.tsx:53` `size-1.5 rounded-full bg-current` — replace with `size-[6px] bg-[var(--accent)]` (or `--success` / `--error` driven by `contract.status`). Also: the `Badge` shadcn primitive defaults to pill shape; either re-style its source to `rounded-none` and remove its `bg-*` fill, or replace these usages entirely with the inline 6×6 + mono label pattern from STYLE.md §3.5.
 
@@ -172,7 +172,7 @@ Raw Tailwind scales counted: `bg-emerald-600`, `bg-emerald-700`, `bg-emerald-500
 
 ### Pillar 4: Typography (1/4)
 
-The page renders **zero** `font-mono` and **zero** `font-display` classes. Every number — contract ID, every BRL amount across the rental data card (≥10 amounts), CEP, CPF, phone, birth date, multiple datetimes — sits in default Inter without `tabular-nums`. STYLE.md §6 Bold Bet 3 names this as a non-negotiable. STYLE.md §6 Bold Bet 4 names three-layer hierarchy enforcement at the screen level as a checklist item, not a guideline. This page fails both. The fix is mechanical (introduce a `<Mono>` component, route values through it, swap one section title to `font-display`), and once done the page will visibly become a TGA page rather than a generic shadcn dashboard.
+The page renders **zero** `font-mono` and **zero** `font-display` classes. Every number — contract ID, every BRL amount across the rental data card (≥10 amounts), CEP, CPF, phone, birth date, multiple datetimes — sits in default Inter without `tabular-nums`. STYLE.md §6 Bold Bet 3 names this as a non-negotiable. STYLE.md §6 Bold Bet 4 names three-layer hierarchy enforcement at the screen level as a checklist item, not a guideline. This page fails both. The fix is mechanical (introduce a `<Mono>` component, route values through it, swap one section title to `font-display`), and once done the page will visibly become a MUTAV page rather than a generic shadcn dashboard.
 
 ### Pillar 5: Spacing (3/4)
 
@@ -198,7 +198,7 @@ Disabled states present (`Cancel proposal`, action menu items, document upload b
 
 Cross-referenced against:
 
-- `brand/branding/tga/patterns/STYLE.md`
-- `brand/branding/tga/identity/typography.md`
-- `brand/branding/tga/identity/color-system.md`
+- `brand/branding/mutav/patterns/STYLE.md`
+- `brand/branding/mutav/identity/typography.md`
+- `brand/branding/mutav/identity/color-system.md`
 - `mutav-app/src/app/globals.css`

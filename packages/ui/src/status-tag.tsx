@@ -41,7 +41,7 @@ export function StatusTag({
     <span className={cn("inline-flex items-center gap-2 align-middle", className)}>
       <span
         aria-hidden
-        className={cn("size-1.5 shrink-0", dotToneClass[tone], pulse && "tga-live-pulse")}
+        className={cn("size-1.5 shrink-0", dotToneClass[tone], pulse && "mutav-live-pulse")}
       />
       {icon ? (
         <span aria-hidden className={cn("inline-flex shrink-0", iconToneClass[tone])}>
