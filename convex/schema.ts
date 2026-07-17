@@ -47,6 +47,16 @@ const tenantApprovalStatus = v.union(
 
 const invoiceLineItemKind = v.union(v.literal("recurring"), v.literal("activation"));
 
+// Canonical `delinquencyStatusValidator` lives in `convex/delinquencies/domain.ts`;
+// inlined here to avoid the entity-file → `_generated/dataModel` circular import.
+const delinquencyStatus = v.union(
+  v.literal("open"),
+  v.literal("under_review"),
+  v.literal("provisioned"),
+  v.literal("paid"),
+  v.literal("closed"),
+);
+
 /**
  * Discriminated union representing the lifecycle state of an invoice.
  * Each variant carries only the fields that are meaningful for that state.
@@ -311,6 +321,27 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_agency_status", ["agencyId", "status"])
     .index("by_agency_tenant_cpf", ["agencyId", "tenantCpf"]),
+
+  // One row per delinquency action (acionamento) raised by an agency against
+  // a rental contract. Transitioning to `provisioned` decrements the parent
+  // contract's `availableGuaranteeCents` (floored at 0);
+  // `appliedGuaranteeDecrementCents` records exactly what was decremented so
+  // the `provisioned → paid` restore never inflates the guarantee above its
+  // pre-delinquency value when the floor clipped the decrement. Null until
+  // the row reaches `provisioned`.
+  delinquencies: defineTable({
+    contractId: v.id("contracts"),
+    agencyId: v.id("agencies"),
+    publicId: v.string(),
+    status: delinquencyStatus,
+    amountCents: v.number(),
+    openedAt: v.string(),
+    closedAt: v.union(v.string(), v.null()),
+    appliedGuaranteeDecrementCents: v.union(v.number(), v.null()),
+  })
+    .index("by_agency_status", ["agencyId", "status"])
+    .index("by_contract", ["contractId"])
+    .index("by_publicId", ["publicId"]),
 
   contractHistory: defineTable({
     agencyId: v.id("agencies"),
