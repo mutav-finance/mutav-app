@@ -1,3 +1,4 @@
+import * as React from "react";
 import { cn } from "./cn";
 import { Eyebrow } from "./eyebrow";
 
@@ -9,7 +10,7 @@ export type StepIndicatorProps = {
   currentSuffix: string;
 };
 
-export function StepIndicator({
+export const StepIndicator = React.memo(function StepIndicator({
   current,
   labels,
   progressLabel,
@@ -66,4 +67,4 @@ export function StepIndicator({
       </div>
     </div>
   );
-}
+});

@@ -27,11 +27,11 @@ export function ContractWizard() {
     dispatch({ type: "PATCH", patch: p });
   }, []);
 
+  const stepLabels = React.useMemo(() => CONTRACT_WIZARD_STEPS.map((n) => t(`steps.${n}`)), [t]);
+
   if (!agencyId) {
     return null;
   }
-
-  const stepLabels = CONTRACT_WIZARD_STEPS.map((n) => t(`steps.${n}`));
 
   return (
     <div className="flex flex-col gap-6">
