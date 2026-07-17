@@ -16,6 +16,7 @@ import {
   contractsByStatusPlatform,
 } from "./contracts/aggregate";
 import { insertContractAggregates } from "./contracts/aggregateWrites";
+import { buildTenantRegistryPatch } from "./tenants/useCases";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,8 @@ const DEMO_TABLES = [
   "invoices",
   "contractHistory",
   "contracts",
+  // tenants after contracts — contracts FK-reference tenants via tenantId.
+  "tenants",
   "memberships",
   "users",
   "agencies",
@@ -53,6 +56,24 @@ async function wipeDemoTables(ctx: MutationCtx) {
       for (const row of rows) await ctx.db.delete(row._id);
       rows = await ctx.db.query(table).take(200);
     }
+  }
+}
+
+/**
+ * Link every unlinked contract to the tenant registry — same helper (and
+ * therefore same dedup/conflict semantics) as
+ * `migrations.backfillContractTenantRegistry`, so seeded deployments come
+ * up already registry-linked while KEEPING the legacy embedded fields.
+ * Idempotent: contracts already carrying `tenantId` are skipped.
+ */
+async function linkContractsToTenantRegistry(ctx: MutationCtx) {
+  const contracts = await ctx.db.query("contracts").collect();
+  for (const contract of contracts) {
+    const patch = await buildTenantRegistryPatch(ctx, contract, {
+      kind: "system",
+      source: "seed.linkContractsToTenantRegistry",
+    });
+    if (patch) await ctx.db.patch(contract._id, patch);
   }
 }
 
@@ -287,7 +308,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Maria Silva Santos",
-        cpf: "111.111.111-11",
+        cpf: "11111111200",
         birthDate: "1990-05-12",
         email: "maria.silva@example.com",
         phone: "11900000001",
@@ -333,7 +354,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Carlos Eduardo Ferreira",
-        cpf: "222.222.222-22",
+        cpf: "22222222303",
         birthDate: "1985-08-20",
         email: "carlos.ferreira@example.com",
         phone: "11900000002",
@@ -383,7 +404,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Tech Solutions Ltda",
-        cpf: "33.333.333/0001-33",
+        entityType: "pj",
+        cpf: "33333333000191",
         birthDate: "2010-01-01",
         email: "contato@techsolutions.example.com",
         phone: "11900000003",
@@ -429,7 +451,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Ana Paula Rodrigues",
-        cpf: "444.444.444-44",
+        cpf: "44444444525",
         birthDate: "1993-02-28",
         email: "ana.rodrigues@example.com",
         phone: "11900000004",
@@ -479,7 +501,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Global Finance S.A.",
-        cpf: "55.555.555/0001-55",
+        entityType: "pj",
+        cpf: "55555555000191",
         birthDate: "1999-07-01",
         email: "financeiro@globalfinance.example.com",
         phone: "11900000005",
@@ -525,7 +548,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Bruno Henrique Lima",
-        cpf: "666.666.666-66",
+        cpf: "66666666747",
         birthDate: "1988-11-15",
         email: "bruno.lima@example.com",
         phone: "11900000006",
@@ -571,7 +594,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Fernanda Costa Oliveira",
-        cpf: "777.777.777-77",
+        cpf: "77777777858",
         birthDate: "1995-06-03",
         email: "fernanda.oliveira@example.com",
         phone: "11900000007",
@@ -617,7 +640,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Ricardo Monteiro Braga",
-        cpf: "888.888.888-88",
+        cpf: "88888888969",
         birthDate: "1980-09-25",
         email: "ricardo.braga@example.com",
         phone: "11900000008",
@@ -663,7 +686,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Juliana Nascimento Souza",
-        cpf: "999.999.999-99",
+        cpf: "00000000191",
         birthDate: "1997-12-08",
         email: "juliana.souza@example.com",
         phone: "11900000009",
@@ -713,7 +736,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Inovação Digital Ltda",
-        cpf: "10.101.010/0001-10",
+        entityType: "pj",
+        cpf: "10101010000177",
         birthDate: "2015-03-01",
         email: "admin@inovacaodigital.example.com",
         phone: "11900000010",
@@ -759,7 +783,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Lucas Andrade Pereira",
-        cpf: "11.111.111-11",
+        cpf: "11111111383",
         birthDate: "1992-04-17",
         email: "lucas.pereira@example.com",
         phone: "11900000011",
@@ -805,7 +829,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Patrícia Gomes Tavares",
-        cpf: "12.121.212-12",
+        cpf: "12121212108",
         birthDate: "1991-07-30",
         email: "patricia.tavares@example.com",
         phone: "11900000012",
@@ -851,7 +875,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Roberto Carvalho Neto",
-        cpf: "13.131.313-13",
+        cpf: "13131313188",
         birthDate: "1987-03-22",
         email: "roberto.neto@example.com",
         phone: "11900000013",
@@ -897,7 +921,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Soluções Web S.A.",
-        cpf: "14.141.414/0001-14",
+        entityType: "pj",
+        cpf: "14141414000145",
         birthDate: "2018-05-10",
         email: "contato@solucoesweb.example.com",
         phone: "11900000014",
@@ -943,7 +968,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Silvia Menezes Rocha",
-        cpf: "15.151.515-15",
+        cpf: "15151515144",
         birthDate: "1983-10-05",
         email: "silvia.rocha@example.com",
         phone: "11900000015",
@@ -992,7 +1017,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Mariana Figueiredo Costa",
-        cpf: "16.161.616-16",
+        cpf: "16161616122",
         birthDate: "1989-01-14",
         email: "mariana.costa@example.com",
         phone: "21900000001",
@@ -1042,7 +1067,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Atlântico Negócios S.A.",
-        cpf: "17.171.717/0001-17",
+        entityType: "pj",
+        cpf: "17171717000107",
         birthDate: "2005-08-01",
         email: "financeiro@atlanticonegocios.example.com",
         phone: "21900000002",
@@ -1088,7 +1114,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Eduardo Pinto Bastos",
-        cpf: "18.181.818-18",
+        cpf: "18181818199",
         birthDate: "1984-07-19",
         email: "eduardo.bastos@example.com",
         phone: "21900000003",
@@ -1134,7 +1160,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Tatiana Alves Mendes",
-        cpf: "19.191.919-19",
+        cpf: "19191919177",
         birthDate: "1996-09-02",
         email: "tatiana.mendes@example.com",
         phone: "21900000004",
@@ -1180,7 +1206,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Construtora Barra S.A.",
-        cpf: "20.202.020/0001-20",
+        entityType: "pj",
+        cpf: "20202020000152",
         birthDate: "2000-02-01",
         email: "obras@construtorabarra.example.com",
         phone: "21900000005",
@@ -1226,7 +1253,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Gustavo Ribeiro Leal",
-        cpf: "21.212.121-21",
+        cpf: "21212121244",
         birthDate: "1990-12-11",
         email: "gustavo.leal@example.com",
         phone: "21900000006",
@@ -1272,7 +1299,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Camila Souza Barros",
-        cpf: "22.222.222-22",
+        cpf: "22222222494",
         birthDate: "1994-05-28",
         email: "camila.barros@example.com",
         phone: "21900000007",
@@ -1322,7 +1349,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Petro Energy Ltda",
-        cpf: "23.232.323/0001-23",
+        entityType: "pj",
+        cpf: "23232323000106",
         birthDate: "1998-11-01",
         email: "corp@petroenergy.example.com",
         phone: "21900000008",
@@ -1368,7 +1396,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Diego Mendonça Freitas",
-        cpf: "24.242.424-24",
+        cpf: "24242424299",
         birthDate: "1993-08-17",
         email: "diego.freitas@example.com",
         phone: "21900000009",
@@ -1414,7 +1442,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Logística Carioca Ltda",
-        cpf: "25.252.525/0001-25",
+        entityType: "pj",
+        cpf: "25252525000145",
         birthDate: "2012-04-01",
         email: "ops@logisticacarioca.example.com",
         phone: "21900000010",
@@ -1460,7 +1489,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Isabela Torres Viana",
-        cpf: "26.262.626-26",
+        cpf: "26262626255",
         birthDate: "1986-02-14",
         email: "isabela.viana@example.com",
         phone: "21900000011",
@@ -1506,7 +1535,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "reprovado",
         fullName: "Marcos Vinícius Santos",
-        cpf: "27.272.727-27",
+        cpf: "27272727233",
         birthDate: "1990-06-20",
         email: "marcos.santos@example.com",
         phone: "21900000012",
@@ -1555,7 +1584,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Renata Campos Drumond",
-        cpf: "28.282.828-28",
+        cpf: "28282828211",
         birthDate: "1991-03-05",
         email: "renata.drumond@example.com",
         phone: "31900000001",
@@ -1605,7 +1634,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Mineira Distribuidora Ltda",
-        cpf: "29.292.929/0001-29",
+        entityType: "pj",
+        cpf: "29292929000113",
         birthDate: "2008-07-20",
         email: "financeiro@mineiradist.example.com",
         phone: "31900000002",
@@ -1651,7 +1681,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Felipe Augusto Corrêa",
-        cpf: "30.303.030-30",
+        cpf: "30303030399",
         birthDate: "1998-01-25",
         email: "felipe.correa@example.com",
         phone: "31900000003",
@@ -2197,6 +2227,8 @@ async function seedFictional(
       });
     }
 
+    await linkContractsToTenantRegistry(ctx);
+
     return {
       agencies: { paulistaId, atlanticaId, horizonteId },
       contractCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
@@ -2433,7 +2465,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 82",
       tenant: {
         fullName: "Beatriz Almeida Carvalho",
-        cpf: "232.323.232-32",
+        cpf: "23232323200",
         birthDate: "1992-08-23",
         phoneSuffix: "31",
         emailLocal: "beatriz.almeida",
@@ -2457,7 +2489,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 1502",
       tenant: {
         fullName: "Rafael Monteiro Lima",
-        cpf: "323.232.323-23",
+        cpf: "32323232355",
         birthDate: "1985-04-17",
         phoneSuffix: "32",
         emailLocal: "rafael.monteiro",
@@ -2481,7 +2513,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 41",
       tenant: {
         fullName: "Letícia Andrade Pires",
-        cpf: "424.242.424-24",
+        cpf: "42424242488",
         birthDate: "1994-11-30",
         phoneSuffix: "33",
         emailLocal: "leticia.andrade",
@@ -2505,7 +2537,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Cobertura 18",
       tenant: {
         fullName: "Fernanda Lopes Cavalcanti",
-        cpf: "525.252.525-25",
+        cpf: "52525252500",
         birthDate: "1980-07-08",
         phoneSuffix: "34",
         emailLocal: "fernanda.lopes",
@@ -2529,7 +2561,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 73",
       tenant: {
         fullName: "Gustavo Ribeiro Tavares",
-        cpf: "626.262.626-26",
+        cpf: "62626262633",
         birthDate: "1989-02-14",
         phoneSuffix: "35",
         emailLocal: "gustavo.ribeiro",
@@ -2553,7 +2585,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 22",
       tenant: {
         fullName: "Bruno Tavares Macedo",
-        cpf: "727.272.727-27",
+        cpf: "72727272766",
         birthDate: "1986-09-19",
         phoneSuffix: "36",
         emailLocal: "bruno.tavares",
@@ -2686,6 +2718,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       message: `Criada Solicitação #${r.publicId} — ${r.spec.tenant.fullName}, aluguel R$ ${(r.spec.rentCents / 100).toLocaleString("pt-BR")}.`,
     });
   }
+
+  await linkContractsToTenantRegistry(ctx);
 
   return { contractsInserted: inserted.length, ativoCount: ativoRows.length };
 }
