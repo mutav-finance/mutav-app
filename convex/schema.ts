@@ -57,6 +57,14 @@ const delinquencyStatus = v.union(
   v.literal("closed"),
 );
 
+// Canonical `delinquencyResolutionValidator` lives in
+// `convex/delinquencies/domain.ts`; inlined here for the same reason.
+const delinquencyResolution = v.union(
+  v.literal("cured"),
+  v.literal("denied"),
+  v.literal("paid_out"),
+);
+
 /**
  * Discriminated union representing the lifecycle state of an invoice.
  * Each variant carries only the fields that are meaningful for that state.
@@ -323,12 +331,16 @@ export default defineSchema({
     .index("by_agency_tenant_cpf", ["agencyId", "tenantCpf"]),
 
   // One row per delinquency action (acionamento) raised by an agency against
-  // a rental contract. Transitioning to `provisioned` decrements the parent
-  // contract's `availableGuaranteeCents` (floored at 0);
-  // `appliedGuaranteeDecrementCents` records exactly what was decremented so
-  // the `provisioned → paid` restore never inflates the guarantee above its
-  // pre-delinquency value when the floor clipped the decrement. Null until
-  // the row reaches `provisioned`.
+  // a rental contract. Money flow: `provisioned` earmarks coverage by
+  // decrementing the parent contract's `availableGuaranteeCents` (floored at
+  // 0); `paid` consumes it permanently (no restore — the payout drew the
+  // reserve); closing FROM `provisioned` (denied without payout) releases the
+  // earmark by restoring exactly `appliedGuaranteeDecrementCents`, so a
+  // floor-clipped decrement never inflates the guarantee above its
+  // pre-delinquency value. `appliedGuaranteeDecrementCents` is null until the
+  // row reaches `provisioned`. `resolution` records the terminal outcome on
+  // close (`cured` / `denied` / `paid_out`); optional for rows created before
+  // the field existed.
   delinquencies: defineTable({
     contractId: v.id("contracts"),
     agencyId: v.id("agencies"),
@@ -338,6 +350,7 @@ export default defineSchema({
     openedAt: v.string(),
     closedAt: v.union(v.string(), v.null()),
     appliedGuaranteeDecrementCents: v.union(v.number(), v.null()),
+    resolution: v.optional(v.union(delinquencyResolution, v.null())),
   })
     .index("by_agency_status", ["agencyId", "status"])
     .index("by_contract", ["contractId"])

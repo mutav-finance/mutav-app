@@ -13,6 +13,7 @@ const LEGAL_EDGES: readonly [DelinquencyStatus, DelinquencyStatus][] = [
   [DELINQUENCY_STATUS.OPEN, DELINQUENCY_STATUS.UNDER_REVIEW],
   [DELINQUENCY_STATUS.UNDER_REVIEW, DELINQUENCY_STATUS.PROVISIONED],
   [DELINQUENCY_STATUS.PROVISIONED, DELINQUENCY_STATUS.PAID],
+  [DELINQUENCY_STATUS.PROVISIONED, DELINQUENCY_STATUS.CLOSED],
   [DELINQUENCY_STATUS.PAID, DELINQUENCY_STATUS.CLOSED],
   [DELINQUENCY_STATUS.OPEN, DELINQUENCY_STATUS.CLOSED],
   [DELINQUENCY_STATUS.UNDER_REVIEW, DELINQUENCY_STATUS.CLOSED],
@@ -25,10 +26,6 @@ describe("canTransition", () => {
 
   test("open cannot skip straight into provisioned", () => {
     expect(canTransition(DELINQUENCY_STATUS.OPEN, DELINQUENCY_STATUS.PROVISIONED)).toBe(false);
-  });
-
-  test("provisioned must pass through paid before closing", () => {
-    expect(canTransition(DELINQUENCY_STATUS.PROVISIONED, DELINQUENCY_STATUS.CLOSED)).toBe(false);
   });
 
   test("open cannot skip straight to paid", () => {

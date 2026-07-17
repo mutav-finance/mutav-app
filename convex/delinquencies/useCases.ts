@@ -1,21 +1,20 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 import { mutationWithAgencyScope, queryWithAgencyScope } from "../lib/auth";
 import type { Result } from "../lib/result";
-import { replaceContractAggregates } from "../contracts/aggregateWrites";
 import { CONTRACT_STATUS } from "../contracts/domain";
-import type { ContractId } from "../contracts/domain";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import {
-  canTransition,
   DELINQUENCY_ERROR_CODE,
   DELINQUENCY_STATUS,
+  delinquencyResolutionValidator,
   delinquencyStatusValidator,
   type Delinquency,
   type DelinquencyStatus,
 } from "./domain";
+import { applyDelinquencyTransition, type DelinquencyTransitionError } from "./transitions";
 
 function generatePublicId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -26,28 +25,14 @@ function generatePublicId(): string {
   return id;
 }
 
-async function adjustContractGuarantee(
-  ctx: MutationCtx,
-  contractId: ContractId,
-  deltaCents: number,
-): Promise<boolean> {
-  const contract = await ctx.db.get(contractId);
-  if (!contract) return false;
-
-  await ctx.db.patch(contract._id, {
-    availableGuaranteeCents: Math.max(0, contract.availableGuaranteeCents + deltaCents),
-  });
-  const after = await ctx.db.get(contract._id);
-  if (after) await replaceContractAggregates(ctx, contract, after);
-  return true;
-}
-
 type OpenDelinquencySuccessResult = { publicId: string; status: DelinquencyStatus };
 type OpenDelinquencyErrorResult = {
   code:
     | typeof DELINQUENCY_ERROR_CODE.NOT_FOUND
     | typeof DELINQUENCY_ERROR_CODE.CONTRACT_NOT_ACTIVE
-    | typeof DELINQUENCY_ERROR_CODE.INVALID_AMOUNT;
+    | typeof DELINQUENCY_ERROR_CODE.INVALID_AMOUNT
+    | typeof DELINQUENCY_ERROR_CODE.DELINQUENCY_ALREADY_OPEN
+    | typeof DELINQUENCY_ERROR_CODE.AMOUNT_EXCEEDS_GUARANTEE;
 };
 
 export const open = mutationWithAgencyScope({
@@ -88,6 +73,28 @@ export const open = mutationWithAgencyScope({
       };
     }
 
+    // Check-then-insert is race-safe under Convex OCC serialization:
+    // concurrent opens conflict on this index read set and retry, so two
+    // non-closed rows can never land on the same contract.
+    const existing = await ctx.db
+      .query("delinquencies")
+      .withIndex("by_contract", (q) => q.eq("contractId", contract._id))
+      .collect();
+    if (existing.some((row) => row.status !== DELINQUENCY_STATUS.CLOSED)) {
+      return {
+        success: false,
+        error: { code: DELINQUENCY_ERROR_CODE.DELINQUENCY_ALREADY_OPEN },
+        message: "A non-closed delinquency already exists for this contract",
+      };
+    }
+    if (args.amountCents > contract.availableGuaranteeCents) {
+      return {
+        success: false,
+        error: { code: DELINQUENCY_ERROR_CODE.AMOUNT_EXCEEDS_GUARANTEE },
+        message: "Amount exceeds the contract's available guarantee",
+      };
+    }
+
     const publicId = generatePublicId();
     const delinquencyId = await ctx.db.insert("delinquencies", {
       contractId: contract._id,
@@ -98,6 +105,7 @@ export const open = mutationWithAgencyScope({
       openedAt: new Date().toISOString(),
       closedAt: null,
       appliedGuaranteeDecrementCents: null,
+      resolution: null,
     });
 
     await appendAuditEntry(ctx, {
@@ -123,12 +131,14 @@ export const open = mutationWithAgencyScope({
 });
 
 type UpdateDelinquencyStatusSuccessResult = { publicId: string; status: DelinquencyStatus };
-type UpdateDelinquencyStatusErrorResult = {
-  code: typeof DELINQUENCY_ERROR_CODE.NOT_FOUND | typeof DELINQUENCY_ERROR_CODE.ILLEGAL_TRANSITION;
-};
+type UpdateDelinquencyStatusErrorResult = DelinquencyTransitionError;
 
 export const updateStatus = mutationWithAgencyScope({
-  args: { publicId: v.string(), status: delinquencyStatusValidator },
+  args: {
+    publicId: v.string(),
+    status: delinquencyStatusValidator,
+    resolution: v.optional(delinquencyResolutionValidator),
+  },
   handler: async (
     ctx,
     args,
@@ -147,53 +157,13 @@ export const updateStatus = mutationWithAgencyScope({
         message: "Delinquency not found",
       };
     }
-    if (!canTransition(row.status, args.status)) {
-      return {
-        success: false,
-        error: { code: DELINQUENCY_ERROR_CODE.ILLEGAL_TRANSITION },
-        message: `Cannot transition from ${row.status} to ${args.status}`,
-      };
-    }
 
-    // Guarantee impact — assumption pending Draau confirmation: provisioning
-    // decrements the contract's availableGuaranteeCents by amountCents
-    // (floored at 0); provisioned → paid restores exactly the applied
-    // decrement. Other transitions have no balance effect.
-    let appliedGuaranteeDecrementCents = row.appliedGuaranteeDecrementCents;
-    if (args.status === DELINQUENCY_STATUS.PROVISIONED) {
-      const contract = await ctx.db.get(row.contractId);
-      if (!contract) {
-        return {
-          success: false,
-          error: { code: DELINQUENCY_ERROR_CODE.NOT_FOUND },
-          message: "Contract not found",
-        };
-      }
-      appliedGuaranteeDecrementCents = Math.min(contract.availableGuaranteeCents, row.amountCents);
-      await adjustContractGuarantee(ctx, row.contractId, -appliedGuaranteeDecrementCents);
-    } else if (
-      row.status === DELINQUENCY_STATUS.PROVISIONED &&
-      args.status === DELINQUENCY_STATUS.PAID
-    ) {
-      const restored = await adjustContractGuarantee(
-        ctx,
-        row.contractId,
-        row.appliedGuaranteeDecrementCents ?? 0,
-      );
-      if (!restored) {
-        return {
-          success: false,
-          error: { code: DELINQUENCY_ERROR_CODE.NOT_FOUND },
-          message: "Contract not found",
-        };
-      }
-    }
-
-    await ctx.db.patch(row._id, {
-      status: args.status,
-      appliedGuaranteeDecrementCents,
-      ...(args.status === DELINQUENCY_STATUS.CLOSED ? { closedAt: new Date().toISOString() } : {}),
+    const transition = await applyDelinquencyTransition(ctx, {
+      row,
+      toStatus: args.status,
+      resolution: args.resolution ?? null,
     });
+    if (!transition.success) return transition;
 
     await appendAuditEntry(ctx, {
       actor: { kind: "user", userId: ctx.user._id },
@@ -204,10 +174,11 @@ export const updateStatus = mutationWithAgencyScope({
         delinquencyId: row._id,
         contractId: row.contractId,
         agencyId: ctx.agencyId,
-        previousStatus: row.status,
-        status: args.status,
+        previousStatus: transition.data.previousStatus,
+        status: transition.data.status,
+        resolution: transition.data.resolution,
         amountCents: row.amountCents,
-        appliedGuaranteeDecrementCents,
+        appliedGuaranteeDecrementCents: transition.data.appliedGuaranteeDecrementCents,
       },
     });
 
