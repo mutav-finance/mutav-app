@@ -3,19 +3,19 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@mutav/ui/button";
+import { CurrencyInput } from "@mutav/ui/currency-input";
+import { Field } from "@mutav/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
-import { cn } from "@mutav/ui/cn";
 import {
   isPropertyKind,
   isTenantEntityType,
-  isValidCPF,
-  isValidCNPJ,
+  parseBRLInput,
   type DraftWizardData,
 } from "@/lib/contracts/wizard";
-import { maskCPF, maskCNPJ } from "@mutav/i18n/brazil";
-import { formatBRLCents, formatCentsPlain } from "@/lib/contracts/format";
+import { maskCPF, maskCNPJ, isValidCPF, isValidCNPJ } from "@mutav/i18n/brazil";
+import { formatBRLCents } from "@/lib/contracts/format";
 
 type Props = {
   data: DraftWizardData;
@@ -28,6 +28,22 @@ type Errors = Partial<Record<string, string>>;
 export function WizardStep1({ data, onChange, onNext }: Props) {
   const t = useTranslations("contractNew");
   const [errors, setErrors] = React.useState<Errors>({});
+  const [rentInput, setRentInput] = React.useState(
+    data.rentCents > 0 ? (data.rentCents / 100).toFixed(2).replace(".", ",") : "",
+  );
+  const [condoInput, setCondoInput] = React.useState(
+    data.condoCents > 0 ? (data.condoCents / 100).toFixed(2).replace(".", ",") : "",
+  );
+  const [otherInput, setOtherInput] = React.useState(
+    data.otherFeesCents > 0 ? (data.otherFeesCents / 100).toFixed(2).replace(".", ",") : "",
+  );
+
+  const handleCurrencyBlur = (
+    raw: string,
+    field: "rentCents" | "condoCents" | "otherFeesCents",
+  ) => {
+    onChange({ [field]: parseBRLInput(raw) });
+  };
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
 
@@ -149,24 +165,27 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t("rent.rent")} error={errors.rentCents}>
             <CurrencyInput
-              cents={data.rentCents}
-              onChange={(cents) => onChange({ rentCents: cents })}
+              value={rentInput}
+              onChange={setRentInput}
+              onBlur={(v) => handleCurrencyBlur(v, "rentCents")}
               placeholder={t("rent.placeholder")}
             />
           </Field>
 
           <Field label={t("rent.condo")}>
             <CurrencyInput
-              cents={data.condoCents}
-              onChange={(cents) => onChange({ condoCents: cents })}
+              value={condoInput}
+              onChange={setCondoInput}
+              onBlur={(v) => handleCurrencyBlur(v, "condoCents")}
               placeholder={t("rent.placeholder")}
             />
           </Field>
 
           <Field label={t("rent.otherFees")}>
             <CurrencyInput
-              cents={data.otherFeesCents}
-              onChange={(cents) => onChange({ otherFeesCents: cents })}
+              value={otherInput}
+              onChange={setOtherInput}
+              onBlur={(v) => handleCurrencyBlur(v, "otherFeesCents")}
               placeholder={t("rent.placeholder")}
             />
           </Field>
@@ -181,56 +200,6 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
       <div className="flex justify-end">
         <Button onClick={handleNext}>{t("nav.nextStep2")}</Button>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-  className,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label>{label}</Label>
-      {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
-    </div>
-  );
-}
-
-function CurrencyInput({
-  cents,
-  onChange,
-  placeholder,
-}: {
-  cents: number;
-  onChange: (cents: number) => void;
-  placeholder?: string;
-}) {
-  const display = cents > 0 ? formatCentsPlain(cents) : "";
-
-  return (
-    <div className="relative">
-      <span className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 text-sm select-none">
-        R$
-      </span>
-      <Input
-        className="pl-8"
-        value={display}
-        placeholder={placeholder}
-        inputMode="numeric"
-        onChange={(e) => {
-          const digits = e.target.value.replace(/\D/g, "");
-          onChange(digits ? Number.parseInt(digits, 10) : 0);
-        }}
-      />
     </div>
   );
 }

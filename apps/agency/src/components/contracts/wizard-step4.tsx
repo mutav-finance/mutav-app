@@ -4,14 +4,15 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
-import { PencilIcon } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@mutav/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
+import { EditField } from "@mutav/ui/edit-field";
 import { Input } from "@mutav/ui/input";
-import { Label } from "@mutav/ui/label";
-import { cn } from "@mutav/ui/cn";
+import { LockedDisplay } from "@mutav/ui/locked-display";
+import { ReviewBlock } from "@mutav/ui/review-block";
+import { ReviewRow } from "@mutav/ui/review-row";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import {
   isPropertyKind,
   parseBRLInput,
@@ -152,7 +153,8 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
     onComplete(result.data.publicId);
   };
 
-  const m = missing;
+  const missingText = (field: keyof DraftWizardData) =>
+    missing.has(field) ? t("validation.required") : undefined;
   const isEditing = editing.kind === "editing";
   const editingProperty = editing.kind === "editing" && editing.block === "property";
   const editingRental = editing.kind === "editing" && editing.block === "rental";
@@ -163,13 +165,16 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
       <h2 className="text-base font-semibold">{t("review.heading")}</h2>
 
       {/* Bloco 1 — Dados do Imóvel */}
-      <Block
+      <ReviewBlock
         title={t("review.propertySection")}
         onEdit={() => startEdit("property")}
         editing={editingProperty}
         disabled={isEditing && !editingProperty}
         onSave={saveEdit}
         onCancel={cancelEdit}
+        editLabel={t("review.editBlock")}
+        saveLabel={t("review.saveBlock")}
+        cancelLabel={t("review.cancelBlock")}
       >
         {editingProperty ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -247,27 +252,32 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                     ? t("property.comercial")
                     : ""
               }
-              missing={m.has("propertyKind")}
+              missing={missingText("propertyKind")}
             />
-            <ReviewRow label={t("property.cep")} value={data.cep} mono missing={m.has("cep")} />
+            <ReviewRow
+              label={t("property.cep")}
+              value={data.cep}
+              mono
+              missing={missingText("cep")}
+            />
             <ReviewRow
               label={t("property.street")}
               value={data.street}
-              missing={m.has("street")}
+              missing={missingText("street")}
               className="col-span-2"
             />
             <ReviewRow
               label={t("property.addressNumber")}
               value={data.addressNumber}
-              missing={m.has("addressNumber")}
+              missing={missingText("addressNumber")}
             />
             <ReviewRow
               label={t("property.neighborhood")}
               value={data.neighborhood}
-              missing={m.has("neighborhood")}
+              missing={missingText("neighborhood")}
             />
-            <ReviewRow label={t("property.city")} value={data.city} missing={m.has("city")} />
-            <ReviewRow label={t("property.uf")} value={data.uf} missing={m.has("uf")} />
+            <ReviewRow label={t("property.city")} value={data.city} missing={missingText("city")} />
+            <ReviewRow label={t("property.uf")} value={data.uf} missing={missingText("uf")} />
             {data.complement && (
               <ReviewRow
                 label={t("property.complement")}
@@ -277,16 +287,19 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             )}
           </div>
         )}
-      </Block>
+      </ReviewBlock>
 
       {/* Bloco 2 — Dados de Locação */}
-      <Block
+      <ReviewBlock
         title={t("review.rentalSection")}
         onEdit={() => startEdit("rental")}
         editing={editingRental}
         disabled={isEditing && !editingRental}
         onSave={saveEdit}
         onCancel={cancelEdit}
+        editLabel={t("review.editBlock")}
+        saveLabel={t("review.saveBlock")}
+        cancelLabel={t("review.cancelBlock")}
       >
         {editingRental ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -327,7 +340,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 label={t("rent.rent")}
                 value={formatBRLCents(data.rentCents)}
                 mono
-                missing={m.has("rentCents")}
+                missing={missingText("rentCents")}
               />
               {data.otherFeesCents > 0 && (
                 <ReviewRow
@@ -350,16 +363,19 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             </div>
           </div>
         )}
-      </Block>
+      </ReviewBlock>
 
       {/* Bloco 3 — Dados do Inquilino */}
-      <Block
+      <ReviewBlock
         title={t("review.tenantSection")}
         onEdit={() => startEdit("tenant")}
         editing={editingTenant}
         disabled={isEditing && !editingTenant}
         onSave={saveEdit}
         onCancel={cancelEdit}
+        editLabel={t("review.editBlock")}
+        saveLabel={t("review.saveBlock")}
+        cancelLabel={t("review.cancelBlock")}
       >
         {editingTenant ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -401,7 +417,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             <ReviewRow
               label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
               value={data.fullName}
-              missing={m.has("fullName")}
+              missing={missingText("fullName")}
               className="col-span-2"
             />
             {data.entityType === "pf" && (
@@ -415,11 +431,20 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 label={t("tenant.birthDate")}
                 value={data.birthDate}
                 mono
-                missing={m.has("birthDate")}
+                missing={missingText("birthDate")}
               />
             )}
-            <ReviewRow label={t("tenant.email")} value={data.email} missing={m.has("email")} />
-            <ReviewRow label={t("tenant.phone")} value={data.phone} mono missing={m.has("phone")} />
+            <ReviewRow
+              label={t("tenant.email")}
+              value={data.email}
+              missing={missingText("email")}
+            />
+            <ReviewRow
+              label={t("tenant.phone")}
+              value={data.phone}
+              mono
+              missing={missingText("phone")}
+            />
             {data.score !== null && data.scoreTier !== null && (
               <ReviewRow
                 label={t("review.score")}
@@ -429,7 +454,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             )}
           </div>
         )}
-      </Block>
+      </ReviewBlock>
 
       {/* Bloco 4 — Dados do Plano */}
       <section className="flex flex-col gap-2 rounded-lg border p-4">
@@ -482,130 +507,6 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         <Button onClick={handleSubmit} disabled={isSubmitting || isEditing}>
           {isSubmitting ? t("review.submitting") : t("review.submit")}
         </Button>
-      </div>
-    </div>
-  );
-}
-
-function Block({
-  title,
-  children,
-  onEdit,
-  onSave,
-  onCancel,
-  editing,
-  disabled,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  editing: boolean;
-  disabled: boolean;
-}) {
-  const t = useTranslations("contractNew");
-  return (
-    <section
-      className={cn(
-        "flex flex-col gap-2 rounded-lg border p-4 transition-opacity",
-        disabled && "pointer-events-none opacity-40",
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
-          {title}
-        </p>
-        {!editing && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
-          >
-            <PencilIcon className="h-3 w-3" />
-            {t("review.editBlock")}
-          </button>
-        )}
-      </div>
-      {children}
-      {editing && (
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            {t("review.cancelBlock")}
-          </Button>
-          <Button size="sm" onClick={onSave}>
-            {t("review.saveBlock")}
-          </Button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ReviewRow({
-  label,
-  value,
-  highlight,
-  mono,
-  missing,
-  large,
-  className,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-  mono?: boolean;
-  missing?: boolean;
-  large?: boolean;
-  className?: string;
-}) {
-  const t = useTranslations("contractNew");
-  const size = large ? "text-base" : "text-sm";
-  return (
-    <div className={cn("flex items-baseline gap-1.5 py-0.5", className)}>
-      <span className={cn("text-muted-foreground shrink-0", size)}>{label}:</span>
-      {missing ? (
-        <span className="text-destructive text-sm font-medium">{t("validation.required")}</span>
-      ) : (
-        <span className={cn(size, mono && "font-mono", highlight && "font-semibold")}>
-          {value || "—"}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function EditField({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function LockedDisplay({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label className="text-muted-foreground">{label}</Label>
-      <div className="bg-muted/50 border-input text-muted-foreground rounded-md border px-3 py-2 font-mono text-sm">
-        {value}
       </div>
     </div>
   );

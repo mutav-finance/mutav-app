@@ -3,11 +3,10 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
-import { LockIcon } from "lucide-react";
 import { Button } from "@mutav/ui/button";
+import { Field } from "@mutav/ui/field";
 import { Input } from "@mutav/ui/input";
-import { Label } from "@mutav/ui/label";
-import { cn } from "@mutav/ui/cn";
+import { LockedField } from "@mutav/ui/locked-field";
 import { type DraftWizardData } from "@/lib/contracts/wizard";
 
 type Props = {
@@ -203,48 +202,6 @@ export function WizardStep3({ data, onChange, onNext, onBack }: Props) {
         </Button>
         <Button onClick={handleNext}>{t("nav.nextStep4")}</Button>
       </div>
-    </div>
-  );
-}
-
-function LockedField({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <div className="flex items-center gap-1.5">
-        <Label className="text-muted-foreground">{label}</Label>
-        <LockIcon className="text-muted-foreground/60 h-3 w-3" />
-      </div>
-      <div className="bg-muted/50 border-input text-muted-foreground rounded-md border px-3 py-2 font-mono text-sm">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-  className,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label>{label}</Label>
-      {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
