@@ -55,9 +55,19 @@ async function seedAndIndexContract(
   publicId: string,
 ) {
   await t.run(async (ctx) => {
+    const tenantId = await ctx.db.insert("tenants", {
+      entityType: "pf",
+      taxId: "11144477735",
+      fullName: "Test Tenant",
+      birthDate: "1990-01-01",
+      email: "tenant@test.br",
+      phone: "11999999999",
+    });
     const id = await ctx.db.insert("contracts", {
       agencyId: spec.agencyId,
       publicId,
+      tenantId,
+      tenantApproval: { status: "pendente", termApprovedAt: null },
       status: spec.status,
       activatedAt: spec.activatedAt ?? null,
       deactivatedAt: spec.deactivatedAt,
@@ -89,15 +99,6 @@ async function seedAndIndexContract(
         { key: "inspection", status: "pendente" },
         { key: "policy", status: "pendente" },
       ],
-      tenant: {
-        approvalStatus: "pendente",
-        fullName: "Test Tenant",
-        cpf: "11144477735",
-        birthDate: "1990-01-01",
-        email: "tenant@test.br",
-        phone: "11999999999",
-        termApprovedAt: null,
-      },
     });
     const doc = await ctx.db.get(id);
     if (!doc) throw new Error("seed lost");
@@ -413,7 +414,7 @@ describe("getActivityByPeriod", () => {
   });
 });
 
-describe("create (tenant registry dual-write)", () => {
+describe("create (tenant registry, narrow phase)", () => {
   const VALID_CPF = "52998224725";
   const VALID_CNPJ = "11444777000161";
 
@@ -444,7 +445,7 @@ describe("create (tenant registry dual-write)", () => {
     };
   }
 
-  test("dual-writes: legacy embedded tenant untouched AND tenantId links a matching registry row", async () => {
+  test("registry-only: no embedded tenant/tenantCpf, top-level score, tenantId links a matching registry row", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
@@ -466,25 +467,13 @@ describe("create (tenant registry dual-write)", () => {
     expect(contract).not.toBeNull();
     if (!contract) return;
 
-    expect(contract.tenantCpf).toBe(VALID_CPF);
-    expect(contract.tenant).toEqual({
-      approvalStatus: "pendente",
-      entityType: "pf",
-      fullName: "Maria Silva Santos",
-      cpf: VALID_CPF,
-      cnpj: undefined,
-      birthDate: "1990-05-12",
-      email: "maria@example.com",
-      phone: "11900000001",
-      score: 750,
-      termApprovedAt: null,
-    });
+    const keys = Object.keys(contract);
+    expect(keys).not.toContain("tenant");
+    expect(keys).not.toContain("tenantCpf");
+    expect(contract.score).toBe(750);
     expect(contract.tenantApproval).toEqual({ status: "pendente", termApprovedAt: null });
 
-    expect(contract.tenantId).toBeDefined();
-    const linkedTenantId = contract.tenantId;
-    if (linkedTenantId === undefined) return;
-    const tenant = await t.run((ctx) => ctx.db.get(linkedTenantId));
+    const tenant = await t.run((ctx) => ctx.db.get(contract.tenantId));
     expect(tenant).toMatchObject({
       entityType: "pf",
       taxId: VALID_CPF,
@@ -493,6 +482,76 @@ describe("create (tenant registry dual-write)", () => {
       email: "maria@example.com",
       phone: "11900000001",
     });
+
+    const history = await t.run((ctx) =>
+      ctx.db
+        .query("contractHistory")
+        .withIndex("by_contract", (q) => q.eq("contractPublicId", result.data.publicId))
+        .collect(),
+    );
+    const creationEvent = history.find((h) => h.message === "Contrato criado");
+    expect(creationEvent?.tenantSnapshot).toMatchObject({
+      entityType: "pf",
+      taxId: VALID_CPF,
+      fullName: "Maria Silva Santos",
+      email: "maria@example.com",
+      phone: "11900000001",
+    });
+  });
+
+  test("getByPublicId round-trips both variants and listByAgency joins the tenant name", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const pf = await asUser.mutation(api.contracts.useCases.create, { agencyId, ...createArgs() });
+    expect(pf.success).toBe(true);
+    if (!pf.success) return;
+
+    const pjArgs = createArgs({
+      tenant: {
+        entityType: "pj" as const,
+        fullName: "Tech Solutions Ltda",
+        cpf: VALID_CPF,
+        cnpj: VALID_CNPJ,
+        birthDate: "",
+        email: "contato@techsolutions.example.com",
+        phone: "11900000003",
+        score: 650,
+      },
+    });
+    const pj = await asUser.mutation(api.contracts.useCases.create, { agencyId, ...pjArgs });
+    expect(pj.success).toBe(true);
+    if (!pj.success) return;
+
+    const pfContract = await asUser.query(api.contracts.useCases.getByPublicId, {
+      publicId: pf.data.publicId,
+    });
+    expect(pfContract?.tenant).toMatchObject({
+      entityType: "pf",
+      taxId: VALID_CPF,
+      birthDate: "1990-05-12",
+      approvalStatus: "pendente",
+    });
+
+    const pjContract = await asUser.query(api.contracts.useCases.getByPublicId, {
+      publicId: pj.data.publicId,
+    });
+    expect(pjContract?.tenant).toMatchObject({
+      entityType: "pj",
+      taxId: VALID_CNPJ,
+      contactCpf: VALID_CPF,
+    });
+    expect(pjContract?.tenant).not.toHaveProperty("birthDate");
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    const names = new Set(page.page.map((row) => row.tenantName));
+    expect(names.has("Maria Silva Santos")).toBe(true);
+    expect(names.has("Tech Solutions Ltda")).toBe(true);
   });
 
   test("second create with the same CPF reuses the same registry row", async () => {

@@ -15,7 +15,7 @@ export type RentMultiplier = "30x";
 export type Payer = "inquilino";
 export type DocumentKey = Contract["documents"][number]["key"];
 export type DocumentStatus = Contract["documents"][number]["status"];
-export type TenantApprovalStatus = Contract["tenant"]["approvalStatus"];
+export type TenantApprovalStatus = Contract["tenantApproval"]["status"];
 
 export const CONTRACT_STATUS = {
   ATIVO: "ativo",

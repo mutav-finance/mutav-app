@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { internalQuery, query } from "../_generated/server";
+import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
 import { priceContract } from "../../apps/agency/src/lib/pricing/contract";
 import type { Contract, ContractHistory } from "./domain";
+import type { Tenant, TenantId } from "../tenants/domain";
 import {
   ativoInsuredCentsPlatform,
   contractsByStatus,
@@ -71,6 +72,13 @@ export const getByPublicId = query({
         continue;
       }
 
+      const tenant = await ctx.db.get(contract.tenantId);
+      // FK-integrity invariant, not a leak case: `tenantId` is required and
+      // registry rows are never deleted, so a miss means corrupted data.
+      if (!tenant) {
+        throw new Error(`Contract ${contract.publicId} references a missing tenants row`);
+      }
+
       const history = await ctx.db
         .query("contractHistory")
         .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
@@ -78,7 +86,7 @@ export const getByPublicId = query({
         // Hard cap; if contracts exceed 100 history entries we'll need pagination.
         .take(100);
 
-      return shapeContract(contract, history);
+      return shapeContract(contract, tenant, history);
     }
 
     return null;
@@ -102,6 +110,28 @@ export const getByPublicIdInternal = internalQuery({
   },
 });
 
+/**
+ * Batch-resolve tenant display names for a set of contracts: one get per
+ * UNIQUE tenantId keeps the join O(unique tenants) instead of O(rows) —
+ * Convex gets are cheap and transaction-cached, but batching makes the
+ * read set explicit. A miss is an FK-integrity violation (`tenantId` is
+ * required, registry rows are never deleted), so it throws.
+ */
+async function tenantNamesFor(
+  ctx: QueryCtx,
+  docs: readonly Contract[],
+): Promise<Map<TenantId, string>> {
+  const names = new Map<TenantId, string>();
+  await Promise.all(
+    [...new Set(docs.map((doc) => doc.tenantId))].map(async (tenantId) => {
+      const tenant = await ctx.db.get(tenantId);
+      if (!tenant) throw new Error(`Contracts reference a missing tenants row ${tenantId}`);
+      names.set(tenantId, tenant.fullName);
+    }),
+  );
+  return names;
+}
+
 /** Paginated list scoped to one agency. */
 export const listByAgency = queryWithAgencyScope({
   args: { paginationOpts: paginationOptsValidator },
@@ -112,26 +142,30 @@ export const listByAgency = queryWithAgencyScope({
       .order("desc")
       .paginate(args.paginationOpts);
 
+    const tenantNames = await tenantNamesFor(ctx, result.page);
+
     return {
       ...result,
-      page: result.page.map(shapeContractSummary),
+      page: result.page.map((doc) =>
+        shapeContractSummary(doc, tenantNames.get(doc.tenantId) ?? ""),
+      ),
     };
   },
 });
 
 /**
  * Lightweight summary of a contract for list views — drops the heavy
- * `rental`/`property`/`optional`/`documents`/`tenant` fields.
- * Use shapeContract for the detail view.
+ * `rental`/`property`/`optional`/`documents` fields and joins only the
+ * tenant's display name. Use shapeContract for the detail view.
  */
-function shapeContractSummary(doc: Contract) {
+function shapeContractSummary(doc: Contract, tenantName: string) {
   return {
     id: doc.publicId,
     agencyId: doc.agencyId,
     status: doc.status,
     nextRenewalDate: doc.nextRenewalDate,
     availableGuaranteeCents: doc.availableGuaranteeCents,
-    tenantName: doc.tenant.fullName,
+    tenantName,
     creationTime: doc._creationTime,
   };
 }
@@ -421,8 +455,10 @@ export const listForCommissionByMonth = queryWithAgencyScope({
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
       .collect();
 
-    return contracts
-      .filter((c) => isActiveDuring(c, effectivePeriod))
+    const activeContracts = contracts.filter((c) => isActiveDuring(c, effectivePeriod));
+    const tenantNames = await tenantNamesFor(ctx, activeContracts);
+
+    return activeContracts
       .map((c) => {
         const activatedMonth = c.activatedAt.slice(0, 7);
         const monthsElapsed = Math.min(
@@ -431,7 +467,7 @@ export const listForCommissionByMonth = queryWithAgencyScope({
         );
         return {
           contractId: c.publicId,
-          tenantName: c.tenant.fullName,
+          tenantName: tenantNames.get(c.tenantId) ?? "",
           rentCents: c.rental.rentCents,
           commissionCents: Math.round((c.rental.rentCents * COMMISSION_RATE_BPS) / 10000),
           installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
@@ -498,30 +534,18 @@ export const requestCreditScore = mutationWithAgencyScope({
   },
 });
 
-/** Lookup tenant name by CPF from existing contracts in this agency. */
-export const lookupTenantByCpf = queryWithAgencyScope({
-  args: { cpf: v.string() },
-  handler: async (ctx, { cpf }) => {
-    const contract = await ctx.db
-      .query("contracts")
-      .withIndex("by_agency_tenant_cpf", (q) => q.eq("agencyId", ctx.agencyId).eq("tenantCpf", cpf))
-      .first();
-    if (!contract) return null;
-    return { fullName: contract.tenant.fullName, email: contract.tenant.email };
-  },
-});
-
 type CreateContractSuccessResult = { publicId: string };
 type CreateContractErrorResult = { code: typeof TENANT_ERROR_CODE.INVALID_TAX_ID };
 
 /**
  * Create a new contract with server-side fee calculation.
  *
- * Dual-write (registry widen phase): resolves the tenant registry row via
- * `getOrCreateTenant` and stores `tenantId` + `tenantApproval` while STILL
- * writing the legacy embedded `tenant` + `tenantCpf` exactly as before —
- * legacy readers are untouched until the narrow PR. The tax-id checksum
- * rejection is the only error Result and happens before any write.
+ * Registry-only write: resolves the tenant registry row via
+ * `getOrCreateTenant` and stores `tenantId` + `tenantApproval` + the
+ * creation-time `score`; the resolved registry fields are also captured on
+ * the creation history event (`tenantSnapshot`, the as-signed mitigation).
+ * The tax-id checksum rejection is the only error Result and happens
+ * before any write.
  */
 export const create = mutationWithAgencyScope({
   args: {
@@ -592,9 +616,9 @@ export const create = mutationWithAgencyScope({
     const contractId = await ctx.db.insert("contracts", {
       agencyId: ctx.agencyId,
       publicId,
-      tenantCpf: args.tenant.cpf,
       tenantId: tenantResult.data.tenantId,
       tenantApproval: { status: "pendente", termApprovedAt: null },
+      score: args.tenant.score,
       status: "pendente",
       activatedAt: null,
       nextRenewalDate,
@@ -620,18 +644,6 @@ export const create = mutationWithAgencyScope({
         { key: "inspection", status: "pendente" },
         { key: "policy", status: "pendente" },
       ],
-      tenant: {
-        approvalStatus: "pendente",
-        entityType: args.tenant.entityType,
-        fullName: args.tenant.fullName,
-        cpf: args.tenant.cpf,
-        cnpj: args.tenant.cnpj,
-        birthDate: args.tenant.birthDate,
-        email: args.tenant.email,
-        phone: args.tenant.phone,
-        score: args.tenant.score,
-        termApprovedAt: null,
-      },
     });
 
     const doc = await ctx.db.get(contractId);
@@ -644,6 +656,9 @@ export const create = mutationWithAgencyScope({
       at: new Date().toISOString(),
       username: ctx.user.name,
       message: "Contrato criado",
+      // As-signed snapshot: the checksum-normalized registry fields at
+      // creation time, frozen on the append-only history event.
+      tenantSnapshot: registryInput,
     });
 
     await appendAuditEntry(ctx, {
@@ -728,10 +743,31 @@ export const cancelProposal = mutationWithAgencyScope({
 });
 
 /**
- * Reshape a Convex `contracts` doc + history into the UI Contract type.
- * Strips system fields (`_id`, `_creationTime`); renames publicId → id.
+ * Discriminated pf/pj tenant view joined from the registry row. Approval
+ * fields are contract-level (`tenantApproval`); identity/contact fields
+ * come from the living `tenants` row.
  */
-function shapeContract(doc: Contract, history: ContractHistory[]) {
+function shapeContractTenant(doc: Contract, tenant: Tenant) {
+  const shared = {
+    approvalStatus: doc.tenantApproval.status,
+    termApprovedAt: doc.tenantApproval.termApprovedAt,
+    taxId: tenant.taxId,
+    fullName: tenant.fullName,
+    email: tenant.email,
+    phone: tenant.phone,
+  };
+  if (tenant.entityType === "pj") {
+    return { ...shared, entityType: "pj" as const, contactCpf: tenant.contactCpf };
+  }
+  return { ...shared, entityType: "pf" as const, birthDate: tenant.birthDate };
+}
+
+/**
+ * Reshape a Convex `contracts` doc + its joined registry tenant + history
+ * into the UI Contract type. Strips system fields (`_id`,
+ * `_creationTime`); renames publicId → id.
+ */
+function shapeContract(doc: Contract, tenant: Tenant, history: ContractHistory[]) {
   return {
     id: doc.publicId,
     agencyId: doc.agencyId,
@@ -742,7 +778,7 @@ function shapeContract(doc: Contract, history: ContractHistory[]) {
     property: doc.property,
     optional: doc.optional,
     documents: doc.documents,
-    tenant: doc.tenant,
+    tenant: shapeContractTenant(doc, tenant),
     history: history.map((h) => ({
       at: h.at,
       username: h.username,
