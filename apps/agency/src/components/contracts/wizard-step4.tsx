@@ -15,8 +15,13 @@ import { cn } from "@mutav/ui/cn";
 import {
   isPropertyKind,
   parseBRLInput,
+  patchBlockDraft,
+  startBlockEdit,
   validateWizard,
+  WIZARD_VIEWING,
   type DraftWizardData,
+  type EditingState,
+  type ReviewBlockKind,
 } from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { splitCommission } from "@/lib/pricing/commission";
@@ -31,8 +36,6 @@ type Props = {
   onBack: () => void;
 };
 
-type EditingBlock = "property" | "rental" | "tenant" | null;
-
 type MissingFields = Set<string>;
 
 export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Props) {
@@ -40,8 +43,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
   const createContract = useMutation(api.contracts.useCases.create);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [missing, setMissing] = React.useState<MissingFields>(new Set());
-  const [editingBlock, setEditingBlock] = React.useState<EditingBlock>(null);
-  const [draft, setDraft] = React.useState<Partial<DraftWizardData>>({});
+  const [editing, setEditing] = React.useState<EditingState>(WIZARD_VIEWING);
 
   const preview =
     data.rentCents > 0 && data.score !== null
@@ -56,20 +58,22 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
 
-  function startEdit(block: EditingBlock) {
-    setEditingBlock(block);
-    setDraft({ ...data });
+  function startEdit(block: ReviewBlockKind) {
+    setEditing(startBlockEdit(block, data));
+  }
+
+  function patchDraft(patch: Partial<DraftWizardData>) {
+    setEditing((s) => patchBlockDraft(s, patch));
   }
 
   function saveEdit() {
-    onChange(draft);
-    setEditingBlock(null);
-    setDraft({});
+    if (editing.kind !== "editing") return;
+    onChange(editing.draft);
+    setEditing(WIZARD_VIEWING);
   }
 
   function cancelEdit() {
-    setEditingBlock(null);
-    setDraft({});
+    setEditing(WIZARD_VIEWING);
   }
 
   const handleSubmit = async () => {
@@ -149,7 +153,10 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
   };
 
   const m = missing;
-  const isEditing = editingBlock !== null;
+  const isEditing = editing.kind === "editing";
+  const editingProperty = editing.kind === "editing" && editing.block === "property";
+  const editingRental = editing.kind === "editing" && editing.block === "rental";
+  const editingTenant = editing.kind === "editing" && editing.block === "tenant";
 
   return (
     <div className="flex flex-col gap-3">
@@ -159,20 +166,20 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
       <Block
         title={t("review.propertySection")}
         onEdit={() => startEdit("property")}
-        editing={editingBlock === "property"}
-        disabled={isEditing && editingBlock !== "property"}
+        editing={editingProperty}
+        disabled={isEditing && !editingProperty}
         onSave={saveEdit}
         onCancel={cancelEdit}
       >
-        {editingBlock === "property" ? (
+        {editingProperty ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <EditField label={t("property.kindLabel")} className="sm:col-span-2">
               <ToggleGroup
                 type="single"
-                value={draft.propertyKind ?? ""}
+                value={editing.draft.propertyKind}
                 onValueChange={(v) => {
                   if (!isPropertyKind(v)) return;
-                  setDraft((d) => ({ ...d, propertyKind: v }));
+                  patchDraft({ propertyKind: v });
                 }}
                 variant="outline"
                 spacing={2}
@@ -184,48 +191,48 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             <EditField label={t("property.cep")}>
               <Input
                 maxLength={9}
-                value={draft.cep ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, cep: e.target.value }))}
+                value={editing.draft.cep}
+                onChange={(e) => patchDraft({ cep: e.target.value })}
               />
             </EditField>
             <EditField label={t("property.neighborhood")}>
               <Input
-                value={draft.neighborhood ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, neighborhood: e.target.value }))}
+                value={editing.draft.neighborhood}
+                onChange={(e) => patchDraft({ neighborhood: e.target.value })}
               />
             </EditField>
             <EditField label={t("property.street")} className="sm:col-span-2">
               <div className="grid grid-cols-[1fr_auto] gap-2">
                 <Input
-                  value={draft.street ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, street: e.target.value }))}
+                  value={editing.draft.street}
+                  onChange={(e) => patchDraft({ street: e.target.value })}
                 />
                 <Input
                   className="w-24"
-                  value={draft.addressNumber ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, addressNumber: e.target.value }))}
+                  value={editing.draft.addressNumber}
+                  onChange={(e) => patchDraft({ addressNumber: e.target.value })}
                   placeholder={t("property.addressNumber")}
                 />
               </div>
             </EditField>
             <EditField label={t("property.city")}>
               <Input
-                value={draft.city ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+                value={editing.draft.city}
+                onChange={(e) => patchDraft({ city: e.target.value })}
               />
             </EditField>
             <EditField label={t("property.uf")}>
               <Input
                 maxLength={2}
                 className="uppercase"
-                value={draft.uf ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, uf: e.target.value.toUpperCase() }))}
+                value={editing.draft.uf}
+                onChange={(e) => patchDraft({ uf: e.target.value.toUpperCase() })}
               />
             </EditField>
             <EditField label={t("property.complement")} className="sm:col-span-2">
               <Input
-                value={draft.complement ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, complement: e.target.value }))}
+                value={editing.draft.complement}
+                onChange={(e) => patchDraft({ complement: e.target.value })}
               />
             </EditField>
           </div>
@@ -276,12 +283,12 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
       <Block
         title={t("review.rentalSection")}
         onEdit={() => startEdit("rental")}
-        editing={editingBlock === "rental"}
-        disabled={isEditing && editingBlock !== "rental"}
+        editing={editingRental}
+        disabled={isEditing && !editingRental}
         onSave={saveEdit}
         onCancel={cancelEdit}
       >
-        {editingBlock === "rental" ? (
+        {editingRental ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <EditField label={t("rent.rent")}>
               <Input
@@ -289,9 +296,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 defaultValue={
                   data.rentCents ? (data.rentCents / 100).toFixed(2).replace(".", ",") : ""
                 }
-                onBlur={(e) =>
-                  setDraft((d) => ({ ...d, rentCents: parseBRLInput(e.target.value) }))
-                }
+                onBlur={(e) => patchDraft({ rentCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
             <EditField label={t("rent.condo")}>
@@ -300,9 +305,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 defaultValue={
                   data.condoCents ? (data.condoCents / 100).toFixed(2).replace(".", ",") : ""
                 }
-                onBlur={(e) =>
-                  setDraft((d) => ({ ...d, condoCents: parseBRLInput(e.target.value) }))
-                }
+                onBlur={(e) => patchDraft({ condoCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
             <EditField label={t("rent.otherFees")}>
@@ -313,9 +316,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                     ? (data.otherFeesCents / 100).toFixed(2).replace(".", ",")
                     : ""
                 }
-                onBlur={(e) =>
-                  setDraft((d) => ({ ...d, otherFeesCents: parseBRLInput(e.target.value) }))
-                }
+                onBlur={(e) => patchDraft({ otherFeesCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
           </div>
@@ -355,12 +356,12 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
       <Block
         title={t("review.tenantSection")}
         onEdit={() => startEdit("tenant")}
-        editing={editingBlock === "tenant"}
-        disabled={isEditing && editingBlock !== "tenant"}
+        editing={editingTenant}
+        disabled={isEditing && !editingTenant}
         onSave={saveEdit}
         onCancel={cancelEdit}
       >
-        {editingBlock === "tenant" ? (
+        {editingTenant ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <LockedDisplay
               label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
@@ -375,23 +376,23 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
               <EditField label={t("tenant.birthDate")}>
                 <Input
                   type="date"
-                  value={draft.birthDate ?? ""}
+                  value={editing.draft.birthDate}
                   max={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setDraft((d) => ({ ...d, birthDate: e.target.value }))}
+                  onChange={(e) => patchDraft({ birthDate: e.target.value })}
                 />
               </EditField>
             )}
             <EditField label={t("tenant.email")}>
               <Input
                 type="email"
-                value={draft.email ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+                value={editing.draft.email}
+                onChange={(e) => patchDraft({ email: e.target.value })}
               />
             </EditField>
             <EditField label={t("tenant.phone")}>
               <Input
-                value={draft.phone ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+                value={editing.draft.phone}
+                onChange={(e) => patchDraft({ phone: e.target.value })}
               />
             </EditField>
           </div>
