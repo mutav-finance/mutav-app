@@ -4,8 +4,8 @@ import { v } from "convex/values";
 import { Resend } from "resend";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { getResendApiKey, getWaitlistAudienceId } from "../lib/env";
-import { waitlistAudienceValidator } from "./domain";
+import { getResendApiKey, getResendFromEmail, getWaitlistAudienceId } from "../lib/env";
+import { WAITLIST_AUDIENCE, waitlistAudienceValidator } from "./domain";
 
 // Best-effort write to a Resend audience so the team can run broadcast
 // campaigns later. Convex is the source of truth; this is a projection.
@@ -45,6 +45,132 @@ export const addToResendAudience = internalAction({
     }
   },
 });
+
+// CTAs for the welcome email. These are marketing constants, not secrets, so
+// they live in code rather than env — a copy change is a code change here.
+const BOOK_A_CALL_URL = "https://calendar.app.google/41vSpkz8pMoK7Saw9";
+const INSTAGRAM_URL = "https://www.instagram.com/mutav.br/";
+
+// Email clients (Gmail, Outlook) strip inline SVG and block base64 images, so
+// the logo must load from a public URL. It ships in the agency app's public
+// dir (apps/agency/public/email/mutav-logo.png) and serves from that origin.
+const MUTAV_LOGO_URL = "https://app.mutav.finance/email/mutav-logo.png";
+
+// Best-effort welcome email, scheduled fire-and-forget from the `join`
+// mutation (mirrors addToResendAudience). Convex already holds the signup;
+// a delivery failure is logged, never re-thrown, so it can't affect signup.
+//
+// Scope: only the `imobiliaria` audience has approved copy today. Other
+// audiences are skipped (logged) until their template lands — see mutav#57.
+//
+// Failure modes (all logged, none re-thrown):
+//   - RESEND_API_KEY missing → skip (local dev without secrets)
+//   - audience without a template → skip
+//   - Resend API rejects (unverified domain, invalid address, …) → log
+export const sendWelcomeEmail = internalAction({
+  args: {
+    email: v.string(),
+    audience: waitlistAudienceValidator,
+  },
+  handler: async (_ctx, { email, audience }) => {
+    if (!process.env.RESEND_API_KEY) {
+      console.warn("[waitlist] RESEND_API_KEY not set, skipping welcome email");
+      return;
+    }
+
+    if (audience !== WAITLIST_AUDIENCE.IMOBILIARIA) {
+      console.warn(`[waitlist] no welcome template for "${audience}" yet, skipping`);
+      return;
+    }
+
+    const resend = new Resend(getResendApiKey());
+
+    const { error } = await resend.emails.send({
+      from: getResendFromEmail(),
+      to: email,
+      subject: "Bem-vindo à MUTAV, vamos conversar?",
+      html: buildImobiliariaWelcomeHtml(),
+    });
+
+    if (error) {
+      console.error(`[waitlist] welcome email failed for ${audience}:${email}`, error);
+    }
+  },
+});
+
+// Single-column, inline-styled HTML — the lowest common denominator email
+// clients render reliably. No external CSS, no web fonts (system stacks only).
+//
+// Brand grammar (Precision Brutalism): depth from stacked light surface planes
+// (canvas → surface-3 header → white body → surface-2 footer), never shadows;
+// 0px radius; amber (#c47e10) as the single scarcity signal; text on amber is
+// always #1a1a1a, never white. The logo is the color-on-light wordmark variant.
+function buildImobiliariaWelcomeHtml(): string {
+  return `<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:0;background-color:#f7f6f3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f7f6f3;padding:32px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;border-collapse:separate;">
+            <tr>
+              <td style="height:3px;background-color:#c47e10;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="background-color:#fff8ee;padding:28px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:middle;">
+                      <img src="${MUTAV_LOGO_URL}" width="43" height="36" alt="MUTAV" style="display:block;border:0;" />
+                    </td>
+                    <td style="padding-left:12px;vertical-align:middle;">
+                      <span style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#c47e10;">MUTAV</span>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:16px 0 0 0;font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-style:italic;letter-spacing:0.06em;color:#6b6860;text-transform:uppercase;">
+                  Feito para quem tem muito o que fazer
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#ffffff;padding:36px 32px 8px 32px;">
+                <h1 style="margin:0;font-size:26px;line-height:1.25;letter-spacing:-0.01em;color:#1a1a1a;text-transform:uppercase;">Que bom ter você por aqui!</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#ffffff;padding:16px 32px 0 32px;">
+                <p style="margin:0;font-size:16px;line-height:1.6;color:#3a3a3a;">
+                  Recebemos seu cadastro. A MUTAV está construindo uma nova forma de garantia locatícia para imobiliárias: mais simples e mais segura para você.
+                </p>
+                <p style="margin:16px 0 0 0;font-size:16px;line-height:1.6;color:#3a3a3a;">
+                  Que tal uma conversa rápida com o nosso time? Queremos entender a sua operação e mostrar como a MUTAV se encaixa no seu dia a dia.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#ffffff;padding:28px 32px 36px 32px;">
+                <a href="${BOOK_A_CALL_URL}" style="display:inline-block;background-color:#c47e10;color:#fff8ee;text-decoration:none;font-size:16px;font-weight:700;letter-spacing:0.04em;padding:14px 28px;text-transform:uppercase;">
+                  Agendar uma conversa
+                </a>
+                <p style="margin:20px 0 0 0;font-size:14px;line-height:1.6;color:#6b6860;">
+                  Prefere nos conhecer aos poucos? Estamos no
+                  <a href="${INSTAGRAM_URL}" style="color:#6b6860;font-weight:700;text-decoration:underline;">Instagram</a>.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#eeedea;padding:18px 32px;">
+                <p style="margin:0;font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:0.06em;color:#6b6860;text-transform:uppercase;">MUTAV · Garantia locatícia mais transparente do mercado</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
 
 type BackfillSummary = {
   dryRun: boolean;

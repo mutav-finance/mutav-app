@@ -71,6 +71,14 @@ export const join = mutation({
       audience: args.audience,
     });
 
+    // Best-effort welcome email. Same fire-and-forget contract: the action
+    // skips audiences without an approved template and logs any delivery
+    // failure without affecting this mutation.
+    await ctx.scheduler.runAfter(0, internal.waitlist.actions.sendWelcomeEmail, {
+      email,
+      audience: args.audience,
+    });
+
     return {
       success: true,
       data: { waitlistId, alreadyOnList: false },
