@@ -731,7 +731,7 @@
   },
   "contractNew": {
     "meta": {
-      "title": "Novo Contrato | SGR"
+      "title": "Novo Contrato | Mutav"
     },
     "heading": "Novo Contrato",
     "subheading": "Preencha os dados para criar uma nova garantia",
@@ -883,7 +883,7 @@
   "paymentFlow": {
     "meta": {
       "title": "Pagar com Stellar — {publicId}",
-      "description": "Pague a fatura TGA via rede Stellar."
+      "description": "Pague a fatura Mutav via rede Stellar."
     },
     "shell": {
       "brand": "mutav",
