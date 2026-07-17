@@ -1,8 +1,15 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
+import type { AgencyId } from "../agencies/domain";
 import type { AuditActor } from "../audit/domain";
+import {
+  registerContractAggregateComponents,
+  seedAgencyWithMembership,
+  setupAuthenticatedUser,
+  type SeededUserId,
+} from "../lib/testFixtures";
 import schema from "../schema";
 import { normalizeEmbeddedTenant, type TenantInput } from "./domain";
 import { getOrCreateTenant } from "./useCases";
@@ -285,5 +292,129 @@ describe("normalizeEmbeddedTenant", () => {
     });
     expect(input?.entityType).toBe("pf");
     expect(input?.taxId).toBe(VALID_CPF);
+  });
+});
+
+describe("lookupTenantByTaxId (relationship-gated)", () => {
+  async function seedSecondAgencyForUser(
+    t: ReturnType<typeof setup>,
+    userId: SeededUserId,
+    cnpj: string,
+  ): Promise<AgencyId> {
+    return t.run(async (ctx) => {
+      const agencyId = await ctx.db.insert("agencies", {
+        name: `Second Agency ${cnpj}`,
+        cnpj,
+        agencyType: "empresa",
+        onboardingState: "active",
+        createdAt: new Date().toISOString(),
+      });
+      await ctx.db.insert("memberships", {
+        userId,
+        agencyId,
+        role: "owner",
+        joinedAt: new Date().toISOString(),
+      });
+      return agencyId;
+    });
+  }
+
+  function pfContractArgs(agencyId: AgencyId) {
+    return {
+      agencyId,
+      property: {
+        cep: "01000000",
+        streetAndNumber: "Rua Teste, 1",
+        neighborhood: "Centro",
+        cityUF: "São Paulo / SP",
+      },
+      optional: { complement: "", tag: "", description: "" },
+      propertyKind: "residencial" as const,
+      rentCents: 300000,
+      condoCents: 0,
+      otherFeesCents: 0,
+      tenant: {
+        entityType: "pf" as const,
+        fullName: "Maria Silva Santos",
+        cpf: VALID_CPF,
+        cnpj: undefined,
+        birthDate: "1990-05-12",
+        email: "maria@example.com",
+        phone: "11900000001",
+        score: 750,
+      },
+    };
+  }
+
+  test("related agency gets prefill; unrelated agency and unknown tax id both get null (no existence leak)", async () => {
+    const t = setup();
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyA = await seedAgencyWithMembership(t, userId);
+    const agencyB = await seedSecondAgencyForUser(t, userId, "00000000000200");
+
+    const created = await asUser.mutation(api.contracts.useCases.create, pfContractArgs(agencyA));
+    expect(created.success).toBe(true);
+
+    const fromRelated = await asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+      agencyId: agencyA,
+      taxId: VALID_CPF,
+    });
+    expect(fromRelated).toEqual({ fullName: "Maria Silva Santos", email: "maria@example.com" });
+
+    const fromUnrelated = await asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+      agencyId: agencyB,
+      taxId: VALID_CPF,
+    });
+    const forUnknown = await asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+      agencyId: agencyA,
+      taxId: VALID_CPF_2,
+    });
+
+    // Known-but-unrelated and never-registered are indistinguishable — both null.
+    expect(fromUnrelated).toBeNull();
+    expect(forUnknown).toBeNull();
+    expect(fromUnrelated).toEqual(forUnknown);
+  });
+
+  test("a pj tenant's contact CPF is not an identity key — looking it up never leaks company data", async () => {
+    const t = setup();
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const pjArgs = {
+      ...pfContractArgs(agencyId),
+      tenant: {
+        entityType: "pj" as const,
+        fullName: "Tech Solutions Ltda",
+        cpf: VALID_CPF,
+        cnpj: VALID_CNPJ,
+        birthDate: "",
+        email: "contato@techsolutions.example.com",
+        phone: "11900000003",
+        score: 650,
+      },
+    };
+    const created = await asUser.mutation(api.contracts.useCases.create, pjArgs);
+    expect(created.success).toBe(true);
+
+    // The registry row keys on the CNPJ; the contact CPF is stored but is not
+    // a lookup key, so a pf-flow lookup by that CPF resolves nothing.
+    const byContactCpf = await asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+      agencyId,
+      taxId: VALID_CPF,
+    });
+    expect(byContactCpf).toBeNull();
+
+    // The CNPJ itself resolves within the owning agency.
+    const byCnpj = await asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+      agencyId,
+      taxId: VALID_CNPJ,
+    });
+    expect(byCnpj).toEqual({
+      fullName: "Tech Solutions Ltda",
+      email: "contato@techsolutions.example.com",
+    });
   });
 });

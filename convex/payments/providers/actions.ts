@@ -42,6 +42,7 @@ import {
 } from "../../lib/env";
 import { decryptSecret, encryptSecret } from "../../lib/secrets";
 import { getTreasurySigner } from "../../lib/stellarSigner";
+import { tenantToSep9Prefill, type TenantPrefill } from "./tenantPrefill";
 import { ANCHOR_ONBOARDING_STATUS, type AnchorAccountId } from "./accountDomain";
 import { anchorProviderValidator, type AnchorProvider } from "./domain";
 import {
@@ -243,18 +244,12 @@ function brlCentsToAssetAmount(brlCents: number, assetSymbol: string): string {
   return assetFace.toFixed(asset.displayDecimals);
 }
 
-interface TenantPrefill {
-  first_name?: string;
-  last_name?: string;
-  email_address?: string;
-  id_number?: string;
-}
-
 /**
- * Resolve SEP-9 tenant fields from a payment row's first line item.
- * Anchor hosted forms pre-fill these (and Etherfuse uses them to seed
- * KYC). Returns an empty object when no contract/tenant is reachable —
- * the deposit still works without prefill.
+ * Resolve SEP-9 tenant fields from a payment row's first line item, joining
+ * the tenant registry via the contract's `tenantId`. Anchor hosted forms
+ * pre-fill these (and Etherfuse uses them to seed KYC). Returns an empty
+ * object when no contract/tenant is reachable — the deposit still works
+ * without prefill.
  */
 async function resolveTenantPrefill(
   ctx: ActionCtx,
@@ -265,15 +260,11 @@ async function resolveTenantPrefill(
     publicId: contractPublicId,
   });
   if (!contract) return {};
-  const tenant = contract.tenant;
-  const fullName = tenant.fullName.trim();
-  const [first, ...rest] = fullName.split(/\s+/);
-  return {
-    first_name: first ?? undefined,
-    last_name: rest.length > 0 ? rest.join(" ") : undefined,
-    email_address: tenant.email || undefined,
-    id_number: tenant.cpf || undefined,
-  };
+  const tenant = await ctx.runQuery(internal.tenants.useCases.getByIdInternal, {
+    tenantId: contract.tenantId,
+  });
+  if (!tenant) return {};
+  return tenantToSep9Prefill(tenant);
 }
 
 function tenantPrefillToFields(p: TenantPrefill): Record<string, string> {

@@ -1,14 +1,14 @@
-import { internalMutation } from "../_generated/server";
+import { v } from "convex/values";
+import { internalMutation, internalQuery } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import type { Result } from "../lib/result";
 import { AUDIT_ACTION, auditActorValidator, type AuditActor } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
-import type { TenantApprovalStatus } from "../contracts/domain";
+import { queryWithAgencyScope } from "../lib/auth";
+import { digitsOnly } from "../lib/taxId";
 import {
-  normalizeEmbeddedTenant,
   tenantInputValidator,
   validateTaxId,
-  type EmbeddedTenantSnapshot,
   type Tenant,
   type TenantErrorCode,
   type TenantId,
@@ -113,46 +113,43 @@ export const getOrCreate = internalMutation({
   handler: async (ctx, args): Promise<GetOrCreateTenantResult> => getOrCreateTenant(ctx, args),
 });
 
-type LegacyTenantContract = {
-  tenantId?: TenantId;
-  tenant: EmbeddedTenantSnapshot & {
-    approvalStatus: TenantApprovalStatus;
-    termApprovedAt: string | null;
-  };
-};
-
-export type TenantRegistryPatch = {
-  tenantId: TenantId;
-  tenantApproval: { status: TenantApprovalStatus; termApprovedAt: string | null };
-};
+/**
+ * Registry row by id for actions (no `ctx.db` in ActionCtx). Callers own
+ * whatever authorization is appropriate at their entry point.
+ */
+export const getByIdInternal = internalQuery({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, { tenantId }) => ctx.db.get(tenantId),
+});
 
 /**
- * Compute the registry-link patch for one legacy contract, resolving (or
- * creating) its `tenants` row from the embedded data. Returns `undefined`
- * when the contract already carries `tenantId` (idempotency) or when the
- * embedded tenant cannot be normalized without fabricating data — such
- * rows stay legacy-only, which the widened schema tolerates. Shared by
- * `migrations.backfillContractTenantRegistry` and the seed so dedup and
- * conflict-logging semantics cannot drift.
+ * Relationship-gated prefill lookup (spec § Domain rules): an agency reads
+ * tenant data only when it has (or had) a contract with that tenant.
+ * Unknown-to-the-platform and known-but-unrelated tax IDs both return
+ * `null` — indistinguishable by design, so there is no existence leak.
+ * `contactCpf` is deliberately NOT an identity key: a pj tenant's contact
+ * CPF never resolves company data into a pf flow.
  */
-export async function buildTenantRegistryPatch(
-  ctx: MutationCtx,
-  contract: LegacyTenantContract,
-  actor: AuditActor,
-): Promise<TenantRegistryPatch | undefined> {
-  if (contract.tenantId !== undefined) return undefined;
+export const lookupTenantByTaxId = queryWithAgencyScope({
+  args: { taxId: v.string() },
+  handler: async (ctx, { taxId }) => {
+    const digits = digitsOnly(taxId);
+    if (digits.length === 0) return null;
 
-  const input = normalizeEmbeddedTenant(contract.tenant);
-  if (!input) return undefined;
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_taxId", (q) => q.eq("taxId", digits))
+      .unique();
+    if (!tenant) return null;
 
-  const result = await getOrCreateTenant(ctx, { input, actor });
-  if (!result.success) return undefined;
+    const relatedContract = await ctx.db
+      .query("contracts")
+      .withIndex("by_agency_tenant", (q) =>
+        q.eq("agencyId", ctx.agencyId).eq("tenantId", tenant._id),
+      )
+      .first();
+    if (!relatedContract) return null;
 
-  return {
-    tenantId: result.data.tenantId,
-    tenantApproval: {
-      status: contract.tenant.approvalStatus,
-      termApprovedAt: contract.tenant.termApprovedAt,
-    },
-  };
-}
+    return { fullName: tenant.fullName, email: tenant.email };
+  },
+});
