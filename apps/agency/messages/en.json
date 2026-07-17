@@ -379,6 +379,7 @@
       "fields": {
         "fullName": "Name",
         "cpf": "CPF",
+        "cnpj": "CNPJ",
         "birthDate": "Date of Birth",
         "email": "E-mail",
         "phone": "Phone"

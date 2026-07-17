@@ -66,8 +66,8 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   );
 
   const tenantLookup = useQuery(
-    api.contracts.useCases.lookupTenantByCpf,
-    agencyId && cpfDigits ? { agencyId, cpf: cpfDigits } : "skip",
+    api.tenants.useCases.lookupTenantByTaxId,
+    agencyId && docDigits ? { agencyId, taxId: docDigits } : "skip",
   );
 
   const triggerScoreRequest = React.useEffectEvent(

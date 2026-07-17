@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
+import { maskCNPJ, maskCPF } from "@mutav/i18n/brazil";
 import { formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
 import type { ContractTenant } from "@/lib/contracts/types";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";
@@ -56,8 +57,14 @@ export function ContractTenantCard({ tenant }: { tenant: ContractTenant }) {
         <FieldGroup className="gap-0">
           <FieldGroupHeader>{t("personal")}</FieldGroupHeader>
           <FieldRow label={tFields("fullName")} value={tenant.fullName} />
-          <FieldRow label={tFields("cpf")} value={tenant.cpf} mono />
-          <FieldRow label={tFields("birthDate")} value={formatDateBR(tenant.birthDate)} mono />
+          {tenant.entityType === "pj" ? (
+            <FieldRow label={tFields("cnpj")} value={maskCNPJ(tenant.taxId)} mono />
+          ) : (
+            <>
+              <FieldRow label={tFields("cpf")} value={maskCPF(tenant.taxId)} mono />
+              <FieldRow label={tFields("birthDate")} value={formatDateBR(tenant.birthDate)} mono />
+            </>
+          )}
           <FieldRow label={tFields("email")} value={tenant.email} />
           <FieldRow label={tFields("phone")} value={tenant.phone} mono />
         </FieldGroup>
