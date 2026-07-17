@@ -32,6 +32,8 @@ import type * as creditAnalysis_providers_mock from "../creditAnalysis/providers
 import type * as creditAnalysis_registry from "../creditAnalysis/registry.js";
 import type * as creditAnalysis_useCases from "../creditAnalysis/useCases.js";
 import type * as crons from "../crons.js";
+import type * as delinquencies_domain from "../delinquencies/domain.js";
+import type * as delinquencies_useCases from "../delinquencies/useCases.js";
 import type * as http from "../http.js";
 import type * as invoices_actions from "../invoices/actions.js";
 import type * as invoices_domain from "../invoices/domain.js";
@@ -108,6 +110,8 @@ declare const fullApi: ApiFromModules<{
   "creditAnalysis/registry": typeof creditAnalysis_registry;
   "creditAnalysis/useCases": typeof creditAnalysis_useCases;
   crons: typeof crons;
+  "delinquencies/domain": typeof delinquencies_domain;
+  "delinquencies/useCases": typeof delinquencies_useCases;
   http: typeof http;
   "invoices/actions": typeof invoices_actions;
   "invoices/domain": typeof invoices_domain;
