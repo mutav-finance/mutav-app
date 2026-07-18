@@ -8,12 +8,12 @@
 # .convex-preview-url, which this script reads.
 #
 # Hard-gated on VERCEL_ENV=preview:
-#   - production builds: skipped (seed:seedPreview is dev-only and wipes
+#   - production builds: skipped (seed:seedReset is dev-only and wipes
 #     tables before inserting)
 #   - development / local: skipped (you seed locally with `bunx convex run
-#     seed:seedPreview` against your dev deployment)
+#     seed:seedReset` against your dev deployment)
 #
-# seedPreview is idempotent — it wipes agencies/users/contracts/payments
+# seedReset is idempotent — it wipes agencies/users/contracts/payments
 # and re-inserts a deterministic ~30-contract fixture plus the four Auth0
 # personas. Every new commit on a PR re-seeds, so previews stay
 # reproducible. Reviewer-added data gets wiped on the next push; that's
@@ -49,8 +49,8 @@ HOST="${CONVEX_URL#https://}"
 HOST="${HOST#http://}"
 DEPLOY_NAME="${HOST%%.*}"
 
-echo "seed-preview: VERCEL_ENV=preview, deployment=${DEPLOY_NAME} — running seed:seedPreview"
-bunx convex run --deployment "${DEPLOY_NAME}" seed:seedPreview
+echo "seed-preview: VERCEL_ENV=preview, deployment=${DEPLOY_NAME} — running seed:seedReset"
+bunx convex run --deployment "${DEPLOY_NAME}" seed:seedReset
 echo "✓ seed-preview: preview deployment populated"
 
 # All config lives in Vercel Project Environment Variables (preview

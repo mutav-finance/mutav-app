@@ -30,16 +30,30 @@ Staff identity isn't enforced anywhere yet — the `(admin)` route group + `quer
 
 ## Recreating the personas on a fresh Convex deployment
 
-Each preview deployment gets its own Convex DB (5-day auto-cleanup). For Vercel previews this is automatic — `scripts/seed-preview.sh` calls `seed:seedPreview` after every deploy, which wipes the DB and re-seeds the fictional dataset plus all four personas.
+Each preview deployment gets its own Convex DB (5-day auto-cleanup). For Vercel previews this is automatic — `scripts/seed-preview.sh` calls `seed:seedReset` after every deploy, which wipes the DB and re-seeds the fictional dataset plus all four personas.
 
-For local dev or manual reset, two commands give you each axis of the seed:
+The seed exposes exactly **two** runnable entrypoints — pick by what you need:
 
-| Goal                                                           | Command                                 |
-| -------------------------------------------------------------- | --------------------------------------- |
-| Full reset (wipe + fictional dataset + personas)               | `bunx convex run seed:seedPreview`      |
-| Refresh only the personas (idempotent, leaves everything else) | `bunx convex run seed:seedTestPersonas` |
+| Goal                                                             | Command                                 |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| Full reset (wipe + fictional dataset + personas + Aprovada book) | `bunx convex run seed:seedReset`        |
+| Refresh only the personas (idempotent, leaves everything else)   | `bunx convex run seed:seedTestPersonas` |
 
-`seedTestPersonas` skips personas whose state already matches, so it's safe to re-run. The Auth0 side (account + password) doesn't need recreating — it's tenant-scoped, not deployment-scoped.
+`seedReset` is the only path that produces a login experience with data. It internally chains wipe → fictional dataset → personas → the `agencyowner` Aprovada book; those steps are private helpers, **not** runnable on their own, so you cannot half-seed the DB by running an intermediate step by hand (that mistake is what left `agencyowner` on an empty dashboard — see the trap below).
+
+`seedTestPersonas` skips personas whose state already matches, so it's safe to re-run. It does **not** wipe or seed the fictional/Aprovada data — use it to repair persona bindings (e.g. after rotating the dev tenant's subjects), not for a first populate. The Auth0 side (account + password) doesn't need recreating — it's tenant-scoped, not deployment-scoped.
+
+### Trap: `agencyowner`'s contracts come from the Aprovada book, not the fictional dataset
+
+The personas own different slices of the seed data:
+
+| Persona                                        | Agency                           | Contracts come from                             |
+| ---------------------------------------------- | -------------------------------- | ----------------------------------------------- |
+| `agencyowner@mutav.finance`                    | **Imobiliária Aprovada**         | the Aprovada book step of `seedReset`           |
+| _(demo dataset, not a login persona's agency)_ | Paulista / Atlântica / Horizonte | the fictional-dataset step of `seedReset`       |
+| `pendinguser` / `newuser`                      | under_review / none              | `seedTestPersonas` (agency state, no contracts) |
+
+The fictional dataset seeds the **demo agencies** (Paulista/Atlântica/Horizonte) — **none of which is a login persona's workspace**. That is why the seed no longer exposes the fictional/Aprovada steps as separate entrypoints: only `seedReset` runs all of them, so logging in as `agencyowner` always lands on a populated **Aprovada** dashboard. `convex/seed.test.ts` is the regression guard — it fails if any change lets `agencyowner`'s agency come up with zero contracts.
 
 ## Recreating the personas on a fresh Auth0 tenant
 

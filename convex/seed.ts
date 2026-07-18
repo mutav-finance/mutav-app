@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { INVOICE_LINE_ITEM_KIND, InvoiceStates } from "./invoices/domain";
 import { generateInvoiceMuxedId } from "./invoices/lib/muxedId";
@@ -27,7 +26,7 @@ const pid = (n: number) => String(1_000_000 + n);
 const d = (s: string) => s;
 
 /**
- * Demo tables wiped by `clearAll` and `seedPreview`. Order matters —
+ * Demo tables wiped by `seedReset`. Order matters —
  * tables with foreign-key-like references come first so we don't leave
  * dangling pointers mid-wipe.
  */
@@ -124,11 +123,20 @@ function externalRefForSettlement(method: SettlementMethod): string | undefined 
   }
 }
 
+type SeedFictionalResult = {
+  agencies: { paulistaId: AgencyId; atlanticaId: AgencyId; horizonteId: AgencyId };
+  contractCounts: { paulista: number; atlantica: number; horizonte: number };
+};
+
 /**
  * Additive dev seed — inserts 3 agencies, 30 contracts, contract history,
  * and historical payments covering the last two months. Does NOT wipe
- * existing rows; call `clearAll` first if you need a clean slate, or use
- * `seedPreview` for the standard wipe-then-seed flow.
+ * existing rows and does NOT seed the `agencyowner` persona's own agency
+ * ("Imobiliária Aprovada"). It is deliberately a private helper, not a
+ * runnable entrypoint: running it by hand leaves `agencyowner` staring at
+ * an empty dashboard (see `docs/test-personas.md` — the partial-seed
+ * trap). Only `seedReset` calls it, chained with the persona + Aprovada
+ * steps that complete the picture.
  *
  * Optional `adminEmail` provisions a user row with that email and grants
  * it owner/admin/member memberships across the three seeded agencies. On
@@ -136,15 +144,13 @@ function externalRefForSettlement(method: SettlementMethod): string | undefined 
  * gets its `subject` patched (see `getOrCreateByIdentity`) so the
  * developer inherits the seeded memberships without re-onboarding.
  *
- * Run with:
- *   bunx convex run seed:seedFictional
- *   bunx convex run seed:seedFictional '{"adminEmail":"you@example.com"}'
- *
  * Dev-only. Do NOT call from production.
  */
-export const seedFictional = internalMutation({
-  args: { adminEmail: v.optional(v.string()) },
-  handler: async (ctx, args) => {
+async function seedFictional(
+  ctx: MutationCtx,
+  args: { adminEmail?: string },
+): Promise<SeedFictionalResult> {
+  {
     // ── Agencies ──────────────────────────────────────────────────────────────
 
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
@@ -2195,15 +2201,16 @@ export const seedFictional = internalMutation({
       agencies: { paulistaId, atlanticaId, horizonteId },
       contractCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
     };
-  },
-});
+  }
+}
 
 /**
  * Test personas — see `docs/test-personas.md`. Source of truth for the
  * Auth0 subject ↔ Convex user binding so seeds attach state to the
  * exact same identity the JWT will resolve to (no email-link dance).
  */
-type PersonaKey = "systemadmin" | "agencyowner" | "pendinguser" | "newuser";
+const PERSONA_KEYS = ["systemadmin", "agencyowner", "pendinguser", "newuser"] as const;
+type PersonaKey = (typeof PERSONA_KEYS)[number];
 
 const PERSONAS: Record<
   PersonaKey,
@@ -2328,30 +2335,28 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   return { persona: key, userId, agencyId };
 }
 
+async function seedAllPersonas(ctx: MutationCtx): Promise<SeedPersonasResult> {
+  const results: SeedPersonasResult = [];
+  for (const key of PERSONA_KEYS) {
+    results.push(await seedPersona(ctx, key));
+  }
+  return results;
+}
+
+/**
+ * Idempotent persona-binding refresh — attaches the four Auth0 test
+ * personas (and their agency state) to the current deployment WITHOUT
+ * wiping anything. Safe to re-run; personas whose state already matches
+ * are skipped. Use this after rotating the dev tenant's subjects, or to
+ * repair persona bindings on a deployment that already holds data. For a
+ * full reset use `seedReset`.
+ *
+ *   bunx convex run seed:seedTestPersonas
+ */
 export const seedTestPersonas = internalMutation({
   args: {},
-  handler: async (ctx) => {
-    const results = [];
-    for (const key of Object.keys(PERSONAS) as PersonaKey[]) {
-      results.push(await seedPersona(ctx, key));
-    }
-    return results;
-  },
+  handler: async (ctx): Promise<SeedPersonasResult> => seedAllPersonas(ctx),
 });
-
-/** Bulk wipe — admin only. */
-export const clearAll = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    await wipeDemoTables(ctx);
-    return null;
-  },
-});
-
-type SeedFictionalResult = {
-  agencies: { paulistaId: AgencyId; atlanticaId: AgencyId; horizonteId: AgencyId };
-  contractCounts: { paulista: number; atlantica: number; horizonte: number };
-};
 
 type SeedPersonasResult = Array<{
   persona: PersonaKey;
@@ -2367,10 +2372,9 @@ type SeedPersonasResult = Array<{
  * `publicId` range (1000031–1000036) so it doesn't collide with the
  * fictional Paulista/Atlântica/Horizonte ids.
  *
- * Idempotent — if a contract in the seeded range already exists for
- * this agency, the function is a no-op. Lets `seedPreview` (post-wipe)
- * and the standalone `seedAprovadaContracts` mutation (against
- * existing prod data) both call it safely.
+ * Idempotent — if a contract in the seeded range already exists, the
+ * function is a no-op. Called only by `seedReset` (post-wipe) as the step
+ * that gives the `agencyowner` persona a populated dashboard.
  */
 async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
   const FIRST_PID = 31;
@@ -2687,38 +2691,28 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
 }
 
 /**
- * Standalone wrapper for {@link populateAprovadaBook} — lets you seed the
- * Aprovada starter book against any existing agency id without running
- * the full `seedPreview` (which wipes the DB). Idempotent: re-runs
- * against the same agency are a no-op.
+ * One-shot full reset — the universal "give me a clean, fully-populated
+ * dev DB" command. Wipes the demo tables, re-seeds the fictional dataset,
+ * attaches the four Auth0 test personas, and tops the `agencyowner`
+ * persona's agency ("Imobiliária Aprovada") with a small believable
+ * contract set so logging in as that persona lands on a populated
+ * dashboard. This is what the Vercel preview hook
+ * (`scripts/seed-preview.sh`) and a developer's local reset both call.
  *
- * Run with:
- *   bunx convex run seed:seedAprovadaContracts '{"agencyId":"<id>"}'
- */
-export const seedAprovadaContracts = internalMutation({
-  args: { agencyId: v.id("agencies") },
-  handler: async (ctx, args) => populateAprovadaBook(ctx, args.agencyId),
-});
-
-/**
- * One-shot preview reset: wipes the demo tables, re-seeds the fictional
- * dataset, attaches the four Auth0 test personas, and tops the
- * `agencyowner` persona's agency ("Imobiliária Aprovada") with a small
- * believable contract set so logging in as that persona lands on a
- * populated dashboard. This is what the Vercel preview hook
- * (`scripts/seed-preview.sh`) and a developer's "give me a clean dev
- * DB" workflow call.
+ * Every step runs as a plain in-process call inside this single mutation,
+ * so the whole reset is one atomic Convex transaction — the same
+ * footprint the earlier `ctx.runMutation` chaining produced, minus the
+ * partial-seed footgun of exposing the intermediate steps as their own
+ * runnable entrypoints.
  *
- * The two nested `runMutation` calls are same-file, so per the Convex
- * guidelines the local return types are annotated to break TypeScript
- * circularity.
+ * Dev-only. Do NOT call from production.
  */
-export const seedPreview = internalMutation({
+export const seedReset = internalMutation({
   args: { adminEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
     await wipeDemoTables(ctx);
-    const fictional: SeedFictionalResult = await ctx.runMutation(internal.seed.seedFictional, args);
-    const personas: SeedPersonasResult = await ctx.runMutation(internal.seed.seedTestPersonas, {});
+    const fictional = await seedFictional(ctx, args);
+    const personas = await seedAllPersonas(ctx);
 
     const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
     const aprovada = aprovadaAgencyId ? await populateAprovadaBook(ctx, aprovadaAgencyId) : null;
