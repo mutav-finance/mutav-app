@@ -217,6 +217,17 @@ convex/
 
 The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outside the entity file — export aliases (e.g. `Contract`, `ContractId`) and import those everywhere else. See `convex-document-types` skill for the full rules.
 
+### Schema changes & migrations — reseed-first (pre-production)
+
+**The app is pre-production: there is no real data. So schema changes ship as wipe + reseed, NOT in-place migrations.** When you change the schema:
+
+- **Do NOT write a data migration.** Update `convex/schema.ts` and update `convex/seed.ts` so `seed:seedReset` produces data in the new shape. Reshape the seed, not the data at rest.
+- `convex/migrations.ts` stays a **no-op runner** (`runAll = [noop]`); leave the migration infrastructure in place but empty. Operational backfills (aggregate rebuild, Resend audience sync, reserve snapshot clear) are **not** migrations and stay out of the runner.
+- `schemaValidation: false` is intentional for this window — a deploy tolerates older data at rest until the operator reseeds (`bun run seed`). Don't flip it to `true` yet.
+- Deploy runbook: `convex deploy` → `bun run seed`. Never assume in-place data preservation.
+
+**This inverts once the first real (non-seed) data reaches the app.** From that point: switch to in-place migrations (widen → migrate → narrow, two PRs — the `schemaValidation` toggle pattern), add each `internal.migrations.<name>` to `runAll` (auto-run by `scripts/run-migrations.sh` on deploy), and re-enable strict `schemaValidation`. The full policy note lives at the top of `convex/migrations.ts`.
+
 ### Layout primitives
 
 Every page wraps content in three composable primitives from `@mutav/ui/page/*` (`page-shell`, `page-header`, `page-content`). **Don't roll a custom page wrapper** — extend the primitives if your case doesn't fit.
