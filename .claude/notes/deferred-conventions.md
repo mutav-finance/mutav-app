@@ -115,7 +115,7 @@ Code that predates a current convention and needs migrating.
   2. **Narrow PR** — re-enable `schemaValidation: true`, drop transitional/old fields, remove migration scaffolding.
 - Test with `bunx convex run migrations:<name> '{"dryRun": true}'` before shipping. Status: `bunx convex run --component migrations lib:getStatus --watch`.
 
-The Phase-1 `payments`→`invoices` rename shipped via **wipe + reseed** instead (pre-launch, disposable dev data, before this tooling landed). A dev who pulled that rename and hits the `anchorOrders.invoiceId` schema-push error catches up once with: clear `anchorOrders` + `payments` (`convex import --replace` empty), `convex dev --once`, `bunx convex run seed:seedPreview`.
+The Phase-1 `payments`→`invoices` rename shipped via **wipe + reseed** instead (pre-launch, disposable dev data, before this tooling landed). A dev who pulled that rename and hits the `anchorOrders.invoiceId` schema-push error catches up once with: clear `anchorOrders` + `payments` (`convex import --replace` empty), `convex dev --once`, `bunx convex run seed:seedReset`.
 
 ## Money fields → integer cents
 
