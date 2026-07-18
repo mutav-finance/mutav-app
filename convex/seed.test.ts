@@ -41,6 +41,13 @@ async function contractCountFor(t: ReturnType<typeof setup>, agencyId: AgencyId)
   });
 }
 
+async function tenantCount(t: ReturnType<typeof setup>): Promise<number> {
+  return t.run(async (ctx) => {
+    const rows = await ctx.db.query("tenants").collect();
+    return rows.length;
+  });
+}
+
 describe("seedReset", () => {
   test("agencyowner's agency (Imobiliária Aprovada) has contracts — the partial-seed regression guard", async () => {
     const t = setup();
@@ -72,6 +79,34 @@ describe("seedReset", () => {
       demoAgencies.map(async (name) => contractCountFor(t, await agencyIdByName(t, name))),
     );
     expect(paulista + atlantica + horizonte).toBe(30);
+  });
+
+  test("registers tenants and dual-writes tenantId onto seeded contracts", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    // The registry must be populated — seedFictional + populateAprovadaBook
+    // run every contract's embedded tenant through getOrCreateTenant.
+    expect(await tenantCount(t)).toBeGreaterThan(0);
+
+    // WIDEN dual-write: every seeded contract carries the registry link
+    // (tenantId + tenantApproval) alongside the still-required embedded tenant.
+    // Guards against linkContractsToTenantRegistry being dropped.
+    const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
+    const linked = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("contracts")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovadaId))
+        .collect();
+      return {
+        total: rows.length,
+        withTenantId: rows.filter((r) => r.tenantId !== undefined).length,
+        withApproval: rows.filter((r) => r.tenantApproval !== undefined).length,
+      };
+    });
+    expect(linked.total).toBeGreaterThan(0);
+    expect(linked.withTenantId).toBe(linked.total);
+    expect(linked.withApproval).toBe(linked.total);
   });
 
   test("seeds all four personas with the correct staff / agency state", async () => {
