@@ -13,9 +13,9 @@ Shared strategy, whitepaper, pitch deck, and brand assets live in [`mutav-financ
 - **Next.js 16** — App Router, Turbopack
 - **Tailwind CSS 4** + **shadcn/ui**
 - **Convex** — realtime backend
-- **Privy** — Solana wallet auth
+- **Auth0** — agency/admin auth (cookie sessions + JWT-verified Convex functions)
 - **Bun** — package manager + script runner
-- **Railway** — deployment
+- **Vercel** — deployment (one project per app)
 
 ## Related tools
 
@@ -29,15 +29,25 @@ Shared strategy, whitepaper, pitch deck, and brand assets live in [`mutav-financ
 
 ## Quick start
 
-Prerequisites: [Bun ≥ 1.3](https://bun.sh).
+Prerequisites: [Bun ≥ 1.3](https://bun.sh) + a Convex login (`bunx convex login`).
 
 ```bash
 git clone https://github.com/mutav-finance/mutav-app.git
 cd mutav-app
 bun install                   # also installs git hooks via husky
-cp .env.example .env.local    # fill in Convex + Privy creds
+cp .env.example .env.local    # fill in Auth0 + (optional) PII values
+bunx convex dev --once        # provisions a dev deployment (writes Convex URLs)
+bun run convex:env:sync       # push deployment-side env (Auth0 etc.) from .env.local
+bunx convex dev --once        # re-run: now deploys cleanly
+bun run seed                  # seed:seedReset — full dataset + all 4 personas
 bun dev
 ```
+
+> **First time?** The apps are Auth0-gated (no dev-user fallback) and a few env
+> vars live in **two** places (`.env.local` _and_ the Convex deployment), so the
+> naked `bun dev` above needs the env + seed steps first. The full runbook,
+> scenarios (reseed, fresh deployment), and a troubleshooting table for the
+> common walls live in **[docs/development.md](docs/development.md)**.
 
 `bun dev` runs Next.js and the Convex backend together with named, colored
 logs (`web` in cyan, `cvx` in magenta). If either crashes, both shut down
@@ -45,18 +55,20 @@ so you never end up with half a dev environment.
 
 ## Scripts
 
-| Command                | What it does                             |
-| ---------------------- | ---------------------------------------- |
-| `bun dev`              | Run Next + Convex together (recommended) |
-| `bun run dev:web`      | Just the Next.js app                     |
-| `bun run dev:convex`   | Just the Convex dev backend              |
-| `bun run build`        | Production build                         |
-| `bun run start`        | Serve the production build               |
-| `bun run lint`         | ESLint                                   |
-| `bun run lint:fix`     | ESLint with `--fix`                      |
-| `bun run typecheck`    | `tsc --noEmit`                           |
-| `bun run format`       | Prettier — write changes                 |
-| `bun run format:check` | Prettier — verify only                   |
+| Command                   | What it does                                                     |
+| ------------------------- | ---------------------------------------------------------------- |
+| `bun dev`                 | Run Next + Convex together (recommended)                         |
+| `bun run dev:web`         | Just the Next.js app                                             |
+| `bun run dev:convex`      | Just the Convex dev backend                                      |
+| `bun run convex:env:sync` | Push deployment-side env from `.env.local` (Auth0/PII/providers) |
+| `bun run seed`            | Full reseed (`seed:seedReset`)                                   |
+| `bun run build`           | Production build                                                 |
+| `bun run start`           | Serve the production build                                       |
+| `bun run lint`            | ESLint                                                           |
+| `bun run lint:fix`        | ESLint with `--fix`                                              |
+| `bun run typecheck`       | `tsc --noEmit`                                                   |
+| `bun run format`          | Prettier — write changes                                         |
+| `bun run format:check`    | Prettier — verify only                                           |
 
 The root scripts above run unfiltered — the whole workspace is touched
 regardless of what changed. CI uses a Turborepo filter
@@ -151,17 +163,15 @@ Bypass in emergencies: `git commit --no-verify` / `git push --no-verify`.
 
 ## Environment
 
-`.env.local` (copied from `.env.example`):
+Copy [`.env.example`](.env.example) → `.env.local` and fill it in. The file is
+annotated; the key thing to know is that some vars live in **two** places:
 
-```
-CONVEX_DEPLOYMENT=          # set by `bunx convex dev` on first run
-NEXT_PUBLIC_CONVEX_URL=     # https://<deployment>.convex.cloud
-NEXT_PUBLIC_CONVEX_SITE_URL=# https://<deployment>.convex.site
-```
+- **`.env.local`** — read by Next.js (Convex URLs, Auth0 cookie-session secrets, `NEXT_PUBLIC_*`).
+- **The Convex deployment** — read by `convex/` functions _and_ the deploy-time analyzer. `AUTH0_DOMAIN` + `AUTH0_CLIENT_ID` **must** be set here or `convex dev` refuses to deploy. Push them from `.env.local` with `bun run convex:env:sync`.
 
-On a fresh clone, the first `bun dev` may prompt you to log in to Convex
-and pick a deployment — that's expected, and it writes the values above
-into `.env.local` for you.
+The Convex URLs (`CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`) are written for you by the first `bunx convex dev`.
+
+See **[docs/development.md](docs/development.md)** for the full first-setup sequence, the two-sided env table, reseed/fresh-deployment scenarios, and a troubleshooting table for the common walls (missing Auth0/PII env, `Buffer is not defined`, empty dashboard after login).
 
 ## Contributing
 

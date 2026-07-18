@@ -83,7 +83,7 @@ Four pre-provisioned Auth0 personas for testing each user state. **Dev tenant on
 | Pending user              | `pendinguser@mutav.finance` | under_review agency        | `/onboarding/status?state=under_review` |
 | New user                  | `newuser@mutav.finance`     | none                       | `/onboarding`                           |
 
-Reseed personas (idempotent): `bunx convex run seed:seedTestPersonas`.
+Full reseed (wipe + fictional dataset + all personas + agencyowner's book): `bun run seed` (`convex run seed:seedReset`). Personas only (idempotent, no wipe): `bunx convex run seed:seedTestPersonas`. First-time setup, env, and reseed scenarios: [`docs/development.md`](docs/development.md).
 
 ## Stellar concepts
 
