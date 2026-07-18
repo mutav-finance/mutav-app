@@ -172,4 +172,23 @@ describe("seedReset", () => {
     expect(newuser?.staffRoleCount).toBe(0);
     expect(newuser?.agencyStates).toEqual([]);
   });
+
+  test("preserves the waitlist (marketing leads) — the wipe is app-demo-only", async () => {
+    const t = setup();
+    // A real marketing lead present before a reseed must survive it.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("waitlist", {
+        email: "lead@example.com",
+        audience: "imobiliaria",
+        ts: 1_700_000_000_000,
+      });
+    });
+
+    await t.mutation(internal.seed.seedReset, {});
+
+    const surviving = await t.run(async (ctx) => ctx.db.query("waitlist").collect());
+    expect(surviving.map((r) => r.email)).toContain("lead@example.com");
+    // And the reseed still produced the app data (wipe ran).
+    expect(await tenantCount(t)).toBeGreaterThan(0);
+  });
 });

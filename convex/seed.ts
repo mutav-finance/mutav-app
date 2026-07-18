@@ -33,6 +33,15 @@ const d = (s: string) => s;
  * Demo tables wiped by `seedReset`. Order matters —
  * tables with foreign-key-like references come first so we don't leave
  * dangling pointers mid-wipe.
+ *
+ * DELIBERATELY EXCLUDED — real/operational data the seed must never destroy:
+ *   - `waitlist`            marketing leads (synced to Resend audiences)
+ *   - `mutavAuditLog` / `mutavAuditAnchors`  hash-chained audit trail
+ *   - `mutavStaff`          Mutav staff role grants
+ *   - `reserveSnapshots`    coverage/transparency history
+ *   - `creditAnalysis*`     bureau signals + assessments
+ *   - anchor/stellar index state, webhook events
+ * Do NOT add any of these here. `seed.test.ts` guards `waitlist` survival.
  */
 const DEMO_TABLES = [
   // providerOrders FK-references invoices; wipe attempts before invoices even
