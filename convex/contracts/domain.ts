@@ -122,3 +122,89 @@ export function tierForScore(score: number): ScoreTier {
   if (score >= SCORE_TIER_THRESHOLD.low) return SCORE_TIER.RUIM;
   return SCORE_TIER.NEGADO;
 }
+
+export type UrgencyTier =
+  | "overdue"
+  | "expiring"
+  | "critical"
+  | "warning"
+  | "pendente"
+  | "ok"
+  | "inactive";
+
+export const URGENCY_TIER = {
+  OVERDUE: "overdue",
+  EXPIRING: "expiring",
+  CRITICAL: "critical",
+  WARNING: "warning",
+  PENDENTE: "pendente",
+  OK: "ok",
+  INACTIVE: "inactive",
+} as const satisfies Record<Uppercase<UrgencyTier>, UrgencyTier>;
+
+export const urgencyTierValidator = v.union(
+  v.literal(URGENCY_TIER.OVERDUE),
+  v.literal(URGENCY_TIER.EXPIRING),
+  v.literal(URGENCY_TIER.CRITICAL),
+  v.literal(URGENCY_TIER.WARNING),
+  v.literal(URGENCY_TIER.PENDENTE),
+  v.literal(URGENCY_TIER.OK),
+  v.literal(URGENCY_TIER.INACTIVE),
+);
+
+const URGENCY_ORDER: Record<UrgencyTier, number> = {
+  overdue: 0,
+  expiring: 1,
+  critical: 2,
+  warning: 3,
+  pendente: 4,
+  ok: 5,
+  inactive: 6,
+};
+
+export function urgencySortKey(tier: UrgencyTier): number {
+  return URGENCY_ORDER[tier];
+}
+
+const EXPIRING_DAYS = 30;
+const CRITICAL_DAYS = 60;
+const WARNING_DAYS = 120;
+const DAY_MS = 86_400_000;
+
+function toUtcMidnight(date: string): number {
+  return new Date(`${date}T00:00:00.000Z`).getTime();
+}
+
+export function getUrgencyTier({
+  status,
+  nextRenewalDate,
+  referenceDate,
+}: {
+  status: ContractStatus;
+  nextRenewalDate: string;
+  referenceDate: string;
+}): UrgencyTier {
+  if (status === CONTRACT_STATUS.ENCERRADO || status === CONTRACT_STATUS.CANCELADO)
+    return URGENCY_TIER.INACTIVE;
+  if (status === CONTRACT_STATUS.PENDENTE) return URGENCY_TIER.PENDENTE;
+
+  const renewalMs = toUtcMidnight(nextRenewalDate);
+  const refMs = toUtcMidnight(referenceDate);
+  if (Number.isNaN(renewalMs) || Number.isNaN(refMs)) return URGENCY_TIER.INACTIVE;
+
+  const daysUntil = Math.floor((renewalMs - refMs) / DAY_MS);
+  if (daysUntil < 0) return URGENCY_TIER.OVERDUE;
+  if (daysUntil <= EXPIRING_DAYS) return URGENCY_TIER.EXPIRING;
+  if (daysUntil <= CRITICAL_DAYS) return URGENCY_TIER.CRITICAL;
+  if (daysUntil <= WARNING_DAYS) return URGENCY_TIER.WARNING;
+  return URGENCY_TIER.OK;
+}
+
+function addDaysUtc(date: string, days: number): string {
+  const ms = toUtcMidnight(date) + days * DAY_MS;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+export function expiringRenewalBounds(referenceDate: string): { gte: string; lte: string } {
+  return { gte: referenceDate, lte: addDaysUtc(referenceDate, CRITICAL_DAYS) };
+}

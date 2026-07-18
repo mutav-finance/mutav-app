@@ -47,6 +47,7 @@ type ContractSeed = {
   availableGuaranteeCents: number;
   activatedAt?: string | null;
   deactivatedAt?: string | null;
+  nextRenewalDate?: string;
 };
 
 async function seedAndIndexContract(
@@ -71,7 +72,7 @@ async function seedAndIndexContract(
       status: spec.status,
       activatedAt: spec.activatedAt ?? null,
       deactivatedAt: spec.deactivatedAt,
-      nextRenewalDate: "2026-12-31",
+      nextRenewalDate: spec.nextRenewalDate ?? "2026-12-31",
       availableGuaranteeCents: spec.availableGuaranteeCents,
       rental: {
         propertyKind: "residencial",
@@ -411,6 +412,137 @@ describe("getActivityByPeriod", () => {
       const d = new Date(Date.UTC(year, month - 1, day));
       expect(d.getUTCDay()).toBe(1);
     }
+  });
+});
+
+describe("listByAgency / getContractTabCounts (urgency)", () => {
+  const REFERENCE_DATE = "2026-07-18";
+  const EXPIRING_10_DAYS = "2026-07-28";
+  const CRITICAL_45_DAYS = "2026-09-01";
+  const OK_200_DAYS = "2027-02-03";
+
+  async function seedUrgencyBook(t: ReturnType<typeof convexTest>, agencyId: AgencyId) {
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 100_00,
+        nextRenewalDate: EXPIRING_10_DAYS,
+      },
+      "U1",
+    );
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 100_00,
+        nextRenewalDate: CRITICAL_45_DAYS,
+      },
+      "U2",
+    );
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 100_00,
+        nextRenewalDate: OK_200_DAYS,
+      },
+      "U3",
+    );
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.PENDENTE, availableGuaranteeCents: 50_00 },
+      "U4",
+    );
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.ENCERRADO, availableGuaranteeCents: 50_00 },
+      "U5",
+    );
+  }
+
+  test("tab 'expiring' returns only the ativo rows inside [today, today+60], each carrying urgency", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+      tab: "expiring",
+      referenceDate: REFERENCE_DATE,
+    });
+
+    const ids = new Set(page.page.map((row) => row.id));
+    expect(ids).toEqual(new Set(["U1", "U2"]));
+    for (const row of page.page) {
+      expect(row.urgency).toBeDefined();
+    }
+  });
+
+  test("tab 'ativo' returns only ativo rows", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+      tab: "ativo",
+      referenceDate: REFERENCE_DATE,
+    });
+
+    expect(new Set(page.page.map((row) => row.id))).toEqual(new Set(["U1", "U2", "U3"]));
+    for (const row of page.page) {
+      expect(row.status).toBe(CONTRACT_STATUS.ATIVO);
+    }
+  });
+
+  test("tab undefined returns every contract", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+      referenceDate: REFERENCE_DATE,
+    });
+
+    expect(new Set(page.page.map((row) => row.id))).toEqual(
+      new Set(["U1", "U2", "U3", "U4", "U5"]),
+    );
+  });
+
+  test("getContractTabCounts: expiring === 2 with correct status buckets", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const counts = await asUser.query(api.contracts.useCases.getContractTabCounts, {
+      agencyId,
+      referenceDate: REFERENCE_DATE,
+    });
+
+    expect(counts).toEqual({
+      all: 5,
+      expiring: 2,
+      ativo: 3,
+      pendente: 1,
+      encerrado: 1,
+      cancelado: 0,
+    });
   });
 });
 

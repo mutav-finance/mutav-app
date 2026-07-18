@@ -17,6 +17,9 @@ import {
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
+  getUrgencyTier,
+  urgencySortKey,
+  expiringRenewalBounds,
 } from "./domain";
 import { normalizeEmbeddedTenant, TENANT_ERROR_CODE } from "../tenants/domain";
 import { getOrCreateTenant } from "../tenants/useCases";
@@ -132,22 +135,78 @@ async function tenantNamesFor(
   return names;
 }
 
-/** Paginated list scoped to one agency. */
+const REFERENCE_DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+function currentReferenceDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function resolveReferenceDate(input: string | undefined): string {
+  return input && REFERENCE_DATE_PATTERN.test(input) ? input : currentReferenceDate();
+}
+
+const CONTRACT_TAB = {
+  ALL: "all",
+  EXPIRING: "expiring",
+  ATIVO: "ativo",
+  PENDENTE: "pendente",
+  ENCERRADO: "encerrado",
+  CANCELADO: "cancelado",
+} as const;
+type ContractTab = (typeof CONTRACT_TAB)[keyof typeof CONTRACT_TAB];
+const contractTabValidator = v.union(
+  v.literal(CONTRACT_TAB.ALL),
+  v.literal(CONTRACT_TAB.EXPIRING),
+  v.literal(CONTRACT_TAB.ATIVO),
+  v.literal(CONTRACT_TAB.PENDENTE),
+  v.literal(CONTRACT_TAB.ENCERRADO),
+  v.literal(CONTRACT_TAB.CANCELADO),
+);
+
+/** Paginated list scoped to one agency, filtered by tab. */
 export const listByAgency = queryWithAgencyScope({
-  args: { paginationOpts: paginationOptsValidator },
+  args: {
+    paginationOpts: paginationOptsValidator,
+    tab: v.optional(contractTabValidator),
+    referenceDate: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    const result = await ctx.db
-      .query("contracts")
-      .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
-      .order("desc")
-      .paginate(args.paginationOpts);
+    const referenceDate = resolveReferenceDate(args.referenceDate);
+    const tab: ContractTab = args.tab ?? CONTRACT_TAB.ALL;
+
+    const result = await (tab === CONTRACT_TAB.EXPIRING
+      ? (() => {
+          const bounds = expiringRenewalBounds(referenceDate);
+          return ctx.db
+            .query("contracts")
+            .withIndex("by_agency_status_nextRenewalDate", (q) =>
+              q
+                .eq("agencyId", ctx.agencyId)
+                .eq("status", CONTRACT_STATUS.ATIVO)
+                .gte("nextRenewalDate", bounds.gte)
+                .lte("nextRenewalDate", bounds.lte),
+            )
+            .order("asc")
+            .paginate(args.paginationOpts);
+        })()
+      : tab === CONTRACT_TAB.ALL
+        ? ctx.db
+            .query("contracts")
+            .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
+            .order("desc")
+            .paginate(args.paginationOpts)
+        : ctx.db
+            .query("contracts")
+            .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", tab))
+            .order("desc")
+            .paginate(args.paginationOpts));
 
     const tenantNames = await tenantNamesFor(ctx, result.page);
 
     return {
       ...result,
       page: result.page.map((doc) =>
-        shapeContractSummary(doc, tenantNames.get(doc.tenantId) ?? ""),
+        shapeContractSummary(doc, tenantNames.get(doc.tenantId) ?? "", referenceDate),
       ),
     };
   },
@@ -158,7 +217,12 @@ export const listByAgency = queryWithAgencyScope({
  * `rental`/`property`/`optional`/`documents` fields and joins only the
  * tenant's display name. Use shapeContract for the detail view.
  */
-function shapeContractSummary(doc: Contract, tenantName: string) {
+function shapeContractSummary(doc: Contract, tenantName: string, referenceDate: string) {
+  const urgency = getUrgencyTier({
+    status: doc.status,
+    nextRenewalDate: doc.nextRenewalDate,
+    referenceDate,
+  });
   return {
     id: doc.publicId,
     agencyId: doc.agencyId,
@@ -167,6 +231,8 @@ function shapeContractSummary(doc: Contract, tenantName: string) {
     availableGuaranteeCents: doc.availableGuaranteeCents,
     tenantName,
     creationTime: doc._creationTime,
+    urgency,
+    urgencySortKey: urgencySortKey(urgency),
   };
 }
 
@@ -212,6 +278,51 @@ export const getStatusCounts = queryWithAgencyScope({
     );
 
     return shapeStatusCountsResult(counts);
+  },
+});
+
+/**
+ * Per-tab badge counts for the contracts list. Status buckets reuse the
+ * O(log n) `contractsByStatus` aggregate; the `expiring` badge counts the
+ * indexed ativo renewal range.
+ */
+export const getContractTabCounts = queryWithAgencyScope({
+  args: { referenceDate: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const referenceDate = resolveReferenceDate(args.referenceDate);
+    const statusCounts = await contractsByStatus.countBatch(
+      ctx,
+      STATUS_KEYS.map((status) => ({
+        namespace: ctx.agencyId,
+        bounds: {
+          lower: { key: status, inclusive: true },
+          upper: { key: status, inclusive: true },
+        },
+      })),
+    );
+    const counts = shapeStatusCountsResult(statusCounts);
+
+    const bounds = expiringRenewalBounds(referenceDate);
+    // Bounded range scan over ativo renewals; revisit with a date-aware aggregate if it outgrows this.
+    const expiringRows = await ctx.db
+      .query("contracts")
+      .withIndex("by_agency_status_nextRenewalDate", (q) =>
+        q
+          .eq("agencyId", ctx.agencyId)
+          .eq("status", CONTRACT_STATUS.ATIVO)
+          .gte("nextRenewalDate", bounds.gte)
+          .lte("nextRenewalDate", bounds.lte),
+      )
+      .collect();
+
+    return {
+      all: counts.ativo + counts.pendente + counts.encerrado + counts.cancelado,
+      expiring: expiringRows.length,
+      ativo: counts.ativo,
+      pendente: counts.pendente,
+      encerrado: counts.encerrado,
+      cancelado: counts.cancelado,
+    };
   },
 });
 

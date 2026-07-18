@@ -339,6 +339,7 @@ export default defineSchema(
       .index("by_publicId", ["publicId"])
       .index("by_status", ["status"])
       .index("by_agency_status", ["agencyId", "status"])
+      .index("by_agency_status_nextRenewalDate", ["agencyId", "status", "nextRenewalDate"])
       .index("by_tenant", ["tenantId"])
       .index("by_agency_tenant", ["agencyId", "tenantId"]),
 

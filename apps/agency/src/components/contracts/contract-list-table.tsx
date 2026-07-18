@@ -13,7 +13,6 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
-  type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
@@ -50,7 +49,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
-import { getUrgencyTier, urgencySortKey, type UrgencyTier } from "@/lib/contracts/urgency";
+import type { UrgencyTier } from "@convex/contracts/domain";
 import { StatusTag } from "@/components/contracts/status-tag";
 import type { ContractStatus } from "@/lib/contracts/types";
 
@@ -150,6 +149,12 @@ function buildColumns(
       header: t("columns.creationTime"),
       cell: ({ row }) => formatDateBR(new Date(row.original.creationTime).toISOString()),
     },
+    {
+      id: "urgency",
+      accessorKey: "urgencySortKey",
+      header: t("columns.urgency"),
+      enableHiding: true,
+    },
   ];
 }
 
@@ -165,70 +170,48 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
+  const referenceDate = new Date().toISOString().slice(0, 10);
+  const [statusTab, setStatusTab] = React.useState<StatusTab>("all");
+
   const result = useQuery(
     api.contracts.useCases.listByAgency,
-    agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
+    agencyId
+      ? { agencyId, paginationOpts: { numItems: 200, cursor: null }, tab: statusTab, referenceDate }
+      : "skip",
   );
 
-  const data = React.useMemo<ContractListItem[]>(
-    () =>
-      (result?.page ?? []).map((c) => ({
-        ...c,
-        urgency: getUrgencyTier(c.status, c.nextRenewalDate),
-        urgencySortKey: urgencySortKey(getUrgencyTier(c.status, c.nextRenewalDate)),
-      })),
-    [result],
-  );
+  const data: ContractListItem[] = result?.page ?? [];
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
   const noAgency = !workspaceLoading && agencyId === undefined;
 
   const columns = React.useMemo(() => buildColumns(t, tStatus), [t, tStatus]);
 
   const [globalFilter, setGlobalFilter] = React.useState("");
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
     creationTime: false,
+    urgency: false,
   });
   const [sorting, setSorting] = React.useState<SortingState>(
     defaultSort ?? [{ id: "nextRenewalDate", desc: false }],
   );
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
-  const [statusTab, setStatusTab] = React.useState<StatusTab>("all");
-
-  React.useEffect(() => {
-    setColumnFilters((prev) => {
-      const without = prev.filter((f) => f.id !== "status");
-      if (statusTab === "all" || statusTab === "expiring") return without;
-      return [...without, { id: "status", value: statusTab }];
-    });
-  }, [statusTab]);
-
-  const tableData = React.useMemo(
-    () =>
-      statusTab === "expiring"
-        ? data.filter((r) => r.urgency === "expiring" || r.urgency === "critical")
-        : data,
-    [data, statusTab],
-  );
 
   // React Compiler skips memoizing this component because TanStack Table's
   // useReactTable() returns non-memoizable functions. Acceptable — the table
   // is small and fast.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
-    data: tableData,
+    data,
     columns,
     state: {
       sorting,
       globalFilter,
-      columnFilters,
       columnVisibility,
       pagination,
     },
     getRowId: (row) => row.id,
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     globalFilterFn: (row, _columnId, filterValue: string) => {
@@ -245,21 +228,18 @@ export function ContractListTable({ defaultSort, emptyStateCta }: Props) {
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  const counts = React.useMemo<Record<StatusTab, number>>(() => {
-    const c: Record<StatusTab, number> = {
-      all: data.length,
-      expiring: 0,
-      ativo: 0,
-      pendente: 0,
-      encerrado: 0,
-      cancelado: 0,
-    };
-    for (const row of data) {
-      c[row.status]++;
-      if (row.urgency === "expiring" || row.urgency === "critical") c.expiring++;
-    }
-    return c;
-  }, [data]);
+  const tabCounts = useQuery(
+    api.contracts.useCases.getContractTabCounts,
+    agencyId ? { agencyId, referenceDate } : "skip",
+  );
+  const counts: Record<StatusTab, number> = {
+    all: tabCounts?.all ?? 0,
+    expiring: tabCounts?.expiring ?? 0,
+    ativo: tabCounts?.ativo ?? 0,
+    pendente: tabCounts?.pendente ?? 0,
+    encerrado: tabCounts?.encerrado ?? 0,
+    cancelado: tabCounts?.cancelado ?? 0,
+  };
 
   if (isLoading) {
     return (
