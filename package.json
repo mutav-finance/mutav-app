@@ -19,6 +19,8 @@
     "dev:pay": "bun --filter @mutav/pay dev",
     "dev:admin": "bun --filter @mutav/admin dev",
     "dev:convex": "convex dev",
+    "convex:env:sync": "bash scripts/sync-convex-env.sh",
+    "seed": "convex run seed:seedReset",
     "build": "turbo run build",
     "start": "bun --filter @mutav/agency start",
     "lint": "eslint",
