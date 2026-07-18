@@ -545,7 +545,9 @@ Auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain 
 
 Before starting non-trivial work in a domain, scan `changelog/pending/*.md` for entries whose `touched_domains` or `scopes` intersect your target files. These entries carry the "why" behind recent changes that `git log` alone can't reveal — they exist specifically to prevent you from operating on stale assumptions.
 
-**Every non-trivial PR MUST land a changelog entry.** The `.husky/pre-push` gate and the `changelog-required.js` PreToolUse hook block `gh pr create` when the entry is missing. Draft one via `bun run changelog:draft` — it inspects the diff, commits, and `.env.example`/`package.json`/`convex/*` signals and writes a complete `changelog/pending/YYYY-MM-DD-<slug>.md`. No human confirmation is required; the sensor validates schema on the next hook fire.
+**Every non-trivial PR MUST land a changelog entry.** The `.husky/pre-push` gate and the `changelog-required.js` PreToolUse hook block `gh pr create` when the entry is missing. Draft one via `bun run changelog:draft` — it inspects the diff, commits, and `.env.example`/`package.json`/`convex/*` signals and writes the frontmatter + a one-line `## What changed` from the PR title.
+
+**The drafter is deliberately dumb about `## Notes for future agents`** — it leaves a TBD prompt because a plain script can't synthesize. **You** write that section. Invoke the `changelog-notes` skill (`Skill(changelog-notes)`) for the synthesis recipe: 3–8 lines of forward-guidance (non-obvious constraints, hidden invariants, "we tried X and it broke Y") — never a log of what happened, since the commits are on the PR. Write those notes under a `## Notes for future agents` heading in the **PR body**, then re-run `bun run changelog:draft` — the drafter extracts that section and pulls it into the entry automatically, so notes live in one place.
 
 **Sync actions** (`sync_actions[].kind`) are the runbook everyone needs on `git pull`. When your PR adds an env var, a seed dependency, or a manual step, the draft script emits the corresponding `sync_actions` entry — do not hand-strip them.
 

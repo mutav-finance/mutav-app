@@ -81,6 +81,14 @@ const BREAKING_MARKER = /BREAKING CHANGE/;
 
 const ISSUE_REF_PATTERN = /(?:^|[\s(])((?:[a-z][a-z0-9-]+#|#)\d+)/gi;
 
+/**
+ * Git trailers to strip from commit bodies before they land in the
+ * `## Notes for future agents` section — they're captured by git's own
+ * author metadata and add pure noise to agent context.
+ */
+const GIT_TRAILER_PATTERN =
+  /^(?:Co-authored-by|Signed-off-by|Reviewed-by|Reported-by|Suggested-by|Acked-by|Tested-by|Cc):\s/i;
+
 const SPACE = " ";
 
 // ─── CLI entrypoint ───────────────────────────────────────────────────────────
@@ -457,42 +465,104 @@ function buildBody(commits: readonly ParsedCommit[], prInfo: PrInfo | null): Ent
   return { whatChanged, notesForAgents };
 }
 
+/**
+ * Single-line synthesis. Prefer the PR title (author-written) — a good PR
+ * title already is the one-line summary. Fall back to the most recent commit
+ * subject as a pre-PR draft, then to a TBD prompt if neither exists.
+ *
+ * No commit-bullet log here — those are accessible via `gh pr view` /
+ * `git log`, and duplicating them turns the entry into a scrolling log.
+ */
 function buildWhatChanged(commits: readonly ParsedCommit[], prInfo: PrInfo | null): string {
-  const lines: string[] = [];
-
-  if (prInfo && prInfo.title.length > 0) {
-    lines.push(prInfo.title);
-    lines.push("");
+  if (prInfo && prInfo.title.trim().length > 0) {
+    return stripConventionalPrefix(prInfo.title);
   }
-
-  if (commits.length > 0) {
-    for (const commit of commits) {
-      if (commit.subject.length === 0) continue;
-      lines.push(`- ${commit.subject}`);
-    }
+  const firstNonEmpty = commits.find((c) => c.subject.length > 0);
+  if (firstNonEmpty) {
+    return stripConventionalPrefix(firstNonEmpty.subject);
   }
-
-  if (lines.length === 0) return "TBD — no commits or PR title available yet.";
-  return lines.join("\n").trim();
+  return "TBD — set once the PR is opened or a commit exists.";
 }
 
-function buildNotesForAgents(commits: readonly ParsedCommit[], prInfo: PrInfo | null): string {
-  const bodies: string[] = [];
-
-  if (prInfo && prInfo.body.trim().length > 0) {
-    bodies.push(prInfo.body.trim());
+/**
+ * Notes are FORWARD-GUIDANCE, not a log. Extract a purpose-built section
+ * from the PR body if one exists (author wrote it once, focused on the WHY
+ * and non-obvious constraints). Commit bodies are NEVER pooled here — the
+ * commits are already on the PR, so re-embedding just duplicates a story
+ * `gh pr view` gives cheap access to.
+ *
+ * If no matching section is found, emit a strong TBD prompt telling the
+ * next author exactly what to write and where to put it.
+ */
+function buildNotesForAgents(_commits: readonly ParsedCommit[], prInfo: PrInfo | null): string {
+  if (prInfo) {
+    const extracted = extractNotesSection(prInfo.body);
+    if (extracted) return stripTrailers(extracted);
   }
+  return (
+    "TBD — the next agent needs the WHY: non-obvious constraints, hidden invariants, " +
+    "and decisions the diff can't reveal. Add a `## Notes for future agents` " +
+    "section to the PR body (or `## Rationale` / `## Why`) — the drafter will " +
+    "pull it in automatically on the next `bun run changelog:draft`."
+  );
+}
 
-  for (const commit of commits) {
-    if (commit.body.length === 0) continue;
-    bodies.push(commit.body);
+/**
+ * Case-insensitive scan for a Notes-shaped section heading in the PR body.
+ * Returns the section content (bounded by the next `## ` heading or EOF),
+ * or null if no matching heading is found. `escapeRegex` neutralizes any
+ * regex metachars in the heading list.
+ */
+const NOTES_SECTION_HEADINGS: readonly string[] = [
+  "Notes for future agents",
+  "Notes",
+  "Rationale",
+  "Why this shape",
+  "Why",
+];
+
+function extractNotesSection(prBody: string): string | null {
+  if (!prBody || prBody.trim().length === 0) return null;
+  for (const heading of NOTES_SECTION_HEADINGS) {
+    const headingRe = new RegExp(`^##\\s+${escapeRegex(heading)}\\s*$`, "im");
+    const match = headingRe.exec(prBody);
+    if (!match) continue;
+    const startIdx = match.index + match[0].length;
+    const after = prBody.slice(startIdx);
+    const nextHeading = /^##\s+/m.exec(after);
+    const section = nextHeading ? after.slice(0, nextHeading.index) : after;
+    const cleaned = section.trim();
+    if (cleaned.length > 0) return cleaned;
   }
+  return null;
+}
 
-  if (bodies.length === 0) {
-    return "TBD — add non-obvious constraints, invariants, or gotchas here.";
-  }
+/**
+ * Strip the `<type>(<scope>):` prefix — the type is already in `category:` and
+ * the scope in `scopes:`, so restating them in the bullet is noise.
+ * Preserves the `!` breaking marker if present (as a caret prefix) so the
+ * bullet still signals breakage without the conventional-commit machinery.
+ */
+function stripConventionalPrefix(subject: string): string {
+  const match = subject.match(CONVENTIONAL_COMMIT);
+  if (!match) return subject;
+  const description = match[4] ?? subject;
+  const breaking = match[3] === "!";
+  return breaking ? `! ${description}` : description;
+}
 
-  return bodies.join("\n\n").trim();
+/**
+ * Drop git trailer lines (Co-authored-by, Signed-off-by, etc.) from a commit
+ * body — they're captured in git's author metadata already and add nothing
+ * to agent context. Also collapses runs of blank lines left behind.
+ */
+function stripTrailers(body: string): string {
+  return body
+    .split("\n")
+    .filter((line) => !GIT_TRAILER_PATTERN.test(line.trim()))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // ─── Sync actions ordering ────────────────────────────────────────────────────
@@ -584,11 +654,14 @@ function renderMarkdown(entry: Entry): string {
   lines.push(`branch: ${entry.branch}`);
   if (entry.merged_at) lines.push(`merged_at: ${entry.merged_at}`);
   lines.push(`category: ${entry.category}`);
-  lines.push(`scopes: ${renderInlineList(entry.scopes)}`);
-  lines.push(`breaking: ${entry.breaking ? "true" : "false"}`);
+  // Empty arrays are omitted — the validator defaults them to [] on parse.
+  // Keeps the frontmatter tight when a change is small-scope.
+  if (entry.scopes.length > 0) lines.push(`scopes: ${renderInlineList(entry.scopes)}`);
+  if (entry.breaking) lines.push(`breaking: true`);
   lines.push(renderSyncActionsBlock(entry.sync_actions));
-  lines.push(renderBlockList("touched_domains", entry.touched_domains));
-  lines.push(`issue_refs: ${renderInlineList(entry.issue_refs)}`);
+  if (entry.touched_domains.length > 0)
+    lines.push(renderBlockList("touched_domains", entry.touched_domains));
+  if (entry.issue_refs.length > 0) lines.push(`issue_refs: ${renderInlineList(entry.issue_refs)}`);
   lines.push("---");
   lines.push("");
   lines.push("## What changed");

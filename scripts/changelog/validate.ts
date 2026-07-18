@@ -262,11 +262,14 @@ const entrySchema = z.object({
   branch: z.string().min(1),
   merged_at: z.string().min(1).optional(),
   category: z.enum(CATEGORIES),
-  scopes: z.array(z.string().min(1)),
-  breaking: z.boolean(),
+  // Empty arrays are omitted from the rendered frontmatter — default them
+  // here so an entry with a small footprint stays terse but still validates.
+  scopes: z.array(z.string().min(1)).default([]),
+  // `breaking` defaults to false — the renderer omits the field when false.
+  breaking: z.boolean().default(false),
   sync_actions: z.array(syncActionSchema),
-  touched_domains: z.array(z.string().min(1)),
-  issue_refs: z.array(z.string().min(1)),
+  touched_domains: z.array(z.string().min(1)).default([]),
+  issue_refs: z.array(z.string().min(1)).default([]),
   body: entryBodySchema,
 });
 

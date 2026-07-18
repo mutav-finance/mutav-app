@@ -124,54 +124,137 @@ describe("extractScopes — file paths → touched domains", () => {
   });
 });
 
-describe("composeBody — What changed / Notes for future agents", () => {
-  test("renders commit subjects as a bullet list under 'What changed'", () => {
+describe("composeBody.whatChanged — one-line synthesis, no commit log", () => {
+  test("uses the PR title (prefix-stripped) when a PR exists — no commit bullets", () => {
     const body = composeBody({
       commits: [
         { subject: "feat(x): add thing", body: "" },
         { subject: "fix(y): fix bug", body: "" },
       ],
-      prInfo: null,
+      prInfo: { number: 42, title: "feat(harness): tenant registry cascade", body: "", url: "" },
     });
-    expect(body.whatChanged).toContain("- feat(x): add thing");
-    expect(body.whatChanged).toContain("- fix(y): fix bug");
+    expect(body.whatChanged).toBe("tenant registry cascade");
+    // Commits are on the PR — do not duplicate them here.
+    expect(body.whatChanged).not.toContain("add thing");
+    expect(body.whatChanged).not.toContain("fix bug");
   });
 
-  test("prepends the PR title to 'What changed' when a PR is supplied", () => {
+  test("falls back to the first non-empty commit subject when no PR is open", () => {
     const body = composeBody({
       commits: [{ subject: "feat(x): add thing", body: "" }],
-      prInfo: { number: 42, title: "Add tenant registry", body: "", url: "" },
+      prInfo: null,
     });
-    expect(body.whatChanged.startsWith("Add tenant registry")).toBe(true);
-    expect(body.whatChanged).toContain("- feat(x): add thing");
+    expect(body.whatChanged).toBe("add thing");
   });
 
-  test("joins commit bodies + PR body into 'Notes for future agents'", () => {
+  test("keeps non-conventional subjects unchanged (no prefix to strip)", () => {
     const body = composeBody({
-      commits: [
-        { subject: "feat(x): a", body: "Non-obvious constraint: X." },
-        { subject: "fix(y): b", body: "" },
-      ],
-      prInfo: { number: 1, title: "T", body: "PR-level rationale here.", url: "" },
+      commits: [{ subject: "wip: hack around thing", body: "" }],
+      prInfo: null,
     });
-    expect(body.notesForAgents).toContain("PR-level rationale here.");
-    expect(body.notesForAgents).toContain("Non-obvious constraint: X.");
+    expect(body.whatChanged).toBe("wip: hack around thing");
   });
 
-  test("emits placeholder text when no raw material is available", () => {
+  test("marks breaking-change titles with a leading `!`", () => {
+    const body = composeBody({
+      commits: [],
+      prInfo: { number: 1, title: "feat(x)!: rework API", body: "", url: "" },
+    });
+    expect(body.whatChanged).toBe("! rework API");
+  });
+
+  test("emits TBD when no PR title and no commit subject exist", () => {
     const body = composeBody({ commits: [], prInfo: null });
     expect(body.whatChanged.toLowerCase()).toContain("tbd");
+  });
+});
+
+describe("composeBody.notesForAgents — extract from PR body, never pool", () => {
+  test("extracts a `## Notes for future agents` section from the PR body", () => {
+    const prBody = [
+      "## Summary",
+      "Big feature.",
+      "",
+      "## Notes for future agents",
+      "The migration deploy-order matters — schema narrow lands in PR 2.",
+      "",
+      "## Test plan",
+      "- [x] tests pass",
+    ].join("\n");
+    const body = composeBody({
+      commits: [],
+      prInfo: { number: 1, title: "T", body: prBody, url: "" },
+    });
+    expect(body.notesForAgents).toContain("The migration deploy-order matters");
+    // Sections outside the Notes block must not leak in.
+    expect(body.notesForAgents).not.toContain("tests pass");
+    expect(body.notesForAgents).not.toContain("Big feature");
+  });
+
+  test("accepts `## Notes`, `## Rationale`, `## Why`, `## Why this shape` as fallback headings", () => {
+    for (const heading of ["Notes", "Rationale", "Why", "Why this shape"]) {
+      const body = composeBody({
+        commits: [],
+        prInfo: {
+          number: 1,
+          title: "T",
+          body: `## ${heading}\nContent for ${heading}.\n`,
+          url: "",
+        },
+      });
+      expect(body.notesForAgents).toContain(`Content for ${heading}.`);
+    }
+  });
+
+  test("never pools raw commit bodies — commits live on the PR, not in the entry", () => {
+    const body = composeBody({
+      commits: [
+        {
+          subject: "feat(x): a",
+          body: "Long commit body — must NOT appear verbatim in notes.",
+        },
+      ],
+      prInfo: null,
+    });
+    expect(body.notesForAgents).not.toContain("must NOT appear");
     expect(body.notesForAgents.toLowerCase()).toContain("tbd");
   });
 
-  test("does not invent notes when commit bodies and PR body are all empty", () => {
+  test("never pools the PR body verbatim when no Notes-shaped heading exists", () => {
     const body = composeBody({
-      commits: [{ subject: "feat(x): a", body: "" }],
-      prInfo: { number: 1, title: "T", body: "", url: "" },
+      commits: [],
+      prInfo: {
+        number: 1,
+        title: "T",
+        body: "## Summary\nOnly a summary here.\n## Test plan\n- [x] done",
+        url: "",
+      },
     });
-    // What changed still populated from subjects + title.
-    expect(body.whatChanged).toContain("- feat(x): a");
-    // Notes falls back to the TBD placeholder — never fabricated.
+    expect(body.notesForAgents).not.toContain("Only a summary here.");
+    expect(body.notesForAgents).not.toContain("Test plan");
     expect(body.notesForAgents.toLowerCase()).toContain("tbd");
+  });
+
+  test("strips git trailers from the extracted section", () => {
+    const prBody = [
+      "## Notes for future agents",
+      "Real content the agent needs.",
+      "",
+      "Co-authored-by: Bot <bot@example.com>",
+      "Signed-off-by: Reviewer",
+    ].join("\n");
+    const body = composeBody({
+      commits: [],
+      prInfo: { number: 1, title: "T", body: prBody, url: "" },
+    });
+    expect(body.notesForAgents).toContain("Real content the agent needs.");
+    expect(body.notesForAgents).not.toContain("Co-authored-by");
+    expect(body.notesForAgents).not.toContain("Signed-off-by");
+  });
+
+  test("TBD prompt tells the author where to write the notes for pickup", () => {
+    const body = composeBody({ commits: [], prInfo: null });
+    expect(body.notesForAgents.toLowerCase()).toContain("tbd");
+    expect(body.notesForAgents).toContain("Notes for future agents");
   });
 });

@@ -73,8 +73,15 @@ All fields import from `scripts/changelog/types.ts`. Do not redefine them locall
 
 Two h2 sections, in this exact order:
 
-- `## What changed` — one paragraph, WHY the change was made and the observable effect. No marketing prose. No "this PR does…" — write it as if the reader is walking into the repo cold.
-- `## Notes for future agents` — non-obvious constraints, hidden invariants, or "we tried X and it didn't work because Y." This is the field that pays back the most in agent context three months from now. Leave it empty (or write "None.") only if you truly cannot think of anything a future subagent would need.
+- `## What changed` — **one line only**. A synthesis of the change. The drafter uses the PR title (prefix-stripped) if a PR exists, otherwise the most recent commit subject. No commit-bullet log — those are on `gh pr view` / `git log` and duplicating them turns the entry into a scrolling log.
+- `## Notes for future agents` — 3–8 lines of forward-guidance. Non-obvious constraints, hidden invariants, "we tried X and it broke Y", deploy-order concerns. **Never a log of what happened** — the commits are on the PR, so restating them here just duplicates a story the reader already has cheap access to.
+
+**How Notes is populated.** The drafter is deliberately dumb about this section — a plain script can't synthesize. Two paths:
+
+1. **Preferred.** Write a `## Notes for future agents` section in the **PR body**. The drafter extracts it verbatim (git trailers stripped) on every `bun run changelog:draft`. Notes live in one place — the PR body — and re-runs of the drafter always match.
+2. **Fallback.** If no PR exists yet, edit the entry file directly. When you open the PR later, mirror the notes into a `## Notes for future agents` section in the PR body so future drafter runs pick them up automatically.
+
+The [`changelog-notes` skill](../../.claude/skills/changelog-notes/SKILL.md) has the recipe: read commits + diff + PR context, identify the WHY, write the synthesis, sync to the PR body. The drafter also accepts `## Notes`, `## Rationale`, `## Why this shape`, and `## Why` as fallback section headings for backwards compatibility with common PR-body conventions.
 
 ### Example
 
@@ -99,9 +106,7 @@ issue_refs: [mutav-app#225]
 
 ## What changed
 
-Collapsed the tenant-registry lookup so agency-scoped queries no longer materialize a
-second copy of the tenant document. Reads drop from 2 → 1 for every contracts list;
-writes are unchanged.
+tenant-registry cascade — one lookup instead of two
 
 ## Notes for future agents
 
