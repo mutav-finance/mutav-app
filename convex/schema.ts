@@ -282,9 +282,9 @@ export default defineSchema(
       agencyId: v.id("agencies"),
       publicId: v.string(),
       // Registry link — the only tenant reference on a contract; readers join
-      // the `tenants` row. The embedded `tenant`/`tenantCpf` fields were
-      // dropped in the narrow phase (cleared by
-      // `migrations.clearContractEmbeddedTenant`).
+      // the `tenants` row. There is no embedded `tenant`/`tenantCpf` field:
+      // pre-prod data comes from `seed:seedReset` in this shape (no in-place
+      // migration — see `convex/migrations.ts`).
       tenantId: v.id("tenants"),
       // Per-contract relationship state — approval belongs to a contract, not
       // to the person.
@@ -708,12 +708,11 @@ export default defineSchema(
     }).index("by_agency_subject_time", ["agencyId", "subjectHash", "assessedAt"]),
   },
   {
-    // Narrow-deploy trap (#188): `contracts` rows at rest still carry the
-    // legacy embedded `tenant`/`tenantCpf` fields, and Convex validates the
-    // narrowed schema against data BEFORE in-deploy migrations run.
-    // Validation stays off until `clearContractEmbeddedTenant` has completed
-    // on every deployment; a one-line follow-up PR re-enables it
-    // (established widen → migrate → narrow two-PR pattern).
+    // Relaxed during the pre-prod reseed window: a deploy can land on a
+    // deployment whose data is still in an older shape, and `seed:seedReset`
+    // (wipe + reseed) — not an in-place migration — brings it current. Flip
+    // back to `true` once real data exists and migrations take over (see the
+    // policy note in `convex/migrations.ts`). Tracked as a follow-up.
     schemaValidation: false,
   },
 );
