@@ -13,8 +13,8 @@ function setup() {
 
 /**
  * Round-trip through a real inserted `tenants` row so `tenantToSep9Prefill`
- * receives an actual `Doc<"tenants">` (branded `_id`/`_creationTime`) without
- * fabricating one via a cast.
+ * receives an actual persisted `Tenant` row (branded `_id`/`_creationTime`)
+ * without fabricating one via a cast.
  */
 describe("tenantToSep9Prefill", () => {
   test("pf: id_number is the CPF tax id; name splits into first/last", async () => {
