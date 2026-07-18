@@ -18,4 +18,9 @@ while read local_ref local_sha remote_ref remote_sha; do
   fi
 done
 
+# Enforce that every non-trivial changelog/pending/*.md entry parses. This is
+# the primary gate — it fires for non-Claude workflows too (e.g. Draau's shell).
+# See docs/superpowers/specs/2026-07-18-agent-facing-changelog-design.md.
+bun run changelog:validate || exit 1
+
 exit 0

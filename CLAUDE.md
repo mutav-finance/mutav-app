@@ -541,6 +541,18 @@ When a query needs data from two domains (e.g. membership + user info), the enri
 
 Auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain providers, and Convex workpool are tracked in `.claude/notes/deferred-conventions.md` with adoption triggers. Pending refactors (e.g. money → cents migration) live in the same file.
 
+## Changelog — mandatory pre-work read
+
+Before starting non-trivial work in a domain, scan `changelog/pending/*.md` for entries whose `touched_domains` or `scopes` intersect your target files. These entries carry the "why" behind recent changes that `git log` alone can't reveal — they exist specifically to prevent you from operating on stale assumptions.
+
+**Every non-trivial PR MUST land a changelog entry.** The `.husky/pre-push` gate and the `changelog-required.js` PreToolUse hook block `gh pr create` when the entry is missing. Draft one via `bun run changelog:draft` — it inspects the diff, commits, and `.env.example`/`package.json`/`convex/*` signals and writes a complete `changelog/pending/YYYY-MM-DD-<slug>.md`. No human confirmation is required; the sensor validates schema on the next hook fire.
+
+**Sync actions** (`sync_actions[].kind`) are the runbook everyone needs on `git pull`. When your PR adds an env var, a seed dependency, or a manual step, the draft script emits the corresponding `sync_actions` entry — do not hand-strip them.
+
+Released entries live on **GitHub Releases** (`gh release list`), tagged by SemVer. Pending entries are cleared into the release on `bun run changelog:release`.
+
+Full spec: [`docs/architecture/changelog.md`](docs/architecture/changelog.md).
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.
