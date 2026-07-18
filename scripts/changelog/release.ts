@@ -213,12 +213,6 @@ function writePackageJsonVersion(nextVersion: string): void {
 
 // ─── Notes composition ────────────────────────────────────────────────────────
 
-function today(): string {
-  // ISO date-only prefix. Matches draft.ts#todayIsoDate and the sibling
-  // scripts/etherfuse-smoke.ts pattern.
-  return new Date().toISOString().slice(0, 10);
-}
-
 function groupBySection(entries: readonly LoadedEntry[]): Map<SectionKey, LoadedEntry[]> {
   const grouped = new Map<SectionKey, LoadedEntry[]>();
   for (const section of SECTION_ORDER) grouped.set(section, []);
@@ -268,7 +262,7 @@ function firstMeaningfulLine(source: string): string {
 function composeNotes(version: string, entries: readonly LoadedEntry[]): string {
   const grouped = groupBySection(entries);
   const lines: string[] = [];
-  lines.push(`# v${version} — ${today()}`);
+  lines.push(`# v${version} — ${new Date().toISOString().slice(0, 10)}`);
   lines.push("");
 
   let wroteAnySection = false;
@@ -348,11 +342,21 @@ function assertReleaseReadyBranch(): void {
     );
   }
 
-  // Fetch (silent) so the up-to-date check compares against the real remote.
-  spawnSync("git", ["fetch", "origin", RELEASE_BRANCH], {
+  // Refresh `origin/<main>` so the up-to-date check compares against the real
+  // remote, not a stale ref. If fetch fails (offline, auth, network flake) we
+  // can't prove up-to-date-ness — surface the error rather than trusting the
+  // cached ref, which would let a release from stale `main` sneak through.
+  const fetchResult = spawnSync("git", ["fetch", "origin", RELEASE_BRANCH], {
     cwd: REPO_ROOT,
     stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
   });
+  if (fetchResult.status !== 0) {
+    const stderr = typeof fetchResult.stderr === "string" ? fetchResult.stderr.trim() : "";
+    throw new Error(
+      `Could not \`git fetch origin ${RELEASE_BRANCH}\` — the up-to-date check needs a fresh remote ref before releasing.${stderr ? `\n  git said: ${stderr}` : ""}`,
+    );
+  }
 
   const local = capture("git", ["rev-parse", `${RELEASE_BRANCH}`]);
   const remote = capture("git", ["rev-parse", `origin/${RELEASE_BRANCH}`]);

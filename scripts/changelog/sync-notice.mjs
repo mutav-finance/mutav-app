@@ -225,8 +225,12 @@ function loadEntry(filePath) {
       ? frontmatter.pr
       : "unmerged";
 
-  const mtimeIso = readMtimeIso(filePath);
-  const effectiveIso = merged_at ?? mtimeIso;
+  // Parse the effective timestamp once here. Downstream filter + sort read the
+  // numeric ms directly — no repeated `Date.parse()` per comparison, and a
+  // malformed `merged_at` producing `NaN` fails loudly at this one point
+  // rather than silently disappearing from filter output on every callsite.
+  const mtimeMs = readMtimeMs(filePath);
+  const effectiveMs = merged_at ? Date.parse(merged_at) : mtimeMs;
 
   return {
     filePath,
@@ -238,15 +242,16 @@ function loadEntry(filePath) {
     touched_domains: normalizeStringArray(frontmatter.touched_domains),
     issue_refs: normalizeStringArray(frontmatter.issue_refs),
     sync_actions: syncActions,
-    effectiveIso,
+    effectiveMs: Number.isFinite(effectiveMs) ? effectiveMs : mtimeMs,
+    effectiveIso: merged_at ?? new Date(mtimeMs).toISOString(),
   };
 }
 
-function readMtimeIso(filePath) {
+function readMtimeMs(filePath) {
   try {
-    return statSync(filePath).mtime.toISOString();
+    return statSync(filePath).mtimeMs;
   } catch {
-    return new Date(0).toISOString();
+    return 0;
   }
 }
 
@@ -299,15 +304,27 @@ function main() {
   const nowIso = new Date().toISOString();
   const seenMs = seenIso ? Date.parse(seenIso) : null;
 
-  const entries = safeListPending()
+  // Stat-first: skip the readFileSync + YAML parse for any entry the caller
+  // has already acknowledged. When seenMs is null (first run), everyone
+  // passes through. This dominates the common case where pending accumulates
+  // between releases but only 1-2 entries are new since last SessionStart.
+  const candidatePaths = safeListPending().filter((filePath) => {
+    if (seenMs === null) return true;
+    try {
+      return statSync(filePath).mtimeMs > seenMs;
+    } catch {
+      return true;
+    }
+  });
+
+  const entries = candidatePaths
     .map((filePath) => loadEntry(filePath))
     .filter((entry) => entry !== null)
-    // Compare via numeric timestamps so a date-only `merged_at` ("2026-07-18")
-    // and a full ISO `seenIso` ("2026-07-18T09:00:00.000Z") don't fall foul
-    // of lex-string comparison — the shorter string would otherwise sort as
-    // less-than-any-longer-string-with-the-same-prefix and get filtered out.
-    .filter((entry) => (seenMs !== null ? Date.parse(entry.effectiveIso) > seenMs : true))
-    .sort((a, b) => Date.parse(a.effectiveIso) - Date.parse(b.effectiveIso));
+    // Compare via numeric ms computed once in loadEntry() — date-only
+    // `merged_at` ("2026-07-18") vs full ISO `seenMs` no longer confuses
+    // lex-string comparison, and each entry's timestamp is parsed once.
+    .filter((entry) => (seenMs !== null ? entry.effectiveMs > seenMs : true))
+    .sort((a, b) => a.effectiveMs - b.effectiveMs);
 
   const syncActions = entries.flatMap((entry) => entry.sync_actions);
 

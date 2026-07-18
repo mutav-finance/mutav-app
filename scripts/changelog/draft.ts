@@ -524,13 +524,16 @@ function resolveEntryPath(slug: string, branch: string): string {
   const existing = findExistingEntry(slug, branch);
   if (existing) return existing;
 
-  const today = todayIsoDate();
+  const today = new Date().toISOString().slice(0, 10);
   return join(PENDING_DIR, `${today}-${slug}.md`);
 }
 
 function findExistingEntry(slug: string, branch: string): string | null {
   if (!existsSync(PENDING_DIR)) return null;
   const entries = readdirSync(PENDING_DIR).filter((name) => name.endsWith(".md"));
+
+  const branchRe = branchFrontmatterRe(branch);
+  const slugRe = slugFilenameRe(slug);
 
   // Scan frontmatter for `branch: <branch>` FIRST. This survives branch renames
   // (the entry still points at the new branch name after `bun run changelog:draft`
@@ -539,27 +542,29 @@ function findExistingEntry(slug: string, branch: string): string | null {
   for (const name of entries) {
     const full = join(PENDING_DIR, name);
     const contents = safeRead(full);
-    if (BRANCH_FRONTMATTER_LINE(branch).test(contents)) return full;
+    if (branchRe.test(contents)) return full;
   }
 
   // Fall back to a strict filename match: `YYYY-MM-DD-<slug>.md`. Anchored so
   // `wizard` cannot match `agency-wizard.md`.
-  const slugMatch = entries.find((name) => SLUG_FILENAME_PATTERN(slug).test(name));
+  const slugMatch = entries.find((name) => slugRe.test(name));
   if (slugMatch) return join(PENDING_DIR, slugMatch);
 
   return null;
 }
 
-function BRANCH_FRONTMATTER_LINE(branch: string): RegExp {
-  // Anchored `^branch: <branch>` at line start; the drafter emits the value
-  // unquoted, so no quote-stripping is required.
-  const escaped = branch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^branch:\\s*${escaped}\\s*$`, "m");
+/** Anchored `^branch: <branch>` — drafter emits the value unquoted, no strip. */
+function branchFrontmatterRe(branch: string): RegExp {
+  return new RegExp(`^branch:\\s*${escapeRegex(branch)}\\s*$`, "m");
 }
 
-function SLUG_FILENAME_PATTERN(slug: string): RegExp {
-  const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${escaped}\\.md$`);
+/** Strict `YYYY-MM-DD-<slug>.md` filename match. Anchored to avoid substrings. */
+function slugFilenameRe(slug: string): RegExp {
+  return new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${escapeRegex(slug)}\\.md$`);
+}
+
+function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function safeRead(path: string): string {
@@ -568,13 +573,6 @@ function safeRead(path: string): string {
   } catch {
     return "";
   }
-}
-
-function todayIsoDate(): string {
-  // `toISOString()` is always `YYYY-MM-DDTHH:mm:ss.sssZ` (UTC); slice(0, 10)
-  // gives the date-only prefix. Matches how scripts/etherfuse-smoke.ts already
-  // formats ISO dates elsewhere in the repo.
-  return new Date().toISOString().slice(0, 10);
 }
 
 // ─── Markdown renderer ────────────────────────────────────────────────────────

@@ -34,28 +34,24 @@ process.stdin.on('end', () => {
     const command = data.tool_input?.command || '';
     if (!GH_PR_CREATE_RE.test(command) && !GH_PR_EDIT_BODY_RE.test(command)) process.exit(0);
 
-    const repoRoot = getRepoRoot();
-    if (!repoRoot) process.exit(0);
+    const ctx = getGitContext();
+    if (!ctx.repoRoot) process.exit(0);
+    if (!ctx.branch || ctx.branch === 'HEAD') process.exit(0);
 
-    const branch = getCurrentBranch(repoRoot);
-    if (!branch || branch === 'HEAD') process.exit(0);
-
-    const branchSlug = slugifyBranch(branch);
-    const skipMarker = path.join(repoRoot, 'changelog', 'pending', `.skip-${branchSlug}`);
+    const branchSlug = slugifyBranch(ctx.branch);
+    const skipMarker = path.join(ctx.repoRoot, 'changelog', 'pending', `.skip-${branchSlug}`);
     if (fs.existsSync(skipMarker)) process.exit(0);
 
-    if (hasEntryForBranch(repoRoot, branch)) process.exit(0);
+    if (hasEntryForBranch(ctx.repoRoot, ctx.branch)) process.exit(0);
 
-    const diffProbe = getDiffProbe(repoRoot);
-    // Fail-closed when we can't resolve a merge-base: no base means we can't
-    // prove the diff is trivial, so treat it as substantive and require the entry.
-    if (diffProbe.baseResolved && !isNonTrivialDiff(diffProbe.diffStat)) process.exit(0);
+    const requirement = shouldRequireEntry(ctx.repoRoot);
+    if (!requirement.required) process.exit(0);
 
-    const baseNote = diffProbe.baseResolved
+    const baseNote = requirement.baseResolved
       ? ''
       : ' (no merge-base found for origin/main/master; treating as substantive)';
     process.stderr.write(
-      `[changelog-required] No changelog entry found for branch ${branch}${baseNote}.\n` +
+      `[changelog-required] No changelog entry found for branch ${ctx.branch}${baseNote}.\n` +
         'Run: bun run changelog:draft\n' +
         'See CLAUDE.md § Changelog for the contract.\n'
     );
@@ -65,47 +61,47 @@ process.stdin.on('end', () => {
   }
 });
 
-function getRepoRoot() {
+// One subprocess for both repoRoot and branch — `--show-toplevel` prints the
+// toplevel, `--abbrev-ref HEAD` prints the branch, in that order on separate
+// lines. Saves one fork/exec on the hot path (per `gh pr create`).
+function getGitContext() {
   try {
-    return execSync('git rev-parse --show-toplevel', {
+    const out = execSync('git rev-parse --show-toplevel --abbrev-ref HEAD', {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: GIT_SUBPROCESS_TIMEOUT_MS,
-    }).trim();
+    });
+    const lines = out.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+    return { repoRoot: lines[0] ?? null, branch: lines[1] ?? null };
   } catch {
-    return null;
+    return { repoRoot: null, branch: null };
   }
 }
 
-function getCurrentBranch(cwd) {
-  try {
-    return execSync('git rev-parse --abbrev-ref HEAD', {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: GIT_SUBPROCESS_TIMEOUT_MS,
-    }).trim();
-  } catch {
-    return null;
-  }
-}
-
-// Returns { baseResolved, diffStat } — separating the two lets us fail-closed
-// when the merge-base can't be resolved instead of silently allowing the PR.
-function getDiffProbe(cwd) {
+/**
+ * Encapsulates the "should we block this PR?" contract in one place — the
+ * caller sees a bool + a diagnostic flag, not a tuple that has to be recombined
+ * with an isNonTrivialDiff check at every callsite. Fail-closed: an unresolved
+ * merge-base means we can't prove the diff is trivial, so we treat it as
+ * substantive and require the entry.
+ */
+function shouldRequireEntry(cwd) {
   const base = resolveMergeBase(cwd);
-  if (!base) return { baseResolved: false, diffStat: '' };
+  if (!base) return { required: true, baseResolved: false };
+
+  let diffStat = '';
   try {
-    const diffStat = execSync(`git diff --name-only ${base}...HEAD`, {
+    diffStat = execSync(`git diff --name-only ${base}...HEAD`, {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: GIT_SUBPROCESS_TIMEOUT_MS,
     });
-    return { baseResolved: true, diffStat };
   } catch {
-    return { baseResolved: false, diffStat: '' };
+    return { required: true, baseResolved: false };
   }
+
+  return { required: isNonTrivialDiff(diffStat), baseResolved: true };
 }
 
 function resolveMergeBase(cwd) {
