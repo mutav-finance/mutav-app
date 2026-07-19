@@ -16,8 +16,6 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { SYNC_ACTION_ORDER, type SyncAction } from "./types";
 
 const DEFAULT_BASE_REF = "origin/main";
@@ -238,56 +236,12 @@ function buildFileDiffs(baseRef: string, cwd: string | undefined): FileDiff[] {
     diffs.push({ path: parsed.path, status: parsed.status, addedLines });
   }
 
-  // Fallback: no committed diff against baseRef yet (e.g. bootstrap moment
-  // when all work is still uncommitted). Fold the working tree in so the
-  // detectors have real signals to inspect.
-  if (diffs.length === 0) {
-    return buildWorkingTreeDiffs(cwd);
-  }
-
+  // If nothing is committed vs baseRef yet, return no signals — the drafter
+  // is meant to run after commits exist. The bootstrap-moment fallback (fold
+  // in the working tree) was removed after the ship-review pass; it had zero
+  // test coverage and only served the self-referential bootstrap of this
+  // harness. If a real need resurfaces, restore from git history.
   return diffs;
-}
-
-function buildWorkingTreeDiffs(cwd: string | undefined): FileDiff[] {
-  const trackedRaw = runGit(["diff", "--name-status", "HEAD"], cwd);
-  const untrackedRaw = runGit(["ls-files", "--others", "--exclude-standard"], cwd);
-
-  const diffs: FileDiff[] = [];
-
-  for (const line of trackedRaw.split("\n")) {
-    if (line.length === 0) continue;
-    const parsed = parseNameStatusRow(line);
-    if (!parsed) continue;
-    const addedLines = readWorkingTreeAddedLines(parsed.path, cwd);
-    diffs.push({ path: parsed.path, status: parsed.status, addedLines });
-  }
-
-  for (const line of untrackedRaw.split("\n")) {
-    const path = line.trim();
-    if (path.length === 0) continue;
-    const addedLines = readWorkingTreeFileLines(path, cwd);
-    diffs.push({ path, status: "A", addedLines });
-  }
-
-  return diffs;
-}
-
-function readWorkingTreeAddedLines(path: string, cwd: string | undefined): string[] {
-  const diff = runGit(["diff", "HEAD", "--", path], cwd);
-  return diff
-    .split("\n")
-    .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
-    .map((line) => line.slice(1));
-}
-
-function readWorkingTreeFileLines(path: string, cwd: string | undefined): string[] {
-  try {
-    const abs = cwd ? join(cwd, path) : path;
-    const contents = readFileSync(abs, "utf8");
-    return contents.split("\n");
-  } catch {
-    return [];
-  }
 }
 
 /**

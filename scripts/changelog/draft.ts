@@ -158,7 +158,6 @@ function slugFromBranch(branch: string): string {
 type ParsedCommit = {
   subject: string;
   category: Category | null;
-  breakingBang: boolean;
 };
 
 function readCommitSubjects(baseRef: string): ParsedCommit[] {
@@ -171,26 +170,23 @@ function readCommitSubjects(baseRef: string): ParsedCommit[] {
     .split("\0")
     .map((chunk) => chunk.trim())
     .filter((s) => s.length > 0);
-  return subjects.map((subject) => {
-    const parsed = parseConventionalCommit(subject);
-    return {
-      subject,
-      category: parsed.category,
-      breakingBang: parsed.breakingBang,
-    };
-  });
+  return subjects.map((subject) => ({
+    subject,
+    category: categoryFromSubject(subject),
+  }));
 }
 
-function parseConventionalCommit(subject: string): {
-  category: Category | null;
-  breakingBang: boolean;
-} {
+/**
+ * Returns the conventional-commit `<type>` (feat / fix / …) if the subject
+ * matches; otherwise null. The `!` breaking marker is re-detected inside
+ * `stripConventionalPrefix` — we don't need to persist it on ParsedCommit.
+ */
+function categoryFromSubject(subject: string): Category | null {
   const match = subject.match(CONVENTIONAL_COMMIT);
-  if (!match) return { category: null, breakingBang: false };
+  if (!match) return null;
   const raw = match[1];
-  if (!raw) return { category: null, breakingBang: false };
-  const category = CATEGORIES.includes(raw as Category) ? (raw as Category) : null;
-  return { category, breakingBang: match[3] === "!" };
+  if (!raw) return null;
+  return CATEGORIES.includes(raw as Category) ? (raw as Category) : null;
 }
 
 // ─── PR info ──────────────────────────────────────────────────────────────────
@@ -233,7 +229,7 @@ type BuildEntryArgs = {
 };
 
 function buildEntry(args: BuildEntryArgs): Entry {
-  const category = inferCategory(args.commits);
+  const category = inferCategoryFromParsed(args.commits);
   const summary = deriveSummary(args.commits, args.prInfo);
 
   return {
@@ -270,10 +266,6 @@ function inferCategoryFromParsed(commits: readonly ParsedCommit[]): Category {
   }
 
   return winnerCount > 0 ? winner : CATEGORY_FALLBACK;
-}
-
-function inferCategory(commits: readonly ParsedCommit[]): Category {
-  return inferCategoryFromParsed(commits);
 }
 
 // ─── Summary derivation ──────────────────────────────────────────────────────
@@ -402,11 +394,21 @@ function renderSyncActionsBlock(actions: readonly SyncAction[]): string {
 }
 
 /**
- * Wrap `summary` in double quotes when it contains a `:` (which the YAML
- * subset parser would otherwise interpret as a key/value separator).
+ * Wrap `summary` in double quotes whenever the YAML subset parser would
+ * otherwise coerce it — bare `true`/`false`/`null`, numeric strings, values
+ * containing `:` or `#`, or multi-line content. Without this a summary like
+ * `"42"` or `"true"` round-trips through `parseScalar` as a number/boolean
+ * and Zod validation fails on the mismatch.
  */
 function quoteIfNeeded(value: string): string {
-  if (value.includes(":") || value.includes("#")) return quoteDetail(value);
+  if (value.length === 0) return '""';
+  if (value === "true" || value === "false" || value === "null" || value === "~") {
+    return quoteDetail(value);
+  }
+  if (/^-?\d+$/.test(value)) return quoteDetail(value);
+  if (value.includes("\n") || value.includes(":") || value.includes("#")) {
+    return quoteDetail(value);
+  }
   return value;
 }
 
@@ -441,14 +443,10 @@ export function deriveSlug(branch: string): string {
 }
 
 export function inferCategoryFromSubjects(subjects: readonly string[]): Category {
-  const parsed: ParsedCommit[] = subjects.map((subject) => {
-    const shape = parseConventionalCommit(subject);
-    return {
-      subject,
-      category: shape.category,
-      breakingBang: shape.breakingBang,
-    };
-  });
+  const parsed: ParsedCommit[] = subjects.map((subject) => ({
+    subject,
+    category: categoryFromSubject(subject),
+  }));
   return inferCategoryFromParsed(parsed);
 }
 
@@ -456,13 +454,9 @@ export function synthesizeSummary(args: {
   commitSubjects: readonly string[];
   prTitle: string | null;
 }): string {
-  const commits = args.commitSubjects.map((subject) => {
-    const shape = parseConventionalCommit(subject);
-    return {
-      subject,
-      category: shape.category,
-      breakingBang: shape.breakingBang,
-    };
-  });
+  const commits: ParsedCommit[] = args.commitSubjects.map((subject) => ({
+    subject,
+    category: categoryFromSubject(subject),
+  }));
   return deriveSummary(commits, args.prTitle ? { number: 0, title: args.prTitle } : null);
 }
