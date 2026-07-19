@@ -55,6 +55,35 @@ describe("encryptPii / decryptPii", () => {
   });
 });
 
+describe("V8 runtime compatibility (no Node Buffer)", () => {
+  // Convex queries/mutations run in a V8 isolate that has no Node `Buffer`
+  // global. The edge-runtime test env DOES expose Buffer, so without deleting
+  // it here the gap is invisible — this is the exact failure that made
+  // requestCreditScore throw `Buffer is not defined` in production.
+  test("hashPii works when global Buffer is absent", async () => {
+    const originalBuffer = globalThis.Buffer;
+    Reflect.deleteProperty(globalThis, "Buffer");
+    try {
+      const hash = await hashPii("11144477735");
+      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    } finally {
+      globalThis.Buffer = originalBuffer;
+    }
+  });
+
+  test("encryptPii/decryptPii roundtrip when global Buffer is absent", async () => {
+    const originalBuffer = globalThis.Buffer;
+    Reflect.deleteProperty(globalThis, "Buffer");
+    try {
+      const envelope = await encryptPii("52998224725");
+      const decrypted = await decryptPii(envelope);
+      expect(decrypted).toBe("52998224725");
+    } finally {
+      globalThis.Buffer = originalBuffer;
+    }
+  });
+});
+
 describe("hashPii", () => {
   test("is deterministic", async () => {
     const a = await hashPii("11144477735");
