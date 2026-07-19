@@ -541,6 +541,25 @@ When a query needs data from two domains (e.g. membership + user info), the enri
 
 Auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain providers, and Convex workpool are tracked in `.claude/notes/deferred-conventions.md` with adoption triggers. Pending refactors (e.g. money → cents migration) live in the same file.
 
+## Changelog — sync-action runbook
+
+`changelog/pending/*.md` is a minimal per-branch runbook: **branch, category, one-line summary, and the mechanical `sync_actions[]`** (env / install / seed / migrate / run / manual) — that's the whole schema. Frontmatter only, no body.
+
+Draft one via `bun run changelog:draft`. The drafter reads the diff + commits + optional PR title and writes the entry mechanically. Filesystem-signal detectors in `signals.ts` emit `sync_actions[]` deterministically — nobody has to remember to write "and run `bun run seed`."
+
+**The two consumers of the entry today:**
+
+- **`.husky/post-merge`** prints a compact banner to Draau on every `git pull`, listing `sync_actions[]` from entries that landed since his last pull. This is the load-bearing feature — it's how a schema-shape PR translates into "run `bun run seed`" showing up in his terminal automatically.
+- **`.claude/hooks/changelog-sync-notice.js`** injects the same list into every agent's first turn as SessionStart context.
+
+**Scope discipline (this is a start-small pilot):**
+
+- No body sections. The 3-months-later "why" narrative was aspirational and got cut. If entries prove valuable enough to warrant it, we add a body back.
+- No PR-blocking sensor. The pre-push hook validates schema shape only; it does not require an entry per PR. If entries get skipped and Draau starts missing sync steps, we add enforcement.
+- No release aggregation. There is no versioned-release ritual on this repo today.
+
+Full spec: [`docs/architecture/changelog.md`](docs/architecture/changelog.md).
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

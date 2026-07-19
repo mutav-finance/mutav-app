@@ -30,6 +30,8 @@
     "test:watch": "bun --filter @mutav/agency test:watch",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "changelog:draft": "bun run scripts/changelog/draft.ts",
+    "changelog:validate": "bun run scripts/changelog/validate.ts --lint-pending",
     "prepare": "husky"
   },
   "lint-staged": {
