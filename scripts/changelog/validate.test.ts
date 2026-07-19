@@ -1,21 +1,8 @@
 /**
  * Tests for scripts/changelog/validate.ts.
  *
- * Fixtures are inline markdown string constants — one per category the
- * validator has to discriminate against. Each fixture exercises the
- * frontmatter parser, the Zod schema, and the body-section extractor
- * end-to-end via `validate()`.
- *
- * Fixture matrix:
- *   1. VALID_FEAT       — happy path, category=feat, sync_actions present
- *   2. VALID_FIX        — happy path, category=fix, no sync_actions
- *   3. MISSING_SYNC     — frontmatter omits sync_actions entirely
- *   4. INVALID_KIND     — sync_actions[0].kind is not in SYNC_ACTION_KINDS
- *   5. INVALID_CATEGORY — category is not in CATEGORIES
- *   6. DOCS_ONLY        — category=docs, still valid (docs entries are allowed)
- *
- * Also covers isNonTrivialDiff() for the three canonical paths the sensor
- * has to classify (docs, notes, real code).
+ * Fixtures are inline markdown constants — one per case the validator has
+ * to discriminate against. Frontmatter-only entries (no body sections).
  */
 
 import { describe, expect, test } from "vitest";
@@ -27,190 +14,136 @@ pr: 42
 branch: feat/agentic-changelog-harness
 merged_at: "2026-07-18"
 category: feat
-scopes: [changelog, harness]
-breaking: false
+summary: agent-facing changelog harness
 sync_actions:
   - kind: install
-    detail: bun install
-  - kind: migrate
-    detail: bunx convex run migrations:runAll
-touched_domains: [changelog, hooks]
-issue_refs: [MUTAV-123]
+    detail: "bun install"
+  - kind: run
+    detail: "bunx husky"
 ---
-
-## What changed
-
-Introduced the agent-facing changelog harness with validate + draft scripts.
-
-## Notes for future agents
-
-Run \`bun run changelog:validate\` before pushing — the husky pre-push hook enforces it.
 `;
 
 const VALID_FIX = `---
-pr: 43
-branch: fix/contract-status-derivation
+branch: fix/invoice-overdue
 category: fix
-scopes: [contracts]
-breaking: false
+summary: invoice overdue derivation
 sync_actions: []
-touched_domains: [contracts]
-issue_refs: []
 ---
-
-## What changed
-
-Fixed the derived contract status when the latest invoice is overdue.
-
-## Notes for future agents
-
-Status derivation lives in convex/contracts/useCases.ts — keep it there.
 `;
 
-const MISSING_SYNC = `---
-pr: 44
-branch: chore/no-sync-actions
-category: chore
-scopes: [chore]
-breaking: false
-touched_domains: [chore]
-issue_refs: []
+const VALID_UNMERGED = `---
+pr: unmerged
+branch: feat/foo
+category: feat
+summary: foo
+sync_actions: []
 ---
+`;
 
-## What changed
-
-Chore entry missing the required sync_actions field.
-
-## Notes for future agents
-
-This fixture should fail validation with MISSING_FIELD.
+const MISSING_SUMMARY = `---
+branch: feat/foo
+category: feat
+sync_actions: []
+---
 `;
 
 const INVALID_KIND = `---
-pr: 45
-branch: feat/invalid-kind
+branch: feat/foo
 category: feat
-scopes: [changelog]
-breaking: false
+summary: foo
 sync_actions:
-  - kind: reboot
-    detail: restart the universe
-touched_domains: [changelog]
-issue_refs: []
+  - kind: bogus
+    detail: "does not exist"
 ---
-
-## What changed
-
-Sync action with an unsupported kind.
-
-## Notes for future agents
-
-The validator must reject any kind outside SYNC_ACTION_KINDS.
 `;
 
 const INVALID_CATEGORY = `---
-pr: 46
-branch: feat/invalid-category
-category: banana
-scopes: [changelog]
-breaking: false
+branch: feat/foo
+category: made-up
+summary: foo
 sync_actions: []
-touched_domains: [changelog]
-issue_refs: []
 ---
-
-## What changed
-
-Category is not in the CATEGORIES union.
-
-## Notes for future agents
-
-The validator must reject unknown categories.
-`;
-
-const DOCS_ONLY = `---
-pr: 47
-branch: docs/changelog-harness
-category: docs
-scopes: [docs]
-breaking: false
-sync_actions: []
-touched_domains: [docs]
-issue_refs: []
----
-
-## What changed
-
-Documented the changelog harness in docs/superpowers/specs/.
-
-## Notes for future agents
-
-Docs-only entries are valid — the category is allowed.
 `;
 
 describe("validate()", () => {
-  test("accepts a valid feat entry and normalizes sync_actions", () => {
+  test("accepts a valid feat entry with sync_actions", () => {
     const result = validate(VALID_FEAT);
     expect(result.success).toBe(true);
     if (!result.success) return;
-
     expect(result.data.category).toBe("feat");
-    expect(result.data.pr).toBe(42);
     expect(result.data.branch).toBe("feat/agentic-changelog-harness");
-    expect(result.data.merged_at).toBe("2026-07-18");
-    expect(result.data.sync_actions).toEqual([
-      { kind: "install", detail: "bun install" },
-      { kind: "migrate", detail: "bunx convex run migrations:runAll" },
-    ]);
-    expect(result.data.body.whatChanged.length).toBeGreaterThan(0);
-    expect(result.data.body.notesForAgents.length).toBeGreaterThan(0);
+    expect(result.data.summary).toBe("agent-facing changelog harness");
+    expect(result.data.pr).toBe(42);
+    expect(result.data.sync_actions).toHaveLength(2);
   });
 
-  test("accepts a valid fix entry with empty sync_actions", () => {
+  test("accepts a valid fix entry with no sync_actions", () => {
     const result = validate(VALID_FIX);
     expect(result.success).toBe(true);
     if (!result.success) return;
-
     expect(result.data.category).toBe("fix");
-    expect(result.data.sync_actions).toEqual([]);
-    expect(result.data.pr).toBe(43);
+    expect(result.data.sync_actions).toHaveLength(0);
   });
 
-  test("rejects an entry missing the sync_actions field", () => {
-    const result = validate(MISSING_SYNC);
+  test("accepts `pr: unmerged` as a valid PR field", () => {
+    const result = validate(VALID_UNMERGED);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.pr).toBe("unmerged");
+  });
+
+  test("rejects an entry missing the required `summary` field", () => {
+    const result = validate(MISSING_SUMMARY);
     expect(result.success).toBe(false);
     if (result.success) return;
-
     expect(result.error.code).toBe("MISSING_FIELD");
-    expect(result.error.field).toBe("sync_actions");
   });
 
-  test("rejects an entry with an invalid sync_action kind", () => {
+  test("rejects a sync_action with an invalid kind", () => {
     const result = validate(INVALID_KIND);
     expect(result.success).toBe(false);
     if (result.success) return;
-
     expect(result.error.code).toBe("INVALID_KIND");
-    expect(result.error.field).toContain("sync_actions");
-    expect(result.error.field).toContain("kind");
   });
 
-  test("rejects an entry with an invalid category", () => {
+  test("rejects an entry with a category outside the enum", () => {
     const result = validate(INVALID_CATEGORY);
     expect(result.success).toBe(false);
     if (result.success) return;
-
     expect(result.error.code).toBe("INVALID_CATEGORY");
-    expect(result.error.field).toBe("category");
   });
 
-  test("accepts a docs-only entry", () => {
-    const result = validate(DOCS_ONLY);
+  test("rejects a file that does not start with a `---` fence", () => {
+    const result = validate("no frontmatter here\n");
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_FRONTMATTER");
+  });
+
+  test("normalizes CRLF line endings before parsing (Windows-authored files)", () => {
+    const crlf = VALID_FEAT.replace(/\n/g, "\r\n");
+    const result = validate(crlf);
+    expect(result.success).toBe(true);
+  });
+
+  test("sorts sync_actions deterministically by SYNC_ACTION_ORDER + detail", () => {
+    const unsorted = `---
+branch: feat/foo
+category: feat
+summary: foo
+sync_actions:
+  - kind: run
+    detail: "z"
+  - kind: env
+    detail: "a"
+  - kind: install
+    detail: "b"
+---
+`;
+    const result = validate(unsorted);
     expect(result.success).toBe(true);
     if (!result.success) return;
-
-    expect(result.data.category).toBe("docs");
-    expect(result.data.sync_actions).toEqual([]);
+    expect(result.data.sync_actions.map((a) => a.kind)).toEqual(["env", "install", "run"]);
   });
 });
 
@@ -232,8 +165,8 @@ describe("isNonTrivialDiff()", () => {
  * SYNC_ACTION_ORDER is duplicated across three files by design (types.ts is
  * TS-only; sync-notice.mjs and .claude/hooks/changelog-sync-notice.js are
  * plain JS so they can run without a build step). Guard the duplication by
- * asserting all three copies agree — a drift causes visible bugs
- * (sync-notice banner order differs from persisted markdown order).
+ * asserting all three copies agree — drift causes visible bugs (sync-notice
+ * banner order differs from persisted markdown order).
  */
 describe("SYNC_ACTION_ORDER alignment", () => {
   test("types.ts / sync-notice.mjs / SessionStart hook all use the same order", async () => {

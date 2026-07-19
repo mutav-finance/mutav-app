@@ -541,17 +541,22 @@ When a query needs data from two domains (e.g. membership + user info), the enri
 
 Auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain providers, and Convex workpool are tracked in `.claude/notes/deferred-conventions.md` with adoption triggers. Pending refactors (e.g. money → cents migration) live in the same file.
 
-## Changelog — mandatory pre-work read
+## Changelog — sync-action runbook
 
-Before starting non-trivial work in a domain, scan `changelog/pending/*.md` for entries whose `touched_domains` or `scopes` intersect your target files. These entries carry the "why" behind recent changes that `git log` alone can't reveal — they exist specifically to prevent you from operating on stale assumptions.
+`changelog/pending/*.md` is a minimal per-branch runbook: **branch, category, one-line summary, and the mechanical `sync_actions[]`** (env / install / seed / migrate / run / manual) — that's the whole schema. Frontmatter only, no body.
 
-**Every non-trivial PR MUST land a changelog entry.** The `.husky/pre-push` gate and the `changelog-required.js` PreToolUse hook block `gh pr create` when the entry is missing. Draft one via `bun run changelog:draft` — it inspects the diff, commits, and `.env.example`/`package.json`/`convex/*` signals and writes the frontmatter + a one-line `## What changed` from the PR title.
+Draft one via `bun run changelog:draft`. The drafter reads the diff + commits + optional PR title and writes the entry mechanically. Filesystem-signal detectors in `signals.ts` emit `sync_actions[]` deterministically — nobody has to remember to write "and run `bun run seed`."
 
-**The drafter is deliberately dumb about `## Notes for future agents`** — it leaves a TBD prompt because a plain script can't synthesize. **You** write that section. Invoke the `changelog-notes` skill (`Skill(changelog-notes)`) for the synthesis recipe: 3–8 lines of forward-guidance (non-obvious constraints, hidden invariants, "we tried X and it broke Y") — never a log of what happened, since the commits are on the PR. Write those notes under a `## Notes for future agents` heading in the **PR body**, then re-run `bun run changelog:draft` — the drafter extracts that section and pulls it into the entry automatically, so notes live in one place.
+**The two consumers of the entry today:**
 
-**Sync actions** (`sync_actions[].kind`) are the runbook everyone needs on `git pull`. When your PR adds an env var, a seed dependency, or a manual step, the draft script emits the corresponding `sync_actions` entry — do not hand-strip them.
+- **`.husky/post-merge`** prints a compact banner to Draau on every `git pull`, listing `sync_actions[]` from entries that landed since his last pull. This is the load-bearing feature — it's how a schema-shape PR translates into "run `bun run seed`" showing up in his terminal automatically.
+- **`.claude/hooks/changelog-sync-notice.js`** injects the same list into every agent's first turn as SessionStart context.
 
-Released entries live on **GitHub Releases** (`gh release list`), tagged by SemVer. Pending entries are cleared into the release on `bun run changelog:release`.
+**Scope discipline (this is a start-small pilot):**
+
+- No body sections. The 3-months-later "why" narrative was aspirational and got cut. If entries prove valuable enough to warrant it, we add a body back.
+- No PR-blocking sensor. The pre-push hook validates schema shape only; it does not require an entry per PR. If entries get skipped and Draau starts missing sync steps, we add enforcement.
+- No release aggregation. There is no versioned-release ritual on this repo today.
 
 Full spec: [`docs/architecture/changelog.md`](docs/architecture/changelog.md).
 

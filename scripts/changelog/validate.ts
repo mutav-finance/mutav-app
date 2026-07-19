@@ -2,22 +2,15 @@
  * Schema validation for `changelog/pending/*.md` entries.
  *
  * Shared by:
- *   - .husky/pre-push  → `bun run changelog:validate` (primary gate; fires
- *     for non-Claude workflows too, e.g. Draau's shell).
- *   - .claude/hooks/changelog-required.js → PreToolUse gate on `gh pr create`.
- *
- * See docs/superpowers/specs/2026-07-18-agent-facing-changelog-design.md.
+ *   - .husky/pre-push  → `bun run changelog:validate` (schema-shape guard)
  *
  * Parsing:
- *   - Accepts a raw markdown string with YAML frontmatter (`---` fences), or
- *     a partially-typed object (already-parsed frontmatter merged with a body).
- *   - Frontmatter parser is a small, purpose-built YAML subset — the harness
- *     controls the shape of the file (it's agent-authored), so we avoid
- *     pulling in gray-matter / js-yaml as a new runtime dep.
+ *   - Entries are frontmatter-only — YAML `---` fenced block, no body.
+ *   - Frontmatter parser is a small purpose-built YAML subset — the harness
+ *     controls the shape (agent-authored via draft.ts), so we avoid pulling
+ *     in gray-matter / js-yaml as a runtime dep.
  *
- * Non-trivial-diff heuristic (`isNonTrivialDiff`) mirrors the tone of
- * .claude/hooks/code-quality.js: docs-only, whitespace-only, and
- * .claude/notes/** changes are skipped so the sensor never blocks a no-op PR.
+ * See docs/architecture/changelog.md for the schema spec.
  */
 
 import { z } from "zod";
@@ -27,7 +20,6 @@ import {
   SYNC_ACTION_ORDER,
   type Category,
   type Entry,
-  type EntryBody,
   type Result,
   type SyncAction,
   type SyncActionKind,
@@ -40,17 +32,16 @@ const TRIVIAL_EXTENSIONS = [".md", ".mdx", ".txt"];
 const TRIVIAL_PATH_PREFIXES = [".claude/notes/"];
 
 /**
- * Returns true when the diff has at least one substantive change — used by
- * hooks + husky to decide whether to enforce the "PR must have a changelog
- * entry" rule. Trivial cases skipped:
+ * Returns true when the diff has at least one substantive change. Used by the
+ * pre-push gate (and any future callers) to decide whether the "PR must have
+ * a changelog entry" rule applies. Trivial cases skipped:
  *
- *   - Empty diff (no files changed)
+ *   - Empty diff
  *   - Docs-only changes (only .md / .mdx / .txt files)
- *   - Notes-only changes (all paths under .claude/notes/**)
+ *   - Notes-only changes (paths under .claude/notes/**)
  *
  * `diffStat` is the output of `git diff --name-only <base>...HEAD` — one path
- * per line. Whitespace-only detection is not attempted here; a caller that
- * needs it should re-run `git diff --shortstat` and compare insertions.
+ * per line.
  */
 export function isNonTrivialDiff(diffStat: string): boolean {
   const paths = diffStat
@@ -73,19 +64,14 @@ export function isNonTrivialDiff(diffStat: string): boolean {
 
 const FRONTMATTER_FENCE = "---";
 
-type ParsedMarkdown = {
-  frontmatter: Record<string, unknown>;
-  body: string;
-};
-
 /**
- * Splits a markdown string into the raw frontmatter block and the body.
- * Returns null when the file doesn't start with a `---` fence.
+ * Splits a markdown string into the raw frontmatter block. Body is discarded —
+ * entries are frontmatter-only. Returns null when the file doesn't start with
+ * a `---` fence.
  */
-function splitFrontmatter(source: string): { raw: string; body: string } | null {
-  // Strip UTF-8 BOM, then normalize CRLF → LF so a Windows-authored entry
-  // parses the same as a Unix-authored one. Without this, the line-oriented
-  // parser sees trailing `\r` on every value and the regex matchers fail.
+function extractFrontmatter(source: string): string | null {
+  // Strip UTF-8 BOM + normalize CRLF/CR → LF so a Windows-authored entry
+  // parses identically to a Unix-authored one.
   const normalized = source.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   if (!normalized.startsWith(FRONTMATTER_FENCE)) return null;
 
@@ -93,9 +79,7 @@ function splitFrontmatter(source: string): { raw: string; body: string } | null 
   const closingIndex = afterOpening.indexOf(`\n${FRONTMATTER_FENCE}`);
   if (closingIndex === -1) return null;
 
-  const raw = afterOpening.slice(0, closingIndex).replace(/^\n/, "");
-  const body = afterOpening.slice(closingIndex + FRONTMATTER_FENCE.length + 1);
-  return { raw, body: body.replace(/^\n/, "") };
+  return afterOpening.slice(0, closingIndex).replace(/^\n/, "");
 }
 
 /**
@@ -103,11 +87,7 @@ function splitFrontmatter(source: string): { raw: string; body: string } | null 
  *   - `key: value` scalars (strings, numbers, booleans)
  *   - `key: [a, b, c]` inline lists of scalars
  *   - block lists via `- ` prefix
- *   - block maps two levels deep (top-level → `- key: value` entries)
- *
- * Not a general YAML parser. If the file uses anything outside this subset,
- * validate() surfaces an INVALID_FRONTMATTER error instead of silently
- * misparsing.
+ *   - block maps two levels deep (`- key: value` entries)
  */
 function parseYamlSubset(raw: string): Record<string, unknown> | null {
   const lines = raw.split("\n");
@@ -138,7 +118,6 @@ function parseYamlSubset(raw: string): Record<string, unknown> | null {
     if (line.trim().length === 0) continue;
     if (line.trim().startsWith("#")) continue;
 
-    // Top-level key.
     const topLevelMatch = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/);
     if (topLevelMatch && !line.startsWith(" ") && !line.startsWith("\t")) {
       flushList();
@@ -153,7 +132,6 @@ function parseYamlSubset(raw: string): Record<string, unknown> | null {
       continue;
     }
 
-    // List item (either scalar or start of a map item).
     const listItemMatch = line.match(/^\s*-\s+(.*)$/);
     if (listItemMatch && currentList) {
       const rest = listItemMatch[1] ?? "";
@@ -166,13 +144,11 @@ function parseYamlSubset(raw: string): Record<string, unknown> | null {
         if (v.length > 0) currentListItem[k] = parseScalarOrInlineList(v);
         continue;
       }
-      // Scalar list item.
       flushListItem();
       currentList.push(parseScalarOrInlineList(rest));
       continue;
     }
 
-    // Continuation of the current map list item (2+ space indent).
     const continuationMatch = line.match(/^\s{2,}([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/);
     if (continuationMatch && currentListItem) {
       const k = continuationMatch[1] ?? "";
@@ -181,7 +157,6 @@ function parseYamlSubset(raw: string): Record<string, unknown> | null {
       continue;
     }
 
-    // Anything else = shape we don't handle.
     return null;
   }
 
@@ -211,38 +186,6 @@ function parseScalar(raw: string): unknown {
   return raw;
 }
 
-function parseMarkdown(source: string): ParsedMarkdown | null {
-  const split = splitFrontmatter(source);
-  if (!split) return null;
-  const frontmatter = parseYamlSubset(split.raw);
-  if (!frontmatter) return null;
-  return { frontmatter, body: split.body };
-}
-
-// ─── Body section extraction ──────────────────────────────────────────────────
-
-const WHAT_CHANGED_HEADING = "## What changed";
-const NOTES_HEADING = "## Notes for future agents";
-
-function extractBodySections(body: string): EntryBody {
-  const whatChanged = extractSection(body, WHAT_CHANGED_HEADING, NOTES_HEADING);
-  const notesForAgents = extractSection(body, NOTES_HEADING, null);
-  return {
-    whatChanged: whatChanged.trim(),
-    notesForAgents: notesForAgents.trim(),
-  };
-}
-
-function extractSection(body: string, startHeading: string, endHeading: string | null): string {
-  const startIdx = body.indexOf(startHeading);
-  if (startIdx === -1) return "";
-  const afterStart = body.slice(startIdx + startHeading.length);
-  if (!endHeading) return afterStart;
-  const endIdx = afterStart.indexOf(endHeading);
-  if (endIdx === -1) return afterStart;
-  return afterStart.slice(0, endIdx);
-}
-
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
 const syncActionSchema = z.object({
@@ -252,35 +195,19 @@ const syncActionSchema = z.object({
 
 const prSchema = z.union([z.number().int().positive(), z.literal("unmerged")]);
 
-const entryBodySchema = z.object({
-  whatChanged: z.string().min(1),
-  notesForAgents: z.string().min(1),
-});
-
 const entrySchema = z.object({
-  pr: prSchema,
   branch: z.string().min(1),
-  merged_at: z.string().min(1).optional(),
   category: z.enum(CATEGORIES),
-  // Empty arrays are omitted from the rendered frontmatter — default them
-  // here so an entry with a small footprint stays terse but still validates.
-  scopes: z.array(z.string().min(1)).default([]),
-  // `breaking` defaults to false — the renderer omits the field when false.
-  breaking: z.boolean().default(false),
+  summary: z.string().min(1),
+  pr: prSchema.optional(),
+  merged_at: z.string().min(1).optional(),
   sync_actions: z.array(syncActionSchema),
-  touched_domains: z.array(z.string().min(1)).default([]),
-  issue_refs: z.array(z.string().min(1)).default([]),
-  body: entryBodySchema,
 });
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Accepts either:
- *   - a raw markdown string (parses YAML frontmatter + body sections), or
- *   - a partially-typed object (frontmatter fields already extracted, with
- *     an optional `body: { whatChanged, notesForAgents }`).
- *
+ * Accepts a raw markdown string OR an already-parsed object.
  * Returns Result<Entry, ValidationError>. Never throws.
  */
 export function validate(input: unknown): Result<Entry, ValidationError> {
@@ -302,8 +229,8 @@ export function validate(input: unknown): Result<Entry, ValidationError> {
 
 function normalizeInput(input: unknown): Result<Record<string, unknown>, ValidationError> {
   if (typeof input === "string") {
-    const parsed = parseMarkdown(input);
-    if (!parsed) {
+    const raw = extractFrontmatter(input);
+    if (!raw) {
       return {
         success: false,
         error: {
@@ -314,11 +241,18 @@ function normalizeInput(input: unknown): Result<Record<string, unknown>, Validat
         message: "Invalid frontmatter.",
       };
     }
-    const merged: Record<string, unknown> = {
-      ...parsed.frontmatter,
-      body: extractBodySections(parsed.body),
-    };
-    return { success: true, data: merged, message: "Parsed markdown." };
+    const frontmatter = parseYamlSubset(raw);
+    if (!frontmatter) {
+      return {
+        success: false,
+        error: {
+          code: "INVALID_FRONTMATTER",
+          message: "Frontmatter contains YAML shapes outside the supported subset.",
+        },
+        message: "Invalid frontmatter.",
+      };
+    }
+    return { success: true, data: frontmatter, message: "Parsed markdown." };
   }
 
   if (input && typeof input === "object") {
@@ -383,16 +317,15 @@ function withSortedSyncActions(entry: Entry): Entry {
   return { ...entry, sync_actions: sorted };
 }
 
-// ─── Re-exports for consumers ────────────────────────────────────────────────
+// ─── Re-exports ───────────────────────────────────────────────────────────────
 
 export type { Category, Entry, SyncAction, SyncActionKind, ValidationError };
 
 // ─── CLI: `bun run scripts/changelog/validate.ts --lint-pending` ──────────────
 //
 // Iterates every `changelog/pending/*.md`, runs validate() on each, and prints
-// a report. Exits 0 when every entry parses; exits 1 with a per-file summary
-// when any entry fails. Used by the root `changelog:validate` script and
-// therefore by `.husky/pre-push` as the primary gate.
+// a report. Used by the root `changelog:validate` script and therefore by
+// `.husky/pre-push` as the primary schema-shape gate.
 
 const PENDING_DIR = "changelog/pending";
 const LINT_FLAG = "--lint-pending";

@@ -1,39 +1,27 @@
 /**
  * Draft or overwrite a changelog entry for the current branch.
  *
- * See docs/superpowers/specs/2026-07-18-agent-facing-changelog-design.md
- * (§ Author workflow) for the full behavior. High-level:
+ * Frontmatter-only. See docs/architecture/changelog.md for the schema.
  *
- *   1. Read the current branch, diff vs base, and conventional-commit log.
- *   2. Optionally read PR title/body/number via `gh pr view --json …`.
- *   3. Call detectSignals() for the mechanical sync_actions runbook.
- *   4. Infer category / scopes / touched_domains / breaking / issue_refs
- *      from that raw material — never invent facts.
+ *   1. Read current branch + commit subjects + optional PR title.
+ *   2. Infer `category` from conventional-commit prefixes (majority vote).
+ *   3. Pick `summary`: PR title (prefix-stripped) if a PR exists, otherwise
+ *      the most recent commit subject.
+ *   4. Call detectSignals() for the mechanical `sync_actions[]` runbook.
  *   5. Write `changelog/pending/YYYY-MM-DD-<slug>.md`, preserving the
- *      original filename (date + slug) if an entry for the branch already
- *      exists so git history stays clean.
+ *      existing filename on re-runs so git history stays clean.
  *
  * CLI:
- *
  *   bun run scripts/changelog/draft.ts
  *   bun run scripts/changelog/draft.ts --pr=264
  *   bun run scripts/changelog/draft.ts --base=origin/main --verbose
- *
- * Prints the resulting file path to stdout. `--verbose` also prints the file.
  */
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { detectSignals } from "./signals";
-import {
-  CATEGORIES,
-  SYNC_ACTION_ORDER,
-  type Category,
-  type Entry,
-  type EntryBody,
-  type SyncAction,
-} from "./types";
+import { CATEGORIES, SYNC_ACTION_ORDER, type Category, type Entry, type SyncAction } from "./types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -43,10 +31,6 @@ const REPO_ROOT = resolve(__dirname, "..", "..");
 
 const PENDING_DIR = join(REPO_ROOT, "changelog", "pending");
 
-/**
- * Branch-prefix stripping order matters — we strip the first match, so listing
- * the closed conventional-commit vocabulary here keeps the slug stable.
- */
 const BRANCH_PREFIXES: readonly string[] = [
   "feat/",
   "fix/",
@@ -57,11 +41,6 @@ const BRANCH_PREFIXES: readonly string[] = [
   "test/",
 ];
 
-/**
- * Category priority for tie-breaking when the commit log's conventional-commit
- * prefixes split evenly. Ordered high → low precedence:
- * feat > fix > refactor > perf > chore > docs > test.
- */
 const CATEGORY_TIEBREAK: readonly Category[] = [
   "feat",
   "fix",
@@ -77,21 +56,9 @@ const CATEGORY_FALLBACK: Category = "chore";
 const CONVENTIONAL_COMMIT =
   /^(feat|fix|refactor|perf|chore|docs|test)(?:\(([^)]+)\))?(!)?:\s*(.+)$/;
 
-const BREAKING_MARKER = /BREAKING CHANGE/;
-
-const ISSUE_REF_PATTERN = /(?:^|[\s(])((?:[a-z][a-z0-9-]+#|#)\d+)/gi;
-
-/**
- * Git trailers to strip from commit bodies before they land in the
- * `## Notes for future agents` section — they're captured by git's own
- * author metadata and add pure noise to agent context.
- */
-const GIT_TRAILER_PATTERN =
-  /^(?:Co-authored-by|Signed-off-by|Reviewed-by|Reported-by|Suggested-by|Acked-by|Tested-by|Cc):\s/i;
-
 const SPACE = " ";
 
-// ─── CLI entrypoint ───────────────────────────────────────────────────────────
+// ─── CLI ──────────────────────────────────────────────────────────────────────
 
 type CliArgs = {
   prOverride: number | null;
@@ -134,25 +101,18 @@ async function main(): Promise<void> {
   }
   if (branch === "HEAD") {
     process.stderr.write(
-      "Detached HEAD: changelog entries are keyed by branch, so `git rev-parse --abbrev-ref HEAD` returning `HEAD` is not a valid target.\n" +
-        "Check out a branch first (e.g. `git switch -c feat/your-feature`) before running `bun run changelog:draft`.\n",
+      "Detached HEAD: changelog entries are keyed by branch. Check out a branch " +
+        "(e.g. `git switch -c feat/your-feature`) before running `bun run changelog:draft`.\n",
     );
     process.exit(1);
   }
 
   const slug = slugFromBranch(branch);
-  const commits = readCommitMessages(args.baseRef);
-  const changedPaths = readChangedPaths(args.baseRef);
+  const commits = readCommitSubjects(args.baseRef);
   const prInfo = readPrInfo(args.prOverride);
   const sync_actions = await detectSignals({ baseRef: args.baseRef });
 
-  const entry = buildEntry({
-    branch,
-    commits,
-    changedPaths,
-    prInfo,
-    sync_actions,
-  });
+  const entry = buildEntry({ branch, commits, prInfo, sync_actions });
 
   const filePath = resolveEntryPath(slug, branch);
   const markdown = renderMarkdown(entry);
@@ -168,9 +128,6 @@ async function main(): Promise<void> {
   }
 }
 
-// Bun sets `import.meta.main` when this file is the entrypoint — matches the
-// pattern already used in validate.ts. Falling back to argv[1] filename
-// matching (as an earlier version did) breaks on symlinks and renames.
 if (import.meta.main) {
   main().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
@@ -200,80 +157,40 @@ function slugFromBranch(branch: string): string {
 
 type ParsedCommit = {
   subject: string;
-  body: string;
   category: Category | null;
-  scope: string | null;
   breakingBang: boolean;
-  breakingFooter: boolean;
 };
 
-function readCommitMessages(baseRef: string): ParsedCommit[] {
-  // `-z` uses NUL as the between-commit separator (not the sentinel string
-  // approach). Robust to commit messages that literally contain any string
-  // sentinel we could otherwise pick.
-  const raw = runGit(["log", `${baseRef}..HEAD`, "-z", "--pretty=format:%s%n%b"]);
+function readCommitSubjects(baseRef: string): ParsedCommit[] {
+  // Subjects only — commit bodies are on the PR (`gh pr view` / `git log`).
+  // -z (NUL-delimited) is robust to whatever the messages contain.
+  const raw = runGit(["log", `${baseRef}..HEAD`, "-z", "--pretty=format:%s"]);
   if (raw.length === 0) return [];
 
-  const chunks = raw.split("\0").map((chunk) => chunk.trim());
-  const commits: ParsedCommit[] = [];
-
-  for (const chunk of chunks) {
-    if (chunk.length === 0) continue;
-    const lines = chunk.split("\n");
-    const subject = lines[0] ?? "";
-    const body = lines.slice(1).join("\n").trim();
+  const subjects = raw
+    .split("\0")
+    .map((chunk) => chunk.trim())
+    .filter((s) => s.length > 0);
+  return subjects.map((subject) => {
     const parsed = parseConventionalCommit(subject);
-
-    commits.push({
+    return {
       subject,
-      body,
       category: parsed.category,
-      scope: parsed.scope,
       breakingBang: parsed.breakingBang,
-      breakingFooter: BREAKING_MARKER.test(body) || BREAKING_MARKER.test(subject),
-    });
-  }
-
-  return commits;
+    };
+  });
 }
 
 function parseConventionalCommit(subject: string): {
   category: Category | null;
-  scope: string | null;
   breakingBang: boolean;
 } {
   const match = subject.match(CONVENTIONAL_COMMIT);
-  if (!match) return { category: null, scope: null, breakingBang: false };
+  if (!match) return { category: null, breakingBang: false };
   const raw = match[1];
-  if (!raw) return { category: null, scope: null, breakingBang: false };
+  if (!raw) return { category: null, breakingBang: false };
   const category = CATEGORIES.includes(raw as Category) ? (raw as Category) : null;
-  return {
-    category,
-    scope: match[2] ?? null,
-    breakingBang: match[3] === "!",
-  };
-}
-
-function readChangedPaths(baseRef: string): string[] {
-  const raw = runGit(["diff", "--name-only", `${baseRef}...HEAD`]);
-  const committed = raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  if (committed.length > 0) return committed;
-  return readWorkingTreePaths();
-}
-
-function readWorkingTreePaths(): string[] {
-  const tracked = runGit(["diff", "--name-only", "HEAD"])
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  const untracked = runGit(["ls-files", "--others", "--exclude-standard"])
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  return [...new Set([...tracked, ...untracked])];
+  return { category, breakingBang: match[3] === "!" };
 }
 
 // ─── PR info ──────────────────────────────────────────────────────────────────
@@ -281,12 +198,10 @@ function readWorkingTreePaths(): string[] {
 type PrInfo = {
   number: number;
   title: string;
-  body: string;
-  url: string;
 };
 
 function readPrInfo(prOverride: number | null): PrInfo | null {
-  const args = ["pr", "view", "--json", "title,body,number,url"];
+  const args = ["pr", "view", "--json", "title,number"];
   if (prOverride !== null) args.push(String(prOverride));
 
   const raw = runCommand("gh", args);
@@ -298,14 +213,10 @@ function readPrInfo(prOverride: number | null): PrInfo | null {
     const record = parsed as Record<string, unknown>;
     const number = record.number;
     const title = record.title;
-    const body = record.body;
-    const url = record.url;
     if (typeof number !== "number") return null;
     return {
       number,
       title: typeof title === "string" ? title : "",
-      body: typeof body === "string" ? body : "",
-      url: typeof url === "string" ? url : "",
     };
   } catch {
     return null;
@@ -317,29 +228,20 @@ function readPrInfo(prOverride: number | null): PrInfo | null {
 type BuildEntryArgs = {
   branch: string;
   commits: ParsedCommit[];
-  changedPaths: string[];
   prInfo: PrInfo | null;
   sync_actions: SyncAction[];
 };
 
 function buildEntry(args: BuildEntryArgs): Entry {
-  const category = inferCategoryFromParsed(args.commits);
-  const scopes = inferScopes(args.commits);
-  const touched_domains = inferTouchedDomains(args.changedPaths);
-  const issue_refs = inferIssueRefs(args.commits, args.prInfo);
-  const breaking = args.commits.some((c) => c.breakingBang || c.breakingFooter);
-  const body = buildBody(args.commits, args.prInfo);
+  const category = inferCategory(args.commits);
+  const summary = deriveSummary(args.commits, args.prInfo);
 
   return {
-    pr: args.prInfo ? args.prInfo.number : "unmerged",
     branch: args.branch,
     category,
-    scopes,
-    breaking,
+    summary,
+    pr: args.prInfo ? args.prInfo.number : "unmerged",
     sync_actions: sortSyncActions(args.sync_actions),
-    touched_domains,
-    issue_refs,
-    body,
   };
 }
 
@@ -357,7 +259,7 @@ function inferCategoryFromParsed(commits: readonly ParsedCommit[]): Category {
   if (counts.size === 0) return CATEGORY_FALLBACK;
 
   let winner: Category = CATEGORY_TIEBREAK[0] ?? CATEGORY_FALLBACK;
-  let winnerCount = -1;
+  let winnerCount = 0;
 
   for (const category of CATEGORY_TIEBREAK) {
     const count = counts.get(category) ?? 0;
@@ -370,110 +272,17 @@ function inferCategoryFromParsed(commits: readonly ParsedCommit[]): Category {
   return winnerCount > 0 ? winner : CATEGORY_FALLBACK;
 }
 
-// ─── Scopes (from conventional-commit prefixes) ───────────────────────────────
-
-function inferScopes(commits: readonly ParsedCommit[]): string[] {
-  const scopes = new Set<string>();
-  for (const commit of commits) {
-    if (commit.scope && commit.scope.length > 0) scopes.add(commit.scope);
-  }
-  return [...scopes].sort();
+function inferCategory(commits: readonly ParsedCommit[]): Category {
+  return inferCategoryFromParsed(commits);
 }
 
-// ─── Touched domains (from changed file paths) ────────────────────────────────
+// ─── Summary derivation ──────────────────────────────────────────────────────
 
 /**
- * Map a changed path to its coarse domain — the string a consuming agent would
- * grep for when filtering entries by their current work area:
- *
- *   convex/contracts/useCases.ts → convex/contracts
- *   packages/ui/src/button.tsx   → packages/ui
- *   apps/agency/src/…            → apps/agency
- *   docs/architecture/…          → docs
- *   scripts/foo.ts               → scripts
- *   .claude/hooks/foo.js         → .claude
- *   README.md                    → root
+ * One-line synthesis. Prefer the PR title (author-written, prefix-stripped).
+ * Fall back to the most recent commit subject when no PR is open.
  */
-function domainForPath(path: string): string | null {
-  if (path.startsWith("convex/")) {
-    const rest = path.slice("convex/".length);
-    const segments = rest.split("/");
-    const first = segments[0];
-    if (!first) return "convex";
-    // Files directly under convex/ (schema.ts, seed.ts, crons.ts, http.ts) get a
-    // single `convex` bucket; nested folders (convex/<domain>/…) keep the domain.
-    if (segments.length === 1) return "convex";
-    return `convex/${first}`;
-  }
-  if (path.startsWith("packages/")) {
-    const first = path.slice("packages/".length).split("/")[0];
-    return first ? `packages/${first}` : null;
-  }
-  if (path.startsWith("apps/")) {
-    const first = path.slice("apps/".length).split("/")[0];
-    return first ? `apps/${first}` : null;
-  }
-  if (path.startsWith("docs/")) return "docs";
-  if (path.startsWith("scripts/")) return "scripts";
-  if (path.startsWith(".claude/")) return ".claude";
-  if (path.startsWith(".husky/")) return ".husky";
-  if (path.startsWith(".github/")) return ".github";
-  if (path.includes("/")) return null;
-  return "root";
-}
-
-function inferTouchedDomains(paths: readonly string[]): string[] {
-  const domains = new Set<string>();
-  for (const path of paths) {
-    const domain = domainForPath(path);
-    if (domain) domains.add(domain);
-  }
-  return [...domains].sort();
-}
-
-// ─── Issue refs (from commit trailers + PR body) ──────────────────────────────
-
-function inferIssueRefs(commits: readonly ParsedCommit[], prInfo: PrInfo | null): string[] {
-  const refs = new Set<string>();
-  const collect = (text: string) => {
-    for (const match of text.matchAll(ISSUE_REF_PATTERN)) {
-      const ref = match[1];
-      if (ref) refs.add(ref);
-    }
-  };
-
-  for (const commit of commits) {
-    collect(commit.subject);
-    if (commit.body.length > 0) collect(commit.body);
-  }
-  if (prInfo) collect(prInfo.body);
-
-  return [...refs].sort();
-}
-
-// ─── Body sections ────────────────────────────────────────────────────────────
-
-/**
- * Compose the `## What changed` and `## Notes for future agents` sections from
- * commit messages and (if present) the PR body. Deliberately mechanical — the
- * drafter never invents rationale; if the raw material is thin, the entry is
- * thin, and a human/agent will flesh it out on the next pass.
- */
-function buildBody(commits: readonly ParsedCommit[], prInfo: PrInfo | null): EntryBody {
-  const whatChanged = buildWhatChanged(commits, prInfo);
-  const notesForAgents = buildNotesForAgents(commits, prInfo);
-  return { whatChanged, notesForAgents };
-}
-
-/**
- * Single-line synthesis. Prefer the PR title (author-written) — a good PR
- * title already is the one-line summary. Fall back to the most recent commit
- * subject as a pre-PR draft, then to a TBD prompt if neither exists.
- *
- * No commit-bullet log here — those are accessible via `gh pr view` /
- * `git log`, and duplicating them turns the entry into a scrolling log.
- */
-function buildWhatChanged(commits: readonly ParsedCommit[], prInfo: PrInfo | null): string {
+function deriveSummary(commits: readonly ParsedCommit[], prInfo: PrInfo | null): string {
   if (prInfo && prInfo.title.trim().length > 0) {
     return stripConventionalPrefix(prInfo.title);
   }
@@ -484,65 +293,6 @@ function buildWhatChanged(commits: readonly ParsedCommit[], prInfo: PrInfo | nul
   return "TBD — set once the PR is opened or a commit exists.";
 }
 
-/**
- * Notes are FORWARD-GUIDANCE, not a log. Extract a purpose-built section
- * from the PR body if one exists (author wrote it once, focused on the WHY
- * and non-obvious constraints). Commit bodies are NEVER pooled here — the
- * commits are already on the PR, so re-embedding just duplicates a story
- * `gh pr view` gives cheap access to.
- *
- * If no matching section is found, emit a strong TBD prompt telling the
- * next author exactly what to write and where to put it.
- */
-function buildNotesForAgents(_commits: readonly ParsedCommit[], prInfo: PrInfo | null): string {
-  if (prInfo) {
-    const extracted = extractNotesSection(prInfo.body);
-    if (extracted) return stripTrailers(extracted);
-  }
-  return (
-    "TBD — the next agent needs the WHY: non-obvious constraints, hidden invariants, " +
-    "and decisions the diff can't reveal. Add a `## Notes for future agents` " +
-    "section to the PR body (or `## Rationale` / `## Why`) — the drafter will " +
-    "pull it in automatically on the next `bun run changelog:draft`."
-  );
-}
-
-/**
- * Case-insensitive scan for a Notes-shaped section heading in the PR body.
- * Returns the section content (bounded by the next `## ` heading or EOF),
- * or null if no matching heading is found. `escapeRegex` neutralizes any
- * regex metachars in the heading list.
- */
-const NOTES_SECTION_HEADINGS: readonly string[] = [
-  "Notes for future agents",
-  "Notes",
-  "Rationale",
-  "Why this shape",
-  "Why",
-];
-
-function extractNotesSection(prBody: string): string | null {
-  if (!prBody || prBody.trim().length === 0) return null;
-  for (const heading of NOTES_SECTION_HEADINGS) {
-    const headingRe = new RegExp(`^##\\s+${escapeRegex(heading)}\\s*$`, "im");
-    const match = headingRe.exec(prBody);
-    if (!match) continue;
-    const startIdx = match.index + match[0].length;
-    const after = prBody.slice(startIdx);
-    const nextHeading = /^##\s+/m.exec(after);
-    const section = nextHeading ? after.slice(0, nextHeading.index) : after;
-    const cleaned = section.trim();
-    if (cleaned.length > 0) return cleaned;
-  }
-  return null;
-}
-
-/**
- * Strip the `<type>(<scope>):` prefix — the type is already in `category:` and
- * the scope in `scopes:`, so restating them in the bullet is noise.
- * Preserves the `!` breaking marker if present (as a caret prefix) so the
- * bullet still signals breakage without the conventional-commit machinery.
- */
 function stripConventionalPrefix(subject: string): string {
   const match = subject.match(CONVENTIONAL_COMMIT);
   if (!match) return subject;
@@ -551,21 +301,7 @@ function stripConventionalPrefix(subject: string): string {
   return breaking ? `! ${description}` : description;
 }
 
-/**
- * Drop git trailer lines (Co-authored-by, Signed-off-by, etc.) from a commit
- * body — they're captured in git's author metadata already and add nothing
- * to agent context. Also collapses runs of blank lines left behind.
- */
-function stripTrailers(body: string): string {
-  return body
-    .split("\n")
-    .filter((line) => !GIT_TRAILER_PATTERN.test(line.trim()))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-// ─── Sync actions ordering ────────────────────────────────────────────────────
+// ─── Sync-actions ordering ────────────────────────────────────────────────────
 
 function sortSyncActions(actions: readonly SyncAction[]): SyncAction[] {
   return [...actions].sort((a, b) => {
@@ -584,9 +320,10 @@ function ensurePendingDir(): void {
 }
 
 /**
- * Preserve the existing filename (date prefix + slug) when an entry for this
- * branch already exists — keeps re-runs from producing spurious renames in
- * git history. Otherwise use today's ISO date.
+ * Reuse the existing filename (date + slug) if an entry for this branch
+ * already exists — keeps re-runs from producing spurious renames in git
+ * history. Scans frontmatter for `branch:` first (survives branch renames);
+ * falls back to a strict `YYYY-MM-DD-<slug>.md` filename match.
  */
 function resolveEntryPath(slug: string, branch: string): string {
   ensurePendingDir();
@@ -605,30 +342,22 @@ function findExistingEntry(slug: string, branch: string): string | null {
   const branchRe = branchFrontmatterRe(branch);
   const slugRe = slugFilenameRe(slug);
 
-  // Scan frontmatter for `branch: <branch>` FIRST. This survives branch renames
-  // (the entry still points at the new branch name after `bun run changelog:draft`
-  // rewrites it) and prevents the substring bug where slug `wizard` matched an
-  // entry named `2026-07-01-agency-wizard.md`.
   for (const name of entries) {
     const full = join(PENDING_DIR, name);
     const contents = safeRead(full);
     if (branchRe.test(contents)) return full;
   }
 
-  // Fall back to a strict filename match: `YYYY-MM-DD-<slug>.md`. Anchored so
-  // `wizard` cannot match `agency-wizard.md`.
   const slugMatch = entries.find((name) => slugRe.test(name));
   if (slugMatch) return join(PENDING_DIR, slugMatch);
 
   return null;
 }
 
-/** Anchored `^branch: <branch>` — drafter emits the value unquoted, no strip. */
 function branchFrontmatterRe(branch: string): RegExp {
   return new RegExp(`^branch:\\s*${escapeRegex(branch)}\\s*$`, "m");
 }
 
-/** Strict `YYYY-MM-DD-<slug>.md` filename match. Anchored to avoid substrings. */
 function slugFilenameRe(slug: string): RegExp {
   return new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${escapeRegex(slug)}\\.md$`);
 }
@@ -645,45 +374,20 @@ function safeRead(path: string): string {
   }
 }
 
-// ─── Markdown renderer ────────────────────────────────────────────────────────
+// ─── Markdown renderer (frontmatter only) ─────────────────────────────────────
 
 function renderMarkdown(entry: Entry): string {
-  const lines: string[] = [];
-  lines.push("---");
-  lines.push(`pr: ${entry.pr === "unmerged" ? "unmerged" : entry.pr}`);
+  const lines: string[] = ["---"];
+  if (entry.pr !== undefined) {
+    lines.push(`pr: ${entry.pr === "unmerged" ? "unmerged" : entry.pr}`);
+  }
   lines.push(`branch: ${entry.branch}`);
   if (entry.merged_at) lines.push(`merged_at: ${entry.merged_at}`);
   lines.push(`category: ${entry.category}`);
-  // Empty arrays are omitted — the validator defaults them to [] on parse.
-  // Keeps the frontmatter tight when a change is small-scope.
-  if (entry.scopes.length > 0) lines.push(`scopes: ${renderInlineList(entry.scopes)}`);
-  if (entry.breaking) lines.push(`breaking: true`);
+  lines.push(`summary: ${quoteIfNeeded(entry.summary)}`);
   lines.push(renderSyncActionsBlock(entry.sync_actions));
-  if (entry.touched_domains.length > 0)
-    lines.push(renderBlockList("touched_domains", entry.touched_domains));
-  if (entry.issue_refs.length > 0) lines.push(`issue_refs: ${renderInlineList(entry.issue_refs)}`);
   lines.push("---");
   lines.push("");
-  lines.push("## What changed");
-  lines.push(entry.body.whatChanged);
-  lines.push("");
-  lines.push("## Notes for future agents");
-  lines.push(entry.body.notesForAgents);
-  lines.push("");
-  return lines.join("\n");
-}
-
-function renderInlineList(items: readonly string[]): string {
-  if (items.length === 0) return "[]";
-  return `[${items.join(", ")}]`;
-}
-
-function renderBlockList(key: string, items: readonly string[]): string {
-  if (items.length === 0) return `${key}: []`;
-  const lines: string[] = [`${key}:`];
-  for (const item of items) {
-    lines.push(`${SPACE}${SPACE}- ${item}`);
-  }
   return lines.join("\n");
 }
 
@@ -697,9 +401,16 @@ function renderSyncActionsBlock(actions: readonly SyncAction[]): string {
   return lines.join("\n");
 }
 
+/**
+ * Wrap `summary` in double quotes when it contains a `:` (which the YAML
+ * subset parser would otherwise interpret as a key/value separator).
+ */
+function quoteIfNeeded(value: string): string {
+  if (value.includes(":") || value.includes("#")) return quoteDetail(value);
+  return value;
+}
+
 function quoteDetail(detail: string): string {
-  // Wrap in double quotes and escape embedded quotes/backslashes — keeps
-  // parseYamlSubset in validate.ts happy (`"…"` becomes an unquoted scalar).
   const escaped = detail.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;
 }
@@ -723,54 +434,35 @@ function runCommand(command: string, args: string[]): string {
   }
 }
 
-// ─── Public pure-function API (for tests + external callers) ──────────────────
-//
-// These wrappers expose the internal helpers under stable names taking plain
-// inputs (branch strings, commit subject lists, path lists). The CLI keeps
-// using the richer ParsedCommit-driven internals; tests exercise the pure
-// projection here without stubbing git.
+// ─── Public pure-function API (for tests) ─────────────────────────────────────
 
 export function deriveSlug(branch: string): string {
   return slugFromBranch(branch);
 }
 
-export function inferCategory(subjects: readonly string[]): Category {
+export function inferCategoryFromSubjects(subjects: readonly string[]): Category {
   const parsed: ParsedCommit[] = subjects.map((subject) => {
     const shape = parseConventionalCommit(subject);
     return {
       subject,
-      body: "",
       category: shape.category,
-      scope: shape.scope,
       breakingBang: shape.breakingBang,
-      breakingFooter: false,
     };
   });
   return inferCategoryFromParsed(parsed);
 }
 
-export function extractScopes(paths: readonly string[]): string[] {
-  return inferTouchedDomains(paths);
-}
-
-export type ComposeBodyCommit = { subject: string; body: string };
-export type ComposeBodyPrInfo = { number: number; title: string; body: string; url: string };
-export type ComposeBodyArgs = {
-  commits: readonly ComposeBodyCommit[];
-  prInfo: ComposeBodyPrInfo | null;
-};
-
-export function composeBody(args: ComposeBodyArgs): EntryBody {
-  const parsed: ParsedCommit[] = args.commits.map((c) => {
-    const shape = parseConventionalCommit(c.subject);
+export function synthesizeSummary(args: {
+  commitSubjects: readonly string[];
+  prTitle: string | null;
+}): string {
+  const commits = args.commitSubjects.map((subject) => {
+    const shape = parseConventionalCommit(subject);
     return {
-      subject: c.subject,
-      body: c.body,
+      subject,
       category: shape.category,
-      scope: shape.scope,
       breakingBang: shape.breakingBang,
-      breakingFooter: BREAKING_MARKER.test(c.body),
     };
   });
-  return buildBody(parsed, args.prInfo);
+  return deriveSummary(commits, args.prTitle ? { number: 0, title: args.prTitle } : null);
 }

@@ -95,8 +95,8 @@ function formatEntryLine(entry) {
     ? entry.merged_at.slice(0, 10)
     : 'unmerged';
   const category = typeof entry.category === 'string' ? entry.category : 'chore';
-  const summary = entry.body && typeof entry.body.whatChanged === 'string'
-    ? entry.body.whatChanged.split('\n')[0].trim()
+  const summary = typeof entry.summary === 'string' && entry.summary.length > 0
+    ? entry.summary
     : '(no summary)';
   return `- ${date} · ${category} · ${summary}`;
 }

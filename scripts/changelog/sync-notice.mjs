@@ -190,11 +190,6 @@ function normalizeSyncAction(raw) {
   return { kind, detail };
 }
 
-function normalizeStringArray(raw) {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((item) => typeof item === "string" && item.length > 0);
-}
-
 function loadEntry(filePath) {
   let source;
   try {
@@ -232,15 +227,15 @@ function loadEntry(filePath) {
   const mtimeMs = readMtimeMs(filePath);
   const effectiveMs = merged_at ? Date.parse(merged_at) : mtimeMs;
 
+  const summary = typeof frontmatter.summary === "string" ? frontmatter.summary : "";
+
   return {
     filePath,
     pr,
     branch,
     category,
+    summary,
     merged_at,
-    scopes: normalizeStringArray(frontmatter.scopes),
-    touched_domains: normalizeStringArray(frontmatter.touched_domains),
-    issue_refs: normalizeStringArray(frontmatter.issue_refs),
     sync_actions: syncActions,
     effectiveMs: Number.isFinite(effectiveMs) ? effectiveMs : mtimeMs,
     effectiveIso: merged_at ?? new Date(mtimeMs).toISOString(),

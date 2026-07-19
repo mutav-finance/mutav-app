@@ -1,14 +1,19 @@
 /**
- * Shared types for the agent-facing changelog harness.
+ * Minimum-viable changelog entry — start-small, prove-the-value shape.
  *
- * See docs/superpowers/specs/2026-07-18-agent-facing-changelog-design.md
- * for the full design. This file is the single source of truth for the
- * entry shape consumed by validate.ts, signals.ts, draft.ts, release.ts,
- * and the .claude/hooks/changelog-*.js sensors.
+ * The load-bearing feature is `sync_actions`: a mechanical runbook emitted
+ * deterministically by filesystem-signal detectors (see signals.ts). Everything
+ * else is metadata to make the banner + agent context readable.
  *
- * The Result<TData, TError> shape mirrors convex/lib/result.ts and
- * apps/agency/src/lib/result.ts so a caller narrows the same way on
- * either side of the wire.
+ * Explicitly OUT of scope (deleted from the earlier design):
+ *   - Body sections (`## What changed` / `## Notes for future agents`) —
+ *     agent-authored narrative was aspirational; ship without and add back
+ *     if entries prove to be a durable source of "why" context.
+ *   - Release aggregation — no versioned-release ritual today.
+ *   - PR-blocking sensors — start with soft encouragement, add enforcement
+ *     if entries get skipped.
+ *
+ * See docs/architecture/changelog.md.
  */
 
 export type SyncActionKind = "env" | "install" | "seed" | "migrate" | "run" | "manual";
@@ -20,9 +25,10 @@ export const SYNC_ACTION_KINDS = ["env", "install", "seed", "migrate", "run", "m
 export const CATEGORIES = ["feat", "fix", "refactor", "perf", "chore", "docs", "test"] as const;
 
 /**
- * Deterministic ordering used when emitting sync_actions in an entry and when
- * rendering the sync-notice banner. Kept as a const record so it can be used
- * to key a stable sort without magic numbers.
+ * Deterministic ordering for `sync_actions[]` — env → install → seed →
+ * migrate → run → manual. Sync-notice.mjs and the SessionStart hook each
+ * mirror this so surfaces read predictably; validate.test.ts asserts the
+ * three copies stay aligned.
  */
 export const SYNC_ACTION_ORDER: Record<SyncActionKind, number> = {
   env: 0,
@@ -38,31 +44,27 @@ export type SyncAction = {
   detail: string;
 };
 
-export type EntryBody = {
-  whatChanged: string;
-  notesForAgents: string;
-};
-
 /**
- * The parsed, validated changelog entry. Mirrors the YAML frontmatter +
- * markdown body of a `changelog/pending/YYYY-MM-DD-<slug>.md` file.
+ * Six fields — three required, three optional. Frontmatter-only; no body.
  *
- * - `pr` is a number once a PR exists, or the literal "unmerged" while the
- *   branch has no PR yet. Kept as `number | "unmerged"` so consumers can
- *   discriminate without a nullable field.
- * - `merged_at` is ISO date (YYYY-MM-DD); omitted while the PR is open.
+ *   - `branch` keys the entry (one-per-branch); the drafter reuses the
+ *     existing filename on re-runs.
+ *   - `category` groups entries in the banner (`feat`, `fix`, etc.).
+ *   - `summary` is the one-line synthesis — PR title (prefix-stripped)
+ *     when a PR exists, otherwise the most recent commit subject.
+ *   - `pr` becomes a number once the PR opens; unset before that.
+ *   - `merged_at` (ISO date) drives the seen-marker filter in
+ *     sync-notice.mjs; when missing, the file's mtime is used.
+ *   - `sync_actions[]` is the runbook Draau (and any agent) needs on
+ *     `git pull`.
  */
 export type Entry = {
-  pr: number | "unmerged";
   branch: string;
-  merged_at?: string;
   category: Category;
-  scopes: string[];
-  breaking: boolean;
+  summary: string;
+  pr?: number | "unmerged";
+  merged_at?: string;
   sync_actions: SyncAction[];
-  touched_domains: string[];
-  issue_refs: string[];
-  body: EntryBody;
 };
 
 export type ValidationErrorCode =
@@ -78,9 +80,9 @@ export type ValidationError = {
 };
 
 /**
- * Result pattern — mirrors convex/lib/result.ts. Kept local so scripts/
- * files (which can't import from convex/ or from an app's src/) share the
- * exact same shape as the rest of the repo.
+ * Result pattern — mirrors convex/lib/result.ts. Local so scripts/ files
+ * (which can't import from convex/ or from an app's src/) share the same
+ * shape as the rest of the repo.
  */
 export type ResultSuccess<T> = { success: true; data: T; message: string };
 export type ResultError<E> = { success: false; error: E; message: string };
