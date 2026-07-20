@@ -8,46 +8,47 @@ import type { Result } from "../lib/result";
  * date for this amount"); the guarantee state is contract-level.
  *
  * One contract can accumulate many notices over its life. Each notice moves
- * independently through this 3-status machine. Terms match the vocabulary
- * used in the existing agency UI (`apps/agency/src/components/delinquencies/`).
+ * independently through this 3-status machine. Identifiers are English per
+ * repo convention (CLAUDE.md § Code style); PT copy for these values lives
+ * in `messages/pt-BR.json` values only.
  */
 export const DELINQUENCY_STATUS = {
-  PENDENCIA_ABERTA: "pendencia_aberta",
-  ENTREGUE: "entregue",
-  CANCELADO: "cancelado",
+  OPEN: "open",
+  RESOLVED: "resolved",
+  CANCELED: "canceled",
 } as const;
 
 export type DelinquencyStatus = (typeof DELINQUENCY_STATUS)[keyof typeof DELINQUENCY_STATUS];
 
 export const DELINQUENCY_STATUSES: readonly DelinquencyStatus[] = [
-  DELINQUENCY_STATUS.PENDENCIA_ABERTA,
-  DELINQUENCY_STATUS.ENTREGUE,
-  DELINQUENCY_STATUS.CANCELADO,
+  DELINQUENCY_STATUS.OPEN,
+  DELINQUENCY_STATUS.RESOLVED,
+  DELINQUENCY_STATUS.CANCELED,
 ] as const;
 
 /**
- * Terminal statuses cannot be un-terminated. A resolved notice (`entregue`)
- * cannot become `cancelado`, and vice-versa. If a resolution turns out to be
- * wrong, open a new notice or a dispute — never mutate a terminal one.
+ * Terminal statuses cannot be un-terminated. A resolved notice cannot become
+ * canceled, and vice-versa. If a resolution turns out to be wrong, open a
+ * new notice or a dispute — never mutate a terminal one.
  */
 export const TERMINAL_STATUSES: ReadonlySet<DelinquencyStatus> = new Set([
-  DELINQUENCY_STATUS.ENTREGUE,
-  DELINQUENCY_STATUS.CANCELADO,
+  DELINQUENCY_STATUS.RESOLVED,
+  DELINQUENCY_STATUS.CANCELED,
 ]);
 
 export const isTerminal = (status: DelinquencyStatus): boolean => TERMINAL_STATUSES.has(status);
 
 /**
- * The only two legal exits from `pendencia_aberta`. Resolution semantics
- * (WHY it went to entregue — tenant cured vs cover committed vs staff
- * dispute) live on the row's `resolution` field, not in this machine.
+ * The only two legal exits from `open`. Resolution semantics (WHY it moved to
+ * `resolved` — tenant cured vs cover committed vs staff dispute) live on the
+ * row's `resolution` field, not in this machine.
  */
 export const ALLOWED_TRANSITIONS: Readonly<
   Record<DelinquencyStatus, readonly DelinquencyStatus[]>
 > = {
-  pendencia_aberta: [DELINQUENCY_STATUS.ENTREGUE, DELINQUENCY_STATUS.CANCELADO],
-  entregue: [],
-  cancelado: [],
+  open: [DELINQUENCY_STATUS.RESOLVED, DELINQUENCY_STATUS.CANCELED],
+  resolved: [],
+  canceled: [],
 } as const;
 
 export type TransitionError =

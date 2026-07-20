@@ -69,9 +69,9 @@
       "statement": "Extrato de pagamento"
     },
     "status": {
-      "pendencia_aberta": "Pendência Aberta",
-      "entregue": "Entregue",
-      "cancelado": "Cancelado"
+      "open": "Pendência Aberta",
+      "resolved": "Entregue",
+      "canceled": "Cancelado"
     },
     "filter": {
       "property": "Imóvel",

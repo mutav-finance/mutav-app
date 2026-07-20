@@ -18,12 +18,12 @@ export type { DelinquencyStatus, TransitionError, TransitionSuccess } from "./ma
 import { DELINQUENCY_STATUS, type DelinquencyStatus } from "./machine";
 
 /**
- * How a `pendencia_aberta` notice reached `entregue`. Stored on the row so
- * the entregue terminal state carries its cause. `tenant_cured` = tenant
- * paid the landlord and the agency confirmed. `cover_committed` = Mutav
- * drew reserve to pay the landlord (creates a Regressive Receivable).
- * `staff_dispute` = staff ruled the arrears claim invalid; no cover, no
- * receivable. `stale` = notice aged out without action (rare; hygiene).
+ * How an `open` notice reached `resolved`. Stored on the row so the resolved
+ * terminal state carries its cause. `tenant_cured` = tenant paid the landlord
+ * and the agency confirmed. `cover_committed` = Mutav drew reserve to pay the
+ * landlord (creates a Regressive Receivable). `staff_dispute` = staff ruled
+ * the arrears claim invalid; no cover, no receivable. `stale` = notice aged
+ * out without action (rare; hygiene).
  */
 export const NOTICE_RESOLUTION_KIND = {
   TENANT_CURED: "tenant_cured",
@@ -43,11 +43,11 @@ export const noticeResolutionKindValidator = v.union(
 );
 
 /**
- * Why a `pendencia_aberta` was cancelled. `agency_withdrew` = the agency
- * revoked the notice before verification. `staff_dismissed` = internal
- * staff rejected the notice for procedural reasons. `duplicate` = a prior
- * notice already covers the same event. `data_error` = the notice was
- * opened with wrong fields (fixable by opening a corrected notice).
+ * Why an `open` notice was canceled. `agency_withdrew` = the agency revoked
+ * the notice before verification. `staff_dismissed` = internal staff rejected
+ * the notice for procedural reasons. `duplicate` = a prior notice already
+ * covers the same event. `data_error` = the notice was opened with wrong
+ * fields (fixable by opening a corrected notice).
  */
 export const NOTICE_CANCELLATION_REASON = {
   AGENCY_WITHDREW: "agency_withdrew",
@@ -68,11 +68,11 @@ export const noticeCancellationReasonValidator = v.union(
 
 /**
  * Provenance of the notice payload. Pilot rows are almost all
- * `agency_reported` — the agency logs into the portal and files the
- * notice. Post-Pix (Story 1.7), `onchain_observed` becomes a system-
- * scheduled trigger when Mutav sees rent absence directly. The evidence
- * source is INDEPENDENT from the state machine — same states, different
- * trust-quality signal on the row and on the transparency dashboard.
+ * `agency_reported` — the agency logs into the portal and files the notice.
+ * Post-Pix (Story 1.7), `onchain_observed` becomes a system-scheduled trigger
+ * when Mutav sees rent absence directly. The evidence source is INDEPENDENT
+ * from the state machine — same states, different trust-quality signal on
+ * the row and on the transparency dashboard.
  */
 export const NOTICE_EVIDENCE_SOURCE = {
   AGENCY_REPORTED: "agency_reported",
@@ -94,22 +94,20 @@ export const noticeEvidenceSourceValidator = v.union(
 );
 
 /**
- * Validator for the notice status field, matching the values consumed by
- * the existing agency UI (`apps/agency/src/components/delinquencies/`).
+ * Validator for the notice status field.
  */
 export const delinquencyStatusValidator = v.union(
-  v.literal(DELINQUENCY_STATUS.PENDENCIA_ABERTA),
-  v.literal(DELINQUENCY_STATUS.ENTREGUE),
-  v.literal(DELINQUENCY_STATUS.CANCELADO),
+  v.literal(DELINQUENCY_STATUS.OPEN),
+  v.literal(DELINQUENCY_STATUS.RESOLVED),
+  v.literal(DELINQUENCY_STATUS.CANCELED),
 );
 
 // ---- pure predicates -------------------------------------------------------
 
-export const isOpen = (status: DelinquencyStatus): boolean =>
-  status === DELINQUENCY_STATUS.PENDENCIA_ABERTA;
+export const isOpen = (status: DelinquencyStatus): boolean => status === DELINQUENCY_STATUS.OPEN;
 
 export const isResolved = (status: DelinquencyStatus): boolean =>
-  status === DELINQUENCY_STATUS.ENTREGUE;
+  status === DELINQUENCY_STATUS.RESOLVED;
 
-export const isCancelled = (status: DelinquencyStatus): boolean =>
-  status === DELINQUENCY_STATUS.CANCELADO;
+export const isCanceled = (status: DelinquencyStatus): boolean =>
+  status === DELINQUENCY_STATUS.CANCELED;

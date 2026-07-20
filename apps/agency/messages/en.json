@@ -79,9 +79,9 @@
       "statement": "Payment statement"
     },
     "status": {
-      "pendencia_aberta": "Open",
-      "entregue": "Delivered",
-      "cancelado": "Cancelled"
+      "open": "Open",
+      "resolved": "Resolved",
+      "canceled": "Canceled"
     },
     "filter": {
       "property": "Property",

@@ -5,28 +5,28 @@ import {
   NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
-  isCancelled,
+  isCanceled,
   isOpen,
   isResolved,
 } from "./domain";
 
 describe("pure predicates", () => {
-  test("isOpen only true for pendencia_aberta", () => {
-    expect(isOpen(DELINQUENCY_STATUS.PENDENCIA_ABERTA)).toBe(true);
-    expect(isOpen(DELINQUENCY_STATUS.ENTREGUE)).toBe(false);
-    expect(isOpen(DELINQUENCY_STATUS.CANCELADO)).toBe(false);
+  test("isOpen only true for open", () => {
+    expect(isOpen(DELINQUENCY_STATUS.OPEN)).toBe(true);
+    expect(isOpen(DELINQUENCY_STATUS.RESOLVED)).toBe(false);
+    expect(isOpen(DELINQUENCY_STATUS.CANCELED)).toBe(false);
   });
 
-  test("isResolved only true for entregue", () => {
-    expect(isResolved(DELINQUENCY_STATUS.ENTREGUE)).toBe(true);
-    expect(isResolved(DELINQUENCY_STATUS.PENDENCIA_ABERTA)).toBe(false);
-    expect(isResolved(DELINQUENCY_STATUS.CANCELADO)).toBe(false);
+  test("isResolved only true for resolved", () => {
+    expect(isResolved(DELINQUENCY_STATUS.RESOLVED)).toBe(true);
+    expect(isResolved(DELINQUENCY_STATUS.OPEN)).toBe(false);
+    expect(isResolved(DELINQUENCY_STATUS.CANCELED)).toBe(false);
   });
 
-  test("isCancelled only true for cancelado", () => {
-    expect(isCancelled(DELINQUENCY_STATUS.CANCELADO)).toBe(true);
-    expect(isCancelled(DELINQUENCY_STATUS.PENDENCIA_ABERTA)).toBe(false);
-    expect(isCancelled(DELINQUENCY_STATUS.ENTREGUE)).toBe(false);
+  test("isCanceled only true for canceled", () => {
+    expect(isCanceled(DELINQUENCY_STATUS.CANCELED)).toBe(true);
+    expect(isCanceled(DELINQUENCY_STATUS.OPEN)).toBe(false);
+    expect(isCanceled(DELINQUENCY_STATUS.RESOLVED)).toBe(false);
   });
 });
 

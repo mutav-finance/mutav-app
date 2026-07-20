@@ -28,21 +28,21 @@ type DelinquencyRow = {
 const MOCK_ROWS: DelinquencyRow[] = [
   {
     propertyId: "2014489",
-    status: "pendencia_aberta",
+    status: "open",
     noticeAt: "26/11/2026 às 09:19",
     amountCents: 345862,
     updatedAmountCents: 345862,
   },
   {
     propertyId: "2052106",
-    status: "pendencia_aberta",
+    status: "open",
     noticeAt: "24/03/2026 às 18:14",
     amountCents: 1381556,
     updatedAmountCents: 1430784,
   },
   {
     propertyId: "3871005",
-    status: "entregue",
+    status: "resolved",
     noticeAt: "30/03/2026 às 23:09",
     amountCents: 489250,
     updatedAmountCents: 545111,
@@ -182,9 +182,9 @@ export function DelinquencyPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t("filter.statusAll")}</SelectItem>
-                    <SelectItem value="pendencia_aberta">{t("status.pendencia_aberta")}</SelectItem>
-                    <SelectItem value="entregue">{t("status.entregue")}</SelectItem>
-                    <SelectItem value="cancelado">{t("status.cancelado")}</SelectItem>
+                    <SelectItem value="open">{t("status.open")}</SelectItem>
+                    <SelectItem value="resolved">{t("status.resolved")}</SelectItem>
+                    <SelectItem value="canceled">{t("status.canceled")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -12,35 +12,35 @@ import {
 const ALL_STATUSES = DELINQUENCY_STATUSES;
 
 describe("DELINQUENCY_STATUS constants", () => {
-  test("exposes the three notice states aligned with the agency UI", () => {
-    expect(DELINQUENCY_STATUSES).toEqual(["pendencia_aberta", "entregue", "cancelado"]);
+  test("exposes the three notice states", () => {
+    expect(DELINQUENCY_STATUSES).toEqual(["open", "resolved", "canceled"]);
   });
 
   test("DELINQUENCY_STATUS keys mirror the values (upper snake)", () => {
-    expect(DELINQUENCY_STATUS.PENDENCIA_ABERTA).toBe("pendencia_aberta");
-    expect(DELINQUENCY_STATUS.ENTREGUE).toBe("entregue");
-    expect(DELINQUENCY_STATUS.CANCELADO).toBe("cancelado");
+    expect(DELINQUENCY_STATUS.OPEN).toBe("open");
+    expect(DELINQUENCY_STATUS.RESOLVED).toBe("resolved");
+    expect(DELINQUENCY_STATUS.CANCELED).toBe("canceled");
   });
 
-  test("entregue and cancelado are terminal; pendencia_aberta is not", () => {
-    expect([...TERMINAL_STATUSES].sort()).toEqual(["cancelado", "entregue"]);
-    expect(isTerminal("entregue")).toBe(true);
-    expect(isTerminal("cancelado")).toBe(true);
-    expect(isTerminal("pendencia_aberta")).toBe(false);
+  test("resolved and canceled are terminal; open is not", () => {
+    expect([...TERMINAL_STATUSES].sort()).toEqual(["canceled", "resolved"]);
+    expect(isTerminal("resolved")).toBe(true);
+    expect(isTerminal("canceled")).toBe(true);
+    expect(isTerminal("open")).toBe(false);
   });
 });
 
 describe("ALLOWED_TRANSITIONS — the two legal edges", () => {
-  test("pendencia_aberta -> entregue is allowed (resolved: tenant cured or cover committed)", () => {
-    const result = assertTransition("pendencia_aberta", "entregue");
+  test("open -> resolved is allowed (tenant cured or cover committed)", () => {
+    const result = assertTransition("open", "resolved");
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data).toEqual({ from: "pendencia_aberta", to: "entregue" });
+    if (result.success) expect(result.data).toEqual({ from: "open", to: "resolved" });
   });
 
-  test("pendencia_aberta -> cancelado is allowed (agency withdrew or staff dismissed)", () => {
-    const result = assertTransition("pendencia_aberta", "cancelado");
+  test("open -> canceled is allowed (agency withdrew or staff dismissed)", () => {
+    const result = assertTransition("open", "canceled");
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data).toEqual({ from: "pendencia_aberta", to: "cancelado" });
+    if (result.success) expect(result.data).toEqual({ from: "open", to: "canceled" });
   });
 
   test("ALLOWED_TRANSITIONS map covers exactly the two edges above", () => {
@@ -50,8 +50,8 @@ describe("ALLOWED_TRANSITIONS — the two legal edges", () => {
     }
     expect(flattened.sort()).toEqual(
       [
-        ["pendencia_aberta", "cancelado"],
-        ["pendencia_aberta", "entregue"],
+        ["open", "canceled"],
+        ["open", "resolved"],
       ].sort(),
     );
   });
@@ -66,32 +66,32 @@ describe("assertTransition — illegal moves rejected", () => {
     }
   });
 
-  test("entregue is terminal — no outbound edges", () => {
+  test("resolved is terminal — no outbound edges", () => {
     for (const target of ALL_STATUSES) {
-      if (target === "entregue") continue;
-      const result = assertTransition("entregue", target);
+      if (target === "resolved") continue;
+      const result = assertTransition("resolved", target);
       expect(result.success).toBe(false);
       if (!result.success) expect(result.error.code).toBe("TERMINAL_STATE");
     }
   });
 
-  test("cancelado is terminal — no outbound edges", () => {
+  test("canceled is terminal — no outbound edges", () => {
     for (const target of ALL_STATUSES) {
-      if (target === "cancelado") continue;
-      const result = assertTransition("cancelado", target);
+      if (target === "canceled") continue;
+      const result = assertTransition("canceled", target);
       expect(result.success).toBe(false);
       if (!result.success) expect(result.error.code).toBe("TERMINAL_STATE");
     }
   });
 
-  test("entregue -> cancelado rejected (both terminal, resolved cannot be cancelled)", () => {
-    const result = assertTransition("entregue", "cancelado");
+  test("resolved -> canceled rejected (both terminal; resolved cannot be canceled)", () => {
+    const result = assertTransition("resolved", "canceled");
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.code).toBe("TERMINAL_STATE");
   });
 
-  test("cancelado -> entregue rejected (cancelled cannot become resolved)", () => {
-    const result = assertTransition("cancelado", "entregue");
+  test("canceled -> resolved rejected (canceled cannot become resolved)", () => {
+    const result = assertTransition("canceled", "resolved");
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.code).toBe("TERMINAL_STATE");
   });
