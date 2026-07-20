@@ -1,0 +1,11 @@
+#!/bin/sh
+# Print changelog sync-actions since last pull. Best-effort — the `|| true`
+# tail guarantees a failed banner can't wedge the merge.
+#
+# Fast path: only spawn node when the merge actually touched a pending entry.
+# `$SQUASH_MSG` and `ORIG_HEAD` are populated by git for merge post-hooks.
+if [ -n "$ORIG_HEAD" ] && ! git diff-tree -r --name-only "$ORIG_HEAD" HEAD -- changelog/pending/ 2>/dev/null | grep -q .; then
+  exit 0
+fi
+
+node scripts/changelog/sync-notice.mjs || true

@@ -80,3 +80,6 @@ docs/superpowers/
 
 # Codex agent runtime (not used; sibling of .claude installed by stellar-build)
 .codex/
+
+# Changelog sync-notice cursor (tracks last-seen entry per developer)
+.claude/notes/.changelog-seen
