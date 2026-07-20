@@ -41,6 +41,13 @@ async function contractCountFor(t: ReturnType<typeof setup>, agencyId: AgencyId)
   });
 }
 
+async function tenantCount(t: ReturnType<typeof setup>): Promise<number> {
+  return t.run(async (ctx) => {
+    const rows = await ctx.db.query("tenants").collect();
+    return rows.length;
+  });
+}
+
 describe("seedReset", () => {
   test("agencyowner's agency (Imobiliária Aprovada) has contracts — the partial-seed regression guard", async () => {
     const t = setup();
@@ -72,6 +79,34 @@ describe("seedReset", () => {
       demoAgencies.map(async (name) => contractCountFor(t, await agencyIdByName(t, name))),
     );
     expect(paulista + atlantica + horizonte).toBe(30);
+  });
+
+  test("registers tenants and links every seeded contract by tenantId", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    // The registry must be populated — seedFictional + populateAprovadaBook
+    // run every contract's tenant block through getOrCreateTenant.
+    expect(await tenantCount(t)).toBeGreaterThan(0);
+
+    // Registry-only: every seeded contract carries the registry link
+    // (tenantId + tenantApproval) and no embedded tenant — the narrowed
+    // schema dropped the embedded fields, so the link is the only tenant ref.
+    const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
+    const linked = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("contracts")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovadaId))
+        .collect();
+      const resolvedTenants = await Promise.all(rows.map((r) => ctx.db.get(r.tenantId)));
+      return {
+        total: rows.length,
+        withResolvableTenant: resolvedTenants.filter((tenant) => tenant !== null).length,
+      };
+    });
+    expect(linked.total).toBeGreaterThan(0);
+    // The tenantId link must resolve to a real registry row for every contract.
+    expect(linked.withResolvableTenant).toBe(linked.total);
   });
 
   test("seeds all four personas with the correct staff / agency state", async () => {
@@ -136,5 +171,24 @@ describe("seedReset", () => {
     expect(newuser?.subject).toBe("auth0|6a150df9a100fbf318f393c3");
     expect(newuser?.staffRoleCount).toBe(0);
     expect(newuser?.agencyStates).toEqual([]);
+  });
+
+  test("preserves the waitlist (marketing leads) — the wipe is app-demo-only", async () => {
+    const t = setup();
+    // A real marketing lead present before a reseed must survive it.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("waitlist", {
+        email: "lead@example.com",
+        audience: "imobiliaria",
+        ts: 1_700_000_000_000,
+      });
+    });
+
+    await t.mutation(internal.seed.seedReset, {});
+
+    const surviving = await t.run(async (ctx) => ctx.db.query("waitlist").collect());
+    expect(surviving.map((r) => r.email)).toContain("lead@example.com");
+    // And the reseed still produced the app data (wipe ran).
+    expect(await tenantCount(t)).toBeGreaterThan(0);
   });
 });

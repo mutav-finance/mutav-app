@@ -4,57 +4,47 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
-import { PencilIcon } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@mutav/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
+import { EditField } from "@mutav/ui/edit-field";
 import { Input } from "@mutav/ui/input";
-import { Label } from "@mutav/ui/label";
-import { cn } from "@mutav/ui/cn";
-import { parseBRLInput, type WizardData } from "@/lib/contracts/wizard";
+import { LockedDisplay } from "@mutav/ui/locked-display";
+import { ReviewBlock } from "@mutav/ui/review-block";
+import { ReviewRow } from "@mutav/ui/review-row";
+import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
+import {
+  isPropertyKind,
+  parseBRLInput,
+  patchBlockDraft,
+  startBlockEdit,
+  validateWizard,
+  WIZARD_VIEWING,
+  type DraftWizardData,
+  type EditingState,
+  type ReviewBlockKind,
+} from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { splitCommission } from "@/lib/pricing/commission";
 import { priceContract } from "@/lib/pricing/contract";
 import { RENT_COVERAGE_MONTHS, EXIT_COVERAGE_MONTHS } from "@/lib/pricing/tiers";
 
 type Props = {
-  data: WizardData;
+  data: DraftWizardData;
   agencyId: AgencyId;
-  onChange: (patch: Partial<WizardData>) => void;
+  onChange: (patch: Partial<DraftWizardData>) => void;
   onComplete: (publicId: string) => void;
   onBack: () => void;
 };
 
-type EditingBlock = "property" | "rental" | "tenant" | null;
-
 type MissingFields = Set<string>;
-
-function getMissingFields(data: WizardData): MissingFields {
-  const missing = new Set<string>();
-  if (!data.propertyKind) missing.add("propertyKind");
-  if (!data.rentCents) missing.add("rentCents");
-  if (data.score === null) missing.add("score");
-  if (!data.fullName.trim()) missing.add("fullName");
-  if (data.entityType === "pf" && !data.birthDate) missing.add("birthDate");
-  if (!data.email.trim()) missing.add("email");
-  if (!data.phone.trim()) missing.add("phone");
-  if (!data.cep.trim()) missing.add("cep");
-  if (!data.street.trim()) missing.add("street");
-  if (!data.addressNumber.trim()) missing.add("addressNumber");
-  if (!data.neighborhood.trim()) missing.add("neighborhood");
-  if (!data.city.trim()) missing.add("city");
-  if (!data.uf.trim()) missing.add("uf");
-  return missing;
-}
 
 export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Props) {
   const t = useTranslations("contractNew");
   const createContract = useMutation(api.contracts.useCases.create);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [missing, setMissing] = React.useState<MissingFields>(new Set());
-  const [editingBlock, setEditingBlock] = React.useState<EditingBlock>(null);
-  const [draft, setDraft] = React.useState<Partial<WizardData>>({});
+  const [editing, setEditing] = React.useState<EditingState>(WIZARD_VIEWING);
 
   const preview =
     data.rentCents > 0 && data.score !== null
@@ -69,91 +59,132 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
 
-  function startEdit(block: EditingBlock) {
-    setEditingBlock(block);
-    setDraft({ ...data });
+  function startEdit(block: ReviewBlockKind) {
+    setEditing(startBlockEdit(block, data));
+  }
+
+  function patchDraft(patch: Partial<DraftWizardData>) {
+    setEditing((s) => patchBlockDraft(s, patch));
   }
 
   function saveEdit() {
-    onChange(draft);
-    setEditingBlock(null);
-    setDraft({});
+    if (editing.kind !== "editing") return;
+    onChange(editing.draft);
+    setEditing(WIZARD_VIEWING);
   }
 
   function cancelEdit() {
-    setEditingBlock(null);
-    setDraft({});
+    setEditing(WIZARD_VIEWING);
   }
 
   const handleSubmit = async () => {
-    const missingFields = getMissingFields(data);
-    if (missingFields.size > 0) {
-      setMissing(missingFields);
-      toast.error(t("review.missingFields"));
+    const validation = validateWizard(data);
+    if (!validation.success) {
+      const invalidFields = new Set<string>();
+      for (const error of validation.error) {
+        if (error.field) invalidFields.add(error.field);
+      }
+      setMissing(invalidFields);
+      const firstCode = validation.error[0]?.code;
+      toast.error(firstCode ? t(`validation.${firstCode}`) : t("review.missingFields"));
       return;
     }
     setMissing(new Set());
+    const { tenant, ...validated } = validation.data;
 
-    if (!data.propertyKind || !data.entityType || data.score === null) return;
+    // create() takes a flat tenant wire shape (cpf + birthDate always present,
+    // cnpj optional) and normalizes it into the registry. The validated tenant
+    // is a pf/pj union — flatten it here, discriminating on entityType so the
+    // adaptation stays cast-free. A pj carries no cpf/birthDate, so send "".
+    const tenantWire =
+      tenant.entityType === "pj"
+        ? {
+            entityType: tenant.entityType,
+            fullName: tenant.fullName,
+            cpf: "",
+            cnpj: tenant.cnpj,
+            birthDate: "",
+            email: tenant.email,
+            phone: tenant.phone,
+            score: tenant.score,
+          }
+        : {
+            entityType: tenant.entityType,
+            fullName: tenant.fullName,
+            cpf: tenant.cpf,
+            cnpj: undefined,
+            birthDate: tenant.birthDate,
+            email: tenant.email,
+            phone: tenant.phone,
+            score: tenant.score,
+          };
 
     setIsSubmitting(true);
+    let result: Awaited<ReturnType<typeof createContract>>;
     try {
-      const result = await createContract({
+      result = await createContract({
         agencyId,
         property: {
-          cep: data.cep.replace(/\D/g, ""),
-          streetAndNumber: `${data.street}, ${data.addressNumber}`,
-          neighborhood: data.neighborhood,
-          cityUF: `${data.city} / ${data.uf}`,
+          cep: validated.cep,
+          streetAndNumber: `${validated.street}, ${validated.addressNumber}`,
+          neighborhood: validated.neighborhood,
+          cityUF: `${validated.city} / ${validated.uf}`,
         },
-        optional: { complement: data.complement, tag: "", description: "" },
-        propertyKind: data.propertyKind,
-        rentCents: data.rentCents,
-        condoCents: data.condoCents,
-        otherFeesCents: data.otherFeesCents,
-        tenant: {
-          entityType: data.entityType,
-          fullName: data.fullName,
-          cpf: data.cpf.replace(/\D/g, ""),
-          cnpj: data.entityType === "pj" ? data.cnpj.replace(/\D/g, "") : undefined,
-          birthDate: data.birthDate,
-          email: data.email,
-          phone: data.phone,
-          score: data.score,
-        },
+        optional: { complement: validated.complement, tag: "", description: "" },
+        propertyKind: validated.propertyKind,
+        rentCents: validated.rentCents,
+        condoCents: validated.condoCents,
+        otherFeesCents: validated.otherFeesCents,
+        tenant: tenantWire,
       });
-      onComplete(result.publicId);
     } catch {
+      // Transport-level failures only (arg-validator/auth throw at the wire);
+      // domain failures arrive as Result codes below.
       toast.error(t("review.errorToast"));
       setIsSubmitting(false);
+      return;
     }
+
+    if (!result.success) {
+      toast.error(t(`review.errors.${result.error.code}`));
+      setIsSubmitting(false);
+      return;
+    }
+    onComplete(result.data.publicId);
   };
 
-  const m = missing;
-  const isEditing = editingBlock !== null;
+  const missingText = (field: keyof DraftWizardData) =>
+    missing.has(field) ? t("validation.required") : undefined;
+  const isEditing = editing.kind === "editing";
+  const editingProperty = editing.kind === "editing" && editing.block === "property";
+  const editingRental = editing.kind === "editing" && editing.block === "rental";
+  const editingTenant = editing.kind === "editing" && editing.block === "tenant";
 
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">{t("review.heading")}</h2>
 
       {/* Bloco 1 — Dados do Imóvel */}
-      <Block
+      <ReviewBlock
         title={t("review.propertySection")}
         onEdit={() => startEdit("property")}
-        editing={editingBlock === "property"}
-        disabled={isEditing && editingBlock !== "property"}
+        editing={editingProperty}
+        disabled={isEditing && !editingProperty}
         onSave={saveEdit}
         onCancel={cancelEdit}
+        editLabel={t("review.editBlock")}
+        saveLabel={t("review.saveBlock")}
+        cancelLabel={t("review.cancelBlock")}
       >
-        {editingBlock === "property" ? (
+        {editingProperty ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <EditField label={t("property.kindLabel")} className="sm:col-span-2">
               <ToggleGroup
                 type="single"
-                value={draft.propertyKind ?? ""}
+                value={editing.draft.propertyKind}
                 onValueChange={(v) => {
-                  if (!v) return;
-                  setDraft((d) => ({ ...d, propertyKind: v as "residencial" | "comercial" }));
+                  if (!isPropertyKind(v)) return;
+                  patchDraft({ propertyKind: v });
                 }}
                 variant="outline"
                 spacing={2}
@@ -165,48 +196,48 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             <EditField label={t("property.cep")}>
               <Input
                 maxLength={9}
-                value={draft.cep ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, cep: e.target.value }))}
+                value={editing.draft.cep}
+                onChange={(e) => patchDraft({ cep: e.target.value })}
               />
             </EditField>
             <EditField label={t("property.neighborhood")}>
               <Input
-                value={draft.neighborhood ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, neighborhood: e.target.value }))}
+                value={editing.draft.neighborhood}
+                onChange={(e) => patchDraft({ neighborhood: e.target.value })}
               />
             </EditField>
             <EditField label={t("property.street")} className="sm:col-span-2">
               <div className="grid grid-cols-[1fr_auto] gap-2">
                 <Input
-                  value={draft.street ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, street: e.target.value }))}
+                  value={editing.draft.street}
+                  onChange={(e) => patchDraft({ street: e.target.value })}
                 />
                 <Input
                   className="w-24"
-                  value={draft.addressNumber ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, addressNumber: e.target.value }))}
+                  value={editing.draft.addressNumber}
+                  onChange={(e) => patchDraft({ addressNumber: e.target.value })}
                   placeholder={t("property.addressNumber")}
                 />
               </div>
             </EditField>
             <EditField label={t("property.city")}>
               <Input
-                value={draft.city ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+                value={editing.draft.city}
+                onChange={(e) => patchDraft({ city: e.target.value })}
               />
             </EditField>
             <EditField label={t("property.uf")}>
               <Input
                 maxLength={2}
                 className="uppercase"
-                value={draft.uf ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, uf: e.target.value.toUpperCase() }))}
+                value={editing.draft.uf}
+                onChange={(e) => patchDraft({ uf: e.target.value.toUpperCase() })}
               />
             </EditField>
             <EditField label={t("property.complement")} className="sm:col-span-2">
               <Input
-                value={draft.complement ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, complement: e.target.value }))}
+                value={editing.draft.complement}
+                onChange={(e) => patchDraft({ complement: e.target.value })}
               />
             </EditField>
           </div>
@@ -221,27 +252,32 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                     ? t("property.comercial")
                     : ""
               }
-              missing={m.has("propertyKind")}
+              missing={missingText("propertyKind")}
             />
-            <ReviewRow label={t("property.cep")} value={data.cep} mono missing={m.has("cep")} />
+            <ReviewRow
+              label={t("property.cep")}
+              value={data.cep}
+              mono
+              missing={missingText("cep")}
+            />
             <ReviewRow
               label={t("property.street")}
               value={data.street}
-              missing={m.has("street")}
+              missing={missingText("street")}
               className="col-span-2"
             />
             <ReviewRow
               label={t("property.addressNumber")}
               value={data.addressNumber}
-              missing={m.has("addressNumber")}
+              missing={missingText("addressNumber")}
             />
             <ReviewRow
               label={t("property.neighborhood")}
               value={data.neighborhood}
-              missing={m.has("neighborhood")}
+              missing={missingText("neighborhood")}
             />
-            <ReviewRow label={t("property.city")} value={data.city} missing={m.has("city")} />
-            <ReviewRow label={t("property.uf")} value={data.uf} missing={m.has("uf")} />
+            <ReviewRow label={t("property.city")} value={data.city} missing={missingText("city")} />
+            <ReviewRow label={t("property.uf")} value={data.uf} missing={missingText("uf")} />
             {data.complement && (
               <ReviewRow
                 label={t("property.complement")}
@@ -251,18 +287,21 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             )}
           </div>
         )}
-      </Block>
+      </ReviewBlock>
 
       {/* Bloco 2 — Dados de Locação */}
-      <Block
+      <ReviewBlock
         title={t("review.rentalSection")}
         onEdit={() => startEdit("rental")}
-        editing={editingBlock === "rental"}
-        disabled={isEditing && editingBlock !== "rental"}
+        editing={editingRental}
+        disabled={isEditing && !editingRental}
         onSave={saveEdit}
         onCancel={cancelEdit}
+        editLabel={t("review.editBlock")}
+        saveLabel={t("review.saveBlock")}
+        cancelLabel={t("review.cancelBlock")}
       >
-        {editingBlock === "rental" ? (
+        {editingRental ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <EditField label={t("rent.rent")}>
               <Input
@@ -270,9 +309,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 defaultValue={
                   data.rentCents ? (data.rentCents / 100).toFixed(2).replace(".", ",") : ""
                 }
-                onBlur={(e) =>
-                  setDraft((d) => ({ ...d, rentCents: parseBRLInput(e.target.value) }))
-                }
+                onBlur={(e) => patchDraft({ rentCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
             <EditField label={t("rent.condo")}>
@@ -281,9 +318,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 defaultValue={
                   data.condoCents ? (data.condoCents / 100).toFixed(2).replace(".", ",") : ""
                 }
-                onBlur={(e) =>
-                  setDraft((d) => ({ ...d, condoCents: parseBRLInput(e.target.value) }))
-                }
+                onBlur={(e) => patchDraft({ condoCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
             <EditField label={t("rent.otherFees")}>
@@ -294,9 +329,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                     ? (data.otherFeesCents / 100).toFixed(2).replace(".", ",")
                     : ""
                 }
-                onBlur={(e) =>
-                  setDraft((d) => ({ ...d, otherFeesCents: parseBRLInput(e.target.value) }))
-                }
+                onBlur={(e) => patchDraft({ otherFeesCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
           </div>
@@ -307,7 +340,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 label={t("rent.rent")}
                 value={formatBRLCents(data.rentCents)}
                 mono
-                missing={m.has("rentCents")}
+                missing={missingText("rentCents")}
               />
               {data.otherFeesCents > 0 && (
                 <ReviewRow
@@ -330,18 +363,21 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             </div>
           </div>
         )}
-      </Block>
+      </ReviewBlock>
 
       {/* Bloco 3 — Dados do Inquilino */}
-      <Block
+      <ReviewBlock
         title={t("review.tenantSection")}
         onEdit={() => startEdit("tenant")}
-        editing={editingBlock === "tenant"}
-        disabled={isEditing && editingBlock !== "tenant"}
+        editing={editingTenant}
+        disabled={isEditing && !editingTenant}
         onSave={saveEdit}
         onCancel={cancelEdit}
+        editLabel={t("review.editBlock")}
+        saveLabel={t("review.saveBlock")}
+        cancelLabel={t("review.cancelBlock")}
       >
-        {editingBlock === "tenant" ? (
+        {editingTenant ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <LockedDisplay
               label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
@@ -356,23 +392,23 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
               <EditField label={t("tenant.birthDate")}>
                 <Input
                   type="date"
-                  value={draft.birthDate ?? ""}
+                  value={editing.draft.birthDate}
                   max={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setDraft((d) => ({ ...d, birthDate: e.target.value }))}
+                  onChange={(e) => patchDraft({ birthDate: e.target.value })}
                 />
               </EditField>
             )}
             <EditField label={t("tenant.email")}>
               <Input
                 type="email"
-                value={draft.email ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+                value={editing.draft.email}
+                onChange={(e) => patchDraft({ email: e.target.value })}
               />
             </EditField>
             <EditField label={t("tenant.phone")}>
               <Input
-                value={draft.phone ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+                value={editing.draft.phone}
+                onChange={(e) => patchDraft({ phone: e.target.value })}
               />
             </EditField>
           </div>
@@ -381,7 +417,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             <ReviewRow
               label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
               value={data.fullName}
-              missing={m.has("fullName")}
+              missing={missingText("fullName")}
               className="col-span-2"
             />
             {data.entityType === "pf" && (
@@ -395,11 +431,20 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 label={t("tenant.birthDate")}
                 value={data.birthDate}
                 mono
-                missing={m.has("birthDate")}
+                missing={missingText("birthDate")}
               />
             )}
-            <ReviewRow label={t("tenant.email")} value={data.email} missing={m.has("email")} />
-            <ReviewRow label={t("tenant.phone")} value={data.phone} mono missing={m.has("phone")} />
+            <ReviewRow
+              label={t("tenant.email")}
+              value={data.email}
+              missing={missingText("email")}
+            />
+            <ReviewRow
+              label={t("tenant.phone")}
+              value={data.phone}
+              mono
+              missing={missingText("phone")}
+            />
             {data.score !== null && data.scoreTier !== null && (
               <ReviewRow
                 label={t("review.score")}
@@ -409,7 +454,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             )}
           </div>
         )}
-      </Block>
+      </ReviewBlock>
 
       {/* Bloco 4 — Dados do Plano */}
       <section className="flex flex-col gap-2 rounded-lg border p-4">
@@ -462,130 +507,6 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         <Button onClick={handleSubmit} disabled={isSubmitting || isEditing}>
           {isSubmitting ? t("review.submitting") : t("review.submit")}
         </Button>
-      </div>
-    </div>
-  );
-}
-
-function Block({
-  title,
-  children,
-  onEdit,
-  onSave,
-  onCancel,
-  editing,
-  disabled,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  editing: boolean;
-  disabled: boolean;
-}) {
-  const t = useTranslations("contractNew");
-  return (
-    <section
-      className={cn(
-        "flex flex-col gap-2 rounded-lg border p-4 transition-opacity",
-        disabled && "pointer-events-none opacity-40",
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
-          {title}
-        </p>
-        {!editing && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
-          >
-            <PencilIcon className="h-3 w-3" />
-            {t("review.editBlock")}
-          </button>
-        )}
-      </div>
-      {children}
-      {editing && (
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            {t("review.cancelBlock")}
-          </Button>
-          <Button size="sm" onClick={onSave}>
-            {t("review.saveBlock")}
-          </Button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ReviewRow({
-  label,
-  value,
-  highlight,
-  mono,
-  missing,
-  large,
-  className,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-  mono?: boolean;
-  missing?: boolean;
-  large?: boolean;
-  className?: string;
-}) {
-  const t = useTranslations("contractNew");
-  const size = large ? "text-base" : "text-sm";
-  return (
-    <div className={cn("flex items-baseline gap-1.5 py-0.5", className)}>
-      <span className={cn("text-muted-foreground shrink-0", size)}>{label}:</span>
-      {missing ? (
-        <span className="text-destructive text-sm font-medium">{t("validation.required")}</span>
-      ) : (
-        <span className={cn(size, mono && "font-mono", highlight && "font-semibold")}>
-          {value || "—"}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function EditField({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function LockedDisplay({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label className="text-muted-foreground">{label}</Label>
-      <div className="bg-muted/50 border-input text-muted-foreground rounded-md border px-3 py-2 font-mono text-sm">
-        {value}
       </div>
     </div>
   );

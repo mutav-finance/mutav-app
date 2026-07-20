@@ -379,6 +379,7 @@
       "fields": {
         "fullName": "Nome",
         "cpf": "CPF",
+        "cnpj": "CNPJ",
         "birthDate": "Data Nascimento",
         "email": "E-mail",
         "phone": "Telefone Fixo/Celular"
@@ -847,6 +848,9 @@
       "submit": "Criar contrato",
       "submitting": "Criando...",
       "errorToast": "Erro ao criar contrato. Tente novamente.",
+      "errors": {
+        "INVALID_TAX_ID": "Documento do inquilino inválido (CPF/CNPJ). Verifique o número e tente novamente."
+      },
       "missingFields": "Preencha todos os campos obrigatórios antes de confirmar.",
       "editBlock": "Editar dados",
       "saveBlock": "Salvar",
@@ -876,6 +880,7 @@
       "birthDateFuture": "Data de nascimento não pode ser futura",
       "birthDateInvalid": "Data inválida",
       "emailInvalid": "E-mail inválido",
+      "phoneInvalid": "Telefone inválido",
       "coverageRequired": "Selecione uma cobertura",
       "exitRequired": "Selecione um custo de saída"
     }

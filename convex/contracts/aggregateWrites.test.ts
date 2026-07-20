@@ -43,10 +43,20 @@ async function seedContract(
   spec: ContractSeed,
   publicId: string,
 ): Promise<ContractId> {
-  return t.run((ctx) =>
-    ctx.db.insert("contracts", {
+  return t.run(async (ctx) => {
+    const tenantId = await ctx.db.insert("tenants", {
+      entityType: "pf",
+      taxId: "11144477735",
+      fullName: "Test Tenant",
+      birthDate: "1990-01-01",
+      email: "tenant@test.br",
+      phone: "11999999999",
+    });
+    return ctx.db.insert("contracts", {
       agencyId: spec.agencyId,
       publicId,
+      tenantId,
+      tenantApproval: { status: "pendente", termApprovedAt: null },
       status: spec.status,
       activatedAt: spec.activatedAt ?? null,
       deactivatedAt: spec.deactivatedAt,
@@ -78,17 +88,8 @@ async function seedContract(
         { key: "inspection", status: "pendente" },
         { key: "policy", status: "pendente" },
       ],
-      tenant: {
-        approvalStatus: "pendente",
-        fullName: "Test Tenant",
-        cpf: "11144477735",
-        birthDate: "1990-01-01",
-        email: "tenant@test.br",
-        phone: "11999999999",
-        termApprovedAt: null,
-      },
-    }),
-  );
+    });
+  });
 }
 
 async function ativoCountFor(t: ReturnType<typeof convexTest>, agencyId: SeedAgency) {

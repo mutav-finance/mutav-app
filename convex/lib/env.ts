@@ -331,7 +331,22 @@ export function getStellarSecretEncryptionKey(): Buffer {
  * `bunx convex env set PII_ENCRYPTION_KEY <base64>`. Production rotates
  * to a managed secret per `.claude/notes/deferred-conventions.md`.
  */
-export function getPiiEncryptionKey(): Buffer {
+/**
+ * Decode standard base64 to raw bytes WITHOUT Node's `Buffer`. The PII keys
+ * below are consumed by crypto that runs inside the Convex V8 isolate (queries
+ * and mutations), where `Buffer` is undefined — using it throws
+ * `ReferenceError: Buffer is not defined` at call time. `atob` is available in
+ * V8, Node, and edge runtimes. Whitespace is stripped to match `Buffer.from`'s
+ * leniency toward a trailing newline in the env value.
+ */
+function decodeBase64Key(raw: string): Uint8Array {
+  const binary = atob(raw.replace(/\s+/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+export function getPiiEncryptionKey(): Uint8Array {
   const raw = process.env.PII_ENCRYPTION_KEY;
   if (!raw) {
     throw new Error(
@@ -341,7 +356,7 @@ export function getPiiEncryptionKey(): Buffer {
         "`bunx convex env set PII_ENCRYPTION_KEY <base64>`.",
     );
   }
-  const key = Buffer.from(raw, "base64");
+  const key = decodeBase64Key(raw);
   if (key.length !== 32) {
     throw new Error(`PII_ENCRYPTION_KEY must decode to 32 bytes (AES-256); got ${key.length}.`);
   }
@@ -452,7 +467,7 @@ export function getAuditAnchorSecret(): string | null {
  * Generate dev/preview keys with `openssl rand -base64 32` and set via
  * `bunx convex env set PII_HMAC_KEY <base64>`.
  */
-export function getPiiHmacKey(): Buffer {
+export function getPiiHmacKey(): Uint8Array {
   const raw = process.env.PII_HMAC_KEY;
   if (!raw) {
     throw new Error(
@@ -462,7 +477,7 @@ export function getPiiHmacKey(): Buffer {
         "`bunx convex env set PII_HMAC_KEY <base64>`.",
     );
   }
-  const key = Buffer.from(raw, "base64");
+  const key = decodeBase64Key(raw);
   if (key.length !== 32) {
     throw new Error(`PII_HMAC_KEY must decode to 32 bytes; got ${key.length}.`);
   }

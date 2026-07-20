@@ -49,15 +49,26 @@ export type ContractHistoryEntry = {
 
 export type TenantApprovalStatus = "aprovado" | "pendente" | "reprovado";
 
-export type ContractTenant = {
+type ContractTenantShared = {
   approvalStatus: TenantApprovalStatus;
+  termApprovedAt: string | null;
+  taxId: string;
   fullName: string;
-  cpf: string;
-  birthDate: string;
   email: string;
   phone: string;
-  termApprovedAt: string | null;
 };
+
+export type ContractTenantPf = ContractTenantShared & {
+  entityType: "pf";
+  birthDate: string;
+};
+
+export type ContractTenantPj = ContractTenantShared & {
+  entityType: "pj";
+  contactCpf?: string;
+};
+
+export type ContractTenant = ContractTenantPf | ContractTenantPj;
 
 export type Contract = {
   id: string;

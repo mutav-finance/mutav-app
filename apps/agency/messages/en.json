@@ -379,6 +379,7 @@
       "fields": {
         "fullName": "Name",
         "cpf": "CPF",
+        "cnpj": "CNPJ",
         "birthDate": "Date of Birth",
         "email": "E-mail",
         "phone": "Phone"
@@ -848,6 +849,9 @@
       "submitting": "Creating...",
       "missingFields": "Fill in all required fields before confirming.",
       "errorToast": "Failed to create contract. Please try again.",
+      "errors": {
+        "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again."
+      },
       "editBlock": "Edit",
       "saveBlock": "Save",
       "cancelBlock": "Cancel"
@@ -876,6 +880,7 @@
       "birthDateFuture": "Date of birth cannot be in the future",
       "birthDateInvalid": "Invalid date",
       "emailInvalid": "Invalid e-mail",
+      "phoneInvalid": "Invalid phone number",
       "coverageRequired": "Select a coverage option",
       "exitRequired": "Select an exit cost option"
     }

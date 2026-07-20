@@ -11,7 +11,7 @@ import { cn } from "@mutav/ui/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import { CheckIcon } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
-import { type WizardData } from "@/lib/contracts/wizard";
+import { type DraftWizardData } from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
 import type { ScoreTier } from "@convex/contracts/domain";
 import { splitCommission } from "@/lib/pricing/commission";
@@ -19,8 +19,8 @@ import { priceContract } from "@/lib/pricing/contract";
 import { EXIT_COVERAGE_MONTHS, SCORE_TIER_RATE } from "@/lib/pricing/tiers";
 
 type Props = {
-  data: WizardData;
-  onChange: (patch: Partial<WizardData>) => void;
+  data: DraftWizardData;
+  onChange: (patch: Partial<DraftWizardData>) => void;
   onNext: () => void;
   onBack: () => void;
 };
@@ -66,8 +66,8 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   );
 
   const tenantLookup = useQuery(
-    api.contracts.useCases.lookupTenantByCpf,
-    agencyId && cpfDigits ? { agencyId, cpf: cpfDigits } : "skip",
+    api.tenants.useCases.lookupTenantByTaxId,
+    agencyId && docDigits ? { agencyId, taxId: docDigits } : "skip",
   );
 
   const triggerScoreRequest = React.useEffectEvent(
@@ -94,7 +94,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const applyTenantLookup = React.useEffectEvent(
     (lookup: { fullName: string; email: string } | null | undefined) => {
       if (!lookup) return;
-      const patch: Partial<WizardData> = {};
+      const patch: Partial<DraftWizardData> = {};
       if (!data.fullName) patch.fullName = lookup.fullName;
       if (!data.email) patch.email = lookup.email;
       if (Object.keys(patch).length > 0) onChange(patch);

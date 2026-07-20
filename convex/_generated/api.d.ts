@@ -10,7 +10,6 @@
 
 import type * as agencies_adminUseCases from "../agencies/adminUseCases.js";
 import type * as agencies_domain from "../agencies/domain.js";
-import type * as agencies_migrations from "../agencies/migrations.js";
 import type * as agencies_useCases from "../agencies/useCases.js";
 import type * as audit_actions from "../audit/actions.js";
 import type * as audit_anchor from "../audit/anchor.js";
@@ -47,6 +46,7 @@ import type * as lib_result from "../lib/result.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_stellarSigner from "../lib/stellarSigner.js";
 import type * as lib_storage from "../lib/storage.js";
+import type * as lib_taxId from "../lib/taxId.js";
 import type * as lib_testFixtures from "../lib/testFixtures.js";
 import type * as migrations from "../migrations.js";
 import type * as mutavStaff_domain from "../mutavStaff/domain.js";
@@ -60,6 +60,7 @@ import type * as payments_providers_bankAccountUseCases from "../payments/provid
 import type * as payments_providers_domain from "../payments/providers/domain.js";
 import type * as payments_providers_orderDomain from "../payments/providers/orderDomain.js";
 import type * as payments_providers_orderUseCases from "../payments/providers/orderUseCases.js";
+import type * as payments_providers_tenantPrefill from "../payments/providers/tenantPrefill.js";
 import type * as payments_providers_useCases from "../payments/providers/useCases.js";
 import type * as payments_providers_webhookUseCases from "../payments/providers/webhookUseCases.js";
 import type * as payments_settlement from "../payments/settlement.js";
@@ -69,6 +70,8 @@ import type * as reserve_domain from "../reserve/domain.js";
 import type * as reserve_useCases from "../reserve/useCases.js";
 import type * as seed from "../seed.js";
 import type * as smoke_auth0Mgmt from "../smoke/auth0Mgmt.js";
+import type * as tenants_domain from "../tenants/domain.js";
+import type * as tenants_useCases from "../tenants/useCases.js";
 import type * as transparency_domain from "../transparency/domain.js";
 import type * as transparency_useCases from "../transparency/useCases.js";
 import type * as users_domain from "../users/domain.js";
@@ -86,7 +89,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   "agencies/adminUseCases": typeof agencies_adminUseCases;
   "agencies/domain": typeof agencies_domain;
-  "agencies/migrations": typeof agencies_migrations;
   "agencies/useCases": typeof agencies_useCases;
   "audit/actions": typeof audit_actions;
   "audit/anchor": typeof audit_anchor;
@@ -123,6 +125,7 @@ declare const fullApi: ApiFromModules<{
   "lib/secrets": typeof lib_secrets;
   "lib/stellarSigner": typeof lib_stellarSigner;
   "lib/storage": typeof lib_storage;
+  "lib/taxId": typeof lib_taxId;
   "lib/testFixtures": typeof lib_testFixtures;
   migrations: typeof migrations;
   "mutavStaff/domain": typeof mutavStaff_domain;
@@ -136,6 +139,7 @@ declare const fullApi: ApiFromModules<{
   "payments/providers/domain": typeof payments_providers_domain;
   "payments/providers/orderDomain": typeof payments_providers_orderDomain;
   "payments/providers/orderUseCases": typeof payments_providers_orderUseCases;
+  "payments/providers/tenantPrefill": typeof payments_providers_tenantPrefill;
   "payments/providers/useCases": typeof payments_providers_useCases;
   "payments/providers/webhookUseCases": typeof payments_providers_webhookUseCases;
   "payments/settlement": typeof payments_settlement;
@@ -145,6 +149,8 @@ declare const fullApi: ApiFromModules<{
   "reserve/useCases": typeof reserve_useCases;
   seed: typeof seed;
   "smoke/auth0Mgmt": typeof smoke_auth0Mgmt;
+  "tenants/domain": typeof tenants_domain;
+  "tenants/useCases": typeof tenants_useCases;
   "transparency/domain": typeof transparency_domain;
   "transparency/useCases": typeof transparency_useCases;
   "users/domain": typeof users_domain;

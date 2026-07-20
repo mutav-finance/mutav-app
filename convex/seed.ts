@@ -8,7 +8,9 @@ import {
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
+  type Contract,
   type ContractId,
+  type TenantApprovalStatus,
 } from "./contracts/domain";
 import {
   ativoInsuredCentsPlatform,
@@ -16,6 +18,8 @@ import {
   contractsByStatusPlatform,
 } from "./contracts/aggregate";
 import { insertContractAggregates } from "./contracts/aggregateWrites";
+import { normalizeEmbeddedTenant, type EmbeddedTenantSnapshot } from "./tenants/domain";
+import { getOrCreateTenant } from "./tenants/useCases";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +33,15 @@ const d = (s: string) => s;
  * Demo tables wiped by `seedReset`. Order matters —
  * tables with foreign-key-like references come first so we don't leave
  * dangling pointers mid-wipe.
+ *
+ * DELIBERATELY EXCLUDED — real/operational data the seed must never destroy:
+ *   - `waitlist`            marketing leads (synced to Resend audiences)
+ *   - `mutavAuditLog` / `mutavAuditAnchors`  hash-chained audit trail
+ *   - `mutavStaff`          Mutav staff role grants
+ *   - `reserveSnapshots`    coverage/transparency history
+ *   - `creditAnalysis*`     bureau signals + assessments
+ *   - anchor/stellar index state, webhook events
+ * Do NOT add any of these here. `seed.test.ts` guards `waitlist` survival.
  */
 const DEMO_TABLES = [
   // providerOrders FK-references invoices; wipe attempts before invoices even
@@ -41,6 +54,8 @@ const DEMO_TABLES = [
   "invoices",
   "contractHistory",
   "contracts",
+  // tenants after contracts — contracts FK-reference tenants via tenantId.
+  "tenants",
   "memberships",
   "users",
   "agencies",
@@ -54,6 +69,51 @@ async function wipeDemoTables(ctx: MutationCtx) {
       rows = await ctx.db.query(table).take(200);
     }
   }
+}
+
+/**
+ * Seed-local tenant block: the wizard-era embedded shape plus the
+ * contract-level approval/score fields, kept so the seed data reads like
+ * one self-contained record per contract.
+ */
+type SeedTenantBlock = EmbeddedTenantSnapshot & {
+  approvalStatus: TenantApprovalStatus;
+  termApprovedAt: string | null;
+  score?: number;
+};
+
+type SeedContractSpec = Omit<
+  Contract,
+  "_id" | "_creationTime" | "tenantId" | "tenantApproval" | "score"
+> & { tenant: SeedTenantBlock };
+
+/**
+ * Registry-only contract insert: resolves (or creates) the `tenants` row
+ * through `getOrCreateTenant` — same dedup / last-write-wins / conflict
+ * audit-logging semantics as `contracts.create` — then writes the contract
+ * with the required `tenantId` + `tenantApproval` link and the
+ * contract-level `score` snapshot. Seed data must be checksum-valid, so a
+ * non-normalizable tenant throws instead of silently skipping.
+ */
+async function insertSeedContract(ctx: MutationCtx, spec: SeedContractSpec): Promise<ContractId> {
+  const { tenant, ...contract } = spec;
+  const input = normalizeEmbeddedTenant(tenant);
+  if (!input) {
+    throw new Error(`Seed tenant for contract ${contract.publicId} failed tax-id normalization`);
+  }
+  const result = await getOrCreateTenant(ctx, {
+    input,
+    actor: { kind: "system", source: "seed" },
+  });
+  if (!result.success) {
+    throw new Error(`Seed tenant for contract ${contract.publicId}: ${result.message}`);
+  }
+  return ctx.db.insert("contracts", {
+    ...contract,
+    tenantId: result.data.tenantId,
+    tenantApproval: { status: tenant.approvalStatus, termApprovedAt: tenant.termApprovedAt },
+    score: tenant.score,
+  });
 }
 
 /**
@@ -250,7 +310,7 @@ async function seedFictional(
 
     // ── Contracts — Imobiliária Paulista (15) ─────────────────────────────────    // 12 ativo, 2 pendente, 1 encerrado
 
-    const p1 = await ctx.db.insert("contracts", {
+    const p1 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(1),
       status: "ativo",
@@ -287,7 +347,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Maria Silva Santos",
-        cpf: "111.111.111-11",
+        cpf: "11111111200",
         birthDate: "1990-05-12",
         email: "maria.silva@example.com",
         phone: "11900000001",
@@ -296,7 +356,7 @@ async function seedFictional(
       },
     });
 
-    const p2 = await ctx.db.insert("contracts", {
+    const p2 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(2),
       status: "ativo",
@@ -333,7 +393,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Carlos Eduardo Ferreira",
-        cpf: "222.222.222-22",
+        cpf: "22222222303",
         birthDate: "1985-08-20",
         email: "carlos.ferreira@example.com",
         phone: "11900000002",
@@ -342,7 +402,7 @@ async function seedFictional(
       },
     });
 
-    const p3 = await ctx.db.insert("contracts", {
+    const p3 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(3),
       status: "ativo",
@@ -383,7 +443,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Tech Solutions Ltda",
-        cpf: "33.333.333/0001-33",
+        entityType: "pj",
+        cpf: "33333333000191",
         birthDate: "2010-01-01",
         email: "contato@techsolutions.example.com",
         phone: "11900000003",
@@ -392,7 +453,7 @@ async function seedFictional(
       },
     });
 
-    const p4 = await ctx.db.insert("contracts", {
+    const p4 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(4),
       status: "ativo",
@@ -429,7 +490,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Ana Paula Rodrigues",
-        cpf: "444.444.444-44",
+        cpf: "44444444525",
         birthDate: "1993-02-28",
         email: "ana.rodrigues@example.com",
         phone: "11900000004",
@@ -438,7 +499,7 @@ async function seedFictional(
       },
     });
 
-    const p5 = await ctx.db.insert("contracts", {
+    const p5 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(5),
       status: "ativo",
@@ -479,7 +540,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Global Finance S.A.",
-        cpf: "55.555.555/0001-55",
+        entityType: "pj",
+        cpf: "55555555000191",
         birthDate: "1999-07-01",
         email: "financeiro@globalfinance.example.com",
         phone: "11900000005",
@@ -488,7 +550,7 @@ async function seedFictional(
       },
     });
 
-    const p6 = await ctx.db.insert("contracts", {
+    const p6 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(6),
       status: "ativo",
@@ -525,7 +587,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Bruno Henrique Lima",
-        cpf: "666.666.666-66",
+        cpf: "66666666747",
         birthDate: "1988-11-15",
         email: "bruno.lima@example.com",
         phone: "11900000006",
@@ -534,7 +596,7 @@ async function seedFictional(
       },
     });
 
-    const p7 = await ctx.db.insert("contracts", {
+    const p7 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(7),
       status: "ativo",
@@ -571,7 +633,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Fernanda Costa Oliveira",
-        cpf: "777.777.777-77",
+        cpf: "77777777858",
         birthDate: "1995-06-03",
         email: "fernanda.oliveira@example.com",
         phone: "11900000007",
@@ -580,7 +642,7 @@ async function seedFictional(
       },
     });
 
-    const p8 = await ctx.db.insert("contracts", {
+    const p8 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(8),
       status: "ativo",
@@ -617,7 +679,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Ricardo Monteiro Braga",
-        cpf: "888.888.888-88",
+        cpf: "88888888969",
         birthDate: "1980-09-25",
         email: "ricardo.braga@example.com",
         phone: "11900000008",
@@ -626,7 +688,7 @@ async function seedFictional(
       },
     });
 
-    const p9 = await ctx.db.insert("contracts", {
+    const p9 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(9),
       status: "ativo",
@@ -663,7 +725,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Juliana Nascimento Souza",
-        cpf: "999.999.999-99",
+        cpf: "00000000191",
         birthDate: "1997-12-08",
         email: "juliana.souza@example.com",
         phone: "11900000009",
@@ -672,7 +734,7 @@ async function seedFictional(
       },
     });
 
-    const p10 = await ctx.db.insert("contracts", {
+    const p10 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(10),
       status: "ativo",
@@ -713,7 +775,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Inovação Digital Ltda",
-        cpf: "10.101.010/0001-10",
+        entityType: "pj",
+        cpf: "10101010000177",
         birthDate: "2015-03-01",
         email: "admin@inovacaodigital.example.com",
         phone: "11900000010",
@@ -722,7 +785,7 @@ async function seedFictional(
       },
     });
 
-    const p11 = await ctx.db.insert("contracts", {
+    const p11 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(11),
       status: "ativo",
@@ -759,7 +822,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Lucas Andrade Pereira",
-        cpf: "11.111.111-11",
+        cpf: "11111111383",
         birthDate: "1992-04-17",
         email: "lucas.pereira@example.com",
         phone: "11900000011",
@@ -768,7 +831,7 @@ async function seedFictional(
       },
     });
 
-    const p12 = await ctx.db.insert("contracts", {
+    const p12 = await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(12),
       status: "ativo",
@@ -805,7 +868,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Patrícia Gomes Tavares",
-        cpf: "12.121.212-12",
+        cpf: "12121212108",
         birthDate: "1991-07-30",
         email: "patricia.tavares@example.com",
         phone: "11900000012",
@@ -814,7 +877,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(13),
       status: "pendente",
@@ -851,7 +914,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Roberto Carvalho Neto",
-        cpf: "13.131.313-13",
+        cpf: "13131313188",
         birthDate: "1987-03-22",
         email: "roberto.neto@example.com",
         phone: "11900000013",
@@ -860,7 +923,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(14),
       status: "pendente",
@@ -897,7 +960,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Soluções Web S.A.",
-        cpf: "14.141.414/0001-14",
+        entityType: "pj",
+        cpf: "14141414000145",
         birthDate: "2018-05-10",
         email: "contato@solucoesweb.example.com",
         phone: "11900000014",
@@ -906,7 +970,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: paulistaId,
       publicId: pid(15),
       status: "encerrado",
@@ -943,7 +1007,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Silvia Menezes Rocha",
-        cpf: "15.151.515-15",
+        cpf: "15151515144",
         birthDate: "1983-10-05",
         email: "silvia.rocha@example.com",
         phone: "11900000015",
@@ -955,7 +1019,7 @@ async function seedFictional(
     // ── Contracts — Imobiliária Atlântica (12) ────────────────────────────────
     // 8 ativo, 2 pendente, 1 encerrado, 1 cancelado
 
-    const a1 = await ctx.db.insert("contracts", {
+    const a1 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(16),
       status: "ativo",
@@ -992,7 +1056,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Mariana Figueiredo Costa",
-        cpf: "16.161.616-16",
+        cpf: "16161616122",
         birthDate: "1989-01-14",
         email: "mariana.costa@example.com",
         phone: "21900000001",
@@ -1001,7 +1065,7 @@ async function seedFictional(
       },
     });
 
-    const a2 = await ctx.db.insert("contracts", {
+    const a2 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(17),
       status: "ativo",
@@ -1042,7 +1106,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Atlântico Negócios S.A.",
-        cpf: "17.171.717/0001-17",
+        entityType: "pj",
+        cpf: "17171717000107",
         birthDate: "2005-08-01",
         email: "financeiro@atlanticonegocios.example.com",
         phone: "21900000002",
@@ -1051,7 +1116,7 @@ async function seedFictional(
       },
     });
 
-    const a3 = await ctx.db.insert("contracts", {
+    const a3 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(18),
       status: "ativo",
@@ -1088,7 +1153,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Eduardo Pinto Bastos",
-        cpf: "18.181.818-18",
+        cpf: "18181818199",
         birthDate: "1984-07-19",
         email: "eduardo.bastos@example.com",
         phone: "21900000003",
@@ -1097,7 +1162,7 @@ async function seedFictional(
       },
     });
 
-    const a4 = await ctx.db.insert("contracts", {
+    const a4 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(19),
       status: "ativo",
@@ -1134,7 +1199,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Tatiana Alves Mendes",
-        cpf: "19.191.919-19",
+        cpf: "19191919177",
         birthDate: "1996-09-02",
         email: "tatiana.mendes@example.com",
         phone: "21900000004",
@@ -1143,7 +1208,7 @@ async function seedFictional(
       },
     });
 
-    const a5 = await ctx.db.insert("contracts", {
+    const a5 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(20),
       status: "ativo",
@@ -1180,7 +1245,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Construtora Barra S.A.",
-        cpf: "20.202.020/0001-20",
+        entityType: "pj",
+        cpf: "20202020000152",
         birthDate: "2000-02-01",
         email: "obras@construtorabarra.example.com",
         phone: "21900000005",
@@ -1189,7 +1255,7 @@ async function seedFictional(
       },
     });
 
-    const a6 = await ctx.db.insert("contracts", {
+    const a6 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(21),
       status: "ativo",
@@ -1226,7 +1292,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Gustavo Ribeiro Leal",
-        cpf: "21.212.121-21",
+        cpf: "21212121244",
         birthDate: "1990-12-11",
         email: "gustavo.leal@example.com",
         phone: "21900000006",
@@ -1235,7 +1301,7 @@ async function seedFictional(
       },
     });
 
-    const a7 = await ctx.db.insert("contracts", {
+    const a7 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(22),
       status: "ativo",
@@ -1272,7 +1338,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Camila Souza Barros",
-        cpf: "22.222.222-22",
+        cpf: "22222222494",
         birthDate: "1994-05-28",
         email: "camila.barros@example.com",
         phone: "21900000007",
@@ -1281,7 +1347,7 @@ async function seedFictional(
       },
     });
 
-    const a8 = await ctx.db.insert("contracts", {
+    const a8 = await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(23),
       status: "ativo",
@@ -1322,7 +1388,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Petro Energy Ltda",
-        cpf: "23.232.323/0001-23",
+        entityType: "pj",
+        cpf: "23232323000106",
         birthDate: "1998-11-01",
         email: "corp@petroenergy.example.com",
         phone: "21900000008",
@@ -1331,7 +1398,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(24),
       status: "pendente",
@@ -1368,7 +1435,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Diego Mendonça Freitas",
-        cpf: "24.242.424-24",
+        cpf: "24242424299",
         birthDate: "1993-08-17",
         email: "diego.freitas@example.com",
         phone: "21900000009",
@@ -1377,7 +1444,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(25),
       status: "pendente",
@@ -1414,7 +1481,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Logística Carioca Ltda",
-        cpf: "25.252.525/0001-25",
+        entityType: "pj",
+        cpf: "25252525000145",
         birthDate: "2012-04-01",
         email: "ops@logisticacarioca.example.com",
         phone: "21900000010",
@@ -1423,7 +1491,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(26),
       status: "encerrado",
@@ -1460,7 +1528,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Isabela Torres Viana",
-        cpf: "26.262.626-26",
+        cpf: "26262626255",
         birthDate: "1986-02-14",
         email: "isabela.viana@example.com",
         phone: "21900000011",
@@ -1469,7 +1537,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: atlanticaId,
       publicId: pid(27),
       status: "cancelado",
@@ -1506,7 +1574,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "reprovado",
         fullName: "Marcos Vinícius Santos",
-        cpf: "27.272.727-27",
+        cpf: "27272727233",
         birthDate: "1990-06-20",
         email: "marcos.santos@example.com",
         phone: "21900000012",
@@ -1518,7 +1586,7 @@ async function seedFictional(
     // ── Contracts — Horizonte Imóveis (3) ─────────────────────────────────────
     // 2 ativo, 1 pendente
 
-    const h1 = await ctx.db.insert("contracts", {
+    const h1 = await insertSeedContract(ctx, {
       agencyId: horizonteId,
       publicId: pid(28),
       status: "ativo",
@@ -1555,7 +1623,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Renata Campos Drumond",
-        cpf: "28.282.828-28",
+        cpf: "28282828211",
         birthDate: "1991-03-05",
         email: "renata.drumond@example.com",
         phone: "31900000001",
@@ -1564,7 +1632,7 @@ async function seedFictional(
       },
     });
 
-    const h2 = await ctx.db.insert("contracts", {
+    const h2 = await insertSeedContract(ctx, {
       agencyId: horizonteId,
       publicId: pid(29),
       status: "ativo",
@@ -1605,7 +1673,8 @@ async function seedFictional(
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Mineira Distribuidora Ltda",
-        cpf: "29.292.929/0001-29",
+        entityType: "pj",
+        cpf: "29292929000113",
         birthDate: "2008-07-20",
         email: "financeiro@mineiradist.example.com",
         phone: "31900000002",
@@ -1614,7 +1683,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("contracts", {
+    await insertSeedContract(ctx, {
       agencyId: horizonteId,
       publicId: pid(30),
       status: "pendente",
@@ -1651,7 +1720,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: "pendente",
         fullName: "Felipe Augusto Corrêa",
-        cpf: "30.303.030-30",
+        cpf: "30303030399",
         birthDate: "1998-01-25",
         email: "felipe.correa@example.com",
         phone: "31900000003",
@@ -2433,7 +2502,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 82",
       tenant: {
         fullName: "Beatriz Almeida Carvalho",
-        cpf: "232.323.232-32",
+        cpf: "23232323200",
         birthDate: "1992-08-23",
         phoneSuffix: "31",
         emailLocal: "beatriz.almeida",
@@ -2457,7 +2526,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 1502",
       tenant: {
         fullName: "Rafael Monteiro Lima",
-        cpf: "323.232.323-23",
+        cpf: "32323232355",
         birthDate: "1985-04-17",
         phoneSuffix: "32",
         emailLocal: "rafael.monteiro",
@@ -2481,7 +2550,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 41",
       tenant: {
         fullName: "Letícia Andrade Pires",
-        cpf: "424.242.424-24",
+        cpf: "42424242488",
         birthDate: "1994-11-30",
         phoneSuffix: "33",
         emailLocal: "leticia.andrade",
@@ -2505,7 +2574,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Cobertura 18",
       tenant: {
         fullName: "Fernanda Lopes Cavalcanti",
-        cpf: "525.252.525-25",
+        cpf: "52525252500",
         birthDate: "1980-07-08",
         phoneSuffix: "34",
         emailLocal: "fernanda.lopes",
@@ -2529,7 +2598,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 73",
       tenant: {
         fullName: "Gustavo Ribeiro Tavares",
-        cpf: "626.262.626-26",
+        cpf: "62626262633",
         birthDate: "1989-02-14",
         phoneSuffix: "35",
         emailLocal: "gustavo.ribeiro",
@@ -2553,7 +2622,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       complement: "Apto 22",
       tenant: {
         fullName: "Bruno Tavares Macedo",
-        cpf: "727.272.727-27",
+        cpf: "72727272766",
         birthDate: "1986-09-19",
         phoneSuffix: "36",
         emailLocal: "bruno.tavares",
@@ -2569,10 +2638,9 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     const feeCents = Math.round(spec.rentCents * FEE_MULTIPLIER);
     const isApproved = spec.status !== "pendente";
 
-    const id = await ctx.db.insert("contracts", {
+    const id = await insertSeedContract(ctx, {
       agencyId,
       publicId,
-      tenantCpf: spec.tenant.cpf.replace(/\D/g, ""),
       status: spec.status,
       activatedAt: spec.activatedAt,
       deactivatedAt: spec.deactivatedAt,

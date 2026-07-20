@@ -1,16 +1,34 @@
 import { Migrations } from "@convex-dev/migrations";
 import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
-import { DEFAULT_TENANT_ENTITY_TYPE } from "./contracts/domain";
 
+/**
+ * Migration policy (pre-production).
+ *
+ * While the app has no real data, we do NOT migrate in place — we **reseed**:
+ * `bunx convex run seed:seedReset` wipes the demo tables and rebuilds the
+ * dataset in the current schema shape (see `convex/seed.ts`). So schema changes
+ * ship as wipe + reseed, not widen → backfill → narrow, and this runner stays a
+ * safe no-op. `schemaValidation` is intentionally relaxed during this window so
+ * a deploy tolerates whatever shape is at rest until the operator reseeds.
+ *
+ * **When the first real (non-seed) data lands**, flip the model: start writing
+ * in-place migrations here (widen → migrate → narrow, two PRs — see
+ * `.claude/notes/deferred-conventions.md`), append each `internal.migrations.<name>`
+ * to `runAll` below, and re-enable strict `schemaValidation`. `run-migrations.sh`
+ * already runs `migrations:runAll` after every `convex deploy`, so real
+ * migrations take effect automatically from that point on.
+ *
+ * NOTE: the operational backfills (`contracts/backfill.ts` aggregate rebuild,
+ * `waitlist` Resend audience sync, `reserve` snapshot clear) are NOT migrations —
+ * they're on-demand tools and deliberately stay out of this runner.
+ */
 export const migrations = new Migrations<DataModel>(components.migrations);
 
 /**
- * No-op sentinel kept at the head of `runAll`. The component's runner errors on
- * an empty list, so this guarantees `runAll` is always a valid, safe no-op —
- * letting the deploy-time migration step ship before any real migration exists.
- * It scans `users` once per deployment, marks itself complete, then is skipped
- * on every subsequent deploy.
+ * No-op sentinel. The component's runner errors on an empty list, so this keeps
+ * `runAll` valid and idempotent while there are no real migrations to run. It
+ * scans `users` once per deployment, marks itself complete, then is skipped.
  */
 export const noop = migrations.define({
   table: "users",
@@ -18,52 +36,8 @@ export const noop = migrations.define({
 });
 
 /**
- * Step 1 of removing the deprecated `users.isStaff` flag (superseded by the
- * `mutavStaff` table). Clears the field from every `users` doc so a follow-up PR
- * can narrow it out of the schema without hitting the deploy-order trap (Convex
- * validates the narrowed schema against data at rest before in-deploy migrations
- * run). Schema is unchanged here — `isStaff` stays optional until that step-2 PR.
- *
- * Returning `undefined` for an already-clean doc skips the write, so re-runs on
- * deploy are no-ops. See issue #207 and the `convex/schema.ts` deprecation note.
+ * Ordered runner, chained after `convex deploy` via `scripts/run-migrations.sh`.
+ * Empty except for the no-op sentinel during the reseed-in-dev window — append
+ * real migrations here once live data exists (see the policy note above).
  */
-export const clearUsersIsStaff = migrations.define({
-  table: "users",
-  migrateOne: (_ctx, user) => (user.isStaff === undefined ? undefined : { isStaff: undefined }),
-});
-
-/**
- * Step 1 of #60 (make `contracts.tenant` a discriminated union on `entityType`).
- * Backfills `tenant.entityType` to `"pf"` on every contract that predates the
- * field, so a follow-up PR can narrow `tenant` into a `v.union` with a required
- * `entityType` literal without tripping the deploy-order trap. Returning
- * `undefined` for docs that already carry an `entityType` skips the write, so
- * re-runs on deploy are no-ops. `tenant` is patched as a whole object (Convex
- * patch merges only at the top level), spreading the existing value.
- */
-export const backfillTenantEntityType = migrations.define({
-  table: "contracts",
-  migrateOne: (_ctx, contract) =>
-    contract.tenant.entityType === undefined
-      ? { tenant: { ...contract.tenant, entityType: DEFAULT_TENANT_ENTITY_TYPE } }
-      : undefined,
-});
-
-/**
- * Ordered runner of all data migrations. Chained after `convex deploy` in every
- * app's `vercel.json` (`scripts/run-migrations.sh`), so each deploy backfills
- * data in place — no wipe/reseed, and every developer's own dev deployment
- * self-heals on `convex dev`. Completed migrations are skipped on re-run.
- *
- * Migration convention (widen → migrate → narrow, two PRs — see
- * `.claude/notes/deferred-conventions.md`): in the WIDEN PR set
- * `schemaValidation: false` (or add the new field as optional), define the
- * migration with `migrations.define({ table, migrateOne })`, and append its
- * `internal.migrations.<name>` here. In the NARROW PR re-enable strict
- * validation and drop the transitional fields.
- */
-export const runAll = migrations.runner([
-  internal.migrations.noop,
-  internal.migrations.clearUsersIsStaff,
-  internal.migrations.backfillTenantEntityType,
-]);
+export const runAll = migrations.runner([internal.migrations.noop]);

@@ -26,15 +26,31 @@ type ContractSeed = {
   availableGuaranteeCents: number;
 };
 
+async function seedTenantRow(t: ReturnType<typeof convexTest>) {
+  return t.run((ctx) =>
+    ctx.db.insert("tenants", {
+      entityType: "pf",
+      taxId: "11144477735",
+      fullName: "Test Tenant",
+      birthDate: "1990-01-01",
+      email: "tenant@test.br",
+      phone: "11999999999",
+    }),
+  );
+}
+
 async function seedContractDirect(
   t: ReturnType<typeof convexTest>,
   spec: ContractSeed,
   publicId: string,
 ) {
+  const tenantId = await seedTenantRow(t);
   return t.run((ctx) =>
     ctx.db.insert("contracts", {
       agencyId: spec.agencyId,
       publicId,
+      tenantId,
+      tenantApproval: { status: "pendente", termApprovedAt: null },
       status: spec.status,
       activatedAt: null,
       nextRenewalDate: "2026-12-31",
@@ -65,15 +81,6 @@ async function seedContractDirect(
         { key: "inspection", status: "pendente" },
         { key: "policy", status: "pendente" },
       ],
-      tenant: {
-        approvalStatus: "pendente",
-        fullName: "Test Tenant",
-        cpf: "11144477735",
-        birthDate: "1990-01-01",
-        email: "tenant@test.br",
-        phone: "11999999999",
-        termApprovedAt: null,
-      },
     }),
   );
 }

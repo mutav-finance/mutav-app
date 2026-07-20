@@ -47,6 +47,7 @@ type ContractSeed = {
   availableGuaranteeCents: number;
   activatedAt?: string | null;
   deactivatedAt?: string | null;
+  nextRenewalDate?: string;
 };
 
 async function seedAndIndexContract(
@@ -55,13 +56,23 @@ async function seedAndIndexContract(
   publicId: string,
 ) {
   await t.run(async (ctx) => {
+    const tenantId = await ctx.db.insert("tenants", {
+      entityType: "pf",
+      taxId: "11144477735",
+      fullName: "Test Tenant",
+      birthDate: "1990-01-01",
+      email: "tenant@test.br",
+      phone: "11999999999",
+    });
     const id = await ctx.db.insert("contracts", {
       agencyId: spec.agencyId,
       publicId,
+      tenantId,
+      tenantApproval: { status: "pendente", termApprovedAt: null },
       status: spec.status,
       activatedAt: spec.activatedAt ?? null,
       deactivatedAt: spec.deactivatedAt,
-      nextRenewalDate: "2026-12-31",
+      nextRenewalDate: spec.nextRenewalDate ?? "2026-12-31",
       availableGuaranteeCents: spec.availableGuaranteeCents,
       rental: {
         propertyKind: "residencial",
@@ -89,15 +100,6 @@ async function seedAndIndexContract(
         { key: "inspection", status: "pendente" },
         { key: "policy", status: "pendente" },
       ],
-      tenant: {
-        approvalStatus: "pendente",
-        fullName: "Test Tenant",
-        cpf: "11144477735",
-        birthDate: "1990-01-01",
-        email: "tenant@test.br",
-        phone: "11999999999",
-        termApprovedAt: null,
-      },
     });
     const doc = await ctx.db.get(id);
     if (!doc) throw new Error("seed lost");
@@ -410,5 +412,369 @@ describe("getActivityByPeriod", () => {
       const d = new Date(Date.UTC(year, month - 1, day));
       expect(d.getUTCDay()).toBe(1);
     }
+  });
+});
+
+describe("listByAgency / getContractTabCounts (urgency)", () => {
+  const REFERENCE_DATE = "2026-07-18";
+  const EXPIRING_10_DAYS = "2026-07-28";
+  const CRITICAL_45_DAYS = "2026-09-01";
+  const OK_200_DAYS = "2027-02-03";
+
+  async function seedUrgencyBook(t: ReturnType<typeof convexTest>, agencyId: AgencyId) {
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 100_00,
+        nextRenewalDate: EXPIRING_10_DAYS,
+      },
+      "U1",
+    );
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 100_00,
+        nextRenewalDate: CRITICAL_45_DAYS,
+      },
+      "U2",
+    );
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 100_00,
+        nextRenewalDate: OK_200_DAYS,
+      },
+      "U3",
+    );
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.PENDENTE, availableGuaranteeCents: 50_00 },
+      "U4",
+    );
+    await seedAndIndexContract(
+      t,
+      { agencyId, status: CONTRACT_STATUS.ENCERRADO, availableGuaranteeCents: 50_00 },
+      "U5",
+    );
+  }
+
+  test("tab 'expiring' returns only the ativo rows inside [today, today+60], each carrying urgency", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+      tab: "expiring",
+      referenceDate: REFERENCE_DATE,
+    });
+
+    const ids = new Set(page.page.map((row) => row.id));
+    expect(ids).toEqual(new Set(["U1", "U2"]));
+    for (const row of page.page) {
+      expect(row.urgency).toBeDefined();
+    }
+  });
+
+  test("tab 'ativo' returns only ativo rows", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+      tab: "ativo",
+      referenceDate: REFERENCE_DATE,
+    });
+
+    expect(new Set(page.page.map((row) => row.id))).toEqual(new Set(["U1", "U2", "U3"]));
+    for (const row of page.page) {
+      expect(row.status).toBe(CONTRACT_STATUS.ATIVO);
+    }
+  });
+
+  test("tab undefined returns every contract", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+      referenceDate: REFERENCE_DATE,
+    });
+
+    expect(new Set(page.page.map((row) => row.id))).toEqual(
+      new Set(["U1", "U2", "U3", "U4", "U5"]),
+    );
+  });
+
+  test("getContractTabCounts: expiring === 2 with correct status buckets", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const counts = await asUser.query(api.contracts.useCases.getContractTabCounts, {
+      agencyId,
+      referenceDate: REFERENCE_DATE,
+    });
+
+    expect(counts).toEqual({
+      all: 5,
+      expiring: 2,
+      ativo: 3,
+      pendente: 1,
+      encerrado: 1,
+      cancelado: 0,
+    });
+  });
+});
+
+describe("create (tenant registry, narrow phase)", () => {
+  const VALID_CPF = "52998224725";
+  const VALID_CNPJ = "11444777000161";
+
+  function createArgs(tenantOverrides: Record<string, never> | object = {}) {
+    return {
+      property: {
+        cep: "01000000",
+        streetAndNumber: "Rua Teste, 1",
+        neighborhood: "Centro",
+        cityUF: "São Paulo / SP",
+      },
+      optional: { complement: "", tag: "", description: "" },
+      propertyKind: "residencial" as const,
+      rentCents: 300000,
+      condoCents: 0,
+      otherFeesCents: 0,
+      tenant: {
+        entityType: "pf" as const,
+        fullName: "Maria Silva Santos",
+        cpf: VALID_CPF,
+        cnpj: undefined,
+        birthDate: "1990-05-12",
+        email: "maria@example.com",
+        phone: "11900000001",
+        score: 750,
+      },
+      ...tenantOverrides,
+    };
+  }
+
+  test("registry-only: no embedded tenant/tenantCpf, top-level score, tenantId links a matching registry row", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs(),
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const contract = await t.run((ctx) =>
+      ctx.db
+        .query("contracts")
+        .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
+        .unique(),
+    );
+    expect(contract).not.toBeNull();
+    if (!contract) return;
+
+    const keys = Object.keys(contract);
+    expect(keys).not.toContain("tenant");
+    expect(keys).not.toContain("tenantCpf");
+    expect(contract.score).toBe(750);
+    expect(contract.tenantApproval).toEqual({ status: "pendente", termApprovedAt: null });
+
+    const tenant = await t.run((ctx) => ctx.db.get(contract.tenantId));
+    expect(tenant).toMatchObject({
+      entityType: "pf",
+      taxId: VALID_CPF,
+      fullName: "Maria Silva Santos",
+      birthDate: "1990-05-12",
+      email: "maria@example.com",
+      phone: "11900000001",
+    });
+
+    const history = await t.run((ctx) =>
+      ctx.db
+        .query("contractHistory")
+        .withIndex("by_contract", (q) => q.eq("contractPublicId", result.data.publicId))
+        .collect(),
+    );
+    const creationEvent = history.find((h) => h.message === "Contrato criado");
+    expect(creationEvent?.tenantSnapshot).toMatchObject({
+      entityType: "pf",
+      taxId: VALID_CPF,
+      fullName: "Maria Silva Santos",
+      email: "maria@example.com",
+      phone: "11900000001",
+    });
+  });
+
+  test("getByPublicId round-trips both variants and listByAgency joins the tenant name", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const pf = await asUser.mutation(api.contracts.useCases.create, { agencyId, ...createArgs() });
+    expect(pf.success).toBe(true);
+    if (!pf.success) return;
+
+    const pjArgs = createArgs({
+      tenant: {
+        entityType: "pj" as const,
+        fullName: "Tech Solutions Ltda",
+        cpf: VALID_CPF,
+        cnpj: VALID_CNPJ,
+        birthDate: "",
+        email: "contato@techsolutions.example.com",
+        phone: "11900000003",
+        score: 650,
+      },
+    });
+    const pj = await asUser.mutation(api.contracts.useCases.create, { agencyId, ...pjArgs });
+    expect(pj.success).toBe(true);
+    if (!pj.success) return;
+
+    const pfContract = await asUser.query(api.contracts.useCases.getByPublicId, {
+      publicId: pf.data.publicId,
+    });
+    expect(pfContract?.tenant).toMatchObject({
+      entityType: "pf",
+      taxId: VALID_CPF,
+      birthDate: "1990-05-12",
+      approvalStatus: "pendente",
+    });
+
+    const pjContract = await asUser.query(api.contracts.useCases.getByPublicId, {
+      publicId: pj.data.publicId,
+    });
+    expect(pjContract?.tenant).toMatchObject({
+      entityType: "pj",
+      taxId: VALID_CNPJ,
+      contactCpf: VALID_CPF,
+    });
+    expect(pjContract?.tenant).not.toHaveProperty("birthDate");
+
+    const page = await asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    const names = new Set(page.page.map((row) => row.tenantName));
+    expect(names.has("Maria Silva Santos")).toBe(true);
+    expect(names.has("Tech Solutions Ltda")).toBe(true);
+  });
+
+  test("second create with the same CPF reuses the same registry row", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const first = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs(),
+    });
+    const second = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs(),
+    });
+    expect(first.success).toBe(true);
+    expect(second.success).toBe(true);
+
+    const tenants = await t.run((ctx) => ctx.db.query("tenants").collect());
+    expect(tenants).toHaveLength(1);
+
+    const contracts = await t.run((ctx) => ctx.db.query("contracts").collect());
+    expect(contracts).toHaveLength(2);
+    expect(contracts[0].tenantId).toBe(tenants[0]._id);
+    expect(contracts[1].tenantId).toBe(tenants[0]._id);
+  });
+
+  test("pj create resolves the registry row from the CNPJ", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({
+        tenant: {
+          entityType: "pj" as const,
+          fullName: "Tech Solutions Ltda",
+          cpf: VALID_CPF,
+          cnpj: VALID_CNPJ,
+          birthDate: "",
+          email: "contato@techsolutions.example.com",
+          phone: "11900000003",
+          score: 650,
+        },
+      }),
+    });
+    expect(result.success).toBe(true);
+
+    const tenants = await t.run((ctx) => ctx.db.query("tenants").collect());
+    expect(tenants).toHaveLength(1);
+    expect(tenants[0]).toMatchObject({
+      entityType: "pj",
+      taxId: VALID_CNPJ,
+      contactCpf: VALID_CPF,
+    });
+  });
+
+  test("checksum-invalid CPF returns an error Result and writes nothing", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({
+        tenant: {
+          entityType: "pf" as const,
+          fullName: "Maria Silva Santos",
+          cpf: "11111111111",
+          cnpj: undefined,
+          birthDate: "1990-05-12",
+          email: "maria@example.com",
+          phone: "11900000001",
+          score: 750,
+        },
+      }),
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_TAX_ID");
+
+    const contracts = await t.run((ctx) => ctx.db.query("contracts").collect());
+    const tenants = await t.run((ctx) => ctx.db.query("tenants").collect());
+    const audit = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+    expect(contracts).toHaveLength(0);
+    expect(tenants).toHaveLength(0);
+    expect(audit).toHaveLength(0);
   });
 });

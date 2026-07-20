@@ -1,9 +1,10 @@
+import * as React from "react";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@mutav/ui/item";
 import { Mono } from "@mutav/ui/mono";
 import { cn } from "@mutav/ui/cn";
 
-export function FieldRow({
+export const FieldRow = React.memo(function FieldRow({
   label,
   value,
   mono = false,
@@ -36,7 +37,7 @@ export function FieldRow({
       </ItemContent>
     </Item>
   );
-}
+});
 
 export function FieldGroupHeader({ children }: { children: React.ReactNode }) {
   return (
