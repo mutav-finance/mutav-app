@@ -79,16 +79,17 @@
       "statement": "Payment statement"
     },
     "status": {
-      "pendencia_aberta": "Open",
-      "entregue": "Delivered",
-      "cancelado": "Cancelled"
+      "open": "Open",
+      "under_review": "Under review",
+      "provisioned": "Provisioned",
+      "paid": "Paid",
+      "closed": "Closed"
     },
     "filter": {
-      "property": "Property",
-      "propertyPlaceholder": "Property ID",
+      "contract": "Contract",
+      "contractPlaceholder": "Contract ID",
       "tenantName": "Tenant name",
       "tenantNamePlaceholder": "Full name",
-      "tenantCpf": "Tenant CPF",
       "status": "Status",
       "statusAll": "All",
       "order": "Order",
@@ -105,15 +106,15 @@
     "table": {
       "heading": "Results",
       "empty": "No delinquencies found.",
-      "view": "View delinquency",
       "col": {
-        "property": "Property",
+        "contract": "Contract",
+        "tenant": "Tenant",
         "status": "Status",
-        "noticeAt": "Notice date",
-        "amount": "Amount",
-        "updatedAmount": "Updated amount",
-        "action": "Action"
-      }
+        "openedAt": "Opened at",
+        "amount": "Amount"
+      },
+      "loadMore": "Load more",
+      "loading": "Loading…"
     }
   },
   "nav": {
@@ -294,11 +295,24 @@
       "errors": {
         "NOT_FOUND": "Proposal not found.",
         "NOT_PENDING": "Only pending proposals can be cancelled.",
-        "UNEXPECTED": "Unexpected error. Please try again."
+        "UNEXPECTED": "Unexpected error. Please try again.",
+        "CONTRACT_NOT_ACTIVE": "Only active contracts can have a delinquency opened.",
+        "INVALID_AMOUNT": "Enter a valid amount greater than zero.",
+        "DELINQUENCY_ALREADY_OPEN": "A delinquency is already in progress for this contract.",
+        "AMOUNT_EXCEEDS_GUARANTEE": "The amount exceeds the contract's available guarantee."
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this contract",
-      "actionsMenu": "Contract actions"
+      "actionsMenu": "Contract actions",
+      "openDialog": {
+        "title": "Open delinquency?",
+        "description": "Enter the delinquency amount for this contract.",
+        "amountLabel": "Amount (R$)",
+        "confirm": "Open delinquency",
+        "back": "Go back",
+        "opening": "Opening…",
+        "success": "Delinquency opened."
+      }
     },
     "status": {
       "ativo": "Active",

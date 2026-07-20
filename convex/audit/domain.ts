@@ -52,6 +52,9 @@ export const AUDIT_ACTION = {
   INVOICE_RESET: "invoice.reset",
   // mutavStaff/ (admin onboarding review — emitted by convex/mutavStaff/useCases.ts).
   ONBOARDING_REVIEWED: "onboarding.reviewed",
+  // delinquencies/ (emitted by convex/delinquencies/useCases.ts).
+  DELINQUENCY_OPENED: "delinquency.opened",
+  DELINQUENCY_STATUS_UPDATED: "delinquency.status_updated",
 } as const satisfies Record<string, string>;
 
 export type AuditActionKey = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -70,6 +73,8 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.INVOICE_PAID),
   v.literal(AUDIT_ACTION.INVOICE_RESET),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_OPENED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_STATUS_UPDATED),
 );
 
 /**

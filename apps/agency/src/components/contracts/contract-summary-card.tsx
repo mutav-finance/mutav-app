@@ -22,9 +22,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@mutav/ui/dropdown-menu";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import { cn } from "@mutav/ui/cn";
+import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import type { Contract, ContractStatus } from "@/lib/contracts/types";
 import { api } from "@convex/_generated/api";
@@ -44,6 +47,38 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
   const cancelProposal = useMutation(api.contracts.useCases.cancelProposal);
   const [cancelOpen, setCancelOpen] = React.useState(false);
   const [isCancelling, setIsCancelling] = React.useState(false);
+  const openDelinquency = useMutation(api.delinquencies.useCases.open);
+  const [openDelinquencyOpen, setOpenDelinquencyOpen] = React.useState(false);
+  const [delinquencyAmount, setDelinquencyAmount] = React.useState("");
+  const [isOpeningDelinquency, setIsOpeningDelinquency] = React.useState(false);
+
+  async function handleConfirmOpenDelinquency() {
+    const parsed = Number.parseFloat(delinquencyAmount.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error(t("errors.INVALID_AMOUNT"));
+      return;
+    }
+    const amountCents = Math.round(parsed * 100);
+    setIsOpeningDelinquency(true);
+    try {
+      const result = await openDelinquency({
+        agencyId: contract.agencyId,
+        contractPublicId: contract.id,
+        amountCents,
+      });
+      if (result.success) {
+        setOpenDelinquencyOpen(false);
+        setDelinquencyAmount("");
+        toast.success(t("openDialog.success"));
+      } else {
+        toast.error(t(`errors.${result.error.code}`));
+      }
+    } catch {
+      toast.error(t("errors.UNEXPECTED"));
+    } finally {
+      setIsOpeningDelinquency(false);
+    }
+  }
 
   async function handleConfirmCancel() {
     setIsCancelling(true);
@@ -76,7 +111,11 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
             <div className="hidden items-center gap-2 sm:flex">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline-primary" size="sm">
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => setOpenDelinquencyOpen(true)}
+                  >
                     {t("openDelinquency")}
                   </Button>
                 </TooltipTrigger>
@@ -84,8 +123,10 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline-primary" size="sm">
-                    {t("trackDelinquencies")}
+                  <Button variant="outline-primary" size="sm" asChild>
+                    <Link href={`/delinquencies?contract=${contract.id}`}>
+                      {t("trackDelinquencies")}
+                    </Link>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("trackDelinquenciesHint")}</TooltipContent>
@@ -119,8 +160,14 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>{t("openDelinquency")}</DropdownMenuItem>
-                <DropdownMenuItem>{t("trackDelinquencies")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setOpenDelinquencyOpen(true)}>
+                  {t("openDelinquency")}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/delinquencies?contract=${contract.id}`}>
+                    {t("trackDelinquencies")}
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem disabled={!isPending} onClick={() => setCancelOpen(true)}>
                   {t("cancelProposal")}
                 </DropdownMenuItem>
@@ -174,6 +221,40 @@ export function ContractSummaryCard({ contract }: { contract: Contract }) {
           </dl>
         </CardContent>
       </Card>
+
+      <AlertDialog open={openDelinquencyOpen} onOpenChange={setOpenDelinquencyOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("openDialog.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("openDialog.description")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="delinquency-amount">{t("openDialog.amountLabel")}</Label>
+            <Input
+              id="delinquency-amount"
+              type="number"
+              inputMode="decimal"
+              min="0.01"
+              step="0.01"
+              placeholder="0,00"
+              value={delinquencyAmount}
+              onChange={(e) => setDelinquencyAmount(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("openDialog.back")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmOpenDelinquency();
+              }}
+              disabled={isOpeningDelinquency}
+            >
+              {isOpeningDelinquency ? t("openDialog.opening") : t("openDialog.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>

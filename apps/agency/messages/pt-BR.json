@@ -79,16 +79,17 @@
       "statement": "Extrato de pagamento"
     },
     "status": {
-      "pendencia_aberta": "Pendência Aberta",
-      "entregue": "Entregue",
-      "cancelado": "Cancelado"
+      "open": "Aberta",
+      "under_review": "Em análise",
+      "provisioned": "Provisionada",
+      "paid": "Paga",
+      "closed": "Encerrada"
     },
     "filter": {
-      "property": "Imóvel",
-      "propertyPlaceholder": "ID do imóvel",
+      "contract": "Contrato",
+      "contractPlaceholder": "ID do contrato",
       "tenantName": "Nome do inquilino",
       "tenantNamePlaceholder": "Nome completo",
-      "tenantCpf": "CPF do inquilino",
       "status": "Status",
       "statusAll": "Todos",
       "order": "Ordem",
@@ -105,15 +106,15 @@
     "table": {
       "heading": "Resultados",
       "empty": "Nenhum acionamento encontrado.",
-      "view": "Ver inadimplência",
       "col": {
-        "property": "Imóvel",
+        "contract": "Contrato",
+        "tenant": "Inquilino",
         "status": "Status",
-        "noticeAt": "Data Aviso",
-        "amount": "Valor Inadimplência",
-        "updatedAmount": "Valor Atualizado",
-        "action": "Ação"
-      }
+        "openedAt": "Data de abertura",
+        "amount": "Valor"
+      },
+      "loadMore": "Carregar mais",
+      "loading": "Carregando…"
     }
   },
   "nav": {
@@ -294,11 +295,24 @@
       "errors": {
         "NOT_FOUND": "Proposta não encontrada.",
         "NOT_PENDING": "Apenas propostas pendentes podem ser canceladas.",
-        "UNEXPECTED": "Erro inesperado. Tente novamente."
+        "UNEXPECTED": "Erro inesperado. Tente novamente.",
+        "CONTRACT_NOT_ACTIVE": "Apenas contratos ativos podem ter inadimplência aberta.",
+        "INVALID_AMOUNT": "Informe um valor válido maior que zero.",
+        "DELINQUENCY_ALREADY_OPEN": "Já existe uma inadimplência em andamento para este contrato.",
+        "AMOUNT_EXCEEDS_GUARANTEE": "O valor excede a garantia disponível do contrato."
       },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",
-      "actionsMenu": "Ações do contrato"
+      "actionsMenu": "Ações do contrato",
+      "openDialog": {
+        "title": "Abrir inadimplência?",
+        "description": "Informe o valor da inadimplência para este contrato.",
+        "amountLabel": "Valor (R$)",
+        "confirm": "Abrir inadimplência",
+        "back": "Voltar",
+        "opening": "Abrindo…",
+        "success": "Inadimplência aberta."
+      }
     },
     "status": {
       "ativo": "Ativo",
