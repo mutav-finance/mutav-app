@@ -1,9 +1,13 @@
 import { v } from "convex/values";
+import type { Doc, Id } from "../_generated/dataModel";
 
 // Machine + status constants are exported from `./machine` — this domain
 // module owns the *auxiliary* value objects that accompany a notice row
-// (resolution kind, cancellation reason, evidence source). Doc<>/Id<>
-// aliases land here once the schema table is introduced.
+// (resolution kind, cancellation reason, evidence source), plus the
+// Doc<>/Id<> aliases so callers never touch raw generics.
+
+export type DelinquencyNotice = Doc<"contractDelinquencyNotices">;
+export type DelinquencyNoticeId = Id<"contractDelinquencyNotices">;
 
 export {
   DELINQUENCY_STATUS,
