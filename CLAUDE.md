@@ -301,6 +301,7 @@ Follow standard clean code principles, opinionated:
 - **No boolean flag arguments** — split into named functions (`approveContract` / `rejectContract`, not `setContractStatus(id, approved)`).
 - **No barrel files** — every import references the actual file path (`./Foo`, never `.` or `./index`).
 - **No comments by default** — only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader. Don't explain WHAT (well-named identifiers do that) and don't reference the current task or PR (that belongs in the PR description, not the code — comments rot, PRs don't).
+- **English-only code identifiers** — all types, `as const` value objects, string literal enum values, DB field values, function/variable names, and i18n **keys** are English (American spelling: `canceled`, not `cancelled`). Portuguese belongs ONLY in `messages/pt-BR.json` **values**. When touching a page that uses PT literals in code, translate them in the same commit — never propagate PT into new code just because the surrounding UI has it. Pre-existing PT identifiers (e.g. `CONTRACT_STATUS = { ATIVO: "ativo", ... }`) are grandfathered — flag them but don't drive-by-rename unless the surrounding change makes it cheap.
 - **TypeScript strict** — see Key Patterns / TypeScript escape hatches below.
 - **Branch workflow** — feature branches → squash merge PRs to main.
 
