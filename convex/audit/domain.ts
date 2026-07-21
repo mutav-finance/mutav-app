@@ -56,6 +56,12 @@ export const AUDIT_ACTION = {
   // emitted by convex/tenants/useCases.ts for staff review; the registry
   // value is NOT overwritten).
   TENANT_DATA_CONFLICT: "tenant.data_conflict",
+  // delinquencies/ (staff-only terminal dispositions — emitted by
+  // convex/delinquencies/mutations.ts). Agency-side transitions are NOT
+  // audited for the pilot; see the mutations file for the TODO.
+  DELINQUENCY_RESOLVED_BY_COVER: "delinquency.resolved_by_cover",
+  DELINQUENCY_DISMISSED: "delinquency.dismissed",
+  DELINQUENCY_DISPUTED: "delinquency.disputed",
 } as const satisfies Record<string, string>;
 
 export type AuditActionKey = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -75,6 +81,9 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.INVOICE_RESET),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
   v.literal(AUDIT_ACTION.TENANT_DATA_CONFLICT),
+  v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER),
+  v.literal(AUDIT_ACTION.DELINQUENCY_DISMISSED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_DISPUTED),
 );
 
 /**

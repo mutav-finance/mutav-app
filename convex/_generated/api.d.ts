@@ -33,6 +33,7 @@ import type * as creditAnalysis_useCases from "../creditAnalysis/useCases.js";
 import type * as crons from "../crons.js";
 import type * as delinquencies_domain from "../delinquencies/domain.js";
 import type * as delinquencies_machine from "../delinquencies/machine.js";
+import type * as delinquencies_mutations from "../delinquencies/mutations.js";
 import type * as delinquencies_useCases from "../delinquencies/useCases.js";
 import type * as http from "../http.js";
 import type * as invoices_actions from "../invoices/actions.js";
@@ -115,6 +116,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   "delinquencies/domain": typeof delinquencies_domain;
   "delinquencies/machine": typeof delinquencies_machine;
+  "delinquencies/mutations": typeof delinquencies_mutations;
   "delinquencies/useCases": typeof delinquencies_useCases;
   http: typeof http;
   "invoices/actions": typeof invoices_actions;
