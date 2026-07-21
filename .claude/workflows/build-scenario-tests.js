@@ -20,15 +20,18 @@ export const meta = {
 //     },
 //   })
 
-if (!args || typeof args !== 'object' || !args.domain) {
+// The Workflow tool may deliver `args` as a JSON string (named-workflow
+// invocation) or as an object (dynamic-script invocation). Normalize.
+const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args
+if (!parsedArgs || typeof parsedArgs !== 'object' || !parsedArgs.domain) {
   throw new Error(
     'build-scenario-tests requires args.domain (string). Optional: args.scenariosDocPath, args.contextNotes.',
   )
 }
 
-const DOMAIN = args.domain
-const SCENARIOS_DOC = args.scenariosDocPath || null
-const EXTRA_NOTES = args.contextNotes || ''
+const DOMAIN = parsedArgs.domain
+const SCENARIOS_DOC = parsedArgs.scenariosDocPath || null
+const EXTRA_NOTES = parsedArgs.contextNotes || ''
 
 // We assume the workflow runs from the repo root (or a worktree of it). The
 // design/implement agents will read files by absolute path, which they resolve

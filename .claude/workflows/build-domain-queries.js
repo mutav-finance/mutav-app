@@ -26,14 +26,17 @@ export const meta = {
 // internalQuery), and requires `bun run test:convex convex/<domain>/` to be
 // all-green before returning.
 
-if (!args || typeof args !== 'object' || !args.domain) {
+// The Workflow tool may deliver `args` as a JSON string (named-workflow
+// invocation) or as an object (dynamic-script invocation). Normalize.
+const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args
+if (!parsedArgs || typeof parsedArgs !== 'object' || !parsedArgs.domain) {
   throw new Error(
     'build-domain-queries requires args.domain (string). Optional: args.contextNotes.',
   )
 }
 
-const DOMAIN = args.domain
-const EXTRA_NOTES = args.contextNotes || ''
+const DOMAIN = parsedArgs.domain
+const EXTRA_NOTES = parsedArgs.contextNotes || ''
 
 const CONTEXT = `
 # Context — mutav-app convex domain query surface
