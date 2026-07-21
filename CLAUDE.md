@@ -430,6 +430,30 @@ Never use the legacy promise-chain + `cancelled`-flag idiom inside `useEffect`. 
 
 For mutations and other stateful async ops, prefer a `useFunction`-style helper (deferred — see `.claude/notes/deferred-conventions.md`) over manual `useState` + `try/catch` once that lands.
 
+### Testing
+
+Runner: **Vitest** everywhere. Two flavors of test file per convex domain:
+
+- **Pure logic** — `machine.test.ts`, `domain.test.ts`. No `convexTest(...)`. Default `node` env. Cover every branch of a state machine or value object; use `test.each` for the transition matrix. Canonical shape: `convex/delinquencies/machine.test.ts` (exhaustive 3×3 status matrix + self-transition + terminal-state rejection).
+- **Scenario / db-backed** — `useCases.test.ts`, `seed.test.ts`. Top of file: `// @vitest-environment edge-runtime`. Body: `const t = convexTest(schema); registerContractAggregateComponents(t);` (from `convex/lib/testFixtures.ts` — required or aggregate writes throw). Canonical shape: `convex/seed.test.ts`.
+
+**Commands (from repo root):**
+
+- `bun run test:convex` — one-shot Convex suite; use before commits.
+- `bun run test:convex:watch` — TDD loop.
+- `bun run test:file <path>` — single file, e.g. `bun run test:file convex/delinquencies/machine.test.ts`.
+- `bun run test` — full turbo run (each app runs its own vitest; convex tests run 4× as a safety net).
+
+**Do NOT** run raw `bunx vitest` from a fresh shell — without config it fires `(intermediate value).glob is not a function` inside `convex-test`. Use the scripts above. See root [`vitest.config.ts`](vitest.config.ts) for why (`server.deps.inline: ["convex-test"]` + `resolve.preserveSymlinks: true`).
+
+**Test hygiene:**
+
+- One `describe` per unit under test; nested `describe`s only when the boundaries are semantic (e.g. "state machine constants" vs "assertTransition — illegal moves rejected").
+- Expected values as literals in the test, not derived from the code under test (a broken implementation shouldn't produce a "correct" derived value that satisfies the test).
+- Every Result-returning function gets both the happy-path and every distinct error `code` covered.
+- Pure tests must run in **&lt;200ms per file**; if you're near that ceiling you're probably reaching for a db-backed test — move it to a `useCases.test.ts`.
+- Seed tests must assert the `waitlist` row survives a reseed (existing regression guard in `convex/seed.test.ts`) — never wipe `waitlist`, `mutavAuditLog`, or `mutavStaff` in `DEMO_TABLES`.
+
 ## i18n (next-intl)
 
 The app is bilingual: `pt-BR` (default) and `en`. Locale prefix is `as-needed` — default-locale URLs are unprefixed, English routes carry `/en/`.

@@ -55,20 +55,24 @@ so you never end up with half a dev environment.
 
 ## Scripts
 
-| Command                   | What it does                                                     |
-| ------------------------- | ---------------------------------------------------------------- |
-| `bun dev`                 | Run Next + Convex together (recommended)                         |
-| `bun run dev:web`         | Just the Next.js app                                             |
-| `bun run dev:convex`      | Just the Convex dev backend                                      |
-| `bun run convex:env:sync` | Push deployment-side env from `.env.local` (Auth0/PII/providers) |
-| `bun run seed`            | Full reseed (`seed:seedReset`)                                   |
-| `bun run build`           | Production build                                                 |
-| `bun run start`           | Serve the production build                                       |
-| `bun run lint`            | ESLint                                                           |
-| `bun run lint:fix`        | ESLint with `--fix`                                              |
-| `bun run typecheck`       | `tsc --noEmit`                                                   |
-| `bun run format`          | Prettier — write changes                                         |
-| `bun run format:check`    | Prettier — verify only                                           |
+| Command                     | What it does                                                                |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `bun dev`                   | Run Next + Convex together (recommended)                                    |
+| `bun run dev:web`           | Just the Next.js app                                                        |
+| `bun run dev:convex`        | Just the Convex dev backend                                                 |
+| `bun run convex:env:sync`   | Push deployment-side env from `.env.local` (Auth0/PII/providers)            |
+| `bun run seed`              | Full reseed (`seed:seedReset`)                                              |
+| `bun run build`             | Production build                                                            |
+| `bun run start`             | Serve the production build                                                  |
+| `bun run lint`              | ESLint                                                                      |
+| `bun run lint:fix`          | ESLint with `--fix`                                                         |
+| `bun run typecheck`         | `tsc --noEmit`                                                              |
+| `bun run test`              | Full suite via turbo (each app + convex/\*\* picked up 4×)                  |
+| `bun run test:convex`       | Convex-only run from repo root — one shot, no duplication                   |
+| `bun run test:convex:watch` | Watch mode for `convex/**` (fastest TDD loop)                               |
+| `bun run test:file <path>`  | Run one file, e.g. `bun run test:file convex/delinquencies/machine.test.ts` |
+| `bun run format`            | Prettier — write changes                                                    |
+| `bun run format:check`      | Prettier — verify only                                                      |
 
 The root scripts above run unfiltered — the whole workspace is touched
 regardless of what changed. CI uses a Turborepo filter
@@ -148,6 +152,37 @@ consumed via `transpilePackages`). This replaces the deprecated
 which keeps CI fast as more persona apps land. The `conventions`
 (regression-greps) and root `format:check` are not per-app turbo tasks
 and continue to run on every PR.
+
+## Testing
+
+The runner is **Vitest** everywhere. Two kinds of test file:
+
+| Kind                     | Where                                                        | Environment                                                                       | Uses convex-test? | Runs without a Convex deployment             |
+| ------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------- | ----------------- | -------------------------------------------- |
+| **Pure logic**           | `convex/**/{domain,machine}.test.ts`, `apps/**/*.test.ts(x)` | `node` (default) — some opt into `edge-runtime`                                   | no                | yes                                          |
+| **Scenario / db-backed** | `convex/**/{seed,useCases}.test.ts`                          | `edge-runtime` (opt in with `// @vitest-environment edge-runtime` at top of file) | yes               | yes — convex-test spins an in-memory backend |
+
+**How to run:**
+
+```bash
+bun run test              # everything, via turbo — each app runs its own vitest
+bun run test:convex       # convex/** only, from repo root — no duplication
+bun run test:convex:watch # TDD loop over convex/**
+bun run test:file <path>  # one file, e.g. bun run test:file convex/delinquencies/machine.test.ts
+```
+
+**Config layout:** every app has its own `vitest.config.ts` scoped to `apps/<app>/**` + `convex/**`, and there's a root `vitest.config.ts` scoped to `convex/**` only. Root config is what `bun run test:convex` uses; the app configs are what `turbo run test` invokes. Both share the two settings convex-test needs — `server.deps.inline: ["convex-test"]` and `resolve.preserveSymlinks: true`.
+
+**Common failure modes** (all solved by using the scripts above — do NOT run raw `bunx vitest` from a fresh shell):
+
+- `(intermediate value).glob is not a function` — you invoked vitest without a config that inlines `convex-test`. Use `bun run test:convex`.
+- `Cannot find module '@mutav/ui/...'` after entering a worktree — workspace symlinks are missing. Run `bun install` once inside the worktree.
+- `No CONVEX_DEPLOYMENT set` when running codegen or `bun run seed` — copy `.env.local` from the parent working tree into the worktree, or run `bunx convex dev --once` in the worktree.
+
+**Writing tests — the shape convention:**
+
+- Pure logic → `machine.test.ts`, `domain.test.ts` — plain vitest, no `convexTest(...)`. See `convex/delinquencies/machine.test.ts` for the canonical shape (state-machine exhaustive coverage, self-transition + terminal-state rejection).
+- Db-backed scenarios → `useCases.test.ts`, `seed.test.ts` — starts with `// @vitest-environment edge-runtime`, calls `convexTest(schema)` and `registerContractAggregateComponents(t)` (from `convex/lib/testFixtures.ts`) so aggregate writes don't throw. See `convex/seed.test.ts` for the pattern.
 
 ## Git hooks
 
