@@ -454,6 +454,25 @@ Runner: **Vitest** everywhere. Two flavors of test file per convex domain:
 - Pure tests must run in **&lt;200ms per file**; if you're near that ceiling you're probably reaching for a db-backed test — move it to a `useCases.test.ts`.
 - Seed tests must assert the `waitlist` row survives a reseed (existing regression guard in `convex/seed.test.ts`) — never wipe `waitlist`, `mutavAuditLog`, or `mutavStaff` in `DEMO_TABLES`.
 
+**Building scenario tests — use the saved workflow:**
+
+For any new convex domain, don't hand-roll the `scenarios.test.ts`. Invoke the saved workflow at [`.claude/workflows/build-scenario-tests.js`](.claude/workflows/build-scenario-tests.js):
+
+```
+Workflow({
+  name: 'build-scenario-tests',
+  args: {
+    domain: 'delinquencies',                                     // required — convex/<domain>/
+    scenariosDocPath: '/absolute/path/to/scenarios.md',          // optional — protocol/product doc
+    contextNotes: 'Any extra background the design agent needs', // optional
+  },
+})
+```
+
+Four-phase sequence: **Design** (one agent produces a structured test plan with arrange/act/assert per test) → **Implement** (one agent writes the file and iterates up to 5× until `bun run test:convex convex/<domain>/scenarios.test.ts` passes) → **Verify** (three parallel adversarial reviewers with distinct lenses — scenario completeness, schema/index behavior, test quality — each returning a structured missing/weak-tests report) → **Address gaps** (if any reviewer flagged holes, one agent fixes them).
+
+Opinionated about output — always `convex/<domain>/scenarios.test.ts`, always `convexTest(schema) + registerContractAggregateComponents(t)`, always fixtures built inline (no seedReset coupling). Only invoke when the caller opts into multi-agent orchestration (mentions "workflow" or "workflows" in the request).
+
 ## i18n (next-intl)
 
 The app is bilingual: `pt-BR` (default) and `en`. Locale prefix is `as-needed` — default-locale URLs are unprefixed, English routes carry `/en/`.
