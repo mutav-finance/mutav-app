@@ -454,24 +454,30 @@ Runner: **Vitest** everywhere. Two flavors of test file per convex domain:
 - Pure tests must run in **&lt;200ms per file**; if you're near that ceiling you're probably reaching for a db-backed test — move it to a `useCases.test.ts`.
 - Seed tests must assert the `waitlist` row survives a reseed (existing regression guard in `convex/seed.test.ts`) — never wipe `waitlist`, `mutavAuditLog`, or `mutavStaff` in `DEMO_TABLES`.
 
-**Building scenario tests — use the saved workflow:**
+### Domain-surface workflows
 
-For any new convex domain, don't hand-roll the `scenarios.test.ts`. Invoke the saved workflow at [`.claude/workflows/build-scenario-tests.js`](.claude/workflows/build-scenario-tests.js):
+For any new convex domain, don't hand-roll the surface files. Three saved workflows in `.claude/workflows/` build them end-to-end (design → implement → 3-way adversarial verify → address gaps → tests). Each is opinionated about its output file, uses only pre-existing auth wrappers, and requires `bun run test:convex convex/<domain>/` all-green before returning.
+
+| Workflow                                                                | Produces                                                             | When to use                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`build-scenario-tests`](.claude/workflows/build-scenario-tests.js)     | `convex/<domain>/scenarios.test.ts`                                  | After schema + seed land, before touching queries/mutations. Exhaustive db-layer coverage: schema conformance, every index, every value-object variant, cross-agency isolation via ctx.db.                              |
+| [`build-domain-queries`](.claude/workflows/build-domain-queries.js)     | `convex/<domain>/useCases.ts` + `convex/<domain>/useCases.test.ts`   | Read-side. Verifier lenses: wrapper contract, index efficiency, return-shape stability. Test lens: wrapper enforcement + pagination + staff-role gating + null-on-miss.                                                 |
+| [`build-domain-mutations`](.claude/workflows/build-domain-mutations.js) | `convex/<domain>/mutations.ts` + `convex/<domain>/mutations.test.ts` | Write-side. Verifier lenses: wrapper contract, machine composition (assertTransition-before-patch), audit + write safety. Test lens: happy paths + illegal transitions + auth failures + cross-agency + audit emission. |
+
+Invocation shape (same for all three):
 
 ```
 Workflow({
-  name: 'build-scenario-tests',
+  name: 'build-domain-mutations',
   args: {
-    domain: 'delinquencies',                                     // required — convex/<domain>/
-    scenariosDocPath: '/absolute/path/to/scenarios.md',          // optional — protocol/product doc
-    contextNotes: 'Any extra background the design agent needs', // optional
+    domain: 'guarantees',                                     // required — convex/<domain>/
+    contextNotes: 'What mutations to build, machine hints',   // strongly recommended
+    // scenariosDocPath: '/abs/path.md',                      // build-scenario-tests only
   },
 })
 ```
 
-Four-phase sequence: **Design** (one agent produces a structured test plan with arrange/act/assert per test) → **Implement** (one agent writes the file and iterates up to 5× until `bun run test:convex convex/<domain>/scenarios.test.ts` passes) → **Verify** (three parallel adversarial reviewers with distinct lenses — scenario completeness, schema/index behavior, test quality — each returning a structured missing/weak-tests report) → **Address gaps** (if any reviewer flagged holes, one agent fixes them).
-
-Opinionated about output — always `convex/<domain>/scenarios.test.ts`, always `convexTest(schema) + registerContractAggregateComponents(t)`, always fixtures built inline (no seedReset coupling). Only invoke when the caller opts into multi-agent orchestration (mentions "workflow" or "workflows" in the request).
+Only invoke when the caller opts into multi-agent orchestration (mentions "workflow" or "workflows" in the request). Workflow scripts run in a deterministic sandbox — `Date.now()` / `new Date()` / `Math.random()` are unavailable AND their literal tokens in prompt strings will trip the parser; use paraphrases like "current-time primitive" or "server-side timestamp" instead of embedding the call syntax.
 
 ## i18n (next-intl)
 
