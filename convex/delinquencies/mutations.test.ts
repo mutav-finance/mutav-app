@@ -230,7 +230,7 @@ describe("openNotice", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.publicId).toBe("DN-CT-1-2026-06");
+    expect(result.data.publicId).toBe("DN-CT-1-2026-06-05");
 
     const row = await t.run((ctx) =>
       ctx.db
@@ -379,10 +379,10 @@ describe("openNotice", () => {
     const t = setup();
     const fx = await makeFixture(t);
     // Seed a prior canceled notice on the exact same rentDueDate — the
-    // current publicId scheme collides on the month, so the second open call
-    // must find a fresh publicId via the -2 suffix.
+    // publicId scheme collides on the day, so the second open call must find
+    // a fresh publicId via the -2 suffix.
     await insertNotice(t, fx, {
-      publicId: "DN-CT-1-2026-06",
+      publicId: "DN-CT-1-2026-06-05",
       status: "canceled",
       rentDueDate: "2026-06-05",
     });
@@ -396,7 +396,60 @@ describe("openNotice", () => {
     });
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.publicId).toBe("DN-CT-1-2026-06-2");
+    expect(result.data.publicId).toBe("DN-CT-1-2026-06-05-2");
+  });
+
+  test("two notices on same contract in same month, different due dates → distinct publicIds retrievable via getByPublicId", async () => {
+    // Regression for the month-granularity collision: previously both notices
+    // would base on `DN-CT-1-2026-04` and rely on the suffix loop. That loop
+    // only saw prior rows on the SAME (contract, rentDueDate) tuple via
+    // `by_contract_dueDate`, so the second notice would get the same base
+    // publicId as the first and permanently break getByPublicId's `.unique()`.
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const first = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      contractPublicId: fx.contractPublicId,
+      rentDueDate: "2026-04-05",
+      originalAmountCents: 300_000,
+    });
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+    expect(first.data.publicId).toBe("DN-CT-1-2026-04-05");
+
+    // Resolve the first so the second is not blocked by DUPLICATE_NOTICE.
+    // (Same day would collide on the idempotency check; different day means
+    // no collision anyway — but resolving keeps the test hermetic.)
+    const resolve = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: first.data.publicId,
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(resolve.success).toBe(true);
+
+    const second = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      contractPublicId: fx.contractPublicId,
+      rentDueDate: "2026-04-20",
+      originalAmountCents: 300_000,
+    });
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+    expect(second.data.publicId).toBe("DN-CT-1-2026-04-20");
+    expect(second.data.publicId).not.toBe(first.data.publicId);
+
+    // Both must be retrievable via getByPublicId (no `.unique()` throw).
+    const detailA = await asUser.query(api.delinquencies.useCases.getByPublicId, {
+      publicId: first.data.publicId,
+    });
+    const detailB = await asUser.query(api.delinquencies.useCases.getByPublicId, {
+      publicId: second.data.publicId,
+    });
+    expect(detailA?.publicId).toBe(first.data.publicId);
+    expect(detailA?.rentDueDate).toBe("2026-04-05");
+    expect(detailB?.publicId).toBe(second.data.publicId);
+    expect(detailB?.rentDueDate).toBe("2026-04-20");
   });
 });
 
@@ -819,7 +872,7 @@ describe("staffMarkResolvedByCover", () => {
     const t = setup();
     const a = await makeFixture(t, "1");
     const b = await makeFixture(t, "2");
-    await insertNotice(t, b, { publicId: "DN-cross-agency" });
+    const noticeId = await insertNotice(t, b, { publicId: "DN-cross-agency" });
     // Staff row lives on user A, but the notice is agency B's.
     await grantStaffRole(t, a.userId, "compliance");
     const asStaff = t.withIdentity({ subject: a.subject });
@@ -828,6 +881,29 @@ describe("staffMarkResolvedByCover", () => {
       coverOperationPublicId: "COVER-CROSS",
     });
     expect(result.success).toBe(true);
+
+    // Row must reflect the staff-signed resolution envelope (kind =
+    // cover_committed, resolvedByUserId = staff A) even though the notice
+    // belongs to agency B.
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("resolved");
+    expect(row?.agencyId).toBe(b.agencyId);
+    expect(row?.resolution?.kind).toBe("cover_committed");
+    expect(row?.resolution?.coverOperationPublicId).toBe("COVER-CROSS");
+    expect(row?.resolution?.resolvedByUserId).toBe(a.userId);
+
+    // Exactly one audit entry, actor = staff A (not the agency owner).
+    const entries = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .withIndex("by_resource", (q) =>
+          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cross-agency"),
+        )
+        .collect(),
+    );
+    expect(entries.length).toBe(1);
+    expect(entries[0].action).toBe("delinquency.resolved_by_cover");
+    expect(entries[0].actor).toEqual({ kind: "user", userId: a.userId });
   });
 
   test("canceled notice cannot be resolved by cover → TERMINAL_STATE and no audit entry emitted", async () => {
@@ -1027,7 +1103,7 @@ describe("staffMarkCanceledByDismissal", () => {
     const t = setup();
     const a = await makeFixture(t, "1");
     const b = await makeFixture(t, "2");
-    await insertNotice(t, b, { publicId: "DN-cross-dismiss" });
+    const noticeId = await insertNotice(t, b, { publicId: "DN-cross-dismiss" });
     await grantStaffRole(t, a.userId, "compliance");
     const asStaff = t.withIdentity({ subject: a.subject });
     const result = await asStaff.mutation(
@@ -1035,6 +1111,26 @@ describe("staffMarkCanceledByDismissal", () => {
       { noticePublicId: "DN-cross-dismiss", disposition: { kind: "staff_dismissed" } },
     );
     expect(result.success).toBe(true);
+
+    // Row reflects a staff-signed cancellation envelope even though the
+    // notice belongs to agency B.
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("canceled");
+    expect(row?.agencyId).toBe(b.agencyId);
+    expect(row?.cancellation?.reason).toBe("staff_dismissed");
+    expect(row?.cancellation?.canceledByUserId).toBe(a.userId);
+
+    const entries = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .withIndex("by_resource", (q) =>
+          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cross-dismiss"),
+        )
+        .collect(),
+    );
+    expect(entries.length).toBe(1);
+    expect(entries[0].action).toBe("delinquency.dismissed");
+    expect(entries[0].actor).toEqual({ kind: "user", userId: a.userId });
   });
 
   test("resolved notice cannot be dismissed → TERMINAL_STATE and no audit entry", async () => {

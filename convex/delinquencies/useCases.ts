@@ -14,7 +14,9 @@ import {
 } from "./domain";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-const STATS_TAKE_LIMIT = 1000;
+// Exported so tests can saturate the take ceiling to exercise the approx-flag
+// branch without hard-coding the number in two places.
+export const STATS_TAKE_LIMIT = 1000;
 
 // ---- projection shapes -----------------------------------------------------
 // Server-owned response types. Callers (UI, tests, internal wrappers) couple
@@ -135,14 +137,18 @@ function shapeDelinquencyAdminQueueRow(notice: DelinquencyNotice): DelinquencyAd
 /**
  * Paginated agency-scoped notice list. `by_agency_status` pre-filters both
  * dimensions; date/amount filters run post-index on the page to keep the
- * composite index tuple narrow. TODO: promote to `by_agency_status_dueDate`
- * once filter usage or row counts justify it.
+ * composite index tuple narrow.
  *
- * ⚠️ Post-index filters run AFTER `.paginate()`, so the returned `page.length`
- * can be smaller than `paginationOpts.numItems` while `isDone === false`.
- * Callers must keep paging until `isDone` — do not treat a short page as EOF.
- * TODO: when the UI actually wires filters, switch to an index-native variant
- * (e.g. a `by_agency_status_dueDate` composite) so page size stays honest.
+ * ⚠️ Paginator contract caveat when ANY of `dueDateFrom`/`dueDateTo`/
+ * `amountFromCents`/`amountToCents` is set: post-index filtering runs AFTER
+ * `.paginate()`, so `page.length` is a CEILING (`≤ paginationOpts.numItems`),
+ * NOT a target. A short page does NOT signal end-of-list — callers MUST keep
+ * paging until `isDone === true`. Treat `numItems` as "at most this many per
+ * page" and never as "if fewer, we're done".
+ *
+ * TODO(index): promote to a composite `by_agency_status_dueDate` (and/or
+ * `_amount`) once filter usage or row counts justify it — that would move
+ * every predicate into the index scan and restore honest page sizes.
  *
  * UI adapter placement: the agency's `DelinquencyPage` renders a
  * `DelinquencyRow` shape with `propertyId` + formatted `noticeAt`. That
@@ -221,6 +227,12 @@ export const getByPublicId = query({
  * `approxCanceled` flag when the take limit was hit so the UI can render a
  * "1000+" style label rather than silently under-report.
  *
+ * Envelope invariant: terminal rows (`resolved`/`canceled`) must carry their
+ * resolution/cancellation envelope. A missing envelope is a schema-drift bug,
+ * not a valid row — silently coercing to `''` would lex-compare LOWER than
+ * any ISO string and drop the row from the 30-day KPI without signal. The
+ * counter logs and skips a malformed row rather than under-count it silently.
+ *
  * TODO(#agg): swap to a namespaced `notice-by-status` aggregate before any
  * agency approaches ~1000 recent notices — or add a
  * `by_agency_status_resolvedAt` / `_canceledAt` index and range-scan since
@@ -259,14 +271,32 @@ export const openStats = queryWithAgencyScope({
         .take(STATS_TAKE_LIMIT),
     ]);
 
+    const resolvedCountLast30d = resolvedRows.filter((notice) => {
+      const resolvedAt = notice.resolution?.resolvedAt;
+      if (resolvedAt == null) {
+        console.error(
+          `[delinquencies.openStats] resolved notice ${notice.publicId} is missing its resolution envelope; skipping in 30d KPI.`,
+        );
+        return false;
+      }
+      return resolvedAt >= since;
+    }).length;
+
+    const canceledCountLast30d = canceledRows.filter((notice) => {
+      const canceledAt = notice.cancellation?.canceledAt;
+      if (canceledAt == null) {
+        console.error(
+          `[delinquencies.openStats] canceled notice ${notice.publicId} is missing its cancellation envelope; skipping in 30d KPI.`,
+        );
+        return false;
+      }
+      return canceledAt >= since;
+    }).length;
+
     return {
       openCount: openRows.length,
-      resolvedCountLast30d: resolvedRows.filter(
-        (notice) => (notice.resolution?.resolvedAt ?? "") >= since,
-      ).length,
-      canceledCountLast30d: canceledRows.filter(
-        (notice) => (notice.cancellation?.canceledAt ?? "") >= since,
-      ).length,
+      resolvedCountLast30d,
+      canceledCountLast30d,
       approxResolved: resolvedRows.length === STATS_TAKE_LIMIT,
       approxCanceled: canceledRows.length === STATS_TAKE_LIMIT,
     };

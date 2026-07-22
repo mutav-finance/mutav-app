@@ -98,14 +98,14 @@ export const openNotice = mutationWithAgencyScope({
       };
     }
 
-    // publicId: DN-<contractPublicId>-<yyyy-mm>. Prior resolved/canceled
-    // notices for the same month collide on this scheme; append -2, -3, ...
-    // deterministic and greppable rather than random. All colliding rows are
-    // already in `priorForDueDate` (same contract, same dueDate → same month),
-    // so pick the first unused suffix in-memory rather than round-tripping
-    // per-candidate to the DB.
-    const yyyymm = args.rentDueDate.slice(0, 7);
-    const basePublicId = `DN-${args.contractPublicId}-${yyyymm}`;
+    // publicId: DN-<contractPublicId>-<yyyy-mm-dd>. basePublicId encodes the
+    // exact rentDueDate, so every candidate collision is on the same
+    // (contractId, rentDueDate) tuple — which is exactly the
+    // `by_contract_dueDate` prefix scanned into `priorForDueDate`. Suffixes
+    // -2, -3, ... deterministic and greppable rather than random; picked
+    // in-memory to avoid per-candidate DB round-trips.
+    const yyyymmdd = args.rentDueDate.slice(0, 10);
+    const basePublicId = `DN-${args.contractPublicId}-${yyyymmdd}`;
     const takenPublicIds = new Set(priorForDueDate.map((n) => n.publicId));
     let publicId = basePublicId;
     let suffix = 2;
@@ -292,6 +292,8 @@ type StaffResolveByCoverError = { code: "NOTICE_NOT_FOUND" | TransitionErrorCode
 export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compliance" })({
   args: {
     noticePublicId: v.string(),
+    // TODO(link): migrate to v.id("coverOperations") when the cover-integration
+    // branch lands — currently coupled via publicId as a natural key.
     coverOperationPublicId: v.string(),
     note: v.optional(v.string()),
   },
