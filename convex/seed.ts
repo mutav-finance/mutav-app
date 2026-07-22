@@ -2771,8 +2771,10 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
   let noticesInserted = 0;
   if (openedByUserId && ativoRows.length >= 3) {
     const [n1, n2, n3] = ativoRows;
+    // publicIds mirror the openNotice mutation shape: DN-<contract>-<yyyy-mm-dd>
+    // (day granularity, matching the by_contract_dueDate collision domain).
     await ctx.db.insert("contractDelinquencyNotices", {
-      publicId: `DN-${n1.publicId}-2026-06`,
+      publicId: `DN-${n1.publicId}-2026-06-05`,
       contractId: n1.id,
       agencyId,
       status: "open",
@@ -2784,7 +2786,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       openedByUserId,
     });
     await ctx.db.insert("contractDelinquencyNotices", {
-      publicId: `DN-${n2.publicId}-2026-05`,
+      publicId: `DN-${n2.publicId}-2026-05-05`,
       contractId: n2.id,
       agencyId,
       status: "open",
@@ -2796,7 +2798,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       openedByUserId,
     });
     await ctx.db.insert("contractDelinquencyNotices", {
-      publicId: `DN-${n3.publicId}-2026-04`,
+      publicId: `DN-${n3.publicId}-2026-04-05`,
       contractId: n3.id,
       agencyId,
       status: "resolved",

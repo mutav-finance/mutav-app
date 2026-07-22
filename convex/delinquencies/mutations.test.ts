@@ -304,6 +304,66 @@ describe("openNotice", () => {
     expect(result.error.code).toBe("INVALID_EVIDENCE_SOURCE");
   });
 
+  test("rentDueDate with ISO datetime shape → INVALID_RENT_DUE_DATE (only YYYY-MM-DD accepted)", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      contractPublicId: fx.contractPublicId,
+      rentDueDate: "2026-06-05T00:00:00Z",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_RENT_DUE_DATE");
+  });
+
+  test("originalAmountCents = 0 → INVALID_AMOUNT (positive integer required)", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      contractPublicId: fx.contractPublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 0,
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_AMOUNT");
+  });
+
+  test("originalAmountCents negative → INVALID_AMOUNT", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      contractPublicId: fx.contractPublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: -1,
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_AMOUNT");
+  });
+
+  test("originalAmountCents non-integer → INVALID_AMOUNT", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      contractPublicId: fx.contractPublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 300.5,
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_AMOUNT");
+  });
+
   test("unknown contract publicId → CONTRACT_NOT_FOUND", async () => {
     const t = setup();
     const fx = await makeFixture(t);

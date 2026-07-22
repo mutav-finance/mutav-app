@@ -28,8 +28,18 @@ type OpenNoticeError = {
     | "CONTRACT_NOT_FOUND"
     | "CONTRACT_NOT_ACTIVE"
     | "DUPLICATE_NOTICE"
-    | "INVALID_EVIDENCE_SOURCE";
+    | "INVALID_EVIDENCE_SOURCE"
+    | "INVALID_RENT_DUE_DATE"
+    | "INVALID_AMOUNT";
 };
+
+// YYYY-MM-DD, calendar-plausible (day 01-31). We don't fully validate
+// calendar validity (Feb 30 is accepted); a later normalize-via-Date pass
+// can tighten this if needed. Prevents ambiguous formats like ISO
+// datetimes ("2026-06-05T00:00:00Z") which would bypass the
+// `by_contract_dueDate` duplicate check and split the publicId collision
+// domain — two calls for the same day would produce distinct publicIds.
+const RENT_DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * The agency-side entry point for filing a delinquency notice. Restricts
@@ -53,6 +63,22 @@ export const openNotice = mutationWithAgencyScope({
         error: { code: "INVALID_EVIDENCE_SOURCE" },
         message:
           "Agency callers may only file notices with evidenceSource='agency_reported'. Higher-trust provenance is system-only.",
+      };
+    }
+
+    if (!RENT_DUE_DATE_PATTERN.test(args.rentDueDate)) {
+      return {
+        success: false,
+        error: { code: "INVALID_RENT_DUE_DATE" },
+        message: `rentDueDate must be YYYY-MM-DD (got '${args.rentDueDate}').`,
+      };
+    }
+
+    if (!Number.isInteger(args.originalAmountCents) || args.originalAmountCents <= 0) {
+      return {
+        success: false,
+        error: { code: "INVALID_AMOUNT" },
+        message: `originalAmountCents must be a positive integer (got ${args.originalAmountCents}).`,
       };
     }
 

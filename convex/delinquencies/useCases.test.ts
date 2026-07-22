@@ -447,6 +447,7 @@ describe("openStats", () => {
       openCount: 2,
       resolvedCountLast30d: 1,
       canceledCountLast30d: 0,
+      approxOpen: false,
       approxResolved: false,
       approxCanceled: false,
     });
@@ -495,6 +496,7 @@ describe("openStats", () => {
       openCount: 0,
       resolvedCountLast30d: 1,
       canceledCountLast30d: 2,
+      approxOpen: false,
       approxResolved: false,
       approxCanceled: false,
     });

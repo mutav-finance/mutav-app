@@ -171,6 +171,13 @@ export const listByAgency = queryWithAgencyScope({
     args,
   ): Promise<{ page: DelinquencyNoticeRow[]; isDone: boolean; continueCursor: string }> => {
     const status = args.status ?? DELINQUENCY_STATUS.OPEN;
+    // Normalize both sides of the compare to YYYY-MM-DD so a caller passing
+    // an ISO datetime (e.g. "2026-06-05T00:00:00Z") is compared against the
+    // stored day, not lex-compared with a longer string that diverges at
+    // position 10. `rentDueDate` is enforced to YYYY-MM-DD at write time by
+    // openNotice's validator; the .slice keeps this query defensive.
+    const dueDateFrom = args.dueDateFrom?.slice(0, 10);
+    const dueDateTo = args.dueDateTo?.slice(0, 10);
     const result = await ctx.db
       .query("contractDelinquencyNotices")
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", status))
@@ -180,8 +187,8 @@ export const listByAgency = queryWithAgencyScope({
     const page = result.page
       .filter(
         (notice) =>
-          (args.dueDateFrom == null || notice.rentDueDate >= args.dueDateFrom) &&
-          (args.dueDateTo == null || notice.rentDueDate <= args.dueDateTo) &&
+          (dueDateFrom == null || notice.rentDueDate.slice(0, 10) >= dueDateFrom) &&
+          (dueDateTo == null || notice.rentDueDate.slice(0, 10) <= dueDateTo) &&
           (args.amountFromCents == null || notice.updatedAmountCents >= args.amountFromCents) &&
           (args.amountToCents == null || notice.updatedAmountCents <= args.amountToCents),
       )
@@ -246,28 +253,41 @@ export const openStats = queryWithAgencyScope({
     openCount: number;
     resolvedCountLast30d: number;
     canceledCountLast30d: number;
+    approxOpen: boolean;
     approxResolved: boolean;
     approxCanceled: boolean;
   }> => {
-    const since = new Date(Date.now() - THIRTY_DAYS_MS).toISOString();
+    // Envelope timestamps compare via Date, not lex — a future writer
+    // emitting non-Z ISO offsets (e.g. seed rows with `-03:00`) still gets
+    // ordered correctly. Lex-compare would silently exclude offset-carrying
+    // rows whose lexicographic ordering diverges from their true instant.
+    const since = new Date(Date.now() - THIRTY_DAYS_MS);
+    // `.order('desc')` is load-bearing: without it Convex returns the OLDEST
+    // rows first, so any agency with >STATS_TAKE_LIMIT rows in a status
+    // would get resolvedCountLast30d/canceledCountLast30d = 0 (the 1000
+    // oldest rows are all outside the window). `.order('desc')` + take
+    // gives us the most-recent 1000 — the window we actually want.
     const [openRows, resolvedRows, canceledRows] = await Promise.all([
       ctx.db
         .query("contractDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.OPEN),
         )
+        .order("desc")
         .take(STATS_TAKE_LIMIT),
       ctx.db
         .query("contractDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.RESOLVED),
         )
+        .order("desc")
         .take(STATS_TAKE_LIMIT),
       ctx.db
         .query("contractDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.CANCELED),
         )
+        .order("desc")
         .take(STATS_TAKE_LIMIT),
     ]);
 
@@ -279,7 +299,7 @@ export const openStats = queryWithAgencyScope({
         );
         return false;
       }
-      return resolvedAt >= since;
+      return new Date(resolvedAt) >= since;
     }).length;
 
     const canceledCountLast30d = canceledRows.filter((notice) => {
@@ -290,13 +310,14 @@ export const openStats = queryWithAgencyScope({
         );
         return false;
       }
-      return canceledAt >= since;
+      return new Date(canceledAt) >= since;
     }).length;
 
     return {
       openCount: openRows.length,
       resolvedCountLast30d,
       canceledCountLast30d,
+      approxOpen: openRows.length === STATS_TAKE_LIMIT,
       approxResolved: resolvedRows.length === STATS_TAKE_LIMIT,
       approxCanceled: canceledRows.length === STATS_TAKE_LIMIT,
     };
