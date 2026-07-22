@@ -154,7 +154,7 @@
       "cumulative": "Total Acumulado",
       "netActive": "Contratos Ativos",
       "activated": "Ativados",
-      "cancelled": "Cancelados",
+      "canceled": "Cancelados",
       "expired": "Encerrados"
     }
   },
@@ -1189,7 +1189,7 @@
       "series": {
         "netActive": "Contratos Ativos",
         "activated": "Ativados",
-        "cancelled": "Cancelados",
+        "canceled": "Cancelados",
         "expired": "Encerrados"
       }
     }

@@ -92,7 +92,7 @@ export function ActivityChart({
       color: "var(--color-chart-3)",
     },
     cancelled: {
-      label: t("series.cancelled"),
+      label: t("series.canceled"),
       color: "var(--color-chart-4)",
     },
     expired: {

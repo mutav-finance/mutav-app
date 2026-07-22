@@ -154,7 +154,7 @@
       "cumulative": "Cumulative Total",
       "netActive": "Active Contracts",
       "activated": "Activated",
-      "cancelled": "Cancelled",
+      "canceled": "Cancelled",
       "expired": "Expired"
     }
   },
@@ -286,14 +286,14 @@
       "cancelProposalHint": "Available only for pending contracts",
       "cancelDialog": {
         "title": "Cancel proposal?",
-        "description": "The contract will be marked as cancelled. History will be preserved.",
+        "description": "The contract will be marked as canceled. History will be preserved.",
         "confirm": "Yes, cancel",
         "cancelling": "Cancelling…",
         "back": "Go back"
       },
       "errors": {
         "NOT_FOUND": "Proposal not found.",
-        "NOT_PENDING": "Only pending proposals can be cancelled.",
+        "NOT_PENDING": "Only pending proposals can be canceled.",
         "UNEXPECTED": "Unexpected error. Please try again."
       },
       "openDelinquencyHint": "Register a new delinquency",
@@ -1189,7 +1189,7 @@
       "series": {
         "netActive": "Active contracts",
         "activated": "Activated",
-        "cancelled": "Cancelled",
+        "canceled": "Cancelled",
         "expired": "Expired"
       }
     }
