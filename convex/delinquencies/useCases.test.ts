@@ -6,6 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { registerContractAggregateComponents } from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import schema from "../schema";
+import { STATS_TAKE_LIMIT } from "./useCases";
 
 // convexTest instance factory. Aggregate components must be registered per
 // instance even though this suite never mutates contracts — the shared
@@ -340,6 +341,10 @@ describe("listByAgency", () => {
       paginationOpts: { numItems: 2, cursor: firstPage.continueCursor },
     });
     expect(secondPage.page.length).toBe(1);
+    // Paginator termination contract — the final page must announce EOF so
+    // callers stop paging. A regression that returns `isDone: false` on the
+    // last page would send a UI into an infinite fetch loop.
+    expect(secondPage.isDone).toBe(true);
     // Union of both pages covers every seeded row exactly once.
     const seen = [...firstPage.page, ...secondPage.page].map((r) => r.publicId).sort();
     expect(seen).toEqual(["DN-p1", "DN-p2", "DN-p3"]);
@@ -446,6 +451,117 @@ describe("openStats", () => {
       approxCanceled: false,
     });
   });
+
+  test("canceledCountLast30d is counted independently and respects the 30-day boundary (in-window vs out-of-window)", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+
+    // Two canceled INSIDE the last 30 days.
+    const recent1 = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const recent2 = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+    await insertNotice(t, fx, {
+      publicId: "DN-canceled-recent-1",
+      status: "canceled",
+      canceledAt: recent1,
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-canceled-recent-2",
+      status: "canceled",
+      canceledAt: recent2,
+    });
+    // One canceled OUTSIDE the window — must be excluded from the 30-day
+    // count. 45 days ago is well past the boundary and immune to test-run
+    // clock skew.
+    const stale = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+    await insertNotice(t, fx, {
+      publicId: "DN-canceled-stale",
+      status: "canceled",
+      canceledAt: stale,
+    });
+    // One resolved in-window — proves the canceled counter does not double
+    // as the resolved counter (independence guarantee).
+    const resolvedIn = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    await insertNotice(t, fx, {
+      publicId: "DN-resolved-in-window",
+      status: "resolved",
+      resolvedAt: resolvedIn,
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const stats = await asUser.query(api.delinquencies.useCases.openStats, {
+      agencyId: fx.agencyId,
+    });
+    expect(stats).toEqual({
+      openCount: 0,
+      resolvedCountLast30d: 1,
+      canceledCountLast30d: 2,
+      approxResolved: false,
+      approxCanceled: false,
+    });
+  });
+
+  test("saturating STATS_TAKE_LIMIT flips approxResolved / approxCanceled to true", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+
+    // Seed exactly STATS_TAKE_LIMIT resolved rows and STATS_TAKE_LIMIT
+    // canceled rows in a single ctx transaction — inserting 2000 rows one
+    // mutation at a time would balloon this test past a reasonable ceiling.
+    const recent = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < STATS_TAKE_LIMIT; i++) {
+        await ctx.db.insert("contractDelinquencyNotices", {
+          publicId: `DN-saturate-resolved-${i}`,
+          contractId: fx.contractId,
+          agencyId: fx.agencyId,
+          status: "resolved",
+          rentDueDate: "2026-06-05",
+          originalAmountCents: 300_000,
+          updatedAmountCents: 300_000,
+          evidenceSource: "agency_reported",
+          openedAt: "2026-06-10T09:00:00-03:00",
+          openedByUserId: fx.userId,
+          resolution: {
+            kind: "tenant_cured" as const,
+            resolvedAt: recent,
+            resolvedByUserId: fx.userId,
+          },
+        });
+      }
+      for (let i = 0; i < STATS_TAKE_LIMIT; i++) {
+        await ctx.db.insert("contractDelinquencyNotices", {
+          publicId: `DN-saturate-canceled-${i}`,
+          contractId: fx.contractId,
+          agencyId: fx.agencyId,
+          status: "canceled",
+          rentDueDate: "2026-06-05",
+          originalAmountCents: 300_000,
+          updatedAmountCents: 300_000,
+          evidenceSource: "agency_reported",
+          openedAt: "2026-06-10T09:00:00-03:00",
+          openedByUserId: fx.userId,
+          cancellation: {
+            reason: "agency_withdrew" as const,
+            canceledAt: recent,
+            canceledByUserId: fx.userId,
+          },
+        });
+      }
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const stats = await asUser.query(api.delinquencies.useCases.openStats, {
+      agencyId: fx.agencyId,
+    });
+    // .take() returned exactly the ceiling → the approx flag flips true so
+    // the UI can render "1000+" instead of silently under-reporting.
+    expect(stats.approxResolved).toBe(true);
+    expect(stats.approxCanceled).toBe(true);
+    // The 30-day counters are capped by the take ceiling as well — every
+    // seeded row is in-window, so both counts equal STATS_TAKE_LIMIT.
+    expect(stats.resolvedCountLast30d).toBe(STATS_TAKE_LIMIT);
+    expect(stats.canceledCountLast30d).toBe(STATS_TAKE_LIMIT);
+  }, 30_000);
 });
 
 // ---------------------------------------------------------------------------

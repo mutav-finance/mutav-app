@@ -2643,9 +2643,11 @@ describe("seed integration — the seeded delinquency book matches the scenario 
     // real seeded users. A regression that dropped the resolvedByUserId to a
     // stale id (or forgot to reseed the user) would fail this.
     const resolved = resolvedRows[0];
-    const resolver = await t.run((ctx) =>
-      ctx.db.get(resolved.resolution?.resolvedByUserId as Id<"users">),
-    );
+    const resolution = resolved.resolution;
+    if (!resolution) {
+      throw new Error("Expected resolved notice to have a resolution envelope, got null.");
+    }
+    const resolver = await t.run((ctx) => ctx.db.get(resolution.resolvedByUserId));
     expect(resolver).not.toBeNull();
     const opener = await t.run((ctx) => ctx.db.get(resolved.openedByUserId));
     expect(opener).not.toBeNull();
