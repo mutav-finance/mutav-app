@@ -203,7 +203,16 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+      <AlertDialog
+        open={cancelOpen}
+        onOpenChange={(v) => {
+          setCancelOpen(v);
+          if (!v) {
+            setReason("agency_withdrew");
+            setNote("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("cancel.dialogTitle")}</AlertDialogTitle>

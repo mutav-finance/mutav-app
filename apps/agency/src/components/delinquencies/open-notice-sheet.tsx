@@ -68,8 +68,7 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
     return null;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
     const parsedCents = parseAmountToCents(amountInput);
     const nextErrors: FieldErrors = {};
     if (!contractPublicId.trim()) nextErrors.contractPublicId = t("errors.MISSING_CONTRACT");
@@ -113,7 +112,14 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
           <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 px-4">
+        <form
+          id="open-notice-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+          className="flex flex-1 flex-col gap-4 px-4"
+        >
           <Field label={t("fields.contractPublicId")} error={errors.contractPublicId}>
             <Input
               value={contractPublicId}
@@ -136,20 +142,15 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
           </div>
 
           <Field label={t("fields.originalAmount")} error={errors.amount}>
-            <CurrencyInput
-              value={amountInput}
-              onChange={setAmountInput}
-              onBlur={() => {}}
-              placeholder="R$ 0,00"
-            />
+            <CurrencyInput value={amountInput} onChange={setAmountInput} placeholder="R$ 0,00" />
           </Field>
         </form>
 
         <SheetFooter className="flex-row justify-end gap-2 border-t">
-          <Button variant="outline" onClick={handleClose} disabled={submitting}>
+          <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
             {t("cancel")}
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
+          <Button type="submit" form="open-notice-form" disabled={submitting}>
             {submitting ? t("submitting") : t("submit")}
           </Button>
         </SheetFooter>

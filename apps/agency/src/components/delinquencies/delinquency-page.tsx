@@ -14,7 +14,7 @@ import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
-import { useRouter } from "@mutav/i18n/navigation";
+import { usePathname, useRouter } from "@mutav/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useWorkspace } from "@/providers/workspace";
 import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-status-tag";
@@ -127,6 +127,7 @@ export function DelinquencyPage() {
   // DelinquencyPageActions (rendered up in PageHeader) trigger the open-notice
   // sheet without prop drilling.
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const noticeParam = searchParams.get(OPEN_QUERY_KEY);
 
@@ -134,13 +135,13 @@ export function DelinquencyPage() {
     const next = new URLSearchParams(searchParams.toString());
     next.delete(OPEN_QUERY_KEY);
     const qs = next.toString();
-    router.replace(qs ? `?${qs}` : "?");
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
   }
 
   function openNoticeDetail(publicId: string) {
     const next = new URLSearchParams(searchParams.toString());
     next.set(OPEN_QUERY_KEY, publicId);
-    router.replace(`?${next.toString()}`);
+    router.replace(`${pathname}?${next.toString()}`);
   }
 
   return (
@@ -346,12 +347,13 @@ export function DelinquencyPage() {
 export function DelinquencyPageActions() {
   const t = useTranslations("delinquencies");
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   function openNew() {
     const next = new URLSearchParams(searchParams.toString());
     next.set(OPEN_QUERY_KEY, OPEN_NEW);
-    router.replace(`?${next.toString()}`);
+    router.replace(`${pathname}?${next.toString()}`);
   }
 
   return (
