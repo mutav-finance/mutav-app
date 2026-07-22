@@ -100,11 +100,9 @@ hostname. Cookies are `Host-Only` so a session never crosses subdomains
 
 ### Packages
 
-| Package           | Owns                                                  |
-| ----------------- | ----------------------------------------------------- |
-| `@mutav/ui`       | shadcn primitives shared across apps                  |
-| `@mutav/i18n`     | next-intl `routing` / `navigation` / `request` shells |
-| `@mutav/tsconfig` | `base.json` + `nextjs.json` consumed by every app     |
+See [CLAUDE.md § Monorepo layout](./CLAUDE.md#monorepo-layout) for the
+canonical list of workspace packages under `packages/*` and what each
+one owns.
 
 Packages are extracted on demand — only when a second app actually
 consumes the code. No speculative package boundaries.
@@ -155,11 +153,12 @@ and continue to run on every PR.
 
 ## Testing
 
-The runner is **Vitest** everywhere. Two kinds of test file:
+The runner is **Vitest** everywhere. Three kinds of test file:
 
 | Kind                     | Where                                                        | Environment                                                                       | Uses convex-test? | Runs without a Convex deployment             |
 | ------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------- | ----------------- | -------------------------------------------- |
 | **Pure logic**           | `convex/**/{domain,machine}.test.ts`, `apps/**/*.test.ts(x)` | `node` (default) — some opt into `edge-runtime`                                   | no                | yes                                          |
+| **Scenario**             | `convex/**/scenarios.test.ts`                                | `edge-runtime` (opt in with `// @vitest-environment edge-runtime` at top of file) | yes               | yes — convex-test spins an in-memory backend |
 | **Scenario / db-backed** | `convex/**/{seed,useCases}.test.ts`                          | `edge-runtime` (opt in with `// @vitest-environment edge-runtime` at top of file) | yes               | yes — convex-test spins an in-memory backend |
 
 **How to run:**
@@ -182,6 +181,7 @@ bun run test:file <path>  # one file, e.g. bun run test:file convex/delinquencie
 **Writing tests — the shape convention:**
 
 - Pure logic → `machine.test.ts`, `domain.test.ts` — plain vitest, no `convexTest(...)`. See `convex/delinquencies/machine.test.ts` for the canonical shape (state-machine exhaustive coverage, self-transition + terminal-state rejection).
+- Scenario → `scenarios.test.ts` — schema conformance, index coverage, and cross-agency isolation; produced by the [`build-scenario-tests`](.claude/workflows/build-scenario-tests.js) workflow. Same edge-runtime + `convexTest` harness as db-backed tests. See `convex/delinquencies/scenarios.test.ts` for the canonical shape.
 - Db-backed scenarios → `useCases.test.ts`, `seed.test.ts` — starts with `// @vitest-environment edge-runtime`, calls `convexTest(schema)` and `registerContractAggregateComponents(t)` (from `convex/lib/testFixtures.ts`) so aggregate writes don't throw. See `convex/seed.test.ts` for the pattern.
 
 ## Git hooks

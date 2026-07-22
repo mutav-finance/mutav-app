@@ -435,7 +435,8 @@ For mutations and other stateful async ops, prefer a `useFunction`-style helper 
 Runner: **Vitest** everywhere. Two flavors of test file per convex domain:
 
 - **Pure logic** — `machine.test.ts`, `domain.test.ts`. No `convexTest(...)`. Default `node` env. Cover every branch of a state machine or value object; use `test.each` for the transition matrix. Canonical shape: `convex/delinquencies/machine.test.ts` (exhaustive 3×3 status matrix + self-transition + terminal-state rejection).
-- **Scenario / db-backed** — `useCases.test.ts`, `seed.test.ts`. Top of file: `// @vitest-environment edge-runtime`. Body: `const t = convexTest(schema); registerContractAggregateComponents(t);` (from `convex/lib/testFixtures.ts` — required or aggregate writes throw). Canonical shape: `convex/seed.test.ts`.
+- **Scenario** — `scenarios.test.ts` (schema conformance, index coverage, cross-agency isolation; produced by the [`build-scenario-tests`](.claude/workflows/build-scenario-tests.js) workflow). Top of file: `// @vitest-environment edge-runtime`. Body: `const t = convexTest(schema); registerContractAggregateComponents(t);` (from `convex/lib/testFixtures.ts` — required or aggregate writes throw). Canonical shape: `convex/delinquencies/scenarios.test.ts`.
+- **Scenario / db-backed** — `useCases.test.ts`, `seed.test.ts`. Same edge-runtime + `convexTest` harness as `scenarios.test.ts`; these cover the read/write surface (wrapper contract, pagination, staff-role gating) and the seed pipeline respectively. Canonical shape: `convex/seed.test.ts`.
 
 **Commands (from repo root):**
 
