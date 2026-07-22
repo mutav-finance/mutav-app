@@ -46,6 +46,7 @@ function isCancelReason(v: string): v is CancelReason {
 export function NoticeDetailSheet({ publicId, onClose }: Props) {
   const t = useTranslations("delinquencies.detailSheet");
   const tStatus = useTranslations("delinquencies.status");
+  const tEvidence = useTranslations("delinquencies.evidenceSource");
   const open = publicId != null;
 
   const detail = useQuery(
@@ -150,9 +151,7 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
                   </div>
                   <div className="flex items-center gap-3">
                     <dt className="text-muted-foreground w-32">{t("fields.evidenceSource")}</dt>
-                    <dd className="text-muted-foreground">
-                      {t(`evidenceSource.${detail.evidenceSource}`)}
-                    </dd>
+                    <dd className="text-muted-foreground">{tEvidence(detail.evidenceSource)}</dd>
                   </div>
                 </dl>
 

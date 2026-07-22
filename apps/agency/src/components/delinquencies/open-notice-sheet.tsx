@@ -40,7 +40,6 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
   const [contractPublicId, setContractPublicId] = React.useState("");
   const [rentDueDate, setRentDueDate] = React.useState("");
   const [amountInput, setAmountInput] = React.useState("");
-  const [amountCents, setAmountCents] = React.useState<number | null>(null);
   const [errors, setErrors] = React.useState<FieldErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -48,41 +47,37 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
     setContractPublicId("");
     setRentDueDate("");
     setAmountInput("");
-    setAmountCents(null);
     setErrors({});
     onClose();
   }
 
-  function handleAmountBlur(rawValue: string) {
+  function parseAmountToCents(rawValue: string): number | null {
     // CurrencyInput yields the "R$ 1.234,56"-shaped string. Parse pt-BR
     // formatting into cents; leave as null on empty so the submit-time
     // validation surfaces the missing-field message.
     const trimmed = rawValue.trim();
-    if (!trimmed) {
-      setAmountCents(null);
-      return;
-    }
+    if (!trimmed) return null;
     const cleaned = trimmed
       .replace(/[^\d,.-]/g, "")
       .replace(/\./g, "")
       .replace(",", ".");
     const parsed = Number(cleaned);
     if (Number.isFinite(parsed) && parsed > 0) {
-      setAmountCents(Math.round(parsed * 100));
-    } else {
-      setAmountCents(null);
+      return Math.round(parsed * 100);
     }
+    return null;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const parsedCents = parseAmountToCents(amountInput);
     const nextErrors: FieldErrors = {};
     if (!contractPublicId.trim()) nextErrors.contractPublicId = t("errors.MISSING_CONTRACT");
     if (!rentDueDate) nextErrors.rentDueDate = t("errors.MISSING_DATE");
-    if (amountCents == null || amountCents <= 0) nextErrors.amount = t("errors.INVALID_AMOUNT");
+    if (parsedCents == null || parsedCents <= 0) nextErrors.amount = t("errors.INVALID_AMOUNT");
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    if (amountCents == null) return;
+    if (parsedCents == null) return;
 
     setSubmitting(true);
     try {
@@ -90,7 +85,7 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
         agencyId,
         contractPublicId: contractPublicId.trim(),
         rentDueDate,
-        originalAmountCents: amountCents,
+        originalAmountCents: parsedCents,
       });
       if (result.success) {
         toast.success(t("success", { publicId: result.data.publicId }));
@@ -144,7 +139,7 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
             <CurrencyInput
               value={amountInput}
               onChange={setAmountInput}
-              onBlur={handleAmountBlur}
+              onBlur={() => {}}
               placeholder="R$ 0,00"
             />
           </Field>
