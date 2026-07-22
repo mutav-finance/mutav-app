@@ -2,9 +2,12 @@
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
 import { registerContractAggregateComponents } from "../lib/testFixtures";
 import schema from "../schema";
+import type { UserId } from "../users/domain";
+import type { AgencyId } from "../agencies/domain";
+import type { ContractId } from "../contracts/domain";
+import type { DelinquencyNoticeId } from "./domain";
 import {
   NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
@@ -36,9 +39,9 @@ function setup() {
 // inserted inline inside a single t.run so downstream tests can assume the
 // row shape holds against the real schema validator.
 type Fixture = {
-  userId: Id<"users">;
-  agencyId: Id<"agencies">;
-  contractId: Id<"contracts">;
+  userId: UserId;
+  agencyId: AgencyId;
+  contractId: ContractId;
 };
 
 async function makeFixture(t: ReturnType<typeof setup>, suffix = "1"): Promise<Fixture> {
@@ -115,9 +118,9 @@ async function makeFixture(t: ReturnType<typeof setup>, suffix = "1"): Promise<F
 // by_contract_dueDate is truly scoped by contractId.
 async function insertSecondContract(
   t: ReturnType<typeof setup>,
-  agencyId: Id<"agencies">,
+  agencyId: AgencyId,
   suffix: string,
-): Promise<Id<"contracts">> {
+): Promise<ContractId> {
   return t.run(async (ctx) => {
     const tenantId = await ctx.db.insert("tenants", {
       entityType: "pf",
@@ -173,7 +176,7 @@ async function insertSecondContract(
 // depend on the guard actually blocking the write, not on a hand-written skip.
 async function guardedPatch(
   t: ReturnType<typeof setup>,
-  id: Id<"contractDelinquencyNotices">,
+  id: DelinquencyNoticeId,
   from: DelinquencyStatus,
   to: DelinquencyStatus,
   patch: NoticePatch,
@@ -323,7 +326,7 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
     const sources = Object.values(NOTICE_EVIDENCE_SOURCE);
     const ids = await t.run(async (ctx) => {
-      const inserted: Array<{ source: string; id: Id<"contractDelinquencyNotices"> }> = [];
+      const inserted: Array<{ source: string; id: DelinquencyNoticeId }> = [];
       let i = 0;
       for (const source of sources) {
         const id = await ctx.db.insert("contractDelinquencyNotices", {
@@ -357,7 +360,7 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
     const kinds = Object.values(NOTICE_RESOLUTION_KIND);
     const ids = await t.run(async (ctx) => {
-      const inserted: Array<{ kind: string; id: Id<"contractDelinquencyNotices"> }> = [];
+      const inserted: Array<{ kind: string; id: DelinquencyNoticeId }> = [];
       let i = 0;
       for (const kind of kinds) {
         const id = await ctx.db.insert("contractDelinquencyNotices", {
@@ -396,7 +399,7 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
     const reasons = Object.values(NOTICE_CANCELLATION_REASON);
     const ids = await t.run(async (ctx) => {
-      const inserted: Array<{ reason: string; id: Id<"contractDelinquencyNotices"> }> = [];
+      const inserted: Array<{ reason: string; id: DelinquencyNoticeId }> = [];
       let i = 0;
       for (const reason of reasons) {
         const id = await ctx.db.insert("contractDelinquencyNotices", {
@@ -718,7 +721,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const targetPublicId = "DN-lookup-target";
     const targetId = await t.run(async (ctx) => {
-      const insertedIds: Id<"contractDelinquencyNotices">[] = [];
+      const insertedIds: DelinquencyNoticeId[] = [];
       const publicIds = ["DN-lookup-other-1", targetPublicId, "DN-lookup-other-2"];
       let i = 0;
       for (const pid of publicIds) {
@@ -1794,7 +1797,7 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
     const noticeIds = await t.run(async (ctx) => {
       const dueDates = ["2026-04-05", "2026-05-05", "2026-06-05"];
-      const inserted: Id<"contractDelinquencyNotices">[] = [];
+      const inserted: DelinquencyNoticeId[] = [];
       let i = 0;
       for (const rentDueDate of dueDates) {
         const id = await ctx.db.insert("contractDelinquencyNotices", {
@@ -1918,7 +1921,7 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     // Three open notices, then split resolutions.
     const [n1Id, n2Id, n3Id] = await t.run(async (ctx) => {
       const dueDates = ["2026-04-05", "2026-05-05", "2026-06-05"];
-      const inserted: Id<"contractDelinquencyNotices">[] = [];
+      const inserted: DelinquencyNoticeId[] = [];
       let i = 0;
       for (const rentDueDate of dueDates) {
         const id = await ctx.db.insert("contractDelinquencyNotices", {

@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query } from "../_generated/server";
-import type { Doc, Id } from "../_generated/dataModel";
 import { assertAgencyAccess, queryWithAgencyScope, queryWithMutavRole } from "../lib/auth";
+import type { UserId } from "../users/domain";
+import type { AgencyId } from "../agencies/domain";
+import type { ContractId } from "../contracts/domain";
 import {
   DELINQUENCY_STATUS,
   delinquencyStatusValidator,
@@ -30,7 +32,7 @@ export const STATS_TAKE_LIMIT = 1000;
  */
 export type DelinquencyNoticeRow = {
   publicId: string;
-  contractId: Id<"contracts">;
+  contractId: ContractId;
   status: DelinquencyStatus;
   rentDueDate: string;
   originalAmountCents: number;
@@ -46,19 +48,19 @@ export type DelinquencyNoticeRow = {
  * envelopes for the detail drawer. Still no Convex system fields.
  */
 export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
-  openedByUserId: Id<"users">;
-  agencyId: Id<"agencies">;
+  openedByUserId: UserId;
+  agencyId: AgencyId;
   resolution: {
     kind: NoticeResolutionKind;
     resolvedAt: string;
-    resolvedByUserId: Id<"users">;
+    resolvedByUserId: UserId;
     coverOperationPublicId: string | null;
     note: string | null;
   } | null;
   cancellation: {
     reason: NoticeCancellationReason;
     canceledAt: string;
-    canceledByUserId: Id<"users">;
+    canceledByUserId: UserId;
     note: string | null;
   } | null;
 };
@@ -70,8 +72,8 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
  */
 export type DelinquencyAdminQueueRow = {
   publicId: string;
-  agencyId: Id<"agencies">;
-  contractId: Id<"contracts">;
+  agencyId: AgencyId;
+  contractId: ContractId;
   rentDueDate: string;
   originalAmountCents: number;
   updatedAmountCents: number;
@@ -366,7 +368,7 @@ export const listOpenAdminQueue = queryWithMutavRole({ minRole: "compliance" })(
  */
 export const getByPublicIdInternal = internalQuery({
   args: { publicId: v.string() },
-  handler: async (ctx, { publicId }): Promise<Doc<"contractDelinquencyNotices"> | null> => {
+  handler: async (ctx, { publicId }): Promise<DelinquencyNotice | null> => {
     return ctx.db
       .query("contractDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", publicId))

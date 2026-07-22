@@ -2,9 +2,12 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
 import { registerContractAggregateComponents } from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
+import type { UserId } from "../users/domain";
+import type { AgencyId } from "../agencies/domain";
+import type { ContractId } from "../contracts/domain";
+import type { DelinquencyNoticeId } from "./domain";
 import schema from "../schema";
 import { STATS_TAKE_LIMIT } from "./useCases";
 
@@ -26,9 +29,9 @@ type T = ReturnType<typeof setup>;
 // `t.withIdentity({ subject })` resolves the same user.
 type Fixture = {
   subject: string;
-  userId: Id<"users">;
-  agencyId: Id<"agencies">;
-  contractId: Id<"contracts">;
+  userId: UserId;
+  agencyId: AgencyId;
+  contractId: ContractId;
 };
 
 async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
@@ -105,7 +108,7 @@ async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
 }
 
 // Seed a mutavStaff row for an existing user. Mirrors mutavStaff/useCases.test.ts.
-async function grantStaffRole(t: T, userId: Id<"users">, role: MutavStaffRole): Promise<void> {
+async function grantStaffRole(t: T, userId: UserId, role: MutavStaffRole): Promise<void> {
   await t.run(async (ctx) => {
     await ctx.db.insert("mutavStaff", {
       userId,
@@ -129,7 +132,7 @@ async function insertNotice(
     resolvedAt?: string;
     canceledAt?: string;
   },
-): Promise<Id<"contractDelinquencyNotices">> {
+): Promise<DelinquencyNoticeId> {
   return t.run(async (ctx) => {
     const status = overrides.status ?? "open";
     return ctx.db.insert("contractDelinquencyNotices", {

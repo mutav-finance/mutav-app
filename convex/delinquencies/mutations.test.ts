@@ -2,9 +2,12 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
 import { registerContractAggregateComponents } from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
+import type { UserId } from "../users/domain";
+import type { AgencyId } from "../agencies/domain";
+import type { ContractId } from "../contracts/domain";
+import type { DelinquencyNoticeId } from "./domain";
 import schema from "../schema";
 
 // A convexTest instance factory. Aggregate components must be registered per
@@ -32,9 +35,9 @@ function orThrow<TValue>(value: TValue | null | undefined, label: string): TValu
 // in useCases.test.ts so mutation calls resolve identity end-to-end.
 type Fixture = {
   subject: string;
-  userId: Id<"users">;
-  agencyId: Id<"agencies">;
-  contractId: Id<"contracts">;
+  userId: UserId;
+  agencyId: AgencyId;
+  contractId: ContractId;
   contractPublicId: string;
 };
 
@@ -112,7 +115,7 @@ async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
   return { subject, contractPublicId, ...fx };
 }
 
-async function grantStaffRole(t: T, userId: Id<"users">, role: MutavStaffRole): Promise<void> {
+async function grantStaffRole(t: T, userId: UserId, role: MutavStaffRole): Promise<void> {
   await t.run(async (ctx) => {
     await ctx.db.insert("mutavStaff", {
       userId,
@@ -124,7 +127,7 @@ async function grantStaffRole(t: T, userId: Id<"users">, role: MutavStaffRole): 
 
 async function setContractStatus(
   t: T,
-  contractId: Id<"contracts">,
+  contractId: ContractId,
   status: "ativo" | "pendente" | "encerrado" | "cancelado",
 ): Promise<void> {
   await t.run(async (ctx) => {
@@ -145,7 +148,7 @@ async function insertNotice(
     resolvedAt?: string;
     canceledAt?: string;
   },
-): Promise<Id<"contractDelinquencyNotices">> {
+): Promise<DelinquencyNoticeId> {
   return t.run(async (ctx) => {
     const status = overrides.status ?? "open";
     return ctx.db.insert("contractDelinquencyNotices", {
