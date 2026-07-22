@@ -76,19 +76,21 @@
     "subheading": "Track and manage open delinquencies for your contracts",
     "actions": {
       "report": "Generate report",
-      "statement": "Payment statement"
+      "statement": "Payment statement",
+      "openNotice": "Open notice"
     },
     "status": {
       "open": "Open",
       "resolved": "Resolved",
       "canceled": "Canceled"
     },
+    "evidenceSource": {
+      "agency_reported": "Agency-reported",
+      "bank_attested": "Bank-attested",
+      "onchain_observed": "On-chain observed",
+      "system_scheduled": "System-scheduled"
+    },
     "filter": {
-      "property": "Property",
-      "propertyPlaceholder": "Property ID",
-      "tenantName": "Tenant name",
-      "tenantNamePlaceholder": "Full name",
-      "tenantCpf": "Tenant CPF",
       "status": "Status",
       "statusAll": "All",
       "order": "Order",
@@ -105,14 +107,92 @@
     "table": {
       "heading": "Results",
       "empty": "No delinquencies found.",
+      "loading": "Loading…",
+      "noAgency": "Select an agency.",
       "view": "View delinquency",
       "col": {
-        "property": "Property",
+        "notice": "Notice",
         "status": "Status",
         "noticeAt": "Notice date",
         "amount": "Amount",
         "updatedAmount": "Updated amount",
         "action": "Action"
+      }
+    },
+    "openNoticeSheet": {
+      "title": "Open delinquency notice",
+      "description": "Register a delinquency notice for an overdue rent payment.",
+      "fields": {
+        "contractPublicId": "Contract",
+        "contractPublicIdPlaceholder": "Contract ID (e.g. 1000001)",
+        "rentDueDate": "Rent due date",
+        "originalAmount": "Original delinquency amount"
+      },
+      "cancel": "Cancel",
+      "submit": "Open notice",
+      "submitting": "Opening…",
+      "success": "Notice {publicId} opened.",
+      "errors": {
+        "MISSING_CONTRACT": "Contract is required.",
+        "MISSING_DATE": "Rent due date is required.",
+        "INVALID_AMOUNT": "Enter a valid amount greater than zero.",
+        "CONTRACT_NOT_FOUND": "Contract not found in this agency.",
+        "CONTRACT_NOT_ACTIVE": "The contract is not active.",
+        "DUPLICATE_NOTICE": "An open notice already exists for this contract and due date.",
+        "INVALID_EVIDENCE_SOURCE": "Invalid evidence source.",
+        "INVALID_RENT_DUE_DATE": "Invalid rent due date (use YYYY-MM-DD).",
+        "UNEXPECTED": "Could not open the notice. Please try again."
+      }
+    },
+    "detailSheet": {
+      "title": "Notice details",
+      "loading": "Loading…",
+      "notFound": "Notice not found.",
+      "close": "Close",
+      "fields": {
+        "status": "Status",
+        "rentDueDate": "Due date",
+        "openedAt": "Opened at",
+        "originalAmount": "Original amount",
+        "updatedAmount": "Updated amount",
+        "evidenceSource": "Source"
+      },
+      "resolution": {
+        "heading": "Resolution",
+        "kind": {
+          "tenant_cured": "Tenant paid the debt",
+          "cover_committed": "Covered by the reserve",
+          "stale": "Closed by prescription",
+          "staff_dispute": "Mutav dispute"
+        }
+      },
+      "cancellation": {
+        "heading": "Cancellation",
+        "reason": {
+          "agency_withdrew": "Withdrawn by the agency",
+          "duplicate": "Duplicate entry",
+          "data_error": "Data error",
+          "staff_dismissed": "Dismissed by Mutav"
+        }
+      },
+      "cancel": {
+        "trigger": "Cancel notice",
+        "dialogTitle": "Cancel notice?",
+        "dialogDescription": "Cancels the open notice. This cannot be undone.",
+        "reasonLabel": "Reason",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "Internal note about the cancellation",
+        "back": "Back",
+        "confirm": "Cancel notice",
+        "submitting": "Canceling…",
+        "success": "Notice canceled.",
+        "errors": {
+          "NOTICE_NOT_FOUND": "Notice not found.",
+          "SELF_TRANSITION": "The notice is already in this state.",
+          "TERMINAL_STATE": "The notice is already closed.",
+          "ILLEGAL_TRANSITION": "Illegal transition for the current state.",
+          "UNEXPECTED": "Could not cancel the notice. Please try again."
+        }
       }
     }
   },

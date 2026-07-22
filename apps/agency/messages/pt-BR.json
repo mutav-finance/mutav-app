@@ -76,19 +76,21 @@
     "subheading": "Acompanhe e gerencie as inadimplências abertas dos seus contratos",
     "actions": {
       "report": "Gerar relatório",
-      "statement": "Extrato de pagamento"
+      "statement": "Extrato de pagamento",
+      "openNotice": "Abrir acionamento"
     },
     "status": {
       "open": "Pendência Aberta",
       "resolved": "Entregue",
       "canceled": "Cancelado"
     },
+    "evidenceSource": {
+      "agency_reported": "Reportado pela imobiliária",
+      "bank_attested": "Atestado pelo banco",
+      "onchain_observed": "Observado on-chain",
+      "system_scheduled": "Agendado pelo sistema"
+    },
     "filter": {
-      "property": "Imóvel",
-      "propertyPlaceholder": "ID do imóvel",
-      "tenantName": "Nome do inquilino",
-      "tenantNamePlaceholder": "Nome completo",
-      "tenantCpf": "CPF do inquilino",
       "status": "Status",
       "statusAll": "Todos",
       "order": "Ordem",
@@ -105,14 +107,92 @@
     "table": {
       "heading": "Resultados",
       "empty": "Nenhum acionamento encontrado.",
+      "loading": "Carregando…",
+      "noAgency": "Selecione uma imobiliária.",
       "view": "Ver inadimplência",
       "col": {
-        "property": "Imóvel",
+        "notice": "Acionamento",
         "status": "Status",
         "noticeAt": "Data Aviso",
         "amount": "Valor Inadimplência",
         "updatedAmount": "Valor Atualizado",
         "action": "Ação"
+      }
+    },
+    "openNoticeSheet": {
+      "title": "Abrir acionamento de inadimplência",
+      "description": "Registra um aviso de inadimplência para um aluguel vencido.",
+      "fields": {
+        "contractPublicId": "Contrato",
+        "contractPublicIdPlaceholder": "ID do contrato (ex.: 1000001)",
+        "rentDueDate": "Data de vencimento do aluguel",
+        "originalAmount": "Valor original da inadimplência"
+      },
+      "cancel": "Cancelar",
+      "submit": "Abrir acionamento",
+      "submitting": "Abrindo…",
+      "success": "Acionamento {publicId} aberto.",
+      "errors": {
+        "MISSING_CONTRACT": "Informe o contrato.",
+        "MISSING_DATE": "Informe a data de vencimento.",
+        "INVALID_AMOUNT": "Informe um valor válido maior que zero.",
+        "CONTRACT_NOT_FOUND": "Contrato não encontrado nesta imobiliária.",
+        "CONTRACT_NOT_ACTIVE": "O contrato informado não está ativo.",
+        "DUPLICATE_NOTICE": "Já existe um acionamento aberto para esse contrato nessa data.",
+        "INVALID_EVIDENCE_SOURCE": "Fonte de evidência inválida.",
+        "INVALID_RENT_DUE_DATE": "Data de vencimento inválida (use AAAA-MM-DD).",
+        "UNEXPECTED": "Não foi possível abrir o acionamento. Tente novamente."
+      }
+    },
+    "detailSheet": {
+      "title": "Detalhes do acionamento",
+      "loading": "Carregando…",
+      "notFound": "Acionamento não encontrado.",
+      "close": "Fechar",
+      "fields": {
+        "status": "Status",
+        "rentDueDate": "Vencimento",
+        "openedAt": "Aberto em",
+        "originalAmount": "Valor original",
+        "updatedAmount": "Valor atualizado",
+        "evidenceSource": "Fonte"
+      },
+      "resolution": {
+        "heading": "Resolução",
+        "kind": {
+          "tenant_cured": "Inquilino quitou a dívida",
+          "cover_committed": "Coberto pela reserva",
+          "stale": "Encerrado por prescrição",
+          "staff_dispute": "Contestação Mutav"
+        }
+      },
+      "cancellation": {
+        "heading": "Cancelamento",
+        "reason": {
+          "agency_withdrew": "Retirado pela imobiliária",
+          "duplicate": "Registro duplicado",
+          "data_error": "Erro de dados",
+          "staff_dismissed": "Rejeitado pela Mutav"
+        }
+      },
+      "cancel": {
+        "trigger": "Cancelar acionamento",
+        "dialogTitle": "Cancelar acionamento?",
+        "dialogDescription": "Cancela o acionamento aberto. Essa ação não pode ser desfeita.",
+        "reasonLabel": "Motivo",
+        "noteLabel": "Observação (opcional)",
+        "notePlaceholder": "Detalhes internos sobre o cancelamento",
+        "back": "Voltar",
+        "confirm": "Cancelar acionamento",
+        "submitting": "Cancelando…",
+        "success": "Acionamento cancelado.",
+        "errors": {
+          "NOTICE_NOT_FOUND": "Acionamento não encontrado.",
+          "SELF_TRANSITION": "O acionamento já está nesse estado.",
+          "TERMINAL_STATE": "O acionamento já foi encerrado.",
+          "ILLEGAL_TRANSITION": "Transição inválida para o estado atual.",
+          "UNEXPECTED": "Não foi possível cancelar o acionamento. Tente novamente."
+        }
       }
     }
   },

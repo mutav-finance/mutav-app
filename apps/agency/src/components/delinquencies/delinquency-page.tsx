@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react";
+import { useQuery } from "convex/react";
+import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon, PlusIcon } from "lucide-react";
+import { api } from "@convex/_generated/api";
+import type { FunctionReturnType } from "convex/server";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent } from "@mutav/ui/card";
@@ -11,68 +14,53 @@ import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
-import {
-  DelinquencyStatusTag,
-  type DelinquencyStatus,
-} from "@/components/delinquencies/delinquency-status-tag";
-import { formatBRLCents } from "@/lib/contracts/format";
+import { useRouter } from "@mutav/i18n/navigation";
+import { useSearchParams } from "next/navigation";
+import { useWorkspace } from "@/providers/workspace";
+import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-status-tag";
+import { OpenNoticeSheet } from "@/components/delinquencies/open-notice-sheet";
+import { NoticeDetailSheet } from "@/components/delinquencies/notice-detail-sheet";
+import { formatBRLCents, formatDateTimeBR } from "@/lib/contracts/format";
 
-type DelinquencyRow = {
-  propertyId: string;
-  status: DelinquencyStatus;
-  noticeAt: string;
-  amountCents: number;
-  updatedAmountCents: number;
-};
+const OPEN_QUERY_KEY = "notice";
+const OPEN_NEW = "new";
+const STATUS_TABS = ["all", "open", "resolved", "canceled"] as const;
+type StatusTab = (typeof STATUS_TABS)[number];
 
-const MOCK_ROWS: DelinquencyRow[] = [
-  {
-    propertyId: "2014489",
-    status: "open",
-    noticeAt: "26/11/2026 às 09:19",
-    amountCents: 345862,
-    updatedAmountCents: 345862,
-  },
-  {
-    propertyId: "2052106",
-    status: "open",
-    noticeAt: "24/03/2026 às 18:14",
-    amountCents: 1381556,
-    updatedAmountCents: 1430784,
-  },
-  {
-    propertyId: "3871005",
-    status: "resolved",
-    noticeAt: "30/03/2026 às 23:09",
-    amountCents: 489250,
-    updatedAmountCents: 545111,
-  },
-];
+function isStatusTab(v: string): v is StatusTab {
+  return STATUS_TABS.some((t) => t === v);
+}
 
-function parseNoticeDate(noticeAt: string): string {
-  const [datePart] = noticeAt.split(" às ");
-  const [dd, mm, yyyy] = datePart.split("/");
-  return `${yyyy}-${mm}-${dd}`;
+type DelinquencyRow = FunctionReturnType<
+  typeof api.delinquencies.useCases.listByAgency
+>["page"][number];
+
+const SORT_KEYS = ["date", "amount", "status"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+
+function isSortKey(v: string): v is SortKey {
+  return SORT_KEYS.some((k) => k === v);
 }
 
 export function DelinquencyPage() {
   const t = useTranslations("delinquencies");
+  const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
+  const agencyId = selectedAgency?._id;
 
-  const [property, setProperty] = React.useState("");
-  const [tenantName, setTenantName] = React.useState("");
-  const [tenantCpf, setTenantCpf] = React.useState("");
-  const [status, setStatus] = React.useState("all");
-  const [order, setOrder] = React.useState("date");
+  const [status, setStatus] = React.useState<StatusTab>("open");
+  const [order, setOrder] = React.useState<SortKey>("date");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
   const [amountFrom, setAmountFrom] = React.useState("");
   const [amountTo, setAmountTo] = React.useState("");
-  const [activeFilters, setActiveFilters] = React.useState({
-    property: "",
-    tenantName: "",
-    tenantCpf: "",
-    status: "all",
-    order: "date",
+  const [activeFilters, setActiveFilters] = React.useState<{
+    status: StatusTab;
+    dateFrom: string;
+    dateTo: string;
+    amountFrom: string;
+    amountTo: string;
+  }>({
+    status: "open",
     dateFrom: "",
     dateTo: "",
     amountFrom: "",
@@ -80,35 +68,18 @@ export function DelinquencyPage() {
   });
 
   function handleSearch() {
-    setActiveFilters({
-      property,
-      tenantName,
-      tenantCpf,
-      status,
-      order,
-      dateFrom,
-      dateTo,
-      amountFrom,
-      amountTo,
-    });
+    setActiveFilters({ status, dateFrom, dateTo, amountFrom, amountTo });
   }
 
   function handleClear() {
-    setProperty("");
-    setTenantName("");
-    setTenantCpf("");
-    setStatus("all");
+    setStatus("open");
     setOrder("date");
     setDateFrom("");
     setDateTo("");
     setAmountFrom("");
     setAmountTo("");
     setActiveFilters({
-      property: "",
-      tenantName: "",
-      tenantCpf: "",
-      status: "all",
-      order: "date",
+      status: "open",
       dateFrom: "",
       dateTo: "",
       amountFrom: "",
@@ -120,25 +91,57 @@ export function DelinquencyPage() {
     if (e.key === "Enter") handleSearch();
   }
 
-  const amountFromCents = activeFilters.amountFrom ? Number(activeFilters.amountFrom) * 100 : null;
-  const amountToCents = activeFilters.amountTo ? Number(activeFilters.amountTo) * 100 : null;
+  const amountFromCents = activeFilters.amountFrom
+    ? Math.round(Number(activeFilters.amountFrom) * 100)
+    : undefined;
+  const amountToCents = activeFilters.amountTo
+    ? Math.round(Number(activeFilters.amountTo) * 100)
+    : undefined;
 
-  const filtered = MOCK_ROWS.filter((r) => {
-    if (activeFilters.property && !r.propertyId.includes(activeFilters.property)) return false;
-    if (activeFilters.status !== "all" && r.status !== activeFilters.status) return false;
-    const noticeDate = parseNoticeDate(r.noticeAt);
-    if (activeFilters.dateFrom && noticeDate < activeFilters.dateFrom) return false;
-    if (activeFilters.dateTo && noticeDate > activeFilters.dateTo) return false;
-    if (amountFromCents !== null && r.amountCents < amountFromCents) return false;
-    if (amountToCents !== null && r.amountCents > amountToCents) return false;
-    return true;
-  });
+  const listArgs = agencyId
+    ? {
+        agencyId,
+        paginationOpts: { numItems: 200, cursor: null },
+        ...(activeFilters.status !== "all" ? { status: activeFilters.status } : {}),
+        ...(activeFilters.dateFrom ? { dueDateFrom: activeFilters.dateFrom } : {}),
+        ...(activeFilters.dateTo ? { dueDateTo: activeFilters.dateTo } : {}),
+        ...(amountFromCents != null ? { amountFromCents } : {}),
+        ...(amountToCents != null ? { amountToCents } : {}),
+      }
+    : ("skip" as const);
 
-  const sorted = [...filtered].sort((a, b) => {
-    if (activeFilters.order === "amount") return b.amountCents - a.amountCents;
-    if (activeFilters.order === "status") return a.status.localeCompare(b.status);
-    return parseNoticeDate(a.noticeAt).localeCompare(parseNoticeDate(b.noticeAt));
-  });
+  const result = useQuery(api.delinquencies.useCases.listByAgency, listArgs);
+
+  const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
+  const noAgency = !workspaceLoading && agencyId === undefined;
+
+  const sorted = React.useMemo<DelinquencyRow[]>(() => {
+    const copy = [...(result?.page ?? [])];
+    if (order === "amount") copy.sort((a, b) => b.updatedAmountCents - a.updatedAmountCents);
+    else if (order === "status") copy.sort((a, b) => a.status.localeCompare(b.status));
+    // Server already returns openedAt desc for the "date" default.
+    return copy;
+  }, [result?.page, order]);
+
+  // URL-driven drawer state — sharable + survives navigations, and lets
+  // DelinquencyPageActions (rendered up in PageHeader) trigger the open-notice
+  // sheet without prop drilling.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const noticeParam = searchParams.get(OPEN_QUERY_KEY);
+
+  function closeSheet() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete(OPEN_QUERY_KEY);
+    const qs = next.toString();
+    router.replace(qs ? `?${qs}` : "?");
+  }
+
+  function openNoticeDetail(publicId: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set(OPEN_QUERY_KEY, publicId);
+    router.replace(`?${next.toString()}`);
+  }
 
   return (
     <div className="flex flex-col gap-6 px-4 py-4 lg:px-6">
@@ -146,37 +149,15 @@ export function DelinquencyPage() {
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-col gap-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">{t("filter.property")}</Label>
-                <Input
-                  placeholder={t("filter.propertyPlaceholder")}
-                  value={property}
-                  onChange={(e) => setProperty(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">{t("filter.tenantName")}</Label>
-                <Input
-                  placeholder={t("filter.tenantNamePlaceholder")}
-                  value={tenantName}
-                  onChange={(e) => setTenantName(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">{t("filter.tenantCpf")}</Label>
-                <Input
-                  placeholder="000.000.000-00"
-                  value={tenantCpf}
-                  onChange={(e) => setTenantCpf(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-              </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">{t("filter.status")}</Label>
-                <Select value={status} onValueChange={setStatus}>
+                <Select
+                  value={status}
+                  onValueChange={(v) => {
+                    if (isStatusTab(v)) setStatus(v);
+                  }}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -190,7 +171,12 @@ export function DelinquencyPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">{t("filter.order")}</Label>
-                <Select value={order} onValueChange={setOrder}>
+                <Select
+                  value={order}
+                  onValueChange={(v) => {
+                    if (isSortKey(v)) setOrder(v);
+                  }}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -201,9 +187,6 @@ export function DelinquencyPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">{t("filter.dateFrom")}</Label>
                 <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
@@ -212,6 +195,9 @@ export function DelinquencyPage() {
                 <Label className="text-xs">{t("filter.dateTo")}</Label>
                 <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
               </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">{t("filter.amountFrom")}</Label>
                 <Input
@@ -257,7 +243,7 @@ export function DelinquencyPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("table.col.property")}</TableHead>
+                <TableHead>{t("table.col.notice")}</TableHead>
                 <TableHead>{t("table.col.status")}</TableHead>
                 <TableHead>{t("table.col.noticeAt")}</TableHead>
                 <TableHead className="text-right">{t("table.col.amount")}</TableHead>
@@ -266,7 +252,25 @@ export function DelinquencyPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sorted.length === 0 ? (
+              {noAgency ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-muted-foreground py-10 text-center text-sm"
+                  >
+                    {t("table.noAgency")}
+                  </TableCell>
+                </TableRow>
+              ) : isLoading ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-muted-foreground py-10 text-center text-sm"
+                  >
+                    {t("table.loading")}
+                  </TableCell>
+                </TableRow>
+              ) : sorted.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -277,9 +281,15 @@ export function DelinquencyPage() {
                 </TableRow>
               ) : (
                 sorted.map((row) => (
-                  <TableRow key={`${row.propertyId}-${row.noticeAt}`}>
+                  <TableRow key={row.publicId}>
                     <TableCell>
-                      <Mono className="text-sm font-medium">{row.propertyId}</Mono>
+                      <button
+                        type="button"
+                        onClick={() => openNoticeDetail(row.publicId)}
+                        className="hover:text-primary text-left"
+                      >
+                        <Mono className="text-sm font-medium">{row.publicId}</Mono>
+                      </button>
                     </TableCell>
                     <TableCell>
                       <DelinquencyStatusTag status={row.status}>
@@ -287,18 +297,25 @@ export function DelinquencyPage() {
                       </DelinquencyStatusTag>
                     </TableCell>
                     <TableCell>
-                      <Mono className="text-muted-foreground text-sm">{row.noticeAt}</Mono>
+                      <Mono className="text-muted-foreground text-sm">
+                        {formatDateTimeBR(row.openedAt)}
+                      </Mono>
                     </TableCell>
                     <TableCell className="text-right">
                       <Mono className="text-sm font-semibold">
-                        {formatBRLCents(row.amountCents)}
+                        {formatBRLCents(row.originalAmountCents)}
                       </Mono>
                     </TableCell>
                     <TableCell className="text-right">
                       <Mono className="text-sm">{formatBRLCents(row.updatedAmountCents)}</Mono>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button variant="ghost" size="icon-sm" disabled aria-label={t("table.view")}>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => openNoticeDetail(row.publicId)}
+                        aria-label={t("table.view")}
+                      >
                         <EyeIcon className="size-4" strokeWidth={1.25} />
                       </Button>
                     </TableCell>
@@ -309,12 +326,34 @@ export function DelinquencyPage() {
           </Table>
         </div>
       </div>
+
+      {agencyId ? (
+        <OpenNoticeSheet
+          open={noticeParam === OPEN_NEW}
+          agencyId={agencyId}
+          onClose={closeSheet}
+          onSuccess={openNoticeDetail}
+        />
+      ) : null}
+      <NoticeDetailSheet
+        publicId={noticeParam && noticeParam !== OPEN_NEW ? noticeParam : null}
+        onClose={closeSheet}
+      />
     </div>
   );
 }
 
 export function DelinquencyPageActions() {
   const t = useTranslations("delinquencies");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  function openNew() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set(OPEN_QUERY_KEY, OPEN_NEW);
+    router.replace(`?${next.toString()}`);
+  }
+
   return (
     <>
       <Button variant="outline" size="sm" disabled>
@@ -324,6 +363,10 @@ export function DelinquencyPageActions() {
       <Button variant="outline" size="sm" disabled>
         <ReceiptTextIcon className="size-4" strokeWidth={1.25} />
         {t("actions.statement")}
+      </Button>
+      <Button size="sm" onClick={openNew}>
+        <PlusIcon className="size-4" strokeWidth={1.5} />
+        {t("actions.openNotice")}
       </Button>
     </>
   );
