@@ -69,9 +69,9 @@
       "statement": "Extrato de pagamento"
     },
     "status": {
-      "pendencia_aberta": "Pendência Aberta",
-      "entregue": "Entregue",
-      "cancelado": "Cancelado"
+      "open": "Pendência Aberta",
+      "resolved": "Entregue",
+      "canceled": "Cancelado"
     },
     "filter": {
       "property": "Imóvel",
@@ -143,7 +143,7 @@
       "cumulative": "Total Acumulado",
       "netActive": "Contratos Ativos",
       "activated": "Ativados",
-      "cancelled": "Cancelados",
+      "canceled": "Cancelados",
       "expired": "Encerrados"
     }
   },

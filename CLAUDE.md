@@ -301,6 +301,7 @@ Follow standard clean code principles, opinionated:
 - **No boolean flag arguments** — split into named functions (`approveContract` / `rejectContract`, not `setContractStatus(id, approved)`).
 - **No barrel files** — every import references the actual file path (`./Foo`, never `.` or `./index`).
 - **No comments by default** — only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader. Don't explain WHAT (well-named identifiers do that) and don't reference the current task or PR (that belongs in the PR description, not the code — comments rot, PRs don't).
+- **English-only code identifiers** — all types, `as const` value objects, string literal enum values, DB field values, function/variable names, and i18n **keys** are English (American spelling: `canceled`, not `cancelled`). Portuguese belongs ONLY in `messages/pt-BR.json` **values**. When touching a page that uses PT literals in code, translate them in the same commit — never propagate PT into new code just because the surrounding UI has it. Pre-existing PT identifiers (e.g. `CONTRACT_STATUS = { ATIVO: "ativo", ... }`) are grandfathered — flag them but don't drive-by-rename unless the surrounding change makes it cheap.
 - **TypeScript strict** — see Key Patterns / TypeScript escape hatches below.
 - **Branch workflow** — feature branches → squash merge PRs to main.
 
@@ -428,6 +429,56 @@ Never use the legacy promise-chain + `cancelled`-flag idiom inside `useEffect`. 
 - **`use()` + Suspense** — when an async result is the primary render data, lift the promise to the parent via `useMemo` and read it with `use()` in the child. No `useState`, no `useEffect`. Requires a `<Suspense>` boundary upstream.
 
 For mutations and other stateful async ops, prefer a `useFunction`-style helper (deferred — see `.claude/notes/deferred-conventions.md`) over manual `useState` + `try/catch` once that lands.
+
+### Testing
+
+Runner: **Vitest** everywhere. Two flavors of test file per convex domain:
+
+- **Pure logic** — `machine.test.ts`, `domain.test.ts`. No `convexTest(...)`. Default `node` env. Cover every branch of a state machine or value object; use `test.each` for the transition matrix. Canonical shape: `convex/delinquencies/machine.test.ts` (exhaustive 3×3 status matrix + self-transition + terminal-state rejection).
+- **Scenario** — `scenarios.test.ts` (schema conformance, index coverage, cross-agency isolation; produced by the [`build-scenario-tests`](.claude/workflows/build-scenario-tests.js) workflow). Top of file: `// @vitest-environment edge-runtime`. Body: `const t = convexTest(schema); registerContractAggregateComponents(t);` (from `convex/lib/testFixtures.ts` — required or aggregate writes throw). Canonical shape: `convex/delinquencies/scenarios.test.ts`.
+- **Scenario / db-backed** — `useCases.test.ts`, `seed.test.ts`. Same edge-runtime + `convexTest` harness as `scenarios.test.ts`; these cover the read/write surface (wrapper contract, pagination, staff-role gating) and the seed pipeline respectively. Canonical shape: `convex/seed.test.ts`.
+
+**Commands (from repo root):**
+
+- `bun run test:convex` — one-shot Convex suite; use before commits.
+- `bun run test:convex:watch` — TDD loop.
+- `bun run test:file <path>` — single file, e.g. `bun run test:file convex/delinquencies/machine.test.ts`.
+- `bun run test` — full turbo run (each app runs its own vitest; convex tests run 4× as a safety net).
+
+**Do NOT** run raw `bunx vitest` from a fresh shell — without config it fires `(intermediate value).glob is not a function` inside `convex-test`. Use the scripts above. See root [`vitest.config.ts`](vitest.config.ts) for why (`server.deps.inline: ["convex-test"]` + `resolve.preserveSymlinks: true`).
+
+**Test hygiene:**
+
+- One `describe` per unit under test; nested `describe`s only when the boundaries are semantic (e.g. "state machine constants" vs "assertTransition — illegal moves rejected").
+- Expected values as literals in the test, not derived from the code under test (a broken implementation shouldn't produce a "correct" derived value that satisfies the test).
+- Every Result-returning function gets both the happy-path and every distinct error `code` covered.
+- Pure tests must run in **&lt;200ms per file**; if you're near that ceiling you're probably reaching for a db-backed test — move it to a `useCases.test.ts`.
+- Seed tests must assert the `waitlist` row survives a reseed (existing regression guard in `convex/seed.test.ts`) — never wipe `waitlist`, `mutavAuditLog`, or `mutavStaff` in `DEMO_TABLES`.
+
+### Domain-surface workflows
+
+For any new convex domain, don't hand-roll the surface files. Three saved workflows in `.claude/workflows/` build them end-to-end (design → implement → 3-way adversarial verify → address gaps → tests). Each is opinionated about its output file, uses only pre-existing auth wrappers, and requires `bun run test:convex convex/<domain>/` all-green before returning.
+
+| Workflow                                                                | Produces                                                             | When to use                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`build-scenario-tests`](.claude/workflows/build-scenario-tests.js)     | `convex/<domain>/scenarios.test.ts`                                  | After schema + seed land, before touching queries/mutations. Exhaustive db-layer coverage: schema conformance, every index, every value-object variant, cross-agency isolation via ctx.db.                              |
+| [`build-domain-queries`](.claude/workflows/build-domain-queries.js)     | `convex/<domain>/useCases.ts` + `convex/<domain>/useCases.test.ts`   | Read-side. Verifier lenses: wrapper contract, index efficiency, return-shape stability. Test lens: wrapper enforcement + pagination + staff-role gating + null-on-miss.                                                 |
+| [`build-domain-mutations`](.claude/workflows/build-domain-mutations.js) | `convex/<domain>/mutations.ts` + `convex/<domain>/mutations.test.ts` | Write-side. Verifier lenses: wrapper contract, machine composition (assertTransition-before-patch), audit + write safety. Test lens: happy paths + illegal transitions + auth failures + cross-agency + audit emission. |
+
+Invocation shape (same for all three):
+
+```
+Workflow({
+  name: 'build-domain-mutations',
+  args: {
+    domain: 'guarantees',                                     // required — convex/<domain>/
+    contextNotes: 'What mutations to build, machine hints',   // strongly recommended
+    // scenariosDocPath: '/abs/path.md',                      // build-scenario-tests only
+  },
+})
+```
+
+Only invoke when the caller opts into multi-agent orchestration (mentions "workflow" or "workflows" in the request). Workflow scripts run in a deterministic sandbox — `Date.now()` / `new Date()` / `Math.random()` are unavailable AND their literal tokens in prompt strings will trip the parser; use paraphrases like "current-time primitive" or "server-side timestamp" instead of embedding the call syntax.
 
 ## i18n (next-intl)
 

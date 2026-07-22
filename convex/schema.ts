@@ -178,6 +178,35 @@ const anchorAccountData = v.union(
   }),
 );
 
+// Delinquency notice validators — per-event record of a missed rent payment
+// on the tenant → landlord flow (distinct from Mutav → Agency billing
+// invoices). Canonical validators live in `convex/delinquencies/domain.ts`;
+// inlined here to avoid the entity-file → `_generated/dataModel` circular
+// import.
+const delinquencyStatus = v.union(v.literal("open"), v.literal("resolved"), v.literal("canceled"));
+
+const noticeResolutionKind = v.union(
+  v.literal("tenant_cured"),
+  v.literal("cover_committed"),
+  v.literal("staff_dispute"),
+  v.literal("stale"),
+);
+
+const noticeCancellationReason = v.union(
+  v.literal("agency_withdrew"),
+  v.literal("staff_dismissed"),
+  v.literal("duplicate"),
+  v.literal("data_error"),
+);
+
+const noticeEvidenceSource = v.union(
+  v.literal("agency_reported"),
+  v.literal("tenant_confirmed"),
+  v.literal("bank_attested"),
+  v.literal("onchain_observed"),
+  v.literal("system_scheduled"),
+);
+
 export default defineSchema(
   {
     agencies: defineTable({
@@ -365,6 +394,58 @@ export default defineSchema(
         }),
       ),
     }).index("by_contract", ["contractPublicId", "at"]),
+
+    // Per-event record filed by an agency (or, post-Pix, a system trigger)
+    // that a tenant missed a specific rent payment. Distinct from the
+    // `invoices` table below — that one is Mutav → Agency platform billing.
+    // A contract accumulates many notices over its life; each moves
+    // independently through open → { resolved | canceled }. The receivable
+    // that arises from a `resolution.kind === "cover_committed"` lives in
+    // its own table (added when the cover slice lands).
+    contractDelinquencyNotices: defineTable({
+      publicId: v.string(),
+      contractId: v.id("contracts"),
+      agencyId: v.id("agencies"),
+      status: delinquencyStatus,
+
+      // What the notice is about — the specific missed rent event.
+      rentDueDate: v.string(),
+      originalAmountCents: v.number(),
+      // Same as originalAmountCents at open; grows as juros/multa accrue.
+      updatedAmountCents: v.number(),
+
+      // Provenance + authorship.
+      evidenceSource: noticeEvidenceSource,
+      openedAt: v.string(),
+      openedByUserId: v.id("users"),
+
+      // Populated on transition to `resolved`. `coverOperationPublicId` is
+      // a string (not an id ref) because coverOperations lands in a later
+      // slice; migrate to `v.id("coverOperations")` when it exists.
+      resolution: v.optional(
+        v.object({
+          kind: noticeResolutionKind,
+          resolvedAt: v.string(),
+          resolvedByUserId: v.id("users"),
+          coverOperationPublicId: v.optional(v.string()),
+          note: v.optional(v.string()),
+        }),
+      ),
+
+      // Populated on transition to `canceled`.
+      cancellation: v.optional(
+        v.object({
+          reason: noticeCancellationReason,
+          canceledAt: v.string(),
+          canceledByUserId: v.id("users"),
+          note: v.optional(v.string()),
+        }),
+      ),
+    })
+      .index("by_publicId", ["publicId"])
+      .index("by_agency_status", ["agencyId", "status"])
+      .index("by_contract_dueDate", ["contractId", "rentDueDate"])
+      .index("by_status_openedAt", ["status", "openedAt"]),
 
     invoices: defineTable({
       agencyId: v.id("agencies"),

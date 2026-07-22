@@ -52,6 +52,9 @@ const DEMO_TABLES = [
   // pointers mid-wipe.
   "payments",
   "invoices",
+  // Notices FK-reference contracts + users. Wipe before contracts so we
+  // don't leave dangling contractId pointers mid-wipe.
+  "contractDelinquencyNotices",
   "contractHistory",
   "contracts",
   // tenants after contracts — contracts FK-reference tenants via tenantId.
@@ -2755,7 +2758,71 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     });
   }
 
-  return { contractsInserted: inserted.length, ativoCount: ativoRows.length };
+  // A believable notice book on the Aprovada agency's ativo contracts —
+  // covers every status so the delinquencies page renders realistic
+  // rows out of the box, replacing the mock data in
+  // apps/agency/src/components/delinquencies/delinquency-page.tsx.
+  const ownerMembership = await ctx.db
+    .query("memberships")
+    .withIndex("by_agency", (q) => q.eq("agencyId", agencyId))
+    .filter((q) => q.eq(q.field("role"), "owner"))
+    .first();
+  const openedByUserId = ownerMembership?.userId;
+  let noticesInserted = 0;
+  if (openedByUserId && ativoRows.length >= 3) {
+    const [n1, n2, n3] = ativoRows;
+    // publicIds mirror the openNotice mutation shape: DN-<contract>-<yyyy-mm-dd>
+    // (day granularity, matching the by_contract_dueDate collision domain).
+    await ctx.db.insert("contractDelinquencyNotices", {
+      publicId: `DN-${n1.publicId}-2026-06-05`,
+      contractId: n1.id,
+      agencyId,
+      status: "open",
+      rentDueDate: "2026-06-05",
+      originalAmountCents: n1.spec.rentCents,
+      updatedAmountCents: Math.round(n1.spec.rentCents * 1.02),
+      evidenceSource: "agency_reported",
+      openedAt: d("2026-06-10T09:19:00-03:00"),
+      openedByUserId,
+    });
+    await ctx.db.insert("contractDelinquencyNotices", {
+      publicId: `DN-${n2.publicId}-2026-05-05`,
+      contractId: n2.id,
+      agencyId,
+      status: "open",
+      rentDueDate: "2026-05-05",
+      originalAmountCents: n2.spec.rentCents,
+      updatedAmountCents: Math.round(n2.spec.rentCents * 1.035),
+      evidenceSource: "agency_reported",
+      openedAt: d("2026-05-14T18:14:00-03:00"),
+      openedByUserId,
+    });
+    await ctx.db.insert("contractDelinquencyNotices", {
+      publicId: `DN-${n3.publicId}-2026-04-05`,
+      contractId: n3.id,
+      agencyId,
+      status: "resolved",
+      rentDueDate: "2026-04-05",
+      originalAmountCents: n3.spec.rentCents,
+      updatedAmountCents: Math.round(n3.spec.rentCents * 1.05),
+      evidenceSource: "agency_reported",
+      openedAt: d("2026-04-08T10:00:00-03:00"),
+      openedByUserId,
+      resolution: {
+        kind: "tenant_cured",
+        resolvedAt: d("2026-04-15T14:30:00-03:00"),
+        resolvedByUserId: openedByUserId,
+        note: "Inquilino quitou aluguel + encargos diretamente com o proprietário.",
+      },
+    });
+    noticesInserted = 3;
+  }
+
+  return {
+    contractsInserted: inserted.length,
+    ativoCount: ativoRows.length,
+    noticesInserted,
+  };
 }
 
 /**
