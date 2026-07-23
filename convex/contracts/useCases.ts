@@ -3,7 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
-import { priceContract } from "../../apps/agency/src/lib/pricing/contract";
+import { priceContract } from "./pricing";
 import type { Contract, ContractHistory } from "./domain";
 import type { Tenant, TenantId } from "../tenants/domain";
 import {
@@ -14,9 +14,12 @@ import {
 import { insertContractAggregates, replaceContractAggregates } from "./aggregateWrites";
 import {
   CONTRACT_STATUS,
+  CONTRACT_ERROR_CODE,
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
+  SCORE_TIER,
+  tierForScore,
   getUrgencyTier,
   urgencySortKey,
   expiringRenewalBounds,
@@ -646,7 +649,9 @@ export const requestCreditScore = mutationWithAgencyScope({
 });
 
 type CreateContractSuccessResult = { publicId: string };
-type CreateContractErrorResult = { code: typeof TENANT_ERROR_CODE.INVALID_TAX_ID };
+type CreateContractErrorResult = {
+  code: typeof TENANT_ERROR_CODE.INVALID_TAX_ID | typeof CONTRACT_ERROR_CODE.TENANT_DENIED;
+};
 
 /**
  * Create a new contract with server-side fee calculation.
@@ -699,6 +704,18 @@ export const create = mutationWithAgencyScope({
       };
     }
 
+    // A denied credit tier cannot be priced (no rate exists for `negado`) and
+    // must never become a contract. Reject before any write; the narrowed
+    // `tier` below is what makes `priceContract` type-check.
+    const tier = tierForScore(args.tenant.score);
+    if (tier === SCORE_TIER.NEGADO) {
+      return {
+        success: false,
+        error: { code: CONTRACT_ERROR_CODE.TENANT_DENIED },
+        message: "Tenant credit tier is denied",
+      };
+    }
+
     const tenantResult = await getOrCreateTenant(ctx, {
       input: registryInput,
       actor: { kind: "user", userId: ctx.user._id },
@@ -715,7 +732,7 @@ export const create = mutationWithAgencyScope({
       rentCents: args.rentCents,
       condoCents: args.condoCents,
       otherFeesCents: args.otherFeesCents,
-      score: args.tenant.score,
+      tier,
     });
 
     const publicId = generatePublicId();

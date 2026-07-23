@@ -123,6 +123,12 @@ export function tierForScore(score: number): ScoreTier {
   return SCORE_TIER.NEGADO;
 }
 
+export const CONTRACT_ERROR_CODE = {
+  TENANT_DENIED: "TENANT_DENIED",
+} as const satisfies Record<string, string>;
+
+export type ContractErrorCode = (typeof CONTRACT_ERROR_CODE)[keyof typeof CONTRACT_ERROR_CODE];
+
 export type UrgencyTier =
   | "overdue"
   | "expiring"

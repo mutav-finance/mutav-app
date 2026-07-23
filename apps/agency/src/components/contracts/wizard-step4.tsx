@@ -25,9 +25,7 @@ import {
   type ReviewBlockKind,
 } from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
-import { splitCommission } from "@/lib/pricing/commission";
-import { priceContract } from "@/lib/pricing/contract";
-import { RENT_COVERAGE_MONTHS, EXIT_COVERAGE_MONTHS } from "@/lib/pricing/tiers";
+import { priceContract, splitCommission, DEFAULT_PRICING_TABLE } from "@convex/contracts/pricing";
 
 type Props = {
   data: DraftWizardData;
@@ -46,13 +44,14 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
   const [missing, setMissing] = React.useState<MissingFields>(new Set());
   const [editing, setEditing] = React.useState<EditingState>(WIZARD_VIEWING);
 
+  const priceableTier = data.scoreTier && data.scoreTier !== "negado" ? data.scoreTier : null;
   const preview =
-    data.rentCents > 0 && data.score !== null
+    priceableTier && data.rentCents > 0
       ? priceContract({
           rentCents: data.rentCents,
           condoCents: data.condoCents,
           otherFeesCents: data.otherFeesCents,
-          score: data.score,
+          tier: priceableTier,
         })
       : null;
   const commission = preview ? splitCommission(preview.feeCents) : null;
@@ -465,12 +464,12 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
           <div className="flex flex-1 flex-col gap-0.5">
             <ReviewRow
               label={t("coverage.rentMultiplierLabel")}
-              value={`${RENT_COVERAGE_MONTHS}x`}
+              value={`${DEFAULT_PRICING_TABLE.coverageCeilingMultiplier}x`}
               mono
             />
             <ReviewRow
               label={t("coverage.exitCostLabel")}
-              value={`${EXIT_COVERAGE_MONTHS}x`}
+              value={`${DEFAULT_PRICING_TABLE.exitCostMultiplier}x`}
               mono
             />
           </div>

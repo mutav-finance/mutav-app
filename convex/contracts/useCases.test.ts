@@ -631,6 +631,39 @@ describe("create (tenant registry, narrow phase)", () => {
     });
   });
 
+  test("rejects a denied credit tier (negado) before any write", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({
+        tenant: {
+          entityType: "pf" as const,
+          fullName: "Maria Silva Santos",
+          cpf: VALID_CPF,
+          cnpj: undefined,
+          birthDate: "1990-05-12",
+          email: "maria@example.com",
+          phone: "11900000001",
+          score: 200,
+        },
+      }),
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("TENANT_DENIED");
+
+    // No side effects: neither a contract nor a tenant registry row was written.
+    const contracts = await t.run((ctx) => ctx.db.query("contracts").collect());
+    expect(contracts).toHaveLength(0);
+    const tenants = await t.run((ctx) => ctx.db.query("tenants").collect());
+    expect(tenants).toHaveLength(0);
+  });
+
   test("getByPublicId round-trips both variants and listByAgency joins the tenant name", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);

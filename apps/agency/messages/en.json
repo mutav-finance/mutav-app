@@ -850,7 +850,8 @@
       "missingFields": "Fill in all required fields before confirming.",
       "errorToast": "Failed to create contract. Please try again.",
       "errors": {
-        "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again."
+        "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again.",
+        "TENANT_DENIED": "The tenant's credit score was denied. The contract cannot be created."
       },
       "editBlock": "Edit",
       "saveBlock": "Save",
