@@ -3,7 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
-import { priceContract } from "./pricing";
+import { priceContract, splitCommission, feeBreakdown } from "./pricing";
 import type { Contract, ContractHistory } from "./domain";
 import type { Tenant, TenantId } from "../tenants/domain";
 import {
@@ -527,11 +527,10 @@ export const getActivityByPeriod = queryWithAuth({
  * Commission page. "Active during" means `activatedAt` is on or before
  * the period and the contract wasn't deactivated *before* it — a
  * contract deactivated during the period still earned commission for
- * that period, so it stays in the result. Commission is a placeholder
- * 1.5% of `rentCents` until the rate-card domain ships (#83 —
- * `pricingVersion` snapshot).
+ * that period, so it stays in the result. Commission is the same
+ * `splitCommission` the wizard previews (taxa at `commissionRate` + prestamista
+ * premium at `prestamistaCommissionRate`), recovered from the stored fee + plan.
  */
-const COMMISSION_RATE_BPS = 150; // 150 basis points = 1.5%
 const COMMISSION_INSTALLMENTS_TOTAL = 12;
 const PERIOD_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -585,7 +584,7 @@ export const listForCommissionByMonth = queryWithAgencyScope({
           contractId: c.publicId,
           tenantName: tenantNames.get(c.tenantId) ?? "",
           rentCents: c.rental.rentCents,
-          commissionCents: Math.round((c.rental.rentCents * COMMISSION_RATE_BPS) / 10000),
+          commissionCents: splitCommission(feeBreakdown(c.rental)).commissionCents,
           installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
           activatedAt: c.activatedAt,
         };
@@ -736,6 +735,7 @@ export const create = mutationWithAgencyScope({
       condoCents: args.condoCents,
       otherFeesCents: args.otherFeesCents,
       tier,
+      plan: args.plan,
     });
 
     const publicId = generatePublicId();

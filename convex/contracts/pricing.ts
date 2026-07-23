@@ -1,4 +1,4 @@
-import { SCORE_TIER, type ScoreTier } from "./domain";
+import { CONTRACT_PLAN, SCORE_TIER, type ContractPlan, type ScoreTier } from "./domain";
 
 /**
  * Contract pricing. Lives in the backend (shared by every app) so the wizard
@@ -20,6 +20,11 @@ export type PricingTable = {
   exitCostMultiplier: number;
   activationFeeCents: number;
   commissionRate: number;
+  /** Monthly premium the `plus` plan adds for the seguro prestamista. */
+  prestamistaPremiumCents: number;
+  /** Broker commission rate applied to the prestamista premium (distinct from
+   * `commissionRate`, which applies to the score-driven taxa portion). */
+  prestamistaCommissionRate: number;
 };
 
 /**
@@ -33,6 +38,10 @@ export const DEFAULT_PRICING_TABLE: PricingTable = {
   exitCostMultiplier: 6,
   activationFeeCents: 15_000,
   commissionRate: 0.015,
+  // MOCK — R$ 12,80. Real premium is pending the corretora de seguros (needs
+  // the CNPJ to open the seguro prestamista); swap this one number when it lands.
+  prestamistaPremiumCents: 1_280,
+  prestamistaCommissionRate: 0.25,
 };
 
 export type PriceContractInput = {
@@ -40,10 +49,16 @@ export type PriceContractInput = {
   condoCents: number;
   otherFeesCents: number;
   tier: PriceableTier;
+  plan: ContractPlan;
 };
 
 export type PricedContract = {
+  /** Total monthly fee: the score-driven taxa plus the plan's prestamista premium. */
   feeCents: number;
+  /** Score-driven portion (rent × tier rate). */
+  taxaFeeCents: number;
+  /** Plan-driven portion (prestamista premium; 0 unless the plan is `plus`). */
+  prestamistaFeeCents: number;
   oneTimeActivationFeeCents: number;
   availableGuaranteeCents: number;
   totalRentCents: number;
@@ -53,13 +68,27 @@ export function priceContract(
   input: PriceContractInput,
   table: PricingTable = DEFAULT_PRICING_TABLE,
 ): PricedContract {
-  const feeCents = Math.round(input.rentCents * table.tierRate[input.tier]);
+  const taxaFeeCents = Math.round(input.rentCents * table.tierRate[input.tier]);
+  const prestamistaFeeCents = input.plan === CONTRACT_PLAN.PLUS ? table.prestamistaPremiumCents : 0;
   return {
-    feeCents,
+    feeCents: taxaFeeCents + prestamistaFeeCents,
+    taxaFeeCents,
+    prestamistaFeeCents,
     oneTimeActivationFeeCents: table.activationFeeCents,
     availableGuaranteeCents: input.rentCents * table.coverageCeilingMultiplier,
     totalRentCents: input.rentCents + input.condoCents + input.otherFeesCents,
   };
+}
+
+/** The taxa/prestamista split of a persisted contract's monthly fee, recovered
+ * from the stored fee + plan. Used where only the contract row is on hand. */
+export function feeBreakdown(
+  rental: { feeCents: number; plan: ContractPlan },
+  table: PricingTable = DEFAULT_PRICING_TABLE,
+): { taxaFeeCents: number; prestamistaFeeCents: number } {
+  const prestamistaFeeCents =
+    rental.plan === CONTRACT_PLAN.PLUS ? table.prestamistaPremiumCents : 0;
+  return { taxaFeeCents: rental.feeCents - prestamistaFeeCents, prestamistaFeeCents };
 }
 
 export type CommissionSplit = {
@@ -70,15 +99,19 @@ export type CommissionSplit = {
 };
 
 /**
- * Split a base fee into its commission component and the total owed. Derives
- * `totalCents` by addition so `total === fee + commission` holds for every
- * input — the `Math.round(fee * 1.015)` form does not.
+ * Broker commission on the two fee portions, at their distinct rates: the
+ * score-driven taxa at `commissionRate`, the plan-driven prestamista premium at
+ * `prestamistaCommissionRate`. `totalCents` is derived by addition so
+ * `total === fee + commission` holds for every input.
  */
 export function splitCommission(
-  feeCents: number,
+  { taxaFeeCents, prestamistaFeeCents }: { taxaFeeCents: number; prestamistaFeeCents: number },
   table: PricingTable = DEFAULT_PRICING_TABLE,
 ): CommissionSplit {
-  const commissionCents = Math.round(feeCents * table.commissionRate);
+  const commissionCents =
+    Math.round(taxaFeeCents * table.commissionRate) +
+    Math.round(prestamistaFeeCents * table.prestamistaCommissionRate);
+  const feeCents = taxaFeeCents + prestamistaFeeCents;
   return {
     commissionCents,
     totalCents: feeCents + commissionCents,

@@ -119,9 +119,10 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
           condoCents: data.condoCents,
           otherFeesCents: data.otherFeesCents,
           tier: priceableTier,
+          plan: data.plan,
         })
       : null;
-  const commission = preview ? splitCommission(preview.feeCents) : null;
+  const commission = preview ? splitCommission(preview) : null;
 
   const tierLabel: Record<ScoreTier, string> = {
     bom: t("tenant.scoreBom"),
@@ -339,7 +340,9 @@ function CoveragePlanCard({
               {t("prestamistaLabel")}
               <PrestamistaInfo />
             </span>
-            <span className="text-primary text-sm font-semibold">{t("included")}</span>
+            <span className="text-primary text-sm font-semibold">
+              +{formatBRLCents(DEFAULT_PRICING_TABLE.prestamistaPremiumCents)}
+            </span>
           </div>
         )}
         <PlanRow label={t("feeRate")} value={`${feeRatePct.toFixed(0)}%`} emphasized />

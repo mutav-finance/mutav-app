@@ -52,9 +52,10 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
           condoCents: data.condoCents,
           otherFeesCents: data.otherFeesCents,
           tier: priceableTier,
+          plan: data.plan,
         })
       : null;
-  const commission = preview ? splitCommission(preview.feeCents) : null;
+  const commission = preview ? splitCommission(preview) : null;
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
 
