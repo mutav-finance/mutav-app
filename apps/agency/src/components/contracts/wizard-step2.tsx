@@ -13,7 +13,7 @@ import { CheckIcon } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
 import { type DraftWizardData } from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
-import type { ScoreTier } from "@convex/contracts/domain";
+import { CONTRACT_PLAN, type ScoreTier } from "@convex/contracts/domain";
 import { priceContract, splitCommission, DEFAULT_PRICING_TABLE } from "@convex/contracts/pricing";
 
 type Props = {
@@ -48,9 +48,10 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const requestScore = useMutation(api.contracts.useCases.requestCreditScore);
   const [requestedFor, setRequestedFor] = React.useState<string | null>(null);
 
-  // Both plans are identical for now — selection is UI-only until the "+"
-  // tier gains distinct coverage. Default to "plus" (the recommended option).
-  const [selectedPlan, setSelectedPlan] = React.useState<"basic" | "plus">("plus");
+  // The chosen plan persists on the wizard draft (and, on create, the
+  // contract). Pricing is still identical between the two — the "+" premium
+  // lands in #184 Fatia D.
+  const selectedPlan = data.plan;
 
   const scoreResult = useQuery(
     api.contracts.useCases.getCachedCreditScore,
@@ -205,16 +206,16 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
           <CoveragePlanCard
             planName={t("coverage.planBasic")}
             feeRatePct={DEFAULT_PRICING_TABLE.tierRate[priceableTier] * 100}
-            selected={selectedPlan === "basic"}
-            onSelect={() => setSelectedPlan("basic")}
+            selected={selectedPlan === CONTRACT_PLAN.BASIC}
+            onSelect={() => onChange({ plan: CONTRACT_PLAN.BASIC })}
           />
           <CoveragePlanCard
             planName={t("coverage.planPlus")}
             feeRatePct={DEFAULT_PRICING_TABLE.tierRate[priceableTier] * 100}
-            selected={selectedPlan === "plus"}
+            selected={selectedPlan === CONTRACT_PLAN.PLUS}
             emphasized
             includesPrestamista
-            onSelect={() => setSelectedPlan("plus")}
+            onSelect={() => onChange({ plan: CONTRACT_PLAN.PLUS })}
           />
         </div>
       )}

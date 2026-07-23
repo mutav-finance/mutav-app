@@ -131,6 +131,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
         },
         optional: { complement: validated.complement, tag: "", description: "" },
         propertyKind: validated.propertyKind,
+        plan: validated.plan,
         rentCents: validated.rentCents,
         condoCents: validated.condoCents,
         otherFeesCents: validated.otherFeesCents,

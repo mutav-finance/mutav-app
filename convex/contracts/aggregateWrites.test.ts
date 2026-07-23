@@ -64,6 +64,7 @@ async function seedContract(
       availableGuaranteeCents: spec.availableGuaranteeCents,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 100000,
         condoCents: 0,
         otherFeesCents: 0,

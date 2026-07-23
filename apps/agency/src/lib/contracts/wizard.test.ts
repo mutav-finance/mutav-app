@@ -25,6 +25,7 @@ const VALID_PF_DRAFT: DraftWizardData = {
   rentCents: 250_000,
   condoCents: 30_000,
   otherFeesCents: 0,
+  plan: "plus",
   fullName: "João Pereira",
   birthDate: "1991-03-04",
   email: "joao@example.com",

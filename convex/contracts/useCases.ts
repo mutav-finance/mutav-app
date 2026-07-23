@@ -15,6 +15,7 @@ import { insertContractAggregates, replaceContractAggregates } from "./aggregate
 import {
   CONTRACT_STATUS,
   CONTRACT_ERROR_CODE,
+  contractPlanValidator,
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
@@ -678,6 +679,7 @@ export const create = mutationWithAgencyScope({
       description: v.string(),
     }),
     propertyKind: v.union(v.literal("residencial"), v.literal("comercial")),
+    plan: contractPlanValidator,
     rentCents: v.number(),
     condoCents: v.number(),
     otherFeesCents: v.number(),
@@ -759,6 +761,7 @@ export const create = mutationWithAgencyScope({
       availableGuaranteeCents: priced.availableGuaranteeCents,
       rental: {
         propertyKind: args.propertyKind,
+        plan: args.plan,
         rentCents: args.rentCents,
         condoCents: args.condoCents,
         otherFeesCents: args.otherFeesCents,

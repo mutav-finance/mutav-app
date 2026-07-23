@@ -76,6 +76,7 @@ async function seedAndIndexContract(
       availableGuaranteeCents: spec.availableGuaranteeCents,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 100000,
         condoCents: 0,
         otherFeesCents: 0,
@@ -562,6 +563,7 @@ describe("create (tenant registry, narrow phase)", () => {
       },
       optional: { complement: "", tag: "", description: "" },
       propertyKind: "residencial" as const,
+      plan: "basic" as const,
       rentCents: 300000,
       condoCents: 0,
       otherFeesCents: 0,
@@ -631,6 +633,28 @@ describe("create (tenant registry, narrow phase)", () => {
       email: "maria@example.com",
       phone: "11900000001",
     });
+  });
+
+  test("persists the chosen plan on the contract rental bundle", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({ plan: "plus" as const }),
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const contract = await t.run((ctx) =>
+      ctx.db
+        .query("contracts")
+        .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
+        .unique(),
+    );
+    expect(contract?.rental.plan).toBe("plus");
   });
 
   test("rejects a denied credit tier (negado) before any write", async () => {

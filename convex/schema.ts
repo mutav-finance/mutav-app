@@ -22,6 +22,9 @@ const documentKey = v.union(
 );
 
 const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
+// Guarantee product chosen for the contract: base (Mutav Fiança) or plus
+// (Mutav Fiança +, with credit-life insurance). See convex/contracts/domain.ts.
+const contractPlan = v.union(v.literal("basic"), v.literal("plus"));
 
 // Canonical `mutavStaffRoleValidator` lives in `convex/mutavStaff/domain.ts`;
 // inlined here to avoid the entity-file → `_generated/dataModel` circular import.
@@ -332,6 +335,7 @@ export default defineSchema(
 
       rental: v.object({
         propertyKind,
+        plan: contractPlan,
         rentCents: v.number(),
         condoCents: v.number(),
         otherFeesCents: v.number(),

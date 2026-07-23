@@ -1,6 +1,8 @@
 import {
+  CONTRACT_PLAN,
   PROPERTY_KIND,
   TENANT_ENTITY_TYPE,
+  type ContractPlan,
   type PropertyKind,
   type ScoreTier,
   type TenantEntityType,
@@ -23,6 +25,7 @@ export type DraftWizardData = {
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
+  plan: ContractPlan;
   fullName: string;
   birthDate: string;
   email: string;
@@ -62,6 +65,7 @@ export type ValidatedWizardData = {
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
+  plan: ContractPlan;
   tenant: ValidatedWizardTenant;
   scoreTier: ScoreTier;
 };
@@ -181,6 +185,7 @@ export function validateWizard(
       rentCents: draft.rentCents,
       condoCents: draft.condoCents,
       otherFeesCents: draft.otherFeesCents,
+      plan: draft.plan,
       tenant,
       scoreTier,
     },
@@ -248,6 +253,7 @@ export const INITIAL_WIZARD_DATA: DraftWizardData = {
   rentCents: 0,
   condoCents: 0,
   otherFeesCents: 0,
+  plan: CONTRACT_PLAN.PLUS,
   fullName: "",
   birthDate: "",
   email: "",

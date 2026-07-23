@@ -5,6 +5,7 @@ import { generateInvoiceMuxedId } from "./invoices/lib/muxedId";
 import { SettlementMethods, type SettlementMethod } from "./payments/domain";
 import type { AgencyId } from "./agencies/domain";
 import {
+  DEFAULT_CONTRACT_PLAN,
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
@@ -87,8 +88,8 @@ type SeedTenantBlock = EmbeddedTenantSnapshot & {
 
 type SeedContractSpec = Omit<
   Contract,
-  "_id" | "_creationTime" | "tenantId" | "tenantApproval" | "score"
-> & { tenant: SeedTenantBlock };
+  "_id" | "_creationTime" | "tenantId" | "tenantApproval" | "score" | "rental"
+> & { rental: Omit<Contract["rental"], "plan">; tenant: SeedTenantBlock };
 
 /**
  * Registry-only contract insert: resolves (or creates) the `tenants` row
@@ -113,6 +114,7 @@ async function insertSeedContract(ctx: MutationCtx, spec: SeedContractSpec): Pro
   }
   return ctx.db.insert("contracts", {
     ...contract,
+    rental: { ...contract.rental, plan: DEFAULT_CONTRACT_PLAN },
     tenantId: result.data.tenantId,
     tenantApproval: { status: tenant.approvalStatus, termApprovedAt: tenant.termApprovedAt },
     score: tenant.score,

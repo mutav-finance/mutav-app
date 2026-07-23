@@ -12,6 +12,7 @@ export type PropertyKind = Contract["rental"]["propertyKind"];
 // enforce write-time discipline so new code can only persist canonical values.
 export type ExitCostMultiplier = "6x";
 export type RentMultiplier = "30x";
+export type ContractPlan = Contract["rental"]["plan"];
 export type Payer = "inquilino";
 export type DocumentKey = Contract["documents"][number]["key"];
 export type DocumentStatus = Contract["documents"][number]["status"];
@@ -102,6 +103,24 @@ export const RENT_MULTIPLIER = {
 
 export const DEFAULT_EXIT_COST_MULTIPLIER: ExitCostMultiplier = EXIT_COST_MULTIPLIER["6X"];
 export const DEFAULT_RENT_MULTIPLIER: RentMultiplier = RENT_MULTIPLIER["30X"];
+
+/**
+ * The guarantee product chosen for a contract. `basic` = Mutav Fiança;
+ * `plus` = Mutav Fiança + (adds credit-life insurance / seguro prestamista,
+ * which raises the fee — priced in #184 Fatia D). Decoupled from the credit
+ * tier: the score sets the fee rate, the plan is the broker's choice.
+ */
+export const CONTRACT_PLAN = {
+  BASIC: "basic",
+  PLUS: "plus",
+} as const satisfies Record<Uppercase<ContractPlan>, ContractPlan>;
+
+export const contractPlanValidator = v.union(
+  v.literal(CONTRACT_PLAN.BASIC),
+  v.literal(CONTRACT_PLAN.PLUS),
+);
+
+export const DEFAULT_CONTRACT_PLAN: ContractPlan = CONTRACT_PLAN.BASIC;
 
 /**
  * Allowed values for `contracts.rental.payer` — the party responsible for
