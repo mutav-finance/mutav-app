@@ -46,7 +46,7 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
 
   const priceableTier = data.scoreTier && data.scoreTier !== "negado" ? data.scoreTier : null;
   const preview =
-    priceableTier && data.rentCents > 0
+    priceableTier && data.rentCents > 0 && data.plan
       ? priceContract({
           rentCents: data.rentCents,
           condoCents: data.condoCents,

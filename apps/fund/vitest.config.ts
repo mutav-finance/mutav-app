@@ -29,7 +29,6 @@ export default defineConfig({
       // Same worktree exclude as apps/agency / apps/pay — historical
       // local-only failure unrelated to this PR.
       "src/lib/pricing/**",
-      "apps/agency/src/lib/pricing/**",
       "apps/pay/src/lib/pricing/**",
       "apps/fund/src/lib/pricing/**",
     ],

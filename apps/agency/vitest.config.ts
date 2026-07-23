@@ -21,28 +21,21 @@ export default defineConfig({
     //
     //   // @vitest-environment edge-runtime
     //
-    // Existing tests using `bun:test` (currently apps/agency/src/lib/pricing/*.test.ts)
-    // stay on Bun's built-in runner and are excluded from vitest discovery.
+    // Some tests using `bun:test` stay on Bun's built-in runner and are excluded
+    // from vitest discovery. Agency's own bun:test pricing was removed in #184;
+    // the only remaining Bun-runner pricing test is apps/fund/src/lib/pricing,
+    // excluded in fund's own config.
     //
-    // The `src/lib/pricing/**` exclude here matches the historical (pre-monorepo)
-    // exclude pattern: it filters out repo-root-relative paths starting with
-    // `src/lib/pricing/`. After the apps/agency/ move the live path is
-    // `apps/agency/src/lib/pricing/**`, so we also list the new location to
-    // make the intent explicit. The historical pattern is kept verbatim so the
-    // local-only worktree failure mode (.claude/worktrees/etherfuse-onramp/...)
-    // is preserved unchanged — fixing that is out of scope for PR 2.
+    // The `src/lib/pricing/**` exclude is the historical (pre-monorepo) pattern,
+    // kept verbatim so the local-only worktree failure mode
+    // (.claude/worktrees/etherfuse-onramp/...) is preserved unchanged.
     // Scope discovery to apps/agency/** + convex/** so the apps/pay tree
     // (which has its own vitest config) doesn't get picked up twice.
     include: [
       "apps/agency/**/*.{test,spec}.?(c|m)[jt]s?(x)",
       "convex/**/*.{test,spec}.?(c|m)[jt]s?(x)",
     ],
-    exclude: [
-      "**/node_modules/**",
-      "**/.next/**",
-      "src/lib/pricing/**",
-      "apps/agency/src/lib/pricing/**",
-    ],
+    exclude: ["**/node_modules/**", "**/.next/**", "src/lib/pricing/**"],
     server: {
       deps: {
         inline: ["convex-test"],

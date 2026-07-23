@@ -878,6 +878,7 @@
       "cepInvalid": "ZIP must have 8 digits",
       "rentRequired": "Rent must be greater than zero",
       "scoreRequired": "Waiting for score result",
+      "planRequired": "Select a guarantee plan",
       "birthDateFuture": "Date of birth cannot be in the future",
       "birthDateInvalid": "Invalid date",
       "emailInvalid": "Invalid e-mail",

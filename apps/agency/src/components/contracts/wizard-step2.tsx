@@ -48,9 +48,8 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const requestScore = useMutation(api.contracts.useCases.requestCreditScore);
   const [requestedFor, setRequestedFor] = React.useState<string | null>(null);
 
-  // The chosen plan persists on the wizard draft (and, on create, the
-  // contract). Pricing is still identical between the two — the "+" premium
-  // lands in #184 Fatia D.
+  // No plan is pre-selected; Step 2's Next stays blocked until the broker picks
+  // one. "plus" adds the prestamista premium to the monthly fee (priceContract).
   const selectedPlan = data.plan;
 
   const scoreResult = useQuery(
@@ -113,7 +112,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const isNegado = score !== null && score < 400;
 
   const preview =
-    priceableTier && data.rentCents > 0
+    priceableTier && data.rentCents > 0 && data.plan
       ? priceContract({
           rentCents: data.rentCents,
           condoCents: data.condoCents,
@@ -260,7 +259,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             <Link href="/">{t("simulation.closeButton")}</Link>
           </Button>
         ) : (
-          <Button onClick={onNext} disabled={isLoading || score === null}>
+          <Button onClick={onNext} disabled={isLoading || score === null || !data.plan}>
             {t("nav.nextStep3")}
           </Button>
         )}

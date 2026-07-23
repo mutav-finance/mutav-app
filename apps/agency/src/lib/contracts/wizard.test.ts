@@ -115,6 +115,13 @@ describe("validateWizard", () => {
     if (result.success) throw new Error("expected failure");
     expect(result.error).toContainEqual({ code: "scoreRequired", field: "score" });
   });
+
+  test("rejects when no plan is selected", () => {
+    const result = validateWizard({ ...VALID_PF_DRAFT, plan: null });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("expected failure");
+    expect(result.error).toContainEqual({ code: "planRequired", field: "plan" });
+  });
 });
 
 describe("EditingState", () => {

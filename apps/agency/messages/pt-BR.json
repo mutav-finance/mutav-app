@@ -878,6 +878,7 @@
       "cepInvalid": "CEP deve ter 8 dígitos",
       "rentRequired": "Aluguel deve ser maior que zero",
       "scoreRequired": "Aguarde o resultado do score",
+      "planRequired": "Selecione um plano de garantia",
       "birthDateFuture": "Data de nascimento não pode ser futura",
       "birthDateInvalid": "Data inválida",
       "emailInvalid": "E-mail inválido",
