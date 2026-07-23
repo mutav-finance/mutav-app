@@ -651,7 +651,10 @@ export const requestCreditScore = mutationWithAgencyScope({
 
 type CreateContractSuccessResult = { publicId: string };
 type CreateContractErrorResult = {
-  code: typeof TENANT_ERROR_CODE.INVALID_TAX_ID | typeof CONTRACT_ERROR_CODE.TENANT_DENIED;
+  code:
+    | typeof TENANT_ERROR_CODE.INVALID_TAX_ID
+    | typeof CONTRACT_ERROR_CODE.TENANT_DENIED
+    | typeof CONTRACT_ERROR_CODE.INVALID_RENT;
 };
 
 /**
@@ -703,6 +706,24 @@ export const create = mutationWithAgencyScope({
         success: false,
         error: { code: TENANT_ERROR_CODE.INVALID_TAX_ID },
         message: "Tenant tax ID failed checksum validation",
+      };
+    }
+
+    // Money inputs are integer cents; rent must be positive. The wizard guards
+    // this client-side, but the mutation is the trust boundary — a negative rent
+    // would flow into fees, the guarantee, and the platform exposure aggregate.
+    if (
+      !Number.isInteger(args.rentCents) ||
+      args.rentCents <= 0 ||
+      !Number.isInteger(args.condoCents) ||
+      args.condoCents < 0 ||
+      !Number.isInteger(args.otherFeesCents) ||
+      args.otherFeesCents < 0
+    ) {
+      return {
+        success: false,
+        error: { code: CONTRACT_ERROR_CODE.INVALID_RENT },
+        message: "Rent and fee amounts must be non-negative integer cents (rent > 0)",
       };
     }
 

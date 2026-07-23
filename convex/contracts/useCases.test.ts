@@ -657,6 +657,25 @@ describe("create (tenant registry, narrow phase)", () => {
     expect(contract?.rental.plan).toBe("plus");
   });
 
+  test("rejects a non-positive rent before any write", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({ rentCents: 0 }),
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_RENT");
+
+    const contracts = await t.run((ctx) => ctx.db.query("contracts").collect());
+    expect(contracts).toHaveLength(0);
+  });
+
   test("rejects a denied credit tier (negado) before any write", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);

@@ -108,6 +108,14 @@ describe("feeBreakdown", () => {
       prestamistaFeeCents: 1_280,
     });
   });
+
+  test("plus — clamps the premium to the stored fee so the split never goes negative", () => {
+    // Defensive: a fee stored under a lower premium than the current table value.
+    const split = feeBreakdown({ feeCents: 800, plan: "plus" });
+    expect(split.taxaFeeCents).toBe(0);
+    expect(split.prestamistaFeeCents).toBe(800);
+    expect(split.taxaFeeCents + split.prestamistaFeeCents).toBe(800);
+  });
 });
 
 describe("splitCommission", () => {

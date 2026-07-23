@@ -81,13 +81,20 @@ export function priceContract(
 }
 
 /** The taxa/prestamista split of a persisted contract's monthly fee, recovered
- * from the stored fee + plan. Used where only the contract row is on hand. */
+ * from the stored fee + plan. Used where only the contract row is on hand.
+ *
+ * The premium is clamped to the stored fee so the split never goes negative and
+ * always reconciles to `feeCents` — a defensive guard for the case where the
+ * premium is raised above a fee that was stored under the old (lower) premium.
+ * The durable fix (snapshotting the price on the contract) is #83. */
 export function feeBreakdown(
   rental: { feeCents: number; plan: ContractPlan },
   table: PricingTable = DEFAULT_PRICING_TABLE,
 ): { taxaFeeCents: number; prestamistaFeeCents: number } {
   const prestamistaFeeCents =
-    rental.plan === CONTRACT_PLAN.PLUS ? table.prestamistaPremiumCents : 0;
+    rental.plan === CONTRACT_PLAN.PLUS
+      ? Math.min(table.prestamistaPremiumCents, rental.feeCents)
+      : 0;
   return { taxaFeeCents: rental.feeCents - prestamistaFeeCents, prestamistaFeeCents };
 }
 

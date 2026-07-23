@@ -144,6 +144,7 @@ export function tierForScore(score: number): ScoreTier {
 
 export const CONTRACT_ERROR_CODE = {
   TENANT_DENIED: "TENANT_DENIED",
+  INVALID_RENT: "INVALID_RENT",
 } as const satisfies Record<string, string>;
 
 export type ContractErrorCode = (typeof CONTRACT_ERROR_CODE)[keyof typeof CONTRACT_ERROR_CODE];

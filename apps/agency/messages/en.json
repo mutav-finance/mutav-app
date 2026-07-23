@@ -851,7 +851,8 @@
       "errorToast": "Failed to create contract. Please try again.",
       "errors": {
         "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again.",
-        "TENANT_DENIED": "The tenant's credit score was denied. The contract cannot be created."
+        "TENANT_DENIED": "The tenant's credit score was denied. The contract cannot be created.",
+        "INVALID_RENT": "Invalid amounts. Rent must be greater than zero."
       },
       "editBlock": "Edit",
       "saveBlock": "Save",
