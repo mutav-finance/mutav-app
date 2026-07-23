@@ -12,7 +12,7 @@ import {
  * Three aggregates must stay in lockstep on every contract write:
  *   - `contractsByStatus` (per-agency status counts)
  *   - `contractsByStatusPlatform` (platform-wide status counts)
- *   - `ativoInsuredCentsPlatform` (platform-wide sum of `availableGuaranteeCents`)
+ *   - `ativoInsuredCentsPlatform` (platform-wide worst-case exposure: 30x ceiling + 6x exit)
  *
  * Every mutation that inserts/replaces/deletes a contract MUST go through one
  * of the helpers below — never call `.insert` / `.replace` / `.delete` directly

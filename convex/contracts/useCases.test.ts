@@ -83,7 +83,7 @@ async function seedAndIndexContract(
         feeCents: 1500,
         oneTimeActivationFeeCents: 0,
         setupInstallments: 1,
-        exitCostMultiplier: "5x",
+        exitCostMultiplier: "6x",
         rentMultiplier: "30x",
         payer: "inquilino",
         pviMigrationSchedule: null,
@@ -173,7 +173,7 @@ describe("getStatusCountsGlobal", () => {
 });
 
 describe("getInsuredCapacityGlobal", () => {
-  test("sums availableGuaranteeCents over ativo contracts only", async () => {
+  test("sums exposure (30x ceiling + 6x exit) over ativo contracts only", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
@@ -196,7 +196,9 @@ describe("getInsuredCapacityGlobal", () => {
     );
 
     const result = await asUser.query(api.contracts.useCases.getInsuredCapacityGlobal, {});
-    expect(result.sumInsuredCents).toBe(350_00);
+    // Exposure per ativo = ceiling + 6x exit (rentCents 100_000 x 6 = 600_000).
+    // Two ativo: (10_000 + 25_000) + 2 x 600_000; the pendente row is excluded.
+    expect(result.sumInsuredCents).toBe(1_235_000);
     expect(result.maxCapacityCents).toBeGreaterThan(0);
   });
 });

@@ -10,7 +10,7 @@ export type PropertyKind = Contract["rental"]["propertyKind"];
 // Decoupled from the schema: persistence is `v.string()` to tolerate legacy
 // rows with bespoke values across these fields. The narrow unions below
 // enforce write-time discipline so new code can only persist canonical values.
-export type ExitCostMultiplier = "5x";
+export type ExitCostMultiplier = "6x";
 export type RentMultiplier = "30x";
 export type Payer = "inquilino";
 export type DocumentKey = Contract["documents"][number]["key"];
@@ -93,14 +93,14 @@ export const SCORE_TIER_THRESHOLD = {
  * are the typed source of truth for new writes.
  */
 export const EXIT_COST_MULTIPLIER = {
-  "5X": "5x",
+  "6X": "6x",
 } as const satisfies Record<Uppercase<ExitCostMultiplier>, ExitCostMultiplier>;
 
 export const RENT_MULTIPLIER = {
   "30X": "30x",
 } as const satisfies Record<Uppercase<RentMultiplier>, RentMultiplier>;
 
-export const DEFAULT_EXIT_COST_MULTIPLIER: ExitCostMultiplier = EXIT_COST_MULTIPLIER["5X"];
+export const DEFAULT_EXIT_COST_MULTIPLIER: ExitCostMultiplier = EXIT_COST_MULTIPLIER["6X"];
 export const DEFAULT_RENT_MULTIPLIER: RentMultiplier = RENT_MULTIPLIER["30X"];
 
 /**

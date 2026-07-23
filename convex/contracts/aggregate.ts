@@ -3,6 +3,7 @@ import { components } from "../_generated/api";
 import type { DataModel } from "../_generated/dataModel";
 import type { AgencyId } from "../agencies/domain";
 import type { ContractStatus } from "./domain";
+import { DEFAULT_PRICING_TABLE } from "./pricing";
 
 /**
  * Aggregate that counts contracts grouped by (agencyId, status).
@@ -44,9 +45,15 @@ export const contractsByStatusPlatform = new TableAggregate<{
 });
 
 /**
- * Platform-wide sum of `availableGuaranteeCents` keyed by status. Queried with
- * `bounds: { lower: "ativo", upper: "ativo" }` to compute total insured
- * exposure in O(log n) — the denominator for the capacity panel.
+ * Platform-wide worst-case exposure keyed by status. Queried with
+ * `bounds: { lower: "ativo", upper: "ativo" }` to compute total exposure in
+ * O(log n) — the denominator for the capacity panel.
+ *
+ * Per contract the exposure is the sum of the two separate, separately-disclosed
+ * coverage limits: the 30x rent-coverage ceiling (`availableGuaranteeCents`, an
+ * annual limit whose reset mechanic is owned by #259) PLUS the 6x exit
+ * sublimit. The two are shown as distinct lines on the contract; only the
+ * risk panel combines them into the 36x worst case.
  */
 export const ativoInsuredCentsPlatform = new TableAggregate<{
   Namespace: undefined;
@@ -55,5 +62,6 @@ export const ativoInsuredCentsPlatform = new TableAggregate<{
   TableName: "contracts";
 }>(components.ativoInsuredCentsPlatform, {
   sortKey: (doc) => doc.status,
-  sumValue: (doc) => doc.availableGuaranteeCents,
+  sumValue: (doc) =>
+    doc.availableGuaranteeCents + doc.rental.rentCents * DEFAULT_PRICING_TABLE.exitCostMultiplier,
 });

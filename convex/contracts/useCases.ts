@@ -351,9 +351,10 @@ export const getStatusCountsGlobal = queryWithAuth({
 });
 
 /**
- * Platform-wide insured capacity. Sum of `availableGuaranteeCents` across
- * every contract in status `ativo`, plus the configured global capacity cap.
- * O(log n) via the `ativoInsuredCentsPlatform` aggregate.
+ * Platform-wide insured capacity. Sum of worst-case exposure (30x rent-coverage
+ * ceiling + 6x exit sublimit) across every contract in status `ativo`, plus the
+ * configured global capacity cap. O(log n) via the `ativoInsuredCentsPlatform`
+ * aggregate.
  */
 export const getInsuredCapacityGlobal = queryWithAuth({
   args: {},
@@ -741,6 +742,11 @@ export const create = mutationWithAgencyScope({
       .toISOString()
       .slice(0, 10);
 
+    // Single source for the multipliers written below, so the audit entry
+    // mirrors exactly what the rental bundle persisted (they must not drift).
+    const rentMultiplier = DEFAULT_RENT_MULTIPLIER;
+    const exitCostMultiplier = DEFAULT_EXIT_COST_MULTIPLIER;
+
     const contractId = await ctx.db.insert("contracts", {
       agencyId: ctx.agencyId,
       publicId,
@@ -760,8 +766,8 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
+        exitCostMultiplier,
+        rentMultiplier,
         payer: DEFAULT_PAYER,
         pviMigrationSchedule: null,
       },
@@ -803,11 +809,8 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         availableGuaranteeCents: priced.availableGuaranteeCents,
-        // TODO: mirror the actual written values when this mutation grows to
-        // accept multipliers from args. Today these always equal the defaults
-        // written above, so audit and rental stay in lockstep.
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
+        rentMultiplier,
+        exitCostMultiplier,
       },
     });
 
