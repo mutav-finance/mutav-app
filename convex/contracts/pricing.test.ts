@@ -1,5 +1,6 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, it, test } from "vitest";
 import { priceContract, splitCommission, feeBreakdown, DEFAULT_PRICING_TABLE } from "./pricing";
+import { DEFAULT_EXIT_COST_MULTIPLIER } from "./domain";
 
 describe("priceContract", () => {
   test("bom tier, basic plan — 9% taxa, no prestamista, 30x guarantee", () => {
@@ -145,5 +146,11 @@ describe("splitCommission", () => {
       const { commissionCents, totalCents } = splitCommission(c);
       expect(totalCents).toBe(c.taxaFeeCents + c.prestamistaFeeCents + commissionCents);
     }
+  });
+});
+
+describe("exit-cost multiplier invariant", () => {
+  it("keeps the persisted string in lockstep with the pricing-table number", () => {
+    expect(DEFAULT_EXIT_COST_MULTIPLIER).toBe(`${DEFAULT_PRICING_TABLE.exitCostMultiplier}x`);
   });
 });
