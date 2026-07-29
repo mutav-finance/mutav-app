@@ -54,13 +54,11 @@ export function DelinquencyPage() {
   const [amountFrom, setAmountFrom] = React.useState("");
   const [amountTo, setAmountTo] = React.useState("");
   const [activeFilters, setActiveFilters] = React.useState<{
-    status: StatusTab;
     dateFrom: string;
     dateTo: string;
     amountFrom: string;
     amountTo: string;
   }>({
-    status: "open",
     dateFrom: "",
     dateTo: "",
     amountFrom: "",
@@ -68,7 +66,7 @@ export function DelinquencyPage() {
   });
 
   function handleSearch() {
-    setActiveFilters({ status, dateFrom, dateTo, amountFrom, amountTo });
+    setActiveFilters({ dateFrom, dateTo, amountFrom, amountTo });
   }
 
   function handleClear() {
@@ -79,7 +77,6 @@ export function DelinquencyPage() {
     setAmountFrom("");
     setAmountTo("");
     setActiveFilters({
-      status: "open",
       dateFrom: "",
       dateTo: "",
       amountFrom: "",
@@ -102,7 +99,7 @@ export function DelinquencyPage() {
     ? {
         agencyId,
         paginationOpts: { numItems: 200, cursor: null },
-        ...(activeFilters.status !== "all" ? { status: activeFilters.status } : {}),
+        ...(status !== "all" ? { status } : {}),
         ...(activeFilters.dateFrom ? { dueDateFrom: activeFilters.dateFrom } : {}),
         ...(activeFilters.dateTo ? { dueDateTo: activeFilters.dateTo } : {}),
         ...(amountFromCents != null ? { amountFromCents } : {}),
