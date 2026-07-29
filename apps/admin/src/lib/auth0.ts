@@ -2,7 +2,7 @@ import { Auth0Client } from "@auth0/nextjs-auth0/server";
 import { ConvexHttpClient } from "convex/browser";
 import { NextResponse } from "next/server";
 import { api } from "@convex/_generated/api";
-import { getAppBaseUrl, getAuth0Connection, getConvexUrl } from "@/lib/env";
+import { getAppBaseUrl, getAuth0AdminOrgId, getConvexUrl } from "@/lib/env";
 
 /**
  * Singleton Auth0 client for apps/admin.
@@ -14,23 +14,23 @@ import { getAppBaseUrl, getAuth0Connection, getConvexUrl } from "@/lib/env";
  *
  * Three load-bearing pieces that distinguish this client from agency's:
  *
- * 1. **Separate connection.** `authorizationParameters.connection` pins
- *    Universal Login to the `mutavStaff` connection (spec § Section 7).
- *    The connection is administratively distinct from the agency-staff
- *    connection: mandatory MFA at the Auth0 rule level, IP allowlist,
- *    disabled self-signup. Provisioning the connection itself is a
- *    downstream Auth0-dashboard step (Daisy); this code just routes to it.
+ * 1. **Organization-gated login.** `authorizationParameters.organization`
+ *    pins Universal Login to the Mutav staff Auth0 Organization. Only
+ *    users who are members of that Organization can complete the flow;
+ *    everyone else fails at Auth0 before the callback even fires. This
+ *    replaces the earlier scaffold that pinned a Connection ("mutavStaff")
+ *    that was never provisioned in the Auth0 tenant.
  *
- * 2. **Shorter session lifetime.** Spec § Section 5 targets 12h absolute
- *    + 30min inactivity for staff sessions. Defaults below; tune in the
- *    admin spec once it lands.
+ * 2. **Shorter session lifetime.** 12h absolute + 30min inactivity for
+ *    staff sessions. SDK enforces these on session-cookie save / rolling
+ *    refresh.
  *
  * 3. **Host-Only cookies.** No `Domain=` attribute set anywhere — the
  *    Auth0 v4 SDK's `SessionCookieOptions` and `TransactionCookieOptions`
  *    don't expose a `domain` field, so the cookie is implicitly scoped to
  *    the exact origin (`admin.mutav.finance`). The explicit `sameSite`
  *    + `secure` settings here lock down the rest of the load-bearing
- *    cookie posture (spec § Section 1).
+ *    cookie posture.
  *
  * The `onCallback` hook is the first-login provisioning point, mirroring
  * apps/agency's client: it provisions the Convex `users` row
@@ -44,7 +44,7 @@ import { getAppBaseUrl, getAuth0Connection, getConvexUrl } from "@/lib/env";
  */
 export const auth0 = new Auth0Client({
   authorizationParameters: {
-    connection: getAuth0Connection(),
+    organization: getAuth0AdminOrgId(),
   },
   async onCallback(error, context, session) {
     const baseUrl = getAppBaseUrl();
@@ -67,8 +67,13 @@ export const auth0 = new Auth0Client({
         code: error.code,
         cause,
       });
+      // Redirect errors to /auth/logout, NOT /auth/login: Auth0 SDK v4 will
+      // immediately re-enter the login flow on /auth/login and, if the
+      // upstream failure is deterministic (e.g. org membership missing),
+      // loop indefinitely. /auth/logout clears the transaction cookie and
+      // lands the user on a terminal state.
       return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
+        new URL(`/auth/logout?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
       );
     }
 
@@ -94,9 +99,6 @@ export const auth0 = new Auth0Client({
 
     return NextResponse.redirect(new URL(context.returnTo ?? "/", baseUrl));
   },
-  // Spec § Section 5: shorter session lifetime for staff. 12h absolute,
-  // 30min inactivity. SDK enforces these on session-cookie save / rolling
-  // refresh.
   session: {
     rolling: true,
     absoluteDuration: 60 * 60 * 12,
