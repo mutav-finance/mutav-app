@@ -3,7 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
-import { priceContract } from "../../apps/agency/src/lib/pricing/contract";
+import { priceContract, splitCommission, feeBreakdown } from "./pricing";
 import type { Contract, ContractHistory } from "./domain";
 import type { Tenant, TenantId } from "../tenants/domain";
 import {
@@ -14,9 +14,13 @@ import {
 import { insertContractAggregates, replaceContractAggregates } from "./aggregateWrites";
 import {
   CONTRACT_STATUS,
+  CONTRACT_ERROR_CODE,
+  contractPlanValidator,
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
+  SCORE_TIER,
+  tierForScore,
   getUrgencyTier,
   urgencySortKey,
   expiringRenewalBounds,
@@ -348,9 +352,10 @@ export const getStatusCountsGlobal = queryWithAuth({
 });
 
 /**
- * Platform-wide insured capacity. Sum of `availableGuaranteeCents` across
- * every contract in status `ativo`, plus the configured global capacity cap.
- * O(log n) via the `ativoInsuredCentsPlatform` aggregate.
+ * Platform-wide insured capacity. Sum of worst-case exposure (30x rent-coverage
+ * ceiling + 6x exit sublimit) across every contract in status `ativo`, plus the
+ * configured global capacity cap. O(log n) via the `ativoInsuredCentsPlatform`
+ * aggregate.
  */
 export const getInsuredCapacityGlobal = queryWithAuth({
   args: {},
@@ -522,11 +527,10 @@ export const getActivityByPeriod = queryWithAuth({
  * Commission page. "Active during" means `activatedAt` is on or before
  * the period and the contract wasn't deactivated *before* it — a
  * contract deactivated during the period still earned commission for
- * that period, so it stays in the result. Commission is a placeholder
- * 1.5% of `rentCents` until the rate-card domain ships (#83 —
- * `pricingVersion` snapshot).
+ * that period, so it stays in the result. Commission is the same
+ * `splitCommission` the wizard previews (taxa at `commissionRate` + prestamista
+ * premium at `prestamistaCommissionRate`), recovered from the stored fee + plan.
  */
-const COMMISSION_RATE_BPS = 150; // 150 basis points = 1.5%
 const COMMISSION_INSTALLMENTS_TOTAL = 12;
 const PERIOD_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -580,7 +584,7 @@ export const listForCommissionByMonth = queryWithAgencyScope({
           contractId: c.publicId,
           tenantName: tenantNames.get(c.tenantId) ?? "",
           rentCents: c.rental.rentCents,
-          commissionCents: Math.round((c.rental.rentCents * COMMISSION_RATE_BPS) / 10000),
+          commissionCents: splitCommission(feeBreakdown(c.rental)).commissionCents,
           installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
           activatedAt: c.activatedAt,
         };
@@ -646,7 +650,12 @@ export const requestCreditScore = mutationWithAgencyScope({
 });
 
 type CreateContractSuccessResult = { publicId: string };
-type CreateContractErrorResult = { code: typeof TENANT_ERROR_CODE.INVALID_TAX_ID };
+type CreateContractErrorResult = {
+  code:
+    | typeof TENANT_ERROR_CODE.INVALID_TAX_ID
+    | typeof CONTRACT_ERROR_CODE.TENANT_DENIED
+    | typeof CONTRACT_ERROR_CODE.INVALID_RENT;
+};
 
 /**
  * Create a new contract with server-side fee calculation.
@@ -672,6 +681,7 @@ export const create = mutationWithAgencyScope({
       description: v.string(),
     }),
     propertyKind: v.union(v.literal("residencial"), v.literal("comercial")),
+    plan: contractPlanValidator,
     rentCents: v.number(),
     condoCents: v.number(),
     otherFeesCents: v.number(),
@@ -699,6 +709,36 @@ export const create = mutationWithAgencyScope({
       };
     }
 
+    // Money inputs are integer cents; rent must be positive. The wizard guards
+    // this client-side, but the mutation is the trust boundary — a negative rent
+    // would flow into fees, the guarantee, and the platform exposure aggregate.
+    if (
+      !Number.isInteger(args.rentCents) ||
+      args.rentCents <= 0 ||
+      !Number.isInteger(args.condoCents) ||
+      args.condoCents < 0 ||
+      !Number.isInteger(args.otherFeesCents) ||
+      args.otherFeesCents < 0
+    ) {
+      return {
+        success: false,
+        error: { code: CONTRACT_ERROR_CODE.INVALID_RENT },
+        message: "Rent and fee amounts must be non-negative integer cents (rent > 0)",
+      };
+    }
+
+    // A denied credit tier cannot be priced (no rate exists for `negado`) and
+    // must never become a contract. Reject before any write; the narrowed
+    // `tier` below is what makes `priceContract` type-check.
+    const tier = tierForScore(args.tenant.score);
+    if (tier === SCORE_TIER.NEGADO) {
+      return {
+        success: false,
+        error: { code: CONTRACT_ERROR_CODE.TENANT_DENIED },
+        message: "Tenant credit tier is denied",
+      };
+    }
+
     const tenantResult = await getOrCreateTenant(ctx, {
       input: registryInput,
       actor: { kind: "user", userId: ctx.user._id },
@@ -715,7 +755,8 @@ export const create = mutationWithAgencyScope({
       rentCents: args.rentCents,
       condoCents: args.condoCents,
       otherFeesCents: args.otherFeesCents,
-      score: args.tenant.score,
+      tier,
+      plan: args.plan,
     });
 
     const publicId = generatePublicId();
@@ -723,6 +764,11 @@ export const create = mutationWithAgencyScope({
     const nextRenewalDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate())
       .toISOString()
       .slice(0, 10);
+
+    // Single source for the multipliers written below, so the audit entry
+    // mirrors exactly what the rental bundle persisted (they must not drift).
+    const rentMultiplier = DEFAULT_RENT_MULTIPLIER;
+    const exitCostMultiplier = DEFAULT_EXIT_COST_MULTIPLIER;
 
     const contractId = await ctx.db.insert("contracts", {
       agencyId: ctx.agencyId,
@@ -736,6 +782,7 @@ export const create = mutationWithAgencyScope({
       availableGuaranteeCents: priced.availableGuaranteeCents,
       rental: {
         propertyKind: args.propertyKind,
+        plan: args.plan,
         rentCents: args.rentCents,
         condoCents: args.condoCents,
         otherFeesCents: args.otherFeesCents,
@@ -743,8 +790,8 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
+        exitCostMultiplier,
+        rentMultiplier,
         payer: DEFAULT_PAYER,
         pviMigrationSchedule: null,
       },
@@ -786,11 +833,8 @@ export const create = mutationWithAgencyScope({
         feeCents: priced.feeCents,
         oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
         availableGuaranteeCents: priced.availableGuaranteeCents,
-        // TODO: mirror the actual written values when this mutation grows to
-        // accept multipliers from args. Today these always equal the defaults
-        // written above, so audit and rental stay in lockstep.
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
+        rentMultiplier,
+        exitCostMultiplier,
       },
     });
 

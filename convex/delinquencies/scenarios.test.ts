@@ -85,6 +85,7 @@ async function makeFixture(t: ReturnType<typeof setup>, suffix = "1"): Promise<F
       availableGuaranteeCents: 3_600_000,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 300_000,
         condoCents: 0,
         otherFeesCents: 0,
@@ -142,6 +143,7 @@ async function insertSecondContract(
       availableGuaranteeCents: 3_600_000,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 300_000,
         condoCents: 0,
         otherFeesCents: 0,

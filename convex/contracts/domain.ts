@@ -10,8 +10,9 @@ export type PropertyKind = Contract["rental"]["propertyKind"];
 // Decoupled from the schema: persistence is `v.string()` to tolerate legacy
 // rows with bespoke values across these fields. The narrow unions below
 // enforce write-time discipline so new code can only persist canonical values.
-export type ExitCostMultiplier = "5x";
+export type ExitCostMultiplier = "6x";
 export type RentMultiplier = "30x";
+export type ContractPlan = Contract["rental"]["plan"];
 export type Payer = "inquilino";
 export type DocumentKey = Contract["documents"][number]["key"];
 export type DocumentStatus = Contract["documents"][number]["status"];
@@ -93,15 +94,33 @@ export const SCORE_TIER_THRESHOLD = {
  * are the typed source of truth for new writes.
  */
 export const EXIT_COST_MULTIPLIER = {
-  "5X": "5x",
+  "6X": "6x",
 } as const satisfies Record<Uppercase<ExitCostMultiplier>, ExitCostMultiplier>;
 
 export const RENT_MULTIPLIER = {
   "30X": "30x",
 } as const satisfies Record<Uppercase<RentMultiplier>, RentMultiplier>;
 
-export const DEFAULT_EXIT_COST_MULTIPLIER: ExitCostMultiplier = EXIT_COST_MULTIPLIER["5X"];
+export const DEFAULT_EXIT_COST_MULTIPLIER: ExitCostMultiplier = EXIT_COST_MULTIPLIER["6X"];
 export const DEFAULT_RENT_MULTIPLIER: RentMultiplier = RENT_MULTIPLIER["30X"];
+
+/**
+ * The guarantee product chosen for a contract. `basic` = Mutav Fiança;
+ * `plus` = Mutav Fiança + (adds credit-life insurance / seguro prestamista,
+ * which raises the fee — priced in #184 Fatia D). Decoupled from the credit
+ * tier: the score sets the fee rate, the plan is the broker's choice.
+ */
+export const CONTRACT_PLAN = {
+  BASIC: "basic",
+  PLUS: "plus",
+} as const satisfies Record<Uppercase<ContractPlan>, ContractPlan>;
+
+export const contractPlanValidator = v.union(
+  v.literal(CONTRACT_PLAN.BASIC),
+  v.literal(CONTRACT_PLAN.PLUS),
+);
+
+export const DEFAULT_CONTRACT_PLAN: ContractPlan = CONTRACT_PLAN.BASIC;
 
 /**
  * Allowed values for `contracts.rental.payer` — the party responsible for
@@ -122,6 +141,13 @@ export function tierForScore(score: number): ScoreTier {
   if (score >= SCORE_TIER_THRESHOLD.low) return SCORE_TIER.RUIM;
   return SCORE_TIER.NEGADO;
 }
+
+export const CONTRACT_ERROR_CODE = {
+  TENANT_DENIED: "TENANT_DENIED",
+  INVALID_RENT: "INVALID_RENT",
+} as const satisfies Record<string, string>;
+
+export type ContractErrorCode = (typeof CONTRACT_ERROR_CODE)[keyof typeof CONTRACT_ERROR_CODE];
 
 export type UrgencyTier =
   | "overdue"

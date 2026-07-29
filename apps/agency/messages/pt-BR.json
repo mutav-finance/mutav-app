@@ -849,7 +849,9 @@
       "submitting": "Criando...",
       "errorToast": "Erro ao criar contrato. Tente novamente.",
       "errors": {
-        "INVALID_TAX_ID": "Documento do inquilino inválido (CPF/CNPJ). Verifique o número e tente novamente."
+        "INVALID_TAX_ID": "Documento do inquilino inválido (CPF/CNPJ). Verifique o número e tente novamente.",
+        "TENANT_DENIED": "O score de crédito do inquilino foi negado. Não é possível criar o contrato.",
+        "INVALID_RENT": "Valores inválidos. O aluguel deve ser maior que zero."
       },
       "missingFields": "Preencha todos os campos obrigatórios antes de confirmar.",
       "editBlock": "Editar dados",
@@ -877,6 +879,7 @@
       "cepInvalid": "CEP deve ter 8 dígitos",
       "rentRequired": "Aluguel deve ser maior que zero",
       "scoreRequired": "Aguarde o resultado do score",
+      "planRequired": "Selecione um plano de garantia",
       "birthDateFuture": "Data de nascimento não pode ser futura",
       "birthDateInvalid": "Data inválida",
       "emailInvalid": "E-mail inválido",

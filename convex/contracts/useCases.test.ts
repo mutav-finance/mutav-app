@@ -76,6 +76,7 @@ async function seedAndIndexContract(
       availableGuaranteeCents: spec.availableGuaranteeCents,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 100000,
         condoCents: 0,
         otherFeesCents: 0,
@@ -83,7 +84,7 @@ async function seedAndIndexContract(
         feeCents: 1500,
         oneTimeActivationFeeCents: 0,
         setupInstallments: 1,
-        exitCostMultiplier: "5x",
+        exitCostMultiplier: "6x",
         rentMultiplier: "30x",
         payer: "inquilino",
         pviMigrationSchedule: null,
@@ -173,7 +174,7 @@ describe("getStatusCountsGlobal", () => {
 });
 
 describe("getInsuredCapacityGlobal", () => {
-  test("sums availableGuaranteeCents over ativo contracts only", async () => {
+  test("sums exposure (30x ceiling + 6x exit) over ativo contracts only", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
@@ -196,7 +197,9 @@ describe("getInsuredCapacityGlobal", () => {
     );
 
     const result = await asUser.query(api.contracts.useCases.getInsuredCapacityGlobal, {});
-    expect(result.sumInsuredCents).toBe(350_00);
+    // Exposure per ativo = ceiling + 6x exit (rentCents 100_000 x 6 = 600_000).
+    // Two ativo: (10_000 + 25_000) + 2 x 600_000; the pendente row is excluded.
+    expect(result.sumInsuredCents).toBe(1_235_000);
     expect(result.maxCapacityCents).toBeGreaterThan(0);
   });
 });
@@ -560,6 +563,7 @@ describe("create (tenant registry, narrow phase)", () => {
       },
       optional: { complement: "", tag: "", description: "" },
       propertyKind: "residencial" as const,
+      plan: "basic" as const,
       rentCents: 300000,
       condoCents: 0,
       otherFeesCents: 0,
@@ -629,6 +633,80 @@ describe("create (tenant registry, narrow phase)", () => {
       email: "maria@example.com",
       phone: "11900000001",
     });
+  });
+
+  test("persists the chosen plan on the contract rental bundle", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({ plan: "plus" as const }),
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const contract = await t.run((ctx) =>
+      ctx.db
+        .query("contracts")
+        .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
+        .unique(),
+    );
+    expect(contract?.rental.plan).toBe("plus");
+  });
+
+  test("rejects a non-positive rent before any write", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({ rentCents: 0 }),
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("INVALID_RENT");
+
+    const contracts = await t.run((ctx) => ctx.db.query("contracts").collect());
+    expect(contracts).toHaveLength(0);
+  });
+
+  test("rejects a denied credit tier (negado) before any write", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const result = await asUser.mutation(api.contracts.useCases.create, {
+      agencyId,
+      ...createArgs({
+        tenant: {
+          entityType: "pf" as const,
+          fullName: "Maria Silva Santos",
+          cpf: VALID_CPF,
+          cnpj: undefined,
+          birthDate: "1990-05-12",
+          email: "maria@example.com",
+          phone: "11900000001",
+          score: 200,
+        },
+      }),
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("TENANT_DENIED");
+
+    // No side effects: neither a contract nor a tenant registry row was written.
+    const contracts = await t.run((ctx) => ctx.db.query("contracts").collect());
+    expect(contracts).toHaveLength(0);
+    const tenants = await t.run((ctx) => ctx.db.query("tenants").collect());
+    expect(tenants).toHaveLength(0);
   });
 
   test("getByPublicId round-trips both variants and listByAgency joins the tenant name", async () => {

@@ -13,10 +13,8 @@ import { CheckIcon } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
 import { type DraftWizardData } from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
-import type { ScoreTier } from "@convex/contracts/domain";
-import { splitCommission } from "@/lib/pricing/commission";
-import { priceContract } from "@/lib/pricing/contract";
-import { EXIT_COVERAGE_MONTHS, SCORE_TIER_RATE } from "@/lib/pricing/tiers";
+import { CONTRACT_PLAN, type ScoreTier } from "@convex/contracts/domain";
+import { priceContract, splitCommission, DEFAULT_PRICING_TABLE } from "@convex/contracts/pricing";
 
 type Props = {
   data: DraftWizardData;
@@ -39,12 +37,6 @@ const TIER_CARD_STYLE: Record<ScoreTier, string> = {
   negado: "border-red-500 bg-red-50/50 dark:bg-red-950/20",
 };
 
-const TIER_FEE_RATE: Record<Exclude<ScoreTier, "negado">, number> = {
-  bom: SCORE_TIER_RATE.high,
-  regular: SCORE_TIER_RATE.medium,
-  ruim: SCORE_TIER_RATE.low,
-};
-
 export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const t = useTranslations("contractNew");
   const { selectedAgency } = useWorkspace();
@@ -56,9 +48,9 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const requestScore = useMutation(api.contracts.useCases.requestCreditScore);
   const [requestedFor, setRequestedFor] = React.useState<string | null>(null);
 
-  // Both plans are identical for now — selection is UI-only until the "+"
-  // tier gains distinct coverage. Default to "plus" (the recommended option).
-  const [selectedPlan, setSelectedPlan] = React.useState<"basic" | "plus">("plus");
+  // No plan is pre-selected; Step 2's Next stays blocked until the broker picks
+  // one. "plus" adds the prestamista premium to the monthly fee (priceContract).
+  const selectedPlan = data.plan;
 
   const scoreResult = useQuery(
     api.contracts.useCases.getCachedCreditScore,
@@ -111,6 +103,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
 
   const score = scoreResult?.score ?? null;
   const scoreTier = scoreResult?.tier ?? null;
+  const priceableTier = scoreTier && scoreTier !== "negado" ? scoreTier : null;
 
   // Loading while: no document entered, Convex query loading (undefined),
   // or action in flight (requested for this doc but no cached result yet).
@@ -119,15 +112,16 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const isNegado = score !== null && score < 400;
 
   const preview =
-    !isNegado && data.rentCents > 0 && score !== null
+    priceableTier && data.rentCents > 0 && data.plan
       ? priceContract({
           rentCents: data.rentCents,
           condoCents: data.condoCents,
           otherFeesCents: data.otherFeesCents,
-          score,
+          tier: priceableTier,
+          plan: data.plan,
         })
       : null;
-  const commission = preview ? splitCommission(preview.feeCents) : null;
+  const commission = preview ? splitCommission(preview) : null;
 
   const tierLabel: Record<ScoreTier, string> = {
     bom: t("tenant.scoreBom"),
@@ -203,7 +197,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
       </section>
 
       {/* Coverage plans — two selectable cards; "+" carries a subtle premium accent */}
-      {!isLoading && !isNegado && scoreTier && scoreTier !== "negado" && (
+      {!isLoading && !isNegado && priceableTier && (
         <div
           role="radiogroup"
           aria-label={t("coverage.planLabel")}
@@ -211,17 +205,17 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
         >
           <CoveragePlanCard
             planName={t("coverage.planBasic")}
-            feeRatePct={TIER_FEE_RATE[scoreTier] * 100}
-            selected={selectedPlan === "basic"}
-            onSelect={() => setSelectedPlan("basic")}
+            feeRatePct={DEFAULT_PRICING_TABLE.tierRate[priceableTier] * 100}
+            selected={selectedPlan === CONTRACT_PLAN.BASIC}
+            onSelect={() => onChange({ plan: CONTRACT_PLAN.BASIC })}
           />
           <CoveragePlanCard
             planName={t("coverage.planPlus")}
-            feeRatePct={TIER_FEE_RATE[scoreTier] * 100}
-            selected={selectedPlan === "plus"}
+            feeRatePct={DEFAULT_PRICING_TABLE.tierRate[priceableTier] * 100}
+            selected={selectedPlan === CONTRACT_PLAN.PLUS}
             emphasized
             includesPrestamista
-            onSelect={() => setSelectedPlan("plus")}
+            onSelect={() => onChange({ plan: CONTRACT_PLAN.PLUS })}
           />
         </div>
       )}
@@ -234,7 +228,9 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             <SummaryRow
               label={t("coverage.summary.exitCost")}
               value={
-                data.rentCents > 0 ? formatBRLCents(EXIT_COVERAGE_MONTHS * data.rentCents) : null
+                data.rentCents > 0
+                  ? formatBRLCents(DEFAULT_PRICING_TABLE.exitCostMultiplier * data.rentCents)
+                  : null
               }
             />
             <SummaryRow
@@ -263,7 +259,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             <Link href="/">{t("simulation.closeButton")}</Link>
           </Button>
         ) : (
-          <Button onClick={onNext} disabled={isLoading || score === null}>
+          <Button onClick={onNext} disabled={isLoading || score === null || !data.plan}>
             {t("nav.nextStep3")}
           </Button>
         )}
@@ -336,14 +332,16 @@ function CoveragePlanCard({
           <span className="text-sm font-semibold">{t("rentCoverageFull")}</span>
           <span className="text-muted-foreground text-xs">{t("rentCoverageIncludes")}</span>
         </div>
-        <PlanRow label={t("exitCoverage")} value={`${EXIT_COVERAGE_MONTHS}x`} />
+        <PlanRow label={t("exitCoverage")} value={`${DEFAULT_PRICING_TABLE.exitCostMultiplier}x`} />
         {includesPrestamista && (
           <div className="bg-primary/[0.06] flex items-center justify-between gap-2 rounded-md p-3">
             <span className="flex items-center gap-1.5 text-sm font-medium">
               {t("prestamistaLabel")}
               <PrestamistaInfo />
             </span>
-            <span className="text-primary text-sm font-semibold">{t("included")}</span>
+            <span className="text-primary text-sm font-semibold">
+              +{formatBRLCents(DEFAULT_PRICING_TABLE.prestamistaPremiumCents)}
+            </span>
           </div>
         )}
         <PlanRow label={t("feeRate")} value={`${feeRatePct.toFixed(0)}%`} emphasized />

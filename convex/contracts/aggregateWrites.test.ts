@@ -64,6 +64,7 @@ async function seedContract(
       availableGuaranteeCents: spec.availableGuaranteeCents,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 100000,
         condoCents: 0,
         otherFeesCents: 0,
@@ -71,7 +72,7 @@ async function seedContract(
         feeCents: 1500,
         oneTimeActivationFeeCents: 0,
         setupInstallments: 1,
-        exitCostMultiplier: "5x",
+        exitCostMultiplier: "6x",
         rentMultiplier: "30x",
         payer: "inquilino",
         pviMigrationSchedule: null,
@@ -155,7 +156,9 @@ describe("insertContractAggregates", () => {
     expect(ativoPlatform).toBe(2);
 
     const sum = await platformInsuredSum(t);
-    expect(sum).toBe(100_00 + 300_00);
+    // Exposure per ativo = availableGuaranteeCents (30x ceiling) + 6x exit
+    // (rentCents 100_000 x 6 = 600_000). Two ativo: (10_000 + 30_000) + 2 x 600_000.
+    expect(sum).toBe(1_240_000);
   });
 });
 
@@ -189,7 +192,8 @@ describe("replaceContractAggregates", () => {
 
     expect(await platformAtivoCount(t)).toBe(1);
     expect(await ativoCountFor(t, agency)).toBe(1);
-    expect(await platformInsuredSum(t)).toBe(500_00);
+    // 50_000 ceiling + 600_000 exit (100_000 x 6).
+    expect(await platformInsuredSum(t)).toBe(650_000);
   });
 });
 
@@ -210,7 +214,8 @@ describe("deleteContractAggregates", () => {
     });
 
     expect(await platformAtivoCount(t)).toBe(1);
-    expect(await platformInsuredSum(t)).toBe(700_00);
+    // 70_000 ceiling + 600_000 exit (100_000 x 6).
+    expect(await platformInsuredSum(t)).toBe(670_000);
 
     await t.run(async (ctx) => {
       const doc = await ctx.db.get(id);

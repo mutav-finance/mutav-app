@@ -85,6 +85,7 @@ async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
       availableGuaranteeCents: 3_600_000,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 300_000,
         condoCents: 0,
         otherFeesCents: 0,

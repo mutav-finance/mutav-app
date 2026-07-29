@@ -850,7 +850,9 @@
       "missingFields": "Fill in all required fields before confirming.",
       "errorToast": "Failed to create contract. Please try again.",
       "errors": {
-        "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again."
+        "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again.",
+        "TENANT_DENIED": "The tenant's credit score was denied. The contract cannot be created.",
+        "INVALID_RENT": "Invalid amounts. Rent must be greater than zero."
       },
       "editBlock": "Edit",
       "saveBlock": "Save",
@@ -877,6 +879,7 @@
       "cepInvalid": "ZIP must have 8 digits",
       "rentRequired": "Rent must be greater than zero",
       "scoreRequired": "Waiting for score result",
+      "planRequired": "Select a guarantee plan",
       "birthDateFuture": "Date of birth cannot be in the future",
       "birthDateInvalid": "Invalid date",
       "emailInvalid": "Invalid e-mail",

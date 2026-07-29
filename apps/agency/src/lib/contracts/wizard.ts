@@ -1,6 +1,7 @@
 import {
   PROPERTY_KIND,
   TENANT_ENTITY_TYPE,
+  type ContractPlan,
   type PropertyKind,
   type ScoreTier,
   type TenantEntityType,
@@ -23,6 +24,7 @@ export type DraftWizardData = {
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
+  plan: ContractPlan | null;
   fullName: string;
   birthDate: string;
   email: string;
@@ -62,6 +64,7 @@ export type ValidatedWizardData = {
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
+  plan: ContractPlan;
   tenant: ValidatedWizardTenant;
   scoreTier: ScoreTier;
 };
@@ -73,6 +76,7 @@ export type WizardValidationCode =
   | "cepInvalid"
   | "rentRequired"
   | "scoreRequired"
+  | "planRequired"
   | "emailInvalid"
   | "phoneInvalid";
 
@@ -133,6 +137,9 @@ export function validateWizard(
   const scoreTier = draft.scoreTier;
   if (score === null || scoreTier === null) errors.push({ code: "scoreRequired", field: "score" });
 
+  const plan = draft.plan;
+  if (plan === null) errors.push({ code: "planRequired", field: "plan" });
+
   let tenant: ValidatedWizardTenant | null = null;
   if (entityType === TENANT_ENTITY_TYPE.PJ) {
     if (!isValidCNPJ(draft.cnpj)) {
@@ -163,7 +170,13 @@ export function validateWizard(
     }
   }
 
-  if (errors.length > 0 || propertyKind === null || tenant === null || scoreTier === null) {
+  if (
+    errors.length > 0 ||
+    propertyKind === null ||
+    tenant === null ||
+    scoreTier === null ||
+    plan === null
+  ) {
     return { success: false, error: errors, message: "Wizard draft failed validation" };
   }
 
@@ -181,6 +194,7 @@ export function validateWizard(
       rentCents: draft.rentCents,
       condoCents: draft.condoCents,
       otherFeesCents: draft.otherFeesCents,
+      plan,
       tenant,
       scoreTier,
     },
@@ -248,6 +262,7 @@ export const INITIAL_WIZARD_DATA: DraftWizardData = {
   rentCents: 0,
   condoCents: 0,
   otherFeesCents: 0,
+  plan: null,
   fullName: "",
   birthDate: "",
   email: "",

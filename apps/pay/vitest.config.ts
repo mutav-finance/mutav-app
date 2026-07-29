@@ -30,7 +30,6 @@ export default defineConfig({
       // unrelated to this PR. See apps/agency/vitest.config.ts for the full
       // rationale.
       "src/lib/pricing/**",
-      "apps/agency/src/lib/pricing/**",
       "apps/pay/src/lib/pricing/**",
     ],
     server: {

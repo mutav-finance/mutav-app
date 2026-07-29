@@ -330,6 +330,7 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
       },
       optional: { complement: "", tag: "", description: "" },
       propertyKind: "residencial" as const,
+      plan: "basic" as const,
       rentCents: 300000,
       condoCents: 0,
       otherFeesCents: 0,

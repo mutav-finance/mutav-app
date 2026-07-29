@@ -57,6 +57,7 @@ async function seedContractDirect(
       availableGuaranteeCents: spec.availableGuaranteeCents,
       rental: {
         propertyKind: "residencial",
+        plan: "basic",
         rentCents: 100000,
         condoCents: 0,
         otherFeesCents: 0,
@@ -64,7 +65,7 @@ async function seedContractDirect(
         feeCents: 1500,
         oneTimeActivationFeeCents: 0,
         setupInstallments: 1,
-        exitCostMultiplier: "5x",
+        exitCostMultiplier: "6x",
         rentMultiplier: "30x",
         payer: "inquilino",
         pviMigrationSchedule: null,
@@ -137,7 +138,9 @@ describe("backfillPlatformAggregates", () => {
     expect(first.done).toBe(true);
 
     expect(await platformAtivoCount(t)).toBe(2);
-    expect(await platformInsuredSum(t)).toBe(350_00);
+    // Exposure per ativo = ceiling + 6x exit (100_000 x 6 = 600_000).
+    // Two ativo: (10_000 + 25_000) + 2 x 600_000.
+    expect(await platformInsuredSum(t)).toBe(1_235_000);
   });
 
   test("idempotent — re-running after first pass is a no-op", async () => {
@@ -152,10 +155,10 @@ describe("backfillPlatformAggregates", () => {
 
     await t.mutation(internal.contracts.backfill.backfillPlatformAggregates, {});
     expect(await platformAtivoCount(t)).toBe(1);
-    expect(await platformInsuredSum(t)).toBe(42_00);
+    expect(await platformInsuredSum(t)).toBe(604_200);
 
     await t.mutation(internal.contracts.backfill.backfillPlatformAggregates, {});
     expect(await platformAtivoCount(t)).toBe(1);
-    expect(await platformInsuredSum(t)).toBe(42_00);
+    expect(await platformInsuredSum(t)).toBe(604_200);
   });
 });
