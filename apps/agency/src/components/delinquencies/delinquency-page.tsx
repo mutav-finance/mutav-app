@@ -107,6 +107,9 @@ export function DelinquencyPage() {
       }
     : ("skip" as const);
 
+  // NOTE: KPI cards read a different index tuple with .take() capped at STATS_TAKE_LIMIT;
+  // can diverge from this paginated list at scale. See openStats TODO(#agg) in
+  // convex/delinquencies/useCases.ts.
   const result = useQuery(api.delinquencies.useCases.listByAgency, listArgs);
 
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
@@ -284,6 +287,7 @@ export function DelinquencyPage() {
                       <button
                         type="button"
                         onClick={() => openNoticeDetail(row.publicId)}
+                        aria-label={t("table.view")}
                         className="hover:text-primary text-left"
                       >
                         <Mono className="text-sm font-medium">{row.publicId}</Mono>

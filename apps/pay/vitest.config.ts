@@ -4,9 +4,8 @@ import { defineConfig } from "vitest/config";
 // Mirror of apps/agency/vitest.config.ts shape but scoped to apps/pay.
 // `root` stays at the monorepo root so the same convex/** tests would be
 // discoverable from either app — that duplication is fine until packages
-// extract (PR 6). The Bun-runner exclude (apps/agency/src/lib/pricing/**)
-// stays here too because vitest's filter is repo-wide; if it weren't,
-// running pay's vitest would pick up agency's pricing tests via root.
+// extract (PR 6). The `src/lib/pricing/**` worktree exclude stays here
+// because vitest's filter is repo-wide.
 
 const monorepoRoot = path.resolve(__dirname, "../..");
 
@@ -30,7 +29,6 @@ export default defineConfig({
       // unrelated to this PR. See apps/agency/vitest.config.ts for the full
       // rationale.
       "src/lib/pricing/**",
-      "apps/pay/src/lib/pricing/**",
     ],
     server: {
       deps: {
