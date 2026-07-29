@@ -8,7 +8,7 @@ export function CurrencyInput({
 }: {
   value: string;
   onChange: (v: string) => void;
-  onBlur: (v: string) => void;
+  onBlur?: (v: string) => void;
   placeholder?: string;
 }) {
   return (
@@ -22,7 +22,7 @@ export function CurrencyInput({
         placeholder={placeholder}
         inputMode="decimal"
         onChange={(e) => onChange(e.target.value)}
-        onBlur={(e) => onBlur(e.target.value)}
+        onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
       />
     </div>
   );
