@@ -19,6 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@mutav/ui/sheet";
+import { parseAmountToCents } from "@/lib/currency/parse";
 
 type Props = {
   open: boolean;
@@ -49,23 +50,6 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
     setAmountInput("");
     setErrors({});
     onClose();
-  }
-
-  function parseAmountToCents(rawValue: string): number | null {
-    // CurrencyInput yields the "R$ 1.234,56"-shaped string. Parse pt-BR
-    // formatting into cents; leave as null on empty so the submit-time
-    // validation surfaces the missing-field message.
-    const trimmed = rawValue.trim();
-    if (!trimmed) return null;
-    const cleaned = trimmed
-      .replace(/[^\d,.-]/g, "")
-      .replace(/\./g, "")
-      .replace(",", ".");
-    const parsed = Number(cleaned);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return Math.round(parsed * 100);
-    }
-    return null;
   }
 
   async function submit() {
