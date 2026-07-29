@@ -10,7 +10,8 @@ import {
   type SeededUserId,
 } from "../lib/testFixtures";
 import { insertContractAggregates } from "./aggregateWrites";
-import { CONTRACT_STATUS, type ContractStatus } from "./domain";
+import { CONTRACT_STATUS, type Contract, type ContractStatus } from "./domain";
+import { feeBreakdown, splitCommission } from "./pricing";
 import schema from "../schema";
 
 beforeAll(() => {
@@ -48,6 +49,7 @@ type ContractSeed = {
   activatedAt?: string | null;
   deactivatedAt?: string | null;
   nextRenewalDate?: string;
+  rental?: Partial<Contract["rental"]>;
 };
 
 async function seedAndIndexContract(
@@ -88,6 +90,7 @@ async function seedAndIndexContract(
         rentMultiplier: "30x",
         payer: "inquilino",
         pviMigrationSchedule: null,
+        ...spec.rental,
       },
       property: {
         cep: "01000000",
@@ -854,5 +857,83 @@ describe("create (tenant registry, narrow phase)", () => {
     expect(contracts).toHaveLength(0);
     expect(tenants).toHaveLength(0);
     expect(audit).toHaveLength(0);
+  });
+});
+
+describe("listForCommissionByMonth", () => {
+  test("returns commissionCents computed via splitCommission(feeBreakdown(rental)) for each active contract", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const periodMonth = "2026-01";
+    const activatedAt = "2026-01-10T12:00:00.000Z";
+
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 300_000 * 30,
+        activatedAt,
+        deactivatedAt: null,
+        rental: {
+          plan: "basic",
+          rentCents: 300_000,
+          totalRentCents: 300_000,
+          feeCents: 27_000,
+        },
+      },
+      "contract-basic",
+    );
+
+    await seedAndIndexContract(
+      t,
+      {
+        agencyId,
+        status: CONTRACT_STATUS.ATIVO,
+        availableGuaranteeCents: 500_000 * 30,
+        activatedAt,
+        deactivatedAt: null,
+        rental: {
+          plan: "plus",
+          rentCents: 500_000,
+          totalRentCents: 500_000,
+          feeCents: 46_280,
+        },
+      },
+      "contract-plus",
+    );
+
+    const rows = await asUser.query(api.contracts.useCases.listForCommissionByMonth, {
+      agencyId,
+      periodMonth,
+    });
+
+    expect(rows).toHaveLength(2);
+
+    const seededList = await t.run((ctx) => ctx.db.query("contracts").collect());
+    const seededByPublicId = new Map(seededList.map((c) => [c.publicId, c]));
+
+    for (const row of rows) {
+      const seeded = seededByPublicId.get(row.contractId);
+      if (!seeded) throw new Error(`missing seed for ${row.contractId}`);
+      const expected = splitCommission(feeBreakdown(seeded.rental)).commissionCents;
+      expect(row.commissionCents).toBe(expected);
+    }
+
+    const totalReturned = rows.reduce((sum, row) => sum + row.commissionCents, 0);
+    const totalExpected = Array.from(seededByPublicId.values()).reduce(
+      (sum, c) => sum + splitCommission(feeBreakdown(c.rental)).commissionCents,
+      0,
+    );
+    expect(totalReturned).toBe(totalExpected);
+
+    const basicRow = rows.find((r) => r.contractId === "contract-basic");
+    const plusRow = rows.find((r) => r.contractId === "contract-plus");
+    if (!basicRow || !plusRow) throw new Error("expected both rows present");
+    expect(basicRow.commissionCents).toBe(405);
+    expect(plusRow.commissionCents).toBe(995);
   });
 });
