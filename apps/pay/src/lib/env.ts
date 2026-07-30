@@ -4,9 +4,8 @@
  * file under src/ that's allowed to read `process.env` directly; see
  * CLAUDE.md.
  *
- * Pay is origin-isolated and carries NO Auth0 — by design (spec § Section 1
- * load-bearing constraint). The Auth0 getters present in apps/agency are
- * intentionally absent here.
+ * Pay is origin-isolated and carries NO Auth0 — by design. The Auth0
+ * getters present in apps/agency are intentionally absent here.
  */
 
 /**

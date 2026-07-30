@@ -2,7 +2,7 @@ import { Auth0Client } from "@auth0/nextjs-auth0/server";
 import { ConvexHttpClient } from "convex/browser";
 import { NextResponse } from "next/server";
 import { api } from "@convex/_generated/api";
-import { getAppBaseUrl, getAuth0Connection, getConvexUrl } from "@/lib/env";
+import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
 
 /**
  * Singleton Auth0 client for apps/admin.
@@ -12,40 +12,40 @@ import { getAppBaseUrl, getAuth0Connection, getConvexUrl } from "@/lib/env";
  * `APP_BASE_URL`) so we don't pass them explicitly. See
  * `apps/admin/src/lib/env.ts` for the inventory.
  *
- * Three load-bearing pieces that distinguish this client from agency's:
+ * **Authorization model.** Auth0 proves identity only; it does not gate
+ * admin access. Authorization lives in Convex: the `mutavStaff` row keyed
+ * by the Auth0 subject is the source of truth, and every admin route is
+ * fail-closed at `getStaffMember()` in `apps/admin/src/lib/auth.ts` — a
+ * user without a staff row is redirected off the admin origin. Any Auth0
+ * identity that reaches the callback without a matching staff row simply
+ * bounces at the gate; provisioning them a `users` row here is harmless.
  *
- * 1. **Separate connection.** `authorizationParameters.connection` pins
- *    Universal Login to the `mutavStaff` connection (spec § Section 7).
- *    The connection is administratively distinct from the agency-staff
- *    connection: mandatory MFA at the Auth0 rule level, IP allowlist,
- *    disabled self-signup. Provisioning the connection itself is a
- *    downstream Auth0-dashboard step (Daisy); this code just routes to it.
+ * Two load-bearing pieces that distinguish this client from agency's:
  *
- * 2. **Shorter session lifetime.** Spec § Section 5 targets 12h absolute
- *    + 30min inactivity for staff sessions. Defaults below; tune in the
- *    admin spec once it lands.
+ * 1. **Shorter session lifetime.** 12h absolute + 30min inactivity for
+ *    staff sessions. SDK enforces these on session-cookie save / rolling
+ *    refresh.
  *
- * 3. **Host-Only cookies.** No `Domain=` attribute set anywhere — the
+ * 2. **Host-Only cookies.** No `Domain=` attribute set anywhere — the
  *    Auth0 v4 SDK's `SessionCookieOptions` and `TransactionCookieOptions`
  *    don't expose a `domain` field, so the cookie is implicitly scoped to
  *    the exact origin (`admin.mutav.finance`). The explicit `sameSite`
  *    + `secure` settings here lock down the rest of the load-bearing
- *    cookie posture (spec § Section 1).
+ *    cookie posture.
  *
  * The `onCallback` hook is the first-login provisioning point, mirroring
  * apps/agency's client: it provisions the Convex `users` row
- * (`getOrCreateByIdentity`) and then additively grants any staff roles
- * carried in the Auth0 roles claim (`mutavStaff.syncFromIdentity`). It
- * fails OPEN — provisioning errors are caught and logged, login still
+ * (`getOrCreateByIdentity`) and that's it. Staff rows are granted separately
+ * — either through the admin panel's `createStaffRole` mutation, or via the
+ * internal-only `bootstrapFirstAdmin` for the genesis case. There is no
+ * claim-based auto-provisioning from the JWT.
+ *
+ * Fails OPEN — provisioning errors are caught and logged, login still
  * completes — because the real staff gate is downstream in `getStaffMember()`
- * (`lib/auth.ts`), which reads the resulting `mutavStaff` row and redirects
- * non-staff users. `syncFromIdentity` is aud-bound to the admin Auth0 client
- * and fails closed until that client exists; the catch swallows that too.
+ * (`lib/auth.ts`), which reads the `mutavStaff` row and redirects non-staff
+ * users off the admin origin.
  */
 export const auth0 = new Auth0Client({
-  authorizationParameters: {
-    connection: getAuth0Connection(),
-  },
   async onCallback(error, context, session) {
     const baseUrl = getAppBaseUrl();
 
@@ -67,8 +67,13 @@ export const auth0 = new Auth0Client({
         code: error.code,
         cause,
       });
+      // Redirect errors to /auth/logout, NOT /auth/login: Auth0 SDK v4 will
+      // immediately re-enter the login flow on /auth/login and, if the
+      // upstream failure is deterministic (e.g. invalid state, misconfigured
+      // callback URL), loop indefinitely. /auth/logout clears the transaction
+      // cookie and lands the user on a terminal state.
       return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
+        new URL(`/auth/logout?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
       );
     }
 
@@ -80,23 +85,17 @@ export const auth0 = new Auth0Client({
           const convex = new ConvexHttpClient(convexUrl);
           convex.setAuth(idToken);
           await convex.mutation(api.users.useCases.getOrCreateByIdentity, {});
-          await convex.mutation(api.mutavStaff.useCases.syncFromIdentity, {});
         }
       } catch (err) {
         // Fail OPEN: log and continue. The staff gate in `getStaffMember()`
         // (`lib/auth.ts`) is the real defense — it reads the `mutavStaff`
-        // row and redirects non-staff users. `syncFromIdentity` is aud-bound
-        // to the admin Auth0 client and fails closed until that client
-        // exists; that throw lands here and is swallowed too.
+        // row and redirects non-staff users.
         console.error("[auth0.onCallback] Convex provisioning failed:", err);
       }
     }
 
     return NextResponse.redirect(new URL(context.returnTo ?? "/", baseUrl));
   },
-  // Spec § Section 5: shorter session lifetime for staff. 12h absolute,
-  // 30min inactivity. SDK enforces these on session-cookie save / rolling
-  // refresh.
   session: {
     rolling: true,
     absoluteDuration: 60 * 60 * 12,

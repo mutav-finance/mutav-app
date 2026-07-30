@@ -18,7 +18,7 @@ import { describe, expect, test } from "vitest";
 const sourcePath = join(dirname(fileURLToPath(import.meta.url)), "useCases.ts");
 const source = readFileSync(sourcePath, "utf8");
 
-const ALLOWLIST = new Set(["getMyStaff", "amIStaff", "syncFromIdentity"]);
+const ALLOWLIST = new Set(["getMyStaff", "amIStaff"]);
 
 const AUD_BOUND = new Set([
   "queryWithMutavStaff",

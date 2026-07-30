@@ -21,6 +21,7 @@ import {
   CoinsIcon,
   ActivityIcon,
   ScaleIcon,
+  UsersIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -44,6 +45,7 @@ export function AppSidebar({
     { title: tMain("treasury"), href: "/treasury", icon: <CoinsIcon /> },
     { title: tMain("observability"), href: "/observability", icon: <ActivityIcon /> },
     { title: tMain("nav"), href: "/nav", icon: <ScaleIcon /> },
+    { title: tMain("staff"), href: "/staff", icon: <UsersIcon /> },
   ];
 
   return (

@@ -4,9 +4,9 @@
  * file under src/ that's allowed to read `process.env` directly; see
  * CLAUDE.md.
  *
- * Fund is origin-isolated and carries NO Auth0 (spec § Section 1
- * load-bearing constraint). Wallet-as-identity arrives with the
- * wallet-kit selection spec; no wallet-kit env getters live here yet.
+ * Fund is origin-isolated and carries NO Auth0. Wallet-as-identity arrives
+ * with the wallet-kit selection spec; no wallet-kit env getters live here
+ * yet.
  */
 
 /**

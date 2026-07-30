@@ -243,6 +243,20 @@ Not yet wrapped (same playbook applies — and remember the internal-companion a
 
 New work in those domains should adopt the wrapper as part of the change; don't add new bare handlers next to existing bare handlers.
 
+## Admin authorization model
+
+Admin authority is split cleanly between identity and authorization:
+
+- **Auth0 proves identity.** All four persona apps share the same Auth0 Application. The admin console does not pin an Auth0 Organization; the app-level gate is "signed in, staff row present". A successful login gives you an ID token — nothing more.
+- **Convex enforces authorization** via the `mutavStaff` table combined with the staff wrappers in [`convex/lib/auth.ts`](../convex/lib/auth.ts) (`queryWithMutavStaff`, `mutationWithMutavStaff`, `queryWithMutavRole`, `mutationWithMutavRole`). These wrappers verify the caller has a `mutavStaff` row before running the handler and expose `ctx.staffUser`. They do NOT bind to a specific Auth0 Application audience — Convex's identity system does not surface the JWT `aud` claim (see [`convex/lib/auth.ts:148-155`](../convex/lib/auth.ts#L148-L155) for the note). If tighter admin-app provenance is needed later, add a custom claim from an admin Auth0 Post-Login Action (tracked in [#206](https://github.com/mutav-finance/mutav-app/issues/206)). One row per (user, role). No admin capability exists off this table.
+- **Roles ladder:** `support` < `compliance` < `admin`, checked by `meetsMinRole`. `treasury` is off the ladder (see [`convex/mutavStaff/domain.ts`](../convex/mutavStaff/domain.ts)) — an orthogonal custody capability that never satisfies an operational `minRole` gate.
+
+**Provisioning:** admins grant capabilities through the `/staff` page in `apps/admin/`, which calls `mutavStaff.createStaffRole({ auth0Sub, role })`. The target must have signed in at least once (a `users` row keyed on `subject` must exist) — we never invent user rows from admin input. Each grant writes a `staff.created` entry to the hash-chained audit log. The very first admin (genesis) is granted via the internal-only `bootstrapFirstAdmin` mutation, invoked once per deployment through `bunx convex run mutavStaff:useCases:bootstrapFirstAdmin`; it refuses once any admin row exists and writes a `staff.bootstrap` audit entry attributed to the `system` actor. There is no claim-based auto-provisioning from the JWT — every staff row is either an explicit admin grant or the genesis bootstrap.
+
+**Revocation:** `mutavStaff.deleteStaffRole({ auth0Sub, role })` removes a single row and writes `staff.deleted` to the audit log. It refuses to remove the last remaining `admin` row — whether the caller is removing their own last admin row or mutually revoking another admin's last admin row — because the only recovery from that lockout would be a direct-database write. Revocation must be deliberate: no login path removes a row, and there is no bulk operation.
+
+**Why not Auth0 Organizations?** See the mutavStaff-only decision rationale — no Auth0 Organizations for pilot scope. It's a B2B primitive that forces a Management API integration for basic writes, drags in per-app connection pinning, and only replicates the mutavStaff-row check with more moving parts. The Convex-side gate handles the same "authenticated staff member with the right capability" check with one table, one wrapper family, and one audit trail. When the staff surface grows beyond ~10 people or needs external time-limited access, revisit Auth0 Roles — Organizations were the wrong shape for either bar.
+
 ## Reference
 
 - [convex-helpers customFunctions](https://stack.convex.dev/custom-functions) — upstream pattern

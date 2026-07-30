@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import schema from "../schema";
 import type { MutavStaffRole } from "./domain";
 
@@ -184,5 +184,320 @@ describe("audit trail", () => {
     expect(entries.length).toBe(1);
     expect(entries[0].action).toBe("onboarding.reviewed");
     expect(entries[0].actor).toEqual({ kind: "user", userId: staffUserId });
+  });
+});
+
+async function seedPlainUser(t: T, subject: string) {
+  return t.run(async (ctx) =>
+    ctx.db.insert("users", {
+      publicId: `pub-${subject}`,
+      subject,
+      name: `User ${subject}`,
+      email: `${subject}@test.br`,
+      createdAt: new Date().toISOString(),
+    }),
+  );
+}
+
+describe("listAllStaff", () => {
+  test("admin sees every mutavStaff row enriched with auth0Sub + addedBy name", async () => {
+    const t = convexTest(schema);
+    const adminUserId = await seedStaff(t, "auth0|admin", ["admin"]);
+    await seedStaff(t, "auth0|comp", ["compliance"]);
+
+    // Grant one row via the admin panel so addedBy is populated.
+    await seedPlainUser(t, "auth0|newbie");
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+    await asAdmin.mutation(api.mutavStaff.useCases.createStaffRole, {
+      auth0Sub: "auth0|newbie",
+      role: "support",
+    });
+
+    const rows = await asAdmin.query(api.mutavStaff.useCases.listAllStaff, {});
+    expect(rows.length).toBe(3);
+
+    const bySub = new Map(rows.map((row) => [`${row.auth0Sub}:${row.role}`, row]));
+    const seeded = bySub.get("auth0|comp:compliance");
+    expect(seeded?.addedBy).toBeNull();
+    expect(seeded?.addedByName).toBeNull();
+
+    const granted = bySub.get("auth0|newbie:support");
+    expect(granted?.addedBy).toBe(adminUserId);
+    expect(granted?.addedByName).toBe("Staff");
+  });
+
+  test("compliance caller is rejected (admin-only)", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|comp", ["compliance"]);
+    const asCompliance = t.withIdentity({ subject: "auth0|comp", aud: ADMIN_AUD });
+    await expect(asCompliance.query(api.mutavStaff.useCases.listAllStaff, {})).rejects.toThrow();
+  });
+});
+
+describe("createStaffRole", () => {
+  test("happy path — grants row, sets addedBy, writes audit entry", async () => {
+    const t = convexTest(schema);
+    const adminUserId = await seedStaff(t, "auth0|admin", ["admin"]);
+    const targetUserId = await seedPlainUser(t, "auth0|newbie");
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+
+    const result = await asAdmin.mutation(api.mutavStaff.useCases.createStaffRole, {
+      auth0Sub: "auth0|newbie",
+      role: "compliance",
+    });
+    expect(result.success).toBe(true);
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query("mutavStaff")
+        .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+        .collect(),
+    );
+    expect(rows.length).toBe(1);
+    expect(rows[0].role).toBe("compliance");
+    expect(rows[0].addedBy).toBe(adminUserId);
+
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .withIndex("by_resource", (q) =>
+          q.eq("resourceType", "mutavStaff").eq("resourceId", rows[0]._id),
+        )
+        .collect(),
+    );
+    expect(audits.length).toBe(1);
+    expect(audits[0].action).toBe("staff.created");
+    expect(audits[0].actor).toEqual({ kind: "user", userId: adminUserId });
+  });
+
+  test("ROLE_ALREADY_EXISTS when the same (sub, role) is granted twice", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    await seedPlainUser(t, "auth0|newbie");
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+
+    await asAdmin.mutation(api.mutavStaff.useCases.createStaffRole, {
+      auth0Sub: "auth0|newbie",
+      role: "support",
+    });
+    const second = await asAdmin.mutation(api.mutavStaff.useCases.createStaffRole, {
+      auth0Sub: "auth0|newbie",
+      role: "support",
+    });
+    expect(second.success).toBe(false);
+    if (!second.success) expect(second.error.code).toBe("ROLE_ALREADY_EXISTS");
+  });
+
+  test("USER_NOT_FOUND when the target auth0Sub has no users row yet", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+
+    const result = await asAdmin.mutation(api.mutavStaff.useCases.createStaffRole, {
+      auth0Sub: "auth0|nobody-here",
+      role: "support",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("USER_NOT_FOUND");
+  });
+
+  test("compliance caller is rejected (admin-only)", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|comp", ["compliance"]);
+    await seedPlainUser(t, "auth0|newbie");
+    const asCompliance = t.withIdentity({ subject: "auth0|comp", aud: ADMIN_AUD });
+    await expect(
+      asCompliance.mutation(api.mutavStaff.useCases.createStaffRole, {
+        auth0Sub: "auth0|newbie",
+        role: "support",
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("deleteStaffRole", () => {
+  test("happy path — removes row and writes staff.deleted audit entry", async () => {
+    const t = convexTest(schema);
+    const adminUserId = await seedStaff(t, "auth0|admin", ["admin"]);
+    const targetUserId = await seedStaff(t, "auth0|comp", ["compliance"]);
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+
+    const result = await asAdmin.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|comp",
+      role: "compliance",
+    });
+    expect(result.success).toBe(true);
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query("mutavStaff")
+        .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+        .collect(),
+    );
+    expect(rows.length).toBe(0);
+
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .filter((q) => q.eq(q.field("action"), "staff.deleted"))
+        .collect(),
+    );
+    expect(audits.length).toBe(1);
+    expect(audits[0].actor).toEqual({ kind: "user", userId: adminUserId });
+  });
+
+  test("ROLE_NOT_FOUND when the (sub, role) pair doesn't exist", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    await seedPlainUser(t, "auth0|ghost");
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+
+    const result = await asAdmin.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|ghost",
+      role: "support",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("ROLE_NOT_FOUND");
+  });
+
+  test("LAST_ADMIN_LOCKOUT when the caller removes their own last admin row", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+
+    const result = await asAdmin.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|admin",
+      role: "admin",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("LAST_ADMIN_LOCKOUT");
+  });
+
+  test("self-revoke succeeds when another admin remains", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    await seedStaff(t, "auth0|admin2", ["admin"]);
+    const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
+
+    const result = await asAdmin.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|admin",
+      role: "admin",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("LAST_ADMIN_LOCKOUT on mutual revoke — admin-A removes admin-B (B is the only other admin)", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|adminA", ["admin"]);
+    await seedStaff(t, "auth0|adminB", ["admin"]);
+    const asAdminA = t.withIdentity({ subject: "auth0|adminA", aud: ADMIN_AUD });
+
+    const first = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminB",
+      role: "admin",
+    });
+    expect(first.success).toBe(true);
+
+    const second = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminA",
+      role: "admin",
+    });
+    expect(second.success).toBe(false);
+    if (!second.success) expect(second.error.code).toBe("LAST_ADMIN_LOCKOUT");
+  });
+
+  test("admin-A can revoke admin-B when 3+ admins remain", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|adminA", ["admin"]);
+    await seedStaff(t, "auth0|adminB", ["admin"]);
+    await seedStaff(t, "auth0|adminC", ["admin"]);
+    const asAdminA = t.withIdentity({ subject: "auth0|adminA", aud: ADMIN_AUD });
+
+    const result = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminB",
+      role: "admin",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("admin-A can revoke admin-B's non-admin role even when only 2 admins remain", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|adminA", ["admin"]);
+    await seedStaff(t, "auth0|adminB", ["admin", "compliance"]);
+    const asAdminA = t.withIdentity({ subject: "auth0|adminA", aud: ADMIN_AUD });
+
+    const result = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminB",
+      role: "compliance",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("compliance caller is rejected (admin-only)", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|comp", ["compliance"]);
+    await seedStaff(t, "auth0|other", ["support"]);
+    const asCompliance = t.withIdentity({ subject: "auth0|comp", aud: ADMIN_AUD });
+    await expect(
+      asCompliance.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+        auth0Sub: "auth0|other",
+        role: "support",
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("bootstrapFirstAdmin", () => {
+  test("happy path — grants first admin row and writes staff.bootstrap audit entry", async () => {
+    const t = convexTest(schema);
+    const targetUserId = await seedPlainUser(t, "auth0|genesis");
+
+    const result = await t.mutation(internal.mutavStaff.useCases.bootstrapFirstAdmin, {
+      auth0Sub: "auth0|genesis",
+      email: "genesis@test.br",
+    });
+    expect(result.success).toBe(true);
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query("mutavStaff")
+        .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+        .collect(),
+    );
+    expect(rows.length).toBe(1);
+    expect(rows[0].role).toBe("admin");
+    expect(rows[0].addedBy).toBeUndefined();
+
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .filter((q) => q.eq(q.field("action"), "staff.bootstrap"))
+        .collect(),
+    );
+    expect(audits.length).toBe(1);
+    expect(audits[0].actor).toEqual({ kind: "system", source: "bootstrap" });
+  });
+
+  test("ADMIN_ALREADY_EXISTS when an admin row is already present", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|existing", ["admin"]);
+    await seedPlainUser(t, "auth0|genesis");
+
+    const result = await t.mutation(internal.mutavStaff.useCases.bootstrapFirstAdmin, {
+      auth0Sub: "auth0|genesis",
+      email: "genesis@test.br",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("ADMIN_ALREADY_EXISTS");
+  });
+
+  test("USER_NOT_FOUND when the target auth0Sub has no users row yet", async () => {
+    const t = convexTest(schema);
+    const result = await t.mutation(internal.mutavStaff.useCases.bootstrapFirstAdmin, {
+      auth0Sub: "auth0|nobody",
+      email: "nobody@test.br",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("USER_NOT_FOUND");
   });
 });

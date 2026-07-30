@@ -26,8 +26,59 @@
       "defaults": "Default requests",
       "treasury": "Treasury",
       "observability": "Observability",
-      "nav": "NAV"
+      "nav": "NAV",
+      "staff": "Staff"
     }
+  },
+  "staff": {
+    "title": "Staff",
+    "subtitle": "Grant or revoke Mutav-internal capabilities.",
+    "empty": "No staff members yet.",
+    "columns": {
+      "auth0Sub": "Auth0 subject",
+      "role": "Role",
+      "createdAt": "Granted",
+      "addedBy": "Added by",
+      "actions": "Actions"
+    },
+    "actions": {
+      "add": "Add staff",
+      "remove": "Remove",
+      "confirmRemove": "Confirm removal",
+      "cancel": "Cancel"
+    },
+    "roles": {
+      "admin": "Admin",
+      "compliance": "Compliance",
+      "support": "Support",
+      "treasury": "Treasury"
+    },
+    "dialog": {
+      "addTitle": "Grant a new staff role",
+      "addDescription": "Enter the Auth0 subject (the target must have logged in at least once) and pick the capability to grant.",
+      "auth0SubLabel": "Auth0 subject",
+      "auth0SubPlaceholder": "auth0|65ab…",
+      "roleLabel": "Role",
+      "submit": "Grant role",
+      "removeTitle": "Revoke staff role",
+      "removeDescription": "This removes the capability immediately. The user keeps their Auth0 identity but loses this Mutav power."
+    },
+    "toast": {
+      "createSuccess": "Staff role granted.",
+      "createError": "Could not grant staff role.",
+      "deleteSuccess": "Staff role revoked.",
+      "deleteError": "Could not revoke staff role."
+    },
+    "errors": {
+      "ADMIN_ALREADY_EXISTS": "An admin already exists — use the admin panel to grant additional roles.",
+      "LAST_ADMIN_LOCKOUT": "Cannot revoke the last remaining admin role — at least one admin must remain.",
+      "ROLE_ALREADY_EXISTS": "That user already holds this role.",
+      "ROLE_NOT_FOUND": "No such role for that user.",
+      "USER_NOT_FOUND": "No user with that Auth0 subject has signed in yet.",
+      "unexpected": "Something went wrong. Please try again."
+    },
+    "addedByFallback": "Unknown",
+    "notAvailable": "—"
   },
   "adminShell": {
     "placeholder": {
