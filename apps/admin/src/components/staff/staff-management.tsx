@@ -143,7 +143,10 @@ function AddStaffDialog({ vm }: { vm: ReturnType<typeof useStaffManagement> }) {
             <span className="text-base-sm font-medium">{t("dialog.roleLabel")}</span>
             <Select
               value={vm.add.role}
-              onValueChange={(value) => vm.add.setRole(value as MutavStaffRole)}
+              onValueChange={(value) => {
+                const parsed = ROLE_OPTIONS.find((role) => role === value);
+                if (parsed) vm.add.setRole(parsed);
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
