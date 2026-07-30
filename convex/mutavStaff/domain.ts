@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import type { UserIdentity } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
 // ─── Mutav staff ────────────────────────────────────────────────────────────────
@@ -40,7 +39,11 @@ export const mutavStaffRoleValidator = v.union(
  * `meetsMinRole`. Folding treasury into a linear order is the exact bug that
  * would let a custody role approve KYC.
  */
-export const MUTAV_STAFF_LADDER = ["support", "compliance", "admin"] as const;
+export const MUTAV_STAFF_LADDER = [
+  "support",
+  "compliance",
+  "admin",
+] as const satisfies readonly MutavStaffRole[];
 
 export type MutavLadderRole = (typeof MUTAV_STAFF_LADDER)[number];
 
@@ -66,44 +69,25 @@ export const hasExactRole = (roles: readonly MutavStaffRole[], role: MutavStaffR
 
 /**
  * Error codes returned by the admin-panel staff-provisioning mutations
- * (`createStaffRole` / `deleteStaffRole`). Rendered client-side via
- * `t('errors.<code>')` lookup — never surface raw messages.
+ * (`createStaffRole` / `deleteStaffRole`) and the genesis `bootstrapFirstAdmin`.
+ * Rendered client-side via `t('errors.<code>')` lookup — never surface raw
+ * messages.
  *
- * `SELF_REVOKE_LAST_ADMIN` guards against an admin locking every admin out by
- * revoking their own last `admin` row when nobody else holds it.
- * `USER_NOT_FOUND` covers the "no `users` row for that auth0Sub yet" case —
- * the target must have logged in at least once before being granted a role.
+ * `LAST_ADMIN_LOCKOUT` guards against dropping the admin count below 1 by
+ * revocation (either self-revoke or mutual revoke). `USER_NOT_FOUND` covers
+ * the "no `users` row for that auth0Sub yet" case — the target must have
+ * logged in at least once before being granted a role.
+ * `ADMIN_ALREADY_EXISTS` is emitted only by `bootstrapFirstAdmin` when an
+ * admin row is already present; further admins must go through
+ * `createStaffRole` under the regular audited path.
  */
 export const MUTAV_STAFF_ERROR_CODE = {
+  ADMIN_ALREADY_EXISTS: "ADMIN_ALREADY_EXISTS",
+  LAST_ADMIN_LOCKOUT: "LAST_ADMIN_LOCKOUT",
   ROLE_ALREADY_EXISTS: "ROLE_ALREADY_EXISTS",
   ROLE_NOT_FOUND: "ROLE_NOT_FOUND",
-  SELF_REVOKE_LAST_ADMIN: "SELF_REVOKE_LAST_ADMIN",
   USER_NOT_FOUND: "USER_NOT_FOUND",
 } as const;
 
 export type MutavStaffErrorCode =
   (typeof MUTAV_STAFF_ERROR_CODE)[keyof typeof MUTAV_STAFF_ERROR_CODE];
-
-/**
- * Auth0 custom claim carrying the staff member's Mutav roles, namespaced per
- * Auth0's custom-claim rules. Injected by the admin app's Post-Login Action
- * (Auth0 dashboard) from the user's group membership. This constant MUST match
- * the claim name the Action sets — it is the contract between the IdP and the
- * `mutavStaff` provisioning path.
- */
-export const MUTAV_ROLES_CLAIM = "https://mutav.finance/mutav_roles";
-
-/**
- * Parse + validate the roles claim off a decoded token. Returns only values
- * that are real `MutavStaffRole`s; anything malformed or unknown is dropped
- * (fail-closed). Reads via the `UserIdentity` index signature with runtime
- * guards — no cast.
- */
-export function readMutavRolesClaim(identity: UserIdentity): MutavStaffRole[] {
-  const claim = identity[MUTAV_ROLES_CLAIM];
-  if (!Array.isArray(claim)) return [];
-  const valid = new Set<string>(Object.values(MUTAV_STAFF_ROLE));
-  return claim.filter(
-    (entry): entry is MutavStaffRole => typeof entry === "string" && valid.has(entry),
-  );
-}

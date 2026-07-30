@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import schema from "../schema";
 import type { MutavStaffRole } from "./domain";
 
@@ -360,7 +360,7 @@ describe("deleteStaffRole", () => {
     if (!result.success) expect(result.error.code).toBe("ROLE_NOT_FOUND");
   });
 
-  test("SELF_REVOKE_LAST_ADMIN when the caller removes their own last admin row", async () => {
+  test("LAST_ADMIN_LOCKOUT when the caller removes their own last admin row", async () => {
     const t = convexTest(schema);
     await seedStaff(t, "auth0|admin", ["admin"]);
     const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
@@ -370,7 +370,7 @@ describe("deleteStaffRole", () => {
       role: "admin",
     });
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.code).toBe("SELF_REVOKE_LAST_ADMIN");
+    if (!result.success) expect(result.error.code).toBe("LAST_ADMIN_LOCKOUT");
   });
 
   test("self-revoke succeeds when another admin remains", async () => {
@@ -386,6 +386,53 @@ describe("deleteStaffRole", () => {
     expect(result.success).toBe(true);
   });
 
+  test("LAST_ADMIN_LOCKOUT on mutual revoke — admin-A removes admin-B (B is the only other admin)", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|adminA", ["admin"]);
+    await seedStaff(t, "auth0|adminB", ["admin"]);
+    const asAdminA = t.withIdentity({ subject: "auth0|adminA", aud: ADMIN_AUD });
+
+    const first = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminB",
+      role: "admin",
+    });
+    expect(first.success).toBe(true);
+
+    const second = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminA",
+      role: "admin",
+    });
+    expect(second.success).toBe(false);
+    if (!second.success) expect(second.error.code).toBe("LAST_ADMIN_LOCKOUT");
+  });
+
+  test("admin-A can revoke admin-B when 3+ admins remain", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|adminA", ["admin"]);
+    await seedStaff(t, "auth0|adminB", ["admin"]);
+    await seedStaff(t, "auth0|adminC", ["admin"]);
+    const asAdminA = t.withIdentity({ subject: "auth0|adminA", aud: ADMIN_AUD });
+
+    const result = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminB",
+      role: "admin",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("admin-A can revoke admin-B's non-admin role even when only 2 admins remain", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|adminA", ["admin"]);
+    await seedStaff(t, "auth0|adminB", ["admin", "compliance"]);
+    const asAdminA = t.withIdentity({ subject: "auth0|adminA", aud: ADMIN_AUD });
+
+    const result = await asAdminA.mutation(api.mutavStaff.useCases.deleteStaffRole, {
+      auth0Sub: "auth0|adminB",
+      role: "compliance",
+    });
+    expect(result.success).toBe(true);
+  });
+
   test("compliance caller is rejected (admin-only)", async () => {
     const t = convexTest(schema);
     await seedStaff(t, "auth0|comp", ["compliance"]);
@@ -397,5 +444,60 @@ describe("deleteStaffRole", () => {
         role: "support",
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("bootstrapFirstAdmin", () => {
+  test("happy path — grants first admin row and writes staff.bootstrap audit entry", async () => {
+    const t = convexTest(schema);
+    const targetUserId = await seedPlainUser(t, "auth0|genesis");
+
+    const result = await t.mutation(internal.mutavStaff.useCases.bootstrapFirstAdmin, {
+      auth0Sub: "auth0|genesis",
+      email: "genesis@test.br",
+    });
+    expect(result.success).toBe(true);
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query("mutavStaff")
+        .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+        .collect(),
+    );
+    expect(rows.length).toBe(1);
+    expect(rows[0].role).toBe("admin");
+    expect(rows[0].addedBy).toBeUndefined();
+
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .filter((q) => q.eq(q.field("action"), "staff.bootstrap"))
+        .collect(),
+    );
+    expect(audits.length).toBe(1);
+    expect(audits[0].actor).toEqual({ kind: "system", source: "bootstrap" });
+  });
+
+  test("ADMIN_ALREADY_EXISTS when an admin row is already present", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|existing", ["admin"]);
+    await seedPlainUser(t, "auth0|genesis");
+
+    const result = await t.mutation(internal.mutavStaff.useCases.bootstrapFirstAdmin, {
+      auth0Sub: "auth0|genesis",
+      email: "genesis@test.br",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("ADMIN_ALREADY_EXISTS");
+  });
+
+  test("USER_NOT_FOUND when the target auth0Sub has no users row yet", async () => {
+    const t = convexTest(schema);
+    const result = await t.mutation(internal.mutavStaff.useCases.bootstrapFirstAdmin, {
+      auth0Sub: "auth0|nobody",
+      email: "nobody@test.br",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("USER_NOT_FOUND");
   });
 });

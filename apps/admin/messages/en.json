@@ -70,9 +70,10 @@
       "deleteError": "Could not revoke staff role."
     },
     "errors": {
+      "ADMIN_ALREADY_EXISTS": "An admin already exists — use the admin panel to grant additional roles.",
+      "LAST_ADMIN_LOCKOUT": "Cannot revoke the last remaining admin role — at least one admin must remain.",
       "ROLE_ALREADY_EXISTS": "That user already holds this role.",
       "ROLE_NOT_FOUND": "No such role for that user.",
-      "SELF_REVOKE_LAST_ADMIN": "You are the last admin — cannot revoke your own admin role.",
       "USER_NOT_FOUND": "No user with that Auth0 subject has signed in yet.",
       "unexpected": "Something went wrong. Please try again."
     },

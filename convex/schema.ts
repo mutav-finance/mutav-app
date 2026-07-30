@@ -279,8 +279,8 @@ export default defineSchema(
       role: mutavStaffRole,
       createdAt: v.string(),
       // The admin who granted this role, when the row was created via the
-      // admin-panel `createStaffRole` mutation. Optional because pre-existing
-      // rows (seed, first-login `syncFromIdentity`) have no acting admin.
+      // admin-panel `createStaffRole` mutation. Optional because rows created
+      // by seed data or the genesis `bootstrapFirstAdmin` have no acting admin.
       addedBy: v.optional(v.id("users")),
     })
       .index("by_user", ["userId"])

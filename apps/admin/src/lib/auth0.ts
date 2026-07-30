@@ -35,13 +35,15 @@ import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
  *
  * The `onCallback` hook is the first-login provisioning point, mirroring
  * apps/agency's client: it provisions the Convex `users` row
- * (`getOrCreateByIdentity`) and then additively grants any staff roles
- * carried in the Auth0 roles claim (`mutavStaff.syncFromIdentity`). It
- * fails OPEN — provisioning errors are caught and logged, login still
+ * (`getOrCreateByIdentity`) and that's it. Staff rows are granted separately
+ * — either through the admin panel's `createStaffRole` mutation, or via the
+ * internal-only `bootstrapFirstAdmin` for the genesis case. There is no
+ * claim-based auto-provisioning from the JWT.
+ *
+ * Fails OPEN — provisioning errors are caught and logged, login still
  * completes — because the real staff gate is downstream in `getStaffMember()`
- * (`lib/auth.ts`), which reads the resulting `mutavStaff` row and redirects
- * non-staff users. `syncFromIdentity` is aud-bound to the admin Auth0 client
- * and fails closed until that client exists; the catch swallows that too.
+ * (`lib/auth.ts`), which reads the `mutavStaff` row and redirects non-staff
+ * users off the admin origin.
  */
 export const auth0 = new Auth0Client({
   async onCallback(error, context, session) {
@@ -83,14 +85,11 @@ export const auth0 = new Auth0Client({
           const convex = new ConvexHttpClient(convexUrl);
           convex.setAuth(idToken);
           await convex.mutation(api.users.useCases.getOrCreateByIdentity, {});
-          await convex.mutation(api.mutavStaff.useCases.syncFromIdentity, {});
         }
       } catch (err) {
         // Fail OPEN: log and continue. The staff gate in `getStaffMember()`
         // (`lib/auth.ts`) is the real defense — it reads the `mutavStaff`
-        // row and redirects non-staff users. `syncFromIdentity` is aud-bound
-        // to the admin Auth0 client and fails closed until that client
-        // exists; that throw lands here and is swallowed too.
+        // row and redirects non-staff users.
         console.error("[auth0.onCallback] Convex provisioning failed:", err);
       }
     }

@@ -70,9 +70,10 @@
       "deleteError": "Não foi possível revogar o papel."
     },
     "errors": {
+      "ADMIN_ALREADY_EXISTS": "Já existe um admin — use o painel para conceder papéis adicionais.",
+      "LAST_ADMIN_LOCKOUT": "Não é possível revogar o último papel de admin — ao menos um admin precisa permanecer.",
       "ROLE_ALREADY_EXISTS": "Este usuário já possui este papel.",
       "ROLE_NOT_FOUND": "Nenhum papel deste tipo encontrado para o usuário.",
-      "SELF_REVOKE_LAST_ADMIN": "Você é o último admin — não é possível revogar seu próprio papel de admin.",
       "USER_NOT_FOUND": "Nenhum usuário com esse identificador Auth0 fez login ainda.",
       "unexpected": "Algo deu errado. Tente novamente."
     },

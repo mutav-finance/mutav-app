@@ -55,6 +55,7 @@ export const AUDIT_ACTION = {
   // mutavStaff/ (admin staff-role provisioning — emitted by convex/mutavStaff/useCases.ts).
   STAFF_CREATED: "staff.created",
   STAFF_DELETED: "staff.deleted",
+  STAFF_BOOTSTRAP: "staff.bootstrap",
   // tenants/ (registry re-encounter with conflicting identity fields —
   // emitted by convex/tenants/useCases.ts for staff review; the registry
   // value is NOT overwritten).
@@ -85,6 +86,7 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
   v.literal(AUDIT_ACTION.STAFF_CREATED),
   v.literal(AUDIT_ACTION.STAFF_DELETED),
+  v.literal(AUDIT_ACTION.STAFF_BOOTSTRAP),
   v.literal(AUDIT_ACTION.TENANT_DATA_CONFLICT),
   v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISMISSED),
