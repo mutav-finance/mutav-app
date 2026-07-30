@@ -2,7 +2,7 @@ import { Auth0Client } from "@auth0/nextjs-auth0/server";
 import { ConvexHttpClient } from "convex/browser";
 import { NextResponse } from "next/server";
 import { api } from "@convex/_generated/api";
-import { getAppBaseUrl, getAuth0AdminOrgId, getConvexUrl } from "@/lib/env";
+import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
 
 /**
  * Singleton Auth0 client for apps/admin.
@@ -12,20 +12,21 @@ import { getAppBaseUrl, getAuth0AdminOrgId, getConvexUrl } from "@/lib/env";
  * `APP_BASE_URL`) so we don't pass them explicitly. See
  * `apps/admin/src/lib/env.ts` for the inventory.
  *
- * Three load-bearing pieces that distinguish this client from agency's:
+ * **Authorization model.** Auth0 proves identity only; it does not gate
+ * admin access. Authorization lives in Convex: the `mutavStaff` row keyed
+ * by the Auth0 subject is the source of truth, and every admin route is
+ * fail-closed at `getStaffMember()` in `apps/admin/src/lib/auth.ts` — a
+ * user without a staff row is redirected off the admin origin. Any Auth0
+ * identity that reaches the callback without a matching staff row simply
+ * bounces at the gate; provisioning them a `users` row here is harmless.
  *
- * 1. **Organization-gated login.** `authorizationParameters.organization`
- *    pins Universal Login to the Mutav staff Auth0 Organization. Only
- *    users who are members of that Organization can complete the flow;
- *    everyone else fails at Auth0 before the callback even fires. This
- *    replaces the earlier scaffold that pinned a Connection ("mutavStaff")
- *    that was never provisioned in the Auth0 tenant.
+ * Two load-bearing pieces that distinguish this client from agency's:
  *
- * 2. **Shorter session lifetime.** 12h absolute + 30min inactivity for
+ * 1. **Shorter session lifetime.** 12h absolute + 30min inactivity for
  *    staff sessions. SDK enforces these on session-cookie save / rolling
  *    refresh.
  *
- * 3. **Host-Only cookies.** No `Domain=` attribute set anywhere — the
+ * 2. **Host-Only cookies.** No `Domain=` attribute set anywhere — the
  *    Auth0 v4 SDK's `SessionCookieOptions` and `TransactionCookieOptions`
  *    don't expose a `domain` field, so the cookie is implicitly scoped to
  *    the exact origin (`admin.mutav.finance`). The explicit `sameSite`
@@ -43,9 +44,6 @@ import { getAppBaseUrl, getAuth0AdminOrgId, getConvexUrl } from "@/lib/env";
  * and fails closed until that client exists; the catch swallows that too.
  */
 export const auth0 = new Auth0Client({
-  authorizationParameters: {
-    organization: getAuth0AdminOrgId(),
-  },
   async onCallback(error, context, session) {
     const baseUrl = getAppBaseUrl();
 
@@ -69,9 +67,9 @@ export const auth0 = new Auth0Client({
       });
       // Redirect errors to /auth/logout, NOT /auth/login: Auth0 SDK v4 will
       // immediately re-enter the login flow on /auth/login and, if the
-      // upstream failure is deterministic (e.g. org membership missing),
-      // loop indefinitely. /auth/logout clears the transaction cookie and
-      // lands the user on a terminal state.
+      // upstream failure is deterministic (e.g. invalid state, misconfigured
+      // callback URL), loop indefinitely. /auth/logout clears the transaction
+      // cookie and lands the user on a terminal state.
       return NextResponse.redirect(
         new URL(`/auth/logout?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
       );

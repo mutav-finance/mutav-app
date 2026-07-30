@@ -22,22 +22,6 @@ export function getAuth0Domain(): string | null {
 }
 
 /**
- * Auth0 Organization id that gates admin access. Universal Login is scoped
- * to this Organization so only members of the Mutav staff org can complete
- * the flow. Required in every environment — no fallback, because a silent
- * default would let any Auth0 user reach the admin shell.
- */
-export function getAuth0AdminOrgId(): string {
-  const orgId = process.env.AUTH0_ADMIN_ORG_ID;
-  if (!orgId) {
-    throw new Error(
-      "AUTH0_ADMIN_ORG_ID is required — set it to the Auth0 Organization id that gates admin access",
-    );
-  }
-  return orgId;
-}
-
-/**
  * Public URL of the agency app (`app.mutav.finance`). The admin staff gate
  * bounces an authenticated-but-not-staff user here (cross-app, cross-origin)
  * rather than looping them back to Universal Login. Falls back to the agency
