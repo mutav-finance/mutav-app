@@ -113,7 +113,15 @@ export const auth0 = new Auth0Client({
     },
   },
   transactionCookie: {
-    sameSite: "strict",
+    // Must be "lax" (not "strict"): the OAuth callback is a cross-site
+    // top-level navigation from the Auth0 tenant domain back to
+    // admin.mutav.finance/auth/callback. Browsers strip SameSite=strict
+    // cookies on cross-site navigations, so a strict transaction cookie
+    // set at /auth/login never reaches the callback handler — the SDK
+    // then throws InvalidStateError and onCallback triggers the
+    // /auth/logout fail-safe. The session cookie above stays "strict"
+    // because it is set post-callback and only serves same-site requests.
+    sameSite: "lax",
     secure: true,
   },
 });
