@@ -101,11 +101,17 @@ export const auth0 = new Auth0Client({
     absoluteDuration: 60 * 60 * 12,
     inactivityDuration: 60 * 30,
     cookie: {
-      // `__Host-` prefix would enforce Host-Only at the browser level too,
-      // but the SDK rejects custom names containing `__Host-` because it
-      // also mounts the cookie on path `/`. Host-Only is still achieved
-      // because no `Domain=` attribute is set by the SDK.
-      sameSite: "strict",
+      // Must be "lax" (not "strict"): the session cookie is Set-Cookie'd on
+      // the /auth/callback response, and the browser immediately follows a
+      // 307 to /pt-BR (or context.returnTo). Chrome treats that follow-up
+      // as still-cross-site because the initiating navigation was Auth0's
+      // cross-site redirect; strict cookies get dropped on the first
+      // request to the layout, getStaffMember() sees no session, redirects
+      // to /auth/login, and the OAuth flow restarts — an infinite loop
+      // that only breaks when transaction-cookie pileup eventually fails
+      // state validation. Lax cookies survive the follow-up nav. Host-Only
+      // is still achieved because the SDK does not set a Domain attribute.
+      sameSite: "lax",
       // `secure` defaults to true when APP_BASE_URL is https. Lock it
       // explicitly so a misconfigured preview env can't accidentally
       // serve the cookie over http.
@@ -113,14 +119,11 @@ export const auth0 = new Auth0Client({
     },
   },
   transactionCookie: {
-    // Must be "lax" (not "strict"): the OAuth callback is a cross-site
-    // top-level navigation from the Auth0 tenant domain back to
-    // admin.mutav.finance/auth/callback. Browsers strip SameSite=strict
-    // cookies on cross-site navigations, so a strict transaction cookie
-    // set at /auth/login never reaches the callback handler — the SDK
-    // then throws InvalidStateError and onCallback triggers the
-    // /auth/logout fail-safe. The session cookie above stays "strict"
-    // because it is set post-callback and only serves same-site requests.
+    // Must be "lax": the OAuth callback is a cross-site top-level navigation
+    // from the Auth0 tenant domain back to admin.mutav.finance/auth/callback.
+    // Browsers strip SameSite=strict cookies on cross-site navigations, so a
+    // strict transaction cookie set at /auth/login never reaches the callback
+    // handler — the SDK then throws InvalidStateError.
     sameSite: "lax",
     secure: true,
   },
