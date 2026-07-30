@@ -26,8 +26,58 @@
       "defaults": "Solicitações de inadimplência",
       "treasury": "Tesouraria",
       "observability": "Observabilidade",
-      "nav": "NAV"
+      "nav": "NAV",
+      "staff": "Equipe"
     }
+  },
+  "staff": {
+    "title": "Equipe",
+    "subtitle": "Conceda ou revogue capacidades internas da Mutav.",
+    "empty": "Nenhum membro da equipe ainda.",
+    "columns": {
+      "auth0Sub": "Identificador Auth0",
+      "role": "Papel",
+      "createdAt": "Concedido em",
+      "addedBy": "Concedido por",
+      "actions": "Ações"
+    },
+    "actions": {
+      "add": "Adicionar membro",
+      "remove": "Remover",
+      "confirmRemove": "Confirmar remoção",
+      "cancel": "Cancelar"
+    },
+    "roles": {
+      "admin": "Admin",
+      "compliance": "Compliance",
+      "support": "Suporte",
+      "treasury": "Tesouraria"
+    },
+    "dialog": {
+      "addTitle": "Conceder novo papel de equipe",
+      "addDescription": "Informe o identificador Auth0 (o usuário precisa ter feito login ao menos uma vez) e escolha a capacidade a conceder.",
+      "auth0SubLabel": "Identificador Auth0",
+      "auth0SubPlaceholder": "auth0|65ab…",
+      "roleLabel": "Papel",
+      "submit": "Conceder papel",
+      "removeTitle": "Revogar papel de equipe",
+      "removeDescription": "A capacidade é removida imediatamente. O usuário mantém a identidade Auth0, mas perde este poder na Mutav."
+    },
+    "toast": {
+      "createSuccess": "Papel concedido.",
+      "createError": "Não foi possível conceder o papel.",
+      "deleteSuccess": "Papel revogado.",
+      "deleteError": "Não foi possível revogar o papel."
+    },
+    "errors": {
+      "ROLE_ALREADY_EXISTS": "Este usuário já possui este papel.",
+      "ROLE_NOT_FOUND": "Nenhum papel deste tipo encontrado para o usuário.",
+      "SELF_REVOKE_LAST_ADMIN": "Você é o último admin — não é possível revogar seu próprio papel de admin.",
+      "USER_NOT_FOUND": "Nenhum usuário com esse identificador Auth0 fez login ainda.",
+      "unexpected": "Algo deu errado. Tente novamente."
+    },
+    "addedByFallback": "Desconhecido",
+    "notAvailable": "—"
   },
   "adminShell": {
     "placeholder": {

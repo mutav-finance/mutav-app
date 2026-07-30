@@ -243,6 +243,20 @@ Not yet wrapped (same playbook applies — and remember the internal-companion a
 
 New work in those domains should adopt the wrapper as part of the change; don't add new bare handlers next to existing bare handlers.
 
+## Admin authorization model
+
+Admin authority is split cleanly between identity and authorization:
+
+- **Auth0 proves identity.** All four persona apps share the same Auth0 Application. The admin console does not pin an Auth0 Organization; the app-level gate is "signed in, staff row present". A successful login gives you an ID token — nothing more.
+- **Convex enforces authorization** via the `mutavStaff` table + the aud-bound wrappers in [`convex/lib/auth.ts`](../convex/lib/auth.ts). One row per (user, role). No admin capability exists off this table.
+- **Roles ladder:** `support` < `compliance` < `admin`, checked by `meetsMinRole`. `treasury` is off the ladder (see [`convex/mutavStaff/domain.ts`](../convex/mutavStaff/domain.ts)) — an orthogonal custody capability that never satisfies an operational `minRole` gate.
+
+**Provisioning:** admins grant capabilities through the `/staff` page in `apps/admin/`, which calls `mutavStaff.createStaffRole({ auth0Sub, role })`. The target must have signed in at least once (a `users` row keyed on `subject` must exist) — we never invent user rows from admin input. Each grant writes a `staff.created` entry to the hash-chained audit log. In parallel, `syncFromIdentity` runs at each admin login and additively grants any roles carried by the JWT's `https://mutav.finance/mutav_roles` claim — never revokes. The additive-only contract keeps a stray call from a non-admin token from wiping someone's access.
+
+**Revocation:** `mutavStaff.deleteStaffRole({ auth0Sub, role })` removes a single row and writes `staff.deleted` to the audit log. It refuses to remove the caller's own last `admin` row when no other admin remains — the only recovery from that lockout would be a direct-database write. Revocation must be deliberate: no login path removes a row, and there is no bulk operation.
+
+**Why not Auth0 Organizations?** We tried it (see workflow `wf_bcf77823-c5d`); it's a B2B primitive that forces a Management API integration for basic writes, drags in per-app connection pinning, and only replicates the mutavStaff-row check with more moving parts. The Convex-side gate handles the same "authenticated staff member with the right capability" check with one table, one wrapper family, and one audit trail. When the staff surface grows beyond ~10 people or needs external time-limited access, revisit Auth0 Roles — Organizations were the wrong shape for either bar.
+
 ## Reference
 
 - [convex-helpers customFunctions](https://stack.convex.dev/custom-functions) — upstream pattern
