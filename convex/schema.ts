@@ -278,9 +278,14 @@ export default defineSchema(
       userId: v.id("users"),
       role: mutavStaffRole,
       createdAt: v.string(),
+      // The admin who granted this role, when the row was created via the
+      // admin-panel `createStaffRole` mutation. Optional because pre-existing
+      // rows (seed, first-login `syncFromIdentity`) have no acting admin.
+      addedBy: v.optional(v.id("users")),
     })
       .index("by_user", ["userId"])
-      .index("by_user_role", ["userId", "role"]),
+      .index("by_user_role", ["userId", "role"])
+      .index("by_role", ["role"]),
 
     // Tenant registry — one row per national tax ID (CPF for pf, CNPJ for pj),
     // digits-only, globally unique via the `getOrCreateTenant` check-then-insert

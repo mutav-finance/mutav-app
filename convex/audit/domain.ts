@@ -52,6 +52,9 @@ export const AUDIT_ACTION = {
   INVOICE_RESET: "invoice.reset",
   // mutavStaff/ (admin onboarding review — emitted by convex/mutavStaff/useCases.ts).
   ONBOARDING_REVIEWED: "onboarding.reviewed",
+  // mutavStaff/ (admin staff-role provisioning — emitted by convex/mutavStaff/useCases.ts).
+  STAFF_CREATED: "staff.created",
+  STAFF_DELETED: "staff.deleted",
   // tenants/ (registry re-encounter with conflicting identity fields —
   // emitted by convex/tenants/useCases.ts for staff review; the registry
   // value is NOT overwritten).
@@ -80,6 +83,8 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.INVOICE_PAID),
   v.literal(AUDIT_ACTION.INVOICE_RESET),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
+  v.literal(AUDIT_ACTION.STAFF_CREATED),
+  v.literal(AUDIT_ACTION.STAFF_DELETED),
   v.literal(AUDIT_ACTION.TENANT_DATA_CONFLICT),
   v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISMISSED),

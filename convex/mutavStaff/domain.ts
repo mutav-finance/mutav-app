@@ -65,6 +65,26 @@ export const hasExactRole = (roles: readonly MutavStaffRole[], role: MutavStaffR
   roles.includes(role);
 
 /**
+ * Error codes returned by the admin-panel staff-provisioning mutations
+ * (`createStaffRole` / `deleteStaffRole`). Rendered client-side via
+ * `t('errors.<code>')` lookup — never surface raw messages.
+ *
+ * `SELF_REVOKE_LAST_ADMIN` guards against an admin locking every admin out by
+ * revoking their own last `admin` row when nobody else holds it.
+ * `USER_NOT_FOUND` covers the "no `users` row for that auth0Sub yet" case —
+ * the target must have logged in at least once before being granted a role.
+ */
+export const MUTAV_STAFF_ERROR_CODE = {
+  ROLE_ALREADY_EXISTS: "ROLE_ALREADY_EXISTS",
+  ROLE_NOT_FOUND: "ROLE_NOT_FOUND",
+  SELF_REVOKE_LAST_ADMIN: "SELF_REVOKE_LAST_ADMIN",
+  USER_NOT_FOUND: "USER_NOT_FOUND",
+} as const;
+
+export type MutavStaffErrorCode =
+  (typeof MUTAV_STAFF_ERROR_CODE)[keyof typeof MUTAV_STAFF_ERROR_CODE];
+
+/**
  * Auth0 custom claim carrying the staff member's Mutav roles, namespaced per
  * Auth0's custom-claim rules. Injected by the admin app's Post-Login Action
  * (Auth0 dashboard) from the user's group membership. This constant MUST match
