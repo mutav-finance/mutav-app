@@ -2,7 +2,7 @@
 
 Inventory of every route, every piece of chrome, and every place the two disagree — written to surface the decisions needed before building authenticated / unauthenticated shell variants.
 
-**This document decides nothing.** It maps what exists and lists what must be decided. Status as of `main` @ `e57b327`.
+Sections 1–3 are the inventory. Section 4 records the decisions taken from it (2026-08-01); section 5 is the work that follows. Status as of `main` @ `e57b327`.
 
 Reconciles against [§ Shell catalog](README.md#shell-catalog), which describes the intended organization. Where reality has drifted, this document records reality.
 
@@ -100,56 +100,61 @@ Six distinct chrome configurations. None is shared between apps.
 
 **F8 — There is no login screen to style.** Auth0 Universal Login is hosted by Auth0, outside this codebase. An "unauthenticated variant" cannot cover sign-in unless Universal Login is separately branded in the Auth0 dashboard.
 
-## 4. Decisions needed
+## 4. Decisions
 
-Ordered by how much downstream work each unblocks.
+Settled 2026-08-01. D7 remains open and is out of scope for the shell work.
 
-### D1 — How many shell variants are there?
+### D1 — Three shell variants ✅
 
-The request names two (authenticated / unauthenticated) and hypothesizes a third (user-flow / full-bleed). The route map supports **three**, but the boundary is not obvious:
+| Variant  | Chrome                                              | Routes                                             |
+| -------- | --------------------------------------------------- | -------------------------------------------------- |
+| **App**  | persistent nav (sidebar or top bar) + identity slot | `agency/(app)`, `admin/(admin)`, `fund/(investor)` |
+| **Flow** | brand + escape hatch, no nav                        | `agency/(onboarding)`, `pay/[publicId]`            |
+| **Bare** | brand + a single action                             | `admin/access-denied`, every 404                   |
 
-- **App** — persistent nav, sidebar or top bar, user menu. `agency/(app)`, `admin/(admin)`, `fund/(investor)`.
-- **Flow** — minimal chrome, no nav, brand + escape hatch only. `agency/(onboarding)`, `pay/[publicId]`.
-- **Bare** — brand + a single action, no chrome. `access-denied`, 404s.
+Bare stays distinct from Flow: collapsing them would give `access-denied` and 404s chrome built for multi-step flows.
 
-Is Bare its own variant or just Flow with no steps? Is `fund/(investor)` App, given it has no user menu and no auth?
+### D2 — Route picks the shell; auth picks the slots ✅
 
-### D2 — Is the variant chosen by auth state, or by route?
+The route group determines which shell renders. Auth state only swaps what fills the **identity slot** (user menu / sign-in link / nothing).
 
-These are not the same axis, and F1/F2 conflate them:
+This resolves F2 without the swap it deferred: `pay/[publicId]` renders `FlowShell` for every viewer, authenticated or not, and varies only the slot. One layout, one shell, no request-time shell selection and no layout shift.
 
-- `agency/(onboarding)` is authenticated but deliberately has no app nav.
-- `pay/[publicId]` may be viewed by an authenticated agency user _or_ an anonymous tenant, at the same URL.
+### D3 — Three shells in `@mutav/ui`, nav passed as props ✅
 
-If the variant is a property of the route group, auth state only drives _slots inside_ the chrome (user menu vs sign-in link). If the variant is a property of auth state, `pay` needs to swap shells per viewer — which is exactly what F2 deferred. **Recommend: route decides the shell, auth decides the slots.** Needs confirmation because everything downstream depends on it.
+`<AppShell>`, `<FlowShell>`, `<BareShell>` live in `@mutav/ui`. Each app passes its own nav items, identity slot, and brand. Resolves F4 (duplicated `AppSidebar` / `SiteHeader` / `NavMain`) and F5 (three inline wordmarks — the lockup becomes one component).
 
-### D3 — Does the shell move to `@mutav/ui`, and how much?
+Nav item **definitions** stay app-local. Centralizing them would couple apps the origin-isolation ADR ([0003](decisions/0003-persona-app-origin-isolation-single-convex.md)) deliberately keeps independent.
 
-Three options, materially different in cost:
+`packages/*` must not read env or auth (CLAUDE.md), so identity arrives as props regardless.
 
-1. **Primitives only** (status quo) — each app composes. Duplication in F4 stays.
-2. **Shared shell components** — `<AppShell>`, `<FlowShell>`, `<BareShell>` in `@mutav/ui`, each app passes nav items and identity as props. Resolves F4, F5.
-3. **Shared shell + shared nav config** — also centralizes nav item definitions. Risks coupling apps that should stay independent per the origin-isolation ADR.
+### D4 — `pay`'s identity slot stays empty for everyone ✅
 
-`packages/*` must not read env or auth (CLAUDE.md), so identity has to arrive as props regardless.
+Identical chrome for authenticated agency users and anonymous tenants. `apps/pay` carries **no Auth0 SDK** by design — it limits phishing surface and the blast radius of a future Auth0 vulnerability (see [§ App catalog](README.md#app-catalog)). Reading session state there would mean adding the SDK back, reversing that decision for a convenience affordance.
 
-### D4 — What does the unauthenticated variant actually show?
+`fund`'s slot takes the wallet connect button; `agency` and `admin` take the user menu.
 
-Sign in? Nothing? Brand only? This differs per app: `pay` must never show a sign-in affordance (F8, and the app deliberately carries no Auth0 SDK to limit phishing surface), while `fund` will need a wallet connect.
+### D5 — 404s get the Bare shell ✅
 
-### D5 — Do 404s get a shell? (F3)
+Follows from D1. Every app gains a `not-found.tsx`. A 404 inside `(app)` drops to Bare rather than keeping the sidebar — the route did not resolve, so the nav has nothing valid to reflect.
 
-The cheapest large win here, and it needs D1 settled first. Also: does a 404 inside `(app)` keep the sidebar, or drop to Bare?
+### D6 — `fund`'s nav is internationalized in the same change ✅
 
-### D6 — Does `fund` get internationalized as part of this? (F6)
+`InvestorNav` is rewritten for the shell migration anyway; doing F6 separately means touching one file twice.
 
-It is the only nav with hardcoded strings. Doing it inside this work is cheap; doing it separately means touching the same file twice.
+### D7 — Auth0 Universal Login branding — OPEN
 
-### D7 — Is Auth0 Universal Login branded? (F8)
+Out of scope for the shell work, but it is the first screen an unauthenticated user sees. While it stays default-Auth0, the unauthenticated experience is inconsistent regardless of what ships here. Track separately.
 
-Out of scope for a shell refactor, but it is the first screen an unauthenticated user sees. If it stays default-Auth0, the "unauthenticated experience" is inconsistent no matter what is built here.
+## 5. Scope that follows
 
-## 5. Not investigated
+1. `<AppShell>` / `<FlowShell>` / `<BareShell>` + a `Wordmark` component in `@mutav/ui`.
+2. Migrate 6 chrome configurations onto them; delete the agency/admin duplicates.
+3. `not-found.tsx` in all four apps (Bare).
+4. Replace the inline auth-aware header in `agency/(onboarding)` with a Flow identity slot.
+5. i18n `InvestorNav`; wire its wallet button as `fund`'s identity slot.
+
+## 6. Not investigated
 
 - Mobile / responsive behavior of any nav — reviewed as source, not rendered at breakpoints.
 - `apps/agency`'s `SidebarRoadmapItem` and `NavCadastros`, whose purpose was not established.
