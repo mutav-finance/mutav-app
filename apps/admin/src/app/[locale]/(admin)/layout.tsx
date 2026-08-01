@@ -2,12 +2,11 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
+import { redirect as localeRedirect } from "@mutav/i18n/navigation";
 import { SidebarInset, SidebarProvider } from "@mutav/ui/sidebar";
 import { Toaster } from "@mutav/ui/sonner";
 import { ThemeProvider } from "@mutav/ui/theme";
 import { getStaffMember } from "@/lib/auth";
-import { buildCrossAppUrl } from "@mutav/i18n/cross-app";
-import { getAgencyUrl } from "@/lib/env";
 
 /**
  * `(admin)` route-group layout — the staff gate + shell.
@@ -17,10 +16,10 @@ import { getAgencyUrl } from "@/lib/env";
  *
  * - `anonymous` → Auth0 Universal Login (same-origin), `returnTo` back at
  *   admin so the user lands here after authentication.
- * - `not-staff` → the AGENCY app ORIGIN (cross-origin), NOT login — an
- *   authenticated non-staff user has a home there. Bouncing to the agency
- *   origin (which never redirects back to admin for a non-staff-with-agency
- *   user) means no guard pair points at each other.
+ * - `not-staff` → `/access-denied` on THIS origin, which explains the denial
+ *   and offers the agency app as a link. It sits outside this route group, so
+ *   it is not re-gated, and it never redirects back here — no guard pair
+ *   points at each other.
  * - `staff` → render the shell.
  *
  * Fail-closed: a session-decrypt or staff-fetch error resolves to
@@ -41,10 +40,10 @@ export default async function AdminLayout({
     redirect(`/auth/login?returnTo=/${locale}`);
   }
   if (result.kind === "not-staff") {
-    // Cross-origin bounce to the agency app — absolute URL from a trusted
-    // env base, so `next/navigation` redirect (the next-intl wrapper is
-    // same-origin only).
-    redirect(buildCrossAppUrl(getAgencyUrl(), locale));
+    // next-intl's redirect, not `next/navigation`'s: `localePrefix: "as-needed"`
+    // means the default locale carries no prefix, so a hand-built
+    // `/${locale}/access-denied` would not resolve for pt-BR.
+    localeRedirect({ href: "/access-denied", locale });
   }
 
   // Empty strings are valid Auth0 claim values (`name: ""`) and would slip
