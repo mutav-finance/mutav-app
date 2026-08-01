@@ -39,6 +39,11 @@ describe("resolveAccessDeniedView", () => {
     it("does not claim the visitor lacks access — they may be staff who is signed out", () => {
       expect(view.titleKey).toBe("anonymousTitle");
       expect(view.subtitleKey).toBe("anonymousSubtitle");
+      expect(view.eyebrowKey).toBe("anonymousEyebrow");
+    });
+
+    it("marks the tone as signed-out so the page shows a sign-in marker", () => {
+      expect(view.tone).toBe("signedOut");
     });
   });
 
@@ -67,6 +72,11 @@ describe("resolveAccessDeniedView", () => {
     it("uses the denial copy", () => {
       expect(view.titleKey).toBe("title");
       expect(view.subtitleKey).toBe("subtitle");
+      expect(view.eyebrowKey).toBe("eyebrow");
+    });
+
+    it("marks the tone as denied", () => {
+      expect(view.tone).toBe("denied");
     });
 
     it("prefixes the agency URL for a non-default locale", () => {
@@ -112,6 +122,8 @@ describe("resolveAccessDeniedView", () => {
       });
       expect(view.titleKey).toBe("staffTitle");
       expect(view.subtitleKey).toBe("staffSubtitle");
+      expect(view.eyebrowKey).toBe("staffEyebrow");
+      expect(view.tone).toBe("granted");
     });
   });
 

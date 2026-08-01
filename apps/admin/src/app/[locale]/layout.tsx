@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -7,8 +7,13 @@ import { Providers } from "@/providers";
 import { routing } from "@mutav/i18n/routing";
 import "../globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+// `--font-display` / `--font-heading` in globals.css resolve `var(--font-geist)`.
+// Admin previously loaded Inter under `--font-inter`, which nothing referenced,
+// so every heading fell back to system-ui while the webfont downloaded unused.
+// Body text is unaffected: `--font-sans` uses "Inter Variable" from
+// `@fontsource-variable/inter`, imported in globals.css.
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
   weight: ["400", "600", "700"],
 });
@@ -49,7 +54,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${inter.variable} h-svh overflow-hidden antialiased`}
+      className={`${geist.variable} h-svh overflow-hidden antialiased`}
       suppressHydrationWarning
     >
       <body className="flex h-svh flex-col overflow-hidden">

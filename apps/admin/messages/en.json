@@ -31,17 +31,20 @@
     }
   },
   "accessDenied": {
+    "eyebrow": "Restricted access",
     "title": "You don't have access to the admin console",
     "subtitle": "Your account is authenticated but isn't part of the Mutav team. If you manage a rental agency, the Agencies console is yours.",
+    "anonymousEyebrow": "Authentication required",
     "anonymousTitle": "Sign in to access the admin console",
     "anonymousSubtitle": "The admin console is restricted to the Mutav team. Sign in so we can check your access.",
+    "staffEyebrow": "Access granted",
     "staffTitle": "You have access to the admin console",
     "staffSubtitle": "Your account is part of the Mutav team. This page is shown to people without access.",
     "goToAgency": "Go to Agencies",
     "goToAdmin": "Back to the admin console",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "signedInAs": "Signed in as {email}"
+    "signedInAs": "Signed in as <mono>{email}</mono>"
   },
   "staff": {
     "title": "Staff",

@@ -4,10 +4,16 @@ import type { StaffGateResult } from "@/lib/auth";
 
 type TitleKey = "title" | "anonymousTitle" | "staffTitle";
 type SubtitleKey = "subtitle" | "anonymousSubtitle" | "staffSubtitle";
+type EyebrowKey = "eyebrow" | "anonymousEyebrow" | "staffEyebrow";
 type PrimaryLabelKey = "goToAgency" | "goToAdmin";
 type SecondaryLabelKey = "signIn" | "signOut";
 
+/** Drives the marker icon. The page owns the icon components; this stays pure. */
+export type AccessDeniedTone = "denied" | "signedOut" | "granted";
+
 export type AccessDeniedView = {
+  tone: AccessDeniedTone;
+  eyebrowKey: EyebrowKey;
   titleKey: TitleKey;
   subtitleKey: SubtitleKey;
   primary: { href: string; labelKey: PrimaryLabelKey };
@@ -40,6 +46,8 @@ export function resolveAccessDeniedView({
     // Not a denial: a signed-out visitor may well be staff. Claiming they lack
     // access would be wrong, and would push a real staff member away.
     return {
+      tone: "signedOut",
+      eyebrowKey: "anonymousEyebrow",
       titleKey: "anonymousTitle",
       subtitleKey: "anonymousSubtitle",
       primary: { href: buildCrossAppUrl(agencyUrl, locale), labelKey: "goToAgency" },
@@ -55,6 +63,8 @@ export function resolveAccessDeniedView({
     // prefixing leaves the default locale unprefixed.
     const adminRootHref = locale === routing.defaultLocale ? "/" : `/${locale}`;
     return {
+      tone: "granted",
+      eyebrowKey: "staffEyebrow",
       titleKey: "staffTitle",
       subtitleKey: "staffSubtitle",
       primary: { href: adminRootHref, labelKey: "goToAdmin" },
@@ -64,6 +74,8 @@ export function resolveAccessDeniedView({
   }
 
   return {
+    tone: "denied",
+    eyebrowKey: "eyebrow",
     titleKey: "title",
     subtitleKey: "subtitle",
     primary: { href: buildCrossAppUrl(agencyUrl, locale), labelKey: "goToAgency" },
