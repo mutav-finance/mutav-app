@@ -30,6 +30,19 @@
       "staff": "Equipe"
     }
   },
+  "accessDenied": {
+    "title": "Você não tem acesso ao painel administrativo",
+    "subtitle": "Sua conta está autenticada, mas não faz parte da equipe Mutav. Se você administra uma imobiliária, seu painel é o de Imobiliárias.",
+    "anonymousTitle": "Entre para acessar o painel administrativo",
+    "anonymousSubtitle": "O painel administrativo é restrito à equipe Mutav. Entre para verificarmos seu acesso.",
+    "staffTitle": "Você tem acesso ao painel administrativo",
+    "staffSubtitle": "Sua conta faz parte da equipe Mutav. Esta página é exibida a quem não tem acesso.",
+    "goToAgency": "Ir para Imobiliárias",
+    "goToAdmin": "Voltar ao painel administrativo",
+    "signIn": "Entrar",
+    "signOut": "Sair",
+    "signedInAs": "Conectado como {email}"
+  },
   "staff": {
     "title": "Equipe",
     "subtitle": "Conceda ou revogue capacidades internas da Mutav.",
