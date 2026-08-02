@@ -36,9 +36,9 @@ Sub-roles encode "what can this Mutav staff member do":
 
 Sub-roles are additive in effect (a `compliance` user can do compliance writes; a user with both `compliance` and `support` can do both). A user has zero or more `mutavStaff` rows, one per role. (Alternative — a single row with a role array — is simpler but loses per-role audit attribution. Defer that choice to implementation.)
 
-### Pre-Auth0 stopgap
+### Staff provisioning in dev
 
-Today the wrappers resolve identity to a hardcoded `dev-user`. The same `dev-user` will be seeded with a `mutavStaff` row of role `admin` so the new shell renders in dev. The Auth0 swap is documented in [`../auth.md`](../auth.md); when it lands, `mutavStaff` rows are provisioned from Auth0 group membership (e.g., the Auth0 group `mutav-compliance` grants a row of role `compliance`).
+Auth0 has landed; the wrappers resolve identity through `ctx.auth.getUserIdentity()` and there is no `dev-user` fallback. In dev, the seeded `systemadmin@mutav.finance` persona (see [`../test-personas.md`](../test-personas.md)) carries the `mutavStaff` row that makes this shell render. Rows are never derived from a JWT claim — every one is an explicit grant through `/staff` or the one-time `bootstrapFirstAdmin`, per [`../auth.md`](../auth.md).
 
 ## Shell architecture
 

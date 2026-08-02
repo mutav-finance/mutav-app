@@ -30,6 +30,13 @@ export async function proxy(request: NextRequest) {
   return intlRes;
 }
 
+// Excludes real asset extensions, NOT every dotted path. A blanket `.*\..*`
+// let `/nope.php` skip the rewrite, so `[locale]` matched the dotted segment
+// itself and the root layout's `hasLocale` guard threw notFound() from the very
+// segment that owns [locale]/not-found.tsx — Next's builtin 404, unbranded.
+// See docs/architecture/nav-shell-audit.md § 5.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|_vercel|api/auth/convex-token|.*\\..*).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|_vercel|api/auth/convex-token|.*\\.(?:ico|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|otf|eot|txt|xml|json|webmanifest|map|mp4|webm|pdf|csv)$).*)",
+  ],
 };

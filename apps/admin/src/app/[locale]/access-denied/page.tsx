@@ -4,6 +4,7 @@ import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Mono } from "@mutav/ui/mono";
 import { BareShell } from "@mutav/ui/shell/bare-shell";
+import { Wordmark } from "@mutav/ui/wordmark";
 import {
   type AccessDeniedTone,
   resolveAccessDeniedView,
@@ -48,7 +49,7 @@ export default async function AccessDeniedPage({
   const ToneIcon = toneIcon[view.tone];
 
   return (
-    <BareShell dataFront="mutav-staff">
+    <BareShell brand={<Wordmark size="sm" />} dataFront="mutav-staff">
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 w-full max-w-lg motion-safe:duration-500">
         <div className="border-border bg-accent-dim text-accent flex size-11 items-center justify-center border">
           <ToneIcon className="size-5" strokeWidth={1.75} aria-hidden />

@@ -14,9 +14,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently --names \"web,pay,adm,cvx\" --prefix-colors \"cyan,green,yellow,magenta\" --kill-others-on-fail \"bun run dev:web\" \"bun run dev:pay\" \"bun run dev:admin\" \"bun run dev:convex\"",
+    "dev": "concurrently --names \"web,pay,fund,adm,cvx\" --prefix-colors \"cyan,green,blue,yellow,magenta\" --kill-others-on-fail \"bun run dev:web\" \"bun run dev:pay\" \"bun run dev:fund\" \"bun run dev:admin\" \"bun run dev:convex\"",
     "dev:web": "bun --filter @mutav/agency dev",
     "dev:pay": "bun --filter @mutav/pay dev",
+    "dev:fund": "bun --filter @mutav/fund dev",
     "dev:admin": "bun --filter @mutav/admin dev",
     "dev:convex": "convex dev",
     "convex:env:sync": "bash scripts/sync-convex-env.sh",

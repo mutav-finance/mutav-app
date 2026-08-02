@@ -296,9 +296,9 @@ Every state-changing public handler in the protocol's domains follows this patte
 
 The compliance check is a single function call from the handler's perspective. Internally it resolves type + level + risk + state + limits in one pass. Adding new capabilities, levels, or risk inputs doesn't change the call site — only the internal resolution.
 
-### Pre-Auth0 / dev mode
+### Dev mode
 
-The dev `dev-user` row is provisioned at the highest available levels (L5 investor + `admin` mutavStaff + active state + low risk) so the dev workspace exercises the full capability surface without manual KYC. The compliance check still runs — the wrapper isn't bypassed — but always returns "allowed" for dev-user. This is the same shape as the auth wrapper's dev shortcut (see [`../auth.md`](../auth.md)); when Auth0 lands, the dev user's compliance posture is provisioned from a fixture, not from real KYC vendor flows.
+There is no `dev-user` row and no auth shortcut — Auth0 has landed and identity is JWT-only (see [`../auth.md`](../auth.md)). Dev posture is a seed fixture instead: the personas in [`../test-personas.md`](../test-personas.md) are provisioned at the levels each scenario needs (the `systemadmin` persona at the highest available — L5 investor + `admin` mutavStaff + active state + low risk) so the workspace exercises the full capability surface without manual KYC. The compliance check still runs against those rows; nothing is bypassed and nothing returns a blanket "allowed".
 
 ## Regulatory pause — the kill switch
 

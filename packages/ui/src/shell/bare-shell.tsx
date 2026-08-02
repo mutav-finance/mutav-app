@@ -2,8 +2,13 @@ import type { ReactNode } from "react";
 import { PublicShell } from "@mutav/ui/public/public-shell";
 
 export type BareShellProps = {
-  /** Optional brand lockup in a bordered top bar. Omitted where the screen has no brand today. */
-  brand?: ReactNode;
+  /**
+   * Brand lockup in a bordered top bar. Required, not optional: a terminal
+   * state is where a user is most likely to doubt they are still on Mutav, and
+   * an optional slot is a rule no gate can see — `admin/access-denied` shipped
+   * without one for exactly that reason.
+   */
+  brand: ReactNode;
   dataFront: string;
   /** Merged onto the PublicShell root — lets a palette-forcing app pass `dark` for routes outside its themed group. */
   className?: string;
@@ -19,11 +24,9 @@ export type BareShellProps = {
 export function BareShell({ brand, dataFront, className, children }: BareShellProps) {
   return (
     <PublicShell className={className}>
-      {brand ? (
-        <header className="border-border bg-canvas border-b">
-          <div className="flex h-14 items-center px-4 lg:px-6">{brand}</div>
-        </header>
-      ) : null}
+      <header className="border-border bg-canvas border-b">
+        <div className="flex h-14 items-center px-4 lg:px-6">{brand}</div>
+      </header>
       <main
         id="main-content"
         data-front={dataFront}

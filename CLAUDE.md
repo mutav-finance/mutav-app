@@ -167,9 +167,10 @@ Each app's Next.js App Router pages live under `apps/<app>/src/app/[locale]/...`
 
 ```
 apps/agency/src/app/
+├── global-not-found.tsx        # <BareShell> + its own <html>/<body> — unmatched URLs
 ├── [locale]/
 │   ├── layout.tsx              # root layout: <html>/<body>, fonts, NextIntlClientProvider
-│   ├── not-found.tsx           # <BareShell> — required in every app
+│   ├── not-found.tsx           # <BareShell> — notFound() thrown under [locale]
 │   └── (app)/                  # dashboard route group
 │       ├── layout.tsx          # guard + <AppShell>, nav passed as props
 │       └── contracts/
@@ -182,23 +183,23 @@ apps/agency/src/app/
 
 Three shells live in `@mutav/ui/shell/*`. **The route picks the shell; auth state only fills the `identity` slot** — never select a shell at request time. Full rationale in [`docs/architecture/nav-shell-audit.md`](docs/architecture/nav-shell-audit.md) § 4 (D1–D6).
 
-| Shell         | Import                       | Use when the route…                       | Today                                          |
-| ------------- | ---------------------------- | ----------------------------------------- | ---------------------------------------------- |
-| `<AppShell>`  | `@mutav/ui/shell/app-shell`  | is behind a nav a signed-in user lives in | `agency/(app)`, `admin/(admin)`                |
-| `<FlowShell>` | `@mutav/ui/shell/flow-shell` | is a multi-step flow — brand, no nav      | `agency/(onboarding)`, `pay/pay/[publicId]`    |
-| `<BareShell>` | `@mutav/ui/shell/bare-shell` | is a terminal state — brand + one action  | `admin/access-denied`, every app's `not-found` |
+| Shell         | Import                       | Use when the route…                       | Today                                              |
+| ------------- | ---------------------------- | ----------------------------------------- | -------------------------------------------------- |
+| `<AppShell>`  | `@mutav/ui/shell/app-shell`  | is behind a nav a signed-in user lives in | `agency/(app)`, `admin/(admin)`                    |
+| `<FlowShell>` | `@mutav/ui/shell/flow-shell` | is a multi-step flow — brand, no nav      | `agency/(onboarding)`, `pay/pay/[publicId]`        |
+| `<BareShell>` | `@mutav/ui/shell/bare-shell` | is a terminal state — brand + a way out   | `admin/access-denied`, both 404 files in every app |
 
 Rules the gates enforce:
 
 - **Exactly one shell per rendered route**, mounted in the route-group `layout.tsx` (a page mounts its own only when no ancestor layout has one — `admin/access-denied`). The `[locale]/layout.tsx` root layout never mounts a shell.
 - **`layout.tsx`, `template.tsx`, and `default.tsx` are all route wrappers** and are held to the same rules — a template wraps every page in its segment exactly like a layout, so chrome hiding in one is a second shell in disguise.
 - **Extracting chrome into `src/components/` does not launder it.** A component rendered as a _child_ of the shell must not hand-roll `<header>`/`<nav>`/`<aside>`/`<footer>`; chrome reaches the shell through a slot prop or not at all. `bun run test:structure` follows a wrapper's app-local child components one hop.
-- **`not-found.tsx` lives at `[locale]/not-found.tsx` and nowhere else.** A nested one would render inside its group's sidebar; a 404 keeps no nav.
+- **Two 404 files per app, both BareShell.** `app/global-not-found.tsx` (app-dir root, behind `experimental.globalNotFound`) catches URLs that match no route, owns its own `<html>`/`<body>`/font/`NextIntlClientProvider`, and is the **only** 404 that server-renders. `[locale]/not-found.tsx` is the `notFound()` boundary — real, but its UI arrives in the RSC payload and paints on hydration, and `admin`/`fund` have no `notFound()` call site to reach it yet. `not-found.tsx` belongs at `[locale]/` and nowhere else: nested it renders inside its group's sidebar, and at the app-dir root Next has no root layout to wrap it in (these apps' root layout is `[locale]/layout.tsx`) so it gets a builtin bare document. Measurements + why a `loading.tsx` does not change this: nav-shell-audit § 5.
 - **Never import `@mutav/ui/sidebar`, `@mutav/ui/public/public-shell`, or `@mutav/ui/sonner` from `src/app/**`** — the shells compose those. Nav definitions stay app-local and arrive as props (`nav`, `identity`, `sidebarHeader`, `headerEnd`, `footer`, `context`). App-local nav components under `src/components/\*\*` import the sidebar primitives freely.
 - **`apps/pay` carries no Auth0 SDK** — its identity slot is empty for every viewer.
 - `fund/(investor)` is a tracked exemption (top-bar arrangement, unresolved palette/scroll ownership) — see nav-shell-audit § 7.
 
-Gates: `bun run test:structure` (`tests/shell-contract.test.ts` — the only check that detects a _missing_ shell) and the `no-restricted-imports` / `no-restricted-syntax` blocks in `eslint.config.mjs`. Both run in the `conventions` / `lint` jobs of `.github/workflows/quality.yml`.
+Gates: `bun run test:structure` (`tests/shell-contract.test.ts` — the only check that detects a _missing_ shell) and the `no-restricted-imports` / `no-restricted-syntax` blocks in `eslint.config.mjs`. Both run in the `conventions` / `lint` jobs of `.github/workflows/quality.yml`. Advisory feedback at write time: `.claude/hooks/shell-contract.js`.
 
 ### Folder responsibilities
 
@@ -304,14 +305,15 @@ If a new page doesn't fit any variant, that's a signal to add a variant — not 
 
 Each Next.js route segment can declare conventional files. Use them at the segment that defines the natural error/loading scope — not piled into the root.
 
-| File               | Purpose                                                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------ |
-| `page.tsx`         | The route's UI                                                                             |
-| `layout.tsx`       | Shared shell that wraps `page.tsx` + child segments; persists across navigation            |
-| `loading.tsx`      | Suspense fallback while the segment loads — server component, no `"use client"`            |
-| `error.tsx`        | Catches errors thrown in the segment — must be `"use client"`, receives `{ error, reset }` |
-| `not-found.tsx`    | Renders when `notFound()` is called or a dynamic segment doesn't match                     |
-| `global-error.tsx` | Catches errors in the root `layout.tsx` itself — replaces the entire HTML                  |
+| File                   | Purpose                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `page.tsx`             | The route's UI                                                                                                   |
+| `layout.tsx`           | Shared shell that wraps `page.tsx` + child segments; persists across navigation                                  |
+| `loading.tsx`          | Suspense fallback while the segment loads — server component, no `"use client"`                                  |
+| `error.tsx`            | Catches errors thrown in the segment — must be `"use client"`, receives `{ error, reset }`                       |
+| `not-found.tsx`        | Renders when `notFound()` is called in this segment's subtree                                                    |
+| `global-not-found.tsx` | App-dir root only. Renders for URLs that match no route; replaces the root layout, so it returns a full document |
+| `global-error.tsx`     | Catches errors in the root `layout.tsx` itself — replaces the entire HTML                                        |
 
 Co-locate the i18n keys these files use under a namespace that matches the segment (e.g. `contractDetails.errors` for `contracts/[id]/error.tsx`).
 
@@ -328,7 +330,7 @@ Follow standard clean code principles, opinionated:
 - **No comments by default** — only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader. Don't explain WHAT (well-named identifiers do that) and don't reference the current task or PR (that belongs in the PR description, not the code — comments rot, PRs don't).
 - **English-only code identifiers** — all types, `as const` value objects, string literal enum values, DB field values, function/variable names, and i18n **keys** are English (American spelling: `canceled`, not `cancelled`). Portuguese belongs ONLY in `messages/pt-BR.json` **values**. When touching a page that uses PT literals in code, translate them in the same commit — never propagate PT into new code just because the surrounding UI has it. Pre-existing PT identifiers (e.g. `CONTRACT_STATUS = { ATIVO: "ativo", ... }`) are grandfathered — flag them but don't drive-by-rename unless the surrounding change makes it cheap.
 - **TypeScript strict** — see Key Patterns / TypeScript escape hatches below.
-- **Branch workflow** — feature branches → squash merge PRs to main.
+- **Branch workflow** — feature branches → squash merge PRs to main. Commit subjects are commitlint-gated (`.husky/commit-msg`): lowercase `type(scope):`, **lowercase subject** (sentence-case / Start Case / PascalCase / UPPER all rejected), no trailing period, header ≤100 chars, and **every body and footer line ≤100 chars** (hard error — wrap bullets). Types: `build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test` — no `wip`. `pre-commit` runs a whole-monorepo `bun run typecheck` plus `eslint --fix --max-warnings=0` on staged files (one warning blocks the commit); `pre-push` runs `bun run changelog:validate` and refuses direct pushes to `main`.
 
 ## Key Patterns
 
@@ -379,8 +381,6 @@ Strict-compliance rule (enforced in review):
 - **Internal writers (`internalMutation` / `internalQuery`):** no wrapper — auth was already enforced by the public caller.
 - **Actions (`ActionCtx`):** no DB access for membership lookup; use `requireIdentity(ctx)` + an `internalQuery` for membership. Per-action wrappers may come later.
 - **Calling wrapped functions from actions:** `ctx.runQuery(api.X.wrapped, …)` inherits the action's identity — fine when the action runs from an authenticated dashboard route, **broken post-Auth0** when the action runs from a tenant/public/webhook context. For those, route through an `internal.X.Y` companion (e.g. `invoices.getByIdInternal`, `contracts.getByPublicIdInternal`). When wrapping a new domain, grep `ctx\.runQuery(api\.<domain>\.` and fix every tenant-facing hit. See [`docs/auth.md`](docs/auth.md) for the full pattern.
-
-Pre-Auth0, `resolveCurrentUser` looks up the hardcoded `dev-user` row. When Auth0 lands, that one function in `convex/lib/auth.ts` swaps to `ctx.auth.getUserIdentity()` and every wrapped handler migrates at once. Do not add per-handler auth shims that would need to be undone on the swap.
 
 ### Convex import paths
 
@@ -575,21 +575,21 @@ Plus the official Convex plugin skills (`convex-quickstart`, `convex-setup-auth`
 
 For any non-trivial change, lean on the `superpowers:*` skill family. These define _how_ to work, not _what_ to build:
 
-| Phase   | Skill                                        | When                                                                      |
-| ------- | -------------------------------------------- | ------------------------------------------------------------------------- |
-| Explore | `superpowers:brainstorming`                  | Before any creative work — new feature, component, or behavior change     |
-| Plan    | `superpowers:writing-plans`                  | Multi-step tasks where the path matters more than any single edit         |
-| Execute | `superpowers:executing-plans`                | Run a written plan in a fresh session with review checkpoints             |
-| Debug   | `superpowers:systematic-debugging`           | Any bug, test failure, or unexpected behavior — before proposing a fix    |
-| Verify  | `superpowers:verification-before-completion` | Before claiming work is complete — evidence (test runs, build) required   |
-| Review  | `superpowers:requesting-code-review`         | Before merging or after a major feature                                   |
-| Isolate | `superpowers:using-git-worktrees`            | When the work needs an isolated tree (long-running branches, experiments) |
+| Phase   | Skill                                        | When                                                                                           |
+| ------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Explore | `superpowers:brainstorming`                  | Before any creative work — new feature, component, or behavior change                          |
+| Plan    | `superpowers:writing-plans`                  | Multi-step tasks where the path matters more than any single edit                              |
+| Execute | `superpowers:executing-plans`                | Run a written plan in a fresh session with review checkpoints                                  |
+| Debug   | `superpowers:systematic-debugging`           | Any bug, test failure, or unexpected behavior — before proposing a fix                         |
+| Verify  | `superpowers:verification-before-completion` | Before claiming work is complete — evidence required; rendered output needs a fetch, see below |
+| Review  | `superpowers:requesting-code-review`         | Before merging or after a major feature                                                        |
+| Isolate | `superpowers:using-git-worktrees`            | Any parallel dispatch where an agent writes — see One writer per working tree                  |
 
-Default to invoking via the Skill tool rather than relying on memory of past patterns — skills evolve.
+**Behavioral verification.** `typecheck`, `lint`, `test:structure` and `build` prove a change _compiles_, never that it _renders_ — Tailwind classes that vanish and CSS-var arbitrary values compile clean (§ Tailwind 4 + workspace packages). A change under `src/app/**`, `src/components/**`, or `packages/ui/**` is not verified until the changed route was served: request it (agency `3000`, pay `3001`, fund `3002`, admin `3003`; `pt-BR` is unprefixed) and quote HTTP status **plus a string from the rendered HTML**, or a screenshot path (`.claude/skills/webapp-testing`). "Files exist, imports correct, exit 0" is structural evidence and does not satisfy this. For auth-gated routes log in as a persona (§ Test accounts) or say plainly that the check stopped at the Auth0 redirect. **A verifying subagent that never fetched a URL reports `structure only`, not `pass`.**
 
-### Progressive loading
+**One writer per working tree.** Agents run in parallel in the same tree only when _all_ of them are read-only. The moment one writes files, runs a build, or plants fixtures, it gets its own worktree under `.claude/worktrees/<name>` (then `bun install` inside it — workspace symlinks don't carry over). Planted-violation verifiers are the sharpest case: a file created to prove a gate fires is compiled into a sibling's build and leaves stale `.next/`, `tsconfig.tsbuildinfo`, and `convex/_generated/` behind, so the sibling fails for reasons unrelated to its change. Such a run ends with `git status --porcelain` empty, and the next turbo run in that tree passes `--force` (see the stale-cache-across-worktrees row in [`docs/development.md`](docs/development.md) § Troubleshooting).
 
-Load `SKILL.md` first via the Skill tool. Skills currently ship without supplementary `examples.md`/`reference.md`/`template.md`; add them only when the patterns merit deeper material.
+Default to invoking via the Skill tool rather than relying on memory of past patterns — skills evolve. Load a skill's `SKILL.md` first; skills here ship without supplementary `examples.md`/`reference.md`/`template.md`, so add those only when the patterns merit deeper material.
 
 ### Domain design
 
@@ -623,7 +623,7 @@ When a query needs data from two domains (e.g. membership + user info), the enri
 
 - Every resource table carries `agencyId` — all scoped queries use the `by_agency_*` composite index.
 - `WorkspaceContext` (`apps/agency/src/providers/workspace.tsx`) is the agency frontend's single source of `selectedAgencyId`. All list queries receive it as an argument — never read `localStorage` directly from a component.
-- Server side, the auth wrappers in `convex/lib/auth.ts` resolve identity and assert membership; handlers do not re-check. Pre-Auth0 the wrappers fall back to a hardcoded `dev-user` row, mirroring `DEV_USER_PUBLIC_ID` on the client. The Auth0 swap is a single function in `convex/lib/auth.ts` (see [`docs/auth.md`](docs/auth.md)) plus removing `DEV_USER_PUBLIC_ID` from `workspace.tsx` — no per-handler edits.
+- Server side, the auth wrappers in `convex/lib/auth.ts` resolve identity via `ctx.auth.getUserIdentity()` and assert membership; handlers do not re-check (see [`docs/auth.md`](docs/auth.md)).
 
 ### Deferred conventions
 

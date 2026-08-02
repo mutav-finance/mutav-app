@@ -59,7 +59,7 @@ Log in at http://localhost:3000 with a persona from [`docs/test-personas.md`](te
 
 ## Running the apps
 
-`bun dev` runs Next (agency) + Convex together. Single app:
+`bun dev` runs all four apps + Convex together (agency `3000`, pay `3001`, fund `3002`, admin `3003`). Single app:
 
 ```bash
 bun --filter @mutav/agency dev     # swap agency → pay | fund | admin

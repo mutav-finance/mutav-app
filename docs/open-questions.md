@@ -249,11 +249,11 @@ Five related deferrals, each with its own forcing function:
 **Forcing function.** Pix webhook integration deepens (today: Etherfuse handles webhook idempotency externally).
 **Canonical source.** Pricing-module PR `#72`.
 
-### E9. Auth0 wiring
+### E9. Auth0 wiring — CLOSED
 
-**Question.** Wire Auth0 (decided 2026-05-16, not yet implemented). One-function change in `convex/lib/auth.ts` plus removing `DEV_USER_PUBLIC_ID` from `workspace.tsx`.
+**Question.** Wire Auth0 (decided 2026-05-16). **Shipped:** `convex/lib/auth.ts` resolves identity via `ctx.auth.getUserIdentity()`, there is no `dev-user` fallback, and `DEV_USER_PUBLIC_ID` is gone from `workspace.tsx`.
 
-**Forcing function.** Before real user accounts. Already planned; tracked in [`docs/auth.md`](auth.md).
+**Forcing function.** Was: before real user accounts. Resolved; see [`docs/auth.md`](auth.md).
 **Canonical source.** [`docs/auth.md`](auth.md); [`convex/lib/auth.ts`](../convex/lib/auth.ts).
 
 ### E10. Telemetry / alerting infrastructure

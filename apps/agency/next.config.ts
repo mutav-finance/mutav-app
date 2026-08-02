@@ -83,6 +83,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // `app/global-not-found.tsx` is silently ignored without this — next-app-loader
+  // deletes the convention when the flag is off.
+  experimental: { globalNotFound: true },
   // Workspace packages ship TypeScript / TSX source; Next.js must transpile
   // them through SWC on the way into the build.
   transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui"],
