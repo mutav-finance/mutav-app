@@ -501,3 +501,97 @@ describe("bootstrapFirstAdmin", () => {
     if (!result.success) expect(result.error.code).toBe("USER_NOT_FOUND");
   });
 });
+
+describe("grantStaffRole", () => {
+  test("grants a second admin — the case bootstrapFirstAdmin refuses", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|incumbent", ["admin"]);
+    const targetUserId = await seedPlainUser(t, "auth0|second");
+
+    const blocked = await t.mutation(internal.mutavStaff.useCases.bootstrapFirstAdmin, {
+      auth0Sub: "auth0|second",
+      email: "second@test.br",
+    });
+    expect(blocked.success).toBe(false);
+    if (!blocked.success) expect(blocked.error.code).toBe("ADMIN_ALREADY_EXISTS");
+
+    const result = await t.mutation(internal.mutavStaff.useCases.grantStaffRole, {
+      auth0Sub: "auth0|second",
+      role: "admin",
+    });
+    expect(result.success).toBe(true);
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query("mutavStaff")
+        .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+        .collect(),
+    );
+    expect(rows.length).toBe(1);
+    expect(rows[0].role).toBe("admin");
+    expect(rows[0].addedBy).toBeUndefined();
+  });
+
+  test("writes a staff.created audit entry attributed to the operator CLI", async () => {
+    const t = convexTest(schema);
+    await seedPlainUser(t, "auth0|target");
+
+    await t.mutation(internal.mutavStaff.useCases.grantStaffRole, {
+      auth0Sub: "auth0|target",
+      role: "treasury",
+    });
+
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .filter((q) => q.eq(q.field("action"), "staff.created"))
+        .collect(),
+    );
+    expect(audits.length).toBe(1);
+    expect(audits[0].actor).toEqual({ kind: "system", source: "operator-cli" });
+  });
+
+  test("grants a non-admin role", async () => {
+    const t = convexTest(schema);
+    await seedPlainUser(t, "auth0|compliance-hire");
+
+    const result = await t.mutation(internal.mutavStaff.useCases.grantStaffRole, {
+      auth0Sub: "auth0|compliance-hire",
+      role: "compliance",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("ROLE_ALREADY_EXISTS is idempotent — no duplicate row", async () => {
+    const t = convexTest(schema);
+    const targetUserId = await seedStaff(t, "auth0|dupe", ["admin"]);
+
+    const result = await t.mutation(internal.mutavStaff.useCases.grantStaffRole, {
+      auth0Sub: "auth0|dupe",
+      role: "admin",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("ROLE_ALREADY_EXISTS");
+
+    const rows = await t.run((ctx) =>
+      ctx.db
+        .query("mutavStaff")
+        .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+        .collect(),
+    );
+    expect(rows.length).toBe(1);
+  });
+
+  test("USER_NOT_FOUND — never invents a users row for an unseen subject", async () => {
+    const t = convexTest(schema);
+    const result = await t.mutation(internal.mutavStaff.useCases.grantStaffRole, {
+      auth0Sub: "auth0|never-signed-in",
+      role: "admin",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("USER_NOT_FOUND");
+
+    const users = await t.run((ctx) => ctx.db.query("users").collect());
+    expect(users.length).toBe(0);
+  });
+});

@@ -104,6 +104,13 @@ type BootstrapFirstAdminError = {
     | typeof MUTAV_STAFF_ERROR_CODE.USER_NOT_FOUND;
 };
 
+type GrantStaffRoleSuccess = { staffId: MutavStaffId };
+type GrantStaffRoleError = {
+  code:
+    | typeof MUTAV_STAFF_ERROR_CODE.ROLE_ALREADY_EXISTS
+    | typeof MUTAV_STAFF_ERROR_CODE.USER_NOT_FOUND;
+};
+
 /** All staff rows across every user, enriched with auth0Sub + addedBy display name. Admin only. */
 export const listAllStaff = queryWithMutavRole({ minRole: "admin" })({
   args: {},
@@ -362,6 +369,82 @@ export const bootstrapFirstAdmin = internalMutation({
       success: true,
       data: { staffId },
       message: "Genesis admin granted.",
+    };
+  },
+});
+
+/**
+ * Operator-side grant of any (auth0Sub, role) pair, for the case
+ * `bootstrapFirstAdmin` deliberately refuses: an admin already exists, but no
+ * one can currently authenticate as one. `createStaffRole` is the normal path
+ * and stays the only client-reachable one — it needs a signed-in admin, which
+ * a CLI invocation does not have, leaving no way to recover a deployment whose
+ * only admin row is unreachable (e.g. a seeded persona on a tenant nobody
+ * holds credentials for).
+ *
+ * `internalMutation` — not client-callable, so reaching it requires the Convex
+ * deploy key. That key is already sufficient to write `mutavStaff` directly;
+ * this exists so the recovery path is audited and enforces the same
+ * invariants instead of being a raw row insert.
+ *
+ * Invoke via:
+ * `bunx convex run mutavStaff:useCases:grantStaffRole '{"auth0Sub":"...","role":"admin"}'`
+ *
+ * The target must have signed in at least once — we never invent a `users`
+ * row, for the same spoofing-vector reason as `createStaffRole`.
+ */
+export const grantStaffRole = internalMutation({
+  args: { auth0Sub: v.string(), role: mutavStaffRoleValidator },
+  handler: async (
+    ctx,
+    { auth0Sub, role },
+  ): Promise<Result<GrantStaffRoleSuccess, GrantStaffRoleError>> => {
+    const target = await ctx.db
+      .query("users")
+      .withIndex("by_subject", (q) => q.eq("subject", auth0Sub))
+      .unique();
+    if (!target) {
+      return {
+        success: false,
+        error: { code: MUTAV_STAFF_ERROR_CODE.USER_NOT_FOUND },
+        message: `No user with subject ${auth0Sub} has signed in yet.`,
+      };
+    }
+
+    const existing = await ctx.db
+      .query("mutavStaff")
+      .withIndex("by_user_role", (q) => q.eq("userId", target._id).eq("role", role))
+      .unique();
+    if (existing) {
+      return {
+        success: false,
+        error: { code: MUTAV_STAFF_ERROR_CODE.ROLE_ALREADY_EXISTS },
+        message: "Target already holds this role.",
+      };
+    }
+
+    const staffId = await ctx.db.insert("mutavStaff", {
+      userId: target._id,
+      role,
+      // No `addedBy`: a CLI invocation has no acting user. The audit entry
+      // below records the operator kind instead, so the grant is still
+      // attributable to an out-of-band action rather than to a staff member.
+      addedBy: undefined,
+      createdAt: new Date().toISOString(),
+    });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "system", source: "operator-cli" },
+      action: AUDIT_ACTION.STAFF_CREATED,
+      resourceType: "mutavStaff",
+      resourceId: staffId,
+      payload: { targetUserId: target._id, auth0Sub, role },
+    });
+
+    return {
+      success: true,
+      data: { staffId },
+      message: "Staff role granted via operator CLI.",
     };
   },
 });
