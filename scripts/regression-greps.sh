@@ -255,6 +255,49 @@ done
 [[ $ui_wiring_violations -eq 0 ]] && pass "all four apps declare the @mutav/ui @source + transpilePackages"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 10. Personal data in console output from convex/ (LGPD-14)
+#
+#     Convex records everything a function writes to console.* in the
+#     deployment function log, which sits outside every retention control
+#     the schema has. A personal-data field must therefore reach console
+#     neither interpolated into the message nor handed over as an argument.
+#     Route it through the redacting emitters in convex/lib/logger.ts
+#     (logInfo / logWarn / logError) instead — they scrub the message and
+#     walk the context object before anything is written.
+# ─────────────────────────────────────────────────────────────────────────────
+section "10. personal data in console.* under convex/"
+
+console_call='console\.(log|info|warn|error|debug|trace)\('
+pii_name='(?i:e-?mail|cpf|cnpj|tax_?id|phone|full_?name|birth_?date|account_?number|account_?holder|representante)'
+
+# Multiline (-U) because a console call is routinely wrapped across lines;
+# `[^;]*?` bounds the scan to the statement.
+interpolated_pii=$(rg -nU --type ts \
+  "${console_call}"'[^;]*?\$\{[^}]*'"${pii_name}"'[^}]*\}' convex/ 2>/dev/null \
+  | grep -v '_generated' \
+  | grep -v '\.test\.ts' || true)
+
+# Same statement window, but for a PII-named identifier handed straight to
+# console as an argument or object value. The identifier must both start on
+# an identifier character and end on a delimiter, so a message string that
+# merely contains the word does not match.
+passed_pii=$(rg -nU --type ts \
+  "${console_call}"'[^;]*?[,({:]\s*[\w$.]*'"${pii_name}"'[\w$]*\s*[,)}]' convex/ 2>/dev/null \
+  | grep -v '_generated' \
+  | grep -v '\.test\.ts' || true)
+
+# A single statement can trip both patterns; report it once.
+pii_console_hits=$(printf '%s\n%s' "$interpolated_pii" "$passed_pii" | grep -v '^$' | sort -u || true)
+
+if [[ -n "$pii_console_hits" ]]; then
+  while IFS= read -r line; do
+    fail "$line — personal data must not reach console. Use logInfo/logWarn/logError from convex/lib/logger.ts."
+  done <<< "$pii_console_hits"
+else
+  pass "no console.* under convex/ carries a personal-data field"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 section "summary"
 
 if [[ $exit_code -eq 0 ]]; then

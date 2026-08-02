@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getResendApiKey, getResendFromEmail, getWaitlistAudienceId } from "../lib/env";
+import { logError } from "../lib/logger";
 import { WAITLIST_AUDIENCE, waitlistAudienceValidator } from "./domain";
 
 // Best-effort write to a Resend audience so the team can run broadcast
@@ -41,7 +42,7 @@ export const addToResendAudience = internalAction({
     });
 
     if (error) {
-      console.error(`[waitlist] Resend contacts.create failed for ${audience}:${email}`, error);
+      logError("[waitlist] Resend contacts.create failed", { audience, error });
     }
   },
 });
@@ -93,7 +94,7 @@ export const sendWelcomeEmail = internalAction({
     });
 
     if (error) {
-      console.error(`[waitlist] welcome email failed for ${audience}:${email}`, error);
+      logError("[waitlist] welcome message delivery failed", { audience, error });
     }
   },
 });
@@ -258,7 +259,7 @@ export const backfillResendAudience = internalAction({
       }
 
       errors.push({ email: row.email, message });
-      console.error(`[backfill] failed for ${audience}:${row.email}`, error);
+      logError("[backfill] contact sync failed", { audience, error });
     }
 
     console.log(
