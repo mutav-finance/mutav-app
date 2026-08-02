@@ -9,9 +9,10 @@ import type {
   ContractApplication,
   ContractApplicationId,
   ContractHistory,
+  ContractId,
 } from "./domain";
 import type { AgencyId } from "../agencies/domain";
-import type { Tenant, TenantId } from "../tenants/domain";
+import type { Tenant, TenantId, TenantInput } from "../tenants/domain";
 import {
   ativoInsuredCentsPlatform,
   contractsByStatus,
@@ -36,6 +37,7 @@ import {
 import {
   normalizeEmbeddedTenant,
   tenantEntityTypeValidator,
+  tenantInputFromSubmission,
   TENANT_ERROR_CODE,
 } from "../tenants/domain";
 import { getOrCreateTenant } from "../tenants/useCases";
@@ -97,7 +99,9 @@ export const getByPublicId = query({
         // Hard cap; if contracts exceed 100 history entries we'll need pagination.
         .take(100);
 
-      return shapeContract(contract, tenant, history);
+      const submitted = await agencySubmittedTenant(ctx, contract);
+
+      return shapeContract(contract, submitted ?? tenant, history);
     }
 
     return null;
@@ -122,22 +126,52 @@ export const getByPublicIdInternal = internalQuery({
 });
 
 /**
- * Batch-resolve tenant display names for a set of contracts: one get per
- * UNIQUE tenantId keeps the join O(unique tenants) instead of O(rows) —
- * Convex gets are cheap and transaction-cached, but batching makes the
- * read set explicit. A miss is an FK-integrity violation (`tenantId` is
- * required, registry rows are never deleted), so it throws.
+ * The tenant identity the owning agency itself submitted, frozen on its
+ * contract creation event. The registry row is shared by every agency
+ * transacting with that tax ID and keeps its first writer's values, so it is
+ * not what a later agency may read back (LGPD-26). `null` for contracts
+ * created before the snapshot existed — those fall back to the registry.
  */
-async function tenantNamesFor(
+async function agencySubmittedTenant(
+  ctx: QueryCtx,
+  contract: Contract,
+): Promise<TenantInput | null> {
+  const creation = await ctx.db
+    .query("contractHistory")
+    .withIndex("by_agency_contract", (q) =>
+      q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
+    )
+    .order("asc")
+    .first();
+  const snapshot = creation?.tenantSnapshot;
+  return snapshot ? tenantInputFromSubmission(snapshot) : null;
+}
+
+/**
+ * Resolve each contract's tenant display name. One get per UNIQUE tenantId
+ * keeps the registry join O(unique tenants) instead of O(rows); the
+ * per-contract creation snapshot then overrides it wherever the agency
+ * submitted its own name. A registry miss is an FK-integrity violation
+ * (`tenantId` is required, registry rows are never deleted), so it throws.
+ */
+async function tenantNamesByContract(
   ctx: QueryCtx,
   docs: readonly Contract[],
-): Promise<Map<TenantId, string>> {
-  const names = new Map<TenantId, string>();
+): Promise<Map<ContractId, string>> {
+  const registryNames = new Map<TenantId, string>();
   await Promise.all(
     [...new Set(docs.map((doc) => doc.tenantId))].map(async (tenantId) => {
       const tenant = await ctx.db.get(tenantId);
       if (!tenant) throw new Error(`Contracts reference a missing tenants row ${tenantId}`);
-      names.set(tenantId, tenant.fullName);
+      registryNames.set(tenantId, tenant.fullName);
+    }),
+  );
+
+  const names = new Map<ContractId, string>();
+  await Promise.all(
+    docs.map(async (doc) => {
+      const submitted = await agencySubmittedTenant(ctx, doc);
+      names.set(doc._id, submitted?.fullName ?? registryNames.get(doc.tenantId) ?? "");
     }),
   );
   return names;
@@ -209,12 +243,12 @@ export const listByAgency = queryWithAgencyScope({
             .order("desc")
             .paginate(args.paginationOpts));
 
-    const tenantNames = await tenantNamesFor(ctx, result.page);
+    const tenantNames = await tenantNamesByContract(ctx, result.page);
 
     return {
       ...result,
       page: result.page.map((doc) =>
-        shapeContractSummary(doc, tenantNames.get(doc.tenantId) ?? "", referenceDate),
+        shapeContractSummary(doc, tenantNames.get(doc._id) ?? "", referenceDate),
       ),
     };
   },
@@ -575,7 +609,7 @@ export const listForCommissionByMonth = queryWithAgencyScope({
       .collect();
 
     const activeContracts = contracts.filter((c) => isActiveDuring(c, effectivePeriod));
-    const tenantNames = await tenantNamesFor(ctx, activeContracts);
+    const tenantNames = await tenantNamesByContract(ctx, activeContracts);
 
     return activeContracts
       .map((c) => {
@@ -586,7 +620,7 @@ export const listForCommissionByMonth = queryWithAgencyScope({
         );
         return {
           contractId: c.publicId,
-          tenantName: tenantNames.get(c.tenantId) ?? "",
+          tenantName: tenantNames.get(c._id) ?? "",
           rentCents: c.rental.rentCents,
           commissionCents: splitCommission(feeBreakdown(c.rental)).commissionCents,
           installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
@@ -1023,31 +1057,32 @@ export const cancelProposal = mutationWithAgencyScope({
 });
 
 /**
- * Discriminated pf/pj tenant view joined from the registry row. Approval
- * fields are contract-level (`tenantApproval`); identity/contact fields
- * come from the living `tenants` row.
+ * Discriminated pf/pj tenant view. Approval fields are contract-level
+ * (`tenantApproval`); identity/contact fields come from `identity`, which the
+ * caller resolves to the owning agency's own submission — never another
+ * agency's values on the shared registry row (LGPD-26).
  */
-function shapeContractTenant(doc: Contract, tenant: Tenant) {
+function shapeContractTenant(doc: Contract, identity: Tenant | TenantInput) {
   const shared = {
     approvalStatus: doc.tenantApproval.status,
     termApprovedAt: doc.tenantApproval.termApprovedAt,
-    taxId: tenant.taxId,
-    fullName: tenant.fullName,
-    email: tenant.email,
-    phone: tenant.phone,
+    taxId: identity.taxId,
+    fullName: identity.fullName,
+    email: identity.email,
+    phone: identity.phone,
   };
-  if (tenant.entityType === "pj") {
-    return { ...shared, entityType: "pj" as const, contactCpf: tenant.contactCpf };
+  if (identity.entityType === "pj") {
+    return { ...shared, entityType: "pj" as const, contactCpf: identity.contactCpf };
   }
-  return { ...shared, entityType: "pf" as const, birthDate: tenant.birthDate };
+  return { ...shared, entityType: "pf" as const, birthDate: identity.birthDate };
 }
 
 /**
- * Reshape a Convex `contracts` doc + its joined registry tenant + history
+ * Reshape a Convex `contracts` doc + its resolved tenant identity + history
  * into the UI Contract type. Strips system fields (`_id`,
  * `_creationTime`); renames publicId → id.
  */
-function shapeContract(doc: Contract, tenant: Tenant, history: ContractHistory[]) {
+function shapeContract(doc: Contract, identity: Tenant | TenantInput, history: ContractHistory[]) {
   return {
     id: doc.publicId,
     agencyId: doc.agencyId,
@@ -1058,7 +1093,7 @@ function shapeContract(doc: Contract, tenant: Tenant, history: ContractHistory[]
     property: doc.property,
     optional: doc.optional,
     documents: doc.documents,
-    tenant: shapeContractTenant(doc, tenant),
+    tenant: shapeContractTenant(doc, identity),
     history: history.map((h) => ({
       at: h.at,
       username: h.username,

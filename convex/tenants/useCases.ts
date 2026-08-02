@@ -7,6 +7,7 @@ import { appendAuditEntry } from "../audit/useCases";
 import { queryWithAgencyScope } from "../lib/auth";
 import { digitsOnly } from "../lib/taxId";
 import {
+  TENANT_ENTITY_TYPE,
   tenantInputValidator,
   validateTaxId,
   type Tenant,
@@ -22,19 +23,32 @@ export type GetOrCreateTenantResult = Result<
   GetOrCreateTenantErrorResult
 >;
 
-type FieldConflict = { existing: string; incoming: string };
+type FieldConflict = { existing: string | undefined; incoming: string | undefined };
 
 function identityConflicts(existing: Tenant, input: TenantInput): Record<string, FieldConflict> {
   const conflicts: Record<string, FieldConflict> = {};
   if (input.fullName !== existing.fullName) {
     conflicts.fullName = { existing: existing.fullName, incoming: input.fullName };
   }
+  if (input.email !== existing.email) {
+    conflicts.email = { existing: existing.email, incoming: input.email };
+  }
+  if (input.phone !== existing.phone) {
+    conflicts.phone = { existing: existing.phone, incoming: input.phone };
+  }
   if (
-    input.entityType === "pf" &&
-    existing.entityType === "pf" &&
+    input.entityType === TENANT_ENTITY_TYPE.PF &&
+    existing.entityType === TENANT_ENTITY_TYPE.PF &&
     input.birthDate !== existing.birthDate
   ) {
     conflicts.birthDate = { existing: existing.birthDate, incoming: input.birthDate };
+  }
+  if (
+    input.entityType === TENANT_ENTITY_TYPE.PJ &&
+    existing.entityType === TENANT_ENTITY_TYPE.PJ &&
+    input.contactCpf !== existing.contactCpf
+  ) {
+    conflicts.contactCpf = { existing: existing.contactCpf, incoming: input.contactCpf };
   }
   return conflicts;
 }
@@ -51,9 +65,11 @@ function identityConflicts(existing: Tenant, input: TenantInput): Record<string,
  * conflict on the `by_taxId` read set, Convex OCC retries the loser, and
  * on retry it observes the winner's row.
  *
- * Re-encounter policy: email/phone are last-write-wins (a new contract
- * refreshes contact data); fullName / pf birthDate mismatches are NOT
- * overwritten — one audit entry records the divergence for staff review.
+ * Re-encounter policy: the row is shared by every agency that transacts with
+ * this tax ID, so NO identity field is ever overwritten (LGPD-26). Any
+ * divergence — name, contact, birth date, contact CPF — appends one audit
+ * entry for staff review and leaves the row alone; each agency reads its own
+ * submission back from its contract creation event.
  *
  * The tax-id checksum rejection is the only error Result and happens
  * before any write.
@@ -81,13 +97,6 @@ export async function getOrCreateTenant(
   if (!existing) {
     const tenantId = await ctx.db.insert("tenants", input);
     return { success: true, data: { tenantId, created: true }, message: "Tenant registered" };
-  }
-
-  const contactPatch: { email?: string; phone?: string } = {};
-  if (input.email !== existing.email) contactPatch.email = input.email;
-  if (input.phone !== existing.phone) contactPatch.phone = input.phone;
-  if (Object.keys(contactPatch).length > 0) {
-    await ctx.db.patch(existing._id, contactPatch);
   }
 
   const conflicts = identityConflicts(existing, input);

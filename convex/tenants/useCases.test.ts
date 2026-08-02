@@ -135,10 +135,15 @@ describe("getOrCreateTenant", () => {
     expect(await listTenants(t)).toHaveLength(0);
   });
 
-  test("re-encounter last-write-wins on email/phone; fullName untouched", async () => {
+  test("re-encounter never overwrites email/phone and appends one audit entry", async () => {
     const t = setup();
 
-    await t.run((ctx) => getOrCreateTenant(ctx, { input: pfInput(), actor: SYSTEM_ACTOR }));
+    const first = await t.run((ctx) =>
+      getOrCreateTenant(ctx, { input: pfInput(), actor: SYSTEM_ACTOR }),
+    );
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+
     await t.run((ctx) =>
       getOrCreateTenant(ctx, {
         input: pfInput({ email: "maria.nova@example.com", phone: "11911111111" }),
@@ -148,9 +153,67 @@ describe("getOrCreateTenant", () => {
 
     const rows = await listTenants(t);
     expect(rows).toHaveLength(1);
-    expect(rows[0].email).toBe("maria.nova@example.com");
-    expect(rows[0].phone).toBe("11911111111");
+    expect(rows[0].email).toBe("maria@example.com");
+    expect(rows[0].phone).toBe("11900000001");
     expect(rows[0].fullName).toBe("Maria Silva");
+
+    const entries = await auditEntriesFor(t, first.data.tenantId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].action).toBe("tenant.data_conflict");
+  });
+
+  test.each([
+    ["fullName", { fullName: "Maria S. Santos" }],
+    ["email", { email: "maria.nova@example.com" }],
+    ["phone", { phone: "11911111111" }],
+    ["birthDate", { birthDate: "1991-01-01" }],
+  ])("a divergent %s alone appends an audit entry", async (_field, override) => {
+    const t = setup();
+
+    const first = await t.run((ctx) =>
+      getOrCreateTenant(ctx, { input: pfInput(), actor: SYSTEM_ACTOR }),
+    );
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+
+    await t.run((ctx) => getOrCreateTenant(ctx, { input: pfInput(override), actor: SYSTEM_ACTOR }));
+
+    const entries = await auditEntriesFor(t, first.data.tenantId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].action).toBe("tenant.data_conflict");
+  });
+
+  test("a divergent pj contactCpf appends an audit entry and is not overwritten", async () => {
+    const t = setup();
+
+    const pjInput = (contactCpf: string | undefined): TenantInput => ({
+      entityType: "pj",
+      taxId: VALID_CNPJ,
+      fullName: "Empresa Ltda",
+      ...(contactCpf === undefined ? {} : { contactCpf }),
+      email: "contato@empresa.com",
+      phone: "11900000002",
+    });
+
+    const first = await t.run((ctx) =>
+      getOrCreateTenant(ctx, { input: pjInput(VALID_CPF), actor: SYSTEM_ACTOR }),
+    );
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+
+    await t.run((ctx) =>
+      getOrCreateTenant(ctx, { input: pjInput(VALID_CPF_2), actor: SYSTEM_ACTOR }),
+    );
+
+    const rows = await listTenants(t);
+    expect(rows).toHaveLength(1);
+    if (rows[0].entityType === "pj") {
+      expect(rows[0].contactCpf).toBe(VALID_CPF);
+    }
+
+    const entries = await auditEntriesFor(t, first.data.tenantId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].action).toBe("tenant.data_conflict");
   });
 
   test("re-encounter with conflicting fullName/birthDate keeps registry values and appends one audit entry", async () => {
@@ -420,5 +483,192 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
       fullName: "Tech Solutions Ltda",
       email: "contato@techsolutions.example.com",
     });
+  });
+});
+
+// Multi-actor sequence: two agencies transact with the same natural person.
+// The registry row is shared; neither agency may see the other's values
+// through any authorized call (LGPD-26).
+describe("cross-agency tenant identity", () => {
+  const AGENCY_A_TENANT = {
+    fullName: "Maria Silva Santos",
+    birthDate: "1990-05-12",
+    email: "maria@agencia-a.example.com",
+    phone: "11900000001",
+  };
+  const AGENCY_B_TENANT = {
+    fullName: "Maria S. Nascimento",
+    birthDate: "1991-01-02",
+    email: "maria@agencia-b.example.com",
+    phone: "11922222222",
+  };
+
+  type SubmittedTenant = typeof AGENCY_A_TENANT;
+
+  function contractArgs(agencyId: AgencyId, tenant: SubmittedTenant) {
+    return {
+      agencyId,
+      property: {
+        cep: "01000000",
+        streetAndNumber: "Rua Teste, 1",
+        neighborhood: "Centro",
+        cityUF: "São Paulo / SP",
+      },
+      optional: { complement: "", tag: "", description: "" },
+      propertyKind: "residencial" as const,
+      plan: "basic" as const,
+      rentCents: 300000,
+      condoCents: 0,
+      otherFeesCents: 0,
+      tenant: {
+        entityType: "pf" as const,
+        fullName: tenant.fullName,
+        cpf: VALID_CPF,
+        cnpj: undefined,
+        birthDate: tenant.birthDate,
+        email: tenant.email,
+        phone: tenant.phone,
+        score: 750,
+      },
+    };
+  }
+
+  async function seedAgencyFor(
+    t: ReturnType<typeof setup>,
+    userId: SeededUserId,
+    cnpj: string,
+  ): Promise<AgencyId> {
+    return t.run(async (ctx) => {
+      const agencyId = await ctx.db.insert("agencies", {
+        name: `Agency ${cnpj}`,
+        cnpj,
+        agencyType: "empresa",
+        onboardingState: "active",
+        createdAt: "2024-01-01T00:00:00-03:00",
+      });
+      await ctx.db.insert("memberships", {
+        userId,
+        agencyId,
+        role: "owner",
+        joinedAt: "2024-01-01T00:00:00-03:00",
+      });
+      return agencyId;
+    });
+  }
+
+  async function bothAgenciesRegisterTheSameCpf(t: ReturnType<typeof setup>) {
+    registerContractAggregateComponents(t);
+
+    const a = await setupAuthenticatedUser(t, {
+      subject: "auth0|agency-a-owner",
+      email: "owner-a@mutav.test",
+      name: "Owner A",
+    });
+    const agencyA = await seedAgencyFor(t, a.userId, "00000000000100");
+    const b = await setupAuthenticatedUser(t, {
+      subject: "auth0|agency-b-owner",
+      email: "owner-b@mutav.test",
+      name: "Owner B",
+    });
+    const agencyB = await seedAgencyFor(t, b.userId, "00000000000200");
+
+    const createdA = await a.asUser.mutation(
+      api.contracts.useCases.create,
+      contractArgs(agencyA, AGENCY_A_TENANT),
+    );
+    const createdB = await b.asUser.mutation(
+      api.contracts.useCases.create,
+      contractArgs(agencyB, AGENCY_B_TENANT),
+    );
+    expect(createdA.success).toBe(true);
+    expect(createdB.success).toBe(true);
+    if (!createdA.success || !createdB.success) throw new Error("Contract creation failed");
+
+    return { a, b, agencyA, agencyB, createdA, createdB };
+  }
+
+  test("agency B reads back its own submitted identity, never agency A's", async () => {
+    const t = setup();
+    const { b, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+
+    const contract = await b.asUser.query(api.contracts.useCases.getByPublicId, {
+      publicId: createdB.data.publicId,
+    });
+
+    expect(contract?.tenant).toMatchObject({
+      entityType: "pf",
+      taxId: VALID_CPF,
+      fullName: "Maria S. Nascimento",
+      email: "maria@agencia-b.example.com",
+      phone: "11922222222",
+    });
+    if (contract?.tenant.entityType === "pf") {
+      expect(contract.tenant.birthDate).toBe("1991-01-02");
+    }
+  });
+
+  test("agency A keeps reading its own submitted identity", async () => {
+    const t = setup();
+    const { a, createdA } = await bothAgenciesRegisterTheSameCpf(t);
+
+    const contract = await a.asUser.query(api.contracts.useCases.getByPublicId, {
+      publicId: createdA.data.publicId,
+    });
+
+    expect(contract?.tenant).toMatchObject({
+      fullName: "Maria Silva Santos",
+      email: "maria@agencia-a.example.com",
+      phone: "11900000001",
+    });
+    if (contract?.tenant.entityType === "pf") {
+      expect(contract.tenant.birthDate).toBe("1990-05-12");
+    }
+  });
+
+  test("the contract list shows each agency the name it submitted", async () => {
+    const t = setup();
+    const { a, b, agencyA, agencyB } = await bothAgenciesRegisterTheSameCpf(t);
+
+    const pageA = await a.asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId: agencyA,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    const pageB = await b.asUser.query(api.contracts.useCases.listByAgency, {
+      agencyId: agencyB,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+
+    expect(pageA.page.map((row) => row.tenantName)).toEqual(["Maria Silva Santos"]);
+    expect(pageB.page.map((row) => row.tenantName)).toEqual(["Maria S. Nascimento"]);
+  });
+
+  test("the shared registry row keeps the first registrant's values on every field", async () => {
+    const t = setup();
+    await bothAgenciesRegisterTheSameCpf(t);
+
+    const rows = await listTenants(t);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      taxId: VALID_CPF,
+      fullName: "Maria Silva Santos",
+      email: "maria@agencia-a.example.com",
+      phone: "11900000001",
+    });
+    if (rows[0].entityType === "pf") {
+      expect(rows[0].birthDate).toBe("1990-05-12");
+    }
+  });
+
+  test("the divergence appends one audit entry attributed to the second agency's user", async () => {
+    const t = setup();
+    const { b } = await bothAgenciesRegisterTheSameCpf(t);
+
+    const rows = await listTenants(t);
+    expect(rows).toHaveLength(1);
+
+    const entries = await auditEntriesFor(t, rows[0]._id);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].action).toBe("tenant.data_conflict");
+    expect(entries[0].actor).toEqual({ kind: "user", userId: b.userId });
   });
 });
