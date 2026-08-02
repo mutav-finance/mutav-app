@@ -28,11 +28,11 @@
     "language": "Language",
     "logOut": "Log out"
   },
-  "notFound": {
-    "eyebrow": "404",
-    "title": "Page not found",
-    "subtitle": "This address doesn't exist or the content moved.",
-    "backLabel": "Back to dashboard"
+  "siteHeader": {
+    "title": "Documents"
+  },
+  "brand": {
+    "name": "Acme Inc."
   },
   "commission": {
     "meta": {
@@ -197,7 +197,6 @@
     }
   },
   "nav": {
-    "brandEyebrow": "MUTAV Guarantees",
     "roadmapBadge": "soon",
     "main": {
       "createContract": "Create Contract",
@@ -933,7 +932,8 @@
       "errors": {
         "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again.",
         "TENANT_DENIED": "The tenant's credit score was denied. The contract cannot be created.",
-        "INVALID_RENT": "Invalid amounts. Rent must be greater than zero."
+        "INVALID_RENT": "Invalid amounts. Rent must be greater than zero.",
+        "CREDIT_ASSESSMENT_REQUIRED": "The credit assessment for this tenant has expired. Run the credit check again before creating the contract."
       },
       "editBlock": "Edit",
       "saveBlock": "Save",
@@ -975,6 +975,7 @@
       "description": "Pay your Mutav invoice via the Stellar network."
     },
     "shell": {
+      "brand": "mutav",
       "paymentLabel": "Invoice",
       "footerBrand": "Mutav · Rental Guarantee Protocol"
     },

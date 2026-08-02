@@ -1163,17 +1163,18 @@ export const onboardAgencyEtherfuseKyc = internalAction({
 // ─── Etherfuse bank account management ────────────────────────────────────────
 
 type BankAccountSummary = {
-  externalBankAccountId: string;
   type: "pix" | "spei";
-  accountNumber: string;
   accountHolderName: string;
+  accountNumberLast4: string;
 };
 
+// Returned to an unauthenticated payer, so it mirrors the tenant-visible
+// projection in `bankAccountUseCases`: enough to recognize the account, never
+// enough to reconstruct it.
 const bankAccountSummaryValidator = v.object({
-  externalBankAccountId: v.string(),
   type: v.union(v.literal("pix"), v.literal("spei")),
-  accountNumber: v.string(),
   accountHolderName: v.string(),
+  accountNumberLast4: v.string(),
 });
 
 const ETHERFUSE_HOSTED_URL_TTL_SECONDS = 900;
@@ -1208,7 +1209,11 @@ type GetEtherfuseBankRegistrationUrlResult =
  * want to re-mirror.
  */
 export const syncEtherfuseBankAccounts = action({
-  args: { agencyId: v.id("agencies") },
+  // The payer is unauthenticated, so the agency is resolved from the invoice
+  // bearer token server-side. Accepting `agencyId` from the client made this
+  // an IDOR: any caller could name any agency and read back its Etherfuse
+  // bank accounts, full account numbers included.
+  args: { invoiceAccessToken: v.string() },
   returns: v.union(
     v.object({
       success: v.literal(true),
@@ -1226,10 +1231,16 @@ export const syncEtherfuseBankAccounts = action({
     }),
   ),
   handler: async (ctx, args): Promise<SyncEtherfuseBankAccountsResult> => {
+    const resolved = await ctx.runQuery(internal.invoices.useCases.resolveAgencyByAccessToken, {
+      accessToken: args.invoiceAccessToken,
+    });
+    if (!resolved) {
+      return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
+    }
     const account = await ctx.runQuery(
       internal.payments.providers.accountUseCases.getByAgencyAndProvider,
       {
-        agencyId: args.agencyId,
+        agencyId: resolved.agencyId,
         provider: "etherfuse",
       },
     );
@@ -1269,10 +1280,14 @@ export const syncEtherfuseBankAccounts = action({
     // so the local picker can't accidentally select a Mexican rail.
     const pixOnly = upstream.filter((a) => a.type === "PIX");
 
+    // `summaries` is what the payer sees; `syncedExternalIds` stays server-side
+    // because the Etherfuse identifier is not the payer's business.
     const summaries: BankAccountSummary[] = [];
+    const syncedExternalIds: string[] = [];
     for (const remote of pixOnly) {
+      syncedExternalIds.push(remote.id);
       await ctx.runMutation(internal.payments.providers.bankAccountUseCases.upsertFromEtherfuse, {
-        agencyId: args.agencyId,
+        agencyId: resolved.agencyId,
         anchorAccountId: account._id,
         externalBankAccountId: remote.id,
         type: "pix",
@@ -1281,17 +1296,16 @@ export const syncEtherfuseBankAccounts = action({
         etherfuseCreatedAt: remote.createdAt,
       });
       summaries.push({
-        externalBankAccountId: remote.id,
         type: "pix",
-        accountNumber: remote.accountNumber,
         accountHolderName: remote.accountHolderName,
+        accountNumberLast4: remote.accountNumber.slice(-4),
       });
     }
     await ctx.runMutation(
       internal.payments.providers.bankAccountUseCases.removeMissingExternalIds,
       {
-        agencyId: args.agencyId,
-        keepExternalIds: summaries.map((s) => s.externalBankAccountId),
+        agencyId: resolved.agencyId,
+        keepExternalIds: syncedExternalIds,
       },
     );
 
@@ -1309,7 +1323,11 @@ export const syncEtherfuseBankAccounts = action({
  * can decide when to re-fetch.
  */
 export const getEtherfuseBankRegistrationUrl = action({
-  args: { agencyId: v.id("agencies") },
+  // The payer is unauthenticated, so the agency is resolved from the invoice
+  // bearer token server-side. Accepting `agencyId` from the client made this
+  // an IDOR: any caller could name any agency and read back its Etherfuse
+  // bank accounts, full account numbers included.
+  args: { invoiceAccessToken: v.string() },
   returns: v.union(
     v.object({
       success: v.literal(true),
@@ -1327,10 +1345,16 @@ export const getEtherfuseBankRegistrationUrl = action({
     }),
   ),
   handler: async (ctx, args): Promise<GetEtherfuseBankRegistrationUrlResult> => {
+    const resolved = await ctx.runQuery(internal.invoices.useCases.resolveAgencyByAccessToken, {
+      accessToken: args.invoiceAccessToken,
+    });
+    if (!resolved) {
+      return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
+    }
     const account = await ctx.runQuery(
       internal.payments.providers.accountUseCases.getByAgencyAndProvider,
       {
-        agencyId: args.agencyId,
+        agencyId: resolved.agencyId,
         provider: "etherfuse",
       },
     );

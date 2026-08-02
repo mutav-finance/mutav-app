@@ -15,18 +15,14 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { api } from "@convex/_generated/api";
-import type { AgencyId } from "@convex/agencies/domain";
-import type {
-  AgencyBankAccount,
-  AgencyBankAccountId,
-} from "@convex/payments/providers/bankAccountDomain";
+import type { AgencyBankAccountId } from "@convex/payments/providers/bankAccountDomain";
+import type { TenantVisibleBankAccount } from "@convex/payments/providers/bankAccountUseCases";
 import type { ProviderOrder } from "@convex/payments/providers/orderDomain";
 import type { InvoiceId } from "@convex/invoices/domain";
 
 interface Props {
   invoiceId: InvoiceId;
-  invoicePublicId: string;
-  agencyId: AgencyId;
+  invoiceAccessToken: string;
   totalCents: number;
 }
 
@@ -43,11 +39,11 @@ interface Props {
  * one we'd get an opaque "Proxy account not found" from their API.
  * Gating up front makes the requirement legible to the operator.
  */
-export function CheckoutPixView({ invoiceId, invoicePublicId, agencyId, totalCents }: Props) {
+export function CheckoutPixView({ invoiceId, invoiceAccessToken, totalCents }: Props) {
   const t = useTranslations("checkout.pix");
   const locale = useLocale();
   const banks = useQuery(api.payments.providers.bankAccountUseCases.listBanksForInvoice, {
-    invoicePublicId,
+    invoiceAccessToken,
   });
   const [started, setStarted] = useState(false);
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
@@ -78,7 +74,9 @@ export function CheckoutPixView({ invoiceId, invoicePublicId, agencyId, totalCen
   );
 
   if (!started) {
-    return <PreFlight agencyId={agencyId} banks={banks} onConfirm={handleConfirm} />;
+    return (
+      <PreFlight invoiceAccessToken={invoiceAccessToken} banks={banks} onConfirm={handleConfirm} />
+    );
   }
 
   if (phase === "failed") {
@@ -95,12 +93,12 @@ export function CheckoutPixView({ invoiceId, invoicePublicId, agencyId, totalCen
 // ─── Pre-flight: bank registration + selection ────────────────────────────────
 
 function PreFlight({
-  agencyId,
+  invoiceAccessToken,
   banks,
   onConfirm,
 }: {
-  agencyId: AgencyId;
-  banks: AgencyBankAccount[] | undefined;
+  invoiceAccessToken: string;
+  banks: TenantVisibleBankAccount[] | undefined;
   onConfirm: (bankAccountId: AgencyBankAccountId) => void;
 }) {
   const t = useTranslations("checkout.pix.bankSelection");
@@ -117,7 +115,7 @@ function PreFlight({
     setActionError(null);
     setAdding(true);
     try {
-      const result = await getRegistrationUrl({ agencyId });
+      const result = await getRegistrationUrl({ invoiceAccessToken });
       if (result.success) {
         window.open(result.data.presignedUrl, "_blank", "noopener,noreferrer");
       } else {
@@ -129,13 +127,13 @@ function PreFlight({
       setAdding(false);
       console.warn("[checkout-pix] getRegistrationUrl failed", err);
     }
-  }, [agencyId, getRegistrationUrl, t]);
+  }, [invoiceAccessToken, getRegistrationUrl, t]);
 
   const handleRefresh = useCallback(async () => {
     setActionError(null);
     setRefreshing(true);
     try {
-      const result = await sync({ agencyId });
+      const result = await sync({ invoiceAccessToken });
       if (!result.success) {
         setActionError(t(`errors.${result.error.code}` as const));
       } else {
@@ -147,7 +145,7 @@ function PreFlight({
     } finally {
       setRefreshing(false);
     }
-  }, [agencyId, sync, t]);
+  }, [invoiceAccessToken, sync, t]);
 
   if (banks === undefined) {
     return <PreFlightSkeleton message={t("loading")} />;
@@ -248,7 +246,7 @@ function BankPicker({
   onAdd,
   onRefresh,
 }: {
-  banks: AgencyBankAccount[];
+  banks: TenantVisibleBankAccount[];
   selectedId: AgencyBankAccountId;
   onSelect: (id: AgencyBankAccountId) => void;
   onConfirm: () => void;
@@ -279,7 +277,7 @@ function BankPicker({
                   {t("picker.holderLabel", { name: bank.accountHolderName || "—" })}
                 </span>
                 <span className="text-muted-foreground text-xs">
-                  {t("picker.keyLabel", { last4: last4Of(bank.accountNumber) })}
+                  {t("picker.keyLabel", { last4: bank.accountNumberLast4 || "—" })}
                 </span>
               </button>
             </li>
@@ -321,11 +319,6 @@ function BankPicker({
       </div>
     </div>
   );
-}
-
-function last4Of(value: string): string {
-  if (!value) return "—";
-  return value.length <= 4 ? value : value.slice(-4);
 }
 
 function LoadedPanel({

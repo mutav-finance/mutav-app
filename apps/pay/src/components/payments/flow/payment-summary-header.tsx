@@ -14,7 +14,7 @@ function utcTodayDate(): string {
 }
 
 type Props = {
-  preloaded: Preloaded<typeof api.invoices.useCases.getPublicByPublicId>;
+  preloaded: Preloaded<typeof api.invoices.useCases.getPublicByAccessToken>;
 };
 
 export function PaymentSummaryHeader({ preloaded }: Props) {

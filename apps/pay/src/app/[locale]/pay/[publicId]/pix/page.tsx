@@ -35,7 +35,9 @@ export default async function CheckoutPixPage({
   params: Promise<{ publicId: string; locale: string }>;
 }) {
   const { publicId, locale } = await params;
-  const preloaded = await preloadQuery(api.invoices.useCases.getPublicByPublicId, { publicId });
+  const preloaded = await preloadQuery(api.invoices.useCases.getPublicByAccessToken, {
+    accessToken: publicId,
+  });
   const payment = preloadedQueryResult(preloaded);
   if (!payment) notFound();
 
@@ -59,8 +61,7 @@ export default async function CheckoutPixPage({
       </Link>
       <CheckoutPixView
         invoiceId={payment.invoiceId}
-        invoicePublicId={publicId}
-        agencyId={payment.agencyId}
+        invoiceAccessToken={publicId}
         totalCents={payment.totalCents}
       />
     </div>

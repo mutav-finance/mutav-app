@@ -32,6 +32,7 @@ import { findFreshAssessment } from "../creditAnalysis/useCases";
 import { CAPABILITY, SUBJECT_TYPE } from "../creditAnalysis/domain";
 import type { ActivityBucket } from "./domain";
 import { getMaxGuaranteeCapacityCents } from "../lib/env";
+import { generateContractPublicId } from "../lib/randomId";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import {
@@ -40,15 +41,6 @@ import {
   queryWithAgencyScope,
   queryWithAuth,
 } from "../lib/auth";
-
-function generatePublicId(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let id = "CTR-";
-  for (let i = 0; i < 8; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return id;
-}
 
 /**
  * Resource-by-id read. The publicId is the only thing in the URL on the
@@ -654,7 +646,8 @@ type CreateContractErrorResult = {
   code:
     | typeof TENANT_ERROR_CODE.INVALID_TAX_ID
     | typeof CONTRACT_ERROR_CODE.TENANT_DENIED
-    | typeof CONTRACT_ERROR_CODE.INVALID_RENT;
+    | typeof CONTRACT_ERROR_CODE.INVALID_RENT
+    | typeof CONTRACT_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED;
 };
 
 /**
@@ -693,7 +686,6 @@ export const create = mutationWithAgencyScope({
       birthDate: v.string(),
       email: v.string(),
       phone: v.string(),
-      score: v.number(),
     }),
   },
   handler: async (
@@ -727,10 +719,30 @@ export const create = mutationWithAgencyScope({
       };
     }
 
+    // The score is re-read from the assessment this agency actually pulled —
+    // it is never accepted from the caller. It sets the price and decides the
+    // denial, so a client-supplied value would let the browser buy itself a
+    // better tier or walk past a `negado`. It is also the input to an
+    // automated decision about a person, which has to be traceable to a
+    // recorded provenance rather than to a request body.
+    const assessment = await findFreshAssessment(ctx, {
+      agencyId: ctx.agencyId,
+      subjectHash: await hashPii(registryInput.taxId),
+      notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
+    });
+    if (!assessment || assessment.status !== "ok" || assessment.score == null) {
+      return {
+        success: false,
+        error: { code: CONTRACT_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED },
+        message: "No fresh credit assessment for this tenant; request one before creating",
+      };
+    }
+    const score = assessment.score;
+
     // A denied credit tier cannot be priced (no rate exists for `negado`) and
     // must never become a contract. Reject before any write; the narrowed
     // `tier` below is what makes `priceContract` type-check.
-    const tier = tierForScore(args.tenant.score);
+    const tier = tierForScore(score);
     if (tier === SCORE_TIER.NEGADO) {
       return {
         success: false,
@@ -759,7 +771,7 @@ export const create = mutationWithAgencyScope({
       plan: args.plan,
     });
 
-    const publicId = generatePublicId();
+    const publicId = generateContractPublicId();
     const today = new Date();
     const nextRenewalDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate())
       .toISOString()
@@ -775,7 +787,7 @@ export const create = mutationWithAgencyScope({
       publicId,
       tenantId: tenantResult.data.tenantId,
       tenantApproval: { status: "pendente", termApprovedAt: null },
-      score: args.tenant.score,
+      score,
       status: "pendente",
       activatedAt: null,
       nextRenewalDate,

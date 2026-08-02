@@ -8,6 +8,7 @@ import {
   seedAgencyWithMembership,
   setupAuthenticatedUser,
   type SeededUserId,
+  seedFreshCreditAssessment,
 } from "../lib/testFixtures";
 import { insertContractAggregates } from "./aggregateWrites";
 import { CONTRACT_STATUS, type Contract, type ContractStatus } from "./domain";
@@ -578,7 +579,6 @@ describe("create (tenant registry, narrow phase)", () => {
         birthDate: "1990-05-12",
         email: "maria@example.com",
         phone: "11900000001",
-        score: 750,
       },
       ...tenantOverrides,
     };
@@ -589,6 +589,7 @@ describe("create (tenant registry, narrow phase)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 750 });
 
     const result = await asUser.mutation(api.contracts.useCases.create, {
       agencyId,
@@ -643,6 +644,7 @@ describe("create (tenant registry, narrow phase)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 750 });
 
     const result = await asUser.mutation(api.contracts.useCases.create, {
       agencyId,
@@ -684,6 +686,7 @@ describe("create (tenant registry, narrow phase)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 200 });
 
     const result = await asUser.mutation(api.contracts.useCases.create, {
       agencyId,
@@ -696,7 +699,6 @@ describe("create (tenant registry, narrow phase)", () => {
           birthDate: "1990-05-12",
           email: "maria@example.com",
           phone: "11900000001",
-          score: 200,
         },
       }),
     });
@@ -717,6 +719,8 @@ describe("create (tenant registry, narrow phase)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 750 });
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CNPJ, score: 650 });
 
     const pf = await asUser.mutation(api.contracts.useCases.create, { agencyId, ...createArgs() });
     expect(pf.success).toBe(true);
@@ -731,7 +735,6 @@ describe("create (tenant registry, narrow phase)", () => {
         birthDate: "",
         email: "contato@techsolutions.example.com",
         phone: "11900000003",
-        score: 650,
       },
     });
     const pj = await asUser.mutation(api.contracts.useCases.create, { agencyId, ...pjArgs });
@@ -772,6 +775,7 @@ describe("create (tenant registry, narrow phase)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 750 });
 
     const first = await asUser.mutation(api.contracts.useCases.create, {
       agencyId,
@@ -798,6 +802,8 @@ describe("create (tenant registry, narrow phase)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 750 });
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CNPJ, score: 650 });
 
     const result = await asUser.mutation(api.contracts.useCases.create, {
       agencyId,
@@ -810,7 +816,6 @@ describe("create (tenant registry, narrow phase)", () => {
           birthDate: "",
           email: "contato@techsolutions.example.com",
           phone: "11900000003",
-          score: 650,
         },
       }),
     });
@@ -842,7 +847,6 @@ describe("create (tenant registry, narrow phase)", () => {
           birthDate: "1990-05-12",
           email: "maria@example.com",
           phone: "11900000001",
-          score: 750,
         },
       }),
     });

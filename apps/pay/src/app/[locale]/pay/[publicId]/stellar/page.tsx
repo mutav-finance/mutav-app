@@ -45,7 +45,7 @@ export default async function CheckoutStellarPage({
   const { publicId, locale } = await params;
   const assets = getActiveAssets(getStellarNetwork());
   const [preloadedPayment, rates] = await Promise.all([
-    preloadQuery(api.invoices.useCases.getPublicByPublicId, { publicId }),
+    preloadQuery(api.invoices.useCases.getPublicByAccessToken, { accessToken: publicId }),
     getBrlRates(assets.map((a) => a.symbol)),
   ]);
   const payment = preloadedQueryResult(preloadedPayment);

@@ -20,22 +20,50 @@ export const listByAgency = queryWithAgencyScope({
   },
 });
 
-// Tenant checkout (`apps/pay`) bank picker. The high-entropy invoice
-// `publicId` is the bearer: resolve it to the owning agency server-side
-// so the no-auth payer never supplies an `agencyId` and cannot enumerate
-// another agency's banks. Unknown publicId → empty list (no existence leak).
+/**
+ * What an unauthenticated tenant may learn about the agency's bank accounts:
+ * enough to recognize which account they are paying, and nothing more. The
+ * full account number, the Etherfuse external id and the anchor linkage all
+ * stay server-side.
+ */
+export type TenantVisibleBankAccount = {
+  _id: AgencyBankAccountId;
+  type: AgencyBankAccount["type"];
+  accountHolderName: string;
+  accountNumberLast4: string;
+};
+
+function shapeTenantVisibleBankAccount(account: AgencyBankAccount): TenantVisibleBankAccount {
+  return {
+    _id: account._id,
+    type: account.type,
+    accountHolderName: account.accountHolderName,
+    accountNumberLast4: account.accountNumber.slice(-4),
+  };
+}
+
+// Tenant checkout (`apps/pay`) bank picker. The invoice `accessToken` is the
+// bearer: resolve it to the owning agency server-side so the no-auth payer
+// never supplies an `agencyId` and cannot enumerate another agency's banks.
+// Unknown token → empty list (no existence leak).
+//
+// Was keyed on the invoice `publicId`, which embeds the last four digits of
+// the agency's CNPJ — public record — and so authorized anyone who could name
+// an agency. It also returned whole `agencyBankAccounts` documents; the payer
+// now gets a projection.
 export const listBanksForInvoice = query({
-  args: { invoicePublicId: v.string() },
-  handler: async (ctx, { invoicePublicId }): Promise<AgencyBankAccount[]> => {
+  args: { invoiceAccessToken: v.string() },
+  handler: async (ctx, { invoiceAccessToken }): Promise<TenantVisibleBankAccount[]> => {
     const invoice = await ctx.db
       .query("invoices")
-      .withIndex("by_publicId", (q) => q.eq("publicId", invoicePublicId))
+      .withIndex("by_accessToken", (q) => q.eq("accessToken", invoiceAccessToken))
       .unique();
     if (!invoice) return [];
-    return ctx.db
+    const accounts = await ctx.db
       .query("agencyBankAccounts")
       .withIndex("by_agency", (q) => q.eq("agencyId", invoice.agencyId))
       .collect();
+    return accounts.map(shapeTenantVisibleBankAccount);
   },
 });
 

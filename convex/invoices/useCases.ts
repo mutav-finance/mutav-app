@@ -73,7 +73,7 @@ export const getById = query({
 /**
  * Resource-by-id read keyed on publicId. Same null-on-miss semantics as
  * `getById`. Agency-staff query — for tenant-bearer access from the public
- * portal use `getPublicByPublicId` instead.
+ * portal use `getPublicByAccessToken` instead.
  */
 export const getByPublicId = query({
   args: { publicId: v.string() },
@@ -95,18 +95,23 @@ export const getByPublicId = query({
 });
 
 /**
- * Tenant-safe shape for the public invoice portal. No auth required — the
- * high-entropy `publicId` IS the bearer. Carries everything the tenant
+ * Tenant-safe shape for the public invoice portal. No auth required — holding
+ * the `accessToken` IS the authorization. Carries everything the tenant
  * checkout flow needs (including `invoiceId` and `agencyId`, which the
  * checkout actions consume) plus the derived Stellar `M…` destination
  * address. Excludes only system fields the tenant has no use for.
+ *
+ * Keyed on `accessToken`, never on `publicId`: the document number embeds the
+ * last four digits of the agency's CNPJ, which is public record, so gating on
+ * it let anyone who knew an agency enumerate that agency's invoices for any
+ * month. The token is 160 CSPRNG bits (convex/lib/randomId.ts).
  */
-export const getPublicByPublicId = query({
-  args: { publicId: v.string() },
+export const getPublicByAccessToken = query({
+  args: { accessToken: v.string() },
   handler: async (ctx, args) => {
     const invoice = await ctx.db
       .query("invoices")
-      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
+      .withIndex("by_accessToken", (q) => q.eq("accessToken", args.accessToken))
       .unique();
     if (!invoice) return null;
 
@@ -141,6 +146,25 @@ export const getByIdInternal = internalQuery({
   args: { invoiceId: v.id("invoices") },
   handler: async (ctx, { invoiceId }) => {
     return ctx.db.get(invoiceId);
+  },
+});
+
+/**
+ * Internal — resolve a bearer token to its owning agency.
+ *
+ * The unauthenticated checkout actions need an `agencyId` but must never
+ * accept one: the token is the only thing the payer has proven, so the agency
+ * has to be derived from it server-side. Returns null for an unknown token so
+ * callers cannot distinguish "no such invoice" from "not yours".
+ */
+export const resolveAgencyByAccessToken = internalQuery({
+  args: { accessToken: v.string() },
+  handler: async (ctx, { accessToken }) => {
+    const invoice = await ctx.db
+      .query("invoices")
+      .withIndex("by_accessToken", (q) => q.eq("accessToken", accessToken))
+      .unique();
+    return invoice ? { agencyId: invoice.agencyId, invoiceId: invoice._id } : null;
   },
 });
 

@@ -9,6 +9,7 @@ import {
   seedAgencyWithMembership,
   setupAuthenticatedUser,
   type SeededUserId,
+  seedFreshCreditAssessment,
 } from "../lib/testFixtures";
 import schema from "../schema";
 import { normalizeEmbeddedTenant, type TenantInput } from "./domain";
@@ -342,7 +343,6 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
         birthDate: "1990-05-12",
         email: "maria@example.com",
         phone: "11900000001",
-        score: 750,
       },
     };
   }
@@ -352,6 +352,8 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyA = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyA, document: VALID_CPF, score: 750 });
+    await seedFreshCreditAssessment(t, { agencyId: agencyA, document: VALID_CNPJ, score: 650 });
     const agencyB = await seedSecondAgencyForUser(t, userId, "00000000000200");
 
     const created = await asUser.mutation(api.contracts.useCases.create, pfContractArgs(agencyA));
@@ -383,6 +385,8 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 750 });
+    await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CNPJ, score: 650 });
 
     const pjArgs = {
       ...pfContractArgs(agencyId),
@@ -394,7 +398,6 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
         birthDate: "",
         email: "contato@techsolutions.example.com",
         phone: "11900000003",
-        score: 650,
       },
     };
     const created = await asUser.mutation(api.contracts.useCases.create, pjArgs);

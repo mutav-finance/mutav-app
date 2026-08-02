@@ -39,7 +39,9 @@ export default async function CheckoutPickerPage({
   params: Promise<{ publicId: string; locale: string }>;
 }) {
   const { publicId, locale } = await params;
-  const preloaded = await preloadQuery(api.invoices.useCases.getPublicByPublicId, { publicId });
+  const preloaded = await preloadQuery(api.invoices.useCases.getPublicByAccessToken, {
+    accessToken: publicId,
+  });
   const payment = preloadedQueryResult(preloaded);
   if (!payment) notFound();
 
