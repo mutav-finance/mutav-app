@@ -9,6 +9,10 @@ import { routing } from "@mutav/i18n/routing";
  */
 export const proxy = createMiddleware(routing);
 
+// Excludes real asset extensions, NOT every dotted path — see the same comment
+// in apps/agency/src/proxy.ts and docs/architecture/nav-shell-audit.md § 5.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|_vercel|.*\\..*).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|_vercel|.*\\.(?:ico|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|otf|eot|txt|xml|json|webmanifest|map|mp4|webm|pdf|csv)$).*)",
+  ],
 };

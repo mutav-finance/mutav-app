@@ -1,0 +1,6 @@
+{
+  "apps/fund/src/app/[locale]/(investor)/layout.tsx": {
+    "reason": "Keeps its own top-bar arrangement instead of AppShell. Serving both from one component needs either a boolean flag (forbidden by CLAUDE.md) or a navPlacement enum that would drag SidebarProvider's cookie/keyboard/CSS-var machinery into a sidebar-less app. Three unsettled contradictions sit under fund first: scroll ownership, the literal `dark` class instead of next-themes, and no ThemeProvider/Toaster/TooltipProvider.",
+    "tracking": "docs/architecture/nav-shell-audit.md § 7 — \"fund/(investor) adopts the App shell\", gated on § 6 being resolved. Deleting this entry is the last step of that follow-up."
+  }
+}

@@ -21,7 +21,7 @@ Patterns adapted from `bwb/tokenization` that aren't worth fully formalizing as 
 
 ## Convex security wrappers (auth-aware queries/mutations)
 
-**Status (2026-05-17): partially landed as Auth0 prep.** The wrapper layer lives in `convex/lib/auth.ts` with four wrappers (`queryWithAuth`, `mutationWithAuth`, `queryWithAgencyScope`, `mutationWithAgencyScope`) + an `assertAgencyAccess` helper for resource-by-id handlers. Spec: [`docs/auth.md`](../../docs/auth.md). Pre-Auth0 the wrappers resolve identity by hardcoded `dev-user` lookup; the post-Auth0 swap is one function in `convex/lib/auth.ts`.
+**Status (2026-05-17): partially landed as Auth0 prep.** The wrapper layer lives in `convex/lib/auth.ts` with four wrappers (`queryWithAuth`, `mutationWithAuth`, `queryWithAgencyScope`, `mutationWithAgencyScope`) + an `assertAgencyAccess` helper for resource-by-id handlers. Spec: [`docs/auth.md`](../../docs/auth.md). Auth0 has since landed: the wrappers resolve identity via `ctx.auth.getUserIdentity()` and there is no `dev-user` fallback.
 
 **Still to adopt** (when the underlying need shows up):
 
@@ -104,13 +104,13 @@ bwb keeps a `.self-improvement/lessons.md` updated after every user correction, 
 
 Code that predates a current convention and needs migrating.
 
-## Convex data migrations (tooling — installed)
+## Convex data migrations (tooling — installed, deliberately unused)
 
-`@convex-dev/migrations` is installed and wired into deploy. Use it for any breaking schema change against existing data — **do not** wipe + reseed.
+`@convex-dev/migrations` is installed and wired into deploy, but **the app is pre-production and schema changes ship as wipe + reseed today** — see CLAUDE.md § "Schema changes & migrations — reseed-first", which is the governing rule and matches `convex/migrations.ts` (`runAll = migrations.runner([internal.migrations.noop])`). Everything below is the plan for **after** the first real (non-seed) data lands; do not start writing migrations against seed data.
 
-- **`convex/migrations.ts`** holds the `Migrations` instance and `runAll` (an ordered runner anchored by a no-op `noop` sentinel so it is always valid). Define each migration with `migrations.define({ table, migrateOne })` and append its `internal.migrations.<name>` to `runAll`.
+- **`convex/migrations.ts`** holds the `Migrations` instance and `runAll` (an ordered runner anchored by a no-op `noop` sentinel so it is always valid). From the flip onward, define each migration with `migrations.define({ table, migrateOne })` and append its `internal.migrations.<name>` to `runAll`.
 - **`scripts/run-migrations.sh`** runs `migrations:runAll` and is chained after `convex deploy` in every app's `vercel.json`. So every deploy (prod + preview) backfills data in place, and every developer's own dev deployment self-heals on `convex dev` after pulling a widen PR — no per-person manual cleanup.
-- **Pattern: widen → migrate → narrow, split across two PRs:**
+- **Pattern (post-flip): widen → migrate → narrow, split across two PRs:**
   1. **Widen PR** — set `defineSchema(tables, { schemaValidation: false })` (or add the new field as optional), define the migration, append it to `runAll`. Deploy → migration backfills.
   2. **Narrow PR** — re-enable `schemaValidation: true`, drop transitional/old fields, remove migration scaffolding.
 - Test with `bunx convex run migrations:<name> '{"dryRun": true}'` before shipping. Status: `bunx convex run --component migrations lib:getStatus --watch`.

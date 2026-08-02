@@ -79,7 +79,12 @@
       "Bash(cat .env*)",
       "Bash(cat **/.env*)",
       "Bash(printenv:*)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(git add -A:*)",
+      "Bash(git add --all:*)",
+      "Bash(git add .:*)",
+      "Bash(git commit -a:*)",
+      "Bash(git commit -am:*)"
     ]
   },
   "hooks": {
@@ -94,6 +99,10 @@
           {
             "type": "command",
             "command": "node .claude/hooks/code-quality.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/shell-contract.js"
           }
         ]
       }

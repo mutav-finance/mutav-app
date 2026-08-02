@@ -49,15 +49,15 @@ bun dev
 > scenarios (reseed, fresh deployment), and a troubleshooting table for the
 > common walls live in **[docs/development.md](docs/development.md)**.
 
-`bun dev` runs Next.js and the Convex backend together with named, colored
-logs (`web` in cyan, `cvx` in magenta). If either crashes, both shut down
-so you never end up with half a dev environment.
+`bun dev` runs all four apps (agency `3000`, pay `3001`, fund `3002`, admin
+`3003`) and the Convex backend together with named, colored logs. If any
+crashes, all shut down so you never end up with half a dev environment.
 
 ## Scripts
 
 | Command                     | What it does                                                                |
 | --------------------------- | --------------------------------------------------------------------------- |
-| `bun dev`                   | Run Next + Convex together (recommended)                                    |
+| `bun dev`                   | Run all four apps + Convex together (recommended)                           |
 | `bun run dev:web`           | Just the Next.js app                                                        |
 | `bun run dev:convex`        | Just the Convex dev backend                                                 |
 | `bun run convex:env:sync`   | Push deployment-side env from `.env.local` (Auth0/PII/providers)            |
@@ -117,8 +117,7 @@ bun --filter @mutav/agency build        # next build, agency only
 ```
 
 Swap `agency` for `pay`, `fund`, or `admin` to target a different app.
-`bun run dev` at the root still launches Next (agency) + Convex
-together for the common dev loop.
+`bun run dev` at the root launches all four apps + Convex together.
 
 ### Per-app Vercel deploy gating
 

@@ -238,7 +238,6 @@ function loadEntry(filePath) {
     merged_at,
     sync_actions: syncActions,
     effectiveMs: Number.isFinite(effectiveMs) ? effectiveMs : mtimeMs,
-    effectiveIso: merged_at ?? new Date(mtimeMs).toISOString(),
   };
 }
 
@@ -325,7 +324,7 @@ function main() {
 
   if (flags.format === "json") {
     const payload = {
-      entries: entries.map(({ filePath, effectiveIso, ...rest }) => ({
+      entries: entries.map(({ filePath, ...rest }) => ({
         ...rest,
         file: filePath,
       })),

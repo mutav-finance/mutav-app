@@ -68,19 +68,59 @@ const INGREDIENTS: readonly string[] = [
 const CHROME_TAGS: readonly string[] = ["header", "nav", "aside", "footer"];
 const CHROME_TAG_PATTERN = /<(header|nav|aside|footer)[\s/>]/;
 
+const EXEMPT_LAYOUTS_FILE = "tests/shell-exempt-layouts.json";
+
 /**
- * `fund/(investor)` keeps its own top-bar arrangement instead of AppShell.
- * Serving both from one component needs either a boolean flag or a
- * `navPlacement` enum that would drag SidebarProvider's cookie/keyboard/CSS-var
- * machinery into a sidebar-less app. Three unsettled contradictions sit under
- * fund first (scroll ownership, the literal `dark` class instead of
- * next-themes, no ThemeProvider/Toaster/TooltipProvider) — see
- * docs/architecture/nav-shell-audit.md § 7 "Follow-ups", which gates the
- * adoption on § 6 being resolved. Remove this entry when that lands.
+ * A route group whose layout arranges its own chrome instead of mounting a
+ * shell. Every entry carries its own `reason` and `tracking` so the rationale
+ * travels with the data: the entry IS the record, not a comment next to it that
+ * the next editor never reads. An entry with no justification cannot be added
+ * without the schema rejecting it.
  */
-const SHELL_EXEMPT_LAYOUTS: readonly string[] = [
-  "apps/fund/src/app/[locale]/(investor)/layout.tsx",
-];
+type ExemptLayout = { reason: string; tracking: string };
+
+function isExemptLayout(value: unknown): value is ExemptLayout {
+  if (typeof value !== "object" || value === null) return false;
+  const record: Record<string, unknown> = { ...value };
+  return (
+    typeof record.reason === "string" &&
+    record.reason.trim().length >= 40 &&
+    typeof record.tracking === "string" &&
+    record.tracking.trim().length >= 20
+  );
+}
+
+function loadExemptLayouts(): ReadonlyMap<string, ExemptLayout> {
+  let raw: string;
+  try {
+    raw = readFileSync(join(REPO_ROOT, EXEMPT_LAYOUTS_FILE), "utf8");
+  } catch {
+    // Without this the module-scope read throws a bare ENOENT and takes down
+    // every `it` in the file — a shell-contract failure must read as one.
+    throw new Error(
+      `${EXEMPT_LAYOUTS_FILE} is missing. It is the shell contract's only exemption list and is read by both this gate and .claude/hooks/shell-contract.js — commit it, or delete both readers.`,
+    );
+  }
+
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`${EXEMPT_LAYOUTS_FILE} must be an object keyed by repo-relative layout path`);
+  }
+
+  const entries = new Map<string, ExemptLayout>();
+  for (const [path, value] of Object.entries(parsed)) {
+    if (!isExemptLayout(value)) {
+      throw new Error(
+        `${EXEMPT_LAYOUTS_FILE}: "${path}" needs a substantive "reason" and a "tracking" reference — an exemption without a justification is a silently softened check`,
+      );
+    }
+    entries.set(path, value);
+  }
+  return entries;
+}
+
+const EXEMPT_LAYOUTS: ReadonlyMap<string, ExemptLayout> = loadExemptLayouts();
+const SHELL_EXEMPT_LAYOUTS: readonly string[] = [...EXEMPT_LAYOUTS.keys()];
 
 const SCANNABLE_EXTENSIONS: readonly string[] = [
   ".ts",
@@ -97,6 +137,10 @@ const SKIPPED_DIRS: readonly string[] = ["node_modules", ".next", ".turbo", "dis
 
 function localeRootOf(app: string): string {
   return join(REPO_ROOT, "apps", app, "src", "app", "[locale]");
+}
+
+function appRootOf(app: string): string {
+  return join(REPO_ROOT, "apps", app, "src", "app");
 }
 
 function repoPath(absolute: string): string {
@@ -141,6 +185,16 @@ function filesNamed(app: string, names: readonly string[]): string[] {
   return collectRouteFiles(app).filter((file) =>
     names.includes(file.split(sep).slice(-1)[0] ?? ""),
   );
+}
+
+/**
+ * Every file of that name anywhere under `src/app/`, not just under `[locale]`.
+ * The positional 404 rules are about paths Next treats specially, and both of
+ * the paths they reject (`src/app/not-found.tsx`, a stray
+ * `[locale]/global-not-found.tsx`) sit outside the `[locale]` route walk.
+ */
+function everyFileNamed(app: string, name: string): string[] {
+  return walk(appRootOf(app), (entry) => entry === name).sort();
 }
 
 function readSource(absolute: string): string {
@@ -418,7 +472,7 @@ describe("shell contract", () => {
     expect(violations, table).toEqual([]);
   });
 
-  it("B — each app has exactly one not-found.tsx, at [locale]/, on BareShell", () => {
+  it("B1 — each app has a global 404 at src/app/global-not-found.tsx, on BareShell, with the flag on", () => {
     const violations: string[] = [];
 
     for (const app of APPS) {
@@ -428,23 +482,95 @@ describe("shell contract", () => {
         );
         continue;
       }
-      const notFounds = filesNamed(app, ["not-found.tsx"]);
-      const expected = join(localeRootOf(app), "not-found.tsx");
 
-      if (notFounds.length === 0) {
-        violations.push(`${app}: no not-found.tsx (D5 — every app gets one, on BareShell)`);
-        continue;
+      // An unmatched URL never reaches [locale]/not-found.tsx: Next resolves
+      // /_not-found against the app-dir ROOT, so the rewrite into [locale]
+      // changes the pathname, not the boundary. See nav-shell-audit § 5.
+      const globalNotFound = join(appRootOf(app), "global-not-found.tsx");
+      // Next reads this convention at the app-dir root ONLY. A copy written one
+      // segment down is not a 404 at all — it is an inert module, and every
+      // import-based assertion below would happily pass on it.
+      for (const stray of everyFileNamed(app, "global-not-found.tsx")) {
+        if (stray === globalNotFound) continue;
+        violations.push(
+          `${repoPath(stray)}: global-not-found.tsx is an app-dir-root convention — Next ignores it here; move it to ${repoPath(globalNotFound)}`,
+        );
       }
-      for (const found of notFounds) {
-        if (found !== expected) {
-          // A not-found.tsx inside a route group would import BareShell,
-          // satisfy every import-based check, and still render inside that
-          // group's AppShell sidebar. Only its PATH reveals the bug.
+      if (!isFile(globalNotFound)) {
+        violations.push(
+          `${app}: no src/app/global-not-found.tsx — unmatched URLs would fall to Next's builtin 404`,
+        );
+      } else {
+        const shells = shellImportsIn(globalNotFound);
+        if (shells.length !== 1 || shells[0] !== "bare-shell") {
           violations.push(
-            `${repoPath(found)}: nested not-found renders inside its group's shell — move it to ${repoPath(expected)}`,
+            `${repoPath(globalNotFound)}: must import exactly @mutav/ui/shell/bare-shell (found: ${shells.join(", ") || "none"})`,
+          );
+        }
+        const source = readSource(globalNotFound);
+        // It replaces the root layout for /_not-found, so it owns the document.
+        if (!source.includes("<html") || !source.includes("<body")) {
+          violations.push(
+            `${repoPath(globalNotFound)}: must return a full document — <html> and <body> with the same classes as [locale]/layout.tsx`,
           );
         }
       }
+
+      // Without the flag, next-app-loader deletes the convention and the file
+      // above is a silent no-op. That is this change's worst failure mode.
+      const config = join(REPO_ROOT, "apps", app, "next.config.ts");
+      if (!isFile(config) || !/globalNotFound:\s*true/.test(readSource(config))) {
+        violations.push(
+          `apps/${app}/next.config.ts: set experimental.globalNotFound: true, or global-not-found.tsx is ignored`,
+        );
+      }
+    }
+
+    expect(violations, table).toEqual([]);
+  });
+
+  it("B2 — each app has exactly one not-found.tsx, at [locale]/, on BareShell", () => {
+    const violations: string[] = [];
+
+    for (const app of APPS) {
+      if (!isDirectory(localeRootOf(app))) continue;
+
+      // Whole app dir, not just [locale]: `src/app/not-found.tsx` and
+      // `src/app/(public)/not-found.tsx` are both wrong and both invisible to
+      // a walk rooted at [locale].
+      const notFounds = everyFileNamed(app, "not-found.tsx");
+      const expected = join(localeRootOf(app), "not-found.tsx");
+      const appRootNotFound = join(appRootOf(app), "not-found.tsx");
+
+      if (notFounds.length === 0) {
+        violations.push(
+          `${app}: no [locale]/not-found.tsx (D5 — the notFound() boundary, on BareShell)`,
+        );
+        continue;
+      }
+      for (const found of notFounds) {
+        if (found === expected) continue;
+        if (found === appRootNotFound) {
+          // In THIS repo the app dir has no `layout.tsx` — the root layout is
+          // `[locale]/layout.tsx` — so Next has no root layout to wrap a root
+          // not-found in and supplies a builtin <html><body> with no lang, no
+          // font variable and no theme class. BareShell collapses inside it.
+          // (Repo-specific: an app with a static root layout would not see this.)
+          violations.push(
+            `${repoPath(found)}: this app's root layout is [locale]/layout.tsx, so a root not-found renders under Next's builtin document — use ${repoPath(join(appRootOf(app), "global-not-found.tsx"))} for unmatched URLs`,
+          );
+          continue;
+        }
+        // A nested not-found.tsx imports BareShell, satisfies every
+        // import-based check, and still renders inside its group's sidebar.
+        // Only its PATH reveals the bug.
+        violations.push(
+          `${repoPath(found)}: nested not-found renders inside its group's shell — move it to ${repoPath(expected)}`,
+        );
+      }
+      // Guard the read: without it, a misplaced not-found makes this test throw
+      // ENOENT instead of reporting the violation it was written for.
+      if (!isFile(expected)) continue;
       const shells = shellImportsIn(expected);
       if (shells.length !== 1 || shells[0] !== "bare-shell") {
         violations.push(
@@ -517,11 +643,32 @@ describe("shell contract", () => {
     );
   });
 
-  it("the exempt layouts named above still exist", () => {
-    // A stale exemption is a silently-disabled assertion. If the fund
-    // follow-up lands and the path changes, this fails and forces a decision.
-    const missing = SHELL_EXEMPT_LAYOUTS.filter((path) => !isFile(join(REPO_ROOT, path)));
+  it("E — each exemption still points at a layout that really arranges its own chrome", () => {
+    const violations: string[] = [];
 
-    expect(missing).toEqual([]);
+    for (const [path, entry] of EXEMPT_LAYOUTS) {
+      const absolute = join(REPO_ROOT, path);
+      // A stale exemption is a silently-disabled assertion. If the fund
+      // follow-up lands and the path changes, this fails and forces a decision.
+      if (!isFile(absolute)) {
+        violations.push(
+          `${path}: exempt layout no longer exists — delete the entry (${entry.tracking})`,
+        );
+        continue;
+      }
+      // The exemption exists because the layout arranges its own chrome — Test
+      // C is what it buys relief from. A layout Test C would not have flagged
+      // is not an exception to the shell rule, it is a route group missing its
+      // shell, and exempting it would hide every leaf beneath it from Test A by
+      // appending one line to a data file.
+      const app = path.split("/")[1] ?? "";
+      if (chromeMountedBy(absolute, app).length === 0) {
+        violations.push(
+          `${path}: exempt from the shell rule but mounts no chrome of its own (inline or one hop away) — an exemption is for a layout that arranges its own chrome, not for a route group that has none`,
+        );
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 });
