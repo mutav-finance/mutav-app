@@ -1,10 +1,10 @@
 import { redirect as nextRedirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@mutav/ui/sidebar";
-import { Toaster } from "@mutav/ui/sonner";
-import { ThemeProvider } from "@mutav/ui/theme";
+import { AgencyIdentity } from "@/components/agency-identity";
+import { AgencyNav } from "@/components/agency-nav";
+import { AgencySidebarHeader } from "@/components/agency-sidebar-header";
+import { ShellSwitcher } from "@/components/shell-switcher";
+import { AppShell } from "@mutav/ui/shell/app-shell";
 import { redirect } from "@mutav/i18n/navigation";
 import { resolveUserDestination } from "@/lib/user-destination";
 import { buildCrossAppUrl } from "@mutav/i18n/cross-app";
@@ -45,32 +45,15 @@ export default async function AppLayout({
   }
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-      <SidebarProvider
-        className="h-svh overflow-hidden"
-        style={
-          {
-            "--sidebar-width": "calc(var(--spacing) * 72)",
-            "--header-height": "calc(var(--spacing) * 12)",
-          } as React.CSSProperties
-        }
-      >
-        <a href="#main-content" className="skip-link">
-          {tA11y("skipToMain")}
-        </a>
-        <AppSidebar variant="inset" />
-        <SidebarInset className="min-h-0">
-          <SiteHeader />
-          <main
-            id="main-content"
-            data-front="imobiliarias"
-            className="@container/main flex min-h-0 flex-1 flex-col overflow-y-auto"
-          >
-            {children}
-          </main>
-        </SidebarInset>
-        <Toaster />
-      </SidebarProvider>
-    </ThemeProvider>
+    <AppShell
+      sidebarHeader={<AgencySidebarHeader />}
+      nav={<AgencyNav />}
+      identity={<AgencyIdentity />}
+      headerEnd={<ShellSwitcher />}
+      dataFront="imobiliarias"
+      skipToMainLabel={tA11y("skipToMain")}
+    >
+      {children}
+    </AppShell>
   );
 }

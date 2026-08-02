@@ -28,11 +28,11 @@
     "language": "Language",
     "logOut": "Log out"
   },
-  "siteHeader": {
-    "title": "Documents"
-  },
-  "brand": {
-    "name": "Acme Inc."
+  "notFound": {
+    "eyebrow": "404",
+    "title": "Page not found",
+    "subtitle": "This address doesn't exist or the content moved.",
+    "backLabel": "Back to dashboard"
   },
   "commission": {
     "meta": {
@@ -197,6 +197,7 @@
     }
   },
   "nav": {
+    "brandEyebrow": "MUTAV Guarantees",
     "roadmapBadge": "soon",
     "main": {
       "createContract": "Create Contract",
@@ -974,7 +975,6 @@
       "description": "Pay your Mutav invoice via the Stellar network."
     },
     "shell": {
-      "brand": "mutav",
       "paymentLabel": "Invoice",
       "footerBrand": "Mutav · Rental Guarantee Protocol"
     },

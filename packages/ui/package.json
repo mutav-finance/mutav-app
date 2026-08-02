@@ -39,6 +39,9 @@
     "./select": "./src/select.tsx",
     "./separator": "./src/separator.tsx",
     "./sheet": "./src/sheet.tsx",
+    "./shell/app-shell": "./src/shell/app-shell.tsx",
+    "./shell/bare-shell": "./src/shell/bare-shell.tsx",
+    "./shell/flow-shell": "./src/shell/flow-shell.tsx",
     "./sidebar": "./src/sidebar.tsx",
     "./skeleton": "./src/skeleton.tsx",
     "./sonner": "./src/sonner.tsx",
@@ -50,7 +53,8 @@
     "./toggle": "./src/toggle.tsx",
     "./toggle-group": "./src/toggle-group.tsx",
     "./tooltip": "./src/tooltip.tsx",
-    "./use-mobile": "./src/use-mobile.ts"
+    "./use-mobile": "./src/use-mobile.ts",
+    "./wordmark": "./src/wordmark.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

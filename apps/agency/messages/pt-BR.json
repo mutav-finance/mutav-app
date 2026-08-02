@@ -28,11 +28,11 @@
     "language": "Idioma",
     "logOut": "Sair"
   },
-  "siteHeader": {
-    "title": "Documentos"
-  },
-  "brand": {
-    "name": "Acme Inc."
+  "notFound": {
+    "eyebrow": "404",
+    "title": "Página não encontrada",
+    "subtitle": "O endereço não existe ou o conteúdo foi movido.",
+    "backLabel": "Voltar ao painel"
   },
   "commission": {
     "meta": {
@@ -197,6 +197,7 @@
     }
   },
   "nav": {
+    "brandEyebrow": "MUTAV Garantias",
     "roadmapBadge": "em breve",
     "main": {
       "createContract": "Criar Contrato",
@@ -974,7 +975,6 @@
       "description": "Pague a fatura Mutav via rede Stellar."
     },
     "shell": {
-      "brand": "mutav",
       "paymentLabel": "Fatura",
       "footerBrand": "Mutav · Protocolo de Garantia de Aluguel"
     },

@@ -18,7 +18,17 @@
     "language": "Language",
     "logOut": "Log out"
   },
+  "notFound": {
+    "eyebrow": "404",
+    "title": "Page not found",
+    "subtitle": "This address doesn't exist or the content moved.",
+    "backLabel": "Back to console"
+  },
   "nav": {
+    "brand": {
+      "title": "Mutav Admin",
+      "subtitle": "Staff console"
+    },
     "main": {
       "overview": "Overview",
       "agencies": "Agencies",

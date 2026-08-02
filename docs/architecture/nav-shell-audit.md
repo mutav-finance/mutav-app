@@ -146,16 +146,60 @@ Follows from D1. Every app gains a `not-found.tsx`. A 404 inside `(app)` drops t
 
 Out of scope for the shell work, but it is the first screen an unauthenticated user sees. While it stays default-Auth0, the unauthenticated experience is inconsistent regardless of what ships here. Track separately.
 
-## 5. Scope that follows
+## 5. Scope that follows — shipped
 
-1. `<AppShell>` / `<FlowShell>` / `<BareShell>` + a `Wordmark` component in `@mutav/ui`.
-2. Migrate 6 chrome configurations onto them; delete the agency/admin duplicates.
-3. `not-found.tsx` in all four apps (Bare).
-4. Replace the inline auth-aware header in `agency/(onboarding)` with a Flow identity slot.
-5. i18n `InvestorNav`; wire its wallet button as `fund`'s identity slot.
+1. ✅ `<AppShell>` / `<FlowShell>` / `<BareShell>` + a `Wordmark` component in `@mutav/ui`.
+2. ✅ Migrate the chrome configurations onto them; delete the agency/admin duplicates.
+3. ✅ `not-found.tsx` in all four apps (Bare).
+4. ✅ Replace the inline auth-aware header in `agency/(onboarding)` with a Flow identity slot.
+5. ✅ i18n `InvestorNav`; wire its wallet button as `fund`'s identity slot.
+6. ✅ Enforcement — see § 8.
+
+Two rulings taken during implementation, recorded so they are not re-opened by omission:
+
+- **`fund/(investor)` did not adopt `<AppShell>`.** D1 lists it under the App variant, but its arrangement is a top bar and serving both from one component would need either a boolean flag (forbidden by CLAUDE.md) or a `navPlacement` enum that drags `SidebarProvider`'s cookie/keyboard/CSS-var machinery into a sidebar-less app. § 6's unresolved contradictions sit under fund and none is test-covered. Deferred to § 7; `fund` still got D5, D6, and a real identity slot.
+- **`pay`'s skip link now targets `#main-content`, not `#primary-action`.** The deleted `pay/[publicId]/layout.tsx` pointed a link labelled "skip to main content" at the payment CTA. `FlowShell` owns `<main id="main-content">`, so the label and the target now agree; the two orphaned `id="primary-action"` anchors were removed with it. A screen-reader user lands on the step's content rather than mid-panel.
+- **`<BareShell>` mounts no `ThemeProvider`.** `admin/access-denied` renders outside any `ThemeProvider` today (only the `(admin)` group layout mounts one), so next-themes never stamps `<html>` for that route. Adding one would change the rendered output for system-dark viewers; the shell ships the existing inconsistency deliberately so the migration had zero rendered diff.
+
+Also settled: no root-level `apps/*/src/app/not-found.tsx`. All four proxies rewrite everything into `[locale]` (matcher `/((?!_next/static|_next/image|_vercel|.*\..*).*)`), so an unmatched path reaches `[locale]/not-found.tsx`. Only dotted paths bypass the middleware and fall to Next's built-in fallback — accepted, rather than papered over with a `not-found.tsx` that would render with no `<html>`/`<body>` wrapper.
 
 ## 6. Not investigated
 
 - Mobile / responsive behavior of any nav — reviewed as source, not rendered at breakpoints.
 - `apps/agency`'s `SidebarRoadmapItem` and `NavCadastros`, whose purpose was not established.
-- Whether `fund`'s "scroll-with-document" root layout comment matches its `h-svh overflow-hidden` markup — they appear to contradict.
+- Whether `fund`'s "scroll-with-document" root layout comment matches its `h-svh overflow-hidden` markup — they appear to contradict. `(investor)/layout.tsx` re-introduces `overflow-y-auto` on an inner div.
+
+## 7. Follow-ups
+
+**`fund/(investor)` adopts the App shell.** Gated on § 6's scroll-ownership question being resolved first, plus two things that make a shared shell unsafe today: the investor palette comes from a literal `dark` class on the `(investor)` div rather than next-themes (a shell owning that element would flip the portal to light in a way invisible in code review), and `fund` mounts no `ThemeProvider`, `Toaster`, or `TooltipProvider`.
+
+Until then the layout is an explicit exemption in `tests/shell-contract.test.ts` (`SHELL_EXEMPT_LAYOUTS`) — an exemption with a tracking reference, not a softened check. The test also asserts the exempt path still exists, so a stale entry fails rather than silently disabling the assertion. Deleting the entry is the last step of the follow-up.
+
+D7 (Auth0 Universal Login branding) also remains open — see § 4.
+
+## 8. Enforcement
+
+Three mechanisms, three moments. None of them can tell an author _which_ shell a new route wants — that is what § 4's table and [`../../CLAUDE.md` § "Which shell a new route gets"](../../CLAUDE.md#which-shell-a-new-route-gets) are for.
+
+| Gate                                                      | Fires at      | Catches                                                                                                                                                                                                                 |
+| --------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/shell-contract.test.ts` (`bun run test:structure`) | merge (CI)    | **absence** — a route group with no shell, nested shells, a `not-found.tsx` at the wrong depth, chrome ingredients or extracted chrome in a wrapper, `@auth0` reaching `apps/pay` directly or through a package subpath |
+| `eslint.config.mjs` (`no-restricted-imports` / `-syntax`) | editor + hook | a route file importing `@mutav/ui/sidebar` / `public-shell` / `sonner`, or a route wrapper inlining `<header>`/`<nav>`/`<aside>`/`<footer>`                                                                             |
+| § 4 + CLAUDE.md                                           | planning      | picking the wrong shell before any file exists                                                                                                                                                                          |
+
+Only the test can see absence: ESLint reads one file at a time, and "this route group has no shell" is a fact about the segment tree. It lives at the repo root because `packages/ui` has no `test` script and the per-app vitest configs run behind a changed-files filter — a check that surveys every app must not be filtered. It runs in the unfiltered `conventions` job of `.github/workflows/quality.yml`.
+
+Four escape hatches the first cut of these gates left open, and what closes each:
+
+| Escape                                                                                             | Closed by                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extract the header into `src/components/` and render it beside the shell                           | The test parses each wrapper, separates JSX in **child** position from JSX in **prop** position, and follows app-local child components one hop to re-read them |
+| Put the chrome in `template.tsx` / `default.tsx` instead of `layout.tsx`                           | Both are route files now — templates join the shell chain, all three are chrome-checked, and the ESLint glob is `{layout,template,default}.tsx`                 |
+| Import `@mutav/app-shell/convex-auth-provider` from `apps/pay` (the string `@auth0` never appears) | Test D taints every `@mutav/*` subpath whose source transitively reaches `@auth0` and greps `apps/pay` for those specifiers too                                 |
+| Add a fifth app                                                                                    | `APPS`, the ESLint `rootDir` list, and `scripts/i18n-parity.mjs` all read `apps/` from disk instead of naming the four                                          |
+
+Both gates were verified against a working reproduction of each escape before the closures landed; each reproduction fails at least one gate now.
+
+The ESLint ban names specific specifiers, so a future `@mutav/ui/top-bar` would slip through. It is defense-in-depth; the test stays primary. The test's chrome follow is likewise **one hop** — a component that renders another component that hand-rolls a `<header>` is not detected. That is a deliberate bound: a route wrapper is a handful of lines by construction, and the refactor being closed is "move it next door".
+
+**Not enforced anywhere:** "compiles but renders unstyled." Arbitrary-value classes referencing a CSS variable (`h-(--header-height)`, `w-(--sidebar-width)`) compile fine and collapse silently if the variable is undeclared — `<AppShell>` declaring both itself is what closes that. `scripts/regression-greps.sh` § 9 asserts the two declarations that make `@mutav/ui`'s classes reachable at all (`@source` + `transpilePackages`), but a vanished class still needs a human looking at the screen.

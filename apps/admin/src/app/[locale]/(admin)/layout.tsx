@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { AdminHeaderActions } from "@/components/admin-header-actions";
+import { AdminNav } from "@/components/admin-nav";
+import { AdminSidebarHeader } from "@/components/admin-sidebar-header";
 import { redirect as localeRedirect } from "@mutav/i18n/navigation";
-import { SidebarInset, SidebarProvider } from "@mutav/ui/sidebar";
-import { Toaster } from "@mutav/ui/sonner";
-import { ThemeProvider } from "@mutav/ui/theme";
+import { NavUser } from "@mutav/ui/nav-user";
+import { AppShell } from "@mutav/ui/shell/app-shell";
 import { getStaffMember } from "@/lib/auth";
 
 /**
@@ -60,32 +60,15 @@ export default async function AdminLayout({
   };
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-      <SidebarProvider
-        className="h-svh overflow-hidden"
-        style={
-          {
-            "--sidebar-width": "calc(var(--spacing) * 72)",
-            "--header-height": "calc(var(--spacing) * 12)",
-          } as React.CSSProperties
-        }
-      >
-        <a href="#main-content" className="skip-link">
-          {tA11y("skipToMain")}
-        </a>
-        <AppSidebar variant="inset" user={user} />
-        <SidebarInset className="min-h-0">
-          <SiteHeader />
-          <main
-            id="main-content"
-            data-front="mutav-staff"
-            className="@container/main flex min-h-0 flex-1 flex-col overflow-y-auto"
-          >
-            {children}
-          </main>
-        </SidebarInset>
-        <Toaster />
-      </SidebarProvider>
-    </ThemeProvider>
+    <AppShell
+      sidebarHeader={<AdminSidebarHeader />}
+      nav={<AdminNav />}
+      identity={<NavUser user={user} />}
+      headerEnd={<AdminHeaderActions />}
+      dataFront="mutav-staff"
+      skipToMainLabel={tA11y("skipToMain")}
+    >
+      {children}
+    </AppShell>
   );
 }

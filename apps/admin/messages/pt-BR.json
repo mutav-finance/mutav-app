@@ -18,7 +18,17 @@
     "language": "Idioma",
     "logOut": "Sair"
   },
+  "notFound": {
+    "eyebrow": "404",
+    "title": "Página não encontrada",
+    "subtitle": "O endereço não existe ou o conteúdo foi movido.",
+    "backLabel": "Voltar ao console"
+  },
   "nav": {
+    "brand": {
+      "title": "Mutav Admin",
+      "subtitle": "Console da equipe"
+    },
     "main": {
       "overview": "Visão geral",
       "agencies": "Imobiliárias",
