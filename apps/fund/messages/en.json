@@ -2,5 +2,29 @@
   "meta": {
     "title": "Mutav Fund — Investor Portal",
     "description": "Invest in the MUTAV fund. Deposit, redeem, and track NAV onchain."
+  },
+  "common": {
+    "a11y": {
+      "skipToMain": "Skip to main content"
+    }
+  },
+  "nav": {
+    "brandLabel": "MUTAV Investor Portal",
+    "ariaLabel": "Investor portal",
+    "main": {
+      "dashboard": "Dashboard",
+      "deposit": "Deposit",
+      "redeem": "Redeem",
+      "transparency": "Transparency"
+    }
+  },
+  "wallet": {
+    "connect": "Connect Wallet"
+  },
+  "notFound": {
+    "eyebrow": "404",
+    "title": "Page not found",
+    "subtitle": "This address doesn't exist or the content moved.",
+    "backLabel": "Back to portal"
   }
 }

@@ -18,11 +18,10 @@
     "language": "Idioma",
     "logOut": "Sair"
   },
-  "siteHeader": {
-    "title": "Documentos"
-  },
-  "brand": {
-    "name": "Acme Inc."
+  "notFound": {
+    "eyebrow": "404",
+    "title": "Página não encontrada",
+    "subtitle": "Verifique o link da fatura que você recebeu."
   },
   "commission": {
     "meta": {
@@ -855,7 +854,6 @@
       "description": "Pague a fatura Mutav via rede Stellar."
     },
     "shell": {
-      "brand": "mutav",
       "paymentLabel": "Fatura",
       "footerBrand": "Mutav · Protocolo de Garantia de Aluguel"
     },

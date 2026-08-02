@@ -20,6 +20,21 @@ export type StaffGateResult =
   | { kind: "staff"; session: SessionData; roles: string[] };
 
 /**
+ * Next signals control flow by throwing tagged errors: `DYNAMIC_SERVER_USAGE`
+ * is how a `headers()` read bails a route out of static generation, and
+ * `NEXT_REDIRECT` / `NEXT_NOT_FOUND` are how the navigation APIs unwind. The
+ * fail-closed catches below must let those through — swallowing them turns
+ * Next's "render this dynamically" into a spurious `anonymous` result and
+ * fills every build log with stack traces that describe no failure.
+ */
+function isNextControlFlowSignal(err: unknown): boolean {
+  if (typeof err !== "object" || err === null || !("digest" in err)) return false;
+  const { digest } = err;
+  if (typeof digest !== "string") return false;
+  return digest === "DYNAMIC_SERVER_USAGE" || digest.startsWith("NEXT_");
+}
+
+/**
  * Server-side staff gate for App Router server components / layouts.
  *
  * Two checks, fail-closed at each (a failed read resolves to `anonymous`,
@@ -45,6 +60,7 @@ export async function getStaffMember(): Promise<StaffGateResult> {
     // send the user to Universal Login. Surface to the layout as
     // `anonymous` rather than bubbling to Next's error boundary, which has
     // no sign-in affordance.
+    if (isNextControlFlowSignal(err)) throw err;
     console.error("[admin] auth0.getSession() failed:", err);
     return { kind: "anonymous" };
   }
@@ -63,6 +79,7 @@ export async function getStaffMember(): Promise<StaffGateResult> {
     // because a fetch blip leaves staff status unknown — a possibly-staff
     // user must not be bounced out of admin. getMyStaff is a subject-keyed
     // identity read (queryWithAuth), not an aud-bound capability wrapper.
+    if (isNextControlFlowSignal(err)) throw err;
     console.error("[admin] mutavStaff.getMyStaff failed:", err);
     return { kind: "anonymous" };
   }

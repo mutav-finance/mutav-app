@@ -163,19 +163,42 @@ mutav-app/
 
 ### App Router structure (per app)
 
-Each app's Next.js App Router pages live under `apps/<app>/src/app/[locale]/...`. The `[locale]` segment is consumed by next-intl. Route groups name the shell (`(app)` for the agency dashboard, `(admin)` for the staff console, `(public)` for tenant payment, `(investor)` for the fund portal).
+Each app's Next.js App Router pages live under `apps/<app>/src/app/[locale]/...`. The `[locale]` segment is consumed by next-intl. Route groups scope the guard and the shell (`(app)` agency dashboard, `(admin)` staff console, `(investor)` fund portal, `(onboarding)` agency signup; `apps/pay` needs no group — its whole tree is one flow).
 
 ```
 apps/agency/src/app/
 ├── [locale]/
-│   ├── layout.tsx              # root layout, locale-aware metadata
+│   ├── layout.tsx              # root layout: <html>/<body>, fonts, NextIntlClientProvider
+│   ├── not-found.tsx           # <BareShell> — required in every app
 │   └── (app)/                  # dashboard route group
-│       ├── layout.tsx          # sidebar + header shell
+│       ├── layout.tsx          # guard + <AppShell>, nav passed as props
 │       └── contracts/
 │           └── [id]/
 │               ├── page.tsx
 │               └── error.tsx
 ```
+
+#### Which shell a new route gets
+
+Three shells live in `@mutav/ui/shell/*`. **The route picks the shell; auth state only fills the `identity` slot** — never select a shell at request time. Full rationale in [`docs/architecture/nav-shell-audit.md`](docs/architecture/nav-shell-audit.md) § 4 (D1–D6).
+
+| Shell         | Import                       | Use when the route…                       | Today                                          |
+| ------------- | ---------------------------- | ----------------------------------------- | ---------------------------------------------- |
+| `<AppShell>`  | `@mutav/ui/shell/app-shell`  | is behind a nav a signed-in user lives in | `agency/(app)`, `admin/(admin)`                |
+| `<FlowShell>` | `@mutav/ui/shell/flow-shell` | is a multi-step flow — brand, no nav      | `agency/(onboarding)`, `pay/pay/[publicId]`    |
+| `<BareShell>` | `@mutav/ui/shell/bare-shell` | is a terminal state — brand + one action  | `admin/access-denied`, every app's `not-found` |
+
+Rules the gates enforce:
+
+- **Exactly one shell per rendered route**, mounted in the route-group `layout.tsx` (a page mounts its own only when no ancestor layout has one — `admin/access-denied`). The `[locale]/layout.tsx` root layout never mounts a shell.
+- **`layout.tsx`, `template.tsx`, and `default.tsx` are all route wrappers** and are held to the same rules — a template wraps every page in its segment exactly like a layout, so chrome hiding in one is a second shell in disguise.
+- **Extracting chrome into `src/components/` does not launder it.** A component rendered as a _child_ of the shell must not hand-roll `<header>`/`<nav>`/`<aside>`/`<footer>`; chrome reaches the shell through a slot prop or not at all. `bun run test:structure` follows a wrapper's app-local child components one hop.
+- **`not-found.tsx` lives at `[locale]/not-found.tsx` and nowhere else.** A nested one would render inside its group's sidebar; a 404 keeps no nav.
+- **Never import `@mutav/ui/sidebar`, `@mutav/ui/public/public-shell`, or `@mutav/ui/sonner` from `src/app/**`** — the shells compose those. Nav definitions stay app-local and arrive as props (`nav`, `identity`, `sidebarHeader`, `headerEnd`, `footer`, `context`). App-local nav components under `src/components/\*\*` import the sidebar primitives freely.
+- **`apps/pay` carries no Auth0 SDK** — its identity slot is empty for every viewer.
+- `fund/(investor)` is a tracked exemption (top-bar arrangement, unresolved palette/scroll ownership) — see nav-shell-audit § 7.
+
+Gates: `bun run test:structure` (`tests/shell-contract.test.ts` — the only check that detects a _missing_ shell) and the `no-restricted-imports` / `no-restricted-syntax` blocks in `eslint.config.mjs`. Both run in the `conventions` / `lint` jobs of `.github/workflows/quality.yml`.
 
 ### Folder responsibilities
 
@@ -243,12 +266,14 @@ Every page wraps content in three composable primitives from `@mutav/ui/page/*` 
   - `narrow` — `max-w-(--page-content-max-width)` (4xl, 56rem) with `px-4 lg:px-6`. For cards, forms, prose, detail pages.
   - `wide` — `max-w-(--page-wide-max-width)` (screen-2xl, 96rem) with `px-4 lg:px-6`. For wide tables that should still cap on ultra-wide screens.
 
-Width tokens live in each app's `src/app/globals.css` alongside `--header-height` and `--sidebar-width`:
+Width tokens live in each app's `src/app/globals.css`:
 
 ```css
 --page-content-max-width: 56rem; /* 4xl — narrow content */
 --page-wide-max-width: 96rem; /* screen-2xl — wide content cap */
 ```
+
+`--header-height` and `--sidebar-width` are **not** among them: `<AppShell>` declares both inline on its own `SidebarProvider`, so they exist only inside that shell. `h-(--header-height)` / `w-(--sidebar-width)` compile fine and collapse to nothing under `<FlowShell>` or `<BareShell>` — don't reach for them outside `AppShell`'s subtree.
 
 **Patterns by page type:**
 

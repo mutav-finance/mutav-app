@@ -30,7 +30,12 @@ export default defineConfig({
     // Default env is node; convex-test-using files opt into edge-runtime via
     //   // @vitest-environment edge-runtime
     // at the top of the file.
-    include: ["convex/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+    // `tests/**` holds repo-structure checks that survey every app at once
+    // (e.g. the shell contract). They cannot live under apps/* — each app's
+    // config scopes to itself and CI runs those behind a changed-files
+    // filter, so a PR touching one app would skip a whole-repo assertion.
+    // packages/ui has no `test` script at all, so a file there never runs.
+    include: ["convex/**/*.{test,spec}.?(c|m)[jt]s?(x)", "tests/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: ["**/node_modules/**", "**/.next/**"],
     server: {
       // convex-test uses `import.meta.glob` internally; without inline

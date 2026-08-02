@@ -2,5 +2,29 @@
   "meta": {
     "title": "Mutav Fund — Portal do Investidor",
     "description": "Invista no fundo MUTAV. Deposite, resgate e acompanhe o NAV onchain."
+  },
+  "common": {
+    "a11y": {
+      "skipToMain": "Pular para o conteúdo principal"
+    }
+  },
+  "nav": {
+    "brandLabel": "MUTAV — Portal do Investidor",
+    "ariaLabel": "Portal do investidor",
+    "main": {
+      "dashboard": "Painel",
+      "deposit": "Depositar",
+      "redeem": "Resgatar",
+      "transparency": "Transparência"
+    }
+  },
+  "wallet": {
+    "connect": "Conectar carteira"
+  },
+  "notFound": {
+    "eyebrow": "404",
+    "title": "Página não encontrada",
+    "subtitle": "O endereço não existe ou o conteúdo foi movido.",
+    "backLabel": "Voltar ao portal"
   }
 }

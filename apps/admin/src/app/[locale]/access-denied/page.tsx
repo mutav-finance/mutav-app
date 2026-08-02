@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Mono } from "@mutav/ui/mono";
-import { PublicShell } from "@mutav/ui/public/public-shell";
+import { BareShell } from "@mutav/ui/shell/bare-shell";
 import {
   type AccessDeniedTone,
   resolveAccessDeniedView,
@@ -48,48 +48,42 @@ export default async function AccessDeniedPage({
   const ToneIcon = toneIcon[view.tone];
 
   return (
-    <PublicShell>
-      <main
-        id="main-content"
-        data-front="mutav-staff"
-        className="flex min-h-0 flex-1 items-center justify-center px-6 py-16"
-      >
-        <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 w-full max-w-lg motion-safe:duration-500">
-          <div className="border-border bg-accent-dim text-accent flex size-11 items-center justify-center border">
-            <ToneIcon className="size-5" strokeWidth={1.75} aria-hidden />
-          </div>
-
-          <Eyebrow tone="subtle" className="mt-6 block uppercase">
-            {t(view.eyebrowKey)}
-          </Eyebrow>
-
-          <h1 className="font-display text-text mt-2 text-3xl font-bold tracking-tight text-balance">
-            {t(view.titleKey)}
-          </h1>
-
-          <p className="text-text-2 mt-3 text-base text-pretty">{t(view.subtitleKey)}</p>
-
-          {/* Both targets can be cross-origin or outside the `[locale]` tree,
-              so plain <a> rather than the next-intl Link. */}
-          <div className="mt-8 flex flex-wrap gap-2">
-            <Button asChild>
-              <a href={view.primary.href}>{t(view.primary.labelKey)}</a>
-            </Button>
-            <Button asChild variant="outline">
-              <a href={view.secondary.href}>{t(view.secondary.labelKey)}</a>
-            </Button>
-          </div>
-
-          {view.email ? (
-            <p className="border-border text-text-3 mt-8 border-t pt-4 text-xs">
-              {t.rich("signedInAs", {
-                email: view.email,
-                mono: (chunks) => <Mono className="text-text-2">{chunks}</Mono>,
-              })}
-            </p>
-          ) : null}
+    <BareShell dataFront="mutav-staff">
+      <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 w-full max-w-lg motion-safe:duration-500">
+        <div className="border-border bg-accent-dim text-accent flex size-11 items-center justify-center border">
+          <ToneIcon className="size-5" strokeWidth={1.75} aria-hidden />
         </div>
-      </main>
-    </PublicShell>
+
+        <Eyebrow tone="subtle" className="mt-6 block uppercase">
+          {t(view.eyebrowKey)}
+        </Eyebrow>
+
+        <h1 className="font-display text-text mt-2 text-3xl font-bold tracking-tight text-balance">
+          {t(view.titleKey)}
+        </h1>
+
+        <p className="text-text-2 mt-3 text-base text-pretty">{t(view.subtitleKey)}</p>
+
+        {/* Both targets can be cross-origin or outside the `[locale]` tree,
+              so plain <a> rather than the next-intl Link. */}
+        <div className="mt-8 flex flex-wrap gap-2">
+          <Button asChild>
+            <a href={view.primary.href}>{t(view.primary.labelKey)}</a>
+          </Button>
+          <Button asChild variant="outline">
+            <a href={view.secondary.href}>{t(view.secondary.labelKey)}</a>
+          </Button>
+        </div>
+
+        {view.email ? (
+          <p className="border-border text-text-3 mt-8 border-t pt-4 text-xs">
+            {t.rich("signedInAs", {
+              email: view.email,
+              mono: (chunks) => <Mono className="text-text-2">{chunks}</Mono>,
+            })}
+          </p>
+        ) : null}
+      </div>
+    </BareShell>
   );
 }

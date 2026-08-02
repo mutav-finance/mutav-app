@@ -25,7 +25,6 @@ export function PaymentAddressPaidReceipt({ paidAt, method }: Props) {
 
   return (
     <section
-      id="primary-action"
       data-stripe="paid"
       className="border-border bg-surface before:bg-success relative flex flex-col gap-5 border p-6 before:absolute before:inset-x-0 before:top-0 before:h-1"
       aria-labelledby="payment-paid-heading"

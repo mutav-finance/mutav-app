@@ -31,7 +31,6 @@ export async function PaymentAddressPanel({ muxedAddress, brlDisplay, options }:
 
   return (
     <section
-      id="primary-action"
       className="border-border bg-surface flex flex-col gap-6 border p-6"
       aria-labelledby="payment-address-heading"
     >

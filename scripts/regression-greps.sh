@@ -215,19 +215,44 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. i18n key parity between pt-BR.json and en.json
+# 8. i18n key parity between pt-BR.json and en.json — every app under apps/
 # ─────────────────────────────────────────────────────────────────────────────
 section "8. i18n key parity (pt-BR vs en)"
 
-if [[ -f apps/agency/messages/pt-BR.json && -f apps/agency/messages/en.json ]]; then
-  if ! node scripts/i18n-parity.mjs; then
-    fail "i18n key drift between apps/agency/messages/pt-BR.json and apps/agency/messages/en.json (see output above)"
-  else
-    pass "i18n keys in sync between pt-BR.json and en.json"
-  fi
+if ! node scripts/i18n-parity.mjs; then
+  fail "i18n key drift between messages/pt-BR.json and messages/en.json (see output above)"
 else
-  echo "${yellow}WARN${reset}: apps/agency/messages/{pt-BR,en}.json not found — skipping i18n parity check"
+  pass "i18n keys in sync between pt-BR.json and en.json in every app"
 fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. @mutav/ui wiring per app — the "compiles but renders unstyled" trap.
+#
+#    The shells ship their Tailwind classes from packages/ui. Tailwind 4 only
+#    scans the consuming project, and arbitrary-value classes that reference a
+#    CSS variable (h-(--header-height), w-(--sidebar-width)) compile fine and
+#    collapse silently at runtime. Neither typecheck nor the shell-contract
+#    test can see a vanished class, so assert the two declarations that make
+#    the package's classes reachable at all.
+# ─────────────────────────────────────────────────────────────────────────────
+section "9. @mutav/ui wiring (@source + transpilePackages)"
+
+ui_wiring_violations=0
+for app in agency admin fund pay; do
+  globals="apps/$app/src/app/globals.css"
+  config="apps/$app/next.config.ts"
+
+  if ! rg -q '@source "\.\./\.\./\.\./\.\./packages/ui/src"' "$globals" 2>/dev/null; then
+    fail "$globals is missing @source \"../../../../packages/ui/src\" — @mutav/ui classes compile to nothing"
+    ui_wiring_violations=$((ui_wiring_violations + 1))
+  fi
+  if ! rg -q 'transpilePackages:.*"@mutav/ui"' "$config" 2>/dev/null; then
+    fail "$config does not list \"@mutav/ui\" in transpilePackages — the package ships TSX source"
+    ui_wiring_violations=$((ui_wiring_violations + 1))
+  fi
+done
+
+[[ $ui_wiring_violations -eq 0 ]] && pass "all four apps declare the @mutav/ui @source + transpilePackages"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "summary"

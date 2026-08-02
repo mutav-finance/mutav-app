@@ -60,18 +60,19 @@ The Auth0 swap is documented in [`../auth.md`](../auth.md). Pre-Auth0, all human
 
 ## Shell catalog
 
-The app layer is a Turborepo monorepo with one Next.js app per audience (`apps/agency`, `apps/pay`, `apps/fund`, `apps/admin`), each hosting a distinct shell via App Router route groups. Each shell has its own layout, sidebar, identity model, and role gate. They share zero UI chrome — the visual separation reflects the actor separation.
+The app layer is a Turborepo monorepo with one Next.js app per audience (`apps/agency`, `apps/pay`, `apps/fund`, `apps/admin`), each on its own origin. Within an app, an App Router **route group scopes the guard and the shell**; the chrome itself is one of three components shared from `@mutav/ui/shell/*`. The route picks the shell — auth state only fills the `identity` slot ([nav-shell-audit](nav-shell-audit.md) § 4, D1–D2).
 
-The [monorepo migration](monorepo-migration.md) that split the original single deployment into these per-app units has landed; the **Home** column names each shell's app.
+| Route group / tree            | Home          | Shell         | Guard                                  | Identity slot        | Status                                                                                     |
+| ----------------------------- | ------------- | ------------- | -------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| `(app)`                       | `apps/agency` | `<AppShell>`  | Auth0 + agency membership              | user menu            | Shipped — live                                                                             |
+| `(onboarding)/onboarding/*`   | `apps/agency` | `<FlowShell>` | Auth0, no agency yet                   | log-out link or none | Shipped — live                                                                             |
+| `(admin)`                     | `apps/admin`  | `<AppShell>`  | Auth0 + `mutavStaff` row               | user menu            | Shell + onboarding review built; A1–A6 pillars placeholder — see [`admin.md`](admin.md)    |
+| `access-denied`               | `apps/admin`  | `<BareShell>` | none — publicly reachable by design    | none                 | Built                                                                                      |
+| `pay/[publicId]/*`            | `apps/pay`    | `<FlowShell>` | `publicId` bearer + contract status    | **always empty**     | Built — deploy pending                                                                     |
+| `(investor)`                  | `apps/fund`   | app-local     | wallet-connected (KYC-gated per route) | wallet connect       | UI built, data mocked; shell adoption deferred — [nav-shell-audit](nav-shell-audit.md) § 7 |
+| `[locale]/not-found.tsx` (×4) | every app     | `<BareShell>` | n/a                                    | none                 | Shipped                                                                                    |
 
-| Shell                | Route group  | Layout owns                                         | Gate                                   | Home                     | Status                                                                                  |
-| -------------------- | ------------ | --------------------------------------------------- | -------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
-| **Agency dashboard** | `(app)`      | `AppSidebar`, agency switcher, NavMain/NavAgency    | Auth + agency membership               | `apps/agency/`           | Shipped — live                                                                          |
-| **Tenant payment**   | `(public)`   | Minimal chrome, no auth UI                          | `publicId` validity + contract status  | `apps/pay/` (own origin) | Built — deploy pending                                                                  |
-| **Investor portal**  | `(investor)` | Investor nav (no agency context)                    | Wallet-connected (KYC-gated per route) | `apps/fund/`             | UI built, data + auth mocked — deploy pending                                           |
-| **Mutav Admin**      | `(admin)`    | `AdminSidebar` (Mutav branding, no agency switcher) | `mutavStaff` row exists                | `apps/admin/`            | Shell + onboarding review built; A1–A6 pillars placeholder — see [`admin.md`](admin.md) |
-
-Each shell now sits in its own app on its own origin (`app.mutav.finance`, `pay.mutav.finance`, `fund.mutav.finance`, `admin.mutav.finance`); the per-app deployment model is described in the App catalog below.
+Nav item **definitions** stay app-local and arrive as props, so the shells couple nothing the [origin-isolation ADR](decisions/0003-persona-app-origin-isolation-single-convex.md) keeps independent. Two structural rules are gated in CI (`tests/shell-contract.test.ts` + `eslint.config.mjs`): exactly one shell per rendered route, and `not-found.tsx` only at `[locale]/`. Picking a shell for a new route: [`../../CLAUDE.md` § "Which shell a new route gets"](../../CLAUDE.md#which-shell-a-new-route-gets).
 
 Mutav-internal users who also hold agency memberships flip between the agency app and the admin app via a shell-switcher in the user menu. They do not see the admin sidebar while inside the agency app, and vice versa. The switcher is a cross-origin link (cookies are `Host-Only` per the [Non-trust-boundary principles](#non-trust-boundary-principles), so a fresh Auth0 session is required on each origin).
 
