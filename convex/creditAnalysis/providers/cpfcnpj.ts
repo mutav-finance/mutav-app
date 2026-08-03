@@ -2,6 +2,7 @@ import { getCpfCnpjToken } from "../../lib/env";
 import {
   CAPABILITY,
   DEFAULT_CREDIT_SCALE,
+  TAX_ID_TRANSMISSION,
   type ProviderRequest,
   type ProviderSignal,
   type CreditAnalysisProvider,
@@ -17,10 +18,23 @@ export function parseScoreRange(range: string): number | null {
   return null;
 }
 
-// Pacote 13 — CPF Risco. GET https://api.cpfcnpj.com.br/{token}/13/{cpf}
+/**
+ * Pacote 13 — CPF Risco. `GET https://api.cpfcnpj.com.br/{token}/13/{cpf}`.
+ *
+ * The subject's tax ID stays in the URL path because the vendor exposes no
+ * body-bearing form: probing the published API with the vendor's own test
+ * token, every POST variant (JSON body and form body, against the root, the
+ * token path and the token+package path) answers `400 Incorrect parameters`,
+ * and the only documented shape is the path GET. The residual risk — the tax
+ * ID reaching intermediary access logs — is therefore accepted and recorded
+ * against the vendor rather than silently carried, per exception E-15 of the
+ * data-access policy.
+ */
 export const cpfCnpjProvider: CreditAnalysisProvider = {
   name: "cpfcnpj",
   capabilities: [CAPABILITY.CREDIT_SCORE],
+  taxIdTransmission: TAX_ID_TRANSMISSION.URL_PATH,
+  acceptedRisk: { exceptionId: "E-15", vendor: "cpfcnpj.com.br" },
   async query(req: ProviderRequest): Promise<ProviderSignal> {
     try {
       const token = getCpfCnpjToken();

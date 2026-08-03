@@ -4,7 +4,13 @@ import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
 import { priceContract, splitCommission, feeBreakdown } from "./pricing";
-import type { Contract, ContractHistory } from "./domain";
+import type {
+  Contract,
+  ContractApplication,
+  ContractApplicationId,
+  ContractHistory,
+} from "./domain";
+import type { AgencyId } from "../agencies/domain";
 import type { Tenant, TenantId } from "../tenants/domain";
 import {
   ativoInsuredCentsPlatform,
@@ -13,9 +19,11 @@ import {
 } from "./aggregate";
 import { insertContractAggregates, replaceContractAggregates } from "./aggregateWrites";
 import {
+  CONTRACT_APPLICATION_VALIDITY_MS,
   CONTRACT_STATUS,
   CONTRACT_ERROR_CODE,
   contractPlanValidator,
+  propertyKindValidator,
   DEFAULT_EXIT_COST_MULTIPLIER,
   DEFAULT_PAYER,
   DEFAULT_RENT_MULTIPLIER,
@@ -25,7 +33,11 @@ import {
   urgencySortKey,
   expiringRenewalBounds,
 } from "./domain";
-import { normalizeEmbeddedTenant, TENANT_ERROR_CODE } from "../tenants/domain";
+import {
+  normalizeEmbeddedTenant,
+  tenantEntityTypeValidator,
+  TENANT_ERROR_CODE,
+} from "../tenants/domain";
 import { getOrCreateTenant } from "../tenants/useCases";
 import type { Result } from "../lib/result";
 import { findFreshAssessment } from "../creditAnalysis/useCases";
@@ -587,17 +599,56 @@ export const listForCommissionByMonth = queryWithAgencyScope({
 
 const CREDIT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+function isSupportedTaxIdLength(digits: string): boolean {
+  return digits.length === 11 || digits.length === 14;
+}
+
+/**
+ * The agency's live declaration that it holds or is seeking a rental
+ * relationship with this subject — the Lei 12.414 art. 15 precondition a
+ * bureau consultation is checked against. Scoped to the calling agency, so
+ * one agency's declaration never authorises another's pull.
+ */
+async function findBindingApplication(
+  ctx: QueryCtx,
+  args: { agencyId: AgencyId; subjectHash: string; notBefore: number },
+): Promise<ContractApplication | null> {
+  return ctx.db
+    .query("contractApplications")
+    .withIndex("by_agency_subject_time", (q) =>
+      q
+        .eq("agencyId", args.agencyId)
+        .eq("subjectHash", args.subjectHash)
+        .gt("openedAt", args.notBefore),
+    )
+    .order("desc")
+    .first();
+}
+
 export const getCachedCreditScore = queryWithAgencyScope({
   args: { document: v.string() },
   handler: async (ctx, { document }) => {
     const digits = document.replace(/\D/g, "");
-    if (digits.length !== 11 && digits.length !== 14) return null;
+    if (!isSupportedTaxIdLength(digits)) return null;
 
     const subjectHash = await hashPii(digits);
+    const now = Date.now();
+
+    // The cache is a bureau consultation the agency already paid for, so it
+    // is reachable only under the same art. 15 binding that authorised the
+    // pull. Without it the reader would learn whether this subject was ever
+    // consulted, and what it scored, from a cache probe alone.
+    const application = await findBindingApplication(ctx, {
+      agencyId: ctx.agencyId,
+      subjectHash,
+      notBefore: now - CONTRACT_APPLICATION_VALIDITY_MS,
+    });
+    if (!application) return null;
+
     const assessment = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
       subjectHash,
-      notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
+      notBefore: now - CREDIT_CACHE_TTL_MS,
     });
     if (
       !assessment ||
@@ -611,19 +662,80 @@ export const getCachedCreditScore = queryWithAgencyScope({
   },
 });
 
+type OpenContractApplicationSuccessResult = { applicationId: ContractApplicationId };
+type OpenContractApplicationErrorResult = { code: typeof CONTRACT_ERROR_CODE.INVALID_TAX_ID };
+
+/**
+ * Record the agency's intent to rent to this subject. Attributable to the
+ * member who declared it, and the only thing that authorises a bureau
+ * consultation on the subject.
+ */
+export const openContractApplication = mutationWithAgencyScope({
+  args: {
+    document: v.string(),
+    entityType: tenantEntityTypeValidator,
+    propertyKind: propertyKindValidator,
+    cep: v.string(),
+    rentCents: v.number(),
+  },
+  handler: async (
+    ctx,
+    { document, entityType, propertyKind, cep, rentCents },
+  ): Promise<Result<OpenContractApplicationSuccessResult, OpenContractApplicationErrorResult>> => {
+    const digits = document.replace(/\D/g, "");
+    if (!isSupportedTaxIdLength(digits)) {
+      return {
+        success: false,
+        error: { code: CONTRACT_ERROR_CODE.INVALID_TAX_ID },
+        message: "Tax ID must be 11 (CPF) or 14 (CNPJ) digits",
+      };
+    }
+
+    const applicationId = await ctx.db.insert("contractApplications", {
+      agencyId: ctx.agencyId,
+      subjectHash: await hashPii(digits),
+      entityType,
+      propertyKind,
+      cep: cep.replace(/\D/g, ""),
+      rentCents,
+      openedBy: ctx.user._id,
+      openedAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      data: { applicationId },
+      message: "Contract application opened",
+    };
+  },
+});
+
 export const requestCreditScore = mutationWithAgencyScope({
   args: { document: v.string() },
   handler: async (ctx, { document }) => {
     const digits = document.replace(/\D/g, "");
-    if (digits.length !== 11 && digits.length !== 14) {
+    if (!isSupportedTaxIdLength(digits)) {
       return { status: "invalid" } as const;
     }
 
     const subjectHash = await hashPii(digits);
+    const now = Date.now();
+
+    // Lei 12.414 art. 15: a consulente may only reach a bureau about someone
+    // it holds or is seeking a commercial relationship with. Checked before
+    // the cache here, and again on `getCachedCreditScore`, so an unbound
+    // caller learns nothing about prior pulls through either path.
+    const application = await findBindingApplication(ctx, {
+      agencyId: ctx.agencyId,
+      subjectHash,
+      notBefore: now - CONTRACT_APPLICATION_VALIDITY_MS,
+    });
+    if (!application) return { status: "no_application" } as const;
+
     const fresh = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
       subjectHash,
-      notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
+      notBefore: now - CREDIT_CACHE_TTL_MS,
     });
     // Any fresh assessment gates re-scheduling — including an `unavailable`
     // one. Re-running the pull re-charges the provider, so a transient outage
@@ -636,6 +748,7 @@ export const requestCreditScore = mutationWithAgencyScope({
       subjectType: SUBJECT_TYPE.TENANT,
       document: digits,
       capability: CAPABILITY.CREDIT_SCORE,
+      applicationId: application._id,
     });
     return { status: "fetching" } as const;
   },

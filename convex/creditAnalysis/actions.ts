@@ -3,6 +3,7 @@ import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
 import {
+  LEGAL_BASIS,
   POLICY_VERSION,
   capabilityValidator,
   deriveCreditAnalysis,
@@ -19,8 +20,9 @@ export const runCreditAnalysis = internalAction({
     subjectType: subjectTypeValidator,
     document: v.string(),
     capability: capabilityValidator,
+    applicationId: v.id("contractApplications"),
   },
-  handler: async (ctx, { agencyId, subjectType, document, capability }) => {
+  handler: async (ctx, { agencyId, subjectType, document, capability, applicationId }) => {
     const digits = document.replace(/\D/g, "");
     const subjectHash = await hashPii(digits);
     const now = Date.now();
@@ -53,6 +55,8 @@ export const runCreditAnalysis = internalAction({
         correlationId,
         windowKey,
         pulledAt: now,
+        applicationId,
+        legalBasis: LEGAL_BASIS.ART_7_X,
       });
       signalIds.push(id);
     }

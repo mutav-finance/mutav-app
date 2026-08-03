@@ -42,8 +42,18 @@ const d = (s: string) => s;
  *   - `mutavStaff`          Mutav staff role grants
  *   - `reserveSnapshots`    coverage/transparency history
  *   - `creditAnalysis*`     bureau signals + assessments
+ *   - `contractApplications` the art. 15 declarations those signals cite
  *   - anchor/stellar index state, webhook events
- * Do NOT add any of these here. `seed.test.ts` guards `waitlist` survival.
+ * Do NOT add any of these here. `seed.test.ts` guards `waitlist` survival and
+ * the signal → application attribution.
+ *
+ * `contractApplications` is retained for the same reason as the signals it
+ * authorises: a `creditAnalysisSignals` row names the declaration that made
+ * its bureau pull lawful, and the signals are never wiped, so wiping the
+ * declarations would leave the retained record citing nothing. Its own
+ * `agencyId` / `openedBy` go stale on a reseed exactly as the signals' do —
+ * and because Convex never reuses an id, a stale row can never match a live
+ * agency, so it cannot authorise a later pull.
  */
 const DEMO_TABLES = [
   // providerOrders FK-references invoices; wipe attempts before invoices even

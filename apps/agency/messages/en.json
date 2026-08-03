@@ -877,7 +877,10 @@
       "approvedValueLabel": "Approved rental value",
       "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
       "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
-      "closeButton": "Back to home"
+      "closeButton": "Back to home",
+      "noApplicationTitle": "Credit check not released",
+      "noApplicationMessage": "The bureau is only consulted after the agency records that it intends to rent to this CPF/CNPJ. Go back to step 1, check the CPF/CNPJ, the property and the rent, and continue again to record it.",
+      "noApplicationAction": "Back to step 1"
     },
     "coverage": {
       "heading": "Coverage Plan",
@@ -953,6 +956,10 @@
       "nextStep3": "Continue",
       "nextStep4": "Review",
       "nextStep5": "Create contract"
+    },
+    "errors": {
+      "INVALID_TAX_ID": "Invalid CPF/CNPJ",
+      "applicationFailed": "Could not record the rental intent. Please try again."
     },
     "validation": {
       "required": "Required field",

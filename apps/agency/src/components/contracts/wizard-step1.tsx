@@ -2,6 +2,9 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@mutav/ui/button";
 import { CurrencyInput } from "@mutav/ui/currency-input";
 import { Field } from "@mutav/ui/field";
@@ -19,15 +22,18 @@ import { formatBRLCents } from "@/lib/contracts/format";
 
 type Props = {
   data: DraftWizardData;
+  agencyId: AgencyId;
   onChange: (patch: Partial<DraftWizardData>) => void;
   onNext: () => void;
 };
 
 type Errors = Partial<Record<string, string>>;
 
-export function WizardStep1({ data, onChange, onNext }: Props) {
+export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
   const t = useTranslations("contractNew");
   const [errors, setErrors] = React.useState<Errors>({});
+  const [isOpeningApplication, setIsOpeningApplication] = React.useState(false);
+  const openApplication = useMutation(api.contracts.useCases.openContractApplication);
   const [rentInput, setRentInput] = React.useState(
     data.rentCents > 0 ? (data.rentCents / 100).toFixed(2).replace(".", ",") : "",
   );
@@ -47,7 +53,10 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
 
   const totalRentCents = data.rentCents + data.condoCents + data.otherFeesCents;
 
-  const handleNext = () => {
+  // Advancing records the agency's declared intent to rent to this subject.
+  // That record — not the wizard reaching step 2 — is what authorises the
+  // bureau consultation step 2 requests.
+  const handleNext = async () => {
     const errs: Errors = {};
 
     if (!data.propertyKind) errs.propertyKind = t("validation.required");
@@ -62,10 +71,32 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
     if (data.cep.replace(/\D/g, "").length !== 8) errs.cep = t("validation.cepInvalid");
     if (data.rentCents <= 0) errs.rentCents = t("validation.rentRequired");
 
-    if (Object.keys(errs).length > 0) {
+    if (Object.keys(errs).length > 0 || !isPropertyKind(data.propertyKind)) {
       setErrors(errs);
       return;
     }
+
+    setIsOpeningApplication(true);
+    try {
+      const result = await openApplication({
+        agencyId,
+        document: isPJ ? data.cnpj : data.cpf,
+        entityType: isPJ ? "pj" : "pf",
+        propertyKind: data.propertyKind,
+        cep: data.cep,
+        rentCents: data.rentCents,
+      });
+      if (!result.success) {
+        setErrors({ doc: t(`errors.${result.error.code}`) });
+        return;
+      }
+    } catch {
+      setErrors({ doc: t("errors.applicationFailed") });
+      return;
+    } finally {
+      setIsOpeningApplication(false);
+    }
+
     setErrors({});
     onNext();
   };
@@ -198,7 +229,9 @@ export function WizardStep1({ data, onChange, onNext }: Props) {
       </section>
 
       <div className="flex justify-end">
-        <Button onClick={handleNext}>{t("nav.nextStep2")}</Button>
+        <Button onClick={handleNext} disabled={isOpeningApplication}>
+          {t("nav.nextStep2")}
+        </Button>
       </div>
     </div>
   );

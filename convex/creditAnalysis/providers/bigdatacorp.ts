@@ -2,6 +2,7 @@ import { getBigDataCorpDataset, getBigDataCorpLogin, getBigDataCorpPassword } fr
 import {
   CAPABILITY,
   DEFAULT_CREDIT_SCALE,
+  TAX_ID_TRANSMISSION,
   type ProviderRequest,
   type ProviderSignal,
   type CreditAnalysisProvider,
@@ -51,6 +52,7 @@ export function extractBigDataCorpScore(json: unknown, dataset: string): number 
 export const bigDataCorpProvider: CreditAnalysisProvider = {
   name: "bigdatacorp",
   capabilities: [CAPABILITY.CREDIT_SCORE],
+  taxIdTransmission: TAX_ID_TRANSMISSION.REQUEST_BODY,
   async query(req: ProviderRequest): Promise<ProviderSignal> {
     try {
       const token = await mintToken();

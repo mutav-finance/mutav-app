@@ -22,6 +22,9 @@ const documentKey = v.union(
 );
 
 const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
+// Canonical `tenantEntityTypeValidator` lives in `convex/tenants/domain.ts`;
+// inlined here to avoid the entity-file → `_generated/dataModel` circular import.
+const tenantEntityType = v.union(v.literal("pf"), v.literal("pj"));
 // Guarantee product chosen for the contract: base (Mutav Fiança) or plus
 // (Mutav Fiança +, with credit-life insurance). See convex/contracts/domain.ts.
 const contractPlan = v.union(v.literal("basic"), v.literal("plus"));
@@ -326,6 +329,21 @@ export default defineSchema(
         }),
       ),
     ).index("by_taxId", ["taxId"]),
+
+    // Lei 12.414 art. 15 relationship record: the agency's declaration that it
+    // intends to enter a rental relationship with this subject. It is the
+    // precondition a bureau consultation is checked against, so it stores the
+    // HMAC digest of the tax ID (never the plaintext, and no plaintext index).
+    contractApplications: defineTable({
+      agencyId: v.id("agencies"),
+      subjectHash: v.string(),
+      entityType: tenantEntityType,
+      propertyKind,
+      cep: v.string(),
+      rentCents: v.number(),
+      openedBy: v.id("users"),
+      openedAt: v.number(),
+    }).index("by_agency_subject_time", ["agencyId", "subjectHash", "openedAt"]),
 
     contracts: defineTable({
       agencyId: v.id("agencies"),
@@ -808,6 +826,11 @@ export default defineSchema(
       correlationId: v.string(),
       windowKey: v.string(),
       pulledAt: v.number(),
+      // Attribution of the consultation. Optional because the table is
+      // append-only and deliberately excluded from the reseed wipe, so rows
+      // written before the art. 15 precondition landed carry neither.
+      applicationId: v.optional(v.id("contractApplications")),
+      legalBasis: v.optional(v.union(v.literal("art7_x"))),
     })
       .index("by_idempotency", ["agencyId", "subjectHash", "capability", "provider", "windowKey"])
       .index("by_agency_subject_capability_time", [

@@ -1,6 +1,7 @@
 import {
   CAPABILITY,
   DEFAULT_CREDIT_SCALE,
+  TAX_ID_TRANSMISSION,
   type ProviderRequest,
   type ProviderSignal,
   type CreditAnalysisProvider,
@@ -16,6 +17,7 @@ export function mockScoreFor(document: string): number {
 export const mockProvider: CreditAnalysisProvider = {
   name: "mock",
   capabilities: [CAPABILITY.CREDIT_SCORE],
+  taxIdTransmission: TAX_ID_TRANSMISSION.NONE,
   async query(req: ProviderRequest): Promise<ProviderSignal> {
     return {
       status: "ok",

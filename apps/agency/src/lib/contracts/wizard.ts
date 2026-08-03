@@ -1,3 +1,5 @@
+import type { FunctionReturnType } from "convex/server";
+import type { api } from "@convex/_generated/api";
 import {
   PROPERTY_KIND,
   TENANT_ENTITY_TYPE,
@@ -270,6 +272,55 @@ export const INITIAL_WIZARD_DATA: DraftWizardData = {
   score: null,
   scoreTier: null,
 };
+
+/**
+ * Derived from the mutation rather than restated, so a status the server adds
+ * or renames breaks this compilation instead of silently reaching no branch.
+ */
+export type CreditScoreRequestStatus = FunctionReturnType<
+  typeof api.contracts.useCases.requestCreditScore
+>["status"];
+
+export const SCORE_PANEL_STATE = {
+  LOADING: "loading",
+  NO_APPLICATION: "noApplication",
+  DENIED: "denied",
+  SCORED: "scored",
+} as const;
+
+export type ScorePanelState = (typeof SCORE_PANEL_STATE)[keyof typeof SCORE_PANEL_STATE];
+
+const DENIED_SCORE_CEILING = 400;
+
+/**
+ * What step 2 shows for the current subject. `noApplication` is a real state,
+ * not a slow load: the bureau refused to dispatch because no live Lei 12.414
+ * art. 15 declaration binds the agency to this subject, so no score is ever
+ * coming and the broker has to go back and open one.
+ */
+export function resolveScorePanelState(input: {
+  documentDigits: string;
+  requestStatus: CreditScoreRequestStatus | null;
+  /** `undefined` while the cache query is in flight, `null` on a cache miss. */
+  cachedScore: number | null | undefined;
+  requestedFor: string | null;
+}): ScorePanelState {
+  if (input.requestStatus === "no_application") return SCORE_PANEL_STATE.NO_APPLICATION;
+
+  if (
+    !input.documentDigits ||
+    input.cachedScore === undefined ||
+    (input.requestedFor === input.documentDigits && input.cachedScore === null)
+  ) {
+    return SCORE_PANEL_STATE.LOADING;
+  }
+
+  if (input.cachedScore !== null && input.cachedScore < DENIED_SCORE_CEILING) {
+    return SCORE_PANEL_STATE.DENIED;
+  }
+
+  return SCORE_PANEL_STATE.SCORED;
+}
 
 export function parseBRLInput(raw: string): number {
   const clean = raw.replace(/[^\d,]/g, "").replace(",", ".");

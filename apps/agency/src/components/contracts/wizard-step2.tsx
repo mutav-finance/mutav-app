@@ -11,7 +11,12 @@ import { cn } from "@mutav/ui/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import { CheckIcon } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
-import { type DraftWizardData } from "@/lib/contracts/wizard";
+import {
+  resolveScorePanelState,
+  SCORE_PANEL_STATE,
+  type CreditScoreRequestStatus,
+  type DraftWizardData,
+} from "@/lib/contracts/wizard";
 import { formatBRLCents } from "@/lib/contracts/format";
 import { CONTRACT_PLAN, type ScoreTier } from "@convex/contracts/domain";
 import { priceContract, splitCommission, DEFAULT_PRICING_TABLE } from "@convex/contracts/pricing";
@@ -47,6 +52,12 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
 
   const requestScore = useMutation(api.contracts.useCases.requestCreditScore);
   const [requestedFor, setRequestedFor] = React.useState<string | null>(null);
+  // Keyed by the document it answered, so a status never survives the broker
+  // editing the tax ID — the reset happens by derivation, not by a setState.
+  const [request, setRequest] = React.useState<{
+    document: string;
+    status: CreditScoreRequestStatus;
+  } | null>(null);
 
   // No plan is pre-selected; Step 2's Next stays blocked until the broker picks
   // one. "plus" adds the prestamista premium to the monthly fee (priceContract).
@@ -66,7 +77,8 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
     (doc: string, agId: NonNullable<typeof agencyId>) => {
       requestScore({ agencyId: agId, document: doc })
         .then((result) => {
-          if (result.status !== "invalid") setRequestedFor(doc);
+          setRequest({ document: doc, status: result.status });
+          if (result.status === "fetching" || result.status === "cached") setRequestedFor(doc);
         })
         .catch(() => {});
     },
@@ -105,11 +117,16 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const scoreTier = scoreResult?.tier ?? null;
   const priceableTier = scoreTier && scoreTier !== "negado" ? scoreTier : null;
 
-  // Loading while: no document entered, Convex query loading (undefined),
-  // or action in flight (requested for this doc but no cached result yet).
-  const isLoading =
-    !docDigits || scoreResult === undefined || (requestedFor === docDigits && scoreResult === null);
-  const isNegado = score !== null && score < 400;
+  const panelState = resolveScorePanelState({
+    documentDigits: docDigits,
+    requestStatus: request?.document === docDigits ? request.status : null,
+    cachedScore: scoreResult === undefined ? undefined : (scoreResult?.score ?? null),
+    requestedFor,
+  });
+  const isLoading = panelState === SCORE_PANEL_STATE.LOADING;
+  const isNegado = panelState === SCORE_PANEL_STATE.DENIED;
+  const hasNoApplication = panelState === SCORE_PANEL_STATE.NO_APPLICATION;
+  const isScored = panelState === SCORE_PANEL_STATE.SCORED;
 
   const preview =
     priceableTier && data.rentCents > 0 && data.plan
@@ -161,6 +178,11 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             </div>
             <Skeleton className="h-12 w-36 rounded-md" />
           </div>
+        ) : hasNoApplication ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-base font-semibold">{t("simulation.noApplicationTitle")}</p>
+            <p className="text-muted-foreground text-sm">{t("simulation.noApplicationMessage")}</p>
+          </div>
         ) : (
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-2">
@@ -197,7 +219,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
       </section>
 
       {/* Coverage plans — two selectable cards; "+" carries a subtle premium accent */}
-      {!isLoading && !isNegado && priceableTier && (
+      {isScored && priceableTier && (
         <div
           role="radiogroup"
           aria-label={t("coverage.planLabel")}
@@ -221,7 +243,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
       )}
 
       {/* Summary block */}
-      {!isLoading && !isNegado && (
+      {isScored && (
         <section className="flex flex-col gap-3 rounded-lg border p-4 md:p-6">
           <h2 className="text-base font-semibold">{t("coverage.summary.heading")}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -258,6 +280,8 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
           <Button variant="outline" asChild>
             <Link href="/">{t("simulation.closeButton")}</Link>
           </Button>
+        ) : hasNoApplication ? (
+          <Button onClick={onBack}>{t("simulation.noApplicationAction")}</Button>
         ) : (
           <Button onClick={onNext} disabled={isLoading || score === null || !data.plan}>
             {t("nav.nextStep3")}
