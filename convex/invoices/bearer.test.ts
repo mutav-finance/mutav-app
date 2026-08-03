@@ -215,6 +215,34 @@ describe("bearer lifecycle — a revoked token is rejected", () => {
     ).toBeNull();
   });
 
+  test("revoking and rotating both leave an audit entry, and neither logs the token", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    const invoiceId = await seedInvoice(t, agencyId);
+
+    await asUser.mutation(api.invoices.mutations.revokeAccessToken, { agencyId, invoiceId });
+    const rotated = await asUser.mutation(api.invoices.mutations.rotateAccessToken, {
+      agencyId,
+      invoiceId,
+    });
+    if (!rotated.success) throw new Error("expected rotation to succeed");
+
+    const entries = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+    const actions = entries.map((entry) => entry.action);
+
+    // Killing or reissuing the credential that gates a named tenant's bill is
+    // exactly the act that has to be reconstructable afterwards.
+    expect(actions).toContain("invoice.access_revoked");
+    expect(actions).toContain("invoice.access_rotated");
+
+    // The payload commits to references, never to the credential itself.
+    const serialized = JSON.stringify(entries);
+    expect(serialized).not.toContain(TOKEN);
+    expect(serialized).not.toContain(rotated.data.accessToken);
+  });
+
   test("rotateAccessToken retires the leaked token and issues a working one", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
@@ -292,32 +320,38 @@ describe("bearer lifecycle — the rate limit trips", () => {
     ).toEqual([]);
   });
 
-  test("a source IP at its cap is denied even when it presents a valid token", async () => {
+  test("a token at its cap is denied", async () => {
     const { t, agencyId } = await setup();
     await seedInvoice(t, agencyId);
     await t.run((ctx) =>
       ctx.db.insert("bearerAccessAttempts", {
-        scope: "ip",
-        key: "203.0.113.7",
+        scope: "token",
+        key: TOKEN,
         windowStartedAt: Date.now(),
         count: 120,
         deniedCount: 0,
       }),
     );
 
-    const capped = await t.mutation(api.invoices.mutations.recordBearerPageView, {
-      accessToken: TOKEN,
-      sourceIp: "203.0.113.7",
-    });
-    // The public surface reports one opaque code, so the control below is what
-    // pins the denial on the IP cap rather than on the token.
-    expect(capped).toMatchObject({ success: false, error: { code: "DENIED" } });
+    expect(
+      await t.mutation(api.invoices.mutations.recordBearerPageView, { accessToken: TOKEN }),
+    ).toMatchObject({ success: false, error: { code: "DENIED" } });
+  });
 
-    const fromAnotherAddress = await t.mutation(api.invoices.mutations.recordBearerPageView, {
-      accessToken: TOKEN,
-      sourceIp: "203.0.113.8",
-    });
-    expect(fromAnotherAddress).toMatchObject({ success: true });
+  test("the limiter key is never caller-supplied, so no caller can cap a stranger", async () => {
+    const { t, agencyId } = await setup();
+    await seedInvoice(t, agencyId);
+
+    await t.mutation(api.invoices.mutations.recordBearerPageView, { accessToken: TOKEN });
+
+    // Every counter row is keyed on the token the caller had to present. A
+    // per-source-IP scope existed here and was removed: it arrived as an
+    // argument on a public mutation, so a caller could spend a stranger's
+    // budget by naming their address, and that stranger's next legitimate
+    // page load would be refused.
+    const rows = await t.run((ctx) => ctx.db.query("bearerAccessAttempts").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ scope: "token", key: TOKEN });
   });
 
   test("an unknown token mints no counter row, so a sweep cannot amplify writes", async () => {
@@ -332,17 +366,13 @@ describe("bearer lifecycle — the rate limit trips", () => {
     expect(rows).toEqual([]);
   });
 
-  test("an unknown token mints no counter row even when it supplies a source IP", async () => {
+  test("a sweep of unknown tokens mints no counter rows", async () => {
     const { t, agencyId } = await setup();
     await seedInvoice(t, agencyId);
 
-    // `sourceIp` arrives over a public mutation, so its cardinality is the
-    // caller's to choose. Counting it before the token resolved let a caller
-    // holding no valid token insert one row per address it cared to invent.
-    for (const octet of [11, 22, 33]) {
+    for (const suffix of ["A", "B", "C"]) {
       await t.mutation(api.invoices.mutations.recordBearerPageView, {
-        accessToken: "NOTATOKEN0000000000000000000000A",
-        sourceIp: `198.51.100.${octet}`,
+        accessToken: `NOTATOKEN000000000000000000000${suffix}`,
       });
     }
 

@@ -71,23 +71,20 @@ export async function resolveBearerInvoice(
 /**
  * Write-path resolution — the same checks, plus counting the attempt.
  *
- * Order is load-bearing, and not in the direction it first looks. Counting the
- * source IP *before* resolving the token would let an unauthenticated caller
- * mint one `bearerAccessAttempts` row per distinct `sourceIp` while holding no
- * valid token at all: the value arrives over a public mutation, so its
- * cardinality is the attacker's to choose. Nothing is counted until the token
- * is known to resolve, which bounds row creation by the token window.
+ * Nothing is counted until the token resolves, so row creation is bounded by
+ * the token window rather than by anything the caller supplies.
  *
- * That costs the IP scope its one theoretical advantage — seeing an
- * enumeration sweep, which never repeats a token. The trade is worth taking:
- * `sourceIp` is forgeable by the same caller, so the scope never stopped a
- * deliberate sweep, and a sweep against a 160-bit token space is not the
- * threat this surface has. The IP window still does its real job, which is
- * capping how hard one origin works the surface across credentials it holds.
+ * The token is the only scope. A per-source-IP scope existed here and was
+ * removed: the address could only arrive as an argument on a public mutation,
+ * so a caller who bypassed the Next server chose it freely. That made it
+ * simultaneously useless and harmful — omit it and the limit does not apply,
+ * or supply someone else's address and their next legitimate page load is
+ * refused. A control an adversary opts out of, and aims at a third party, is
+ * not a control. See BEARER_RATE_LIMIT_SCOPE.
  */
 export async function consumeBearerInvoice(
   ctx: MutationCtx,
-  args: { accessToken: string; sourceIp?: string; nowMs: number },
+  args: { accessToken: string; nowMs: number },
 ): Promise<BearerResolution> {
   const invoice = await findByToken(ctx, args.accessToken);
   if (invoice === null) {
@@ -98,15 +95,6 @@ export async function consumeBearerInvoice(
 
   const lifecycleDenial = bearerLifecycleDenial(invoice, args.nowMs);
   if (lifecycleDenial !== null) return denied(lifecycleDenial);
-
-  if (args.sourceIp !== undefined && args.sourceIp.length > 0) {
-    const ipAllowed = await recordBearerAttempt(ctx, {
-      scope: BEARER_RATE_LIMIT_SCOPE.IP,
-      key: args.sourceIp,
-      nowMs: args.nowMs,
-    });
-    if (!ipAllowed) return denied(BEARER_DENIAL_REASON.RATE_LIMITED);
-  }
 
   const tokenAllowed = await recordBearerAttempt(ctx, {
     scope: BEARER_RATE_LIMIT_SCOPE.TOKEN,

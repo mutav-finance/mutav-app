@@ -36,13 +36,8 @@ type BearerPageViewErrorResult = { code: "DENIED" };
 
 /**
  * Server-rendered checkout entry gate. `apps/pay` calls this once per page
- * load with the client address it observed, which is the only point in the
- * system that sees one — Convex queries and actions are handed no request, so
- * a per-IP limit has to be fed from the Next server or not at all.
- *
- * `sourceIp` is a denial-only input: it can add a reason to refuse and never a
- * reason to allow, so a caller who lies about it evades the IP window and
- * still meets the per-token one.
+ * load, and the token is the only thing it sends: this is a public mutation,
+ * so any client-supplied identifier is chosen by the caller, not observed.
  *
  * Every refusal collapses to one opaque `DENIED`. The specific reason is real
  * and is used inside the resolver, but returning it here would tell an
@@ -51,11 +46,10 @@ type BearerPageViewErrorResult = { code: "DENIED" };
  * token space, and the same leak the read paths already refuse to emit.
  */
 export const recordBearerPageView = mutation({
-  args: { accessToken: v.string(), sourceIp: v.optional(v.string()) },
+  args: { accessToken: v.string() },
   handler: async (ctx, args): Promise<Result<object, BearerPageViewErrorResult>> => {
     const resolved = await consumeBearerInvoice(ctx, {
       accessToken: args.accessToken,
-      sourceIp: args.sourceIp,
       nowMs: Date.now(),
     });
     if (!resolved.success) {
@@ -76,11 +70,10 @@ export const recordBearerPageView = mutation({
  * unauthenticated surface by forwarding what it was handed.
  */
 export const consumeBearerAccess = internalMutation({
-  args: { accessToken: v.string(), sourceIp: v.optional(v.string()) },
+  args: { accessToken: v.string() },
   handler: async (ctx, args): Promise<Result<BearerGrant, BearerAccessErrorResult>> => {
     const resolved = await consumeBearerInvoice(ctx, {
       accessToken: args.accessToken,
-      sourceIp: args.sourceIp,
       nowMs: Date.now(),
     });
     if (!resolved.success) return resolved;
@@ -113,6 +106,16 @@ export const revokeAccessToken = mutationWithAgencyScope({
       return { success: false as const, error: { code: "INVOICE_NOT_FOUND" as const } };
     }
     await ctx.db.patch(invoice._id, { accessTokenRevokedAt: Date.now() });
+    // Killing the credential that gates a named tenant's bill is exactly the
+    // act that has to leave a trail. The token itself never enters the
+    // payload — the whole point is that it stops being usable.
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.INVOICE_ACCESS_REVOKED,
+      resourceType: "invoices",
+      resourceId: invoice.publicId,
+      payload: { invoiceId: invoice._id, agencyId: invoice.agencyId },
+    });
     return { success: true as const, data: { publicId: invoice.publicId } };
   },
 });
@@ -134,6 +137,13 @@ export const rotateAccessToken = mutationWithAgencyScope({
       accessToken,
       accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
       accessTokenRevokedAt: undefined,
+    });
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.INVOICE_ACCESS_ROTATED,
+      resourceType: "invoices",
+      resourceId: invoice.publicId,
+      payload: { invoiceId: invoice._id, agencyId: invoice.agencyId },
     });
     return { success: true as const, data: { accessToken } };
   },

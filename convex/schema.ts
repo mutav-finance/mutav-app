@@ -55,7 +55,7 @@ const invoiceLineItemKind = v.union(v.literal("recurring"), v.literal("activatio
 
 // Canonical `BEARER_RATE_LIMIT_SCOPE` lives in `convex/invoices/domain.ts`;
 // inlined here to avoid the entity-file → `_generated/dataModel` circular import.
-const bearerRateLimitScope = v.union(v.literal("token"), v.literal("ip"));
+const bearerRateLimitScope = v.literal("token");
 
 /**
  * Discriminated union representing the lifecycle state of an invoice.
@@ -556,6 +556,13 @@ export default defineSchema(
     // kept here rather than in `mutavAuditLog` because that chain is
     // hash-linked and anchored on-chain, and an unauthenticated caller must
     // never be able to drive appends into it.
+    //
+    // `scope` is a single literal on purpose. The key is always the presented
+    // token, which the caller cannot forge or omit. A per-source-IP scope was
+    // tried and removed: the address reached Convex as an argument on a public
+    // mutation, so it bounded only honest callers while letting anyone else
+    // spend a stranger's budget by naming their address. Do not re-add a scope
+    // whose key the caller chooses.
     bearerAccessAttempts: defineTable({
       scope: bearerRateLimitScope,
       key: v.string(),

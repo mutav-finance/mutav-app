@@ -64,11 +64,21 @@ export const InvoiceStates = {
 
 // ─── Bearer credential lifecycle ──────────────────────────────────────────────
 
-export type BearerRateLimitScope = "token" | "ip";
+/**
+ * Only the token is a rate-limit scope.
+ *
+ * A per-source-IP scope was tried and removed. The address could only reach
+ * Convex as an argument on a *public* mutation, so a caller who skipped the
+ * Next server chose its value freely — which made it useless as a control
+ * (omit it and the scope does not apply) and dangerous as a lever (supply a
+ * victim's address and the victim's next legitimate page load is refused).
+ * The token cannot be forged and cannot be omitted, so it is the only key
+ * that means anything here.
+ */
+export type BearerRateLimitScope = "token";
 
 export const BEARER_RATE_LIMIT_SCOPE = {
   TOKEN: "token",
-  IP: "ip",
 } as const satisfies Record<Uppercase<BearerRateLimitScope>, BearerRateLimitScope>;
 
 export type BearerDenialReason = "MISSING" | "UNKNOWN" | "EXPIRED" | "REVOKED" | "RATE_LIMITED";
