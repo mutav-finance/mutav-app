@@ -61,6 +61,8 @@ const DEMO_TABLES = [
   "contracts",
   // tenants after contracts — contracts FK-reference tenants via tenantId.
   "tenants",
+  // Applications FK-reference agencies + users; wipe before either.
+  "contractApplications",
   "memberships",
   "users",
   "agencies",

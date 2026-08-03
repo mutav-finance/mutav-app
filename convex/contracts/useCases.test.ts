@@ -216,11 +216,24 @@ describe("requestCreditScore / getCachedCreditScore", () => {
     vi.useRealTimers();
   });
 
+  async function seedBoundSubject(t: ReturnType<typeof convexTest>, document: string) {
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await asUser.mutation(api.contracts.useCases.openContractApplication, {
+      agencyId,
+      document,
+      entityType: document.replace(/\D/g, "").length === 14 ? "pj" : "pf",
+      propertyKind: "residencial",
+      cep: "01310-100",
+      rentCents: 250_000,
+    });
+    return { asUser, agencyId };
+  }
+
   test("scheduling a CPF makes the score readable via getCachedCreditScore after actions run", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
-    const { asUser, userId } = await setupAuthenticatedUser(t);
-    const agencyId = await seedAgencyWithMembership(t, userId);
+    const { asUser, agencyId } = await seedBoundSubject(t, "12345678901");
 
     const req = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
       agencyId,
@@ -241,8 +254,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
   test("returns cached status when a fresh assessment already exists", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
-    const { asUser, userId } = await setupAuthenticatedUser(t);
-    const agencyId = await seedAgencyWithMembership(t, userId);
+    const { asUser, agencyId } = await seedBoundSubject(t, "12345678901");
 
     const first = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
       agencyId,
@@ -274,8 +286,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
   test("CNPJ (14-digit) also routes through creditAnalysis and yields a cached score", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
-    const { asUser, userId } = await setupAuthenticatedUser(t);
-    const agencyId = await seedAgencyWithMembership(t, userId);
+    const { asUser, agencyId } = await seedBoundSubject(t, "12345678000190");
 
     const req = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
       agencyId,

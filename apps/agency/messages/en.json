@@ -954,6 +954,10 @@
       "nextStep4": "Review",
       "nextStep5": "Create contract"
     },
+    "errors": {
+      "INVALID_TAX_ID": "Invalid CPF/CNPJ",
+      "applicationFailed": "Could not record the rental intent. Please try again."
+    },
     "validation": {
       "required": "Required field",
       "cpfInvalid": "Invalid CPF",

@@ -66,7 +66,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
     (doc: string, agId: NonNullable<typeof agencyId>) => {
       requestScore({ agencyId: agId, document: doc })
         .then((result) => {
-          if (result.status !== "invalid") setRequestedFor(doc);
+          if (result.status === "fetching" || result.status === "cached") setRequestedFor(doc);
         })
         .catch(() => {});
     },

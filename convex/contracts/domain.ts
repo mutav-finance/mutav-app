@@ -3,6 +3,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 
 export type Contract = Doc<"contracts">;
 export type ContractId = Id<"contracts">;
+export type ContractApplication = Doc<"contractApplications">;
+export type ContractApplicationId = Id<"contractApplications">;
 export type ContractHistory = Doc<"contractHistory">;
 export type ContractHistoryId = Id<"contractHistory">;
 export type ContractStatus = Contract["status"];
@@ -29,6 +31,11 @@ export const PROPERTY_KIND = {
   RESIDENCIAL: "residencial",
   COMERCIAL: "comercial",
 } as const satisfies Record<Uppercase<PropertyKind>, PropertyKind>;
+
+export const propertyKindValidator = v.union(
+  v.literal(PROPERTY_KIND.RESIDENCIAL),
+  v.literal(PROPERTY_KIND.COMERCIAL),
+);
 
 export const contractStatusValidator = v.union(
   v.literal(CONTRACT_STATUS.ATIVO),
@@ -146,9 +153,18 @@ export const CONTRACT_ERROR_CODE = {
   TENANT_DENIED: "TENANT_DENIED",
   INVALID_RENT: "INVALID_RENT",
   CREDIT_ASSESSMENT_REQUIRED: "CREDIT_ASSESSMENT_REQUIRED",
+  INVALID_TAX_ID: "INVALID_TAX_ID",
 } as const satisfies Record<string, string>;
 
 export type ContractErrorCode = (typeof CONTRACT_ERROR_CODE)[keyof typeof CONTRACT_ERROR_CODE];
+
+/**
+ * How long a declared intent to rent keeps authorising a bureau consultation
+ * on the subject. A prospective commercial relationship under Lei 12.414
+ * art. 15 is not perpetual, so the record ages out rather than standing
+ * forever.
+ */
+export const CONTRACT_APPLICATION_VALIDITY_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type UrgencyTier =
   | "overdue"

@@ -954,6 +954,10 @@
       "nextStep4": "Confirmar",
       "nextStep5": "Criar contrato"
     },
+    "errors": {
+      "INVALID_TAX_ID": "CPF/CNPJ inválido",
+      "applicationFailed": "Não foi possível registrar a intenção de locação. Tente novamente."
+    },
     "validation": {
       "required": "Campo obrigatório",
       "cpfInvalid": "CPF inválido",

@@ -26,6 +26,12 @@ export const subjectTypeValidator = v.union(
   v.literal(SUBJECT_TYPE.INVESTOR),
 );
 
+/** LGPD legal basis a bureau consultation is attributed to. Art. 7 X — credit
+ * protection — is the only one the underwriting pull runs under. */
+export type LegalBasis = "art7_x";
+export const LEGAL_BASIS = { ART_7_X: "art7_x" } as const satisfies Record<string, LegalBasis>;
+export const legalBasisValidator = v.union(v.literal(LEGAL_BASIS.ART_7_X));
+
 export const POLICY_VERSION = { CREDIT_ANALYSIS: "credit_analysis_v1" } as const;
 export const DEFAULT_CREDIT_SCALE = 1000;
 
@@ -51,11 +57,32 @@ export type ProviderSignal =
     }
   | { status: "error"; provider: string; capability: Capability; error: string };
 
-export interface CreditAnalysisProvider {
+/**
+ * Where an adapter puts the subject's tax ID when it talks to its vendor.
+ * `url_path` leaks the value into every intermediary's access log, so an
+ * adapter may only declare it together with an `acceptedRisk` record naming
+ * the vendor and the registered exception.
+ */
+export type TaxIdTransmission = "none" | "request_body" | "url_path";
+export const TAX_ID_TRANSMISSION = {
+  NONE: "none",
+  REQUEST_BODY: "request_body",
+  URL_PATH: "url_path",
+} as const satisfies Record<Uppercase<TaxIdTransmission>, TaxIdTransmission>;
+
+export type AcceptedTransmissionRisk = { exceptionId: string; vendor: string };
+
+export type CreditAnalysisProvider = {
   readonly name: string;
   readonly capabilities: readonly Capability[];
   query(req: ProviderRequest): Promise<ProviderSignal>;
-}
+} & (
+  | { readonly taxIdTransmission: Exclude<TaxIdTransmission, "url_path"> }
+  | {
+      readonly taxIdTransmission: typeof TAX_ID_TRANSMISSION.URL_PATH;
+      readonly acceptedRisk: AcceptedTransmissionRisk;
+    }
+);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

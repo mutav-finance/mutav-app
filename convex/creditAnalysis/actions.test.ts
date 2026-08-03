@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeAll, expect, test } from "vitest";
 import { internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
+import type { ContractApplicationId } from "../contracts/domain";
 import schema from "../schema";
 
 beforeAll(() => {
@@ -25,14 +26,41 @@ async function seedAgency(t: ReturnType<typeof convexTest>): Promise<AgencyId> {
   );
 }
 
+async function seedApplication(
+  t: ReturnType<typeof convexTest>,
+  agencyId: AgencyId,
+): Promise<ContractApplicationId> {
+  return t.run(async (ctx) => {
+    const openedBy = await ctx.db.insert("users", {
+      publicId: "user-application-opener",
+      subject: "auth0|application-opener",
+      name: "Application Opener",
+      email: "opener@mutav.test",
+      createdAt: new Date().toISOString(),
+    });
+    return ctx.db.insert("contractApplications", {
+      agencyId,
+      subjectHash: "hash-application",
+      entityType: "pf",
+      propertyKind: "residencial",
+      cep: "01310100",
+      rentCents: 250_000,
+      openedBy,
+      openedAt: Date.now(),
+    });
+  });
+}
+
 test("runCreditAnalysis (mock provider) writes one signal + an ok assessment", async () => {
   const t = convexTest(schema);
   const agencyId = await seedAgency(t);
+  const applicationId = await seedApplication(t, agencyId);
   await t.action(internal.creditAnalysis.actions.runCreditAnalysis, {
     agencyId,
     subjectType: "tenant",
     document: "12345678901",
     capability: "credit_score",
+    applicationId,
   });
   const signals = await t.run((ctx) => ctx.db.query("creditAnalysisSignals").collect());
   const assessments = await t.run((ctx) => ctx.db.query("creditAnalysisAssessments").collect());
@@ -53,6 +81,7 @@ test("runCreditAnalysis is idempotent on signals within a day window", async () 
     subjectType: "tenant" as const,
     document: "12345678901",
     capability: "credit_score" as const,
+    applicationId: await seedApplication(t, agencyId),
   };
   await t.action(internal.creditAnalysis.actions.runCreditAnalysis, args);
   await t.action(internal.creditAnalysis.actions.runCreditAnalysis, args);

@@ -11,6 +11,7 @@ import type {
 import {
   capabilityValidator,
   creditScoreNormalizedValidator,
+  legalBasisValidator,
   subjectTypeValidator,
 } from "./domain";
 
@@ -28,6 +29,8 @@ export const recordSignal = internalMutation({
     correlationId: v.string(),
     windowKey: v.string(),
     pulledAt: v.number(),
+    applicationId: v.id("contractApplications"),
+    legalBasis: legalBasisValidator,
   },
   handler: async (ctx, args): Promise<CreditAnalysisSignalId> => {
     const existing = await ctx.db

@@ -46,6 +46,7 @@ export function ContractWizard() {
       {state.step === 1 && (
         <WizardStep1
           data={state.data}
+          agencyId={agencyId}
           onChange={patch}
           onNext={() => dispatch({ type: "GO_TO", step: 2 })}
         />
