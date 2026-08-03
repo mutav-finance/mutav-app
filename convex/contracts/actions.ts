@@ -10,7 +10,7 @@ import {
   getWhatsAppApiUrl,
   getWhatsAppApiKey,
 } from "../lib/env";
-import { logError } from "../lib/logger";
+import { logError, logWarn } from "../lib/logger";
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ export const sendProposalNotifications = internalAction({
 
 async function sendEmail(args: NotificationArgs): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
-    console.warn("[notifications] RESEND_API_KEY not set, skipping email");
+    logWarn("[notifications] RESEND_API_KEY not set, skipping email");
     return;
   }
   const resend = new Resend(getResendApiKey());

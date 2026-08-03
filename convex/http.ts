@@ -141,7 +141,7 @@ http.route({
           // it's for an order from a different deployment. Stamp processed
           // so a retry doesn't keep re-running this lookup; ack so
           // Etherfuse doesn't retry forever.
-          console.warn(`[etherfuse-webhook] no local order for ${orderExternalId}`);
+          logWarn(`[etherfuse-webhook] no local order for ${orderExternalId}`);
           await ctx.runMutation(
             internal.payments.providers.webhookUseCases.markWebhookEventProcessed,
             {

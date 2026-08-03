@@ -128,6 +128,24 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Convex ships everything written to `console.*` to the function log, which
+    // is US-hosted and outside any retention policy, so a raw console call is
+    // an uninstrumentable disclosure.
+    //
+    // This replaces enumerating PII field names and call shapes in a grep. That
+    // approach could not see `console.log(JSON.stringify(row))` — the single
+    // most common way to dump a document — because any function-call wrapper
+    // defeated the pattern, and its field list silently missed `cep`,
+    // `address` and bare `name`. "console exists in exactly one file" is a
+    // bounded invariant a parser can enforce; "no PII in any argument shape"
+    // is not.
+    files: ["convex/**/*.ts"],
+    ignores: ["convex/_generated/**", "convex/lib/logger.ts", "convex/**/*.test.ts"],
+    rules: {
+      "no-console": "error",
+    },
+  },
 ]);
 
 export default eslintConfig;

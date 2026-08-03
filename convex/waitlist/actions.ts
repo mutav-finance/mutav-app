@@ -5,7 +5,7 @@ import { Resend } from "resend";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getResendApiKey, getResendFromEmail, getWaitlistAudienceId } from "../lib/env";
-import { logError } from "../lib/logger";
+import { logError, logInfo, logWarn } from "../lib/logger";
 import { WAITLIST_AUDIENCE, summarizeBackfillFailures, waitlistAudienceValidator } from "./domain";
 
 // Best-effort write to a Resend audience so the team can run broadcast
@@ -23,13 +23,13 @@ export const addToResendAudience = internalAction({
   },
   handler: async (_ctx, { email, audience }) => {
     if (!process.env.RESEND_API_KEY) {
-      console.warn("[waitlist] RESEND_API_KEY not set, skipping Resend sync");
+      logWarn("[waitlist] RESEND_API_KEY not set, skipping Resend sync");
       return;
     }
 
     const audienceId = getWaitlistAudienceId(audience);
     if (!audienceId) {
-      console.warn(`[waitlist] no Resend audience id configured for "${audience}", skipping sync`);
+      logWarn(`[waitlist] no Resend audience id configured for "${audience}", skipping sync`);
       return;
     }
 
@@ -75,12 +75,12 @@ export const sendWelcomeEmail = internalAction({
   },
   handler: async (_ctx, { email, audience }) => {
     if (!process.env.RESEND_API_KEY) {
-      console.warn("[waitlist] RESEND_API_KEY not set, skipping welcome email");
+      logWarn("[waitlist] RESEND_API_KEY not set, skipping welcome email");
       return;
     }
 
     if (audience !== WAITLIST_AUDIENCE.IMOBILIARIA) {
-      console.warn(`[waitlist] no welcome template for "${audience}" yet, skipping`);
+      logWarn(`[waitlist] no welcome template for "${audience}" yet, skipping`);
       return;
     }
 
@@ -219,7 +219,7 @@ export const backfillResendAudience = internalAction({
     });
     const totalInConvex = rows.length;
 
-    console.log(
+    logInfo(
       `[backfill] ${dryRun ? "DRY RUN — " : ""}audience=${audience} ` +
         `audienceId=${audienceId} totalInConvex=${totalInConvex}`,
     );
@@ -264,7 +264,7 @@ export const backfillResendAudience = internalAction({
       logError("[backfill] contact sync failed", { audience, error });
     }
 
-    console.log(
+    logInfo(
       `[backfill] done audience=${audience} synced=${syncedToResend} ` +
         `alreadyPresent=${alreadyInResend} failed=${failureMessages.length}`,
     );
