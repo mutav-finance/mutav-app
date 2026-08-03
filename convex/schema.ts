@@ -233,11 +233,23 @@ export default defineSchema(
       // agencies stay Convex-only with this field absent — wrappers MUST
       // tolerate both shapes during the migration window.
       auth0OrgId: v.optional(v.string()),
+      // Invoice document-number prefix (`INV-{invoiceRef}-{NNNN}`) and the
+      // agency's own invoice counter. Both optional so rows predating the
+      // scheme stay valid; `generateMonthlyInvoices` mints them on first use.
+      //
+      // The counter is per-agency, not global, deliberately: a global sequence
+      // would tell every agency how many invoices Mutav issues in total, and
+      // the delta between two of its own invoices would give it the monthly
+      // rate. Active-agency count is a business metric, not something to
+      // publish in a field the customer cannot avoid reading.
+      invoiceRef: v.optional(v.string()),
+      nextInvoiceSequence: v.optional(v.number()),
     })
       .index("by_cnpj", ["cnpj"])
       .index("by_cpf", ["cpf"])
       .index("by_onboardingState", ["onboardingState"])
-      .index("by_auth0OrgId", ["auth0OrgId"]),
+      .index("by_auth0OrgId", ["auth0OrgId"])
+      .index("by_invoiceRef", ["invoiceRef"]),
 
     users: defineTable({
       publicId: v.string(),
@@ -458,9 +470,16 @@ export default defineSchema(
 
     invoices: defineTable({
       agencyId: v.id("agencies"),
-      // Human-readable document number (`INV-{period}-{last4 of agency CNPJ}`).
-      // Derived from public-record data, so it is a REFERENCE, never a
-      // credential — nothing unauthenticated may be gated on knowing it.
+      // Human-readable document number (`INV-{agencyRef}-{NNNN}`) — a
+      // REFERENCE, never a credential. Nothing unauthenticated may be gated on
+      // knowing it; the bearer credential is `accessToken` below.
+      //
+      // Unique by construction (per-agency prefix + per-agency counter) and by
+      // assertion (`assertUniquePublicId` before every insert). Both readers of
+      // `by_publicId` call `.unique()`, which throws on a duplicate, so
+      // uniqueness is a correctness requirement rather than a nicety. The
+      // previous `INV-{period}-{last4 of CNPJ or CPF}` scheme guaranteed
+      // neither — see convex/lib/randomId.ts.
       publicId: v.string(),
       // Bearer credential for the no-auth tenant checkout in `apps/pay`.
       // 160 CSPRNG bits; see convex/lib/randomId.ts for why it is a separate
