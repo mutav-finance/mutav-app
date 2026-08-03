@@ -4,6 +4,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { getEtherfuseWebhookSecret } from "./lib/env";
+import { logWarn } from "./lib/logger";
 
 const http = httpRouter();
 
@@ -104,7 +105,9 @@ http.route({
     const eventId = extractEventId(parsed);
     if (!eventId) {
       // No id means we can't dedupe — accept once but log so ops can audit.
-      console.warn("[etherfuse-webhook] event without id, processing without dedupe", parsed);
+      // The body itself is never logged: it is vendor-shaped and carries
+      // subject data no pattern-based redaction can be trusted to cover.
+      logWarn("[etherfuse-webhook] event without id, processing without dedupe");
     }
 
     const eventType = extractEventType(parsed);

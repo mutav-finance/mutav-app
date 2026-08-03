@@ -5,7 +5,8 @@ import { Resend } from "resend";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getResendApiKey, getResendFromEmail, getWaitlistAudienceId } from "../lib/env";
-import { WAITLIST_AUDIENCE, waitlistAudienceValidator } from "./domain";
+import { logError } from "../lib/logger";
+import { WAITLIST_AUDIENCE, summarizeBackfillFailures, waitlistAudienceValidator } from "./domain";
 
 // Best-effort write to a Resend audience so the team can run broadcast
 // campaigns later. Convex is the source of truth; this is a projection.
@@ -41,7 +42,7 @@ export const addToResendAudience = internalAction({
     });
 
     if (error) {
-      console.error(`[waitlist] Resend contacts.create failed for ${audience}:${email}`, error);
+      logError("[waitlist] Resend contacts.create failed", { audience, error });
     }
   },
 });
@@ -93,7 +94,7 @@ export const sendWelcomeEmail = internalAction({
     });
 
     if (error) {
-      console.error(`[waitlist] welcome email failed for ${audience}:${email}`, error);
+      logError("[waitlist] welcome message delivery failed", { audience, error });
     }
   },
 });
@@ -179,7 +180,8 @@ type BackfillSummary = {
   totalInConvex: number;
   syncedToResend: number;
   alreadyInResend: number;
-  errors: Array<{ email: string; message: string }>;
+  failedCount: number;
+  failureReasons: readonly string[];
 };
 
 // One-shot backfill — enumerates every Convex waitlist row for the given
@@ -230,14 +232,15 @@ export const backfillResendAudience = internalAction({
         totalInConvex,
         syncedToResend: 0,
         alreadyInResend: 0,
-        errors: [],
+        failedCount: 0,
+        failureReasons: [],
       };
     }
 
     const resend = new Resend(getResendApiKey());
     let syncedToResend = 0;
     let alreadyInResend = 0;
-    const errors: Array<{ email: string; message: string }> = [];
+    const failureMessages: string[] = [];
 
     for (const row of rows) {
       const { error } = await resend.contacts.create({
@@ -257,13 +260,13 @@ export const backfillResendAudience = internalAction({
         continue;
       }
 
-      errors.push({ email: row.email, message });
-      console.error(`[backfill] failed for ${audience}:${row.email}`, error);
+      failureMessages.push(message);
+      logError("[backfill] contact sync failed", { audience, error });
     }
 
     console.log(
       `[backfill] done audience=${audience} synced=${syncedToResend} ` +
-        `alreadyPresent=${alreadyInResend} errors=${errors.length}`,
+        `alreadyPresent=${alreadyInResend} failed=${failureMessages.length}`,
     );
 
     return {
@@ -273,7 +276,8 @@ export const backfillResendAudience = internalAction({
       totalInConvex,
       syncedToResend,
       alreadyInResend,
-      errors,
+      failedCount: failureMessages.length,
+      failureReasons: summarizeBackfillFailures(failureMessages),
     };
   },
 });

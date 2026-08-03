@@ -10,6 +10,7 @@ import {
   getWhatsAppApiUrl,
   getWhatsAppApiKey,
 } from "../lib/env";
+import { logError } from "../lib/logger";
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
@@ -36,7 +37,9 @@ export const sendProposalNotifications = internalAction({
   handler: async (_ctx, args) => {
     const results = await Promise.allSettled([sendEmail(args), sendWhatsApp(args)]);
     for (const result of results) {
-      if (result.status === "rejected") console.error("[notifications]", result.reason);
+      if (result.status === "rejected") {
+        logError("[notifications] delivery rejected", { reason: result.reason });
+      }
     }
   },
 });
