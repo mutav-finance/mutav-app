@@ -143,8 +143,9 @@ export const getByIdInternal = internalQuery({
  * The values returned are the caller's OWN latest submission, resolved from
  * its contract creation snapshot — never the shared registry row, which keeps
  * its first writer's values and would hand this agency another one's contact
- * data (LGPD-26). The registry is the fallback only for contracts that predate
- * the snapshot.
+ * data (LGPD-26). No submission means `null`, not the registry: this is a
+ * convenience that saves retyping, and an isolation boundary must not default
+ * to disclosure when the value it should return cannot be found.
  */
 export const lookupTenantByTaxId = queryWithAgencyScope({
   args: { taxId: v.string() },
@@ -172,6 +173,6 @@ export const lookupTenantByTaxId = queryWithAgencyScope({
       if (submitted) return { fullName: submitted.fullName, email: submitted.email };
     }
 
-    return { fullName: tenant.fullName, email: tenant.email };
+    return null;
   },
 });

@@ -529,7 +529,6 @@ describe("cross-agency tenant identity", () => {
         birthDate: tenant.birthDate,
         email: tenant.email,
         phone: tenant.phone,
-        score: 750,
       },
     };
   }
@@ -572,6 +571,11 @@ describe("cross-agency tenant identity", () => {
       name: "Owner B",
     });
     const agencyB = await seedAgencyFor(t, b.userId, "00000000000200");
+
+    // `create` re-reads the score from the assessment the agency itself pulled
+    // (#273); each agency needs its own for the shared CPF.
+    await seedFreshCreditAssessment(t, { agencyId: agencyA, document: VALID_CPF, score: 750 });
+    await seedFreshCreditAssessment(t, { agencyId: agencyB, document: VALID_CPF, score: 750 });
 
     const createdA = await a.asUser.mutation(
       api.contracts.useCases.create,
@@ -709,10 +713,11 @@ describe("cross-agency tenant identity", () => {
 
   test("the anchor SEP-9 prefill carries agency B's own submitted contact data", async () => {
     const t = setup();
-    const { createdB } = await bothAgenciesRegisterTheSameCpf(t);
+    const { agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
 
     // The two steps `resolveTenantPrefill` composes inside the anchor action.
     const identity = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+      agencyId: agencyB,
       publicId: createdB.data.publicId,
     });
     expect(identity).not.toBeNull();
@@ -737,5 +742,166 @@ describe("cross-agency tenant identity", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].action).toBe("tenant.data_conflict");
     expect(entries[0].actor).toEqual({ kind: "user", userId: b.userId });
+  });
+
+  // The snapshot must be selected by CARRYING a tenantSnapshot, never by
+  // sorting first. `contractHistory.at` is indexed as a plain string, and an
+  // offset-form timestamp sorts BEFORE the Z form on identical clock digits
+  // ("-" < "Z") while denoting a LATER instant — the shape convex/seed.ts
+  // already writes. One such row leading the index makes an earliest-row
+  // lookup miss the snapshot, and every consumer then falls through to the
+  // shared registry row and serves the other agency's data.
+  describe("with a history row that sorts before the creation event", () => {
+    async function plantHistoryRowSortingFirst(
+      t: ReturnType<typeof setup>,
+      agencyId: AgencyId,
+      contractPublicId: string,
+    ) {
+      await t.run(async (ctx) => {
+        const rows = await ctx.db
+          .query("contractHistory")
+          .withIndex("by_agency_contract", (q) =>
+            q.eq("agencyId", agencyId).eq("contractPublicId", contractPublicId),
+          )
+          .collect();
+        const creation = rows.find((row) => row.tenantSnapshot !== undefined);
+        if (!creation) throw new Error("Creation event carries no tenantSnapshot");
+        await ctx.db.insert("contractHistory", {
+          agencyId,
+          contractPublicId,
+          at: creation.at.replace("Z", "-03:00"),
+          username: "Owner B",
+          message: "Vistoria agendada",
+        });
+      });
+    }
+
+    test("the contract detail still reads agency B's own submitted identity", async () => {
+      const t = setup();
+      const { b, agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+      await plantHistoryRowSortingFirst(t, agencyB, createdB.data.publicId);
+
+      const contract = await b.asUser.query(api.contracts.useCases.getByPublicId, {
+        publicId: createdB.data.publicId,
+      });
+
+      expect(contract?.tenant).toMatchObject({
+        fullName: "Maria S. Nascimento",
+        email: "maria@agencia-b.example.com",
+        phone: "11922222222",
+      });
+      if (contract?.tenant.entityType === "pf") {
+        expect(contract.tenant.birthDate).toBe("1991-01-02");
+      }
+    });
+
+    test("the contract list still shows agency B the name it submitted", async () => {
+      const t = setup();
+      const { b, agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+      await plantHistoryRowSortingFirst(t, agencyB, createdB.data.publicId);
+
+      const page = await b.asUser.query(api.contracts.useCases.listByAgency, {
+        agencyId: agencyB,
+        paginationOpts: { numItems: 10, cursor: null },
+      });
+
+      expect(page.page.map((row) => row.tenantName)).toEqual(["Maria S. Nascimento"]);
+    });
+
+    test("the prefill lookup still gives agency B its own contact data", async () => {
+      const t = setup();
+      const { b, agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+      await plantHistoryRowSortingFirst(t, agencyB, createdB.data.publicId);
+
+      const prefill = await b.asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+        agencyId: agencyB,
+        taxId: VALID_CPF,
+      });
+
+      expect(prefill).toEqual({
+        fullName: "Maria S. Nascimento",
+        email: "maria@agencia-b.example.com",
+      });
+    });
+
+    test("the anchor SEP-9 prefill still carries agency B's own contact data", async () => {
+      const t = setup();
+      const { agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+      await plantHistoryRowSortingFirst(t, agencyB, createdB.data.publicId);
+
+      const identity = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+        agencyId: agencyB,
+        publicId: createdB.data.publicId,
+      });
+
+      expect(identity).toMatchObject({
+        fullName: "Maria S. Nascimento",
+        email: "maria@agencia-b.example.com",
+        phone: "11922222222",
+      });
+    });
+  });
+
+  // publicId carries no DB-level uniqueness constraint, so the same value under
+  // two agencies is a real state. Resolving it by publicId alone either throws
+  // on `.unique()` or ships one agency's tenant PII under the other's session.
+  describe("with the same publicId under both agencies", () => {
+    async function renameContract(
+      t: ReturnType<typeof setup>,
+      fromPublicId: string,
+      toPublicId: string,
+    ) {
+      await t.run(async (ctx) => {
+        const contracts = await ctx.db
+          .query("contracts")
+          .withIndex("by_publicId", (q) => q.eq("publicId", fromPublicId))
+          .collect();
+        for (const contract of contracts)
+          await ctx.db.patch(contract._id, { publicId: toPublicId });
+
+        const history = await ctx.db
+          .query("contractHistory")
+          .withIndex("by_contract", (q) => q.eq("contractPublicId", fromPublicId))
+          .collect();
+        for (const row of history) await ctx.db.patch(row._id, { contractPublicId: toPublicId });
+      });
+    }
+
+    test("the anchor prefill resolves each agency's own tenant identity", async () => {
+      const t = setup();
+      const { agencyA, agencyB, createdA, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+      const sharedPublicId = createdB.data.publicId;
+      await renameContract(t, createdA.data.publicId, sharedPublicId);
+
+      const forB = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+        agencyId: agencyB,
+        publicId: sharedPublicId,
+      });
+      const forA = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+        agencyId: agencyA,
+        publicId: sharedPublicId,
+      });
+
+      expect(forB).toMatchObject({
+        fullName: "Maria S. Nascimento",
+        email: "maria@agencia-b.example.com",
+      });
+      expect(forA).toMatchObject({
+        fullName: "Maria Silva Santos",
+        email: "maria@agencia-a.example.com",
+      });
+    });
+
+    test("an agency that owns no contract under that publicId resolves nothing", async () => {
+      const t = setup();
+      const { agencyA, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+
+      const forA = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+        agencyId: agencyA,
+        publicId: createdB.data.publicId,
+      });
+
+      expect(forA).toBeNull();
+    });
   });
 });

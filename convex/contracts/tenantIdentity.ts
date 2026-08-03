@@ -17,13 +17,19 @@ export async function agencySubmittedTenant(
   ctx: QueryCtx,
   contract: Contract,
 ): Promise<TenantInput | null> {
-  const creation = await ctx.db
+  // Selected by CARRYING a snapshot, never by sort position. `at` is indexed
+  // as a plain string, so an offset-form timestamp sorts before the Z form the
+  // writers emit ("-" < "Z") while denoting a later instant — the shape
+  // `convex/seed.ts` writes. Taking the first row would let any such entry hide
+  // the creation event, and a `null` here sends callers to the shared registry
+  // row, i.e. to another agency's contact data. Exactly one row carries a
+  // snapshot: `contracts.create` writes it on the creation event only.
+  const history = await ctx.db
     .query("contractHistory")
     .withIndex("by_agency_contract", (q) =>
       q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
     )
-    .order("asc")
-    .first();
-  const snapshot = creation?.tenantSnapshot;
+    .collect();
+  const snapshot = history.find((entry) => entry.tenantSnapshot !== undefined)?.tenantSnapshot;
   return snapshot ? tenantInputFromSubmission(snapshot) : null;
 }

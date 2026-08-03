@@ -37,8 +37,6 @@ import {
 import {
   normalizeEmbeddedTenant,
   tenantEntityTypeValidator,
-  tenantInputFromSubmission,
-  tenantInputFromRegistry,
   TENANT_ERROR_CODE,
 } from "../tenants/domain";
 import { agencySubmittedTenant } from "./tenantIdentity";
@@ -134,27 +132,33 @@ export const getByPublicIdInternal = internalQuery({
 
 /**
  * Tenant identity for a contract as the *owning* agency submitted it, for
- * actions that have no `ctx.db` (anchor SEP-9 prefill). Never returns the
- * shared registry row while a submission exists: the registry keeps its first
- * writer's values and is write-once, so shipping it to a third-party anchor
- * would disclose another agency's contact data and freeze a stale one
- * (LGPD-26). Falls back to the registry only for contracts predating the
- * snapshot.
+ * actions that have no `ctx.db` (anchor SEP-9 prefill). This is the one read
+ * path that hands tenant PII to a third party, so it is scoped and fail-closed
+ * on both axes.
+ *
+ * `agencyId` is required, not derived: `publicId` carries no DB-level
+ * uniqueness constraint, so resolving by it alone either throws on `.unique()`
+ * or picks whichever agency's contract sorts first and ships that tenant's data
+ * under the caller's session.
+ *
+ * The shared registry row is never a fallback here. It keeps its first writer's
+ * values and is never patched, so serving it would disclose another agency's
+ * contact data to the anchor and pin it there permanently (LGPD-26). A contract
+ * with no submission of its own yields `null`; prefill is a convenience and the
+ * deposit still works without it.
  */
 export const getTenantIdentityInternal = internalQuery({
-  args: { publicId: v.string() },
-  handler: async (ctx, { publicId }): Promise<TenantInput | null> => {
-    const contract = await ctx.db
+  args: { agencyId: v.id("agencies"), publicId: v.string() },
+  handler: async (ctx, { agencyId, publicId }): Promise<TenantInput | null> => {
+    const candidates = await ctx.db
       .query("contracts")
       .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
-      .unique();
+      .collect();
+
+    const contract = candidates.find((candidate) => candidate.agencyId === agencyId);
     if (!contract) return null;
 
-    const submitted = await agencySubmittedTenant(ctx, contract);
-    if (submitted) return submitted;
-
-    const tenant = await ctx.db.get(contract.tenantId);
-    return tenant ? tenantInputFromRegistry(tenant) : null;
+    return agencySubmittedTenant(ctx, contract);
   },
 });
 

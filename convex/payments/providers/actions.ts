@@ -252,14 +252,18 @@ function brlCentsToAssetAmount(brlCents: number, assetSymbol: string): string {
  * it here would ship another agency's contact data to a third-party anchor and
  * pin it there permanently (LGPD-26). Returns an empty object when no
  * contract/tenant is reachable — the deposit still works without prefill.
+ *
+ * `agencyId` comes from the invoice being paid, so a `contractPublicId` that
+ * also exists under another agency cannot pull that agency's tenant in.
  */
 async function resolveTenantPrefill(
   ctx: ActionCtx,
-  contractPublicId: string | undefined,
+  args: { agencyId: AgencyId; contractPublicId: string | undefined },
 ): Promise<TenantPrefill> {
-  if (!contractPublicId) return {};
+  if (!args.contractPublicId) return {};
   const identity = await ctx.runQuery(internal.contracts.useCases.getTenantIdentityInternal, {
-    publicId: contractPublicId,
+    agencyId: args.agencyId,
+    publicId: args.contractPublicId,
   });
   if (!identity) return {};
   return tenantToSep9Prefill(identity);
@@ -428,7 +432,10 @@ export const startPixOnramp = action({
     await client.authenticate(signer.publicKey, signer.sign);
 
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
-    const tenant = await resolveTenantPrefill(ctx, invoice.lineItems[0]?.contractPublicId);
+    const tenant = await resolveTenantPrefill(ctx, {
+      agencyId: invoice.agencyId,
+      contractPublicId: invoice.lineItems[0]?.contractPublicId,
+    });
 
     try {
       const response = await client.sep6.deposit({
@@ -614,7 +621,10 @@ export const startAnchorTestOnramp = action({
     await client.authenticate(signer.publicKey, signer.sign);
 
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
-    const tenant = await resolveTenantPrefill(ctx, invoice.lineItems[0]?.contractPublicId);
+    const tenant = await resolveTenantPrefill(ctx, {
+      agencyId: invoice.agencyId,
+      contractPublicId: invoice.lineItems[0]?.contractPublicId,
+    });
 
     try {
       const response = await client.sep24.deposit({
