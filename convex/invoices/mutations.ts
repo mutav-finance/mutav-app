@@ -6,6 +6,7 @@ import { SettlementMethods } from "../payments/domain";
 import { recordSettlement } from "../payments/settlement";
 import { generateInvoiceAccessToken } from "../lib/randomId";
 import { INVOICE_LINE_ITEM_KIND, InvoiceStates } from "./domain";
+import { allocateInvoiceDocumentNumber } from "./lib/documentNumber";
 import { generateInvoiceMuxedId } from "./lib/muxedId";
 
 /**
@@ -100,12 +101,7 @@ export const generateMonthlyInvoices = internalMutation({
 
       const totalCents = lineItems.reduce((sum, item) => sum + item.amountCents, 0);
 
-      // Document number: INV-{period}-{last 4 digits of CNPJ or CPF}. Derived
-      // from public-record data and therefore guessable — it identifies the
-      // invoice to the agency, it does not authorize anything. The bearer
-      // credential is `accessToken`.
-      const identifier = agency.cnpj ?? agency.cpf ?? "0000";
-      const publicId = `INV-${periodMonth}-${identifier.slice(-4)}`;
+      const publicId = await allocateInvoiceDocumentNumber(ctx, agency);
 
       const invoiceId = await ctx.db.insert("invoices", {
         agencyId: agency._id,
