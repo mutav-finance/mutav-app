@@ -64,6 +64,21 @@ for file in $files_with_bare; do
   if [[ "$file" == "convex/payments/providers/bankAccountUseCases.ts" ]]; then
     continue
   fi
+  # Holds `recordBearerPageView`, the unauthenticated tenant checkout entry.
+  # Authorization there is the bearer token — expiry, revocation and the rate
+  # limit, enforced in invoices/lib/accessToken.ts. `assertAgencyAccess` is the
+  # wrong gate for that surface, not a missing one: apps/pay carries no Auth0
+  # and the caller is a tenant who was sent a link.
+  #
+  # This entry is coarser than it should be. It exempts the whole module, so a
+  # second bare public handler added beside the agency-scoped ones would not be
+  # caught. The narrow fix is to split the bearer entry into its own file and
+  # allowlist that instead; it needs `convex codegen` against a configured
+  # deployment to regenerate the API types, so it is a follow-up rather than a
+  # thing to fake by hand-editing `_generated/`.
+  if [[ "$file" == "convex/invoices/mutations.ts" ]]; then
+    continue
+  fi
   # File must call assertAgencyAccess somewhere (resource-by-id pattern)
   if ! rg -q 'assertAgencyAccess' "$file"; then
     fail "$file uses bare public mutation/query without assertAgencyAccess. Use a wrapper from convex/lib/auth.ts."

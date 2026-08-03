@@ -31,6 +31,40 @@ type BearerGrant = {
 
 type BearerAccessErrorResult = { code: BearerDenialReason };
 
+/** The only refusal the unauthenticated surface is allowed to distinguish. */
+type BearerPageViewErrorResult = { code: "DENIED" };
+
+/**
+ * Server-rendered checkout entry gate. `apps/pay` calls this once per page
+ * load with the client address it observed, which is the only point in the
+ * system that sees one — Convex queries and actions are handed no request, so
+ * a per-IP limit has to be fed from the Next server or not at all.
+ *
+ * `sourceIp` is a denial-only input: it can add a reason to refuse and never a
+ * reason to allow, so a caller who lies about it evades the IP window and
+ * still meets the per-token one.
+ *
+ * Every refusal collapses to one opaque `DENIED`. The specific reason is real
+ * and is used inside the resolver, but returning it here would tell an
+ * unauthenticated caller whether a token merely expired — and so was issued
+ * once — or was never issued at all. That is an existence oracle over the
+ * token space, and the same leak the read paths already refuse to emit.
+ */
+export const recordBearerPageView = mutation({
+  args: { accessToken: v.string(), sourceIp: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<Result<object, BearerPageViewErrorResult>> => {
+    const resolved = await consumeBearerInvoice(ctx, {
+      accessToken: args.accessToken,
+      sourceIp: args.sourceIp,
+      nowMs: Date.now(),
+    });
+    if (!resolved.success) {
+      return { success: false, error: { code: "DENIED" }, message: "Bearer access denied" };
+    }
+    return { success: true, data: {}, message: "Bearer access granted" };
+  },
+});
+
 /**
  * The write-path bearer gate every unauthenticated checkout action goes
  * through. A mutation rather than a query because the rate limiter has to
@@ -63,29 +97,6 @@ export const consumeBearerAccess = internalMutation({
       },
       message: "Bearer access granted",
     };
-  },
-});
-
-/**
- * Server-rendered checkout entry gate. `apps/pay` calls this once per page
- * load with the client address it observed, which is the only point in the
- * system that sees one — Convex queries and actions are handed no request, so
- * a per-IP limit has to be fed from the Next server or not at all.
- *
- * `sourceIp` is a denial-only input: it can add a reason to refuse and never a
- * reason to allow, so a caller who lies about it evades the IP window and
- * still meets the per-token one.
- */
-export const recordBearerPageView = mutation({
-  args: { accessToken: v.string(), sourceIp: v.optional(v.string()) },
-  handler: async (ctx, args): Promise<Result<object, BearerAccessErrorResult>> => {
-    const resolved = await consumeBearerInvoice(ctx, {
-      accessToken: args.accessToken,
-      sourceIp: args.sourceIp,
-      nowMs: Date.now(),
-    });
-    if (!resolved.success) return resolved;
-    return { success: true, data: {}, message: "Bearer access granted" };
   },
 });
 

@@ -292,7 +292,7 @@ describe("bearer lifecycle — the rate limit trips", () => {
     ).toEqual([]);
   });
 
-  test("a source IP at its cap is denied before the token is even looked up", async () => {
+  test("a source IP at its cap is denied even when it presents a valid token", async () => {
     const { t, agencyId } = await setup();
     await seedInvoice(t, agencyId);
     await t.run((ctx) =>
@@ -305,11 +305,19 @@ describe("bearer lifecycle — the rate limit trips", () => {
       }),
     );
 
-    const result = await t.mutation(api.invoices.mutations.recordBearerPageView, {
+    const capped = await t.mutation(api.invoices.mutations.recordBearerPageView, {
       accessToken: TOKEN,
       sourceIp: "203.0.113.7",
     });
-    expect(result).toMatchObject({ success: false, error: { code: "RATE_LIMITED" } });
+    // The public surface reports one opaque code, so the control below is what
+    // pins the denial on the IP cap rather than on the token.
+    expect(capped).toMatchObject({ success: false, error: { code: "DENIED" } });
+
+    const fromAnotherAddress = await t.mutation(api.invoices.mutations.recordBearerPageView, {
+      accessToken: TOKEN,
+      sourceIp: "203.0.113.8",
+    });
+    expect(fromAnotherAddress).toMatchObject({ success: true });
   });
 
   test("an unknown token mints no counter row, so a sweep cannot amplify writes", async () => {
@@ -322,6 +330,41 @@ describe("bearer lifecycle — the rate limit trips", () => {
 
     const rows = await t.run((ctx) => ctx.db.query("bearerAccessAttempts").collect());
     expect(rows).toEqual([]);
+  });
+
+  test("an unknown token mints no counter row even when it supplies a source IP", async () => {
+    const { t, agencyId } = await setup();
+    await seedInvoice(t, agencyId);
+
+    // `sourceIp` arrives over a public mutation, so its cardinality is the
+    // caller's to choose. Counting it before the token resolved let a caller
+    // holding no valid token insert one row per address it cared to invent.
+    for (const octet of [11, 22, 33]) {
+      await t.mutation(api.invoices.mutations.recordBearerPageView, {
+        accessToken: "NOTATOKEN0000000000000000000000A",
+        sourceIp: `198.51.100.${octet}`,
+      });
+    }
+
+    const rows = await t.run((ctx) => ctx.db.query("bearerAccessAttempts").collect());
+    expect(rows).toEqual([]);
+  });
+
+  test("every refusal collapses to one opaque code, so expiry is not an existence oracle", async () => {
+    const { t, agencyId } = await setup();
+    await seedInvoice(t, agencyId, { accessTokenExpiresAt: Date.now() - 1 });
+
+    const expired = await t.mutation(api.invoices.mutations.recordBearerPageView, {
+      accessToken: TOKEN,
+    });
+    const unknown = await t.mutation(api.invoices.mutations.recordBearerPageView, {
+      accessToken: "NOTATOKEN0000000000000000000000A",
+    });
+
+    // A token that expired once existed; one that was never issued did not.
+    // Distinguishable refusals would confirm which, over the token space.
+    expect(expired).toMatchObject({ success: false, error: { code: "DENIED" } });
+    expect(unknown).toMatchObject({ success: false, error: { code: "DENIED" } });
   });
 
   test("the window rolls over once it is older than a minute", async () => {
