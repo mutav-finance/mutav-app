@@ -65,6 +65,34 @@ describe("redactPii", () => {
     expect(redactPii("sms to (11) 98765-4321 failed")).toBe("sms to [REDACTED:PHONE] failed");
   });
 
+  it.each([
+    ["5511987654321", "[REDACTED:PHONE]"],
+    ["551134567890", "[REDACTED:PHONE]"],
+    ["+5511987654321", "[REDACTED:PHONE]"],
+  ])("redacts E.164 written without a leading plus as %s", (input, expected) => {
+    expect(redactPii(input)).toBe(expected);
+  });
+
+  it("redacts a bare E.164 phone embedded in a vendor payload dump", () => {
+    expect(redactPii('{"to":"5511987654321","status":"failed"}')).toBe(
+      '{"to":"[REDACTED:PHONE]","status":"failed"}',
+    );
+  });
+
+  it.each([
+    ["1754160000", "1754160000"],
+    ["1754160000000", "1754160000000"],
+    ["4200000001", "4200000001"],
+  ])("leaves the bare digit run %s untouched", (input, expected) => {
+    expect(redactPii(input)).toBe(expected);
+  });
+
+  it("leaves a unix-seconds timestamp and a numeric external id readable", () => {
+    expect(redactPii("order 4200000001 quoted at 1754160000 expired")).toBe(
+      "order 4200000001 quoted at 1754160000 expired",
+    );
+  });
+
   it("redacts every occurrence in a string carrying several identifiers", () => {
     expect(
       redactPii(

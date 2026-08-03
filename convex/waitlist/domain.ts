@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
+import { redactPii } from "../lib/logger";
 
 export type Waitlist = Doc<"waitlist">;
 export type WaitlistId = Id<"waitlist">;
@@ -34,4 +35,13 @@ export function isValidEmail(input: string): boolean {
 
 export function normalizeEmail(input: string): string {
   return input.trim().toLowerCase();
+}
+
+// Convex records a function's return value in the deployment function log, so
+// a summary is a log channel of its own — the console rules apply to it. A
+// failed backfill row is reported as a scrubbed, deduplicated vendor reason
+// plus a count; the address it failed for never leaves the action.
+export function summarizeBackfillFailures(vendorMessages: readonly string[]): readonly string[] {
+  const reasons = vendorMessages.map((message) => redactPii(message));
+  return [...new Set(reasons)];
 }

@@ -22,6 +22,7 @@ import {
   getStellarNetwork,
   getStellarRpcUrl,
 } from "../lib/env";
+import { logError } from "../lib/logger";
 import {
   storedValueCentsFromValuedAssets,
   valueAssets,
@@ -140,7 +141,7 @@ async function readReserve(): Promise<ReserveReadResult> {
   } catch (err) {
     // Non-fatal: keep the last good snapshot, report unavailable, never a mock.
     // Logged so operators can see a persistently broken read.
-    console.error("[reserve] RPC read failed — snapshot not updated:", err);
+    logError("[reserve] RPC read failed — snapshot not updated", { error: err });
     return { available: false };
   }
 }

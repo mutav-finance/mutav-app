@@ -25,7 +25,17 @@ const REDACTION_RULES: readonly RedactionRule[] = [
   { label: "EMAIL", pattern: /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g },
   { label: "CNPJ", pattern: /(?<!\d)\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}(?!\d)/g },
   { label: "CPF", pattern: /(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)/g },
-  { label: "PHONE", pattern: /(?<!\d)(?:\+55[\s-]?)?\(?\d{2}\)?[\s-]?9?\d{4}[\s-]?\d{4}(?!\d)/g },
+  // Two shapes, because an undelimited digit run is ambiguous. A run with no
+  // separator only counts as a phone when it carries the 55 country code
+  // (the vendor integrations send E.164 with the + stripped), which keeps a
+  // bare 10-digit unix-seconds stamp or numeric external id out of the match.
+  // Without the country code a separator — parentheses, space or dash — is
+  // required. A bare 11-digit run is left to the CPF rule above.
+  {
+    label: "PHONE",
+    pattern:
+      /(?<!\d)(?:\+?55[\s-]?\(?[1-9]\d\)?[\s-]?9?\d{4}[\s-]?\d{4}|(?:\([1-9]\d\)|[1-9]\d[\s-])\s?9?\d{4}[\s-]?\d{4})(?!\d)/g,
+  },
 ];
 
 const MAX_REDACTION_DEPTH = 6;

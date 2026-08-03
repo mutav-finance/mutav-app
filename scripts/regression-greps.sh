@@ -260,7 +260,12 @@ done
 #     Convex records everything a function writes to console.* in the
 #     deployment function log, which sits outside every retention control
 #     the schema has. A personal-data field must therefore reach console
-#     neither interpolated into the message nor handed over as an argument.
+#     neither interpolated into the message, nor concatenated onto it, nor
+#     named as an object key, nor handed over as an argument. And because a
+#     vendor-shaped payload carries subject data under names this grep can
+#     never enumerate, console takes literal arguments only — an identifier,
+#     member expression, object literal or spread reaching console is a
+#     violation on its own, whatever it is called.
 #     Route it through the redacting emitters in convex/lib/logger.ts
 #     (logInfo / logWarn / logError) instead — they scrub the message and
 #     walk the context object before anything is written.
@@ -269,6 +274,8 @@ section "10. personal data in console.* under convex/"
 
 console_call='console\.(log|info|warn|error|debug|trace)\('
 pii_name='(?i:e-?mail|cpf|cnpj|tax_?id|phone|full_?name|birth_?date|account_?number|account_?holder|representante)'
+# A bare identifier or member expression, e.g. `parsed` or `result.reason`.
+opaque_arg='[A-Za-z_$][\w$]*(?:\.[\w$]+)*'
 
 # Multiline (-U) because a console call is routinely wrapped across lines;
 # `[^;]*?` bounds the scan to the statement.
@@ -286,8 +293,34 @@ passed_pii=$(rg -nU --type ts \
   | grep -v '_generated' \
   | grep -v '\.test\.ts' || true)
 
-# A single statement can trip both patterns; report it once.
-pii_console_hits=$(printf '%s\n%s' "$interpolated_pii" "$passed_pii" | grep -v '^$' | sort -u || true)
+# PII in key position — `{ email: sanitize(row) }` hides the value behind a
+# call the value-position pattern above cannot see, but the key still names
+# what is being logged.
+keyed_pii=$(rg -nU --type ts \
+  "${console_call}"'[^;]*?[,({]\s*'"${pii_name}"'[\w$]*\s*:' convex/ 2>/dev/null \
+  | grep -v '_generated' \
+  | grep -v '\.test\.ts' || true)
+
+# PII glued onto the message with `+` rather than interpolated.
+concatenated_pii=$(rg -nU --type ts \
+  "${console_call}"'[^;]*?(?:\+\s*[\w$.]*'"${pii_name}"'|'"${pii_name}"'[\w$]*\s*\+)' convex/ 2>/dev/null \
+  | grep -v '_generated' \
+  | grep -v '\.test\.ts' || true)
+
+# Any non-literal argument. This is the one that catches an opaque vendor
+# payload — `console.warn("event without id", parsed)` — where no name in the
+# statement looks like personal data but the object is full of it. Matching on
+# the argument boundary (`,`/`(` before, `,`/`)` after) keeps a comma inside a
+# template interpolation from counting as an argument separator.
+opaque_console_arg=$(rg -nU --type ts \
+  "${console_call}"'(?:\s*'"${opaque_arg}"'\s*[,)]|[^;]*?,\s*(?:'"${opaque_arg}"'\s*[,)]|\{|\[|\.\.\.))' convex/ 2>/dev/null \
+  | grep -v '_generated' \
+  | grep -v '\.test\.ts' || true)
+
+# A single statement can trip several patterns; report it once.
+pii_console_hits=$(printf '%s\n%s\n%s\n%s\n%s' \
+  "$interpolated_pii" "$passed_pii" "$keyed_pii" "$concatenated_pii" "$opaque_console_arg" \
+  | grep -v '^$' | sort -u || true)
 
 if [[ -n "$pii_console_hits" ]]; then
   while IFS= read -r line; do
