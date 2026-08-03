@@ -558,6 +558,7 @@
         "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
         "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
         "NO_BANK_ACCOUNT": "Register a bank account to pay via PIX before continuing.",
+        "RATE_LIMITED": "Too many attempts on this payment link. Please wait a minute and try again.",
         "INTERNAL": "Internal error. Please try again."
       }
     },
@@ -605,6 +606,7 @@
         "ANCHOR_REJECTED": "The anchor rejected the deposit. Please try again shortly.",
         "ANCHOR_RESPONSE_INVALID": "Unexpected response from the anchor.",
         "NO_BANK_ACCOUNT": "Register a bank account to pay via PIX before continuing.",
+        "RATE_LIMITED": "Too many attempts on this payment link. Please wait a minute and try again.",
         "INTERNAL": "Internal error. Please try again."
       }
     },

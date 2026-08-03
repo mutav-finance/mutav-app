@@ -63,11 +63,7 @@ export default async function CheckoutPixPage({
         <ArrowLeft className="size-3" strokeWidth={1.5} />
         {t("back")}
       </Link>
-      <CheckoutPixView
-        invoiceId={payment.invoiceId}
-        invoiceAccessToken={accessToken}
-        totalCents={payment.totalCents}
-      />
+      <CheckoutPixView invoiceAccessToken={accessToken} totalCents={payment.totalCents} />
     </div>
   );
 }

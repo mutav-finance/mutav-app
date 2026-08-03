@@ -1,5 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { InvoiceChip } from "@/components/public/invoice-chip";
+import { allowBearerPageView } from "@/lib/invoices/bearer-gate";
 import { fetchInvoiceDocumentNumber } from "@/lib/invoices/document-number";
 import { PublicFooter } from "@mutav/ui/public/public-footer";
 import { PageContent } from "@mutav/ui/page/page-content";
@@ -22,6 +24,8 @@ export default async function CheckoutLayout({
   params: Promise<{ publicId: string }>;
 }) {
   const { publicId: accessToken } = await params;
+  if (!(await allowBearerPageView(accessToken))) notFound();
+
   const [tA11y, documentNumber] = await Promise.all([
     getTranslations("common.a11y"),
     fetchInvoiceDocumentNumber(accessToken),

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery, query } from "../../_generated/server";
-import { findInvoiceByAccessToken } from "../../invoices/lib/accessToken";
+import { resolveBearerInvoice } from "../../invoices/lib/accessToken";
 import { queryWithAgencyScope } from "../../lib/auth";
 import {
   agencyBankAccountTypeValidator,
@@ -46,7 +46,9 @@ function shapeTenantVisibleBankAccount(account: AgencyBankAccount): TenantVisibl
 // Tenant checkout (`apps/pay`) bank picker. The invoice `accessToken` is the
 // bearer: resolve it to the owning agency server-side so the no-auth payer
 // never supplies an `agencyId` and cannot enumerate another agency's banks.
-// Unknown token → empty list (no existence leak).
+// A token that is unknown, expired, revoked or rate-limited all produce the
+// same empty list — no existence leak, and no way to probe which of the four
+// it was.
 //
 // Was keyed on the invoice `publicId`, which embeds the last four digits of
 // the agency's CNPJ — public record — and so authorized anyone who could name
@@ -55,11 +57,14 @@ function shapeTenantVisibleBankAccount(account: AgencyBankAccount): TenantVisibl
 export const listBanksForInvoice = query({
   args: { invoiceAccessToken: v.string() },
   handler: async (ctx, { invoiceAccessToken }): Promise<TenantVisibleBankAccount[]> => {
-    const invoice = await findInvoiceByAccessToken(ctx, invoiceAccessToken);
-    if (!invoice) return [];
+    const resolved = await resolveBearerInvoice(ctx, {
+      accessToken: invoiceAccessToken,
+      nowMs: Date.now(),
+    });
+    if (!resolved.success) return [];
     const accounts = await ctx.db
       .query("agencyBankAccounts")
-      .withIndex("by_agency", (q) => q.eq("agencyId", invoice.agencyId))
+      .withIndex("by_agency", (q) => q.eq("agencyId", resolved.data.invoice.agencyId))
       .collect();
     return accounts.map(shapeTenantVisibleBankAccount);
   },

@@ -17,6 +17,11 @@ vi.mock("next-intl/server", () => ({
 
 vi.mock("convex/nextjs", () => ({
   fetchQuery: async () => ({ publicId: DOCUMENT_NUMBER }),
+  fetchMutation: async () => ({ success: true, data: {}, message: "ok" }),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }),
 }));
 
 vi.mock("@mutav/ui/shell/flow-shell", () => ({

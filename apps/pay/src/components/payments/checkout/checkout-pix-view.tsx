@@ -18,10 +18,8 @@ import { api } from "@convex/_generated/api";
 import type { AgencyBankAccountId } from "@convex/payments/providers/bankAccountDomain";
 import type { TenantVisibleBankAccount } from "@convex/payments/providers/bankAccountUseCases";
 import type { ProviderOrder } from "@convex/payments/providers/orderDomain";
-import type { InvoiceId } from "@convex/invoices/domain";
 
 interface Props {
-  invoiceId: InvoiceId;
   invoiceAccessToken: string;
   totalCents: number;
 }
@@ -39,7 +37,7 @@ interface Props {
  * one we'd get an opaque "Proxy account not found" from their API.
  * Gating up front makes the requirement legible to the operator.
  */
-export function CheckoutPixView({ invoiceId, invoiceAccessToken, totalCents }: Props) {
+export function CheckoutPixView({ invoiceAccessToken, totalCents }: Props) {
   const t = useTranslations("checkout.pix");
   const locale = useLocale();
   const banks = useQuery(api.payments.providers.bankAccountUseCases.listBanksForInvoice, {
@@ -47,7 +45,7 @@ export function CheckoutPixView({ invoiceId, invoiceAccessToken, totalCents }: P
   });
   const [started, setStarted] = useState(false);
   const { phase, order, error, start, cancel, reset } = useAnchorOnramp({
-    invoiceId,
+    invoiceAccessToken,
     startAction: api.payments.providers.actions.startPixOnramp,
     pollAction: api.payments.providers.actions.pollPixOnramp,
     lang: locale,

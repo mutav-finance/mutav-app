@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation, type MutationCtx } from "./_generated/server";
-import { INVOICE_LINE_ITEM_KIND, InvoiceStates } from "./invoices/domain";
+import {
+  accessTokenExpiryFrom,
+  INVOICE_LINE_ITEM_KIND,
+  InvoiceStates,
+  settledAccessTokenExpiry,
+} from "./invoices/domain";
 import { generateInvoiceMuxedId } from "./invoices/lib/muxedId";
 import { generateInvoiceAccessToken } from "./lib/randomId";
 import { SettlementMethods, type SettlementMethod } from "./payments/domain";
@@ -167,6 +172,10 @@ async function seedPaidInvoice(
     totalCents: invoice.totalCents,
     state: InvoiceStates.paid(invoice.paidAt),
     accessToken: generateInvoiceAccessToken(),
+    // Seeded expiry runs from the reseed, not from the fixture's historical
+    // `issuedAt` — a demo dataset whose links are born expired is a dataset
+    // nobody can walk through.
+    accessTokenExpiresAt: settledAccessTokenExpiry(accessTokenExpiryFrom(Date.now()), Date.now()),
     muxedId: generateInvoiceMuxedId(),
     lineItems: invoice.lineItems,
   });
@@ -2097,6 +2106,7 @@ async function seedFictional(
       totalCents: h2026Feb.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
       accessToken: generateInvoiceAccessToken(),
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
       muxedId: generateInvoiceMuxedId(),
       lineItems: h2026Feb,
     });
@@ -2142,6 +2152,7 @@ async function seedFictional(
       totalCents: h2026Mar.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
       accessToken: generateInvoiceAccessToken(),
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
       muxedId: generateInvoiceMuxedId(),
       lineItems: h2026Mar,
     });
@@ -2188,6 +2199,7 @@ async function seedFictional(
       totalCents: horizonteAprLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
       accessToken: generateInvoiceAccessToken(),
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
       muxedId: generateInvoiceMuxedId(),
       lineItems: horizonteAprLineItems,
     });
@@ -2202,6 +2214,7 @@ async function seedFictional(
       totalCents: paulistaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
       accessToken: generateInvoiceAccessToken(),
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
       muxedId: generateInvoiceMuxedId(),
       lineItems: paulistaMayLineItems,
     });
@@ -2216,6 +2229,7 @@ async function seedFictional(
       totalCents: atlanticaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
       accessToken: generateInvoiceAccessToken(),
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
       muxedId: generateInvoiceMuxedId(),
       lineItems: atlanticaMayLineItems,
     });
@@ -2230,6 +2244,7 @@ async function seedFictional(
       totalCents: horizonteMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
       accessToken: generateInvoiceAccessToken(),
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
       muxedId: generateInvoiceMuxedId(),
       lineItems: horizonteMayLineItems,
     });
@@ -2277,6 +2292,7 @@ async function seedFictional(
         totalCents: t.amountCents,
         state: InvoiceStates.open(),
         accessToken: generateInvoiceAccessToken(),
+        accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
         muxedId: generateInvoiceMuxedId(),
         lineItems: [
           {
@@ -2766,6 +2782,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     totalCents: may.reduce((s, x) => s + x.amountCents, 0),
     state: InvoiceStates.open(),
     accessToken: generateInvoiceAccessToken(),
+    accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
     muxedId: generateInvoiceMuxedId(),
     lineItems: may,
   });

@@ -5,7 +5,7 @@ import type { QueryCtx } from "../_generated/server";
 import { assertAgencyAccess, queryWithAgencyScope } from "../lib/auth";
 import type { SettlementMethod } from "../payments/domain";
 import { isChargeable, isOverdue, type Invoice, type InvoiceId } from "./domain";
-import { findInvoiceByAccessToken } from "./lib/accessToken";
+import { resolveBearerInvoice } from "./lib/accessToken";
 import { deriveInvoiceMuxedAddress } from "./lib/muxedAddress";
 
 /** Current UTC date as a `YYYY-MM-DD` string for due-date comparison. */
@@ -133,21 +133,29 @@ export const getByPublicId = query({
 
 /**
  * Tenant-safe shape for the public invoice portal. No auth required — holding
- * the `accessToken` IS the authorization. Carries everything the tenant
- * checkout flow needs (including `invoiceId` and `agencyId`, which the
- * checkout actions consume) plus the derived Stellar `M…` destination
- * address. Excludes only system fields the tenant has no use for.
+ * the `accessToken` IS the authorization, so the read is gated on the token's
+ * whole lifecycle (expiry, revocation, rate limit), not merely on knowing it.
  *
  * Keyed on `accessToken`, never on `publicId`: the document number embeds the
  * last four digits of the agency's CNPJ, which is public record, so gating on
  * it let anyone who knew an agency enumerate that agency's invoices for any
  * month. The token is 160 CSPRNG bits (convex/lib/randomId.ts).
+ *
+ * The invoice's `_id` is deliberately NOT in this shape. It used to be, because
+ * the checkout actions authorized on it — which made a revoked token's holder
+ * still able to start real anchor orders from an id they had already been
+ * handed. Those actions now take the token, and the id has no reason to reach
+ * an unauthenticated caller.
  */
 export const getPublicByAccessToken = query({
   args: { accessToken: v.string() },
   handler: async (ctx, args) => {
-    const invoice = await findInvoiceByAccessToken(ctx, args.accessToken);
-    if (!invoice) return null;
+    const resolved = await resolveBearerInvoice(ctx, {
+      accessToken: args.accessToken,
+      nowMs: Date.now(),
+    });
+    if (!resolved.success) return null;
+    const { invoice } = resolved.data;
 
     const agency = await ctx.db.get(invoice.agencyId);
     if (!agency) return null;
@@ -155,7 +163,6 @@ export const getPublicByAccessToken = query({
     const muxedAddress = invoice.muxedId ? deriveInvoiceMuxedAddress(invoice.muxedId) : null;
 
     return {
-      invoiceId: invoice._id,
       agencyId: invoice.agencyId,
       publicId: invoice.publicId,
       agencyName: agency.name,
@@ -167,35 +174,6 @@ export const getPublicByAccessToken = query({
       method: await resolveInvoiceMethod(ctx, invoice._id),
       muxedAddress,
     };
-  },
-});
-
-/**
- * Internal companion to `getById` for actions that authorize by the
- * publicId-bearer model (tenant checkout) rather than by user identity.
- * The tenant has no session, so the identity-gated `getById` would always
- * return null post-Auth0. The action gates on chargeability instead.
- */
-export const getByIdInternal = internalQuery({
-  args: { invoiceId: v.id("invoices") },
-  handler: async (ctx, { invoiceId }) => {
-    return ctx.db.get(invoiceId);
-  },
-});
-
-/**
- * Internal — resolve a bearer token to its owning agency.
- *
- * The unauthenticated checkout actions need an `agencyId` but must never
- * accept one: the token is the only thing the payer has proven, so the agency
- * has to be derived from it server-side. Returns null for an unknown token so
- * callers cannot distinguish "no such invoice" from "not yours".
- */
-export const resolveAgencyByAccessToken = internalQuery({
-  args: { accessToken: v.string() },
-  handler: async (ctx, { accessToken }) => {
-    const invoice = await findInvoiceByAccessToken(ctx, accessToken);
-    return invoice ? { agencyId: invoice.agencyId, invoiceId: invoice._id } : null;
   },
 });
 

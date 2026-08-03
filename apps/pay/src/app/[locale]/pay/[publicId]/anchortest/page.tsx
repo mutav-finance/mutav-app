@@ -65,7 +65,7 @@ export default async function CheckoutAnchorTestPage({
         <ArrowLeft className="size-3" strokeWidth={1.5} />
         {t("back")}
       </Link>
-      <CheckoutAnchorTestView invoiceId={payment.invoiceId} totalCents={payment.totalCents} />
+      <CheckoutAnchorTestView invoiceAccessToken={accessToken} totalCents={payment.totalCents} />
     </div>
   );
 }

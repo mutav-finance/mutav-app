@@ -7,7 +7,6 @@ import type { FunctionReference } from "convex/server";
 import { api } from "@convex/_generated/api";
 import type { ProviderOrder, ProviderOrderId } from "@convex/payments/providers/orderDomain";
 import type { AgencyBankAccountId } from "@convex/payments/providers/bankAccountDomain";
-import type { InvoiceId } from "@convex/invoices/domain";
 
 type ProviderOrderStatus = ProviderOrder["status"];
 
@@ -40,7 +39,7 @@ type StartActionRef = FunctionReference<
   "action",
   "public",
   {
-    invoiceId: InvoiceId;
+    invoiceAccessToken: string;
     lang?: string;
     bankAccountId?: AgencyBankAccountId;
   },
@@ -55,7 +54,8 @@ type PollActionRef = FunctionReference<
 >;
 
 interface UseAnchorOnrampArgs {
-  invoiceId: InvoiceId;
+  /** The bearer credential from the checkout URL. The start actions authorize on it. */
+  invoiceAccessToken: string;
   startAction: StartActionRef;
   pollAction: PollActionRef;
   /** Forwarded as the SEP-24/SEP-6 `lang` field so the anchor renders its hosted UI in this locale. */
@@ -89,7 +89,7 @@ interface UseAnchorOnrampResult {
  * subscription are identical across providers.
  */
 export function useAnchorOnramp({
-  invoiceId,
+  invoiceAccessToken,
   startAction: startActionRef,
   pollAction: pollActionRef,
   lang,
@@ -140,7 +140,7 @@ export function useAnchorOnramp({
       setIsStarting(true);
       try {
         const result = await startAction({
-          invoiceId,
+          invoiceAccessToken,
           lang,
           bankAccountId: opts?.bankAccountId,
         });
@@ -158,7 +158,7 @@ export function useAnchorOnramp({
         setIsStarting(false);
       }
     },
-    [invoiceId, startAction, lang],
+    [invoiceAccessToken, startAction, lang],
   );
 
   const cancel = useCallback(() => {
