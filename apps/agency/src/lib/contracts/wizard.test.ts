@@ -3,12 +3,15 @@ import {
   isPropertyKind,
   isTenantEntityType,
   patchBlockDraft,
+  resolveScorePanelState,
   startBlockEdit,
   validateWizard,
   WIZARD_VIEWING,
   type DraftWizardData,
   type ReviewBlockKind,
 } from "@/lib/contracts/wizard";
+import en from "../../../messages/en.json";
+import ptBR from "../../../messages/pt-BR.json";
 
 const VALID_PF_DRAFT: DraftWizardData = {
   entityType: "pf",
@@ -166,6 +169,75 @@ describe("EditingState", () => {
     if (patched.kind !== "editing") throw new Error("expected editing state");
     expect(patched.draft).toEqual({ ...VALID_PF_DRAFT, rentCents: 300_000 });
   });
+});
+
+describe("resolveScorePanelState", () => {
+  const BOUND_AND_SCORED = {
+    documentDigits: "39053344705",
+    requestStatus: "cached",
+    cachedScore: 720,
+    requestedFor: "39053344705",
+  } as const;
+
+  test("a refused dispatch is its own state, not a blank score under the approved label", () => {
+    expect(
+      resolveScorePanelState({
+        ...BOUND_AND_SCORED,
+        requestStatus: "no_application",
+        cachedScore: null,
+      }),
+    ).toBe("noApplication");
+  });
+
+  test("no_application wins over the pending-query state — no score is ever coming", () => {
+    expect(
+      resolveScorePanelState({
+        ...BOUND_AND_SCORED,
+        requestStatus: "no_application",
+        cachedScore: undefined,
+      }),
+    ).toBe("noApplication");
+  });
+
+  test("loads while no document is typed, the query is in flight, or the pull is running", () => {
+    expect(resolveScorePanelState({ ...BOUND_AND_SCORED, documentDigits: "" })).toBe("loading");
+    expect(resolveScorePanelState({ ...BOUND_AND_SCORED, cachedScore: undefined })).toBe("loading");
+    expect(
+      resolveScorePanelState({
+        ...BOUND_AND_SCORED,
+        requestStatus: "fetching",
+        cachedScore: null,
+      }),
+    ).toBe("loading");
+  });
+
+  test("denies below the 400 threshold and scores at or above it", () => {
+    expect(resolveScorePanelState({ ...BOUND_AND_SCORED, cachedScore: 399 })).toBe("denied");
+    expect(resolveScorePanelState({ ...BOUND_AND_SCORED, cachedScore: 400 })).toBe("scored");
+  });
+
+  test("a resolved cache miss for another document is scored, not stuck loading", () => {
+    expect(
+      resolveScorePanelState({ ...BOUND_AND_SCORED, cachedScore: null, requestedFor: null }),
+    ).toBe("scored");
+  });
+});
+
+describe("contractNew.simulation messages", () => {
+  const NO_APPLICATION_KEYS = [
+    "noApplicationTitle",
+    "noApplicationMessage",
+    "noApplicationAction",
+  ] as const;
+
+  // pt-BR is the default locale, so its value is the one a real broker reads.
+  for (const [locale, messages] of Object.entries({ "pt-BR": ptBR, en })) {
+    test(`${locale} explains the refused consultation and offers a way out`, () => {
+      for (const key of NO_APPLICATION_KEYS) {
+        expect(messages.contractNew.simulation[key].length, `${locale}.${key}`).toBeGreaterThan(0);
+      }
+    });
+  }
 });
 
 describe("isTenantEntityType / isPropertyKind", () => {

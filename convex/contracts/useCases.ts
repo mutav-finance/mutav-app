@@ -603,30 +603,6 @@ function isSupportedTaxIdLength(digits: string): boolean {
   return digits.length === 11 || digits.length === 14;
 }
 
-export const getCachedCreditScore = queryWithAgencyScope({
-  args: { document: v.string() },
-  handler: async (ctx, { document }) => {
-    const digits = document.replace(/\D/g, "");
-    if (!isSupportedTaxIdLength(digits)) return null;
-
-    const subjectHash = await hashPii(digits);
-    const assessment = await findFreshAssessment(ctx, {
-      agencyId: ctx.agencyId,
-      subjectHash,
-      notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
-    });
-    if (
-      !assessment ||
-      assessment.status !== "ok" ||
-      assessment.score == null ||
-      assessment.tier == null
-    ) {
-      return null;
-    }
-    return { score: assessment.score, tier: assessment.tier };
-  },
-});
-
 /**
  * The agency's live declaration that it holds or is seeking a rental
  * relationship with this subject — the Lei 12.414 art. 15 precondition a
@@ -648,6 +624,43 @@ async function findBindingApplication(
     .order("desc")
     .first();
 }
+
+export const getCachedCreditScore = queryWithAgencyScope({
+  args: { document: v.string() },
+  handler: async (ctx, { document }) => {
+    const digits = document.replace(/\D/g, "");
+    if (!isSupportedTaxIdLength(digits)) return null;
+
+    const subjectHash = await hashPii(digits);
+    const now = Date.now();
+
+    // The cache is a bureau consultation the agency already paid for, so it
+    // is reachable only under the same art. 15 binding that authorised the
+    // pull. Without it the reader would learn whether this subject was ever
+    // consulted, and what it scored, from a cache probe alone.
+    const application = await findBindingApplication(ctx, {
+      agencyId: ctx.agencyId,
+      subjectHash,
+      notBefore: now - CONTRACT_APPLICATION_VALIDITY_MS,
+    });
+    if (!application) return null;
+
+    const assessment = await findFreshAssessment(ctx, {
+      agencyId: ctx.agencyId,
+      subjectHash,
+      notBefore: now - CREDIT_CACHE_TTL_MS,
+    });
+    if (
+      !assessment ||
+      assessment.status !== "ok" ||
+      assessment.score == null ||
+      assessment.tier == null
+    ) {
+      return null;
+    }
+    return { score: assessment.score, tier: assessment.tier };
+  },
+});
 
 type OpenContractApplicationSuccessResult = { applicationId: ContractApplicationId };
 type OpenContractApplicationErrorResult = { code: typeof CONTRACT_ERROR_CODE.INVALID_TAX_ID };
@@ -710,7 +723,8 @@ export const requestCreditScore = mutationWithAgencyScope({
 
     // Lei 12.414 art. 15: a consulente may only reach a bureau about someone
     // it holds or is seeking a commercial relationship with. Checked before
-    // the cache so an unbound caller learns nothing about prior pulls either.
+    // the cache here, and again on `getCachedCreditScore`, so an unbound
+    // caller learns nothing about prior pulls through either path.
     const application = await findBindingApplication(ctx, {
       agencyId: ctx.agencyId,
       subjectHash,

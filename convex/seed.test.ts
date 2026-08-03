@@ -173,6 +173,62 @@ describe("seedReset", () => {
     expect(newuser?.agencyStates).toEqual([]);
   });
 
+  test("preserves the application a retained credit signal is attributed to", async () => {
+    const t = setup();
+    // A bureau consultation and the art. 15 declaration that authorised it.
+    // `creditAnalysisSignals` is never wiped, so wiping the declaration would
+    // leave the retained signal pointing at a row that no longer exists.
+    const signalId = await t.run(async (ctx) => {
+      const agencyId = await ctx.db.insert("agencies", {
+        name: "Imobiliária Pré-Reseed",
+        cnpj: "11222333000181",
+        onboardingState: "active",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      });
+      const userId = await ctx.db.insert("users", {
+        publicId: "USR-PRERESEED",
+        email: "broker@example.com",
+        name: "Broker",
+        createdAt: "2026-08-01T00:00:00.000Z",
+      });
+      const applicationId = await ctx.db.insert("contractApplications", {
+        agencyId,
+        subjectHash: "hash-of-a-subject",
+        entityType: "pf",
+        propertyKind: "residencial",
+        cep: "01310100",
+        rentCents: 250_000,
+        openedBy: userId,
+        openedAt: 1_700_000_000_000,
+      });
+      return ctx.db.insert("creditAnalysisSignals", {
+        agencyId,
+        subjectType: "tenant",
+        subjectHash: "hash-of-a-subject",
+        capability: "credit_score",
+        provider: "mock",
+        status: "ok",
+        normalized: { score: 700, scale: 1000 },
+        correlationId: "corr-1",
+        windowKey: "2026-08-02",
+        pulledAt: 1_700_000_000_000,
+        applicationId,
+        legalBasis: "art7_x",
+      });
+    });
+
+    await t.mutation(internal.seed.seedReset, {});
+
+    const attribution = await t.run(async (ctx) => {
+      const signal = await ctx.db.get(signalId);
+      if (!signal?.applicationId) return null;
+      return ctx.db.get(signal.applicationId);
+    });
+    expect(attribution).not.toBeNull();
+    // And the reseed still produced the app data (wipe ran).
+    expect(await tenantCount(t)).toBeGreaterThan(0);
+  });
+
   test("preserves the waitlist (marketing leads) — the wipe is app-demo-only", async () => {
     const t = setup();
     // A real marketing lead present before a reseed must survive it.

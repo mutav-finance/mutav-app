@@ -283,6 +283,37 @@ describe("requestCreditScore / getCachedCreditScore", () => {
     expect(result.status).toBe("invalid");
   });
 
+  test("getCachedCreditScore refuses the cache once no application binds the agency to the subject", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, agencyId } = await seedBoundSubject(t, "12345678901");
+
+    await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+      agencyId,
+      document: "12345678901",
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const whileBound = await asUser.query(api.contracts.useCases.getCachedCreditScore, {
+      agencyId,
+      document: "12345678901",
+    });
+    expect(whileBound).not.toBeNull();
+
+    // Drop the art. 15 declaration but keep the assessment. A cache read that
+    // still answers would tell an unbound caller that this subject was pulled
+    // and what it scored — the leak the precondition on the cache path closes.
+    await t.run(async (ctx) => {
+      const applications = await ctx.db.query("contractApplications").collect();
+      for (const application of applications) await ctx.db.delete(application._id);
+    });
+
+    const whileUnbound = await asUser.query(api.contracts.useCases.getCachedCreditScore, {
+      agencyId,
+      document: "12345678901",
+    });
+    expect(whileUnbound).toBeNull();
+  });
+
   test("CNPJ (14-digit) also routes through creditAnalysis and yields a cached score", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
