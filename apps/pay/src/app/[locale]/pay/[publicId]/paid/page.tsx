@@ -7,6 +7,7 @@ import { Link, redirect } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
+import { fetchInvoiceDocumentNumber } from "@/lib/invoices/document-number";
 import { api } from "@convex/_generated/api";
 
 export async function generateMetadata({
@@ -14,10 +15,13 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; publicId: string }>;
 }) {
-  const { locale, publicId } = await params;
-  const t = await getTranslations({ locale, namespace: "checkout.pago.meta" });
+  const { locale, publicId: accessToken } = await params;
+  const [t, documentNumber] = await Promise.all([
+    getTranslations({ locale, namespace: "checkout.pago.meta" }),
+    fetchInvoiceDocumentNumber(accessToken),
+  ]);
   return {
-    title: t("title", { publicId }),
+    title: t("title", { publicId: documentNumber ?? "" }),
     description: t("description"),
   };
 }
@@ -34,15 +38,15 @@ export default async function CheckoutPaidPage({
 }: {
   params: Promise<{ publicId: string; locale: string }>;
 }) {
-  const { publicId, locale } = await params;
+  const { publicId: accessToken, locale } = await params;
   const preloaded = await preloadQuery(api.invoices.useCases.getPublicByAccessToken, {
-    accessToken: publicId,
+    accessToken,
   });
   const payment = preloadedQueryResult(preloaded);
   if (!payment) notFound();
 
   if (payment.state.kind !== "paid" && payment.state.kind !== "void") {
-    redirect({ href: `/pay/${publicId}`, locale });
+    redirect({ href: `/pay/${accessToken}`, locale });
   }
 
   const t = await getTranslations({ locale, namespace: "checkout.pago" });
@@ -118,7 +122,7 @@ export default async function CheckoutPaidPage({
           </Button>
         )}
         <Link
-          href={`/pay/${publicId}`}
+          href={`/pay/${accessToken}`}
           className="text-muted-foreground hover:text-foreground text-xs"
         >
           ← {tCommon("backToCheckout")}

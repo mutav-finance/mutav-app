@@ -8,16 +8,20 @@ import { Link, redirect } from "@mutav/i18n/navigation";
 import { Mono } from "@mutav/ui/mono";
 import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
 import { shouldShowTestanchor } from "@/lib/env";
+import { fetchInvoiceDocumentNumber } from "@/lib/invoices/document-number";
 
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ locale: string; publicId: string }>;
 }) {
-  const { locale, publicId } = await params;
-  const t = await getTranslations({ locale, namespace: "checkout.picker.meta" });
+  const { locale, publicId: accessToken } = await params;
+  const [t, documentNumber] = await Promise.all([
+    getTranslations({ locale, namespace: "checkout.picker.meta" }),
+    fetchInvoiceDocumentNumber(accessToken),
+  ]);
   return {
-    title: t("title", { publicId }),
+    title: t("title", { publicId: documentNumber ?? "" }),
     description: t("description"),
   };
 }
@@ -38,21 +42,21 @@ export default async function CheckoutPickerPage({
 }: {
   params: Promise<{ publicId: string; locale: string }>;
 }) {
-  const { publicId, locale } = await params;
+  const { publicId: accessToken, locale } = await params;
   const preloaded = await preloadQuery(api.invoices.useCases.getPublicByAccessToken, {
-    accessToken: publicId,
+    accessToken,
   });
   const payment = preloadedQueryResult(preloaded);
   if (!payment) notFound();
 
   if (payment.state.kind === "paid" || payment.state.kind === "void") {
-    redirect({ href: `/pay/${publicId}/paid`, locale });
+    redirect({ href: `/pay/${accessToken}/paid`, locale });
   }
   if (payment.method?.kind === "stellar") {
-    redirect({ href: `/pay/${publicId}/stellar`, locale });
+    redirect({ href: `/pay/${accessToken}/stellar`, locale });
   }
   if (payment.method?.kind === "pix") {
-    redirect({ href: `/pay/${publicId}/pix`, locale });
+    redirect({ href: `/pay/${accessToken}/pix`, locale });
   }
 
   const t = await getTranslations({ locale, namespace: "checkout.picker" });
@@ -84,14 +88,14 @@ export default async function CheckoutPickerPage({
           }
         >
           <MethodPickerCard
-            href={`/pay/${publicId}/pix`}
+            href={`/pay/${accessToken}/pix`}
             icon={<Banknote className="size-5" strokeWidth={1.25} />}
             title={t("pix.title")}
             subtitle={t("pix.subtitle")}
             duration={t("pix.duration")}
           />
           <MethodPickerCard
-            href={`/pay/${publicId}/stellar`}
+            href={`/pay/${accessToken}/stellar`}
             icon={<Coins className="size-5" strokeWidth={1.25} />}
             title={t("stellar.title")}
             subtitle={t("stellar.subtitle")}
@@ -99,7 +103,7 @@ export default async function CheckoutPickerPage({
           />
           {shouldShowTestanchor() ? (
             <MethodPickerCard
-              href={`/pay/${publicId}/anchortest`}
+              href={`/pay/${accessToken}/anchortest`}
               icon={<FlaskConical className="size-5" strokeWidth={1.25} />}
               title={t("anchortest.title")}
               subtitle={t("anchortest.subtitle")}
