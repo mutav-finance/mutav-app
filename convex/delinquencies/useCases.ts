@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { logError } from "../lib/logger";
 import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query } from "../_generated/server";
 import { assertAgencyAccess, queryWithAgencyScope, queryWithMutavRole } from "../lib/auth";
@@ -296,7 +297,7 @@ export const openStats = queryWithAgencyScope({
     const resolvedCountLast30d = resolvedRows.filter((notice) => {
       const resolvedAt = notice.resolution?.resolvedAt;
       if (resolvedAt == null) {
-        console.error(
+        logError(
           `[delinquencies.openStats] resolved notice ${notice.publicId} is missing its resolution envelope; skipping in 30d KPI.`,
         );
         return false;
@@ -307,7 +308,7 @@ export const openStats = queryWithAgencyScope({
     const canceledCountLast30d = canceledRows.filter((notice) => {
       const canceledAt = notice.cancellation?.canceledAt;
       if (canceledAt == null) {
-        console.error(
+        logError(
           `[delinquencies.openStats] canceled notice ${notice.publicId} is missing its cancellation envelope; skipping in 30d KPI.`,
         );
         return false;

@@ -40,6 +40,7 @@ import {
   getStellarNetwork,
   getTreasurySecret,
 } from "../../lib/env";
+import { logWarn } from "../../lib/logger";
 import { decryptSecret, encryptSecret } from "../../lib/secrets";
 import { getTreasurySigner } from "../../lib/stellarSigner";
 import { tenantToSep9Prefill, type TenantPrefill } from "./tenantPrefill";
@@ -927,7 +928,10 @@ async function tolerateAlreadyDone<T>(fn: () => Promise<T>, label: string): Prom
       const looksAlreadyDone =
         err.statusCode === 409 || err.message.toLowerCase().includes("already");
       if (looksAlreadyDone) {
-        console.warn(`[etherfuse] ${label} already done, continuing: ${err.message}`);
+        // The vendor's 409 text routinely embeds the customer it collided on
+        // ("customer with email … already exists"), so it goes through the
+        // redactor as context rather than interpolated into the message.
+        logWarn("[etherfuse] step already done, continuing", { label, error: err });
         return null;
       }
     }

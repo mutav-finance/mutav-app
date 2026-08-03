@@ -1,3 +1,4 @@
+import { logWarn } from "./logger";
 /**
  * Which score bureau provider to use for tenant score lookups.
  * Defaults to "mock" so deployments without credentials still work.
@@ -97,7 +98,7 @@ export function getMaxGuaranteeCapacityCents(): number {
   if (!raw) return 500_000_000;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    console.warn(
+    logWarn(
       `[env] MAX_GUARANTEE_CAPACITY_CENTS=${JSON.stringify(raw)} is not a positive integer; falling back to default`,
     );
     return 500_000_000;
