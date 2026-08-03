@@ -464,8 +464,14 @@ export default defineSchema(
       publicId: v.string(),
       // Bearer credential for the no-auth tenant checkout in `apps/pay`.
       // 160 CSPRNG bits; see convex/lib/randomId.ts for why it is a separate
-      // field from `publicId`.
-      accessToken: v.string(),
+      // field from `publicId`. Optional because invoices written before the
+      // field existed carry none: declaring it required would hand every read
+      // a `string` for rows that hold nothing, which is exactly the shape in
+      // which a bearer comparison passes on two absent values. Resolution goes
+      // through `invoices/lib/accessToken.ts`, which refuses a blank token —
+      // a tokenless row sits under the `undefined` key of `by_accessToken` and
+      // must stay unreachable from the wire.
+      accessToken: v.optional(v.string()),
       periodMonth: v.string(),
       issuedAt: v.string(),
       dueDate: v.string(),

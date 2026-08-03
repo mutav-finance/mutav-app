@@ -11,7 +11,12 @@ import type { Invoice } from "@convex/invoices/domain";
  * the `INV-…` document number by mistake: the pay routes resolve that segment
  * as the bearer credential, and the document number authorizes nothing
  * (LGPD-25).
+ *
+ * Null when the invoice predates `accessToken`: such a row has no credential
+ * to share, and a link built from an absent one would only hand the tenant a
+ * dead segment.
  */
-export function tenantCheckoutUrl(invoice: Pick<Invoice, "accessToken">): string {
+export function tenantCheckoutUrl(invoice: Pick<Invoice, "accessToken">): string | null {
+  if (!invoice.accessToken) return null;
   return `${getPayUrl()}/pay/${invoice.accessToken}`;
 }

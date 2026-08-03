@@ -23,12 +23,12 @@ function MethodRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-function ShareTenantLink({ payment }: { payment: Invoice }) {
+function ShareTenantLink({ checkoutUrl }: { checkoutUrl: string }) {
   const t = useTranslations("invoiceDetails.methodCard");
   const { copied, copy } = useCopyToClipboard(t("linkCopied"));
 
   const handleCopy = () => {
-    copy(tenantCheckoutUrl(payment));
+    copy(checkoutUrl);
   };
 
   return (
@@ -51,15 +51,18 @@ function ChargeableActions({
   variant: "primary" | "secondary";
 }) {
   const t = useTranslations("invoiceDetails.methodCard");
+  const checkoutUrl = tenantCheckoutUrl(payment);
+  if (!checkoutUrl) return null;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button asChild size="sm" variant={variant === "primary" ? "default" : "outline"}>
-        <a href={tenantCheckoutUrl(payment)} target="_blank" rel="noopener">
+        <a href={checkoutUrl} target="_blank" rel="noopener">
           {t("openCheckout")}
           <ExternalLink className="size-4" strokeWidth={1.25} />
         </a>
       </Button>
-      <ShareTenantLink payment={payment} />
+      <ShareTenantLink checkoutUrl={checkoutUrl} />
     </div>
   );
 }

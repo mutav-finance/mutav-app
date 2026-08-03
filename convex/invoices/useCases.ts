@@ -4,7 +4,8 @@ import { internalQuery, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { assertAgencyAccess, queryWithAgencyScope } from "../lib/auth";
 import type { SettlementMethod } from "../payments/domain";
-import { isChargeable, isOverdue, type InvoiceId } from "./domain";
+import { isChargeable, isOverdue, type Invoice, type InvoiceId } from "./domain";
+import { findInvoiceByAccessToken } from "./lib/accessToken";
 import { deriveInvoiceMuxedAddress } from "./lib/muxedAddress";
 
 /** Current UTC date as a `YYYY-MM-DD` string for due-date comparison. */
@@ -28,6 +29,43 @@ async function resolveInvoiceMethod(
   return settlements.find((p) => p.status === "succeeded")?.method ?? null;
 }
 
+type InvoiceSummary = Pick<
+  Invoice,
+  | "_id"
+  | "_creationTime"
+  | "agencyId"
+  | "publicId"
+  | "periodMonth"
+  | "issuedAt"
+  | "dueDate"
+  | "totalCents"
+  | "state"
+  | "lineItems"
+> & { method: SettlementMethod | null };
+
+/**
+ * Projection for the agency invoice table. An allowlist rather than an
+ * omission: a list read fans every row out into the RSC payload and the Convex
+ * client cache, so the bearer `accessToken` — and any credential field added
+ * later — has to be opted in, never opted out. The share link is built from
+ * the detail read, which is the one place a single token is actually wanted.
+ */
+function shapeInvoiceSummary(invoice: Invoice, method: SettlementMethod | null): InvoiceSummary {
+  return {
+    _id: invoice._id,
+    _creationTime: invoice._creationTime,
+    agencyId: invoice.agencyId,
+    publicId: invoice.publicId,
+    periodMonth: invoice.periodMonth,
+    issuedAt: invoice.issuedAt,
+    dueDate: invoice.dueDate,
+    totalCents: invoice.totalCents,
+    state: invoice.state,
+    lineItems: invoice.lineItems,
+    method,
+  };
+}
+
 export const listByAgency = queryWithAgencyScope({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
@@ -38,10 +76,9 @@ export const listByAgency = queryWithAgencyScope({
       .paginate(args.paginationOpts);
 
     const page = await Promise.all(
-      result.page.map(async (inv) => ({
-        ...inv,
-        method: await resolveInvoiceMethod(ctx, inv._id),
-      })),
+      result.page.map(async (invoice) =>
+        shapeInvoiceSummary(invoice, await resolveInvoiceMethod(ctx, invoice._id)),
+      ),
     );
     return { ...result, page };
   },
@@ -109,10 +146,7 @@ export const getByPublicId = query({
 export const getPublicByAccessToken = query({
   args: { accessToken: v.string() },
   handler: async (ctx, args) => {
-    const invoice = await ctx.db
-      .query("invoices")
-      .withIndex("by_accessToken", (q) => q.eq("accessToken", args.accessToken))
-      .unique();
+    const invoice = await findInvoiceByAccessToken(ctx, args.accessToken);
     if (!invoice) return null;
 
     const agency = await ctx.db.get(invoice.agencyId);
@@ -160,10 +194,7 @@ export const getByIdInternal = internalQuery({
 export const resolveAgencyByAccessToken = internalQuery({
   args: { accessToken: v.string() },
   handler: async (ctx, { accessToken }) => {
-    const invoice = await ctx.db
-      .query("invoices")
-      .withIndex("by_accessToken", (q) => q.eq("accessToken", accessToken))
-      .unique();
+    const invoice = await findInvoiceByAccessToken(ctx, accessToken);
     return invoice ? { agencyId: invoice.agencyId, invoiceId: invoice._id } : null;
   },
 });

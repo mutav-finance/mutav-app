@@ -34,6 +34,12 @@ describe("tenantCheckoutUrl", () => {
     expect(url).not.toContain("INV-");
   });
 
+  it("yields no link at all for an invoice that predates the access token", () => {
+    vi.stubEnv("NEXT_PUBLIC_PAY_URL", "https://pay.mutav.finance");
+
+    expect(tenantCheckoutUrl({ accessToken: undefined })).toBeNull();
+  });
+
   it("falls back to the pay app's dev origin when NEXT_PUBLIC_PAY_URL is unset", () => {
     vi.stubEnv("NEXT_PUBLIC_PAY_URL", undefined);
 

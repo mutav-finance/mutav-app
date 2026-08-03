@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery, query } from "../../_generated/server";
+import { findInvoiceByAccessToken } from "../../invoices/lib/accessToken";
 import { queryWithAgencyScope } from "../../lib/auth";
 import {
   agencyBankAccountTypeValidator,
@@ -54,10 +55,7 @@ function shapeTenantVisibleBankAccount(account: AgencyBankAccount): TenantVisibl
 export const listBanksForInvoice = query({
   args: { invoiceAccessToken: v.string() },
   handler: async (ctx, { invoiceAccessToken }): Promise<TenantVisibleBankAccount[]> => {
-    const invoice = await ctx.db
-      .query("invoices")
-      .withIndex("by_accessToken", (q) => q.eq("accessToken", invoiceAccessToken))
-      .unique();
+    const invoice = await findInvoiceByAccessToken(ctx, invoiceAccessToken);
     if (!invoice) return [];
     const accounts = await ctx.db
       .query("agencyBankAccounts")
