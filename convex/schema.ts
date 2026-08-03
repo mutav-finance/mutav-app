@@ -649,8 +649,10 @@ export default defineSchema(
       .index("by_agency_kind", ["agencyId", "kind"]),
 
     // Server-side claim on a national document (CPF | CNPJ). The row stores
-    // only the HMAC-SHA256 of the document (`hashPii(digits)`); the
-    // plaintext lives only in the encrypted columns of the owning agency.
+    // only the HMAC-SHA256 of the document (`hashPii(digits)`); the plaintext
+    // lives in the owning agency's `cpf`/`cnpj` columns, still plaintext at
+    // rest pilot-stage — they become envelopes when the PII encryption
+    // migration (#94) lands.
     // Inserted by `submitOnboarding` *before* patching the agency state, so
     // two concurrent submissions for the same document race on the same
     // `by_documentHash` row — Convex OCC serializes, the loser fails its
