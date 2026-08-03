@@ -458,7 +458,20 @@ export default defineSchema(
 
     invoices: defineTable({
       agencyId: v.id("agencies"),
+      // Human-readable document number (`INV-{period}-{last4 of agency CNPJ}`).
+      // Derived from public-record data, so it is a REFERENCE, never a
+      // credential — nothing unauthenticated may be gated on knowing it.
       publicId: v.string(),
+      // Bearer credential for the no-auth tenant checkout in `apps/pay`.
+      // 160 CSPRNG bits; see convex/lib/randomId.ts for why it is a separate
+      // field from `publicId`. Optional because invoices written before the
+      // field existed carry none: declaring it required would hand every read
+      // a `string` for rows that hold nothing, which is exactly the shape in
+      // which a bearer comparison passes on two absent values. Resolution goes
+      // through `invoices/lib/accessToken.ts`, which refuses a blank token —
+      // a tokenless row sits under the `undefined` key of `by_accessToken` and
+      // must stay unreachable from the wire.
+      accessToken: v.optional(v.string()),
       periodMonth: v.string(),
       issuedAt: v.string(),
       dueDate: v.string(),
@@ -480,6 +493,7 @@ export default defineSchema(
       .index("by_agency_period", ["agencyId", "periodMonth"])
       .index("by_state_kind", ["state.kind"])
       .index("by_publicId", ["publicId"])
+      .index("by_accessToken", ["accessToken"])
       .index("by_muxedId", ["muxedId"]),
 
     // Settlement record — one row per settlement attempt against an invoice;

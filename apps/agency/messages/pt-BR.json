@@ -932,7 +932,8 @@
       "errors": {
         "INVALID_TAX_ID": "Documento do inquilino inválido (CPF/CNPJ). Verifique o número e tente novamente.",
         "TENANT_DENIED": "O score de crédito do inquilino foi negado. Não é possível criar o contrato.",
-        "INVALID_RENT": "Valores inválidos. O aluguel deve ser maior que zero."
+        "INVALID_RENT": "Valores inválidos. O aluguel deve ser maior que zero.",
+        "CREDIT_ASSESSMENT_REQUIRED": "A análise de crédito deste inquilino expirou. Refaça a consulta antes de criar o contrato."
       },
       "missingFields": "Preencha todos os campos obrigatórios antes de confirmar.",
       "editBlock": "Editar dados",
@@ -975,6 +976,7 @@
       "description": "Pague a fatura Mutav via rede Stellar."
     },
     "shell": {
+      "brand": "mutav",
       "paymentLabel": "Fatura",
       "footerBrand": "Mutav · Protocolo de Garantia de Aluguel"
     },

@@ -58,6 +58,7 @@ describe("getOverdueCount — open + past-due counts as overdue", () => {
       await ctx.db.insert("invoices", {
         ...base,
         publicId: "INV-OVERDUE",
+        accessToken: "TOK-FIXTURE-01",
         dueDate: "2026-04-10",
         state: InvoiceStates.open(),
       });
@@ -65,6 +66,7 @@ describe("getOverdueCount — open + past-due counts as overdue", () => {
       await ctx.db.insert("invoices", {
         ...base,
         publicId: "INV-FUTURE",
+        accessToken: "TOK-FIXTURE-02",
         dueDate: "2026-12-10",
         state: InvoiceStates.open(),
       });
@@ -72,6 +74,7 @@ describe("getOverdueCount — open + past-due counts as overdue", () => {
       await ctx.db.insert("invoices", {
         ...base,
         publicId: "INV-PAID",
+        accessToken: "TOK-FIXTURE-03",
         dueDate: "2026-04-10",
         state: InvoiceStates.paid("2026-04-08"),
       });

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { INVOICE_LINE_ITEM_KIND, InvoiceStates } from "./invoices/domain";
 import { generateInvoiceMuxedId } from "./invoices/lib/muxedId";
+import { generateInvoiceAccessToken } from "./lib/randomId";
 import { SettlementMethods, type SettlementMethod } from "./payments/domain";
 import type { AgencyId } from "./agencies/domain";
 import {
@@ -155,6 +156,7 @@ async function seedPaidInvoice(
     dueDate: invoice.dueDate,
     totalCents: invoice.totalCents,
     state: InvoiceStates.paid(invoice.paidAt),
+    accessToken: generateInvoiceAccessToken(),
     muxedId: generateInvoiceMuxedId(),
     lineItems: invoice.lineItems,
   });
@@ -2084,6 +2086,7 @@ async function seedFictional(
       dueDate: "2026-02-10",
       totalCents: h2026Feb.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
+      accessToken: generateInvoiceAccessToken(),
       muxedId: generateInvoiceMuxedId(),
       lineItems: h2026Feb,
     });
@@ -2128,6 +2131,7 @@ async function seedFictional(
       dueDate: "2026-03-10",
       totalCents: h2026Mar.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
+      accessToken: generateInvoiceAccessToken(),
       muxedId: generateInvoiceMuxedId(),
       lineItems: h2026Mar,
     });
@@ -2173,6 +2177,7 @@ async function seedFictional(
       dueDate: "2026-04-10",
       totalCents: horizonteAprLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
+      accessToken: generateInvoiceAccessToken(),
       muxedId: generateInvoiceMuxedId(),
       lineItems: horizonteAprLineItems,
     });
@@ -2186,6 +2191,7 @@ async function seedFictional(
       dueDate: "2026-05-10",
       totalCents: paulistaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
+      accessToken: generateInvoiceAccessToken(),
       muxedId: generateInvoiceMuxedId(),
       lineItems: paulistaMayLineItems,
     });
@@ -2199,6 +2205,7 @@ async function seedFictional(
       dueDate: "2026-05-10",
       totalCents: atlanticaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
+      accessToken: generateInvoiceAccessToken(),
       muxedId: generateInvoiceMuxedId(),
       lineItems: atlanticaMayLineItems,
     });
@@ -2212,6 +2219,7 @@ async function seedFictional(
       dueDate: "2026-05-10",
       totalCents: horizonteMayLineItems.reduce((s, x) => s + x.amountCents, 0),
       state: InvoiceStates.open(),
+      accessToken: generateInvoiceAccessToken(),
       muxedId: generateInvoiceMuxedId(),
       lineItems: horizonteMayLineItems,
     });
@@ -2258,6 +2266,7 @@ async function seedFictional(
         dueDate: "2026-05-20",
         totalCents: t.amountCents,
         state: InvoiceStates.open(),
+        accessToken: generateInvoiceAccessToken(),
         muxedId: generateInvoiceMuxedId(),
         lineItems: [
           {
@@ -2746,6 +2755,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     dueDate: "2026-05-10",
     totalCents: may.reduce((s, x) => s + x.amountCents, 0),
     state: InvoiceStates.open(),
+    accessToken: generateInvoiceAccessToken(),
     muxedId: generateInvoiceMuxedId(),
     lineItems: may,
   });

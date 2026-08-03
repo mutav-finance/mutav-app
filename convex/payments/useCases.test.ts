@@ -21,6 +21,7 @@ describe("payments.settlement.recordSettlement (idempotency)", () => {
       ctx.db.insert("invoices", {
         agencyId,
         publicId: "INV-idem-1",
+        accessToken: "TOK-FIXTURE-01",
         periodMonth: "2026-05",
         issuedAt: new Date().toISOString(),
         dueDate: new Date().toISOString(),
@@ -67,6 +68,7 @@ describe("payments.useCases.listByInvoice (scoping)", () => {
       const invoiceId = await ctx.db.insert("invoices", {
         agencyId,
         publicId: "INV-scope-1",
+        accessToken: "TOK-FIXTURE-02",
         periodMonth: "2026-05",
         issuedAt: new Date().toISOString(),
         dueDate: new Date().toISOString(),
@@ -103,6 +105,7 @@ describe("payments.useCases.listByInvoice (scoping)", () => {
       const foreignInvoiceId = await ctx.db.insert("invoices", {
         agencyId: foreignAgencyId,
         publicId: "INV-foreign-1",
+        accessToken: "TOK-FIXTURE-03",
         periodMonth: "2026-05",
         issuedAt: new Date().toISOString(),
         dueDate: new Date().toISOString(),
@@ -138,6 +141,7 @@ describe("payments dual-write (markPaidByTx)", () => {
       ctx.db.insert("invoices", {
         agencyId,
         publicId: "INV-dualwrite-1",
+        accessToken: "TOK-FIXTURE-04",
         periodMonth: "2026-05",
         issuedAt: new Date().toISOString(),
         dueDate: new Date().toISOString(),
@@ -177,6 +181,7 @@ describe("payments idempotency (markPaidByTx replays)", () => {
       ctx.db.insert("invoices", {
         agencyId,
         publicId: "INV-idem-replay-1",
+        accessToken: "TOK-FIXTURE-05",
         periodMonth: "2026-05",
         issuedAt: new Date().toISOString(),
         dueDate: new Date().toISOString(),

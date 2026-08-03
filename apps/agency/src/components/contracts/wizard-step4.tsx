@@ -106,7 +106,6 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             birthDate: "",
             email: tenant.email,
             phone: tenant.phone,
-            score: tenant.score,
           }
         : {
             entityType: tenant.entityType,
@@ -116,7 +115,6 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
             birthDate: tenant.birthDate,
             email: tenant.email,
             phone: tenant.phone,
-            score: tenant.score,
           };
 
     setIsSubmitting(true);

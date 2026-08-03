@@ -1,4 +1,7 @@
 import type { convexTest } from "convex-test";
+import type { AgencyId } from "../agencies/domain";
+import { tierForScore } from "../contracts/domain";
+import { hashPii } from "./pii";
 import aggregateComponentSchema from "../../node_modules/@convex-dev/aggregate/src/component/schema";
 import migrationsComponentSchema from "../../node_modules/@convex-dev/migrations/src/component/schema";
 
@@ -106,6 +109,33 @@ export async function seedForeignAgency(t: ReturnType<typeof convexTest>) {
       agencyType: "empresa",
       onboardingState: "active",
       createdAt: new Date().toISOString(),
+    }),
+  );
+}
+
+/**
+ * Record a fresh, successful credit assessment for a tenant document.
+ *
+ * `contracts.create` re-reads the score from this row rather than trusting the
+ * caller, so any test that creates a contract has to establish the assessment
+ * the agency would really have pulled first.
+ */
+export async function seedFreshCreditAssessment(
+  t: ReturnType<typeof convexTest>,
+  args: { agencyId: AgencyId; document: string; score: number },
+) {
+  const subjectHash = await hashPii(args.document.replace(/\D/g, ""));
+  return t.run((ctx) =>
+    ctx.db.insert("creditAnalysisAssessments", {
+      agencyId: args.agencyId,
+      subjectType: "tenant",
+      subjectHash,
+      policyVersion: "test",
+      signalIds: [],
+      status: "ok",
+      score: args.score,
+      tier: tierForScore(args.score),
+      assessedAt: Date.now(),
     }),
   );
 }
