@@ -6,6 +6,7 @@ import { AUDIT_ACTION, auditActorValidator, type AuditActor } from "../audit/dom
 import { appendAuditEntry } from "../audit/useCases";
 import { queryWithAgencyScope } from "../lib/auth";
 import { digitsOnly } from "../lib/taxId";
+import { agencySubmittedTenant } from "../contracts/tenantIdentity";
 import {
   TENANT_ENTITY_TYPE,
   tenantInputValidator,
@@ -138,6 +139,12 @@ export const getByIdInternal = internalQuery({
  * `null` — indistinguishable by design, so there is no existence leak.
  * `contactCpf` is deliberately NOT an identity key: a pj tenant's contact
  * CPF never resolves company data into a pf flow.
+ *
+ * The values returned are the caller's OWN latest submission, resolved from
+ * its contract creation snapshot — never the shared registry row, which keeps
+ * its first writer's values and would hand this agency another one's contact
+ * data (LGPD-26). The registry is the fallback only for contracts that predate
+ * the snapshot.
  */
 export const lookupTenantByTaxId = queryWithAgencyScope({
   args: { taxId: v.string() },
@@ -151,13 +158,19 @@ export const lookupTenantByTaxId = queryWithAgencyScope({
       .unique();
     if (!tenant) return null;
 
-    const relatedContract = await ctx.db
+    const relatedContracts = await ctx.db
       .query("contracts")
       .withIndex("by_agency_tenant", (q) =>
         q.eq("agencyId", ctx.agencyId).eq("tenantId", tenant._id),
       )
-      .first();
-    if (!relatedContract) return null;
+      .order("desc")
+      .collect();
+    if (relatedContracts.length === 0) return null;
+
+    for (const contract of relatedContracts) {
+      const submitted = await agencySubmittedTenant(ctx, contract);
+      if (submitted) return { fullName: submitted.fullName, email: submitted.email };
+    }
 
     return { fullName: tenant.fullName, email: tenant.email };
   },

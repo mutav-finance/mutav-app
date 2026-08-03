@@ -123,6 +123,32 @@ export function tenantInputFromSubmission(submission: TenantSubmission): TenantI
 }
 
 /**
+ * The registry row as a write-shaped value — drops the system fields so a
+ * caller can hand the same union to readers that also accept an agency's own
+ * submission. Fallback only: the registry is shared across agencies (LGPD-26).
+ */
+export function tenantInputFromRegistry(tenant: Tenant): TenantInput {
+  if (tenant.entityType === TENANT_ENTITY_TYPE.PJ) {
+    return {
+      entityType: TENANT_ENTITY_TYPE.PJ,
+      taxId: tenant.taxId,
+      fullName: tenant.fullName,
+      ...(tenant.contactCpf === undefined ? {} : { contactCpf: tenant.contactCpf }),
+      email: tenant.email,
+      phone: tenant.phone,
+    };
+  }
+  return {
+    entityType: TENANT_ENTITY_TYPE.PF,
+    taxId: tenant.taxId,
+    fullName: tenant.fullName,
+    birthDate: tenant.birthDate,
+    email: tenant.email,
+    phone: tenant.phone,
+  };
+}
+
+/**
  * Legacy embedded `contracts.tenant` shape relevant to registry
  * normalization (approval/score fields stay contract-level).
  */

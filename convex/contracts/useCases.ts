@@ -38,8 +38,10 @@ import {
   normalizeEmbeddedTenant,
   tenantEntityTypeValidator,
   tenantInputFromSubmission,
+  tenantInputFromRegistry,
   TENANT_ERROR_CODE,
 } from "../tenants/domain";
+import { agencySubmittedTenant } from "./tenantIdentity";
 import { getOrCreateTenant } from "../tenants/useCases";
 import type { Result } from "../lib/result";
 import { findFreshAssessment } from "../creditAnalysis/useCases";
@@ -92,9 +94,14 @@ export const getByPublicId = query({
         throw new Error(`Contract ${contract.publicId} references a missing tenants row`);
       }
 
+      // Scoped by agency, not by publicId alone: publicId carries no DB-level
+      // uniqueness constraint, so `by_contract` would fold another agency's
+      // history rows — username and message included — into this response.
       const history = await ctx.db
         .query("contractHistory")
-        .withIndex("by_contract", (q) => q.eq("contractPublicId", args.publicId))
+        .withIndex("by_agency_contract", (q) =>
+          q.eq("agencyId", contract.agencyId).eq("contractPublicId", args.publicId),
+        )
         .order("desc")
         // Hard cap; if contracts exceed 100 history entries we'll need pagination.
         .take(100);
@@ -126,26 +133,30 @@ export const getByPublicIdInternal = internalQuery({
 });
 
 /**
- * The tenant identity the owning agency itself submitted, frozen on its
- * contract creation event. The registry row is shared by every agency
- * transacting with that tax ID and keeps its first writer's values, so it is
- * not what a later agency may read back (LGPD-26). `null` for contracts
- * created before the snapshot existed — those fall back to the registry.
+ * Tenant identity for a contract as the *owning* agency submitted it, for
+ * actions that have no `ctx.db` (anchor SEP-9 prefill). Never returns the
+ * shared registry row while a submission exists: the registry keeps its first
+ * writer's values and is write-once, so shipping it to a third-party anchor
+ * would disclose another agency's contact data and freeze a stale one
+ * (LGPD-26). Falls back to the registry only for contracts predating the
+ * snapshot.
  */
-async function agencySubmittedTenant(
-  ctx: QueryCtx,
-  contract: Contract,
-): Promise<TenantInput | null> {
-  const creation = await ctx.db
-    .query("contractHistory")
-    .withIndex("by_agency_contract", (q) =>
-      q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
-    )
-    .order("asc")
-    .first();
-  const snapshot = creation?.tenantSnapshot;
-  return snapshot ? tenantInputFromSubmission(snapshot) : null;
-}
+export const getTenantIdentityInternal = internalQuery({
+  args: { publicId: v.string() },
+  handler: async (ctx, { publicId }): Promise<TenantInput | null> => {
+    const contract = await ctx.db
+      .query("contracts")
+      .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
+      .unique();
+    if (!contract) return null;
+
+    const submitted = await agencySubmittedTenant(ctx, contract);
+    if (submitted) return submitted;
+
+    const tenant = await ctx.db.get(contract.tenantId);
+    return tenant ? tenantInputFromRegistry(tenant) : null;
+  },
+});
 
 /**
  * Resolve each contract's tenant display name. One get per UNIQUE tenantId

@@ -11,6 +11,7 @@ import {
   type SeededUserId,
   seedFreshCreditAssessment,
 } from "../lib/testFixtures";
+import { tenantToSep9Prefill } from "../payments/providers/tenantPrefill";
 import schema from "../schema";
 import { normalizeEmbeddedTenant, type TenantInput } from "./domain";
 import { getOrCreateTenant } from "./useCases";
@@ -657,6 +658,72 @@ describe("cross-agency tenant identity", () => {
     if (rows[0].entityType === "pf") {
       expect(rows[0].birthDate).toBe("1990-05-12");
     }
+  });
+
+  test("the prefill lookup gives agency B its own submitted contact data, never agency A's", async () => {
+    const t = setup();
+    const { a, b, agencyA, agencyB } = await bothAgenciesRegisterTheSameCpf(t);
+
+    const prefillB = await b.asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+      agencyId: agencyB,
+      taxId: VALID_CPF,
+    });
+    const prefillA = await a.asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
+      agencyId: agencyA,
+      taxId: VALID_CPF,
+    });
+
+    expect(prefillB).toEqual({
+      fullName: "Maria S. Nascimento",
+      email: "maria@agencia-b.example.com",
+    });
+    expect(prefillA).toEqual({
+      fullName: "Maria Silva Santos",
+      email: "maria@agencia-a.example.com",
+    });
+  });
+
+  test("the contract detail history excludes another agency's rows under the same publicId", async () => {
+    const t = setup();
+    const { b, agencyA, createdB } = await bothAgenciesRegisterTheSameCpf(t);
+
+    // publicId carries no DB-level uniqueness constraint, so a collision across
+    // agencies is a real state — seed re-runs already produce them.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("contractHistory", {
+        agencyId: agencyA,
+        contractPublicId: createdB.data.publicId,
+        at: "2025-01-01T00:00:00-03:00",
+        username: "Owner A",
+        message: "Agency A internal note",
+      });
+    });
+
+    const contract = await b.asUser.query(api.contracts.useCases.getByPublicId, {
+      publicId: createdB.data.publicId,
+    });
+
+    expect(contract?.history.map((entry) => entry.username)).toEqual(["Owner B"]);
+    expect(contract?.history.map((entry) => entry.message)).not.toContain("Agency A internal note");
+  });
+
+  test("the anchor SEP-9 prefill carries agency B's own submitted contact data", async () => {
+    const t = setup();
+    const { createdB } = await bothAgenciesRegisterTheSameCpf(t);
+
+    // The two steps `resolveTenantPrefill` composes inside the anchor action.
+    const identity = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+      publicId: createdB.data.publicId,
+    });
+    expect(identity).not.toBeNull();
+    if (!identity) return;
+
+    expect(tenantToSep9Prefill(identity)).toEqual({
+      first_name: "Maria",
+      last_name: "S. Nascimento",
+      email_address: "maria@agencia-b.example.com",
+      id_number: VALID_CPF,
+    });
   });
 
   test("the divergence appends one audit entry attributed to the second agency's user", async () => {
