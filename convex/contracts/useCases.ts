@@ -12,7 +12,7 @@ import type {
   ContractId,
 } from "./domain";
 import type { AgencyId } from "../agencies/domain";
-import type { Tenant, TenantId, TenantInput } from "../tenants/domain";
+import type { Tenant, TenantInput } from "../tenants/domain";
 import {
   ativoInsuredCentsPlatform,
   contractsByStatus,
@@ -104,9 +104,18 @@ export const getByPublicId = query({
         // Hard cap; if contracts exceed 100 history entries we'll need pagination.
         .take(100);
 
+      // No fallback to `tenant`. The registry row keeps its first writer's
+      // values, so serving it here shows this agency whatever the *other*
+      // agency submitted for the same person — the disclosure this domain
+      // exists to prevent. Every contract carries its own submission
+      // (`contracts.create` in production, `attachTenantSnapshots` in seed),
+      // so an absent one is corrupted data, not a case to paper over.
       const submitted = await agencySubmittedTenant(ctx, contract);
+      if (!submitted) {
+        throw new Error(`Contract ${contract.publicId} has no tenant submission of its own`);
+      }
 
-      return shapeContract(contract, submitted ?? tenant, history);
+      return shapeContract(contract, submitted, history);
     }
 
     return null;
@@ -163,30 +172,23 @@ export const getTenantIdentityInternal = internalQuery({
 });
 
 /**
- * Resolve each contract's tenant display name. One get per UNIQUE tenantId
- * keeps the registry join O(unique tenants) instead of O(rows); the
- * per-contract creation snapshot then overrides it wherever the agency
- * submitted its own name. A registry miss is an FK-integrity violation
- * (`tenantId` is required, registry rows are never deleted), so it throws.
+ * Resolve each contract's tenant display name from the identity the listing
+ * agency itself submitted. The shared `tenants` registry is deliberately not
+ * consulted: it holds its first writer's values, so reading it here would put
+ * another agency's version of the same person in this agency's list.
  */
 async function tenantNamesByContract(
   ctx: QueryCtx,
   docs: readonly Contract[],
 ): Promise<Map<ContractId, string>> {
-  const registryNames = new Map<TenantId, string>();
-  await Promise.all(
-    [...new Set(docs.map((doc) => doc.tenantId))].map(async (tenantId) => {
-      const tenant = await ctx.db.get(tenantId);
-      if (!tenant) throw new Error(`Contracts reference a missing tenants row ${tenantId}`);
-      registryNames.set(tenantId, tenant.fullName);
-    }),
-  );
-
   const names = new Map<ContractId, string>();
   await Promise.all(
     docs.map(async (doc) => {
       const submitted = await agencySubmittedTenant(ctx, doc);
-      names.set(doc._id, submitted?.fullName ?? registryNames.get(doc.tenantId) ?? "");
+      // Blank rather than the registry name: a list row showing the name the
+      // *other* agency submitted is the same disclosure as the detail view,
+      // just quieter.
+      names.set(doc._id, submitted?.fullName ?? "");
     }),
   );
   return names;
