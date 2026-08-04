@@ -223,7 +223,7 @@ For every hit, walk back to the entry-point action and decide tenant vs staff. T
 
 Wrapped:
 
-- `convex/contracts/useCases.ts` — `getByPublicId`, `listByAgency`, `getPipelineSummary`, `countByMonth`, `lookupTenantByCpf`, `create`, `cancelProposal` (+ `getByPublicIdInternal` companion for tenant prefill)
+- `convex/contracts/useCases.ts` — `getByPublicId`, `listByAgency`, `getPipelineSummary`, `countByMonth`, `lookupTenantByCpf`, `create`, `cancelProposal` (+ `getTenantIdentityInternal` companion for tenant prefill, scoped by `agencyId`)
 - `convex/payments/useCases.ts` — `listByAgency`, `getById`, `getByPublicId`, `getNextPendingPayment` (+ `getByIdInternal` companion for tenant onramp actions)
 - `convex/agencies/useCases.ts` — `getById`, `listAgenciesForUser` (+ `getByIdInternal` companion for internal actions)
 - `convex/anchors/orderUseCases.ts` — `getOrderById` (resource-by-id pattern; + `getOrderByIdInternal` companion for webhook + scheduler pollers)
