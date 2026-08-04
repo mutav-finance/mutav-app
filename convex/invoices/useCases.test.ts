@@ -19,7 +19,12 @@ async function seedInvoice(
       publicId: args.publicId,
       // Spread rather than assign so a legacy row has no `accessToken` key at
       // all — that, not an empty string, is what predates the field.
-      ...(args.accessToken === undefined ? {} : { accessToken: args.accessToken }),
+      ...(args.accessToken === undefined
+        ? {}
+        : {
+            accessToken: args.accessToken,
+            accessTokenExpiresAt: Date.now() + 86_400_000,
+          }),
       periodMonth: "2026-07",
       issuedAt: "2026-07-01",
       dueDate: "2026-07-10",
@@ -120,15 +125,16 @@ describe("invoices bearer resolution — a tokenless row is unreachable", () => 
     ).toBeNull();
   });
 
-  test("resolveAgencyByAccessToken returns null for a blank token while a tokenless invoice exists", async () => {
+  test("consumeBearerAccess refuses a blank token while a tokenless invoice exists", async () => {
     const t = convexTest(schema);
     const { userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedInvoice(t, { agencyId, publicId: "INV-LEGACY-0002" });
 
-    expect(
-      await t.query(internal.invoices.useCases.resolveAgencyByAccessToken, { accessToken: "" }),
-    ).toBeNull();
+    const result = await t.mutation(internal.invoices.mutations.consumeBearerAccess, {
+      accessToken: "",
+    });
+    expect(result.success).toBe(false);
   });
 
   test("listBanksForInvoice returns no banks for a blank token while a tokenless invoice exists", async () => {

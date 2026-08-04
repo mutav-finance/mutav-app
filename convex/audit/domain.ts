@@ -50,6 +50,8 @@ export const AUDIT_ACTION = {
   INVOICE_METHOD_SET: "invoice.method_set",
   INVOICE_PAID: "invoice.paid",
   INVOICE_RESET: "invoice.reset",
+  INVOICE_ACCESS_REVOKED: "invoice.access_revoked",
+  INVOICE_ACCESS_ROTATED: "invoice.access_rotated",
   // mutavStaff/ (admin onboarding review — emitted by convex/mutavStaff/useCases.ts).
   ONBOARDING_REVIEWED: "onboarding.reviewed",
   // mutavStaff/ (admin staff-role provisioning — emitted by convex/mutavStaff/useCases.ts).
@@ -83,6 +85,8 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.INVOICE_METHOD_SET),
   v.literal(AUDIT_ACTION.INVOICE_PAID),
   v.literal(AUDIT_ACTION.INVOICE_RESET),
+  v.literal(AUDIT_ACTION.INVOICE_ACCESS_REVOKED),
+  v.literal(AUDIT_ACTION.INVOICE_ACCESS_ROTATED),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
   v.literal(AUDIT_ACTION.STAFF_CREATED),
   v.literal(AUDIT_ACTION.STAFF_DELETED),

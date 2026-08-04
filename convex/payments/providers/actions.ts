@@ -54,7 +54,7 @@ import {
   type ProviderOrderId,
 } from "./orderDomain";
 import type { AgencyBankAccountId } from "./bankAccountDomain";
-import { isChargeable } from "../../invoices/domain";
+import { isChargeable, type BearerDenialReason } from "../../invoices/domain";
 
 type CurrencyStatus = "live" | "dead" | "test" | "private";
 
@@ -290,6 +290,7 @@ export const ANCHOR_START_ERROR_CODE = {
   ANCHOR_REJECTED: "ANCHOR_REJECTED",
   ANCHOR_RESPONSE_INVALID: "ANCHOR_RESPONSE_INVALID",
   NO_BANK_ACCOUNT: "NO_BANK_ACCOUNT",
+  RATE_LIMITED: "RATE_LIMITED",
   INTERNAL: "INTERNAL",
 } as const;
 
@@ -304,8 +305,22 @@ const anchorStartErrorCodeValidator = v.union(
   v.literal(ANCHOR_START_ERROR_CODE.ANCHOR_REJECTED),
   v.literal(ANCHOR_START_ERROR_CODE.ANCHOR_RESPONSE_INVALID),
   v.literal(ANCHOR_START_ERROR_CODE.NO_BANK_ACCOUNT),
+  v.literal(ANCHOR_START_ERROR_CODE.RATE_LIMITED),
   v.literal(ANCHOR_START_ERROR_CODE.INTERNAL),
 );
+
+/**
+ * Collapse every bearer denial except the rate limit into `PAYMENT_NOT_FOUND`.
+ * An unauthenticated caller learns only that the link no longer works, never
+ * whether the invoice exists, whether the token expired or whether someone
+ * revoked it. The rate limit is reported honestly because it is the one
+ * denial a legitimate payer can act on by waiting.
+ */
+function bearerDenialToStartError(code: BearerDenialReason): AnchorStartErrorCode {
+  return code === "RATE_LIMITED"
+    ? ANCHOR_START_ERROR_CODE.RATE_LIMITED
+    : ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND;
+}
 
 interface AnchorStartError {
   code: AnchorStartErrorCode;
@@ -363,7 +378,12 @@ interface PollPixOnrampResult {
  */
 export const startPixOnramp = action({
   args: {
-    invoiceId: v.id("invoices"),
+    // The bearer token, never the invoice id. Authorizing on the id made
+    // revocation advisory: the id is a durable handle the payer was already
+    // handed, so anyone holding a stale one could keep starting real anchor
+    // orders — which push a tenant CPF to the provider — after the link that
+    // disclosed it had been revoked or had expired.
+    invoiceAccessToken: v.string(),
     lang: v.optional(v.string()),
     // Optional for back-compat with the SEP-6 dispatch (testanchor doesn't
     // use it) and for callers that just want the first registered bank.
@@ -388,12 +408,14 @@ export const startPixOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartPixOnrampResult> => {
-    const invoice = await ctx.runQuery(internal.invoices.useCases.getByIdInternal, {
-      invoiceId: args.invoiceId,
+    const granted = await ctx.runMutation(internal.invoices.mutations.consumeBearerAccess, {
+      accessToken: args.invoiceAccessToken,
     });
-    if (!invoice) {
-      return { success: false, error: { code: ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND } };
+    if (!granted.success) {
+      return { success: false, error: { code: bearerDenialToStartError(granted.error.code) } };
     }
+    const invoice = granted.data;
+
     if (!isChargeable(invoice.state)) {
       return {
         success: false,
@@ -416,7 +438,7 @@ export const startPixOnramp = action({
     // a provider that doesn't speak the protocol.
     if (providerName === "etherfuse") {
       return startEtherfusePixOnramp(ctx, {
-        invoiceId: invoice._id,
+        invoiceId: invoice.invoiceId,
         agencyId: invoice.agencyId,
         amountBRLCents: invoice.totalCents,
         bankAccountId: args.bankAccountId,
@@ -434,7 +456,7 @@ export const startPixOnramp = action({
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
     const tenant = await resolveTenantPrefill(ctx, {
       agencyId: invoice.agencyId,
-      contractPublicId: invoice.lineItems[0]?.contractPublicId,
+      contractPublicId: invoice.firstContractPublicId ?? undefined,
     });
 
     try {
@@ -460,7 +482,7 @@ export const startPixOnramp = action({
 
       const orderId = await ctx.runMutation(internal.payments.providers.orderUseCases.insertOrder, {
         agencyId: invoice.agencyId,
-        invoiceId: invoice._id,
+        invoiceId: invoice.invoiceId,
         provider: providerName,
         anchorTxId: response.id,
         instructions: response.instructions,
@@ -570,7 +592,8 @@ export const pollPixOnramp = action({
  */
 export const startAnchorTestOnramp = action({
   args: {
-    invoiceId: v.id("invoices"),
+    // Bearer token, not the invoice id — same reasoning as `startPixOnramp`.
+    invoiceAccessToken: v.string(),
     lang: v.optional(v.string()),
   },
   returns: v.union(
@@ -591,12 +614,14 @@ export const startAnchorTestOnramp = action({
     }),
   ),
   handler: async (ctx, args): Promise<StartAnchorTestOnrampResult> => {
-    const invoice = await ctx.runQuery(internal.invoices.useCases.getByIdInternal, {
-      invoiceId: args.invoiceId,
+    const granted = await ctx.runMutation(internal.invoices.mutations.consumeBearerAccess, {
+      accessToken: args.invoiceAccessToken,
     });
-    if (!invoice) {
-      return { success: false, error: { code: ANCHOR_START_ERROR_CODE.PAYMENT_NOT_FOUND } };
+    if (!granted.success) {
+      return { success: false, error: { code: bearerDenialToStartError(granted.error.code) } };
     }
+    const invoice = granted.data;
+
     if (!isChargeable(invoice.state)) {
       return {
         success: false,
@@ -623,7 +648,7 @@ export const startAnchorTestOnramp = action({
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
     const tenant = await resolveTenantPrefill(ctx, {
       agencyId: invoice.agencyId,
-      contractPublicId: invoice.lineItems[0]?.contractPublicId,
+      contractPublicId: invoice.firstContractPublicId ?? undefined,
     });
 
     try {
@@ -646,7 +671,7 @@ export const startAnchorTestOnramp = action({
 
       const orderId = await ctx.runMutation(internal.payments.providers.orderUseCases.insertOrder, {
         agencyId: invoice.agencyId,
-        invoiceId: invoice._id,
+        invoiceId: invoice.invoiceId,
         provider: providerName,
         anchorTxId: response.id,
         hostedUrl: response.url,
@@ -1242,16 +1267,16 @@ export const syncEtherfuseBankAccounts = action({
     }),
   ),
   handler: async (ctx, args): Promise<SyncEtherfuseBankAccountsResult> => {
-    const resolved = await ctx.runQuery(internal.invoices.useCases.resolveAgencyByAccessToken, {
+    const granted = await ctx.runMutation(internal.invoices.mutations.consumeBearerAccess, {
       accessToken: args.invoiceAccessToken,
     });
-    if (!resolved) {
+    if (!granted.success) {
       return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
     }
     const account = await ctx.runQuery(
       internal.payments.providers.accountUseCases.getByAgencyAndProvider,
       {
-        agencyId: resolved.agencyId,
+        agencyId: granted.data.agencyId,
         provider: "etherfuse",
       },
     );
@@ -1298,7 +1323,7 @@ export const syncEtherfuseBankAccounts = action({
     for (const remote of pixOnly) {
       syncedExternalIds.push(remote.id);
       await ctx.runMutation(internal.payments.providers.bankAccountUseCases.upsertFromEtherfuse, {
-        agencyId: resolved.agencyId,
+        agencyId: granted.data.agencyId,
         anchorAccountId: account._id,
         externalBankAccountId: remote.id,
         type: "pix",
@@ -1315,7 +1340,7 @@ export const syncEtherfuseBankAccounts = action({
     await ctx.runMutation(
       internal.payments.providers.bankAccountUseCases.removeMissingExternalIds,
       {
-        agencyId: resolved.agencyId,
+        agencyId: granted.data.agencyId,
         keepExternalIds: syncedExternalIds,
       },
     );
@@ -1356,16 +1381,16 @@ export const getEtherfuseBankRegistrationUrl = action({
     }),
   ),
   handler: async (ctx, args): Promise<GetEtherfuseBankRegistrationUrlResult> => {
-    const resolved = await ctx.runQuery(internal.invoices.useCases.resolveAgencyByAccessToken, {
+    const granted = await ctx.runMutation(internal.invoices.mutations.consumeBearerAccess, {
       accessToken: args.invoiceAccessToken,
     });
-    if (!resolved) {
+    if (!granted.success) {
       return { success: false, error: { code: "NO_ANCHOR_ACCOUNT" } };
     }
     const account = await ctx.runQuery(
       internal.payments.providers.accountUseCases.getByAgencyAndProvider,
       {
-        agencyId: resolved.agencyId,
+        agencyId: granted.data.agencyId,
         provider: "etherfuse",
       },
     );

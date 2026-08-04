@@ -62,6 +62,103 @@ export const InvoiceStates = {
   voided: (): Extract<InvoiceState, { kind: "void" }> => ({ kind: "void" }),
 } as const;
 
+// ─── Bearer credential lifecycle ──────────────────────────────────────────────
+
+/**
+ * Only the token is a rate-limit scope.
+ *
+ * A per-source-IP scope was tried and removed. The address could only reach
+ * Convex as an argument on a *public* mutation, so a caller who skipped the
+ * Next server chose its value freely — which made it useless as a control
+ * (omit it and the scope does not apply) and dangerous as a lever (supply a
+ * victim's address and the victim's next legitimate page load is refused).
+ * The token cannot be forged and cannot be omitted, so it is the only key
+ * that means anything here.
+ */
+export type BearerRateLimitScope = "token";
+
+export const BEARER_RATE_LIMIT_SCOPE = {
+  TOKEN: "token",
+} as const satisfies Record<Uppercase<BearerRateLimitScope>, BearerRateLimitScope>;
+
+export type BearerDenialReason = "MISSING" | "UNKNOWN" | "EXPIRED" | "REVOKED" | "RATE_LIMITED";
+
+export const BEARER_DENIAL_REASON = {
+  MISSING: "MISSING",
+  UNKNOWN: "UNKNOWN",
+  EXPIRED: "EXPIRED",
+  REVOKED: "REVOKED",
+  RATE_LIMITED: "RATE_LIMITED",
+} as const satisfies Record<BearerDenialReason, BearerDenialReason>;
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * How long a checkout link stays usable from the moment the invoice is issued.
+ *
+ * The constraint that sets the floor is the product, not the threat model: a
+ * tenant must be able to pay a bill that is legitimately outstanding, and a
+ * Mutav invoice can be outstanding for a long time — it falls due on the 10th,
+ * then runs through the notice and delinquency process before anyone writes it
+ * off. A 30- or 60-day TTL would routinely kill the link of a payer who is
+ * late but paying, and every one of those is a support ticket that ends in
+ * someone reissuing a credential by hand.
+ *
+ * Six months is the first horizon past which "still trying to collect via a
+ * self-service link" stops being true: by then the contract is in the
+ * delinquency book and collection is a human process, not a URL. It also
+ * bounds the real exposure — a link forwarded into a group chat, pasted into a
+ * support ticket or left in a mailbox dies inside one rental semester instead
+ * of outliving the tenancy.
+ */
+export const INVOICE_ACCESS_TOKEN_TTL_MS = 180 * MS_PER_DAY;
+
+/**
+ * Once the invoice settles, the link's only remaining job is showing the payer
+ * their receipt, so it stops running on the issuance clock and expires on its
+ * own, much shorter one. Seven days covers "I paid, send me the confirmation"
+ * without leaving a permanent, unauthenticated record of a person's rent
+ * sitting behind a URL that has already done everything it was minted for.
+ */
+export const INVOICE_ACCESS_TOKEN_SETTLED_GRACE_MS = 7 * MS_PER_DAY;
+
+/** Absolute expiry for a token minted at `issuedAtMs`. */
+export function accessTokenExpiryFrom(issuedAtMs: number): number {
+  return issuedAtMs + INVOICE_ACCESS_TOKEN_TTL_MS;
+}
+
+/**
+ * Expiry after settlement. Never extends an existing deadline — settlement can
+ * only bring the expiry forward, so an invoice paid on day 1 does not gain
+ * another week of reachable bearer access.
+ */
+export function settledAccessTokenExpiry(
+  currentExpiresAt: number | undefined,
+  settledAtMs: number,
+): number {
+  const graceExpiry = settledAtMs + INVOICE_ACCESS_TOKEN_SETTLED_GRACE_MS;
+  return currentExpiresAt === undefined ? graceExpiry : Math.min(currentExpiresAt, graceExpiry);
+}
+
+/**
+ * The lifecycle half of bearer authorization: why this invoice's token must
+ * not be honored right now, or `null` when it may be. Revocation is reported
+ * ahead of expiry so an operator who revokes a link can tell from the denial
+ * that the revocation is what took effect.
+ */
+export function bearerLifecycleDenial(
+  invoice: Pick<Invoice, "accessTokenExpiresAt" | "accessTokenRevokedAt">,
+  nowMs: number,
+): BearerDenialReason | null {
+  if (invoice.accessTokenRevokedAt !== undefined && invoice.accessTokenRevokedAt <= nowMs) {
+    return BEARER_DENIAL_REASON.REVOKED;
+  }
+  if (invoice.accessTokenExpiresAt === undefined || invoice.accessTokenExpiresAt <= nowMs) {
+    return BEARER_DENIAL_REASON.EXPIRED;
+  }
+  return null;
+}
+
 // ─── Predicates ───────────────────────────────────────────────────────────────
 
 /** An invoice is chargeable while it is open (awaiting or past its due date). */

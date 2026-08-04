@@ -53,6 +53,10 @@ const tenantApprovalStatus = v.union(
 
 const invoiceLineItemKind = v.union(v.literal("recurring"), v.literal("activation"));
 
+// Canonical `BEARER_RATE_LIMIT_SCOPE` lives in `convex/invoices/domain.ts`;
+// inlined here to avoid the entity-file → `_generated/dataModel` circular import.
+const bearerRateLimitScope = v.literal("token");
+
 /**
  * Discriminated union representing the lifecycle state of an invoice.
  * Each variant carries only the fields that are meaningful for that state.
@@ -513,6 +517,13 @@ export default defineSchema(
       // a tokenless row sits under the `undefined` key of `by_accessToken` and
       // must stay unreachable from the wire.
       accessToken: v.optional(v.string()),
+      // Lifecycle of the bearer credential, in unix ms. Both are checked on
+      // every bearer entry point before any data is returned. `expiresAt` is
+      // absent on rows written before the lifecycle existed, and absence is
+      // read as expired: a credential the system cannot date is a credential
+      // it cannot retire, which is the defect these two columns close.
+      accessTokenExpiresAt: v.optional(v.number()),
+      accessTokenRevokedAt: v.optional(v.number()),
       periodMonth: v.string(),
       issuedAt: v.string(),
       dueDate: v.string(),
@@ -536,6 +547,30 @@ export default defineSchema(
       .index("by_publicId", ["publicId"])
       .index("by_accessToken", ["accessToken"])
       .index("by_muxedId", ["muxedId"]),
+
+    // Fixed-window counters for the unauthenticated bearer surface, one row
+    // per (scope, key). Rows are only ever created for a key that already
+    // resolved to something real — an unknown token never mints a row, so a
+    // spray against random tokens cannot turn the limiter into a write
+    // amplifier against us. `deniedCount`/`lastDeniedAt` are the deny log:
+    // kept here rather than in `mutavAuditLog` because that chain is
+    // hash-linked and anchored on-chain, and an unauthenticated caller must
+    // never be able to drive appends into it.
+    //
+    // `scope` is a single literal on purpose. The key is always the presented
+    // token, which the caller cannot forge or omit. A per-source-IP scope was
+    // tried and removed: the address reached Convex as an argument on a public
+    // mutation, so it bounded only honest callers while letting anyone else
+    // spend a stranger's budget by naming their address. Do not re-add a scope
+    // whose key the caller chooses.
+    bearerAccessAttempts: defineTable({
+      scope: bearerRateLimitScope,
+      key: v.string(),
+      windowStartedAt: v.number(),
+      count: v.number(),
+      deniedCount: v.number(),
+      lastDeniedAt: v.optional(v.number()),
+    }).index("by_scope_key", ["scope", "key"]),
 
     // Settlement record — one row per settlement attempt against an invoice;
     // idempotent on externalRef.

@@ -1,13 +1,153 @@
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, mutation } from "../_generated/server";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
+import { mutationWithAgencyScope } from "../lib/auth";
+import type { Result } from "../lib/result";
 import { SettlementMethods } from "../payments/domain";
 import { recordSettlement } from "../payments/settlement";
 import { generateInvoiceAccessToken } from "../lib/randomId";
-import { INVOICE_LINE_ITEM_KIND, InvoiceStates } from "./domain";
+import type { AgencyId } from "../agencies/domain";
+import {
+  accessTokenExpiryFrom,
+  INVOICE_LINE_ITEM_KIND,
+  InvoiceStates,
+  settledAccessTokenExpiry,
+  type BearerDenialReason,
+  type InvoiceId,
+  type InvoiceState,
+} from "./domain";
+import { consumeBearerInvoice } from "./lib/accessToken";
 import { allocateInvoiceDocumentNumber } from "./lib/documentNumber";
 import { generateInvoiceMuxedId } from "./lib/muxedId";
+
+type BearerGrant = {
+  invoiceId: InvoiceId;
+  agencyId: AgencyId;
+  totalCents: number;
+  state: InvoiceState;
+  firstContractPublicId: string | null;
+};
+
+type BearerAccessErrorResult = { code: BearerDenialReason };
+
+/** The only refusal the unauthenticated surface is allowed to distinguish. */
+type BearerPageViewErrorResult = { code: "DENIED" };
+
+/**
+ * Server-rendered checkout entry gate. `apps/pay` calls this once per page
+ * load, and the token is the only thing it sends: this is a public mutation,
+ * so any client-supplied identifier is chosen by the caller, not observed.
+ *
+ * Every refusal collapses to one opaque `DENIED`. The specific reason is real
+ * and is used inside the resolver, but returning it here would tell an
+ * unauthenticated caller whether a token merely expired — and so was issued
+ * once — or was never issued at all. That is an existence oracle over the
+ * token space, and the same leak the read paths already refuse to emit.
+ */
+export const recordBearerPageView = mutation({
+  args: { accessToken: v.string() },
+  handler: async (ctx, args): Promise<Result<object, BearerPageViewErrorResult>> => {
+    const resolved = await consumeBearerInvoice(ctx, {
+      accessToken: args.accessToken,
+      nowMs: Date.now(),
+    });
+    if (!resolved.success) {
+      return { success: false, error: { code: "DENIED" }, message: "Bearer access denied" };
+    }
+    return { success: true, data: {}, message: "Bearer access granted" };
+  },
+});
+
+/**
+ * The write-path bearer gate every unauthenticated checkout action goes
+ * through. A mutation rather than a query because the rate limiter has to
+ * count the attempt, and because the only honest place to spend a bearer
+ * credential is a context that can record that it was spent.
+ *
+ * Returns the fields the checkout actions need and nothing else — notably not
+ * the token, and not the raw document, so an action cannot re-widen the
+ * unauthenticated surface by forwarding what it was handed.
+ */
+export const consumeBearerAccess = internalMutation({
+  args: { accessToken: v.string() },
+  handler: async (ctx, args): Promise<Result<BearerGrant, BearerAccessErrorResult>> => {
+    const resolved = await consumeBearerInvoice(ctx, {
+      accessToken: args.accessToken,
+      nowMs: Date.now(),
+    });
+    if (!resolved.success) return resolved;
+
+    const { invoice } = resolved.data;
+    return {
+      success: true,
+      data: {
+        invoiceId: invoice._id,
+        agencyId: invoice.agencyId,
+        totalCents: invoice.totalCents,
+        state: invoice.state,
+        firstContractPublicId: invoice.lineItems[0]?.contractPublicId ?? null,
+      },
+      message: "Bearer access granted",
+    };
+  },
+});
+
+/**
+ * Kill a checkout link that has gone somewhere it should not have — forwarded
+ * into a group chat, pasted into a support ticket. Effective on the next
+ * request against any bearer entry point.
+ */
+export const revokeAccessToken = mutationWithAgencyScope({
+  args: { invoiceId: v.id("invoices") },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice || invoice.agencyId !== ctx.agencyId) {
+      return { success: false as const, error: { code: "INVOICE_NOT_FOUND" as const } };
+    }
+    await ctx.db.patch(invoice._id, { accessTokenRevokedAt: Date.now() });
+    // Killing the credential that gates a named tenant's bill is exactly the
+    // act that has to leave a trail. The token itself never enters the
+    // payload — the whole point is that it stops being usable.
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.INVOICE_ACCESS_REVOKED,
+      resourceType: "invoices",
+      resourceId: invoice.publicId,
+      payload: { invoiceId: invoice._id, agencyId: invoice.agencyId },
+    });
+    return { success: true as const, data: { publicId: invoice.publicId } };
+  },
+});
+
+/**
+ * Issue a fresh credential for the same invoice, clearing any revocation and
+ * restarting the TTL. The point of rotation is that a leaked link can be
+ * replaced without voiding and reissuing the bill the tenant still owes.
+ */
+export const rotateAccessToken = mutationWithAgencyScope({
+  args: { invoiceId: v.id("invoices") },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice || invoice.agencyId !== ctx.agencyId) {
+      return { success: false as const, error: { code: "INVOICE_NOT_FOUND" as const } };
+    }
+    const accessToken = generateInvoiceAccessToken();
+    await ctx.db.patch(invoice._id, {
+      accessToken,
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
+      accessTokenRevokedAt: undefined,
+    });
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.INVOICE_ACCESS_ROTATED,
+      resourceType: "invoices",
+      resourceId: invoice.publicId,
+      payload: { invoiceId: invoice._id, agencyId: invoice.agencyId },
+    });
+    return { success: true as const, data: { accessToken } };
+  },
+});
 
 /**
  * Generate one `invoices` record per agency for the given billing period.
@@ -107,6 +247,7 @@ export const generateMonthlyInvoices = internalMutation({
         agencyId: agency._id,
         publicId,
         accessToken: generateInvoiceAccessToken(),
+        accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
         periodMonth,
         issuedAt,
         dueDate,
@@ -171,8 +312,11 @@ export const markPaidByTx = internalMutation({
         : { invoiceId, status: "duplicate_inbound" as const };
     }
 
+    // Settlement puts the credential on its own, shorter clock: the link's
+    // remaining job is the receipt, not the payment.
     await ctx.db.patch(invoiceId, {
       state: InvoiceStates.paid(paidAt),
+      accessTokenExpiresAt: settledAccessTokenExpiry(invoice.accessTokenExpiresAt, Date.now()),
     });
 
     await recordSettlement(ctx, {
@@ -235,6 +379,7 @@ export const markPaidByAnchor = internalMutation({
 
     await ctx.db.patch(invoiceId, {
       state: InvoiceStates.paid(paidAt),
+      accessTokenExpiresAt: settledAccessTokenExpiry(invoice.accessTokenExpiresAt, Date.now()),
     });
 
     await recordSettlement(ctx, {
@@ -282,8 +427,12 @@ export const resetInvoiceToOpen = internalMutation({
       .unique();
     if (!invoice) throw new Error(`Invoice ${publicId} not found`);
     const previousState = invoice.state.kind;
+    // Reopening puts the credential back on the issuance clock — otherwise the
+    // demo invoice comes back payable behind a link that already expired on the
+    // settlement grace.
     await ctx.db.patch(invoice._id, {
       state: InvoiceStates.open(),
+      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
     });
 
     await appendAuditEntry(ctx, {
