@@ -2864,6 +2864,67 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
  *
  * Dev-only. Do NOT call from production.
  */
+/**
+ * Give every seeded contract the tenant identity its own agency submitted,
+ * the shape `contracts.create` writes in production.
+ *
+ * Without it a seeded contract has no per-agency submission to resolve, and
+ * the read paths would need a fallback to the shared `tenants` registry row —
+ * which is the cross-agency disclosure this domain exists to prevent, not to
+ * reproduce in the dev dataset. The seed gives each contract its own tenant,
+ * so submission and registry agree here; what matters is that the *shape*
+ * matches production so the read paths can fail closed.
+ */
+async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
+  for (const contract of await ctx.db.query("contracts").collect()) {
+    const tenant = await ctx.db.get(contract.tenantId);
+    if (!tenant) continue;
+
+    const snapshot =
+      tenant.entityType === "pf"
+        ? {
+            entityType: "pf" as const,
+            taxId: tenant.taxId,
+            fullName: tenant.fullName,
+            email: tenant.email,
+            phone: tenant.phone,
+            birthDate: tenant.birthDate,
+          }
+        : {
+            entityType: "pj" as const,
+            taxId: tenant.taxId,
+            fullName: tenant.fullName,
+            email: tenant.email,
+            phone: tenant.phone,
+            ...(tenant.contactCpf === undefined ? {} : { contactCpf: tenant.contactCpf }),
+          };
+
+    // Earliest row is the creation event for seeded data, which is written
+    // here in one pass. Readers must NOT select this way — they find the row
+    // that carries a snapshot, because a later row can sort earlier.
+    const creation = await ctx.db
+      .query("contractHistory")
+      .withIndex("by_agency_contract", (q) =>
+        q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
+      )
+      .first();
+
+    if (creation) {
+      await ctx.db.patch(creation._id, { tenantSnapshot: snapshot });
+      continue;
+    }
+
+    await ctx.db.insert("contractHistory", {
+      agencyId: contract.agencyId,
+      contractPublicId: contract.publicId,
+      at: contract.activatedAt ?? d("2025-09-15T09:00:00-03:00"),
+      username: "seed",
+      message: `Criada Solicitação #${contract.publicId}.`,
+      tenantSnapshot: snapshot,
+    });
+  }
+}
+
 export const seedReset = internalMutation({
   args: { adminEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
@@ -2873,6 +2934,8 @@ export const seedReset = internalMutation({
 
     const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
     const aprovada = aprovadaAgencyId ? await populateAprovadaBook(ctx, aprovadaAgencyId) : null;
+
+    await attachTenantSnapshots(ctx);
 
     return { fictional, personas, aprovada };
   },

@@ -79,6 +79,50 @@ export function validateTaxId(args: {
 const CPF_LENGTH = 11;
 
 /**
+ * What one agency submitted for a tenant, frozen on its contract creation
+ * event. Structurally the `contractHistory.tenantSnapshot` shape, declared
+ * here because the value it maps to (`TenantInput`) is this domain's.
+ */
+export type TenantSubmission = {
+  entityType: TenantEntityType;
+  taxId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  birthDate?: string;
+  contactCpf?: string;
+};
+
+/**
+ * Read an agency's own submission back as a registry-shaped value, or `null`
+ * when the submission predates the snapshot (legacy/seeded rows) or cannot be
+ * discriminated without fabricating data (pf without birthDate). Callers fall
+ * back to the registry row only on `null` — the registry is shared across
+ * agencies and keeps its first writer's values (LGPD-26).
+ */
+export function tenantInputFromSubmission(submission: TenantSubmission): TenantInput | null {
+  if (submission.entityType === TENANT_ENTITY_TYPE.PJ) {
+    return {
+      entityType: TENANT_ENTITY_TYPE.PJ,
+      taxId: submission.taxId,
+      fullName: submission.fullName,
+      ...(submission.contactCpf === undefined ? {} : { contactCpf: submission.contactCpf }),
+      email: submission.email,
+      phone: submission.phone,
+    };
+  }
+  if (!submission.birthDate) return null;
+  return {
+    entityType: TENANT_ENTITY_TYPE.PF,
+    taxId: submission.taxId,
+    fullName: submission.fullName,
+    birthDate: submission.birthDate,
+    email: submission.email,
+    phone: submission.phone,
+  };
+}
+
+/**
  * Legacy embedded `contracts.tenant` shape relevant to registry
  * normalization (approval/score fields stay contract-level).
  */

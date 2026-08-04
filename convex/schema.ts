@@ -432,7 +432,11 @@ export default defineSchema(
           contactCpf: v.optional(v.string()),
         }),
       ),
-    }).index("by_contract", ["contractPublicId", "at"]),
+    })
+      .index("by_contract", ["contractPublicId", "at"])
+      // publicId is not unique across agencies, so the tenant read-back path
+      // resolves the creation event by agency first.
+      .index("by_agency_contract", ["agencyId", "contractPublicId", "at"]),
 
     // Per-event record filed by an agency (or, post-Pix, a system trigger)
     // that a tenant missed a specific rent payment. Distinct from the

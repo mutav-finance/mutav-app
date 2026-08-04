@@ -246,26 +246,27 @@ function brlCentsToAssetAmount(brlCents: number, assetSymbol: string): string {
 }
 
 /**
- * Resolve SEP-9 tenant fields from a payment row's first line item, joining
- * the tenant registry via the contract's `tenantId`. Anchor hosted forms
- * pre-fill these (and Etherfuse uses them to seed KYC). Returns an empty
- * object when no contract/tenant is reachable — the deposit still works
- * without prefill.
+ * Resolve SEP-9 tenant fields from a payment row's first line item. The
+ * identity is the owning agency's own submission, NOT the shared registry row
+ * — that row keeps its first writer's values and is never patched, so reading
+ * it here would ship another agency's contact data to a third-party anchor and
+ * pin it there permanently (LGPD-26). Returns an empty object when no
+ * contract/tenant is reachable — the deposit still works without prefill.
+ *
+ * `agencyId` comes from the invoice being paid, so a `contractPublicId` that
+ * also exists under another agency cannot pull that agency's tenant in.
  */
 async function resolveTenantPrefill(
   ctx: ActionCtx,
-  contractPublicId: string | undefined,
+  args: { agencyId: AgencyId; contractPublicId: string | undefined },
 ): Promise<TenantPrefill> {
-  if (!contractPublicId) return {};
-  const contract = await ctx.runQuery(internal.contracts.useCases.getByPublicIdInternal, {
-    publicId: contractPublicId,
+  if (!args.contractPublicId) return {};
+  const identity = await ctx.runQuery(internal.contracts.useCases.getTenantIdentityInternal, {
+    agencyId: args.agencyId,
+    publicId: args.contractPublicId,
   });
-  if (!contract) return {};
-  const tenant = await ctx.runQuery(internal.tenants.useCases.getByIdInternal, {
-    tenantId: contract.tenantId,
-  });
-  if (!tenant) return {};
-  return tenantToSep9Prefill(tenant);
+  if (!identity) return {};
+  return tenantToSep9Prefill(identity);
 }
 
 function tenantPrefillToFields(p: TenantPrefill): Record<string, string> {
@@ -431,7 +432,10 @@ export const startPixOnramp = action({
     await client.authenticate(signer.publicKey, signer.sign);
 
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
-    const tenant = await resolveTenantPrefill(ctx, invoice.lineItems[0]?.contractPublicId);
+    const tenant = await resolveTenantPrefill(ctx, {
+      agencyId: invoice.agencyId,
+      contractPublicId: invoice.lineItems[0]?.contractPublicId,
+    });
 
     try {
       const response = await client.sep6.deposit({
@@ -617,7 +621,10 @@ export const startAnchorTestOnramp = action({
     await client.authenticate(signer.publicKey, signer.sign);
 
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
-    const tenant = await resolveTenantPrefill(ctx, invoice.lineItems[0]?.contractPublicId);
+    const tenant = await resolveTenantPrefill(ctx, {
+      agencyId: invoice.agencyId,
+      contractPublicId: invoice.lineItems[0]?.contractPublicId,
+    });
 
     try {
       const response = await client.sep24.deposit({

@@ -109,6 +109,69 @@ describe("seedReset", () => {
     expect(linked.withResolvableTenant).toBe(linked.total);
   });
 
+  test("gives every contract its own tenant submission, so the read paths can fail closed", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    // The read paths no longer fall back to the shared registry row — serving
+    // it would show one agency the identity another agency submitted for the
+    // same person. That fail-closed choice is only safe while every contract
+    // carries a submission of its own, which is what this asserts.
+    const missing = await t.run(async (ctx) => {
+      const contracts = await ctx.db.query("contracts").collect();
+      const withoutSnapshot: string[] = [];
+      for (const contract of contracts) {
+        const history = await ctx.db
+          .query("contractHistory")
+          .withIndex("by_agency_contract", (q) =>
+            q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
+          )
+          .collect();
+        if (!history.some((entry) => entry.tenantSnapshot !== undefined)) {
+          withoutSnapshot.push(contract.publicId);
+        }
+      }
+      return { total: contracts.length, withoutSnapshot };
+    });
+
+    expect(missing.total).toBeGreaterThan(0);
+    expect(missing.withoutSnapshot).toEqual([]);
+  });
+
+  test("the snapshot is found by content, not by sort order", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    // Seed timestamps are offset-form (`-03:00`), which sorts BEFORE Z-form
+    // while denoting a later instant. A reader that took the earliest row
+    // would miss the snapshot the moment any Z-form row is appended, and fall
+    // through to the shared registry row.
+    const probe = await t.run(async (ctx) => {
+      const contract = await ctx.db.query("contracts").first();
+      if (!contract) throw new Error("seed produced no contracts");
+      await ctx.db.insert("contractHistory", {
+        agencyId: contract.agencyId,
+        contractPublicId: contract.publicId,
+        at: "2020-01-01T00:00:00.000Z",
+        username: "probe",
+        message: "sorts first, carries no snapshot",
+      });
+      const history = await ctx.db
+        .query("contractHistory")
+        .withIndex("by_agency_contract", (q) =>
+          q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
+        )
+        .collect();
+      return {
+        earliestHasSnapshot: history[0]?.tenantSnapshot !== undefined,
+        someRowHasSnapshot: history.some((entry) => entry.tenantSnapshot !== undefined),
+      };
+    });
+
+    expect(probe.earliestHasSnapshot).toBe(false);
+    expect(probe.someRowHasSnapshot).toBe(true);
+  });
+
   test("seeds all four personas with the correct staff / agency state", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
