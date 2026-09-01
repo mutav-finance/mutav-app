@@ -18,13 +18,42 @@ export function shouldShowTestanchor(): boolean {
 }
 
 /**
+ * Guard for URL vars whose dev fallback is a localhost origin. An unset
+ * var used to fall through silently and ship `http://localhost:PORT` to
+ * real users — a dead redirect that reads as an auth bug rather than the
+ * config bug it is. Fail loud instead; mirrors the fail-loud posture of
+ * `getStellarRpcUrl` in apps/admin.
+ *
+ * `NEXT_PUBLIC_*` reads are inlined at build time, so an unset var fails
+ * the production build instead of waiting for a user to hit the route.
+ * Dev and preview keep the port fallback, so local dev needs no `.env`.
+ */
+export function requireUrlInProduction(
+  value: string | undefined,
+  varName: string,
+  devFallback: string,
+): string {
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      `${varName} must be set in production — refusing to fall back to ${devFallback}`,
+    );
+  }
+  return devFallback;
+}
+
+/**
  * App public URL — used by server-side route handlers (e.g. /api/auth/*)
  * when constructing absolute redirect URLs. Falls back to localhost:3000
  * for dev. Production sets `NEXT_PUBLIC_APP_URL` (Vercel exposes it on
  * `VERCEL_URL` too, but we prefer the explicit project-set value).
  */
 export function getAppUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return requireUrlInProduction(
+    process.env.NEXT_PUBLIC_APP_URL,
+    "NEXT_PUBLIC_APP_URL",
+    "http://localhost:3000",
+  );
 }
 
 /**
@@ -36,7 +65,11 @@ export function getAppUrl(): string {
  * `NEXT_PUBLIC_PAY_URL=https://pay.mutav.finance`.
  */
 export function getPayUrl(): string {
-  return process.env.NEXT_PUBLIC_PAY_URL ?? "http://localhost:3001";
+  return requireUrlInProduction(
+    process.env.NEXT_PUBLIC_PAY_URL,
+    "NEXT_PUBLIC_PAY_URL",
+    "http://localhost:3001",
+  );
 }
 
 /**
@@ -47,7 +80,11 @@ export function getPayUrl(): string {
  * `NEXT_PUBLIC_ADMIN_URL=https://admin.mutav.finance`.
  */
 export function getAdminUrl(): string {
-  return process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3003";
+  return requireUrlInProduction(
+    process.env.NEXT_PUBLIC_ADMIN_URL,
+    "NEXT_PUBLIC_ADMIN_URL",
+    "http://localhost:3003",
+  );
 }
 
 /**
@@ -55,10 +92,14 @@ export function getAdminUrl(): string {
  * construction. Distinct from `getAppUrl()` (client-facing
  * `NEXT_PUBLIC_APP_URL`): `APP_BASE_URL` is the canonical name the
  * Auth0 v4 SDK reads itself, so we mirror it for consistency.
- * Returns `undefined` in the browser bundle.
+ *
+ * Server-only: `APP_BASE_URL` carries no `NEXT_PUBLIC_` prefix, so it is
+ * absent from the browser bundle. Every caller is server-side (see
+ * `lib/auth0.ts`); calling this from a client component would trip the
+ * production guard, which is the intended signal.
  */
 export function getAppBaseUrl(): string {
-  return process.env.APP_BASE_URL ?? "http://localhost:3000";
+  return requireUrlInProduction(process.env.APP_BASE_URL, "APP_BASE_URL", "http://localhost:3000");
 }
 
 /**

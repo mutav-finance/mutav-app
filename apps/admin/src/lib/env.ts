@@ -5,12 +5,40 @@
  * CLAUDE.md.
  */
 
+/**
+ * Guard for URL vars whose dev fallback is a localhost origin. An unset
+ * var used to fall through silently and ship `http://localhost:PORT` to
+ * real users — a dead redirect that reads as an auth bug rather than the
+ * config bug it is. Fail loud instead, as `getStellarRpcUrl` below does.
+ *
+ * `NEXT_PUBLIC_*` reads are inlined at build time, so an unset var fails
+ * the production build instead of waiting for a user to hit the route.
+ * Dev and preview keep the port fallback, so local dev needs no `.env`.
+ */
+export function requireUrlInProduction(
+  value: string | undefined,
+  varName: string,
+  devFallback: string,
+): string {
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      `${varName} must be set in production — refusing to fall back to ${devFallback}`,
+    );
+  }
+  return devFallback;
+}
+
 export function getAppUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3003";
+  return requireUrlInProduction(
+    process.env.NEXT_PUBLIC_APP_URL,
+    "NEXT_PUBLIC_APP_URL",
+    "http://localhost:3003",
+  );
 }
 
 export function getAppBaseUrl(): string {
-  return process.env.APP_BASE_URL ?? "http://localhost:3003";
+  return requireUrlInProduction(process.env.APP_BASE_URL, "APP_BASE_URL", "http://localhost:3003");
 }
 
 export function getConvexUrl(): string | null {
@@ -29,7 +57,11 @@ export function getAuth0Domain(): string | null {
  * `NEXT_PUBLIC_AGENCY_URL=https://app.mutav.finance`.
  */
 export function getAgencyUrl(): string {
-  return process.env.NEXT_PUBLIC_AGENCY_URL ?? "http://localhost:3000";
+  return requireUrlInProduction(
+    process.env.NEXT_PUBLIC_AGENCY_URL,
+    "NEXT_PUBLIC_AGENCY_URL",
+    "http://localhost:3000",
+  );
 }
 
 // ─── Stellar (wallet signing) ────────────────────────────────────────────────
