@@ -28,7 +28,18 @@ export default async function GlobalNotFound() {
   return (
     <html lang={locale} className={`${geist.variable} h-svh overflow-hidden antialiased`}>
       <body className="flex h-svh flex-col overflow-hidden">
-        <NextIntlClientProvider>
+        {/*
+          Explicit (empty) messages, not the default. Left undefined,
+          NextIntlClientProvider falls back to `await getMessages()` and
+          inlines the whole catalog into this page's HTML — the leak #307
+          closed for [locale]/layout.tsx but not for this route, which is the
+          unauthenticated 404 on a public, Auth0-free origin. Nothing under
+          this provider translates in the browser: NotFoundContent, BareShell
+          and Wordmark are all server-rendered, and the client <Link> needs
+          the provider for the locale, not for copy. A client component added
+          here must take its strings as props or extend this pick.
+        */}
+        <NextIntlClientProvider messages={{}}>
           <BareShell brand={<Wordmark variant="display" size="md" />} dataFront="imobiliarias">
             <NotFoundContent />
           </BareShell>
