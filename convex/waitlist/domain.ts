@@ -16,6 +16,14 @@ export const waitlistAudienceValidator = v.union(
   v.literal(WAITLIST_AUDIENCE.IMOBILIARIA),
 );
 
+// The projection the delivery actions resolve from a row id. Deliberately
+// narrower than `Waitlist`: the audit columns (`ip`, `ua`, `referer`) are
+// personal data the send has no use for, so they never cross the boundary.
+export type WaitlistDelivery = {
+  readonly email: string;
+  readonly audience: WaitlistAudience;
+};
+
 export type WaitlistErrorCode = "INVALID_EMAIL" | "DUPLICATE" | "SERVER_ERROR";
 
 export const WAITLIST_ERROR_CODE = {
