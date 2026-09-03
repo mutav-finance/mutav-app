@@ -4,16 +4,86 @@ name: cleanup-convex-preview
 # (merged OR closed-without-merge). Without this, previews sit around for up
 # to 5 days waiting for free-plan auto-cleanup, and dense activity periods
 # hit the 40-deployment team quota.
+#
+# Convex keys previews by BRANCH, not by PR — so several PRs sharing one head
+# branch share one preview deployment. Closing one of them must not delete a
+# preview the others are still deploying into (see the guard job below).
 
 on:
   pull_request:
     types: [closed]
 
+# Serialize cleanups per branch so two PRs on the same branch closing at
+# nearly the same moment don't evaluate the guard against identical stale
+# state. `cancel-in-progress: false` is deliberate: a canceled cleanup is a
+# leaked preview we never revisit.
+concurrency:
+  group: cleanup-convex-preview-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
 jobs:
   delete-preview:
     runs-on: ubuntu-latest
+    # Declaring `permissions` at all makes every unlisted scope `none`, so both
+    # entries are load-bearing: `pull-requests: read` for the `gh pr list`
+    # guard, `contents: read` for repository metadata access behind it.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
+      - name: Check whether other PRs still share this branch
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          CLOSED_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+
+          # Fail-safe direction: `proceed=true` is emitted only when this step
+          # positively confirms zero other open PRs on the branch. Any
+          # ambiguity (API error, PRs still open) leaves the preview alive —
+          # a leaked preview costs one quota slot until the 5-day auto-cleanup;
+          # deleting a live one breaks a running `convex deploy` mid-push.
+          if ! REMAINING=$(gh pr list \
+                --repo "$GITHUB_REPOSITORY" \
+                --head "$BRANCH" \
+                --state open \
+                --json number \
+                --jq '[.[].number | tostring | select(. != env.CLOSED_PR)] | join(", ")' 2>/tmp/gh-error.txt); then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Convex preview kept::Could not list open PRs for branch '$BRANCH' — keeping the preview rather than risk deleting a live one"
+            cat /tmp/gh-error.txt
+            {
+              echo "### ⚠ Convex preview NOT deleted"
+              echo ""
+              echo "\`gh pr list\` failed for branch \`$BRANCH\`. Erring toward keeping the preview."
+              echo "It will be reclaimed by Convex's 5-day auto-cleanup, or delete it manually via"
+              echo "\`scripts/list-convex-previews.sh\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ -n "$REMAINING" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Convex preview kept::Branch '$BRANCH' still has open PR(s) #$REMAINING — preview deployment kept alive"
+            echo "ℹ PR #$CLOSED_PR closed, but branch '$BRANCH' still has open PR(s): #$REMAINING"
+            echo "ℹ Convex keys previews by branch, so deleting now would kill a preview those PRs still deploy into."
+            echo "ℹ Skipping deletion. The last PR to close on this branch will clean it up."
+            {
+              echo "### ℹ Convex preview kept alive"
+              echo ""
+              echo "PR #$CLOSED_PR closed, but branch \`$BRANCH\` still has open PR(s): #$REMAINING."
+              echo "Convex previews are keyed by branch — deleting now would break those PRs' deploys."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "✓ No other open PRs on branch '$BRANCH' — safe to delete its preview"
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
       - name: Delete Convex preview deployment
+        if: steps.guard.outputs.proceed == 'true'
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
           TOKEN: ${{ secrets.CONVEX_MANAGEMENT_TOKEN }}
