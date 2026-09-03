@@ -21,7 +21,7 @@
   "notFound": {
     "eyebrow": "404",
     "title": "Page not found",
-    "subtitle": "Check the invoice link you were sent."
+    "subtitle": "This link may have expired or be incorrect. Ask your agency for a new one."
   },
   "commission": {
     "meta": {
