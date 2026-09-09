@@ -4,32 +4,31 @@ import { useTranslations } from "next-intl";
 import { usePreloadedQuery } from "convex/react";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { ActivityBucket } from "@convex/guarantees/domain";
+import type { StateTimelineBucket } from "@convex/guarantees/domain";
 import type { GuaranteeAggregates, ReserveCoverage } from "@convex/transparency/domain";
-import { GuaranteeStateBreakdown } from "@/components/guarantees/guarantee-state-breakdown";
 import { GuaranteesPanel } from "./guarantees-panel";
 import { CapacityPanel } from "./capacity-panel";
 import { ReservePanel } from "./reserve-panel";
-import { TimelinePanel } from "./timeline-panel";
+import { PlatformStateChart } from "./platform-state-chart";
 
 type Props = {
   preloadedAggregates: Preloaded<typeof api.transparency.useCases.getGuaranteeAggregates> | null;
-  preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getActivityByPeriod> | null;
+  preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getStateTimelineByPeriod> | null;
   preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage> | null;
   initialAggregates: GuaranteeAggregates | null;
-  initialTimeline: ActivityBucket[] | null;
+  initialTimeline: StateTimelineBucket[] | null;
   initialCoverage: ReserveCoverage | null;
 };
 
 type LiveProps = {
   preloadedAggregates: Preloaded<typeof api.transparency.useCases.getGuaranteeAggregates>;
-  preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getActivityByPeriod>;
+  preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getStateTimelineByPeriod>;
   preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage>;
 };
 
 type LayoutProps = {
   aggregates: GuaranteeAggregates | null | undefined;
-  timeline: ActivityBucket[] | null | undefined;
+  timeline: StateTimelineBucket[] | null | undefined;
   coverage: ReserveCoverage | null | undefined;
 };
 
@@ -45,14 +44,12 @@ function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps)
         <GuaranteesPanel aggregates={agg} />
       </div>
 
-      <GuaranteeStateBreakdown heading={t("guarantees.byState")} counts={agg?.countByState} />
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <CapacityPanel aggregates={agg} />
         <ReservePanel coverage={coverage} />
       </div>
 
-      <TimelinePanel data={tl} />
+      <PlatformStateChart timeline={tl} counts={agg?.countByState} />
 
       <p className="text-muted-foreground text-xs">{t("footer")}</p>
     </div>

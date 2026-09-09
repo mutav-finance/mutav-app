@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { ActivityBucket } from "@convex/guarantees/domain";
+import type { StateTimelineBucket } from "@convex/guarantees/domain";
 import type { GuaranteeAggregates, ReserveCoverage } from "@convex/transparency/domain";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
@@ -22,12 +22,12 @@ export default async function TransparencyRoutePage() {
   let preloadedAggregates: Preloaded<
     typeof api.transparency.useCases.getGuaranteeAggregates
   > | null = null;
-  let preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getActivityByPeriod> | null =
+  let preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getStateTimelineByPeriod> | null =
     null;
   let preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage> | null =
     null;
   let aggregates: GuaranteeAggregates | null = null;
-  let timeline: ActivityBucket[] | null = null;
+  let timeline: StateTimelineBucket[] | null = null;
   let coverage: ReserveCoverage | null = null;
 
   try {
@@ -35,7 +35,7 @@ export default async function TransparencyRoutePage() {
     [preloadedAggregates, preloadedTimeline, preloadedCoverage] = await Promise.all([
       preloadQuery(api.transparency.useCases.getGuaranteeAggregates, {}, { token }),
       preloadQuery(
-        api.guarantees.useCases.getActivityByPeriod,
+        api.guarantees.useCases.getStateTimelineByPeriod,
         { scope: { kind: "platform" }, granularity: "week" },
         { token },
       ),
