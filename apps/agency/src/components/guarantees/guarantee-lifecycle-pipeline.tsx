@@ -201,7 +201,7 @@ function CureReturn({ label }: { label: string }) {
           className="text-muted-foreground/70 absolute top-0 left-0 size-3.5 -translate-x-1/2"
           strokeWidth={2.5}
         />
-        <span className="bg-muted-foreground/60 absolute top-3.5 right-0 size-1.5 translate-x-1/2 -translate-y-1/2 rounded-full" />
+        <span className="bg-muted-foreground/70 absolute top-3.5 right-0 size-2 translate-x-1/2 -translate-y-1/2 rounded-full" />
       </div>
       <p className="text-muted-foreground/70 mt-1 text-center text-[11px]">{label}</p>
     </div>
