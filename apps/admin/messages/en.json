@@ -143,6 +143,90 @@
       "unexpected": "Something went wrong. Please try again."
     }
   },
+  "defaults": {
+    "title": "Default requests",
+    "subtitle": "Delinquency notices awaiting a compliance decision, oldest first.",
+    "empty": "No outstanding notices.",
+    "moreAvailable": "More notices are queued — only the oldest page is shown.",
+    "notAvailable": "—",
+    "dueOn": "Rent due {date}",
+    "daysOpen": "{days, plural, =0 {today} one {# day} other {# days}}",
+    "columns": {
+      "notice": "Notice",
+      "agency": "Agency",
+      "tenant": "Tenant",
+      "guarantee": "Guarantee",
+      "outstanding": "Outstanding",
+      "openFor": "Open for",
+      "actions": "Actions"
+    },
+    "noticeStatus": {
+      "open": "Reported",
+      "verified": "Default verified"
+    },
+    "guaranteeState": {
+      "drafted": "Draft",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "actions": {
+      "verify": "Verify",
+      "cover": "Record cover",
+      "dismiss": "Dismiss",
+      "cancel": "Cancel"
+    },
+    "cover": {
+      "title": "Record cover payment",
+      "description": "Mutav has paid the landlord and a regressive receivable is born. This reserves capacity on the guarantee.",
+      "claimed": "Amount claimed",
+      "remainingCapacity": "Remaining coverage",
+      "applied": "Amount that will be drawn",
+      "clampWarning": "The claim exceeds the remaining coverage. Only the figure above is drawn — {shortfall} is left uncovered.",
+      "operationLabel": "Cover operation reference",
+      "operationPlaceholder": "COV-2026-000123",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Anything the audit trail should carry",
+      "confirm": "Record cover"
+    },
+    "dismiss": {
+      "title": "Dismiss notice",
+      "description": "Closes the notice without a cover payment. Choose the disposition that matches the finding.",
+      "reasonLabel": "Disposition",
+      "reason": {
+        "staff_dismissed": "Dismissed — the arrears was never real",
+        "staff_dispute": "Disputed — the claim is invalid, guarantee stays in default"
+      },
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Why the notice is being closed",
+      "confirm": "Dismiss notice"
+    },
+    "toast": {
+      "verified": "Default verified.",
+      "covered": "Cover recorded.",
+      "dismissed": "Notice closed."
+    },
+    "errors": {
+      "NOTICE_NOT_FOUND": "That notice no longer exists.",
+      "NOTICE_NOT_VERIFIED": "Only a verified default can draw cover. Verify the notice first.",
+      "SELF_TRANSITION": "The notice is already in that state.",
+      "TERMINAL_STATE": "The notice is already closed and cannot change again.",
+      "ILLEGAL_TRANSITION": "That move is not allowed from the notice's current state.",
+      "GUARANTEE_TRANSITION_REFUSED": "The guarantee's lifecycle refuses this move. Reload the queue and check its current state.",
+      "INVALID_AMOUNT": "The cover amount is not a valid figure in cents.",
+      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures do not add up. Escalate before drawing cover.",
+      "RELEASE_EXCEEDS_RESERVED": "The release is larger than what is currently reserved on the guarantee.",
+      "CLOSURE_REQUIRED": "Closing a guarantee needs a close reason.",
+      "CLOSURE_NOT_ALLOWED": "A close reason was supplied for a move that does not close the guarantee.",
+      "GUARANTEE_CLOSED": "The guarantee is closed and no longer accepts changes.",
+      "INVALID_RENEWAL_DATE": "The renewal date is not a valid date.",
+      "FORBIDDEN": "Your staff role cannot perform this action.",
+      "unexpected": "Something went wrong. Please try again."
+    }
+  },
   "shellSwitcher": {
     "backToAgency": "Back to agencies"
   },
