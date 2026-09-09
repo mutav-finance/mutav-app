@@ -13,7 +13,7 @@ import { Mono } from "@mutav/ui/mono";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
-import { formatBRLCents } from "@/lib/contracts/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import { api } from "@convex/_generated/api";
 import type { AgencyBankAccountId } from "@convex/payments/providers/bankAccountDomain";
 import type { TenantVisibleBankAccount } from "@convex/payments/providers/bankAccountUseCases";

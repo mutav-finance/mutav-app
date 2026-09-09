@@ -2,7 +2,7 @@ import { useTranslations } from "next-intl";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
-import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
+import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
 import { derivedStatus, type ResolvedInvoice } from "@convex/invoices/domain";
 import { InvoiceStatusTag } from "./invoice-status-tag";

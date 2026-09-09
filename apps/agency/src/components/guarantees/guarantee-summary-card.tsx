@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { MoreHorizontalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -25,7 +27,7 @@ import {
 import { Mono } from "@mutav/ui/mono";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import { cn } from "@mutav/ui/cn";
-import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
+import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { GUARANTEE_STATE } from "@convex/guarantees/domain";
 import type { Guarantee } from "@/lib/guarantees/types";
 import { api } from "@convex/_generated/api";
@@ -38,7 +40,7 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
   const isDrafted = guarantee.status === GUARANTEE_STATE.DRAFTED;
   const cancelDraft = useMutation(api.guarantees.useCases.cancelDraft);
   const [cancelOpen, setCancelOpen] = React.useState(false);
-  const [isCancelling, setIsCancelling] = React.useState(false);
+  const [isCanceling, setIsCanceling] = React.useState(false);
 
   // The row keeps `available + reserved = ceiling` for its whole life, so a
   // closed guarantee still carries capacity it no longer covers anything with.
@@ -46,7 +48,7 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
     guarantee.status === GUARANTEE_STATE.CLOSED ? 0 : guarantee.capacity.availableCents;
 
   async function handleConfirmCancel() {
-    setIsCancelling(true);
+    setIsCanceling(true);
     try {
       const result = await cancelDraft({
         agencyId: guarantee.agencyId,
@@ -60,7 +62,7 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
     } catch {
       toast.error(t("errors.UNEXPECTED"));
     } finally {
-      setIsCancelling(false);
+      setIsCanceling(false);
     }
   }
 
@@ -194,8 +196,8 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("cancelDialog.back")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmCancel} disabled={isCancelling}>
-              {isCancelling ? t("cancelDialog.cancelling") : t("cancelDialog.confirm")}
+            <AlertDialogAction onClick={handleConfirmCancel} disabled={isCanceling}>
+              {isCanceling ? t("cancelDialog.canceling") : t("cancelDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

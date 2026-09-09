@@ -22,7 +22,8 @@ export default async function TransparencyRoutePage() {
   let preloadedAggregates: Preloaded<
     typeof api.transparency.useCases.getGuaranteeAggregates
   > | null = null;
-  let preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getActivityByPeriod> | null = null;
+  let preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getActivityByPeriod> | null =
+    null;
   let preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage> | null =
     null;
   let aggregates: GuaranteeAggregates | null = null;

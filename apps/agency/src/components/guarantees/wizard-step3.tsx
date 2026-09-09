@@ -7,7 +7,7 @@ import { Button } from "@mutav/ui/button";
 import { Field } from "@mutav/ui/field";
 import { Input } from "@mutav/ui/input";
 import { LockedField } from "@mutav/ui/locked-field";
-import { type DraftWizardData } from "@/lib/guarantees/wizard";
+import { type DraftWizardData, type TenantFieldValidationCode } from "@/lib/guarantees/wizard";
 
 type Props = {
   data: DraftWizardData;
@@ -16,12 +16,7 @@ type Props = {
   onBack: () => void;
 };
 
-type ErrorCode =
-  | "required"
-  | "emailInvalid"
-  | "birthDateInvalid"
-  | "birthDateFuture"
-  | "fullNameRequired";
+type ErrorCode = "required" | "emailInvalid" | "fullNameRequired" | TenantFieldValidationCode;
 
 type Errors = Partial<Record<string, ErrorCode>>;
 

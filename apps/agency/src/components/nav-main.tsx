@@ -27,12 +27,12 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              tooltip={t("createContract")}
+              tooltip={t("createGuarantee")}
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
             >
               <Link href="/guarantees/new">
                 <CirclePlusIcon />
-                <span>{t("createContract")}</span>
+                <span>{t("createGuarantee")}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { CLOSE_REASONS, GUARANTEE_STATES } from "@convex/guarantees/machine";
+import { TENANT_FIELD_VALIDATION_CODES, WIZARD_VALIDATION_CODES } from "./wizard";
 
 /**
  * The guarantee state and close reason are rendered by dynamic key lookup —
@@ -181,7 +182,7 @@ function referencedKeys(files: readonly string[]): { exact: Set<string>; prefixe
 describe("guarantee state labels", () => {
   const catalogs = new Map(LOCALES.map((locale) => [locale, readCatalog(locale)]));
 
-  it("A — every guarantee state and close reason is labeled in both locales", () => {
+  it("A — every guarantee state, close reason and validation code is labeled in both locales", () => {
     const problems = LOCALES.flatMap((locale) => {
       const catalog = catalogs.get(locale);
       if (catalog === undefined) throw new Error(`no catalog for ${locale}`);
@@ -192,6 +193,15 @@ describe("guarantee state labels", () => {
           catalog,
           ["guaranteeList", "tabs"],
           ["all", "expiring", ...GUARANTEE_STATES],
+          locale,
+        ),
+        // Test C credits the whole `guaranteeNew.validation.` subtree to the
+        // template-literal call in step 4, so a code the wizard dropped stays
+        // invisible there. Compared against the code list, it cannot.
+        ...nonEmptyLabels(
+          catalog,
+          ["guaranteeNew", "validation"],
+          [...WIZARD_VALIDATION_CODES, ...TENANT_FIELD_VALIDATION_CODES],
           locale,
         ),
       ];

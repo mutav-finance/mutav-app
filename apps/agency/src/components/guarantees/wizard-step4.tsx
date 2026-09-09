@@ -24,7 +24,7 @@ import {
   type EditingState,
   type ReviewBlockKind,
 } from "@/lib/guarantees/wizard";
-import { formatBRLCents } from "@/lib/guarantees/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import { priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
 import type { PublicProduct } from "@convex/products/domain";
 import { PROPERTY_KIND } from "@convex/leases/domain";

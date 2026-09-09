@@ -8,7 +8,7 @@ import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@mutav/ui/collapsible";
 import { Mono } from "@mutav/ui/mono";
-import { formatDateTimeBR } from "@/lib/guarantees/format";
+import { formatDateTimeBR } from "@mutav/i18n/brazil";
 import type { GuaranteeHistoryEntry } from "@/lib/guarantees/types";
 
 export function GuaranteeHistoryCard({ history }: { history: GuaranteeHistoryEntry[] }) {

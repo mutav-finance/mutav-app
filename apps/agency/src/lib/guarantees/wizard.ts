@@ -70,16 +70,33 @@ export type ValidatedWizardData = {
   scoreTier: ScoreTier;
 };
 
-export type WizardValidationCode =
-  | "required"
-  | "cpfInvalid"
-  | "cnpjInvalid"
-  | "cepInvalid"
-  | "rentRequired"
-  | "scoreRequired"
-  | "planRequired"
-  | "emailInvalid"
-  | "phoneInvalid";
+/**
+ * Every code `validateWizard` can emit. Exported as an array because the codes
+ * are rendered by dynamic key lookup (`t(\`validation.${code}\`)`), which no
+ * type can tie to the message catalogs — the agency i18n gate compares this
+ * list against `guaranteeNew.validation` in both locales.
+ */
+export const WIZARD_VALIDATION_CODES = [
+  "required",
+  "cpfInvalid",
+  "cnpjInvalid",
+  "cepInvalid",
+  "rentRequired",
+  "scoreRequired",
+  "planRequired",
+  "emailInvalid",
+  "phoneInvalid",
+] as const;
+
+export type WizardValidationCode = (typeof WIZARD_VALIDATION_CODES)[number];
+
+/**
+ * Codes the step-3 tenant fields raise on their own. They label keys in the
+ * same `guaranteeNew.validation` group, so the gate has to see them too.
+ */
+export const TENANT_FIELD_VALIDATION_CODES = ["birthDateInvalid", "birthDateFuture"] as const;
+
+export type TenantFieldValidationCode = (typeof TENANT_FIELD_VALIDATION_CODES)[number];
 
 export type WizardValidationError = {
   code: WizardValidationCode;

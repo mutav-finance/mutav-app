@@ -59,24 +59,12 @@ const RENT_DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export const openNotice = mutationWithAgencyScope({
   args: {
-    // Both optional only while the agency app still sends `contractPublicId`;
-    // exactly one names the guarantee. Deleted with the contracts facade.
-    guaranteePublicId: v.optional(v.string()),
-    contractPublicId: v.optional(v.string()),
+    guaranteePublicId: v.string(),
     rentDueDate: v.string(),
     originalAmountCents: v.number(),
     evidenceSource: v.optional(noticeEvidenceSourceValidator),
   },
   handler: async (ctx, args): Promise<Result<OpenNoticeSuccess, OpenNoticeError>> => {
-    const guaranteePublicId = args.guaranteePublicId ?? args.contractPublicId;
-    if (guaranteePublicId === undefined) {
-      return {
-        success: false,
-        error: { code: "GUARANTEE_NOT_FOUND" },
-        message: "openNotice requires guaranteePublicId.",
-      };
-    }
-
     const evidenceSource = args.evidenceSource ?? NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED;
     if (evidenceSource !== NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED) {
       return {
@@ -107,7 +95,7 @@ export const openNotice = mutationWithAgencyScope({
     // can exist under two agencies; the caller's agency picks the row.
     const candidates = await ctx.db
       .query("guarantees")
-      .withIndex("by_publicId", (q) => q.eq("publicId", guaranteePublicId))
+      .withIndex("by_publicId", (q) => q.eq("publicId", args.guaranteePublicId))
       .collect();
     const guarantee = candidates.find((candidate) => candidate.agencyId === ctx.agencyId);
 
@@ -118,7 +106,7 @@ export const openNotice = mutationWithAgencyScope({
       return {
         success: false,
         error: { code: "GUARANTEE_NOT_FOUND" },
-        message: `No guarantee '${guaranteePublicId}' in this agency.`,
+        message: `No guarantee '${args.guaranteePublicId}' in this agency.`,
       };
     }
 
@@ -157,7 +145,7 @@ export const openNotice = mutationWithAgencyScope({
     // -2, -3, ... deterministic and greppable rather than random; picked
     // in-memory to avoid per-candidate DB round-trips.
     const yyyymmdd = args.rentDueDate.slice(0, 10);
-    const basePublicId = `DN-${guaranteePublicId}-${yyyymmdd}`;
+    const basePublicId = `DN-${args.guaranteePublicId}-${yyyymmdd}`;
     const takenPublicIds = new Set(priorForDueDate.map((n) => n.publicId));
     let publicId = basePublicId;
     let suffix = 2;

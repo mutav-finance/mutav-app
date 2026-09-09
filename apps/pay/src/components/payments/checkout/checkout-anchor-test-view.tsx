@@ -13,7 +13,7 @@ import {
   type CheckoutStepState,
 } from "@/components/payments/checkout/checkout-steps";
 import { useAnchorOnramp, type AnchorOnrampPhase } from "@/hooks/use-anchor-onramp";
-import { formatBRLCents } from "@/lib/contracts/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import { api } from "@convex/_generated/api";
 import type { ProviderOrder } from "@convex/payments/providers/orderDomain";
 

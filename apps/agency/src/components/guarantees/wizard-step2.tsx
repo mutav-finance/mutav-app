@@ -17,7 +17,7 @@ import {
   type CreditScoreRequestStatus,
   type DraftWizardData,
 } from "@/lib/guarantees/wizard";
-import { formatBRLCents } from "@/lib/guarantees/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import { GUARANTEE_PLAN, type ScoreTier } from "@convex/guarantees/domain";
 import { priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
 import type { ProductTerms, PublicProduct } from "@convex/products/domain";
@@ -260,11 +260,7 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <SummaryRow
               label={t("coverage.summary.exitCost")}
-              value={
-                product && data.rentCents > 0
-                  ? formatBRLCents(product.terms.exitCostMultiplier * data.rentCents)
-                  : null
-              }
+              value={preview ? formatBRLCents(preview.exitCostCapCents) : null}
             />
             <SummaryRow
               label={t("coverage.summary.fee")}

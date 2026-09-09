@@ -8,7 +8,7 @@ import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { formatBRLCents } from "@/lib/guarantees/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import { tenantCheckoutUrl } from "@/lib/invoices/payment-link";
 import { api } from "@convex/_generated/api";
 import { isChargeable, type Invoice, type ResolvedInvoice } from "@convex/invoices/domain";

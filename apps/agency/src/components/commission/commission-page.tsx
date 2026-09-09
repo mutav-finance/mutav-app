@@ -19,7 +19,7 @@ import { Input } from "@mutav/ui/input";
 import { Mono } from "@mutav/ui/mono";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
-import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
+import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { useWorkspace } from "@/providers/workspace";
 
 function toPeriodMonth(date: Date): string {
@@ -106,7 +106,7 @@ export function CommissionPage() {
                   {formatBRLCents(totalCommissionCents)}
                 </Mono>
                 <span className="text-muted-foreground text-sm">
-                  {t("kpi.contracts", { count: guaranteeCount })}
+                  {t("kpi.guarantees", { count: guaranteeCount })}
                 </span>
               </div>
             </div>
@@ -170,7 +170,7 @@ export function CommissionPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("table.col.contract")}</TableHead>
+                <TableHead>{t("table.col.guarantee")}</TableHead>
                 <TableHead>{t("table.col.tenant")}</TableHead>
                 <TableHead className="text-right">{t("table.col.rent")}</TableHead>
                 <TableHead className="text-right">{t("table.col.commission")}</TableHead>

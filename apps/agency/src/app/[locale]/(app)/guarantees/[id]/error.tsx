@@ -32,7 +32,7 @@ export default function GuaranteeError({
             <div className="flex flex-wrap gap-2">
               <Button onClick={reset}>{t("retry")}</Button>
               <Button variant="outline-primary" asChild>
-                <Link href="/guarantees">{t("backToContracts")}</Link>
+                <Link href="/guarantees">{t("backToGuarantees")}</Link>
               </Button>
             </div>
           </CardContent>

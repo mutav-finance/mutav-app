@@ -9,7 +9,7 @@ import { api } from "@convex/_generated/api";
 import { INSURED_STATES } from "@convex/guarantees/domain";
 import { useWorkspace } from "@/providers/workspace";
 import { GuaranteeStateBreakdown } from "@/components/guarantees/guarantee-state-breakdown";
-import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
+import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 
 export function SectionCards() {
   const t = useTranslations("metrics");

@@ -18,7 +18,7 @@ import {
   type DraftWizardData,
 } from "@/lib/guarantees/wizard";
 import { maskCPF, maskCNPJ, isValidCPF, isValidCNPJ } from "@mutav/i18n/brazil";
-import { formatBRLCents } from "@/lib/guarantees/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 
 type Props = {
   data: DraftWizardData;

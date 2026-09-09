@@ -1,7 +1,7 @@
 import { useTranslations } from "next-intl";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
-import { formatBRLCents } from "@/lib/guarantees/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import type { GuaranteeLease } from "@/lib/guarantees/types";
 import { GuaranteeActionsMenu } from "./guarantee-actions-menu";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";

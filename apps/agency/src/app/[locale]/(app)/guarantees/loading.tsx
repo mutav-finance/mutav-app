@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { PageContent } from "@mutav/ui/page/page-content";
+import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { Skeleton } from "@mutav/ui/skeleton";
 
@@ -7,10 +8,7 @@ export default async function GuaranteesLoading() {
   const t = await getTranslations("guaranteeList");
   return (
     <PageShell aria-busy="true" aria-label={t("loading")}>
-      <header className="flex flex-col gap-1 px-4 lg:px-6">
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="h-4 w-72" />
-      </header>
+      <PageHeader title={t("heading")} subtitle={t("subheading")} />
       <PageContent variant="full">
         <div className="px-4 lg:px-6">
           <Skeleton className="h-9 w-[420px] max-w-full" />

@@ -27,7 +27,7 @@ export function WizardStep5({ publicId, onReset }: Props) {
 
         <div className="flex w-full flex-col gap-2 sm:flex-row">
           <Button asChild className="flex-1">
-            <Link href={`/guarantees/${publicId}`}>{t("success.viewContract")}</Link>
+            <Link href={`/guarantees/${publicId}`}>{t("success.viewGuarantee")}</Link>
           </Button>
           <Button variant="outline" className="flex-1" onClick={onReset}>
             {t("success.createAnother")}

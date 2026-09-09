@@ -29,7 +29,7 @@ type Props = {
 };
 
 type FieldErrors = {
-  contractPublicId?: string;
+  guaranteePublicId?: string;
   rentDueDate?: string;
   amount?: string;
 };
@@ -38,14 +38,14 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
   const t = useTranslations("delinquencies.openNoticeSheet");
   const openNotice = useMutation(api.delinquencies.mutations.openNotice);
 
-  const [contractPublicId, setContractPublicId] = React.useState("");
+  const [guaranteePublicId, setGuaranteePublicId] = React.useState("");
   const [rentDueDate, setRentDueDate] = React.useState("");
   const [amountInput, setAmountInput] = React.useState("");
   const [errors, setErrors] = React.useState<FieldErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
 
   function handleClose() {
-    setContractPublicId("");
+    setGuaranteePublicId("");
     setRentDueDate("");
     setAmountInput("");
     setErrors({});
@@ -55,7 +55,7 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
   async function submit() {
     const parsedCents = parseAmountToCents(amountInput);
     const nextErrors: FieldErrors = {};
-    if (!contractPublicId.trim()) nextErrors.contractPublicId = t("errors.MISSING_CONTRACT");
+    if (!guaranteePublicId.trim()) nextErrors.guaranteePublicId = t("errors.MISSING_GUARANTEE");
     if (!rentDueDate) nextErrors.rentDueDate = t("errors.MISSING_DATE");
     if (parsedCents == null || parsedCents <= 0) nextErrors.amount = t("errors.INVALID_AMOUNT");
     setErrors(nextErrors);
@@ -66,7 +66,7 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
     try {
       const result = await openNotice({
         agencyId,
-        contractPublicId: contractPublicId.trim(),
+        guaranteePublicId: guaranteePublicId.trim(),
         rentDueDate,
         originalAmountCents: parsedCents,
       });
@@ -104,11 +104,11 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
           }}
           className="flex flex-1 flex-col gap-4 px-4"
         >
-          <Field label={t("fields.contractPublicId")} error={errors.contractPublicId}>
+          <Field label={t("fields.guaranteePublicId")} error={errors.guaranteePublicId}>
             <Input
-              value={contractPublicId}
-              onChange={(e) => setContractPublicId(e.target.value)}
-              placeholder={t("fields.contractPublicIdPlaceholder")}
+              value={guaranteePublicId}
+              onChange={(e) => setGuaranteePublicId(e.target.value)}
+              placeholder={t("fields.guaranteePublicIdPlaceholder")}
               autoFocus
             />
           </Field>
