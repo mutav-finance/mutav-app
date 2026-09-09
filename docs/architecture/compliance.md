@@ -18,7 +18,7 @@ The compliance domain owns:
 It does **not** own:
 
 - Identity or authentication (lives in `users`, `mutavStaff`, Auth0, wallet)
-- Domain-specific business rules ("a contract can't be cancelled after activation" — lives in `contracts`)
+- Domain-specific business rules ("a guarantee can't be canceled after activation" — lives in `guarantees`)
 - The audit log (compliance writes to the shared `mutavAuditLog` — see [`reliability.md`](reliability.md))
 
 ## Account types
@@ -28,7 +28,7 @@ Every principal on the platform has exactly one account type. The type determine
 | Account type                    | Surface                            | Identity source                            | Principal of                                                                |
 | ------------------------------- | ---------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------- |
 | **Anonymous visitor**           | `(public)`, `(investor)` read-only | None                                       | Browse-only sessions                                                        |
-| **Tenant**                      | `(public)/pay/[publicId]`          | `publicId` bearer                          | A single assigned contract                                                  |
+| **Tenant**                      | `(public)/pay/[publicId]`          | `publicId` bearer                          | A single assigned invoice                                                   |
 | **Agency member**               | `(app)`                            | Auth0 (planned) → `users` + `memberships`  | An agency, with role `member` / `admin` / `owner`                           |
 | **Investor — retail PF**        | `(investor)`                       | Wallet on a supported chain                | One (chain, wallet) pair                                                    |
 | **Investor — qualified PF**     | `(investor)`                       | Wallet + qualified-investor classification | One (chain, wallet) pair with CVM 175 qualified declaration                 |
@@ -229,17 +229,17 @@ Risk classification overlays this: a Blocked classification removes all "✓" ex
 
 ### Agency staff capabilities by role
 
-| Capability                     | Member | Admin | Owner |
-| ------------------------------ | ------ | ----- | ----- |
-| View agency contracts          | ✓      | ✓     | ✓     |
-| Create / edit contracts        | ✓      | ✓     | ✓     |
-| Open delinquency on a contract | ✓      | ✓     | ✓     |
-| Invite agency members          | —      | ✓     | ✓     |
-| Configure agency settings      | —      | ✓     | ✓     |
-| Manage billing                 | —      | —     | ✓     |
-| Submit KYB documents           | —      | ✓     | ✓     |
+| Capability                      | Member | Admin | Owner |
+| ------------------------------- | ------ | ----- | ----- |
+| View agency guarantees          | ✓      | ✓     | ✓     |
+| Create / edit guarantees        | ✓      | ✓     | ✓     |
+| Open delinquency on a guarantee | ✓      | ✓     | ✓     |
+| Invite agency members           | —      | ✓     | ✓     |
+| Configure agency settings       | —      | ✓     | ✓     |
+| Manage billing                  | —      | —     | ✓     |
+| Submit KYB documents            | —      | ✓     | ✓     |
 
-Agency staff don't have verification levels (agency-side KYB is the agency's verification, not the staff member's). They do have role and they do have a personal risk classification (a member flagged for fraud loses the ability to act on contracts).
+Agency staff don't have verification levels (agency-side KYB is the agency's verification, not the staff member's). They do have role and they do have a personal risk classification (a member flagged for fraud loses the ability to act on guarantees).
 
 ### Mutav-internal capabilities by sub-role
 
@@ -249,7 +249,7 @@ Agency staff don't have verification levels (agency-side KYB is the agency's ver
 | ------------------------------------------- | --------------------------- | ----- | ---------- | ------------- | -------- |
 | Review agency onboarding                    | `Mutav-BR`                  | ✓     | ✓          | —             | —        |
 | Approve / reject agency                     | `Mutav-BR`                  | ✓     | ✓          | —             | —        |
-| Read all agencies / contracts (no write)    | `Mutav-BR`                  | ✓     | ✓          | ✓             | ✓        |
+| Read all agencies / guarantees (no write)   | `Mutav-BR`                  | ✓     | ✓          | ✓             | ✓        |
 | Adjust investor verification level          | `Mutav-Fund` (KYC ref)      | ✓     | ✓          | —             | —        |
 | Adjust risk classification                  | `Mutav-Fund`                | ✓     | ✓          | —             | —        |
 | Adjust limit rules                          | both                        | ✓     | ✓          | —             | —        |

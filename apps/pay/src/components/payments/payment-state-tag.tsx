@@ -3,12 +3,18 @@ import type { InvoiceDisplayStatus } from "@convex/invoices/domain";
 
 type Tone = "accent" | "success" | "error" | "neutral" | "warning";
 
+/**
+ * Every tone paints from a brand token, so this surface inherits palette
+ * corrections instead of drifting from them. `warning` was a raw `yellow-500`
+ * until #320 re-stepped `--warning` for colorblind separation and left this
+ * one tag behind on the old hue.
+ */
 const toneClass: Record<Tone, string> = {
   accent: "bg-accent",
   success: "bg-success",
-  error: "bg-destructive",
-  warning: "bg-yellow-500",
-  neutral: "bg-muted-foreground",
+  error: "bg-error",
+  warning: "bg-warning",
+  neutral: "bg-text-3",
 };
 
 const paymentStateTone: Record<InvoiceDisplayStatus, Tone> = {
