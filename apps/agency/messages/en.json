@@ -141,6 +141,7 @@
         "DUPLICATE_NOTICE": "An open notice already exists for this guarantee and due date.",
         "INVALID_EVIDENCE_SOURCE": "Invalid evidence source.",
         "INVALID_RENT_DUE_DATE": "Invalid rent due date (use YYYY-MM-DD).",
+        "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot be moved into arrears from its current state.",
         "UNEXPECTED": "Could not open the notice. Please try again."
       }
     },
@@ -191,6 +192,7 @@
           "SELF_TRANSITION": "The notice is already in this state.",
           "TERMINAL_STATE": "The notice is already closed.",
           "ILLEGAL_TRANSITION": "Illegal transition for the current state.",
+          "NOTICE_VERIFIED": "Mutav has already verified this default; only Mutav can close it.",
           "UNEXPECTED": "Could not cancel the notice. Please try again."
         }
       }

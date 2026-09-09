@@ -1,8 +1,22 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
+import type { MutationCtx } from "../_generated/server";
 import type { Result } from "../lib/result";
 import { assertAgencyAccess, mutationWithAgencyScope, mutationWithMutavRole } from "../lib/auth";
-import { isInsured } from "../guarantees/domain";
+import {
+  GUARANTEE_STATE,
+  assertTransition as assertGuaranteeTransition,
+  isInsured,
+  type Guarantee,
+  type GuaranteeId,
+} from "../guarantees/domain";
+import {
+  applyGuaranteeTransition,
+  reserveCoverCapacity,
+  type CoverCapacityError,
+  type GuaranteeActor,
+} from "../guarantees/transitions";
+import type { UserId } from "../users/domain";
 import { AUDIT_ACTION } from "../audit/domain";
 import {
   DELINQUENCY_STATUS,
@@ -11,6 +25,8 @@ import {
   NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
   noticeEvidenceSourceValidator,
+  type DelinquencyNotice,
+  type DelinquencyNoticeId,
 } from "./domain";
 import type { TransitionError } from "./machine";
 
@@ -27,6 +43,93 @@ type TransitionErrorCode = TransitionError["code"];
 const NOTICE_VERIFIED_ERROR_CODE = "NOTICE_VERIFIED";
 type NoticeVerifiedErrorCode = typeof NOTICE_VERIFIED_ERROR_CODE;
 
+/**
+ * One wire code for "the guarantee machine refused the state change this
+ * notice disposition implies". `applyGuaranteeTransition` reports seven
+ * distinct guard codes; surfacing them raw would ask every caller to carry a
+ * message key per guarantee state, and the caller's remedy is the same in all
+ * seven cases. The refusal's own sentence travels in `message`.
+ */
+const GUARANTEE_REFUSED_ERROR_CODE = "GUARANTEE_TRANSITION_REFUSED";
+type GuaranteeRefusedErrorCode = typeof GUARANTEE_REFUSED_ERROR_CODE;
+
+type CoverCapacityErrorCode = CoverCapacityError["code"];
+
+async function guaranteeActorFor(ctx: MutationCtx, userId: UserId): Promise<GuaranteeActor> {
+  const user = await ctx.db.get(userId);
+  if (!user) throw new Error(`Authenticated user ${userId} has no row`);
+  return { userId, username: user.name };
+}
+
+async function loadGuarantee(ctx: MutationCtx, guaranteeId: GuaranteeId): Promise<Guarantee> {
+  const guarantee = await ctx.db.get(guaranteeId);
+  if (!guarantee) throw new Error(`Notice points at a missing guarantee ${guaranteeId}`);
+  return guarantee;
+}
+
+/**
+ * Is anything still outstanding on this guarantee besides the notice being
+ * closed right now? `by_guarantee_dueDate` ranges on its `guaranteeId` prefix,
+ * so this reads exactly the notices of one guarantee — a handful, one per
+ * missed rent — and nothing else. There is no (guarantee, status) index and
+ * the row count does not warrant one.
+ */
+async function hasOtherOutstandingNotice(
+  ctx: MutationCtx,
+  {
+    guaranteeId,
+    exceptNoticeId,
+  }: { guaranteeId: GuaranteeId; exceptNoticeId: DelinquencyNoticeId },
+): Promise<boolean> {
+  const notices = await ctx.db
+    .query("guaranteeDelinquencyNotices")
+    .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
+    .collect();
+  return notices.some(
+    (candidate) =>
+      candidate._id !== exceptNoticeId &&
+      (candidate.status === DELINQUENCY_STATUS.OPEN ||
+        candidate.status === DELINQUENCY_STATUS.VERIFIED),
+  );
+}
+
+/**
+ * A guarantee is in arrears only while an outstanding notice says so, so the
+ * last open or verified notice closing is what earns it its way back to
+ * `active`. Returns the row to move, or null to leave the guarantee alone —
+ * the machine is the gate, so a guarantee whose life has moved on to eviction
+ * (or has closed) is not pulled back by a disposition on one notice.
+ */
+async function planReturnToActive(
+  ctx: MutationCtx,
+  notice: DelinquencyNotice,
+): Promise<Guarantee | null> {
+  const guarantee = await loadGuarantee(ctx, notice.guaranteeId);
+  if (!assertGuaranteeTransition(guarantee.status, GUARANTEE_STATE.ACTIVE).success) return null;
+  const stillOutstanding = await hasOtherOutstandingNotice(ctx, {
+    guaranteeId: guarantee._id,
+    exceptNoticeId: notice._id,
+  });
+  return stillOutstanding ? null : guarantee;
+}
+
+async function returnGuaranteeToActive(
+  ctx: MutationCtx,
+  { guarantee, actor, message }: { guarantee: Guarantee; actor: GuaranteeActor; message: string },
+): Promise<void> {
+  const applied = await applyGuaranteeTransition(ctx, {
+    guarantee,
+    to: GUARANTEE_STATE.ACTIVE,
+    actor,
+    message,
+  });
+  // The notice row is already patched here, so a refusal cannot be reported as
+  // a clean Result without committing a half-applied cure. `planReturnToActive`
+  // consulted the same machine a moment ago, so this only fires on a genuine
+  // invariant break — throwing rolls the whole transaction back.
+  if (!applied.success) throw new Error(applied.message);
+}
+
 // ---------------------------------------------------------------------------
 // openNotice — agency files a new delinquency notice
 // ---------------------------------------------------------------------------
@@ -39,7 +142,8 @@ type OpenNoticeError = {
     | "DUPLICATE_NOTICE"
     | "INVALID_EVIDENCE_SOURCE"
     | "INVALID_RENT_DUE_DATE"
-    | "INVALID_AMOUNT";
+    | "INVALID_AMOUNT"
+    | GuaranteeRefusedErrorCode;
 };
 
 // YYYY-MM-DD, calendar-plausible (day 01-31). We don't fully validate
@@ -154,6 +258,29 @@ export const openNotice = mutationWithAgencyScope({
       suffix += 1;
     }
 
+    // The guarantee enters arrears in THIS transaction: a notice that commits
+    // without the state change would leave every dashboard reading the
+    // guarantee as performing. Run before the insert so a machine refusal
+    // returns a Result with nothing written. A guarantee already past `active`
+    // keeps the state it has and still records the notice — a tenant under
+    // cover can miss another rent; `drafted` and `closed` never get here, the
+    // `isInsured` guard above turned them away.
+    if (guarantee.status === GUARANTEE_STATE.ACTIVE) {
+      const applied = await applyGuaranteeTransition(ctx, {
+        guarantee,
+        to: GUARANTEE_STATE.IN_ARREARS,
+        actor: { userId: ctx.user._id, username: ctx.user.name },
+        message: "Inadimplência registrada",
+      });
+      if (!applied.success) {
+        return {
+          success: false,
+          error: { code: GUARANTEE_REFUSED_ERROR_CODE },
+          message: applied.message,
+        };
+      }
+    }
+
     const openedAt = new Date().toISOString();
     // TODO(audit): emit appendAuditEntry once agency-side audit lands. Pilot
     // relies on the openedByUserId column plus staff-side entries; see
@@ -183,7 +310,7 @@ export const openNotice = mutationWithAgencyScope({
 // markResolved — agency-triggered resolution (tenant_cured, stale)
 // ---------------------------------------------------------------------------
 
-type MarkResolvedSuccess = { publicId: string };
+type MarkResolvedSuccess = { publicId: string; guaranteeReturnedToActive: boolean };
 type MarkResolvedError = {
   code: "NOTICE_NOT_FOUND" | NoticeVerifiedErrorCode | TransitionErrorCode;
 };
@@ -239,6 +366,14 @@ export const markResolved = mutation({
       return { success: false, error: { code: guard.error.code }, message: guard.message };
     }
 
+    // Only a cure says the arrears are gone. `stale` means the notice aged out
+    // with nobody acting on it — the debt behind it was never shown to be
+    // settled, so it must not hand the guarantee back its performing state.
+    const cured =
+      args.resolution.kind === NOTICE_RESOLUTION_KIND.TENANT_CURED
+        ? await planReturnToActive(ctx, notice)
+        : null;
+
     // TODO(audit): emit appendAuditEntry once agency-side audit lands; see
     // docs/architecture/admin.md.
     await ctx.db.patch(notice._id, {
@@ -251,9 +386,17 @@ export const markResolved = mutation({
       },
     });
 
+    if (cured) {
+      await returnGuaranteeToActive(ctx, {
+        guarantee: cured,
+        actor: await guaranteeActorFor(ctx, membership.userId),
+        message: "Inadimplência regularizada",
+      });
+    }
+
     return {
       success: true,
-      data: { publicId: notice.publicId },
+      data: { publicId: notice.publicId, guaranteeReturnedToActive: cured !== null },
       message: `Delinquency notice '${notice.publicId}' resolved (${args.resolution.kind}).`,
     };
   },
@@ -264,7 +407,7 @@ export const markResolved = mutation({
 // data_error)
 // ---------------------------------------------------------------------------
 
-type MarkCanceledSuccess = { publicId: string };
+type MarkCanceledSuccess = { publicId: string; guaranteeReturnedToActive: boolean };
 type MarkCanceledError = {
   code: "NOTICE_NOT_FOUND" | NoticeVerifiedErrorCode | TransitionErrorCode;
 };
@@ -316,6 +459,12 @@ export const markCanceled = mutation({
       return { success: false, error: { code: guard.error.code }, message: guard.message };
     }
 
+    // A canceled notice is a notice that should never have existed, so it also
+    // stops holding the guarantee in arrears. It never touches capacity: only
+    // a cover resolution reserves, and cover is staff-only on a verified
+    // notice, which an agency cannot cancel.
+    const withdrawn = await planReturnToActive(ctx, notice);
+
     // TODO(audit): emit appendAuditEntry once agency-side audit lands; see
     // docs/architecture/admin.md.
     await ctx.db.patch(notice._id, {
@@ -328,10 +477,112 @@ export const markCanceled = mutation({
       },
     });
 
+    if (withdrawn) {
+      await returnGuaranteeToActive(ctx, {
+        guarantee: withdrawn,
+        actor: await guaranteeActorFor(ctx, membership.userId),
+        message: "Acionamento de inadimplência cancelado",
+      });
+    }
+
     return {
       success: true,
-      data: { publicId: notice.publicId },
+      data: { publicId: notice.publicId, guaranteeReturnedToActive: withdrawn !== null },
       message: `Delinquency notice '${notice.publicId}' canceled (${args.cancellation.reason}).`,
+    };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// staffVerifyDefault — compliance confirms the reported arrears is a default
+// ---------------------------------------------------------------------------
+
+type StaffVerifyDefaultSuccess = {
+  publicId: string;
+  guaranteeStatus: typeof GUARANTEE_STATE.DEFAULT_VERIFIED;
+};
+type StaffVerifyDefaultError = {
+  code: "NOTICE_NOT_FOUND" | TransitionErrorCode | GuaranteeRefusedErrorCode;
+};
+
+/**
+ * The gate between "the agency says the tenant missed rent" and "Mutav owes
+ * the landlord". Verification is what makes a cover draw legal, so it carries
+ * the compliance role and moves both machines at once: the notice to
+ * `verified`, the guarantee from `in_arrears` to `default_verified`.
+ */
+export const staffVerifyDefault = mutationWithMutavRole({ minRole: "compliance" })({
+  args: {
+    noticePublicId: v.string(),
+    note: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<Result<StaffVerifyDefaultSuccess, StaffVerifyDefaultError>> => {
+    const notice = await ctx.db
+      .query("guaranteeDelinquencyNotices")
+      .withIndex("by_publicId", (q) => q.eq("publicId", args.noticePublicId))
+      .unique();
+    if (!notice) {
+      return {
+        success: false,
+        error: { code: "NOTICE_NOT_FOUND" },
+        message: `No delinquency notice '${args.noticePublicId}'.`,
+      };
+    }
+
+    const guard = assertTransition(notice.status, DELINQUENCY_STATUS.VERIFIED);
+    if (!guard.success) {
+      return { success: false, error: { code: guard.error.code }, message: guard.message };
+    }
+
+    // The guarantee moves first: it is the only step that can still be refused
+    // without a write, and its own guards run before its first patch.
+    const guarantee = await loadGuarantee(ctx, notice.guaranteeId);
+    const applied = await applyGuaranteeTransition(ctx, {
+      guarantee,
+      to: GUARANTEE_STATE.DEFAULT_VERIFIED,
+      actor: { userId: ctx.user._id, username: ctx.user.name },
+      message: "Inadimplência confirmada pela Mutav",
+    });
+    if (!applied.success) {
+      return {
+        success: false,
+        error: { code: GUARANTEE_REFUSED_ERROR_CODE },
+        message: applied.message,
+      };
+    }
+
+    const verifiedAt = new Date().toISOString();
+    await ctx.db.patch(notice._id, {
+      status: DELINQUENCY_STATUS.VERIFIED,
+      verification: {
+        verifiedAt,
+        verifiedByUserId: ctx.user._id,
+        note: args.note,
+      },
+    });
+
+    await ctx.appendStaffAudit({
+      action: AUDIT_ACTION.DELINQUENCY_VERIFIED,
+      resourceType: "guaranteeDelinquencyNotices",
+      resourceId: notice.publicId,
+      payload: {
+        noticeId: notice._id,
+        guaranteeId: notice.guaranteeId,
+        agencyId: notice.agencyId,
+        originalAmountCents: notice.originalAmountCents,
+        updatedAmountCents: notice.updatedAmountCents,
+        verifiedAt,
+        note: args.note ?? null,
+      },
+    });
+
+    return {
+      success: true,
+      data: { publicId: notice.publicId, guaranteeStatus: GUARANTEE_STATE.DEFAULT_VERIFIED },
+      message: `Delinquency notice '${notice.publicId}' verified.`,
     };
   },
 });
@@ -340,8 +591,14 @@ export const markCanceled = mutation({
 // staffMarkResolvedByCover — cover_committed resolution, compliance+ only
 // ---------------------------------------------------------------------------
 
-type StaffResolveByCoverSuccess = { publicId: string };
-type StaffResolveByCoverError = { code: "NOTICE_NOT_FOUND" | TransitionErrorCode };
+type StaffResolveByCoverSuccess = { publicId: string; appliedCoverCents: number };
+type StaffResolveByCoverError = {
+  code:
+    | "NOTICE_NOT_FOUND"
+    | TransitionErrorCode
+    | GuaranteeRefusedErrorCode
+    | CoverCapacityErrorCode;
+};
 
 /**
  * cover_committed is the money-committing resolution: Mutav has drawn from
@@ -378,6 +635,50 @@ export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compli
       return { success: false, error: { code: guard.error.code }, message: guard.message };
     }
 
+    const guarantee = await loadGuarantee(ctx, notice.guaranteeId);
+    // Pure pre-check of the guarantee machine so the draw below is the FIRST
+    // write of the transaction: reserving cents and only then discovering the
+    // guarantee cannot be covered would either commit an orphan reservation or
+    // force a throw where a typed refusal belongs.
+    const guaranteeGuard = assertGuaranteeTransition(
+      guarantee.status,
+      GUARANTEE_STATE.COVER_COMMITTED,
+    );
+    if (!guaranteeGuard.success) {
+      return {
+        success: false,
+        error: { code: GUARANTEE_REFUSED_ERROR_CODE },
+        message: guaranteeGuard.message,
+      };
+    }
+
+    // Draw the UPDATED amount, not the original: `updatedAmountCents` is what
+    // the tenant owes the landlord at cover time — the original plus whatever
+    // juros and multa have accrued since — and that is the figure Mutav pays
+    // out. The schema keeps the field required and seeds it equal to the
+    // original at open, so there is no "if present" branch to write.
+    const actor: GuaranteeActor = { userId: ctx.user._id, username: ctx.user.name };
+    const reserved = await reserveCoverCapacity(ctx, {
+      guarantee,
+      amountCents: notice.updatedAmountCents,
+      actor,
+    });
+    if (!reserved.success) {
+      return { success: false, error: { code: reserved.error.code }, message: reserved.message };
+    }
+
+    const drawn = await loadGuarantee(ctx, notice.guaranteeId);
+    const applied = await applyGuaranteeTransition(ctx, {
+      guarantee: drawn,
+      to: GUARANTEE_STATE.COVER_COMMITTED,
+      actor,
+      message: "Cobertura acionada pela Mutav",
+    });
+    // Pre-checked above against the same machine, and capacity is already
+    // committed — a refusal here is an invariant break, so throw and let the
+    // transaction take the reservation back with it.
+    if (!applied.success) throw new Error(applied.message);
+
     const resolvedAt = new Date().toISOString();
     await ctx.db.patch(notice._id, {
       status: DELINQUENCY_STATUS.RESOLVED,
@@ -386,6 +687,9 @@ export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compli
         resolvedAt,
         resolvedByUserId: ctx.user._id,
         coverOperationPublicId: args.coverOperationPublicId,
+        // The clamped figure, never the face amount: a later dispute reversal
+        // releases exactly this many cents.
+        appliedCoverCents: reserved.data.appliedCents,
         note: args.note,
       },
     });
@@ -404,6 +708,8 @@ export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compli
         coverOperationPublicId: args.coverOperationPublicId,
         originalAmountCents: notice.originalAmountCents,
         updatedAmountCents: notice.updatedAmountCents,
+        appliedCoverCents: reserved.data.appliedCents,
+        capacity: reserved.data.capacity,
         resolvedAt,
         note: args.note ?? null,
       },
@@ -411,8 +717,8 @@ export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compli
 
     return {
       success: true,
-      data: { publicId: notice.publicId },
-      message: `Delinquency notice '${notice.publicId}' resolved by cover.`,
+      data: { publicId: notice.publicId, appliedCoverCents: reserved.data.appliedCents },
+      message: `Delinquency notice '${notice.publicId}' resolved by cover for ${reserved.data.appliedCents} cents.`,
     };
   },
 });

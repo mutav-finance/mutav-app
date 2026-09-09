@@ -141,6 +141,7 @@
         "DUPLICATE_NOTICE": "Já existe um acionamento aberto para essa garantia nessa data.",
         "INVALID_EVIDENCE_SOURCE": "Fonte de evidência inválida.",
         "INVALID_RENT_DUE_DATE": "Data de vencimento inválida (use AAAA-MM-DD).",
+        "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode entrar em inadimplência a partir do estado atual.",
         "UNEXPECTED": "Não foi possível abrir o acionamento. Tente novamente."
       }
     },
@@ -191,6 +192,7 @@
           "SELF_TRANSITION": "O acionamento já está nesse estado.",
           "TERMINAL_STATE": "O acionamento já foi encerrado.",
           "ILLEGAL_TRANSITION": "Transição inválida para o estado atual.",
+          "NOTICE_VERIFIED": "A Mutav já confirmou essa inadimplência; só a Mutav pode encerrá-la.",
           "UNEXPECTED": "Não foi possível cancelar o acionamento. Tente novamente."
         }
       }
