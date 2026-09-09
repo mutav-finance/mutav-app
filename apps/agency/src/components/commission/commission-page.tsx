@@ -19,7 +19,7 @@ import { Input } from "@mutav/ui/input";
 import { Mono } from "@mutav/ui/mono";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
-import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
 import { useWorkspace } from "@/providers/workspace";
 
 function toPeriodMonth(date: Date): string {
@@ -40,17 +40,17 @@ export function CommissionPage() {
   );
 
   const rows = useQuery(
-    api.contracts.useCases.listForCommissionByMonth,
+    api.guarantees.useCases.listForCommissionByMonth,
     agencyId ? { agencyId, periodMonth: toPeriodMonth(month) } : "skip",
   );
 
   const term = search.toLowerCase();
   const filtered = (rows ?? []).filter(
-    (r) => r.contractId.toLowerCase().includes(term) || r.tenantName.toLowerCase().includes(term),
+    (r) => r.guaranteeId.toLowerCase().includes(term) || r.tenantName.toLowerCase().includes(term),
   );
 
   const totalCommissionCents = filtered.reduce((sum, r) => sum + r.commissionCents, 0);
-  const contractCount = filtered.length;
+  const guaranteeCount = filtered.length;
 
   function prevMonth() {
     setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1));
@@ -106,7 +106,7 @@ export function CommissionPage() {
                   {formatBRLCents(totalCommissionCents)}
                 </Mono>
                 <span className="text-muted-foreground text-sm">
-                  {t("kpi.contracts", { count: contractCount })}
+                  {t("kpi.contracts", { count: guaranteeCount })}
                 </span>
               </div>
             </div>
@@ -190,13 +190,13 @@ export function CommissionPage() {
                 </TableRow>
               ) : (
                 filtered.map((row) => (
-                  <TableRow key={row.contractId}>
+                  <TableRow key={row.guaranteeId}>
                     <TableCell>
                       <Link
-                        href={`/contracts/${row.contractId}`}
+                        href={`/guarantees/${row.guaranteeId}`}
                         className="text-primary hover:text-primary/80 font-mono text-sm font-medium transition-colors"
                       >
-                        {row.contractId}
+                        {row.guaranteeId}
                       </Link>
                     </TableCell>
                     <TableCell className="text-base-sm">{row.tenantName}</TableCell>

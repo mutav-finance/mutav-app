@@ -30,7 +30,7 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
               tooltip={t("createContract")}
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
             >
-              <Link href="/contracts/new">
+              <Link href="/guarantees/new">
                 <CirclePlusIcon />
                 <span>{t("createContract")}</span>
               </Link>

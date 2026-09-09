@@ -7,7 +7,7 @@ import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@mutav
 import { Skeleton } from "@mutav/ui/skeleton";
 import { api } from "@convex/_generated/api";
 import { useWorkspace } from "@/providers/workspace";
-import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
 
 export function SectionCards() {
   const t = useTranslations("metrics");
@@ -15,7 +15,7 @@ export function SectionCards() {
   const agencyId = selectedAgency?._id;
 
   const summary = useQuery(
-    api.contracts.useCases.getStatusCounts,
+    api.guarantees.useCases.getStatusCounts,
     agencyId ? { agencyId } : "skip",
   );
 

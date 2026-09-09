@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
-import type { ContractAggregates } from "@convex/transparency/domain";
+import type { GuaranteeAggregates } from "@convex/transparency/domain";
 
-type Props = { aggregates: ContractAggregates | null };
+type Props = { aggregates: GuaranteeAggregates | null };
 
 export function CapacityPanel({ aggregates }: Props) {
   const t = useTranslations("transparency.capacity");

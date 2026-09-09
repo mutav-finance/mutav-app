@@ -13,7 +13,6 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
-  type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 
 import { api } from "@convex/_generated/api";
-import { derivedStatus, type InvoiceDisplayStatus } from "@convex/invoices/domain";
 import { useWorkspace } from "@/providers/workspace";
 import { Link } from "@mutav/i18n/navigation";
 import { Badge } from "@mutav/ui/badge";
@@ -51,34 +49,47 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
-import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
-import { InvoiceStatusTag } from "@/components/invoices/invoice-status-tag";
+import { GUARANTEE_STATE, type UrgencyTier } from "@convex/guarantees/domain";
+import { StatusTag } from "@/components/guarantees/status-tag";
+import type { GuaranteeState } from "@/lib/guarantees/types";
 
-type StateTab = "all" | InvoiceDisplayStatus;
+type GuaranteeListItem = {
+  id: string;
+  status: GuaranteeState;
+  nextRenewalDate: string;
+  availableCapacityCents: number;
+  tenantName: string;
+  creationTime: number;
+  urgency: UrgencyTier;
+  urgencySortKey: number;
+};
 
-const STATE_TABS: readonly StateTab[] = ["all", "open", "overdue", "paid", "void"];
+type StatusTab = "all" | GuaranteeState | "expiring";
 
-function isStateTab(value: string): value is StateTab {
-  return STATE_TABS.some((tab) => tab === value);
+const STATUS_TABS: readonly StatusTab[] = [
+  "all",
+  "expiring",
+  "ativo",
+  "pendente",
+  "encerrado",
+  "cancelado",
+];
+
+function isStatusTab(value: string): value is StatusTab {
+  return STATUS_TABS.some((tab) => tab === value);
 }
 
-type InvoiceListItem = {
-  id: string;
-  agencyId: string;
-  periodMonth: string;
-  issuedAt: string;
-  dueDate: string;
-  totalCents: number;
-  status: InvoiceDisplayStatus;
-  method: ({ kind: string } & Record<string, unknown>) | null;
-  lineItemCount: number;
+const statusTone: Record<GuaranteeState, "accent" | "success" | "error" | "neutral"> = {
+  ativo: "success",
+  pendente: "accent",
+  encerrado: "neutral",
+  cancelado: "error",
 };
 
 function buildColumns(
-  t: ReturnType<typeof useTranslations<"invoiceList">>,
-  tState: ReturnType<typeof useTranslations<"invoiceDetails.state">>,
-  tMethod: ReturnType<typeof useTranslations<"invoiceDetails.method">>,
-): ColumnDef<InvoiceListItem>[] {
+  t: ReturnType<typeof useTranslations<"contractList">>,
+  tStatus: ReturnType<typeof useTranslations<"contractDetails.status">>,
+): ColumnDef<GuaranteeListItem>[] {
   return [
     {
       id: "publicId",
@@ -86,7 +97,7 @@ function buildColumns(
       header: t("columns.publicId"),
       cell: ({ row }) => (
         <Link
-          href={`/invoices/${row.original.id}`}
+          href={`/guarantees/${row.original.id}`}
           className="text-foreground font-mono hover:underline"
         >
           {row.original.id}
@@ -94,111 +105,100 @@ function buildColumns(
       ),
     },
     {
-      id: "period",
-      accessorKey: "periodMonth",
-      header: t("columns.period"),
-      cell: ({ row }) => formatPeriodMonth(row.original.periodMonth),
-    },
-    {
-      id: "dueDate",
-      accessorKey: "dueDate",
-      header: t("columns.dueDate"),
-      cell: ({ row }) => formatDateBR(row.original.dueDate),
-    },
-    {
-      id: "total",
-      accessorKey: "totalCents",
-      header: () => <div className="w-full text-right">{t("columns.total")}</div>,
-      cell: ({ row }) => (
-        <div className="text-right font-mono">{formatBRLCents(row.original.totalCents)}</div>
-      ),
-    },
-    {
-      id: "state",
+      id: "status",
       accessorKey: "status",
-      header: t("columns.state"),
-      cell: ({ row }) => (
-        <InvoiceStatusTag
-          status={row.original.status}
-          pulse={row.original.status === "open" || row.original.status === "overdue"}
-        >
-          {tState(row.original.status)}
-        </InvoiceStatusTag>
-      ),
-      filterFn: (row, _columnId, value) => row.original.status === value,
-    },
-    {
-      id: "contracts",
-      accessorKey: "lineItemCount",
-      header: t("columns.contracts"),
-      cell: ({ row }) => (
-        <span className="text-muted-foreground tabular-nums">{row.original.lineItemCount}</span>
-      ),
-    },
-    {
-      id: "method",
-      accessorKey: "method",
-      header: () => null,
-      enableHiding: true,
+      header: t("columns.status"),
       cell: ({ row }) => {
-        const method = row.original.method;
-        return (
-          <span className="text-muted-foreground text-xs">
-            {method ? tMethod(method.kind as "boleto" | "pix" | "stellar") : tMethod("none")}
-          </span>
-        );
+        const { status, urgency } = row.original;
+        if (status === GUARANTEE_STATE.ACTIVE) {
+          if (urgency === "overdue")
+            return <StatusTag tone="error">{t("urgency.overdue")}</StatusTag>;
+          if (urgency === "expiring")
+            return <StatusTag tone="expiring">{t("urgency.expiring")}</StatusTag>;
+          if (urgency === "critical")
+            return <StatusTag tone="caution">{t("urgency.critical")}</StatusTag>;
+        }
+        return <StatusTag tone={statusTone[status]}>{tStatus(status)}</StatusTag>;
       },
+      filterFn: (row, columnId, value) => row.getValue(columnId) === value,
+    },
+    {
+      id: "tenant",
+      accessorKey: "tenantName",
+      header: t("columns.tenant"),
+    },
+    {
+      id: "availableGuarantee",
+      accessorKey: "availableCapacityCents",
+      header: () => <div className="w-full text-right">{t("columns.availableGuarantee")}</div>,
+      cell: ({ row }) => (
+        <div className="text-right font-mono">
+          {formatBRLCents(row.original.availableCapacityCents)}
+        </div>
+      ),
+    },
+    {
+      id: "nextRenewalDate",
+      accessorKey: "nextRenewalDate",
+      header: t("columns.nextRenewalDate"),
+      cell: ({ row }) => formatDateBR(row.original.nextRenewalDate),
+    },
+    {
+      id: "creationTime",
+      accessorKey: "creationTime",
+      header: t("columns.creationTime"),
+      cell: ({ row }) => formatDateBR(new Date(row.original.creationTime).toISOString()),
+    },
+    {
+      id: "urgency",
+      accessorKey: "urgencySortKey",
+      header: t("columns.urgency"),
+      enableHiding: true,
     },
   ];
 }
 
-export function InvoiceListTable() {
-  const t = useTranslations("invoiceList");
-  const tState = useTranslations("invoiceDetails.state");
-  const tMethod = useTranslations("invoiceDetails.method");
+type Props = {
+  defaultSort?: SortingState;
+  emptyStateCta?: string;
+};
+
+export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
+  const t = useTranslations("contractList");
+  const tStatus = useTranslations("contractDetails.status");
 
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
+  const referenceDate = new Date().toISOString().slice(0, 10);
+  const [statusTab, setStatusTab] = React.useState<StatusTab>("all");
+
   const result = useQuery(
-    api.invoices.useCases.listByAgency,
-    agencyId ? { agencyId, paginationOpts: { numItems: 200, cursor: null } } : "skip",
+    api.guarantees.useCases.listByAgency,
+    agencyId
+      ? { agencyId, paginationOpts: { numItems: 200, cursor: null }, tab: statusTab, referenceDate }
+      : "skip",
   );
 
-  const data = React.useMemo<InvoiceListItem[]>(() => {
-    const today = utcTodayDate();
-    return (result?.page ?? []).map((doc) => ({
-      id: doc.publicId,
-      agencyId: doc.agencyId,
-      periodMonth: doc.periodMonth,
-      issuedAt: doc.issuedAt,
-      dueDate: doc.dueDate,
-      totalCents: doc.totalCents,
-      status: derivedStatus(doc, today),
-      method: doc.method,
-      lineItemCount: doc.lineItems.length,
-    }));
-  }, [result]);
+  const data: GuaranteeListItem[] = result?.page ?? [];
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
+  const noAgency = !workspaceLoading && agencyId === undefined;
 
-  const columns = React.useMemo(() => buildColumns(t, tState, tMethod), [t, tState, tMethod]);
+  const columns = React.useMemo(() => buildColumns(t, tStatus), [t, tStatus]);
 
   const [globalFilter, setGlobalFilter] = React.useState("");
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    method: false,
+    creationTime: false,
+    urgency: false,
   });
-  const [sorting, setSorting] = React.useState<SortingState>([{ id: "dueDate", desc: true }]);
+  const [sorting, setSorting] = React.useState<SortingState>(
+    defaultSort ?? [{ id: "nextRenewalDate", desc: false }],
+  );
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
-  const [stateTab, setStateTab] = React.useState<StateTab>("all");
 
-  React.useEffect(() => {
-    setColumnFilters((prev) => {
-      const without = prev.filter((f) => f.id !== "state");
-      return stateTab === "all" ? without : [...without, { id: "state", value: stateTab }];
-    });
-  }, [stateTab]);
-
+  // React Compiler skips memoizing this component because TanStack Table's
+  // useReactTable() returns non-memoizable functions. Acceptable — the table
+  // is small and fast.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
@@ -206,21 +206,19 @@ export function InvoiceListTable() {
     state: {
       sorting,
       globalFilter,
-      columnFilters,
       columnVisibility,
       pagination,
     },
     getRowId: (row) => row.id,
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     globalFilterFn: (row, _columnId, filterValue: string) => {
       const q = String(filterValue).toLowerCase();
       const id = (row.original.id ?? "").toLowerCase();
-      const period = (row.original.periodMonth ?? "").toLowerCase();
-      return id.includes(q) || period.includes(q);
+      const tenant = (row.original.tenantName ?? "").toLowerCase();
+      return id.includes(q) || tenant.includes(q);
     },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -230,34 +228,44 @@ export function InvoiceListTable() {
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  const counts = React.useMemo<Record<StateTab, number>>(() => {
-    const c: Record<StateTab, number> = {
-      all: data.length,
-      open: 0,
-      overdue: 0,
-      paid: 0,
-      void: 0,
-    };
-    for (const row of data) c[row.status]++;
-    return c;
-  }, [data]);
+  const tabCounts = useQuery(
+    api.guarantees.useCases.getGuaranteeTabCounts,
+    agencyId ? { agencyId, referenceDate } : "skip",
+  );
+  const counts: Record<StatusTab, number> = {
+    all: tabCounts?.all ?? 0,
+    expiring: tabCounts?.expiring ?? 0,
+    ativo: tabCounts?.ativo ?? 0,
+    pendente: tabCounts?.pendente ?? 0,
+    encerrado: tabCounts?.encerrado ?? 0,
+    cancelado: tabCounts?.cancelado ?? 0,
+  };
+
   if (isLoading) {
     return (
       <div className="text-muted-foreground px-4 py-8 text-center text-sm">{t("loading")}</div>
     );
   }
 
+  if (noAgency) {
+    return (
+      <div className="text-muted-foreground px-4 py-8 text-center text-sm">
+        {t("noAgencySelected")}
+      </div>
+    );
+  }
+
   return (
     <Tabs
-      value={stateTab}
+      value={statusTab}
       onValueChange={(v) => {
-        if (isStateTab(v)) setStateTab(v);
+        if (isStatusTab(v)) setStatusTab(v);
       }}
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 lg:px-6">
         <TabsList>
-          {STATE_TABS.map((tab) => (
+          {STATUS_TABS.map((tab) => (
             <TabsTrigger key={tab} value={tab}>
               {t(`tabs.${tab}`)} <Badge variant="count">{counts[tab]}</Badge>
             </TabsTrigger>
@@ -299,7 +307,7 @@ export function InvoiceListTable() {
       </div>
 
       <TabsContent
-        value={stateTab}
+        value={statusTab}
         forceMount
         className="relative flex flex-col gap-4 overflow-x-auto px-4 lg:px-6"
       >
@@ -332,7 +340,17 @@ export function InvoiceListTable() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
-                    {t("noResults")}
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-muted-foreground text-sm">{t("noResults")}</span>
+                      {emptyStateCta && data.length === 0 && statusTab === "all" && (
+                        <Link
+                          href="/guarantees/new"
+                          className="text-primary text-sm font-medium hover:underline"
+                        >
+                          {emptyStateCta} →
+                        </Link>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -349,14 +367,14 @@ export function InvoiceListTable() {
           </div>
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="pay-rows-per-page" className="text-sm font-medium">
+              <Label htmlFor="rows-per-page" className="text-sm font-medium">
                 {t("pagination.rowsPerPage")}
               </Label>
               <Select
                 value={`${table.getState().pagination.pageSize}`}
                 onValueChange={(value) => table.setPageSize(Number(value))}
               >
-                <SelectTrigger size="sm" className="w-20" id="pay-rows-per-page">
+                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
                   <SelectValue placeholder={table.getState().pagination.pageSize} />
                 </SelectTrigger>
                 <SelectContent side="top">

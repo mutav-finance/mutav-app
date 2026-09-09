@@ -29,7 +29,7 @@ import {
   SheetTitle,
 } from "@mutav/ui/sheet";
 import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-status-tag";
-import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@/lib/guarantees/format";
 
 type Props = {
   publicId: string | null;

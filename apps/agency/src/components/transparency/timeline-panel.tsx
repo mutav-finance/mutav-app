@@ -1,7 +1,7 @@
 "use client";
 
-import type { ActivityBucket } from "@convex/contracts/domain";
-import { ActivityChart } from "@/components/contracts/activity-chart";
+import type { ActivityBucket } from "@convex/guarantees/domain";
+import { ActivityChart } from "@/components/guarantees/activity-chart";
 
 type Props = { data: ActivityBucket[] | null };
 

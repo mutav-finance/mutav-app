@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
-import { formatBRLCents } from "@/lib/contracts/format";
+import { formatBRLCents } from "@/lib/guarantees/format";
 import type { Invoice } from "@convex/invoices/domain";
 
 export function InvoiceLineItemsCard({ payment }: { payment: Invoice }) {
@@ -43,7 +43,7 @@ export function InvoiceLineItemsCard({ payment }: { payment: Invoice }) {
                 <TableRow key={idx}>
                   <TableCell>
                     <Link
-                      href={`/contracts/${item.guaranteePublicId}`}
+                      href={`/guarantees/${item.guaranteePublicId}`}
                       className="font-mono text-sm hover:underline"
                     >
                       {item.guaranteePublicId}

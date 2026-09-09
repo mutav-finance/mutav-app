@@ -4,30 +4,30 @@ import { useTranslations } from "next-intl";
 import { usePreloadedQuery } from "convex/react";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { ActivityBucket } from "@convex/contracts/domain";
-import type { ContractAggregates, ReserveCoverage } from "@convex/transparency/domain";
-import { ContractsPanel } from "./contracts-panel";
+import type { ActivityBucket } from "@convex/guarantees/domain";
+import type { GuaranteeAggregates, ReserveCoverage } from "@convex/transparency/domain";
+import { GuaranteesPanel } from "./guarantees-panel";
 import { CapacityPanel } from "./capacity-panel";
 import { ReservePanel } from "./reserve-panel";
 import { TimelinePanel } from "./timeline-panel";
 
 type Props = {
-  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getContractAggregates> | null;
-  preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod> | null;
+  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getGuaranteeAggregates> | null;
+  preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getActivityByPeriod> | null;
   preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage> | null;
-  initialAggregates: ContractAggregates | null;
+  initialAggregates: GuaranteeAggregates | null;
   initialTimeline: ActivityBucket[] | null;
   initialCoverage: ReserveCoverage | null;
 };
 
 type LiveProps = {
-  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getContractAggregates>;
-  preloadedTimeline: Preloaded<typeof api.contracts.useCases.getActivityByPeriod>;
+  preloadedAggregates: Preloaded<typeof api.transparency.useCases.getGuaranteeAggregates>;
+  preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getActivityByPeriod>;
   preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage>;
 };
 
 type LayoutProps = {
-  aggregates: ContractAggregates | null | undefined;
+  aggregates: GuaranteeAggregates | null | undefined;
   timeline: ActivityBucket[] | null | undefined;
   coverage: ReserveCoverage | null | undefined;
 };
@@ -41,7 +41,7 @@ function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps)
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ContractsPanel aggregates={agg} />
+        <GuaranteesPanel aggregates={agg} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

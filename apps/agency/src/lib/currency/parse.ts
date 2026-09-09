@@ -11,7 +11,7 @@
  * Callers use the null return to surface a submit-time "missing / invalid
  * amount" error to the user.
  *
- * Distinct from `parseBRLInput` in `../contracts/wizard.ts`, which returns
+ * Distinct from `parseBRLInput` in `../guarantees/wizard.ts`, which returns
  * `0` on invalid/empty input. That zero-returning variant is used by the
  * contract wizard's `onBlur` handlers to write into draft state, where a
  * cleared field must produce a stable numeric zero. This null-returning

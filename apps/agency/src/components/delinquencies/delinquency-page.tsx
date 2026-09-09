@@ -20,7 +20,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-status-tag";
 import { OpenNoticeSheet } from "@/components/delinquencies/open-notice-sheet";
 import { NoticeDetailSheet } from "@/components/delinquencies/notice-detail-sheet";
-import { formatBRLCents, formatDateTimeBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateTimeBR } from "@/lib/guarantees/format";
 
 const OPEN_QUERY_KEY = "notice";
 const OPEN_NEW = "new";
