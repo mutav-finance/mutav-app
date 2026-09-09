@@ -12,6 +12,7 @@ import {
   type GuaranteeId,
   type GuaranteeState,
 } from "../guarantees/domain";
+import type { Result } from "../lib/result";
 import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import { isEligible, type ProductEligibility } from "../products/domain";
 import schema from "../schema";
@@ -160,6 +161,11 @@ async function leasesByAgencyTenant(
     .query("leases")
     .withIndex("by_agency_tenant", (q) => q.eq("agencyId", agencyId).eq("tenantId", tenantId))
     .collect();
+}
+
+function errorOf<E>(result: Result<unknown, E>): E {
+  if (result.success) throw new Error("expected a failed Result");
+  return result.error;
 }
 
 function publicIds(rows: Lease[]): string[] {
@@ -1773,7 +1779,7 @@ describe("one-open-guarantee rule — lease side", () => {
     });
 
     expect(before.guard.success).toBe(false);
-    expect(before.guard.error).toEqual({ code: "LEASE_HAS_OPEN_GUARANTEE" });
+    expect(errorOf(before.guard)).toEqual({ code: "LEASE_HAS_OPEN_GUARANTEE" });
     expect(before.sweep).toEqual([
       { lease: "LSE-ST1", problem: "pointer targets a closed guarantee" },
     ]);
