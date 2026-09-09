@@ -3,9 +3,10 @@ import type { Result } from "../lib/result";
 /**
  * Delinquency notice lifecycle.
  *
- * A DIFFERENT object from the guarantee state ({@link ../guarantees/machine.ts}).
- * A notice is a per-event record ("agency reports tenant missed rent on this
- * date for this amount"); the guarantee state is contract-level.
+ * A DIFFERENT object from the guarantee state ({@link ../guarantees/machine.ts}),
+ * which lives on the guarantee row. A notice is one per-event record ("agency
+ * reports tenant missed rent on this date for this amount") that may drive a
+ * guarantee transition, but never carries the guarantee state itself.
  *
  * One contract can accumulate many notices over its life. Each notice moves
  * independently through this 3-status machine. Identifiers are English per

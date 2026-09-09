@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import type { Result } from "../lib/result";
 
 export const GUARANTEE_STATE = {
@@ -95,5 +96,89 @@ export const assertTransition = (
     success: true,
     data: { from, to },
     message: `Guarantee transition ${from} -> ${to} approved.`,
+  };
+};
+
+export const CLOSE_REASON = {
+  END_OF_LEASE: "end_of_lease",
+  RESCISSION: "rescission",
+  ABANDONMENT: "abandonment",
+  EVICTION: "eviction",
+  DISPUTE_REVERSAL: "dispute_reversal",
+  CANCELED_PRE_ACTIVATION: "canceled_pre_activation",
+  DEATH: "death",
+} as const;
+
+export type CloseReason = (typeof CLOSE_REASON)[keyof typeof CLOSE_REASON];
+
+export const CLOSE_REASONS: readonly CloseReason[] = [
+  CLOSE_REASON.END_OF_LEASE,
+  CLOSE_REASON.RESCISSION,
+  CLOSE_REASON.ABANDONMENT,
+  CLOSE_REASON.EVICTION,
+  CLOSE_REASON.DISPUTE_REVERSAL,
+  CLOSE_REASON.CANCELED_PRE_ACTIVATION,
+  CLOSE_REASON.DEATH,
+] as const;
+
+export const closeReasonValidator = v.union(
+  v.literal(CLOSE_REASON.END_OF_LEASE),
+  v.literal(CLOSE_REASON.RESCISSION),
+  v.literal(CLOSE_REASON.ABANDONMENT),
+  v.literal(CLOSE_REASON.EVICTION),
+  v.literal(CLOSE_REASON.DISPUTE_REVERSAL),
+  v.literal(CLOSE_REASON.CANCELED_PRE_ACTIVATION),
+  v.literal(CLOSE_REASON.DEATH),
+);
+
+/**
+ * A draft is canceled, never ended: the lease-ending reasons exclude `drafted`
+ * on purpose, and `canceled_pre_activation` is the only way out of it.
+ */
+const ENDED_FROM_ANY_ACTIVATED_STATE: readonly GuaranteeState[] = [
+  GUARANTEE_STATE.ACTIVE,
+  GUARANTEE_STATE.IN_ARREARS,
+  GUARANTEE_STATE.DEFAULT_VERIFIED,
+  GUARANTEE_STATE.COVER_COMMITTED,
+  GUARANTEE_STATE.IN_EVICTION,
+] as const;
+
+export const CLOSE_REASON_ALLOWED_FROM: Readonly<Record<CloseReason, readonly GuaranteeState[]>> = {
+  end_of_lease: ENDED_FROM_ANY_ACTIVATED_STATE,
+  rescission: ENDED_FROM_ANY_ACTIVATED_STATE,
+  abandonment: ENDED_FROM_ANY_ACTIVATED_STATE,
+  death: ENDED_FROM_ANY_ACTIVATED_STATE,
+  eviction: [GUARANTEE_STATE.IN_EVICTION],
+  dispute_reversal: [GUARANTEE_STATE.DEFAULT_VERIFIED, GUARANTEE_STATE.COVER_COMMITTED],
+  canceled_pre_activation: [GUARANTEE_STATE.DRAFTED],
+} as const;
+
+export type CloseError = { code: "TERMINAL_STATE" } | { code: "REASON_NOT_ALLOWED_FROM_STATE" };
+
+export type CloseSuccess = { from: GuaranteeState; reason: CloseReason };
+
+export const assertClose = (
+  from: GuaranteeState,
+  reason: CloseReason,
+): Result<CloseSuccess, CloseError> => {
+  if (isTerminal(from)) {
+    return {
+      success: false,
+      error: { code: "TERMINAL_STATE" },
+      message: `Guarantee state "${from}" is terminal; it cannot be closed again.`,
+    };
+  }
+  const legalOrigins = CLOSE_REASON_ALLOWED_FROM[reason];
+  if (!legalOrigins.includes(from)) {
+    return {
+      success: false,
+      error: { code: "REASON_NOT_ALLOWED_FROM_STATE" },
+      message: `Close reason "${reason}" is not allowed from guarantee state "${from}". Allowed from: ${legalOrigins.join(", ")}.`,
+    };
+  }
+  return {
+    success: true,
+    data: { from, reason },
+    message: `Guarantee close from ${from} with reason "${reason}" approved.`,
   };
 };
