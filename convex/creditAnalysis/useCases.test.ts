@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractApplicationId } from "../contracts/domain";
+import type { ContractApplicationId } from "../guarantees/domain";
 import {
   registerContractAggregateComponents,
   seedAgencyWithMembership,
@@ -39,7 +39,7 @@ async function seedApplication(
       agencyId: args.agencyId,
       subjectHash: args.subjectHash,
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310100",
       rentCents: 250_000,
       openedBy: args.openedBy,
@@ -153,7 +153,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
-    const result = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+    const result = await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
       agencyId,
       document: SUBJECT_CPF,
     });
@@ -170,17 +170,17 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
-    const opened = await asUser.mutation(api.contracts.useCases.openContractApplication, {
+    const opened = await asUser.mutation(api.guarantees.useCases.openContractApplication, {
       agencyId,
       document: SUBJECT_CPF,
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310-100",
       rentCents: 250_000,
     });
     expect(opened.success).toBe(true);
 
-    const result = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+    const result = await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
       agencyId,
       document: SUBJECT_CPF,
     });
@@ -200,7 +200,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
       openedAt: Date.now(),
     });
 
-    const result = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+    const result = await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
       agencyId,
       document: SUBJECT_CPF,
     });
@@ -219,7 +219,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
       openedAt: Date.now() - APPLICATION_VALIDITY_MS - 1,
     });
 
-    const result = await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+    const result = await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
       agencyId,
       document: SUBJECT_CPF,
     });
@@ -238,7 +238,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
       openedAt: Date.now(),
     });
 
-    await asUser.mutation(api.contracts.useCases.requestCreditScore, {
+    await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
       agencyId,
       document: SUBJECT_CPF,
     });
@@ -256,11 +256,11 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
-    const result = await asUser.mutation(api.contracts.useCases.openContractApplication, {
+    const result = await asUser.mutation(api.guarantees.useCases.openContractApplication, {
       agencyId,
       document: "123",
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310-100",
       rentCents: 250_000,
     });
@@ -278,11 +278,11 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
-    await asUser.mutation(api.contracts.useCases.openContractApplication, {
+    await asUser.mutation(api.guarantees.useCases.openContractApplication, {
       agencyId,
       document: "111.444.777-35",
       entityType: "pf",
-      propertyKind: "comercial",
+      propertyKind: "commercial",
       cep: "01310-100",
       rentCents: 250_000,
     });
@@ -292,7 +292,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
     expect(rows[0].openedBy).toBe(userId);
     expect(rows[0].agencyId).toBe(agencyId);
     expect(rows[0].cep).toBe("01310100");
-    expect(rows[0].propertyKind).toBe("comercial");
+    expect(rows[0].propertyKind).toBe("commercial");
     expect(rows[0].subjectHash).toBe(await hashPii(SUBJECT_CPF));
   });
 });

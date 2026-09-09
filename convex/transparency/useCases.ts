@@ -1,8 +1,8 @@
 import { queryWithAuth } from "../lib/auth";
-import { ativoInsuredCentsPlatform, contractsByStatusPlatform } from "../contracts/aggregate";
-import { CONTRACT_STATUS } from "../contracts/domain";
+import { countByStatePlatform, countInsured, sumInsuredExposure } from "../guarantees/aggregate";
+import { GUARANTEE_STATE } from "../guarantees/domain";
 import { getMaxGuaranteeCapacityCents, getReserveContractId, getStellarNetwork } from "../lib/env";
-import type { ContractAggregates, ReserveCoverage } from "./domain";
+import type { GuaranteeAggregates, ReserveCoverage } from "./domain";
 
 // Aggregates in this module are platform-wide BY DESIGN — every viewer sees the
 // same numbers (transparency dashboard). Do NOT add per-agency filtering here;
@@ -11,37 +11,20 @@ import type { ContractAggregates, ReserveCoverage } from "./domain";
 
 export const getContractAggregates = queryWithAuth({
   args: {},
-  handler: async (ctx): Promise<ContractAggregates> => {
-    const [countAtivos, countPendentes] = await contractsByStatusPlatform.countBatch(ctx, [
-      {
-        bounds: {
-          lower: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
-          upper: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
-        },
-      },
-      {
-        bounds: {
-          lower: { key: CONTRACT_STATUS.PENDENTE, inclusive: true },
-          upper: { key: CONTRACT_STATUS.PENDENTE, inclusive: true },
-        },
-      },
-    ]);
-
-    const sumInsuredCents = await ativoInsuredCentsPlatform.sum(ctx, {
-      bounds: {
-        lower: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
-        upper: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
-      },
-    });
-
-    // No `inadimplente` contract state exists yet — expose null so the UI shows
-    // "—" instead of a misleading 0% on a transparency surface.
+  handler: async (ctx): Promise<GuaranteeAggregates> => {
+    // The default rate needs the receivable ledger (spec 9h) to define its
+    // denominator honestly — expose null so the UI shows "—" instead of a
+    // misleading 0% on a transparency surface.
+    const countByState = await countByStatePlatform(ctx);
+    const insured = await countInsured(ctx);
     return {
-      countAtivos: countAtivos ?? 0,
-      countPendentes: countPendentes ?? 0,
-      sumInsuredCents,
+      countByState,
+      countInsured: insured,
+      sumInsuredCents: await sumInsuredExposure(ctx),
       defaultRate: null,
       maxCapacityCents: getMaxGuaranteeCapacityCents(),
+      countAtivos: insured,
+      countPendentes: countByState[GUARANTEE_STATE.DRAFTED],
     };
   },
 });

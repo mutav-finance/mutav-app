@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { type ScoreTier, tierForScore } from "../contracts/domain";
+import { type ScoreTier, tierForScore } from "../guarantees/domain";
 
 export type CreditAnalysisSignal = Doc<"creditAnalysisSignals">;
 export type CreditAnalysisSignalId = Id<"creditAnalysisSignals">;

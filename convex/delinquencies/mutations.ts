@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { Result } from "../lib/result";
 import { assertAgencyAccess, mutationWithAgencyScope, mutationWithMutavRole } from "../lib/auth";
-import { CONTRACT_STATUS } from "../contracts/domain";
+import { isInsured } from "../guarantees/domain";
 import { AUDIT_ACTION } from "../audit/domain";
 import {
   DELINQUENCY_STATUS,
@@ -18,6 +18,15 @@ import type { TransitionError } from "./machine";
 // codes map 1:1 onto the mutation-level error codes for transition failures.
 type TransitionErrorCode = TransitionError["code"];
 
+/**
+ * Agency-side dispositions act on `open` notices only. The machine allows
+ * `verified → resolved | canceled` because staff close verified notices
+ * (cover committed, dispute, dismissal); an agency must not be able to make a
+ * default that compliance has already confirmed disappear.
+ */
+const NOTICE_VERIFIED_ERROR_CODE = "NOTICE_VERIFIED";
+type NoticeVerifiedErrorCode = typeof NOTICE_VERIFIED_ERROR_CODE;
+
 // ---------------------------------------------------------------------------
 // openNotice — agency files a new delinquency notice
 // ---------------------------------------------------------------------------
@@ -25,8 +34,8 @@ type TransitionErrorCode = TransitionError["code"];
 type OpenNoticeSuccess = { publicId: string };
 type OpenNoticeError = {
   code:
-    | "CONTRACT_NOT_FOUND"
-    | "CONTRACT_NOT_ACTIVE"
+    | "GUARANTEE_NOT_FOUND"
+    | "GUARANTEE_NOT_INSURED"
     | "DUPLICATE_NOTICE"
     | "INVALID_EVIDENCE_SOURCE"
     | "INVALID_RENT_DUE_DATE"
@@ -37,7 +46,7 @@ type OpenNoticeError = {
 // calendar validity (Feb 30 is accepted); a later normalize-via-Date pass
 // can tighten this if needed. Prevents ambiguous formats like ISO
 // datetimes ("2026-06-05T00:00:00Z") which would bypass the
-// `by_contract_dueDate` duplicate check and split the publicId collision
+// `by_guarantee_dueDate` duplicate check and split the publicId collision
 // domain — two calls for the same day would produce distinct publicIds.
 const RENT_DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -50,12 +59,24 @@ const RENT_DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export const openNotice = mutationWithAgencyScope({
   args: {
-    contractPublicId: v.string(),
+    // Both optional only while the agency app still sends `contractPublicId`;
+    // exactly one names the guarantee. Deleted with the contracts facade.
+    guaranteePublicId: v.optional(v.string()),
+    contractPublicId: v.optional(v.string()),
     rentDueDate: v.string(),
     originalAmountCents: v.number(),
     evidenceSource: v.optional(noticeEvidenceSourceValidator),
   },
   handler: async (ctx, args): Promise<Result<OpenNoticeSuccess, OpenNoticeError>> => {
+    const guaranteePublicId = args.guaranteePublicId ?? args.contractPublicId;
+    if (guaranteePublicId === undefined) {
+      return {
+        success: false,
+        error: { code: "GUARANTEE_NOT_FOUND" },
+        message: "openNotice requires guaranteePublicId.",
+      };
+    }
+
     const evidenceSource = args.evidenceSource ?? NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED;
     if (evidenceSource !== NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED) {
       return {
@@ -82,37 +103,42 @@ export const openNotice = mutationWithAgencyScope({
       };
     }
 
-    const contract = await ctx.db
-      .query("contracts")
-      .withIndex("by_publicId", (q) => q.eq("publicId", args.contractPublicId))
-      .unique();
+    // `publicId` carries no DB-level uniqueness constraint, so the same value
+    // can exist under two agencies; the caller's agency picks the row.
+    const candidates = await ctx.db
+      .query("guarantees")
+      .withIndex("by_publicId", (q) => q.eq("publicId", guaranteePublicId))
+      .collect();
+    const guarantee = candidates.find((candidate) => candidate.agencyId === ctx.agencyId);
 
     // Merge not-found + wrong-agency: same error surface avoids leaking
     // cross-agency existence to a caller that only has membership in a
     // different agency.
-    if (!contract || contract.agencyId !== ctx.agencyId) {
+    if (!guarantee) {
       return {
         success: false,
-        error: { code: "CONTRACT_NOT_FOUND" },
-        message: `No active contract '${args.contractPublicId}' in this agency.`,
+        error: { code: "GUARANTEE_NOT_FOUND" },
+        message: `No guarantee '${guaranteePublicId}' in this agency.`,
       };
     }
 
-    if (contract.status !== CONTRACT_STATUS.ATIVO) {
+    // Any in-force state accepts a notice — a guarantee already in arrears or
+    // under cover can miss another rent. Drafts and closed guarantees cannot.
+    if (!isInsured(guarantee)) {
       return {
         success: false,
-        error: { code: "CONTRACT_NOT_ACTIVE" },
-        message: `Contract '${contract.publicId}' is not active (current status: '${contract.status}').`,
+        error: { code: "GUARANTEE_NOT_INSURED" },
+        message: `Guarantee '${guarantee.publicId}' is not in force (current status: '${guarantee.status}').`,
       };
     }
 
-    // Idempotency: one OPEN notice per (contract, dueDate). Prior notices
+    // Idempotency: one OPEN notice per (guarantee, dueDate). Prior notices
     // that resolved or canceled are legal — the agency may re-file if a
     // stale/withdrawn notice needs to be reopened.
     const priorForDueDate = await ctx.db
-      .query("contractDelinquencyNotices")
-      .withIndex("by_contract_dueDate", (q) =>
-        q.eq("contractId", contract._id).eq("rentDueDate", args.rentDueDate),
+      .query("guaranteeDelinquencyNotices")
+      .withIndex("by_guarantee_dueDate", (q) =>
+        q.eq("guaranteeId", guarantee._id).eq("rentDueDate", args.rentDueDate),
       )
       .collect();
 
@@ -120,18 +146,18 @@ export const openNotice = mutationWithAgencyScope({
       return {
         success: false,
         error: { code: "DUPLICATE_NOTICE" },
-        message: `An open notice already exists for contract '${contract.publicId}' on ${args.rentDueDate}.`,
+        message: `An open notice already exists for guarantee '${guarantee.publicId}' on ${args.rentDueDate}.`,
       };
     }
 
-    // publicId: DN-<contractPublicId>-<yyyy-mm-dd>. basePublicId encodes the
+    // publicId: DN-<guaranteePublicId>-<yyyy-mm-dd>. basePublicId encodes the
     // exact rentDueDate, so every candidate collision is on the same
-    // (contractId, rentDueDate) tuple — which is exactly the
-    // `by_contract_dueDate` prefix scanned into `priorForDueDate`. Suffixes
+    // (guaranteeId, rentDueDate) tuple — which is exactly the
+    // `by_guarantee_dueDate` prefix scanned into `priorForDueDate`. Suffixes
     // -2, -3, ... deterministic and greppable rather than random; picked
     // in-memory to avoid per-candidate DB round-trips.
     const yyyymmdd = args.rentDueDate.slice(0, 10);
-    const basePublicId = `DN-${args.contractPublicId}-${yyyymmdd}`;
+    const basePublicId = `DN-${guaranteePublicId}-${yyyymmdd}`;
     const takenPublicIds = new Set(priorForDueDate.map((n) => n.publicId));
     let publicId = basePublicId;
     let suffix = 2;
@@ -144,9 +170,9 @@ export const openNotice = mutationWithAgencyScope({
     // TODO(audit): emit appendAuditEntry once agency-side audit lands. Pilot
     // relies on the openedByUserId column plus staff-side entries; see
     // docs/architecture/admin.md.
-    await ctx.db.insert("contractDelinquencyNotices", {
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId,
-      contractId: contract._id,
+      guaranteeId: guarantee._id,
       agencyId: ctx.agencyId,
       status: DELINQUENCY_STATUS.OPEN,
       rentDueDate: args.rentDueDate,
@@ -170,7 +196,9 @@ export const openNotice = mutationWithAgencyScope({
 // ---------------------------------------------------------------------------
 
 type MarkResolvedSuccess = { publicId: string };
-type MarkResolvedError = { code: "NOTICE_NOT_FOUND" | TransitionErrorCode };
+type MarkResolvedError = {
+  code: "NOTICE_NOT_FOUND" | NoticeVerifiedErrorCode | TransitionErrorCode;
+};
 
 /**
  * Agency-side resolution. Deliberately excludes `cover_committed` and
@@ -192,7 +220,7 @@ export const markResolved = mutation({
   },
   handler: async (ctx, args): Promise<Result<MarkResolvedSuccess, MarkResolvedError>> => {
     const notice = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.noticePublicId))
       .unique();
     if (!notice) {
@@ -209,6 +237,14 @@ export const markResolved = mutation({
     // the authenticated caller's id — assertAgencyAccess resolved it from
     // the identity token — so no separate user re-fetch is needed.
     const membership = await assertAgencyAccess(ctx, notice.agencyId);
+
+    if (notice.status === DELINQUENCY_STATUS.VERIFIED) {
+      return {
+        success: false,
+        error: { code: NOTICE_VERIFIED_ERROR_CODE },
+        message: `Delinquency notice '${notice.publicId}' is staff-verified; only staff may close it.`,
+      };
+    }
 
     const guard = assertTransition(notice.status, DELINQUENCY_STATUS.RESOLVED);
     if (!guard.success) {
@@ -241,7 +277,9 @@ export const markResolved = mutation({
 // ---------------------------------------------------------------------------
 
 type MarkCanceledSuccess = { publicId: string };
-type MarkCanceledError = { code: "NOTICE_NOT_FOUND" | TransitionErrorCode };
+type MarkCanceledError = {
+  code: "NOTICE_NOT_FOUND" | NoticeVerifiedErrorCode | TransitionErrorCode;
+};
 
 /**
  * Agency-side cancellation. Validator excludes `staff_dismissed`, mirroring
@@ -262,7 +300,7 @@ export const markCanceled = mutation({
   },
   handler: async (ctx, args): Promise<Result<MarkCanceledSuccess, MarkCanceledError>> => {
     const notice = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.noticePublicId))
       .unique();
     if (!notice) {
@@ -276,6 +314,14 @@ export const markCanceled = mutation({
     // See markResolved above for why membership.userId (not a re-fetch) is
     // the authored-by id on a bare mutation.
     const membership = await assertAgencyAccess(ctx, notice.agencyId);
+
+    if (notice.status === DELINQUENCY_STATUS.VERIFIED) {
+      return {
+        success: false,
+        error: { code: NOTICE_VERIFIED_ERROR_CODE },
+        message: `Delinquency notice '${notice.publicId}' is staff-verified; only staff may close it.`,
+      };
+    }
 
     const guard = assertTransition(notice.status, DELINQUENCY_STATUS.CANCELED);
     if (!guard.success) {
@@ -328,7 +374,7 @@ export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compli
     args,
   ): Promise<Result<StaffResolveByCoverSuccess, StaffResolveByCoverError>> => {
     const notice = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.noticePublicId))
       .unique();
     if (!notice) {
@@ -361,11 +407,11 @@ export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compli
     // rest of the transaction — no orphan entries in either direction.
     await ctx.appendStaffAudit({
       action: AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER,
-      resourceType: "contractDelinquencyNotices",
+      resourceType: "guaranteeDelinquencyNotices",
       resourceId: notice.publicId,
       payload: {
         noticeId: notice._id,
-        contractId: notice.contractId,
+        guaranteeId: notice.guaranteeId,
         agencyId: notice.agencyId,
         coverOperationPublicId: args.coverOperationPublicId,
         originalAmountCents: notice.originalAmountCents,
@@ -397,8 +443,8 @@ type StaffDismissError = { code: "NOTICE_NOT_FOUND" | TransitionErrorCode };
  * The two staff-only terminal dispositions share auth gate, cross-agency
  * scope, and audit shape — collapsed into one mutation with a discriminated
  * arg. Per contract-default-scenarios.md, `staff_dispute` is a RESOLUTION on
- * the notice (not a cancellation); the contract-level `closed(dispute_reversal)`
- * that follows belongs to the contracts domain and is not this mutation's
+ * the notice (not a cancellation); the guarantee-level `closed(dispute_reversal)`
+ * that follows belongs to the guarantees domain and is not this mutation's
  * responsibility.
  */
 export const staffMarkCanceledByDismissal = mutationWithMutavRole({ minRole: "compliance" })({
@@ -414,7 +460,7 @@ export const staffMarkCanceledByDismissal = mutationWithMutavRole({ minRole: "co
   },
   handler: async (ctx, args): Promise<Result<StaffDismissSuccess, StaffDismissError>> => {
     const notice = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.noticePublicId))
       .unique();
     if (!notice) {
@@ -458,11 +504,11 @@ export const staffMarkCanceledByDismissal = mutationWithMutavRole({ minRole: "co
 
     await ctx.appendStaffAudit({
       action: isDispute ? AUDIT_ACTION.DELINQUENCY_DISPUTED : AUDIT_ACTION.DELINQUENCY_DISMISSED,
-      resourceType: "contractDelinquencyNotices",
+      resourceType: "guaranteeDelinquencyNotices",
       resourceId: notice.publicId,
       payload: {
         noticeId: notice._id,
-        contractId: notice.contractId,
+        guaranteeId: notice.guaranteeId,
         agencyId: notice.agencyId,
         kind: args.disposition.kind,
         at: now,

@@ -34,10 +34,19 @@ export const GENESIS_PREV_HASH = "0".repeat(64);
  * deprecate by adding a new key.
  */
 export const AUDIT_ACTION = {
-  // contracts/
+  // contracts/ (frozen wire values — historical rows only; the domain is now
+  // `guarantees/` and emits the `guarantee.*` keys below).
   CONTRACT_CREATED: "contract.created",
   CONTRACT_CANCELED: "contract.canceled",
   CONTRACT_STATUS_UPDATED: "contract.status_updated",
+  // guarantees/ (current — emitted by convex/guarantees/useCases.ts and the
+  // transition helper).
+  GUARANTEE_CREATED: "guarantee.created",
+  GUARANTEE_TRANSITIONED: "guarantee.transitioned",
+  GUARANTEE_REPRICED: "guarantee.repriced",
+  GUARANTEE_CAPACITY_RESERVED: "guarantee.capacity_reserved",
+  // leases/ (current — emitted alongside guarantee creation).
+  LEASE_CREATED: "lease.created",
   // payments/ (frozen wire values — historical rows only; never emitted by
   // current code, kept so the hash chain still verifies pre-rename entries).
   PAYMENT_BATCH_GENERATED: "payment.batch_generated",
@@ -65,6 +74,7 @@ export const AUDIT_ACTION = {
   // delinquencies/ (staff-only terminal dispositions — emitted by
   // convex/delinquencies/mutations.ts). Agency-side transitions are NOT
   // audited for the pilot; see the mutations file for the TODO.
+  DELINQUENCY_VERIFIED: "delinquency.verified",
   DELINQUENCY_RESOLVED_BY_COVER: "delinquency.resolved_by_cover",
   DELINQUENCY_DISMISSED: "delinquency.dismissed",
   DELINQUENCY_DISPUTED: "delinquency.disputed",
@@ -76,6 +86,11 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.CONTRACT_CREATED),
   v.literal(AUDIT_ACTION.CONTRACT_CANCELED),
   v.literal(AUDIT_ACTION.CONTRACT_STATUS_UPDATED),
+  v.literal(AUDIT_ACTION.GUARANTEE_CREATED),
+  v.literal(AUDIT_ACTION.GUARANTEE_TRANSITIONED),
+  v.literal(AUDIT_ACTION.GUARANTEE_REPRICED),
+  v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RESERVED),
+  v.literal(AUDIT_ACTION.LEASE_CREATED),
   v.literal(AUDIT_ACTION.PAYMENT_BATCH_GENERATED),
   v.literal(AUDIT_ACTION.PAYMENT_MARKED_OVERDUE),
   v.literal(AUDIT_ACTION.PAYMENT_METHOD_SET),
@@ -92,6 +107,7 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.STAFF_DELETED),
   v.literal(AUDIT_ACTION.STAFF_BOOTSTRAP),
   v.literal(AUDIT_ACTION.TENANT_DATA_CONFLICT),
+  v.literal(AUDIT_ACTION.DELINQUENCY_VERIFIED),
   v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISMISSED),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISPUTED),

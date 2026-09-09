@@ -139,3 +139,31 @@ The Phase-1 `payments`→`invoices` rename shipped via **wipe + reseed** instead
 4. Drop the old `*BRL` fields once no readers remain. Use `@convex-dev/migrations` for the schema-shape change — see official `convex-migration-helper` skill.
 
 Defer until the schema has at least one production record or a feature actually performs money arithmetic on these values; until then, a simple rename + seed-data update suffices.
+
+## PT value objects on the guarantee row (document status, tenant approval, score tier)
+
+**Rule:** stored enum values are English (CLAUDE.md § Code style). Three grandfathered PT value objects survived the `contracts → guarantees` rename because they are not lifecycle statuses and the rename PR was already one hard reseed:
+
+- `guarantees.documents[].status` — `DOCUMENT_STATUS = { PENDENTE, ENVIADO, APROVADO }` (`convex/guarantees/domain.ts`, validator `documentStatus` in `convex/schema.ts`).
+- `guarantees.tenantApproval.status` — `TENANT_APPROVAL_STATUS = { APROVADO, PENDENTE, REPROVADO }` (same files).
+- `SCORE_TIER = { bom, regular, ruim, negado }` — and, new with the products catalog, the PT keys are **frozen into data as field names**: `products.terms.tierRate: { bom, regular, ruim }` (`productTermsValidator`, `DEFAULT_PRICING_TABLE`, every `guarantees.terms` snapshot derives its fee from one of them).
+
+`seed.ts` and `lib/testFixtures.ts` now write these only through the constants, so a rename is a constant + schema + message-key change, not a literal hunt.
+
+**Migration approach:** rename all three in one wipe + reseed PR (`pending | submitted | approved`; `approved | pending | rejected`; `good | fair | poor | denied` with `tierRate: { good, fair, poor }`), updating the agency wizard/detail label maps and both message files in the same PR. Do it after the contracts facade is deleted (PR4) so the rename does not have to be mirrored twice; before the first real product row is written from the admin catalog UI, because `tierRate` keys become an API surface for that form.
+
+## PT free text written by the server (history messages, invoice line descriptions)
+
+**Rule:** identifiers and stored enum values are English; Portuguese lives only in `messages/pt-BR.json` values (CLAUDE.md § Code style).
+
+**Existing server-written PT free text** (grandfathered from the `contracts` era, carried through the `guarantees` rename):
+
+- `guaranteeHistory.message` — `"Garantia criada"` (`guarantees/useCases.ts` create), `"Proposta cancelada"` (`cancelDraft`), plus the seed's narrative entries.
+- `invoices.lineItems[].description` — `` `Mensalidade — garantia ${publicId}` `` and `` `Taxa de ativação — garantia ${publicId}` `` (`invoices/mutations.ts` `generateMonthlyInvoices`). The pay app renders these verbatim.
+
+**Migration approach:** replace the free-text columns with an English event/kind code and let each UI translate:
+
+1. `guaranteeHistory`: add `kind: "created" | "draft_canceled" | "transitioned" | …` (+ structured `payload`), keep `message` optional for the seed's narrative rows; agency detail renders `history.<kind>` from `messages/*.json`.
+2. `invoices.lineItems[]`: `kind` already exists (`recurring` / `activation`) — drop `description`, render from `kind` + `guaranteePublicId` in agency and pay.
+
+Both are schema-shape changes on the wipe+reseed path and need the agency + pay UIs in the same PR; do them when PR4 (agency guarantees UI) or the next pay billing change touches those renderers. Until then, do not add new PT literals to server code — new history events use the `guarantee.transitioned` audit payload (`from`/`to`/`reason`) as their source of truth.

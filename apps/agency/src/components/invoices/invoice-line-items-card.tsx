@@ -43,10 +43,10 @@ export function InvoiceLineItemsCard({ payment }: { payment: Invoice }) {
                 <TableRow key={idx}>
                   <TableCell>
                     <Link
-                      href={`/contracts/${item.contractPublicId}`}
+                      href={`/contracts/${item.guaranteePublicId}`}
                       className="font-mono text-sm hover:underline"
                     >
-                      {item.contractPublicId}
+                      {item.guaranteePublicId}
                     </Link>
                   </TableCell>
                   <TableCell>

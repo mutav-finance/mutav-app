@@ -6,12 +6,36 @@ import { v } from "convex/values";
 // would create a circular dependency through `_generated/dataModel`.
 const agencyDocumentKind = v.union(v.literal("documento_empresa"), v.literal("responsavel_id"));
 
-const contractStatus = v.union(
-  v.literal("ativo"),
-  v.literal("encerrado"),
-  v.literal("pendente"),
-  v.literal("cancelado"),
+// Canonical `GUARANTEE_STATE` / `CLOSE_REASON` live in
+// `convex/guarantees/machine.ts`; inlined here to avoid the entity-file →
+// `_generated/dataModel` circular import. The seven states are the guarantee
+// lifecycle (drafted → active → in_arrears → default_verified →
+// cover_committed → in_eviction → closed); `closed` carries a reason.
+const guaranteeState = v.union(
+  v.literal("drafted"),
+  v.literal("active"),
+  v.literal("in_arrears"),
+  v.literal("default_verified"),
+  v.literal("cover_committed"),
+  v.literal("in_eviction"),
+  v.literal("closed"),
 );
+
+const closeReason = v.union(
+  v.literal("end_of_lease"),
+  v.literal("rescission"),
+  v.literal("abandonment"),
+  v.literal("eviction"),
+  v.literal("dispute_reversal"),
+  v.literal("canceled_pre_activation"),
+  v.literal("death"),
+);
+
+// Canonical `SCORE_TIER` lives in `convex/guarantees/domain.ts`. `negado` is
+// deliberately absent from the priceable set: a denied tenant is rejected
+// before pricing, so no product carries a rate for it.
+const priceableTier = v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"));
+const scoreTier = v.union(priceableTier, v.literal("negado"));
 
 const documentStatus = v.union(v.literal("pendente"), v.literal("enviado"), v.literal("aprovado"));
 
@@ -21,13 +45,15 @@ const documentKey = v.union(
   v.literal("policy"),
 );
 
-const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
+const propertyKind = v.union(v.literal("residential"), v.literal("commercial"));
 // Canonical `tenantEntityTypeValidator` lives in `convex/tenants/domain.ts`;
 // inlined here to avoid the entity-file → `_generated/dataModel` circular import.
 const tenantEntityType = v.union(v.literal("pf"), v.literal("pj"));
-// Guarantee product chosen for the contract: base (Mutav Fiança) or plus
-// (Mutav Fiança +, with credit-life insurance). See convex/contracts/domain.ts.
-const contractPlan = v.union(v.literal("basic"), v.literal("plus"));
+// Guarantee plan: base (Mutav Fiança) or plus (Mutav Fiança +, with
+// credit-life insurance). See convex/guarantees/domain.ts.
+const guaranteePlan = v.union(v.literal("basic"), v.literal("plus"));
+// Canonical `PAYER` lives in `convex/leases/domain.ts`.
+const payer = v.literal("tenant");
 
 // Canonical `mutavStaffRoleValidator` lives in `convex/mutavStaff/domain.ts`;
 // inlined here to avoid the entity-file → `_generated/dataModel` circular import.
@@ -37,13 +63,6 @@ const mutavStaffRole = v.union(
   v.literal("support"),
   v.literal("treasury"),
 );
-
-// `rental.exitCostMultiplier`, `rental.rentMultiplier`, and `rental.payer` all
-// persist as `v.string()` (set directly on the rental object). Legacy prod rows
-// hold bespoke values across these fields ("6x" / "40x" / "Recorrência via
-// Imobiliária") alongside canonical ones. Writes still funnel through
-// `DEFAULT_*` constants from `convex/contracts/domain.ts` for type discipline;
-// the schema just doesn't reject the legacy data.
 
 const tenantApprovalStatus = v.union(
   v.literal("aprovado"),
@@ -193,7 +212,12 @@ const anchorAccountData = v.union(
 // invoices). Canonical validators live in `convex/delinquencies/domain.ts`;
 // inlined here to avoid the entity-file → `_generated/dataModel` circular
 // import.
-const delinquencyStatus = v.union(v.literal("open"), v.literal("resolved"), v.literal("canceled"));
+const delinquencyStatus = v.union(
+  v.literal("open"),
+  v.literal("verified"),
+  v.literal("resolved"),
+  v.literal("canceled"),
+);
 
 const noticeResolutionKind = v.union(
   v.literal("tenant_cured"),
@@ -349,58 +373,105 @@ export default defineSchema(
       openedAt: v.number(),
     }).index("by_agency_subject_time", ["agencyId", "subjectHash", "openedAt"]),
 
-    contracts: defineTable({
+    // The rental relationship — long-lived, one row per property × tenant
+    // agreement the agency brokers. Holds the lease economics (rent bundle,
+    // payer) and the property; everything Mutav *sells* against it lives on
+    // `guarantees`. One lease carries many guarantees over time but at most
+    // one non-closed guarantee at any instant — `openGuaranteeId` is that
+    // pointer and the mutation-level guard (`guarantees.create` refuses when
+    // it is non-null; closing nulls it; OCC on this row serializes racing
+    // creates).
+    leases: defineTable({
       agencyId: v.id("agencies"),
       publicId: v.string(),
-      // Registry link — the only tenant reference on a contract; readers join
-      // the `tenants` row. There is no embedded `tenant`/`tenantCpf` field:
-      // pre-prod data comes from `seed:seedReset` in this shape (no in-place
-      // migration — see `convex/migrations.ts`).
+      // Registry link — the only tenant reference on a lease; readers join
+      // the `tenants` row. There is no embedded `tenant`/`tenantCpf` field.
       tenantId: v.id("tenants"),
-      // Per-contract relationship state — approval belongs to a contract, not
-      // to the person.
-      tenantApproval: v.object({
-        status: tenantApprovalStatus,
-        termApprovedAt: v.union(v.string(), v.null()),
-      }),
-      // Creation-time underwriting snapshot. The living score is the
-      // creditAnalysis domain's, keyed by document (#83 pricing snapshots).
-      score: v.optional(v.number()),
-      status: contractStatus,
-      activatedAt: v.union(v.string(), v.null()),
-      deactivatedAt: v.optional(v.union(v.string(), v.null())),
-      nextRenewalDate: v.string(),
-      availableGuaranteeCents: v.number(),
-
-      rental: v.object({
-        propertyKind,
-        plan: contractPlan,
-        rentCents: v.number(),
-        condoCents: v.number(),
-        otherFeesCents: v.number(),
-        totalRentCents: v.number(),
-        feeCents: v.number(),
-        oneTimeActivationFeeCents: v.number(),
-        setupInstallments: v.number(),
-        exitCostMultiplier: v.string(),
-        rentMultiplier: v.string(),
-        payer: v.string(),
-        pviMigrationSchedule: v.union(v.string(), v.null()),
-      }),
-
+      propertyKind,
       property: v.object({
         cep: v.string(),
         streetAndNumber: v.string(),
         neighborhood: v.string(),
         cityUF: v.string(),
-      }),
-
-      optional: v.object({
         complement: v.string(),
-        tag: v.string(),
-        description: v.string(),
       }),
+      tag: v.string(),
+      description: v.string(),
+      rent: v.object({
+        rentCents: v.number(),
+        condoCents: v.number(),
+        otherFeesCents: v.number(),
+        totalRentCents: v.number(),
+      }),
+      payer,
+      openGuaranteeId: v.union(v.id("guarantees"), v.null()),
+    })
+      .index("by_publicId", ["publicId"])
+      .index("by_agency", ["agencyId"])
+      .index("by_tenant", ["tenantId"])
+      .index("by_agency_tenant", ["agencyId", "tenantId"]),
 
+    // What Mutav sells: one guarantee life on one lease. `terms` is the
+    // immutable per-guarantee parameter snapshot copied from the product at
+    // pricing time — editing a product never mutates existing guarantees;
+    // a renewal/reajuste writes a new snapshot on the same row.
+    // `terms.rentCents` is the rent at pricing time; `leases.rent` is the
+    // living value. Capacity invariant: `available + reserved = ceiling`
+    // (a `consumed` leg joins once receivables land).
+    guarantees: defineTable({
+      agencyId: v.id("agencies"),
+      leaseId: v.id("leases"),
+      publicId: v.string(),
+      productId: v.id("products"),
+      status: guaranteeState,
+      // Populated on transition to `closed`. The reason is from-state-gated
+      // by `assertClose` in `convex/guarantees/machine.ts`.
+      closure: v.optional(
+        v.object({
+          reason: closeReason,
+          closedAt: v.string(),
+          note: v.optional(v.string()),
+        }),
+      ),
+      activatedAt: v.union(v.string(), v.null()),
+      nextRenewalDate: v.string(),
+      // Creation-time underwriting snapshot. The living score is the
+      // creditAnalysis domain's, keyed by document.
+      underwriting: v.object({
+        score: v.number(),
+        tier: scoreTier,
+        assessmentId: v.optional(v.id("creditAnalysisAssessments")),
+      }),
+      // Per-guarantee relationship state — approval belongs to a guarantee,
+      // not to the person.
+      tenantApproval: v.object({
+        status: tenantApprovalStatus,
+        termApprovedAt: v.union(v.string(), v.null()),
+      }),
+      terms: v.object({
+        productSlug: v.string(),
+        plan: guaranteePlan,
+        rentCents: v.number(),
+        feeCents: v.number(),
+        taxaFeeCents: v.number(),
+        prestamistaFeeCents: v.number(),
+        oneTimeActivationFeeCents: v.number(),
+        // Broker commission rates ride in the snapshot too: commission on a
+        // sold guarantee is owed at the rate it was sold under, not at
+        // whatever the product says later.
+        commissionRate: v.number(),
+        prestamistaCommissionRate: v.number(),
+        coverageCeilingMultiplier: v.number(),
+        exitCostMultiplier: v.number(),
+        coverageCeilingCents: v.number(),
+        exitCostCapCents: v.number(),
+        appliedAt: v.string(),
+      }),
+      capacity: v.object({
+        ceilingCents: v.number(),
+        availableCents: v.number(),
+        reservedCents: v.number(),
+      }),
       documents: v.array(
         v.object({
           key: documentKey,
@@ -412,12 +483,50 @@ export default defineSchema(
       .index("by_status", ["status"])
       .index("by_agency_status", ["agencyId", "status"])
       .index("by_agency_status_nextRenewalDate", ["agencyId", "status", "nextRenewalDate"])
-      .index("by_tenant", ["tenantId"])
-      .index("by_agency_tenant", ["agencyId", "tenantId"]),
+      .index("by_lease", ["leaseId"])
+      .index("by_product", ["productId"]),
 
-    contractHistory: defineTable({
+    // Guarantee products — pricing parameters as data: they vary by agency /
+    // region / tenant score and become admin-adjustable. Each guarantee
+    // copies the product's `terms` into its own immutable snapshot at
+    // pricing time. One row is seeded as the default (`mutav-fianca`) with
+    // today's constants, so behavior is unchanged until a second product
+    // exists. No personal data.
+    products: defineTable({
+      slug: v.string(),
+      name: v.string(),
+      enabled: v.boolean(),
+      isDefault: v.boolean(),
+      effectiveFrom: v.string(),
+      effectiveTo: v.optional(v.string()),
+      terms: v.object({
+        tierRate: v.object({
+          bom: v.number(),
+          regular: v.number(),
+          ruim: v.number(),
+        }),
+        coverageCeilingMultiplier: v.number(),
+        exitCostMultiplier: v.number(),
+        activationFeeCents: v.number(),
+        commissionRate: v.number(),
+        prestamistaPremiumCents: v.number(),
+        prestamistaCommissionRate: v.number(),
+      }),
+      // `null` on every axis = no restriction. A non-null list restricts to
+      // its members; `minTier` is the worst tier still eligible.
+      eligibility: v.object({
+        agencyIds: v.union(v.array(v.id("agencies")), v.null()),
+        regionUFs: v.union(v.array(v.string()), v.null()),
+        minTier: v.union(priceableTier, v.null()),
+        propertyKinds: v.union(v.array(propertyKind), v.null()),
+      }),
+    })
+      .index("by_slug", ["slug"])
+      .index("by_enabled_isDefault", ["enabled", "isDefault"]),
+
+    guaranteeHistory: defineTable({
       agencyId: v.id("agencies"),
-      contractPublicId: v.string(),
+      guaranteePublicId: v.string(),
       at: v.string(),
       username: v.string(),
       message: v.string(),
@@ -437,21 +546,22 @@ export default defineSchema(
         }),
       ),
     })
-      .index("by_contract", ["contractPublicId", "at"])
+      .index("by_guarantee", ["guaranteePublicId", "at"])
       // publicId is not unique across agencies, so the tenant read-back path
       // resolves the creation event by agency first.
-      .index("by_agency_contract", ["agencyId", "contractPublicId", "at"]),
+      .index("by_agency_guarantee", ["agencyId", "guaranteePublicId", "at"]),
 
     // Per-event record filed by an agency (or, post-Pix, a system trigger)
     // that a tenant missed a specific rent payment. Distinct from the
     // `invoices` table below — that one is Mutav → Agency platform billing.
-    // A contract accumulates many notices over its life; each moves
-    // independently through open → { resolved | canceled }. The receivable
-    // that arises from a `resolution.kind === "cover_committed"` lives in
-    // its own table (added when the cover slice lands).
-    contractDelinquencyNotices: defineTable({
+    // A guarantee accumulates many notices over its life; each moves
+    // independently through open → verified → { resolved | canceled } and
+    // drives the guarantee's own transitions in the same transaction. The
+    // receivable that arises from a `resolution.kind === "cover_committed"`
+    // lives in its own table (added when the cover slice lands).
+    guaranteeDelinquencyNotices: defineTable({
       publicId: v.string(),
-      contractId: v.id("contracts"),
+      guaranteeId: v.id("guarantees"),
       agencyId: v.id("agencies"),
       status: delinquencyStatus,
 
@@ -466,15 +576,28 @@ export default defineSchema(
       openedAt: v.string(),
       openedByUserId: v.id("users"),
 
+      // Populated on transition to `verified` (staff confirmed the default).
+      verification: v.optional(
+        v.object({
+          verifiedAt: v.string(),
+          verifiedByUserId: v.id("users"),
+          note: v.optional(v.string()),
+        }),
+      ),
+
       // Populated on transition to `resolved`. `coverOperationPublicId` is
       // a string (not an id ref) because coverOperations lands in a later
       // slice; migrate to `v.id("coverOperations")` when it exists.
+      // `appliedCoverCents` is the amount actually reserved against the
+      // guarantee's capacity (clamped to what was available), so the
+      // reversal on dispute is exact.
       resolution: v.optional(
         v.object({
           kind: noticeResolutionKind,
           resolvedAt: v.string(),
           resolvedByUserId: v.id("users"),
           coverOperationPublicId: v.optional(v.string()),
+          appliedCoverCents: v.optional(v.number()),
           note: v.optional(v.string()),
         }),
       ),
@@ -491,7 +614,7 @@ export default defineSchema(
     })
       .index("by_publicId", ["publicId"])
       .index("by_agency_status", ["agencyId", "status"])
-      .index("by_contract_dueDate", ["contractId", "rentDueDate"])
+      .index("by_guarantee_dueDate", ["guaranteeId", "rentDueDate"])
       .index("by_status_openedAt", ["status", "openedAt"]),
 
     invoices: defineTable({
@@ -534,8 +657,8 @@ export default defineSchema(
       muxedId: v.optional(v.string()),
       lineItems: v.array(
         v.object({
-          contractId: v.id("contracts"),
-          contractPublicId: v.string(),
+          guaranteeId: v.id("guarantees"),
+          guaranteePublicId: v.string(),
           kind: invoiceLineItemKind,
           amountCents: v.number(),
           description: v.string(),
@@ -724,7 +847,7 @@ export default defineSchema(
     }).index("by_documentHash", ["documentHash"]),
 
     // Hash-chained audit log of money-moving and lifecycle-changing actions.
-    // Every state-changing mutation in `invoices/` and `contracts/` appends
+    // Every state-changing mutation in `invoices/` and `guarantees/` appends
     // one row via `appendAuditEntry` (see `convex/audit/useCases.ts`).
     //
     // Chain invariant: every entry's `prevHash` equals the previous entry's
