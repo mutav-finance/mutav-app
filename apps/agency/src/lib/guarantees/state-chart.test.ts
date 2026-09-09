@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { GUARANTEE_STATES, type GuaranteeState } from "@convex/guarantees/machine";
 import type { StateTimelineBucket } from "@convex/guarantees/domain";
 import {
+  CHART_COLOR_FAMILY,
   GUARANTEE_STATE_CHART_COLOR,
   GUARANTEE_STATE_FILL_OPACITY,
 } from "@/components/guarantees/state-chart-palette";
@@ -63,22 +64,52 @@ describe("state chart palette", () => {
     }
   });
 
-  it("separates any two states that share a colour by fill strength", () => {
-    const byColor = new Map<string, GuaranteeState[]>();
+  // Grouping by the CSS-var string would call `var(--color-warning)` and
+  // `var(--color-warning-strong)` two colours; they measure ΔE 1.6 for a
+  // deuteranope, i.e. one colour. `CHART_COLOR_FAMILY` is the resolved read,
+  // so the guard sees the pair the way a reader does.
+  it("separates any two states in the same colour family by fill strength", () => {
+    const byFamily = new Map<string, GuaranteeState[]>();
     for (const state of GUARANTEE_STATES) {
-      const color = GUARANTEE_STATE_CHART_COLOR[state];
-      byColor.set(color, [...(byColor.get(color) ?? []), state]);
+      const family = CHART_COLOR_FAMILY[state];
+      byFamily.set(family, [...(byFamily.get(family) ?? []), state]);
     }
 
     const indistinguishable: string[] = [];
-    for (const [color, states] of byColor) {
+    for (const [family, states] of byFamily) {
       const opacities = states.map((state) => GUARANTEE_STATE_FILL_OPACITY[state]);
       if (new Set(opacities).size !== states.length) {
-        indistinguishable.push(`${color}: ${states.join(", ")}`);
+        indistinguishable.push(`${family}: ${states.join(", ")}`);
       }
     }
 
     expect(indistinguishable).toEqual([]);
+  });
+
+  it("gives every state that shares a colour a distinct family entry", () => {
+    // A state whose colour is shared but whose family says otherwise would slip
+    // past the guard above, so the two maps have to agree.
+    for (const a of GUARANTEE_STATES) {
+      for (const b of GUARANTEE_STATES) {
+        if (a === b) continue;
+        if (GUARANTEE_STATE_CHART_COLOR[a] !== GUARANTEE_STATE_CHART_COLOR[b]) continue;
+        expect(CHART_COLOR_FAMILY[a]).toBe(CHART_COLOR_FAMILY[b]);
+      }
+    }
+  });
+
+  it("makes every touching pair of bands resolvable without hover", () => {
+    const unresolvable: string[] = [];
+    for (let i = 1; i < GUARANTEE_STATE_STACK_ORDER.length; i++) {
+      const below = GUARANTEE_STATE_STACK_ORDER[i - 1];
+      const above = GUARANTEE_STATE_STACK_ORDER[i];
+      const sameFamily = CHART_COLOR_FAMILY[below] === CHART_COLOR_FAMILY[above];
+      const sameStrength =
+        GUARANTEE_STATE_FILL_OPACITY[below] === GUARANTEE_STATE_FILL_OPACITY[above];
+      if (sameFamily && sameStrength) unresolvable.push(`${below} / ${above}`);
+    }
+
+    expect(unresolvable).toEqual([]);
   });
 });
 

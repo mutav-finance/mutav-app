@@ -65,8 +65,16 @@ const pid = (n: number) => String(1_000_000 + n);
 /** Seed lease reference derived from its guarantee's public id (`LSE-1000007`). */
 const leasePid = (guaranteePublicId: string) => `LSE-${guaranteePublicId}`;
 
-/** ISO date string */
-const d = (s: string) => s;
+/**
+ * Seed timestamp, normalized to UTC `Z` form. Production stamps every history,
+ * notice and audit row with `toISOString()`, and both the state timeline and
+ * the activity series compare those strings LEXICALLY against `Z`-form period
+ * boundaries — so an offset-form seed row (`…T22:00:00-03:00`) sorts and
+ * buckets as the day before the instant it denotes, and orders backwards
+ * against a production row written on the same day. One format everywhere is
+ * the only way the two corpora are comparable.
+ */
+const d = (s: string) => new Date(s).toISOString();
 
 /**
  * Demo tables wiped by `seedReset`. Order matters —
@@ -2876,10 +2884,9 @@ async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
 const EVICTION_FILED_AFTER_COVER_DAYS = 15;
 
 /**
- * Add whole days to a seed timestamp, keeping its clock time AND its `-03:00`
- * offset. Going through `toISOString()` would emit a `Z` string, and both the
- * state timeline and the activity series compare these values lexically — one
- * mixed-format row sorts wrong against every other.
+ * Add whole days to a seed timestamp, keeping its clock time. Inputs come from
+ * `d()` and are therefore already UTC `Z` strings, so the rebuilt value stays
+ * in the one format the timeline compares lexically.
  */
 function seedDaysAfter(at: string, days: number): string {
   const [datePart, timePart] = at.split("T");
@@ -3024,6 +3031,11 @@ function planGuaranteeTransitions(
     if (event.kind === "opened") outstanding.add(event.noticePublicId);
     if (event.kind === "settled") outstanding.delete(event.noticePublicId);
     if (event.to === null) continue;
+    // `openNotice` moves the guarantee only from `active`; one filed while it
+    // is already past that records the notice and leaves the state alone. The
+    // machine would accept `cover_committed → in_arrears`, so without this the
+    // seed could lay down a path production has no way to write.
+    if (event.kind === "opened" && currentState() !== GUARANTEE_STATE.ACTIVE) continue;
     // A guarantee leaves arrears only once nothing else is still outstanding —
     // the rule the delinquency mutations apply before returning it to active.
     if (event.to === GUARANTEE_STATE.ACTIVE && outstanding.size > 0) continue;

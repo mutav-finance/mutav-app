@@ -461,17 +461,61 @@ describe("getStateTimelineByPeriod", () => {
     });
 
     expect(buckets).toHaveLength(12);
-    // Before its first transition the guarantee sits in that transition's
-    // `from` state, so every bucket sums to the size of the book.
-    expect(bucketMonthsAgo(buckets, 11).countByState).toEqual({ ...ZERO_COUNTS, drafted: 1 });
-    expect(bucketMonthsAgo(buckets, 7).countByState).toEqual({ ...ZERO_COUNTS, drafted: 1 });
+    // Nothing is recorded before the activation row, so the guarantee did not
+    // exist for the earlier buckets and is absent from them.
+    expect(bucketMonthsAgo(buckets, 11).countByState).toEqual(ZERO_COUNTS);
+    expect(bucketMonthsAgo(buckets, 7).countByState).toEqual(ZERO_COUNTS);
     expect(bucketMonthsAgo(buckets, 6).countByState).toEqual({ ...ZERO_COUNTS, active: 1 });
     expect(bucketMonthsAgo(buckets, 3).countByState).toEqual({ ...ZERO_COUNTS, active: 1 });
     expect(bucketMonthsAgo(buckets, 2).countByState).toEqual({ ...ZERO_COUNTS, in_arrears: 1 });
     expect(bucketMonthsAgo(buckets, 0).countByState).toEqual({ ...ZERO_COUNTS, in_arrears: 1 });
   });
 
-  test("a guarantee with no transition history counts in its current status in every bucket", async () => {
+  test("a guarantee is absent from every bucket that closed before it existed", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    // Creation writes a free-text row; the activation transition follows it.
+    const createdAt = monthsAgoISO(3, 2);
+    const activatedAt = monthsAgoISO(2, 2);
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId, status: GUARANTEE_STATE.ACTIVE, activatedAt },
+      "S3",
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.insert("guaranteeHistory", {
+        agencyId,
+        guaranteePublicId: "S3",
+        at: createdAt,
+        username: "tester",
+        message: "created",
+      });
+    });
+    await insertTransition(t, {
+      agencyId,
+      guaranteePublicId: "S3",
+      at: activatedAt,
+      from: "drafted",
+      to: "active",
+    });
+
+    const buckets = await asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+      scope: { kind: "agency", agencyId },
+      granularity: "month",
+    });
+
+    expect(bucketMonthsAgo(buckets, 11).countByState).toEqual(ZERO_COUNTS);
+    expect(bucketMonthsAgo(buckets, 4).countByState).toEqual(ZERO_COUNTS);
+    // The month it was created in: drafted, because the activation lands later.
+    expect(bucketMonthsAgo(buckets, 3).countByState).toEqual({ ...ZERO_COUNTS, drafted: 1 });
+    expect(bucketMonthsAgo(buckets, 2).countByState).toEqual({ ...ZERO_COUNTS, active: 1 });
+    expect(bucketMonthsAgo(buckets, 0).countByState).toEqual({ ...ZERO_COUNTS, active: 1 });
+  });
+
+  test("a guarantee with no transition history counts in its current status from the moment it exists", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
@@ -498,8 +542,14 @@ describe("getStateTimelineByPeriod", () => {
       granularity: "month",
     });
 
-    for (const bucket of buckets) {
-      expect(bucket.countByState).toEqual({ ...ZERO_COUNTS, cover_committed: 1 });
+    // The free-text creation row is not a machine move, but it does date the
+    // guarantee — so it bounds the series without contributing a state.
+    expect(bucketMonthsAgo(buckets, 5).countByState).toEqual(ZERO_COUNTS);
+    for (const months of [4, 3, 2, 1, 0]) {
+      expect(bucketMonthsAgo(buckets, months).countByState).toEqual({
+        ...ZERO_COUNTS,
+        cover_committed: 1,
+      });
     }
   });
 

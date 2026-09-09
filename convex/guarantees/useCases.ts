@@ -516,6 +516,12 @@ const activityGranularityValidator = v.union(v.literal("month"), v.literal("week
  * Per-agency scope uses the `by_agency_status` index to bound the scan;
  * platform scope does a full `.collect()` by design. Time-series aggregates
  * are deliberately deferred until the guarantees table crosses ~5–10k rows.
+ *
+ * NO CLIENT TODAY. `getStateTimelineByPeriod` replaced it in both cards (the
+ * dashboard and `/transparency`). It stays for the second half of the chart
+ * redesign — event bars beneath the composition panel, which need exactly
+ * these activation/closure counts — and should be deleted with its tests if
+ * that panel is dropped.
  */
 export const getActivityByPeriod = queryWithAuth({
   args: {
@@ -579,16 +585,21 @@ type TimelineHistory = Pick<
  * structured `guaranteeHistory.transition` rows.
  *
  * Semantics, so the series is readable without the code:
+ * - a guarantee is counted only from the instant it exists — the earliest `at`
+ *   on ANY of its history rows, transition or not, since creation writes a
+ *   free-text row. Without that bound a guarantee sold six months ago would be
+ *   counted as `drafted` in the six buckets before it, and the total would be
+ *   flat at today's book size for the whole window;
  * - state at boundary B = the `to` of the last transition with `at < B.end`;
  * - before its first transition a guarantee is counted in that transition's
- *   `from` state — that IS the state it was in, and it keeps every bucket
- *   summing to the size of the book;
- * - a guarantee with no transition rows at all is counted in its current
- *   status in every bucket (the documented fallback for pre-PR5 rows, which
- *   carry only free-text history).
+ *   `from` state — that IS the state it was in;
+ * - a guarantee with no history rows at all is counted in its current status in
+ *   every bucket. Nothing dates it, and `_creationTime` cannot stand in: it is
+ *   the seed run time for every demo row and would empty the whole series.
  *
  * History rows whose guarantee is out of scope are ignored, and a row with no
- * `transition` (creation, reprice) is not a machine move.
+ * `transition` (creation, reprice) is not a machine move — but it still counts
+ * as evidence that the guarantee existed.
  */
 function replayStateTimeline(
   guarantees: readonly TimelineGuarantee[],
@@ -596,10 +607,13 @@ function replayStateTimeline(
   boundaries: readonly PeriodBoundary[],
 ): StateTimelineBucket[] {
   const transitionsByGuarantee = new Map<string, ReplayedTransition[]>();
+  const existsFromByGuarantee = new Map<string, string>();
   for (const row of history) {
+    const key = guaranteeTimelineKey(row.agencyId, row.guaranteePublicId);
+    const earliest = existsFromByGuarantee.get(key);
+    if (earliest === undefined || row.at < earliest) existsFromByGuarantee.set(key, row.at);
     const transition = row.transition;
     if (!transition) continue;
-    const key = guaranteeTimelineKey(row.agencyId, row.guaranteePublicId);
     const replayed = { at: row.at, from: transition.from, to: transition.to };
     const existing = transitionsByGuarantee.get(key);
     if (existing) existing.push(replayed);
@@ -615,9 +629,9 @@ function replayStateTimeline(
   }));
 
   for (const guarantee of guarantees) {
-    const transitions =
-      transitionsByGuarantee.get(guaranteeTimelineKey(guarantee.agencyId, guarantee.publicId)) ??
-      [];
+    const key = guaranteeTimelineKey(guarantee.agencyId, guarantee.publicId);
+    const transitions = transitionsByGuarantee.get(key) ?? [];
+    const existsFromISO = existsFromByGuarantee.get(key);
     const first = transitions[0];
     let state: GuaranteeState = first ? first.from : guarantee.status;
     let next = 0;
@@ -628,6 +642,9 @@ function replayStateTimeline(
         next++;
         pending = transitions[next];
       }
+      // A bucket that closed before the guarantee's first recorded moment is a
+      // period it did not exist in — counting it there would invent book.
+      if (existsFromISO !== undefined && endISO <= existsFromISO) return;
       const bucket = buckets[index];
       if (bucket) bucket.countByState[state]++;
     });
@@ -648,8 +665,16 @@ function replayStateTimeline(
  *
  * Per-agency scope bounds both scans on an index (`by_agency_status`,
  * `by_agency_guarantee`); platform scope collects both tables by design, the
- * same trade `getActivityByPeriod` already makes — time-series aggregates stay
- * deferred until the guarantees table crosses ~5–10k rows.
+ * same trade `getActivityByPeriod` already makes.
+ *
+ * The binding table here is `guaranteeHistory`, not `guarantees`: it takes a
+ * row per creation, per guarded transition and per reprice, is never pruned,
+ * and is read in full even though only the last 12 months matter. So the
+ * platform arm reaches Convex's per-query document-read ceiling at roughly
+ * `guarantees × average path length`, well before the ~5–10k guarantee rows
+ * the activity series is deferred against. The fix when it binds is a
+ * `by_at` / `by_agency_at` index ranged from the window's first boundary, with
+ * the opening state replayed backwards from `guarantees.status`.
  */
 export const getStateTimelineByPeriod = queryWithAuth({
   args: {

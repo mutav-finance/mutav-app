@@ -141,6 +141,27 @@ describe("guarantees.activate", () => {
     expect((await readGuarantee(t, guaranteeId)).status).toBe(GUARANTEE_STATE.ACTIVE);
   });
 
+  test("refuses a draft that somehow carries reserved cents instead of zeroing them", async () => {
+    const { guaranteeId } = await seedGuarantee(t, fx, "A4", GUARANTEE_STATE.DRAFTED, {
+      availableCents: 2_000_000,
+    });
+    const before = await readGuarantee(t, guaranteeId);
+    expect(before.capacity.reservedCents).toBe(1_000_000);
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.guarantees.mutations.activate, {
+      agencyId: fx.agencyId,
+      publicId: "A4",
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("CAPACITY_INVARIANT_BROKEN");
+    const after = await readGuarantee(t, guaranteeId);
+    expect(after.status).toBe(GUARANTEE_STATE.DRAFTED);
+    expect(after.capacity).toEqual(before.capacity);
+  });
+
   test("returns NOT_FOUND for another agency's draft without revealing it", async () => {
     const other = await makeFixture(t, "2");
     await seedGuarantee(t, other, "A3", GUARANTEE_STATE.DRAFTED);
@@ -313,7 +334,7 @@ describe("guarantees.reprice", () => {
     await grantStaffRole(t, fx.userId, "compliance");
   });
 
-  test("writes a new terms snapshot and renewal date without moving reserved cents", async () => {
+  test("writes a new terms snapshot and renewal date without touching capacity", async () => {
     // 1,000,000 available means 2,000,000 already reserved against the 3,000,000 ceiling.
     const { guaranteeId } = await seedGuarantee(t, fx, "R1", GUARANTEE_STATE.ACTIVE, {
       availableCents: 1_000_000,
@@ -329,25 +350,25 @@ describe("guarantees.reprice", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.capacity).toEqual({
-      ceilingCents: 6_000_000,
-      availableCents: 4_000_000,
-      reservedCents: 2_000_000,
-    });
+    expect(result.data.capacity).toEqual(before.capacity);
 
     const after = await readGuarantee(t, guaranteeId);
     expect(after.status).toBe(GUARANTEE_STATE.ACTIVE);
     expect(after.nextRenewalDate).toBe("2027-06-30");
     expect(after.terms.rentCents).toBe(200_000);
-    expect(after.terms.coverageCeilingCents).toBe(6_000_000);
     expect(after.terms.appliedAt).not.toBe(before.terms.appliedAt);
-    expect(after.capacity.reservedCents).toBe(before.capacity.reservedCents);
-    expect(after.capacity.availableCents + after.capacity.reservedCents).toBe(
-      after.capacity.ceilingCents,
-    );
+    // The new ceiling lives in the snapshot; the coverage the guarantee is on
+    // risk for is the one it was activated under and does not move with a
+    // reajuste.
+    expect(after.terms.coverageCeilingCents).toBe(6_000_000);
+    expect(after.capacity).toEqual({
+      ceilingCents: 3_000_000,
+      availableCents: 1_000_000,
+      reservedCents: 2_000_000,
+    });
   });
 
-  test("refuses a new ceiling that would fall below what is already reserved", async () => {
+  test("a rent cut below what is reserved still leaves the live coverage intact", async () => {
     const { guaranteeId } = await seedGuarantee(t, fx, "R2", GUARANTEE_STATE.ACTIVE, {
       availableCents: 1_000_000,
     });
@@ -360,11 +381,12 @@ describe("guarantees.reprice", () => {
       nextRenewalDate: "2027-06-30",
     });
 
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error.code).toBe("CEILING_BELOW_RESERVED");
-    expect((await readGuarantee(t, guaranteeId)).terms).toEqual(before.terms);
-    expect((await readGuarantee(t, guaranteeId)).capacity).toEqual(before.capacity);
+    expect(result.success).toBe(true);
+    const after = await readGuarantee(t, guaranteeId);
+    // 50,000 x 30 = 1,500,000, below the 2,000,000 already reserved — harmless
+    // precisely because capacity is untouched.
+    expect(after.terms.coverageCeilingCents).toBe(1_500_000);
+    expect(after.capacity).toEqual(before.capacity);
   });
 
   test("refuses to reprice a closed guarantee", async () => {

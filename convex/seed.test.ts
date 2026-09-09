@@ -311,7 +311,9 @@ describe("seedReset", () => {
       coverageCeilingCents: 9_600_000,
       exitCostCapCents: 1_920_000,
       // The snapshot is dated at activation, not at the tenant's term approval.
-      appliedAt: "2025-06-03T10:00:00-03:00",
+      // Seed timestamps are normalized to UTC so they compare against the
+      // `Z`-form strings the runtime writes.
+      appliedAt: "2025-06-03T13:00:00.000Z",
     });
     expect(probe.sample.capacity).toEqual({
       ceilingCents: 9_600_000,
@@ -343,7 +345,7 @@ describe("seedReset", () => {
     expect(probe.effectiveFrom).toBe("2022-01-01T00:00:00.000Z");
     expect(probe.pricedBeforeEffect).toEqual([]);
     // Aprovada's closed guarantee is the oldest life in the dataset.
-    expect(probe.earliestAppliedAt).toBe("2024-04-15T10:00:00-03:00");
+    expect(probe.earliestAppliedAt).toBe("2024-04-15T13:00:00.000Z");
   });
 
   test("every guarantee that has been in force carries a full ISO activatedAt; drafts and pre-activation cancellations carry none", async () => {
@@ -525,10 +527,10 @@ describe("seedReset", () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
 
-    // Seed timestamps are offset-form (`-03:00`), which sorts BEFORE Z-form
-    // while denoting a later instant. A reader that took the earliest row
-    // would miss the snapshot the moment any Z-form row is appended, and fall
-    // through to the shared registry row.
+    // The index returns rows in insertion order, not by `at`. A reader that
+    // took whichever row sorts or lands first would miss the snapshot the
+    // moment any earlier-dated row is appended, and fall through to the
+    // shared registry row.
     const probe = await t.run(async (ctx) => {
       const guarantee = await ctx.db.query("guarantees").first();
       if (!guarantee) throw new Error("seed produced no guarantees");

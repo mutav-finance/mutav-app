@@ -261,6 +261,12 @@ export async function reserveCoverCapacity(
  * recorded as applied, never the notice's face amount. Releasing more than is
  * currently reserved is refused rather than floored, because the excess would
  * have to come from somewhere and there is nowhere honest for it to come from.
+ *
+ * STAGED, NOT FORGOTTEN: nothing calls this yet. Policy C's release/burn half
+ * lands with the receivable ledger, so today a `close(dispute_reversal)` from
+ * `cover_committed` leaves the reserved cents held — see `guarantees.close`.
+ * The reserve side is what PR5 ships; this is its other half, written now so
+ * the two stay symmetric.
  */
 export async function releaseCoverCapacity(
   ctx: MutationCtx,

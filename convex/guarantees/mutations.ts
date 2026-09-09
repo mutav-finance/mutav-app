@@ -3,7 +3,6 @@ import type { MutationCtx } from "../_generated/server";
 import type { Result } from "../lib/result";
 import { mutationWithAgencyScope, mutationWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
-import { appendAuditEntry } from "../audit/useCases";
 import type { AgencyId } from "../agencies/domain";
 import { ufFromCityUF } from "../leases/domain";
 import { PRODUCT_ERROR_CODE } from "../products/domain";
@@ -103,6 +102,18 @@ export const activate = mutationWithAgencyScope({
     });
     if (!guarantee) return notFound(args.publicId);
 
+    // Nothing can have drawn cover before the guarantee went on risk, so a
+    // reservation on a draft is drift rather than history. Refuse it — writing
+    // the fresh capacity over it would silently destroy the reserved cents,
+    // the same drift `reserveCoverCapacity` refuses instead of repairing.
+    if (guarantee.capacity.reservedCents !== 0) {
+      return {
+        success: false,
+        error: { code: GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN },
+        message: `Guarantee ${guarantee.publicId} carries ${guarantee.capacity.reservedCents} reserved cents before activation`,
+      };
+    }
+
     const ceilingCents = guarantee.terms.coverageCeilingCents;
     const applied = await applyGuaranteeTransition(ctx, {
       guarantee,
@@ -171,6 +182,10 @@ export const closeEndOfLease = mutationWithAgencyScope({
  * gates the reason against the state it is closing from — `eviction` only from
  * `in_eviction`, `dispute_reversal` only from a verified default or a
  * committed cover, `canceled_pre_activation` only from a draft.
+ *
+ * Closing never touches `capacity`: cents reserved by a committed cover survive
+ * a `dispute_reversal` here, because giving them back is `releaseCoverCapacity`
+ * and the release/burn half of policy C lands with the receivable ledger.
  */
 export const close = mutationWithMutavRole({ minRole: "compliance" })({
   args: { publicId: v.string(), reason: closeReasonValidator, note: v.optional(v.string()) },
@@ -250,8 +265,6 @@ type RepriceErrorResult = {
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENT
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENEWAL_DATE
     | typeof GUARANTEE_ERROR_CODE.TENANT_DENIED
-    | typeof GUARANTEE_ERROR_CODE.CEILING_BELOW_RESERVED
-    | typeof GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN
     | typeof PRODUCT_ERROR_CODE.PRODUCT_UNAVAILABLE;
 };
 
@@ -267,11 +280,11 @@ function isCalendarDate(value: string): boolean {
  * plus the renewal date it now runs to. Deliberately not a transition — the
  * guarantee keeps its state and its `activatedAt`.
  *
- * Money rules: `capacity.reservedCents` is never touched (cover already
- * committed against the old ceiling stays committed), and the new ceiling is
- * refused outright when it would fall below what is already reserved, since
- * accepting it would mean either a negative `available` or a broken
- * `available + reserved = ceiling`.
+ * Money rule: `capacity` is not touched at all. The coverage a guarantee runs
+ * on is the one it was activated under, and a reajuste must not silently move
+ * how much Mutav is on risk for on an in-force guarantee. The new ceiling lives
+ * in `terms.coverageCeilingCents`; `activate` reads it from there, so a draft
+ * repriced before it goes on risk still starts on the new figure.
  */
 export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
   args: {
@@ -350,39 +363,15 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
       product.terms,
     );
 
-    const { reservedCents } = guarantee.capacity;
-    const ceilingCents = priced.capacity.ceilingCents;
-    if (ceilingCents < reservedCents) {
-      return {
-        success: false,
-        error: { code: GUARANTEE_ERROR_CODE.CEILING_BELOW_RESERVED },
-        message: `New ceiling ${ceilingCents} is below the ${reservedCents} cents already reserved`,
-      };
-    }
-    if (guarantee.capacity.availableCents + reservedCents !== guarantee.capacity.ceilingCents) {
-      return {
-        success: false,
-        error: { code: GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN },
-        message: `Guarantee ${guarantee.publicId} capacity does not satisfy available + reserved = ceiling`,
-      };
-    }
-
-    const capacity: GuaranteeCapacity = {
-      ceilingCents,
-      availableCents: ceilingCents - reservedCents,
-      reservedCents,
-    };
-
     await ctx.db.patch(guarantee._id, {
       productId: product._id,
       terms: priced.terms,
-      capacity,
       nextRenewalDate: args.nextRenewalDate,
     });
     const after = await ctx.db.get(guarantee._id);
     if (!after) throw new Error("Guarantee row vanished mid-transaction");
     // `ativoInsuredCentsPlatform` sums `availableCents + terms.exitCostCapCents`;
-    // both just moved, so the aggregate is part of this write.
+    // the exit cost cap just moved, so the aggregate is part of this write.
     await replaceGuaranteeAggregates(ctx, guarantee, after);
 
     await ctx.db.insert("guaranteeHistory", {
@@ -393,8 +382,7 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
       message: "Garantia reprecificada",
     });
 
-    await appendAuditEntry(ctx, {
-      actor: { kind: "user", userId: ctx.user._id },
+    await ctx.appendStaffAudit({
       action: AUDIT_ACTION.GUARANTEE_REPRICED,
       resourceType: "guarantees",
       resourceId: guarantee.publicId,
@@ -405,7 +393,8 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
         productId: product._id,
         previousTerms: guarantee.terms,
         terms: priced.terms,
-        previousCapacity: guarantee.capacity,
+        // Unchanged by a reprice; recorded so the entry shows what the
+        // guarantee is still on risk for under the new terms.
         capacity: after.capacity,
         nextRenewalDate: args.nextRenewalDate,
       },
