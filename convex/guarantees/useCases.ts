@@ -5,28 +5,29 @@ import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
 import { priceGuarantee, splitCommission } from "./pricing";
 import type {
-  ActivityBucket,
   ContractApplication,
   ContractApplicationId,
   Guarantee,
   GuaranteeHistory,
   GuaranteeId,
+  GuaranteeEvent,
   GuaranteeState,
+  StateTimelineBucket,
 } from "./domain";
 import type { AgencyId } from "../agencies/domain";
 import type { Tenant, TenantInput } from "../tenants/domain";
 import type { Lease } from "../leases/domain";
 import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { contractsByStatus, countByStatePlatform, sumInsuredExposure } from "./aggregate";
-import { insertGuaranteeAggregates, replaceGuaranteeAggregates } from "./aggregateWrites";
+import { insertGuaranteeAggregates } from "./aggregateWrites";
+import { applyGuaranteeTransition } from "./transitions";
 import {
-  assertClose,
-  assertTransition,
   CLOSE_REASON,
   CONTRACT_APPLICATION_VALIDITY_MS,
   DOCUMENT_KEY,
   DOCUMENT_STATUS,
   GUARANTEE_ERROR_CODE,
+  GUARANTEE_EVENT,
   GUARANTEE_STATE,
   GUARANTEE_STATES,
   guaranteePlanValidator,
@@ -460,45 +461,6 @@ function buildWeekBoundaries(now: Date, count: number): PeriodBoundary[] {
   return boundaries;
 }
 
-type GuaranteeTimePoint = Pick<Guarantee, "activatedAt" | "closure">;
-
-/**
- * A guarantee leaves the in-force book at `closure.closedAt`. A draft
- * canceled before activation counts as `cancelled`; every other close
- * reason (end of lease, rescission, eviction, …) counts as `expired`.
- */
-function bucketsForGuarantees(
-  guarantees: readonly GuaranteeTimePoint[],
-  boundaries: readonly PeriodBoundary[],
-): ActivityBucket[] {
-  return boundaries.map(({ startISO, endISO, key }) => {
-    let activated = 0;
-    let cancelled = 0;
-    let expired = 0;
-    let netActive = 0;
-
-    for (const g of guarantees) {
-      const activatedAt = g.activatedAt;
-      const closedAt = g.closure?.closedAt ?? null;
-
-      if (activatedAt && activatedAt >= startISO && activatedAt < endISO) {
-        activated++;
-      }
-      if (closedAt && closedAt >= startISO && closedAt < endISO) {
-        if (g.closure?.reason === CLOSE_REASON.CANCELED_PRE_ACTIVATION) cancelled++;
-        else expired++;
-      }
-
-      if (!activatedAt) continue;
-      if (activatedAt >= endISO) continue;
-      if (closedAt && closedAt < endISO) continue;
-      netActive++;
-    }
-
-    return { period: key, activated, cancelled, expired, netActive };
-  });
-}
-
 const activityScopeValidator = v.union(
   v.object({ kind: v.literal("agency"), agencyId: v.id("agencies") }),
   v.object({ kind: v.literal("platform") }),
@@ -507,31 +469,203 @@ const activityScopeValidator = v.union(
 const activityGranularityValidator = v.union(v.literal("month"), v.literal("week"));
 
 /**
- * Guarantee-activity time series, scoped to either one agency or the platform.
+ * A guarantee's position on the machine, replayed from its history rows.
+ * `agencyId` is part of the key because `publicId` is unique per agency, not
+ * across the platform — keying on the id alone would merge two agencies'
+ * guarantees in the platform arm.
+ */
+function guaranteeTimelineKey(agencyId: AgencyId, guaranteePublicId: string): string {
+  return `${agencyId}:${guaranteePublicId}`;
+}
+
+function emptyStateCounts(): Record<GuaranteeState, number> {
+  return {
+    drafted: 0,
+    active: 0,
+    in_arrears: 0,
+    default_verified: 0,
+    cover_committed: 0,
+    in_eviction: 0,
+    closed: 0,
+  };
+}
+
+function emptyEventCounts(): Record<GuaranteeEvent, number> {
+  return {
+    created: 0,
+    activated: 0,
+    default_verified: 0,
+    cover_paid: 0,
+    closed: 0,
+  };
+}
+
+/**
+ * The event a transition counts as, or `null` when it is a move the event
+ * panel does not track (a cure, an eviction filing). `activated` is only the
+ * first sale — a return to `active` after arrears or a payout is a cure, not
+ * new business, so the `from` state is part of the test.
+ */
+function eventForTransition(from: GuaranteeState, to: GuaranteeState): GuaranteeEvent | null {
+  if (to === GUARANTEE_STATE.ACTIVE) {
+    return from === GUARANTEE_STATE.DRAFTED ? GUARANTEE_EVENT.ACTIVATED : null;
+  }
+  if (to === GUARANTEE_STATE.DEFAULT_VERIFIED) return GUARANTEE_EVENT.DEFAULT_VERIFIED;
+  if (to === GUARANTEE_STATE.COVER_COMMITTED) return GUARANTEE_EVENT.COVER_PAID;
+  if (to === GUARANTEE_STATE.CLOSED) return GUARANTEE_EVENT.CLOSED;
+  return null;
+}
+
+/** Index of the boundary whose half-open window contains `atISO`, else -1. */
+function boundaryIndexFor(atISO: string, boundaries: readonly PeriodBoundary[]): number {
+  return boundaries.findIndex(({ startISO, endISO }) => atISO >= startISO && atISO < endISO);
+}
+
+type ReplayedTransition = { at: string; from: GuaranteeState; to: GuaranteeState };
+
+type TimelineGuarantee = Pick<Guarantee, "agencyId" | "publicId" | "status">;
+type TimelineHistory = Pick<
+  GuaranteeHistory,
+  "agencyId" | "guaranteePublicId" | "at" | "transition"
+>;
+
+/**
+ * Composition of the book at the end of each boundary, plus the lifecycle
+ * events inside it, by replaying the structured `guaranteeHistory.transition`
+ * rows.
+ *
+ * Semantics, so the series is readable without the code:
+ * - a guarantee is counted only from the instant it exists — the earliest `at`
+ *   on ANY of its history rows, transition or not, since creation writes a
+ *   free-text row. Without that bound a guarantee sold six months ago would be
+ *   counted as `drafted` in the six buckets before it, and the total would be
+ *   flat at today's book size for the whole window;
+ * - state at boundary B = the `to` of the last transition with `at < B.end`;
+ * - before its first transition a guarantee is counted in that transition's
+ *   `from` state — that IS the state it was in;
+ * - a guarantee with no history rows at all is counted in its current status in
+ *   every bucket. Nothing dates it, and `_creationTime` cannot stand in: it is
+ *   the seed run time for every demo row and would empty the whole series;
+ * - an event lands in the bucket whose half-open window contains its
+ *   timestamp, so anything older than the window contributes no bar. A
+ *   guarantee with no history rows produces no events at all.
+ *
+ * History rows whose guarantee is out of scope are ignored, and a row with no
+ * `transition` (creation, reprice) is not a machine move — but it still counts
+ * as evidence that the guarantee existed.
+ */
+function replayStateTimeline(
+  guarantees: readonly TimelineGuarantee[],
+  history: readonly TimelineHistory[],
+  boundaries: readonly PeriodBoundary[],
+): StateTimelineBucket[] {
+  const transitionsByGuarantee = new Map<string, ReplayedTransition[]>();
+  const existsFromByGuarantee = new Map<string, string>();
+  for (const row of history) {
+    const key = guaranteeTimelineKey(row.agencyId, row.guaranteePublicId);
+    const earliest = existsFromByGuarantee.get(key);
+    if (earliest === undefined || row.at < earliest) existsFromByGuarantee.set(key, row.at);
+    const transition = row.transition;
+    if (!transition) continue;
+    const replayed = { at: row.at, from: transition.from, to: transition.to };
+    const existing = transitionsByGuarantee.get(key);
+    if (existing) existing.push(replayed);
+    else transitionsByGuarantee.set(key, [replayed]);
+  }
+  for (const rows of transitionsByGuarantee.values()) {
+    rows.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  }
+
+  const buckets = boundaries.map(({ key }) => ({
+    period: key,
+    countByState: emptyStateCounts(),
+    eventCount: emptyEventCounts(),
+  }));
+
+  for (const guarantee of guarantees) {
+    const key = guaranteeTimelineKey(guarantee.agencyId, guarantee.publicId);
+    const transitions = transitionsByGuarantee.get(key) ?? [];
+    const existsFromISO = existsFromByGuarantee.get(key);
+
+    if (existsFromISO !== undefined) {
+      const createdIn = buckets[boundaryIndexFor(existsFromISO, boundaries)];
+      if (createdIn) createdIn.eventCount.created++;
+    }
+    for (const transition of transitions) {
+      const event = eventForTransition(transition.from, transition.to);
+      if (!event) continue;
+      const happenedIn = buckets[boundaryIndexFor(transition.at, boundaries)];
+      if (happenedIn) happenedIn.eventCount[event]++;
+    }
+
+    const first = transitions[0];
+    let state: GuaranteeState = first ? first.from : guarantee.status;
+    let next = 0;
+    boundaries.forEach(({ endISO }, index) => {
+      let pending = transitions[next];
+      while (pending && pending.at < endISO) {
+        state = pending.to;
+        next++;
+        pending = transitions[next];
+      }
+      // A bucket that closed before the guarantee's first recorded moment is a
+      // period it did not exist in — counting it there would invent book.
+      if (existsFromISO !== undefined && endISO <= existsFromISO) return;
+      const bucket = buckets[index];
+      if (bucket) bucket.countByState[state]++;
+    });
+  }
+
+  return buckets;
+}
+
+/**
+ * Guarantee **state timeline** — one count per lifecycle state per period,
+ * scoped to either one agency or the platform.
  *
  * Auth: `queryWithAuth` + inline `assertAgencyAccess` for the agency arm —
- * since wrapper choice is static per handler, the scope discriminator is the
- * only way to serve both consumers from a single public function.
+ * wrapper choice is static per handler, so the scope discriminator is the only
+ * way to serve both consumers from one public function.
  *
- * Per-agency scope uses the `by_agency_status` index to bound the scan;
- * platform scope does a full `.collect()` by design. Time-series aggregates
- * are deliberately deferred until the guarantees table crosses ~5–10k rows.
+ * `activatedAt` and `closure.closedAt` are the only timestamps the guarantee
+ * row carries, so a series derived from them can never show `in_arrears`,
+ * `default_verified`, `cover_committed` or `in_eviction`. This one replays
+ * `guaranteeHistory.transition` instead and therefore sees every state the
+ * machine can reach.
+ *
+ * Per-agency scope bounds both scans on an index (`by_agency_status`,
+ * `by_agency_guarantee`); platform scope collects both tables by design.
+ *
+ * The binding table here is `guaranteeHistory`, not `guarantees`: it takes a
+ * row per creation, per guarded transition and per reprice, is never pruned,
+ * and is read in full even though only the last 12 months matter. So the
+ * platform arm reaches Convex's per-query document-read ceiling at roughly
+ * `guarantees × average path length`, well before the ~5–10k guarantee rows
+ * a count-only series would be deferred against. The fix when it binds is a
+ * `by_at` / `by_agency_at` index ranged from the window's first boundary, with
+ * the opening state replayed backwards from `guarantees.status`.
  */
-export const getActivityByPeriod = queryWithAuth({
+export const getStateTimelineByPeriod = queryWithAuth({
   args: {
     scope: activityScopeValidator,
     granularity: activityGranularityValidator,
   },
-  handler: async (ctx, { scope, granularity }): Promise<ActivityBucket[]> => {
-    let guarantees: readonly GuaranteeTimePoint[];
+  handler: async (ctx, { scope, granularity }): Promise<StateTimelineBucket[]> => {
+    let guarantees: readonly TimelineGuarantee[];
+    let history: readonly TimelineHistory[];
     if (scope.kind === "agency") {
       await assertAgencyAccess(ctx, scope.agencyId);
       guarantees = await ctx.db
         .query("guarantees")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", scope.agencyId))
         .collect();
+      history = await ctx.db
+        .query("guaranteeHistory")
+        .withIndex("by_agency_guarantee", (q) => q.eq("agencyId", scope.agencyId))
+        .collect();
     } else {
       guarantees = await ctx.db.query("guarantees").collect();
+      history = await ctx.db.query("guaranteeHistory").collect();
     }
 
     const now = new Date();
@@ -540,7 +674,7 @@ export const getActivityByPeriod = queryWithAuth({
         ? buildMonthBoundaries(now, ACTIVITY_MONTH_PERIODS)
         : buildWeekBoundaries(now, ACTIVITY_WEEK_PERIODS);
 
-    return bucketsForGuarantees(guarantees, boundaries);
+    return replayStateTimeline(guarantees, history, boundaries);
   },
 });
 
@@ -1024,9 +1158,10 @@ type CancelDraftErrorResult = {
 
 /**
  * Close a draft before activation (`drafted → closed`, reason
- * `canceled_pre_activation`). Both machine guards run before the patch; the
- * lease pointer is released in the same transaction so the lease can take a
- * new guarantee immediately.
+ * `canceled_pre_activation`). Lives here rather than in `mutations.ts` because
+ * the agency detail page binds to `api.guarantees.useCases.cancelDraft`; the
+ * lifecycle mechanics belong to the shared helper, so there is still exactly
+ * one implementation of the transition.
  */
 export const cancelDraft = mutationWithAgencyScope({
   args: { publicId: v.string() },
@@ -1047,52 +1182,24 @@ export const cancelDraft = mutationWithAgencyScope({
       };
     }
 
-    const closing = assertClose(guarantee.status, CLOSE_REASON.CANCELED_PRE_ACTIVATION);
-    const transition = assertTransition(guarantee.status, GUARANTEE_STATE.CLOSED);
-    if (!closing.success || !transition.success) {
+    const applied = await applyGuaranteeTransition(ctx, {
+      guarantee,
+      to: GUARANTEE_STATE.CLOSED,
+      closure: { reason: CLOSE_REASON.CANCELED_PRE_ACTIVATION },
+      actor: { userId: ctx.user._id, username: ctx.user.name },
+      message: "Proposta cancelada",
+    });
+    // Every machine refusal collapses to one agency-facing code: from an
+    // agency's point of view the only thing that can be wrong here is that the
+    // guarantee is no longer a draft, and `guaranteeDetails.errors.NOT_DRAFTED`
+    // is the message it already renders.
+    if (!applied.success) {
       return {
         success: false,
         error: { code: GUARANTEE_ERROR_CODE.NOT_DRAFTED },
-        message: closing.success ? transition.message : closing.message,
+        message: applied.message,
       };
     }
-
-    const nowISO = new Date().toISOString();
-    await ctx.db.patch(guarantee._id, {
-      status: GUARANTEE_STATE.CLOSED,
-      closure: { reason: CLOSE_REASON.CANCELED_PRE_ACTIVATION, closedAt: nowISO },
-    });
-    const after = await ctx.db.get(guarantee._id);
-    if (!after) throw new Error("Guarantee disappeared mid-mutation");
-    await replaceGuaranteeAggregates(ctx, guarantee, after);
-
-    const lease = await ctx.db.get(guarantee.leaseId);
-    if (lease && lease.openGuaranteeId === guarantee._id) {
-      await ctx.db.patch(lease._id, { openGuaranteeId: null });
-    }
-
-    await ctx.db.insert("guaranteeHistory", {
-      agencyId: guarantee.agencyId,
-      guaranteePublicId: args.publicId,
-      at: nowISO,
-      username: ctx.user.name,
-      message: "Proposta cancelada",
-    });
-
-    await appendAuditEntry(ctx, {
-      actor: { kind: "user", userId: ctx.user._id },
-      action: AUDIT_ACTION.GUARANTEE_TRANSITIONED,
-      resourceType: "guarantees",
-      resourceId: args.publicId,
-      payload: {
-        guaranteeId: guarantee._id,
-        leaseId: guarantee.leaseId,
-        agencyId: guarantee.agencyId,
-        from: transition.data.from,
-        to: transition.data.to,
-        reason: closing.data.reason,
-      },
-    });
 
     return { success: true, data: { canceled: true }, message: "Draft canceled" };
   },

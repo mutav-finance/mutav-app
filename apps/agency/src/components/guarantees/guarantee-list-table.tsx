@@ -64,7 +64,7 @@ type GuaranteeListItem = {
   urgencySortKey: number;
 };
 
-type StateTab = "all" | "expiring" | GuaranteeState;
+export type StateTab = "all" | "expiring" | GuaranteeState;
 
 /**
  * Tab order runs "everything → what needs attention soon → the in-force states
@@ -166,9 +166,21 @@ function buildColumns(
 type Props = {
   defaultSort?: SortingState;
   emptyStateCta?: string;
+  /**
+   * Controlled tab, for a caller that drives the same filter from elsewhere on
+   * the page — the dashboard's lifecycle pipeline. Left off, the table owns the
+   * tab itself: the standalone guarantees page has nothing to share it with.
+   */
+  stateTab?: StateTab;
+  onStateTabChange?: (tab: StateTab) => void;
 };
 
-export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
+export function GuaranteeListTable({
+  defaultSort,
+  emptyStateCta,
+  stateTab: controlledStateTab,
+  onStateTabChange,
+}: Props) {
   const t = useTranslations("guaranteeList");
   const tState = useTranslations("guaranteeDetails.state");
 
@@ -176,7 +188,9 @@ export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
   const agencyId = selectedAgency?._id;
 
   const referenceDate = new Date().toISOString().slice(0, 10);
-  const [stateTab, setStateTab] = React.useState<StateTab>("all");
+  const [ownStateTab, setOwnStateTab] = React.useState<StateTab>("all");
+  const stateTab = controlledStateTab ?? ownStateTab;
+  const setStateTab = onStateTabChange ?? setOwnStateTab;
 
   const result = useQuery(
     api.guarantees.useCases.listByAgency,

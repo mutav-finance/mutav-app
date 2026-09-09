@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { FileTextIcon, ClockIcon, AlertTriangleIcon } from "lucide-react";
-import { Card, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { GuaranteeAggregates } from "@convex/transparency/domain";
 
@@ -13,11 +13,13 @@ function MetricCard({
   label,
   value,
   loading,
+  hint,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   loading: boolean;
+  hint?: string;
 }) {
   return (
     <Card>
@@ -30,6 +32,11 @@ function MetricCard({
           {loading ? <Skeleton className="h-8 w-16" /> : value}
         </CardTitle>
       </CardHeader>
+      {hint ? (
+        <CardContent>
+          <p className="text-muted-foreground text-xs">{hint}</p>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }
@@ -62,6 +69,7 @@ export function GuaranteesPanel({ aggregates }: Props) {
         label={t("defaultRate")}
         value={defaultRatePct}
         loading={loading}
+        hint={t("defaultRateHint")}
       />
     </>
   );

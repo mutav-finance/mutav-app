@@ -141,6 +141,7 @@
         "DUPLICATE_NOTICE": "Já existe um acionamento aberto para essa garantia nessa data.",
         "INVALID_EVIDENCE_SOURCE": "Fonte de evidência inválida.",
         "INVALID_RENT_DUE_DATE": "Data de vencimento inválida (use AAAA-MM-DD).",
+        "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode entrar em inadimplência a partir do estado atual.",
         "UNEXPECTED": "Não foi possível abrir o acionamento. Tente novamente."
       }
     },
@@ -191,6 +192,7 @@
           "SELF_TRANSITION": "O acionamento já está nesse estado.",
           "TERMINAL_STATE": "O acionamento já foi encerrado.",
           "ILLEGAL_TRANSITION": "Transição inválida para o estado atual.",
+          "NOTICE_VERIFIED": "A Mutav já confirmou essa inadimplência; só a Mutav pode encerrá-la.",
           "UNEXPECTED": "Não foi possível cancelar o acionamento. Tente novamente."
         }
       }
@@ -221,23 +223,23 @@
     }
   },
   "chart": {
-    "title": "Garantias sob Gestão",
-    "descriptionLong": "Total de garantias criadas nos últimos meses",
-    "descriptionShort": "Garantias por mês",
+    "title": "Carteira vigente",
+    "descriptionLong": "Composição da carteira vigente e as movimentações por trás dela",
+    "descriptionShort": "Carteira vigente",
     "last6Months": "Últimos 6 meses",
     "last12Months": "Últimos 12 meses",
     "selectRangeAriaLabel": "Selecione um período",
-    "series": {
-      "guarantees": "Garantias",
-      "desktop": "Desktop",
-      "mobile": "Mobile",
-      "newActivations": "Novas Ativações",
-      "cumulative": "Total Acumulado",
-      "netActive": "Garantias Ativas",
-      "activated": "Ativados",
-      "canceled": "Cancelados",
-      "expired": "Encerrados"
-    }
+    "legendLabel": "Garantias vigentes por situação, contagem atual",
+    "seriesLabel": "Séries do gráfico: carteira vigente e movimentações por mês",
+    "inForceLabel": "Vigentes"
+  },
+  "lifecycle": {
+    "title": "Onde a carteira está",
+    "description": "Garantias por estado do ciclo de vida — selecione um para filtrar a lista abaixo",
+    "spineLabel": "Ciclo de vida da garantia",
+    "exitsLabel": "Saídas",
+    "cureReturn": "Regularização volta para {state}",
+    "nodeAriaLabel": "{state}: {count}. Filtrar a lista por este estado."
   },
   "metrics": {
     "inForce": {
@@ -258,8 +260,7 @@
       "label": "Inadimplências",
       "footerNone": "Nenhuma fatura em atraso",
       "footerSome": "{count, plural, one {# fatura em atraso} other {# faturas em atraso}}"
-    },
-    "byState": "Garantias por situação"
+    }
   },
   "dataTable": {
     "columns": {
@@ -1269,7 +1270,7 @@
       "insured": "Garantias em vigor",
       "drafted": "Rascunhos",
       "defaultRate": "Taxa de inadimplência",
-      "byState": "Garantias por situação"
+      "defaultRateHint": "Inadimplências verificadas e coberturas registradas sobre as garantias em vigor, no momento."
     },
     "capacity": {
       "label": "Utilização da capacidade contratada",
@@ -1285,18 +1286,22 @@
       "viewExplorer": "Verificar na rede Stellar"
     },
     "timeline": {
-      "title": "Garantias por semana",
-      "descriptionLong": "Evolução semanal de garantias no período selecionado.",
-      "descriptionShort": "Garantias por semana",
+      "title": "Carteira vigente da plataforma",
+      "descriptionLong": "Composição semanal da carteira vigente da plataforma, por situação da garantia.",
+      "descriptionShort": "Carteira vigente",
       "m6": "Últimos 6 meses",
       "m12": "Últimos 12 meses",
       "selectRangeAriaLabel": "Selecione um período",
-      "series": {
-        "netActive": "Garantias Ativas",
-        "activated": "Ativados",
-        "canceled": "Cancelados",
-        "expired": "Encerrados"
-      }
+      "legendLabel": "Garantias vigentes por situação, contagem atual",
+      "seriesLabel": "Séries do gráfico: carteira vigente e movimentações por semana",
+      "inForceLabel": "Vigentes"
     }
+  },
+  "guaranteeEvents": {
+    "created": "Criadas",
+    "activated": "Ativadas",
+    "default_verified": "Inadimplência verificada",
+    "cover_paid": "Cobertura paga",
+    "closed": "Encerradas"
   }
 }

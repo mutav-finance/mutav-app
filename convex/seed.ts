@@ -14,8 +14,11 @@ import {
   DELINQUENCY_STATUS,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
+  type DelinquencyNotice,
 } from "./delinquencies/domain";
 import {
+  assertClose,
+  assertTransition,
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
   DOCUMENT_STATUS,
@@ -62,8 +65,16 @@ const pid = (n: number) => String(1_000_000 + n);
 /** Seed lease reference derived from its guarantee's public id (`LSE-1000007`). */
 const leasePid = (guaranteePublicId: string) => `LSE-${guaranteePublicId}`;
 
-/** ISO date string */
-const d = (s: string) => s;
+/**
+ * Seed timestamp, normalized to UTC `Z` form. Production stamps every history,
+ * notice and audit row with `toISOString()`, and both the state timeline and
+ * the activity series compare those strings LEXICALLY against `Z`-form period
+ * boundaries — so an offset-form seed row (`…T22:00:00-03:00`) sorts and
+ * buckets as the day before the instant it denotes, and orders backwards
+ * against a production row written on the same day. One format everywhere is
+ * the only way the two corpora are comparable.
+ */
+const d = (s: string) => new Date(s).toISOString();
 
 /**
  * Demo tables wiped by `seedReset`. Order matters —
@@ -2862,6 +2873,262 @@ async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
 }
 
 /**
+ * Days between a committed cover and the eviction filing in the demo book.
+ *
+ * Nothing in the schema dates an eviction: neither `guarantees` nor the notice
+ * table carries the filing, and the structured `guaranteeHistory.transition`
+ * row written here is the only place it can live. So the seed derives it from
+ * the cover it follows rather than inventing a free-floating date — 15 days is
+ * the interval the Horizonte book's own resolution note already describes.
+ */
+const EVICTION_FILED_AFTER_COVER_DAYS = 15;
+
+/**
+ * Add whole days to a seed timestamp, keeping its clock time. Inputs come from
+ * `d()` and are therefore already UTC `Z` strings, so the rebuilt value stays
+ * in the one format the timeline compares lexically.
+ */
+function seedDaysAfter(at: string, days: number): string {
+  const [datePart, timePart] = at.split("T");
+  if (!datePart || !timePart) throw new Error(`Seed timestamp "${at}" is not a full ISO timestamp`);
+  const shifted = new Date(`${datePart}T00:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return `${shifted.toISOString().slice(0, 10)}T${timePart}`;
+}
+
+type SeedNotice = DelinquencyNotice;
+
+type NoticeEvent = {
+  at: string;
+  /** `settled` is either disposition that ends a notice: resolution or cancellation. */
+  kind: "opened" | "verified" | "settled";
+  noticePublicId: string;
+  /** Guarantee state this event moves to, or null when it moves nothing. */
+  to: GuaranteeState | null;
+  message: string;
+};
+
+type PlannedTransition = {
+  at: string;
+  from: GuaranteeState;
+  to: GuaranteeState;
+  closeReason?: CloseReason;
+  message: string;
+};
+
+/** Flatten one notice into the timestamped events that moved its guarantee. */
+function noticeEventsFor(notice: SeedNotice): NoticeEvent[] {
+  const events: NoticeEvent[] = [
+    {
+      at: notice.openedAt,
+      kind: "opened",
+      noticePublicId: notice.publicId,
+      to: GUARANTEE_STATE.IN_ARREARS,
+      message: `Aviso de inadimplência ${notice.publicId} aberto pela imobiliária.`,
+    },
+  ];
+  if (notice.verification) {
+    events.push({
+      at: notice.verification.verifiedAt,
+      kind: "verified",
+      noticePublicId: notice.publicId,
+      to: GUARANTEE_STATE.DEFAULT_VERIFIED,
+      message: `Inadimplência do aviso ${notice.publicId} verificada pela Mutav.`,
+    });
+  }
+  if (notice.resolution) {
+    const isCover = notice.resolution.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED;
+    const isCured = notice.resolution.kind === NOTICE_RESOLUTION_KIND.TENANT_CURED;
+    events.push({
+      at: notice.resolution.resolvedAt,
+      kind: "settled",
+      noticePublicId: notice.publicId,
+      // A stale or disputed notice ends without curing the guarantee — the same
+      // asymmetry the delinquency mutations enforce.
+      to: isCover ? GUARANTEE_STATE.COVER_COMMITTED : isCured ? GUARANTEE_STATE.ACTIVE : null,
+      message: isCover
+        ? `Cobertura comprometida para o aviso ${notice.publicId}.`
+        : `Aviso ${notice.publicId} resolvido (${notice.resolution.kind}).`,
+    });
+  }
+  if (notice.cancellation) {
+    events.push({
+      at: notice.cancellation.canceledAt,
+      kind: "settled",
+      noticePublicId: notice.publicId,
+      to: GUARANTEE_STATE.ACTIVE,
+      message: `Aviso ${notice.publicId} cancelado (${notice.cancellation.reason}).`,
+    });
+  }
+  return events;
+}
+
+/**
+ * Replay a seeded guarantee's own record into the transition path that produced
+ * it: activation from `activatedAt`, the arrears / verification / cover hops
+ * from its notices, the eviction filing, and the closure.
+ *
+ * Notice-driven hops the machine refuses are skipped rather than forced — that
+ * is what the production mutations do (a notice opened on a guarantee already
+ * in arrears is still recorded; the guarantee does not move). Hops read off the
+ * guarantee row itself (activation, eviction, closure) are never skipped: an
+ * illegal one means the seed data is wrong, so it throws.
+ */
+function planGuaranteeTransitions(
+  guarantee: Guarantee,
+  notices: readonly SeedNotice[],
+): PlannedTransition[] {
+  const planned: PlannedTransition[] = [];
+
+  // The path itself carries the running state — a separate mutable variable
+  // would be narrowed to its initializer by every read after a closure writes it.
+  const currentState = (): GuaranteeState => {
+    if (planned.length === 0) return GUARANTEE_STATE.DRAFTED;
+    return planned[planned.length - 1].to;
+  };
+
+  const push = (
+    at: string,
+    to: GuaranteeState,
+    message: string,
+    closeReason?: CloseReason,
+  ): void => {
+    planned.push({
+      at,
+      from: currentState(),
+      to,
+      message,
+      ...(closeReason === undefined ? {} : { closeReason }),
+    });
+  };
+
+  const pushStructural = (
+    at: string,
+    to: GuaranteeState,
+    message: string,
+    closeReason?: CloseReason,
+  ): void => {
+    const allowed = assertTransition(currentState(), to);
+    if (!allowed.success) {
+      throw new Error(`Seed guarantee ${guarantee.publicId}: ${allowed.message}`);
+    }
+    push(at, to, message, closeReason);
+  };
+
+  if (guarantee.activatedAt) {
+    pushStructural(
+      guarantee.activatedAt,
+      GUARANTEE_STATE.ACTIVE,
+      `Garantia ${guarantee.publicId} ativada.`,
+    );
+  }
+
+  const events = notices
+    .flatMap(noticeEventsFor)
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const outstanding = new Set<string>();
+  for (const event of events) {
+    if (event.kind === "opened") outstanding.add(event.noticePublicId);
+    if (event.kind === "settled") outstanding.delete(event.noticePublicId);
+    if (event.to === null) continue;
+    // `openNotice` moves the guarantee only from `active`; one filed while it
+    // is already past that records the notice and leaves the state alone. The
+    // machine would accept `cover_committed → in_arrears`, so without this the
+    // seed could lay down a path production has no way to write.
+    if (event.kind === "opened" && currentState() !== GUARANTEE_STATE.ACTIVE) continue;
+    // A guarantee leaves arrears only once nothing else is still outstanding —
+    // the rule the delinquency mutations apply before returning it to active.
+    if (event.to === GUARANTEE_STATE.ACTIVE && outstanding.size > 0) continue;
+    if (event.to === currentState()) continue;
+    if (!assertTransition(currentState(), event.to).success) continue;
+    push(event.at, event.to, event.message);
+  }
+
+  if (
+    guarantee.status === GUARANTEE_STATE.IN_EVICTION &&
+    currentState() !== GUARANTEE_STATE.IN_EVICTION
+  ) {
+    const last = planned[planned.length - 1];
+    if (!last) {
+      throw new Error(
+        `Seed guarantee ${guarantee.publicId} is in eviction but was never activated`,
+      );
+    }
+    pushStructural(
+      seedDaysAfter(last.at, EVICTION_FILED_AFTER_COVER_DAYS),
+      GUARANTEE_STATE.IN_EVICTION,
+      `Ação de despejo ajuizada para a garantia ${guarantee.publicId}.`,
+    );
+  }
+
+  if (guarantee.closure) {
+    const closing = assertClose(currentState(), guarantee.closure.reason);
+    if (!closing.success) {
+      throw new Error(`Seed guarantee ${guarantee.publicId}: ${closing.message}`);
+    }
+    pushStructural(
+      guarantee.closure.closedAt,
+      GUARANTEE_STATE.CLOSED,
+      `Garantia ${guarantee.publicId} encerrada (${guarantee.closure.reason}).`,
+      guarantee.closure.reason,
+    );
+  }
+
+  const replayedState = currentState();
+  if (replayedState !== guarantee.status) {
+    throw new Error(
+      `Seed guarantee ${guarantee.publicId}: replayed path ends in "${replayedState}" but the row is "${guarantee.status}"`,
+    );
+  }
+  for (let i = 1; i < planned.length; i++) {
+    const previous = planned[i - 1];
+    const current = planned[i];
+    if (current.at < previous.at) {
+      throw new Error(
+        `Seed guarantee ${guarantee.publicId}: the transition to "${current.to}" is dated before the one it follows`,
+      );
+    }
+  }
+  return planned;
+}
+
+/**
+ * Give every seeded guarantee the structured transition history the lifecycle
+ * writes in production, so the state timeline has a real path instead of one
+ * flat step at today's status.
+ *
+ * Runs last in `seedReset`, after `attachTenantSnapshots`: that pass claims the
+ * EARLIEST history row as the creation event and must find the free-text
+ * creation row (or synthesize one), never a transition.
+ */
+async function attachGuaranteeTransitionHistory(ctx: MutationCtx): Promise<number> {
+  let inserted = 0;
+  for (const guarantee of await ctx.db.query("guarantees").collect()) {
+    const notices = await ctx.db
+      .query("guaranteeDelinquencyNotices")
+      .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guarantee._id))
+      .collect();
+
+    for (const transition of planGuaranteeTransitions(guarantee, notices)) {
+      await ctx.db.insert("guaranteeHistory", {
+        agencyId: guarantee.agencyId,
+        guaranteePublicId: guarantee.publicId,
+        at: transition.at,
+        username: "seed",
+        message: transition.message,
+        transition: {
+          from: transition.from,
+          to: transition.to,
+          ...(transition.closeReason === undefined ? {} : { closeReason: transition.closeReason }),
+        },
+      });
+      inserted++;
+    }
+  }
+  return inserted;
+}
+
+/**
  * One-shot full reset — the universal "give me a clean, fully-populated
  * dev DB" command. Wipes the demo tables, seeds the default product,
  * attaches the four Auth0 test personas (the `systemadmin` one signs the
@@ -2895,7 +3162,8 @@ export const seedReset = internalMutation({
       : null;
 
     await attachTenantSnapshots(ctx);
+    const transitionRows = await attachGuaranteeTransitionHistory(ctx);
 
-    return { product: product.slug, fictional, personas, aprovada };
+    return { product: product.slug, fictional, personas, aprovada, transitionRows };
   },
 });

@@ -72,24 +72,57 @@ export function isInsured(guarantee: Pick<Guarantee, "status">): boolean {
   return INSURED_STATE_SET.has(guarantee.status);
 }
 
+export type ActivityGranularity = "month" | "week";
+
 /**
- * One bucket in the unified guarantee-activity time series. Shared between the
- * agency dashboard (`granularity: "month"`) and the platform health timeline
- * (`granularity: "week"`).
+ * One bucket in the guarantee **state timeline**: the composition of the book
+ * at the END of the period (`countByState`), plus the lifecycle moves that
+ * happened DURING it (`eventCount`).
  *
- * `period` is the bucket start: `"YYYY-MM"` for month, `"YYYY-MM-DD"` (UTC
- * Monday) for week. `netActive` is the snapshot of guarantees in force at the
- * END of the period — the unified trend semantic on both charts.
+ * Both come from one replay of the same history rows, so the card draws its
+ * trend and its event panel from a single round trip. They are different
+ * units — a stock and a flow — and belong in different plots.
+ *
+ * Arrears is a state, not an event, and nothing on the guarantee row dates it;
+ * the timeline is reconstructed from `guaranteeHistory.transition`, so every
+ * state the machine can reach is visible.
+ *
+ * The counts sum to the number of guarantees in scope in every bucket: a
+ * guarantee is always somewhere on the machine, so the series reads as a
+ * true part-to-whole composition.
  */
-export type ActivityBucket = {
+export type StateTimelineBucket = {
   period: string;
-  activated: number;
-  cancelled: number;
-  expired: number;
-  netActive: number;
+  countByState: Record<GuaranteeState, number>;
+  eventCount: Record<GuaranteeEvent, number>;
 };
 
-export type ActivityGranularity = "month" | "week";
+export type GuaranteeEvent = "created" | "activated" | "default_verified" | "cover_paid" | "closed";
+
+/**
+ * The lifecycle moves worth counting per period. Each one is a machine
+ * transition (or, for `created`, the first history row a guarantee ever gets)
+ * — a flow, where `countByState` is a stock. The two never share a plot.
+ *
+ * Not every transition earns a series: a cure (`in_arrears -> active`) and an
+ * eviction filing are real moves but the reader asked for new business,
+ * activations, defaults, payouts and endings.
+ */
+export const GUARANTEE_EVENT = {
+  CREATED: "created",
+  ACTIVATED: "activated",
+  DEFAULT_VERIFIED: "default_verified",
+  COVER_PAID: "cover_paid",
+  CLOSED: "closed",
+} as const satisfies Record<Uppercase<GuaranteeEvent>, GuaranteeEvent>;
+
+export const GUARANTEE_EVENTS: readonly GuaranteeEvent[] = [
+  GUARANTEE_EVENT.CREATED,
+  GUARANTEE_EVENT.ACTIVATED,
+  GUARANTEE_EVENT.DEFAULT_VERIFIED,
+  GUARANTEE_EVENT.COVER_PAID,
+  GUARANTEE_EVENT.CLOSED,
+] as const;
 
 // Transitional re-export: the entity-type family moved to the tenants
 // registry domain (`convex/tenants/domain.ts`). Kept here so existing
@@ -189,6 +222,13 @@ export const GUARANTEE_ERROR_CODE = {
   INVALID_TAX_ID: "INVALID_TAX_ID",
   NOT_FOUND: "NOT_FOUND",
   NOT_DRAFTED: "NOT_DRAFTED",
+  CLOSURE_REQUIRED: "CLOSURE_REQUIRED",
+  CLOSURE_NOT_ALLOWED: "CLOSURE_NOT_ALLOWED",
+  CAPACITY_INVARIANT_BROKEN: "CAPACITY_INVARIANT_BROKEN",
+  INVALID_AMOUNT: "INVALID_AMOUNT",
+  RELEASE_EXCEEDS_RESERVED: "RELEASE_EXCEEDS_RESERVED",
+  GUARANTEE_CLOSED: "GUARANTEE_CLOSED",
+  INVALID_RENEWAL_DATE: "INVALID_RENEWAL_DATE",
 } as const satisfies Record<string, string>;
 
 export type GuaranteeErrorCode = (typeof GUARANTEE_ERROR_CODE)[keyof typeof GUARANTEE_ERROR_CODE];

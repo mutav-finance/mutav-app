@@ -141,6 +141,7 @@
         "DUPLICATE_NOTICE": "An open notice already exists for this guarantee and due date.",
         "INVALID_EVIDENCE_SOURCE": "Invalid evidence source.",
         "INVALID_RENT_DUE_DATE": "Invalid rent due date (use YYYY-MM-DD).",
+        "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot be moved into arrears from its current state.",
         "UNEXPECTED": "Could not open the notice. Please try again."
       }
     },
@@ -191,6 +192,7 @@
           "SELF_TRANSITION": "The notice is already in this state.",
           "TERMINAL_STATE": "The notice is already closed.",
           "ILLEGAL_TRANSITION": "Illegal transition for the current state.",
+          "NOTICE_VERIFIED": "Mutav has already verified this default; only Mutav can close it.",
           "UNEXPECTED": "Could not cancel the notice. Please try again."
         }
       }
@@ -221,23 +223,23 @@
     }
   },
   "chart": {
-    "title": "Guarantees under Management",
-    "descriptionLong": "Total guarantees created over the last months",
-    "descriptionShort": "Guarantees per month",
+    "title": "Book in force",
+    "descriptionLong": "Composition of the book in force and the moves behind it",
+    "descriptionShort": "Book in force",
     "last6Months": "Last 6 months",
     "last12Months": "Last 12 months",
     "selectRangeAriaLabel": "Select a range",
-    "series": {
-      "guarantees": "Guarantees",
-      "desktop": "Desktop",
-      "mobile": "Mobile",
-      "newActivations": "New Activations",
-      "cumulative": "Cumulative Total",
-      "netActive": "Active Guarantees",
-      "activated": "Activated",
-      "canceled": "Cancelled",
-      "expired": "Expired"
-    }
+    "legendLabel": "Guarantees in force by state, current count",
+    "seriesLabel": "Plotted series: book in force and moves per month",
+    "inForceLabel": "In force"
+  },
+  "lifecycle": {
+    "title": "Where the book sits",
+    "description": "Guarantees by lifecycle state — select one to filter the list below",
+    "spineLabel": "Guarantee lifecycle",
+    "exitsLabel": "Exits",
+    "cureReturn": "Regularization returns to {state}",
+    "nodeAriaLabel": "{state}: {count}. Filter the list by this state."
   },
   "metrics": {
     "inForce": {
@@ -258,8 +260,7 @@
       "label": "Delinquencies",
       "footerNone": "No overdue invoices",
       "footerSome": "{count, plural, one {# overdue invoice} other {# overdue invoices}}"
-    },
-    "byState": "Guarantees by state"
+    }
   },
   "dataTable": {
     "columns": {
@@ -1269,7 +1270,7 @@
       "insured": "Guarantees in force",
       "drafted": "Drafts",
       "defaultRate": "Default rate",
-      "byState": "Guarantees by state"
+      "defaultRateHint": "Verified defaults and committed covers as a share of guarantees in force, right now."
     },
     "capacity": {
       "label": "Contracted capacity utilization",
@@ -1285,18 +1286,22 @@
       "viewExplorer": "Verify on the Stellar network"
     },
     "timeline": {
-      "title": "Guarantees per week",
-      "descriptionLong": "Weekly guarantee breakdown for the selected period.",
-      "descriptionShort": "Guarantees per week",
+      "title": "Platform book in force",
+      "descriptionLong": "Weekly composition of the platform book in force, by guarantee state.",
+      "descriptionShort": "Book in force",
       "m6": "Last 6 months",
       "m12": "Last 12 months",
       "selectRangeAriaLabel": "Select a range",
-      "series": {
-        "netActive": "Active guarantees",
-        "activated": "Activated",
-        "canceled": "Cancelled",
-        "expired": "Expired"
-      }
+      "legendLabel": "Guarantees in force by state, current count",
+      "seriesLabel": "Plotted series: book in force and moves per week",
+      "inForceLabel": "In force"
     }
+  },
+  "guaranteeEvents": {
+    "created": "Created",
+    "activated": "Activated",
+    "default_verified": "Default verified",
+    "cover_paid": "Cover paid",
+    "closed": "Closed"
   }
 }

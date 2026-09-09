@@ -131,6 +131,113 @@ describe("seedReset", () => {
     expect(byState.nonClosedWithClosure).toBe(0);
   });
 
+  test("every non-drafted guarantee carries transition history that replays to its current status", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const rows = await t.run(async (ctx) => {
+      const guarantees = await ctx.db.query("guarantees").collect();
+      const history = await ctx.db.query("guaranteeHistory").collect();
+      return guarantees.map((guarantee) => ({
+        publicId: guarantee.publicId,
+        status: guarantee.status,
+        transitions: history
+          .filter(
+            (row) =>
+              row.agencyId === guarantee.agencyId && row.guaranteePublicId === guarantee.publicId,
+          )
+          .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+          .flatMap((row) => (row.transition ? [{ at: row.at, ...row.transition }] : [])),
+      }));
+    });
+
+    const nonDraftedWithoutHistory = rows
+      .filter((row) => row.status !== GUARANTEE_STATE.DRAFTED && row.transitions.length === 0)
+      .map((row) => row.publicId);
+    expect(nonDraftedWithoutHistory).toEqual([]);
+
+    const draftedWithHistory = rows
+      .filter((row) => row.status === GUARANTEE_STATE.DRAFTED && row.transitions.length > 0)
+      .map((row) => row.publicId);
+    expect(draftedWithHistory).toEqual([]);
+
+    // Replay: every path starts at `drafted`, each hop leaves where the last
+    // one landed, and the last hop lands on the row's stored status.
+    const replayed = rows
+      .filter((row) => row.transitions.length > 0)
+      .map((row) => {
+        let state: string = GUARANTEE_STATE.DRAFTED;
+        const broken: string[] = [];
+        for (const transition of row.transitions) {
+          if (transition.from !== state) broken.push(`${state} != ${transition.from}`);
+          state = transition.to;
+        }
+        return { publicId: row.publicId, state, broken };
+      });
+    expect(replayed.filter((row) => row.broken.length > 0)).toEqual([]);
+    expect(
+      replayed
+        .filter((row) => {
+          const guarantee = rows.find((candidate) => candidate.publicId === row.publicId);
+          return guarantee?.status !== row.state;
+        })
+        .map((row) => row.publicId),
+    ).toEqual([]);
+
+    // The whole point of the structured rows: every state the machine can
+    // reach is actually reached somewhere in the demo book, so the state
+    // timeline is a real path rather than one flat step at today's status.
+    const reached = [...new Set(rows.flatMap((row) => row.transitions.map((x) => x.to)))].sort();
+    expect(reached).toEqual([
+      "active",
+      "closed",
+      "cover_committed",
+      "default_verified",
+      "in_arrears",
+      "in_eviction",
+    ]);
+
+    // Spread over the trailing year, not stacked on one seed date.
+    const months = new Set(rows.flatMap((row) => row.transitions.map((x) => x.at.slice(0, 7))));
+    expect(months.size).toBeGreaterThanOrEqual(12);
+  });
+
+  test("the guarantee in eviction carries the full arrears → verified → cover → eviction path", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const path = await t.run(async (ctx) => {
+      const guarantee = (await ctx.db.query("guarantees").collect()).find(
+        (row) => row.status === GUARANTEE_STATE.IN_EVICTION,
+      );
+      if (!guarantee) throw new Error("no guarantee seeded in eviction");
+      const history = await ctx.db
+        .query("guaranteeHistory")
+        .withIndex("by_agency_guarantee", (q) =>
+          q.eq("agencyId", guarantee.agencyId).eq("guaranteePublicId", guarantee.publicId),
+        )
+        .collect();
+      return history
+        .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+        .flatMap((row) =>
+          row.transition
+            ? [`${row.at.slice(0, 10)} ${row.transition.from}->${row.transition.to}`]
+            : [],
+        );
+    });
+
+    // The eviction filing has no timestamp anywhere in the schema; the seed
+    // derives it 15 days after the cover, the interval the notice's own
+    // resolution note describes.
+    expect(path).toEqual([
+      "2026-02-05 drafted->active",
+      "2026-04-20 active->in_arrears",
+      "2026-04-30 in_arrears->default_verified",
+      "2026-05-05 default_verified->cover_committed",
+      "2026-05-20 cover_committed->in_eviction",
+    ]);
+  });
+
   test("seeds exactly one default product carrying today's pricing constants", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
@@ -204,7 +311,9 @@ describe("seedReset", () => {
       coverageCeilingCents: 9_600_000,
       exitCostCapCents: 1_920_000,
       // The snapshot is dated at activation, not at the tenant's term approval.
-      appliedAt: "2025-06-03T10:00:00-03:00",
+      // Seed timestamps are normalized to UTC so they compare against the
+      // `Z`-form strings the runtime writes.
+      appliedAt: "2025-06-03T13:00:00.000Z",
     });
     expect(probe.sample.capacity).toEqual({
       ceilingCents: 9_600_000,
@@ -236,7 +345,7 @@ describe("seedReset", () => {
     expect(probe.effectiveFrom).toBe("2022-01-01T00:00:00.000Z");
     expect(probe.pricedBeforeEffect).toEqual([]);
     // Aprovada's closed guarantee is the oldest life in the dataset.
-    expect(probe.earliestAppliedAt).toBe("2024-04-15T10:00:00-03:00");
+    expect(probe.earliestAppliedAt).toBe("2024-04-15T13:00:00.000Z");
   });
 
   test("every guarantee that has been in force carries a full ISO activatedAt; drafts and pre-activation cancellations carry none", async () => {
@@ -418,10 +527,10 @@ describe("seedReset", () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
 
-    // Seed timestamps are offset-form (`-03:00`), which sorts BEFORE Z-form
-    // while denoting a later instant. A reader that took the earliest row
-    // would miss the snapshot the moment any Z-form row is appended, and fall
-    // through to the shared registry row.
+    // The index returns rows in insertion order, not by `at`. A reader that
+    // took whichever row sorts or lands first would miss the snapshot the
+    // moment any earlier-dated row is appended, and fall through to the
+    // shared registry row.
     const probe = await t.run(async (ctx) => {
       const guarantee = await ctx.db.query("guarantees").first();
       if (!guarantee) throw new Error("seed produced no guarantees");

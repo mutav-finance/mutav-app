@@ -1,7 +1,6 @@
-import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-import { GuaranteeListTable } from "@/components/guarantees/guarantee-list-table";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageShell } from "@mutav/ui/page/page-shell";
+import { AgencyGuaranteeBook } from "@/components/guarantees/agency-guarantee-book";
 import { SectionCards } from "@/components/section-cards";
 
 export default function Page() {
@@ -9,10 +8,7 @@ export default function Page() {
     <PageShell>
       <PageContent variant="full">
         <SectionCards />
-        <div className="px-4 lg:px-6">
-          <ChartAreaInteractive />
-        </div>
-        <GuaranteeListTable defaultSort={[{ id: "urgency", desc: false }]} />
+        <AgencyGuaranteeBook />
       </PageContent>
     </PageShell>
   );

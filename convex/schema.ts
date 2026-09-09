@@ -530,6 +530,17 @@ export default defineSchema(
       at: v.string(),
       username: v.string(),
       message: v.string(),
+      // Machine-readable twin of `message`. Written by
+      // `applyGuaranteeTransition` on every guarded status change so a
+      // timeline can be rebuilt without parsing free text; absent on rows
+      // that record something other than a transition (creation, reprice).
+      transition: v.optional(
+        v.object({
+          from: guaranteeState,
+          to: guaranteeState,
+          closeReason: v.optional(closeReason),
+        }),
+      ),
       // As-signed mitigation for the fully-normalized tenant link: the
       // creation event captures the resolved registry fields as an
       // append-only payload, since the living `tenants` row can change after

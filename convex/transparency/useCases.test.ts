@@ -2,6 +2,13 @@
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
+import { GUARANTEE_STATE, type GuaranteeState } from "../guarantees/domain";
+import {
+  registerContractAggregateComponents,
+  seedAgencyWithMembership,
+  seedGuaranteeWithLease,
+  setupAuthenticatedUser,
+} from "../lib/testFixtures";
 import schema from "../schema";
 
 beforeAll(() => {
@@ -25,6 +32,61 @@ async function authedReader() {
   );
   return t.withIdentity({ subject: "auth0|reader", email: "reader@test.br", name: "Reader" });
 }
+
+describe("getGuaranteeAggregates — defaultRate", () => {
+  async function bookWith(states: readonly GuaranteeState[]) {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    let index = 0;
+    for (const status of states) {
+      index++;
+      await seedGuaranteeWithLease(t, { agencyId, status }, `D${index}`);
+    }
+    return asUser.query(api.transparency.useCases.getGuaranteeAggregates, {});
+  }
+
+  test("is null when nothing is in force — a rate needs a denominator, not a zero", async () => {
+    const aggregates = await bookWith([GUARANTEE_STATE.DRAFTED, GUARANTEE_STATE.CLOSED]);
+    expect(aggregates.countInsured).toBe(0);
+    expect(aggregates.defaultRate).toBeNull();
+  });
+
+  test("is (default_verified + cover_committed) over the in-force book", async () => {
+    const aggregates = await bookWith([
+      GUARANTEE_STATE.ACTIVE,
+      GUARANTEE_STATE.ACTIVE,
+      GUARANTEE_STATE.IN_ARREARS,
+      GUARANTEE_STATE.DEFAULT_VERIFIED,
+      GUARANTEE_STATE.COVER_COMMITTED,
+    ]);
+    expect(aggregates.countInsured).toBe(5);
+    expect(aggregates.defaultRate).toBeCloseTo(0.4, 10);
+  });
+
+  test("excludes arrears from the numerator — an unverified claim must not move the figure", async () => {
+    const aggregates = await bookWith([
+      GUARANTEE_STATE.ACTIVE,
+      GUARANTEE_STATE.IN_ARREARS,
+      GUARANTEE_STATE.IN_ARREARS,
+      GUARANTEE_STATE.IN_EVICTION,
+    ]);
+    expect(aggregates.countInsured).toBe(4);
+    expect(aggregates.defaultRate).toBe(0);
+  });
+
+  test("drafted and closed rows are outside the denominator", async () => {
+    const aggregates = await bookWith([
+      GUARANTEE_STATE.DEFAULT_VERIFIED,
+      GUARANTEE_STATE.DRAFTED,
+      GUARANTEE_STATE.DRAFTED,
+      GUARANTEE_STATE.CLOSED,
+    ]);
+    expect(aggregates.countInsured).toBe(1);
+    expect(aggregates.defaultRate).toBe(1);
+  });
+});
 
 describe("getReserveCoverage", () => {
   test("reports unavailable with the testnet contract explorer url when no snapshot exists", async () => {
