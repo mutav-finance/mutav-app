@@ -12,6 +12,7 @@ import type {
   GuaranteeHistory,
   GuaranteeId,
   GuaranteeState,
+  StateTimelineBucket,
 } from "./domain";
 import type { AgencyId } from "../agencies/domain";
 import type { Tenant, TenantInput } from "../tenants/domain";
@@ -540,6 +541,146 @@ export const getActivityByPeriod = queryWithAuth({
         : buildWeekBoundaries(now, ACTIVITY_WEEK_PERIODS);
 
     return bucketsForGuarantees(guarantees, boundaries);
+  },
+});
+
+/**
+ * A guarantee's position on the machine, replayed from its history rows.
+ * `agencyId` is part of the key because `publicId` is unique per agency, not
+ * across the platform — keying on the id alone would merge two agencies'
+ * guarantees in the platform arm.
+ */
+function guaranteeTimelineKey(agencyId: AgencyId, guaranteePublicId: string): string {
+  return `${agencyId}:${guaranteePublicId}`;
+}
+
+function emptyStateCounts(): Record<GuaranteeState, number> {
+  return {
+    drafted: 0,
+    active: 0,
+    in_arrears: 0,
+    default_verified: 0,
+    cover_committed: 0,
+    in_eviction: 0,
+    closed: 0,
+  };
+}
+
+type ReplayedTransition = { at: string; from: GuaranteeState; to: GuaranteeState };
+
+type TimelineGuarantee = Pick<Guarantee, "agencyId" | "publicId" | "status">;
+type TimelineHistory = Pick<
+  GuaranteeHistory,
+  "agencyId" | "guaranteePublicId" | "at" | "transition"
+>;
+
+/**
+ * Composition of the book at the end of each boundary, by replaying the
+ * structured `guaranteeHistory.transition` rows.
+ *
+ * Semantics, so the series is readable without the code:
+ * - state at boundary B = the `to` of the last transition with `at < B.end`;
+ * - before its first transition a guarantee is counted in that transition's
+ *   `from` state — that IS the state it was in, and it keeps every bucket
+ *   summing to the size of the book;
+ * - a guarantee with no transition rows at all is counted in its current
+ *   status in every bucket (the documented fallback for pre-PR5 rows, which
+ *   carry only free-text history).
+ *
+ * History rows whose guarantee is out of scope are ignored, and a row with no
+ * `transition` (creation, reprice) is not a machine move.
+ */
+function replayStateTimeline(
+  guarantees: readonly TimelineGuarantee[],
+  history: readonly TimelineHistory[],
+  boundaries: readonly PeriodBoundary[],
+): StateTimelineBucket[] {
+  const transitionsByGuarantee = new Map<string, ReplayedTransition[]>();
+  for (const row of history) {
+    const transition = row.transition;
+    if (!transition) continue;
+    const key = guaranteeTimelineKey(row.agencyId, row.guaranteePublicId);
+    const replayed = { at: row.at, from: transition.from, to: transition.to };
+    const existing = transitionsByGuarantee.get(key);
+    if (existing) existing.push(replayed);
+    else transitionsByGuarantee.set(key, [replayed]);
+  }
+  for (const rows of transitionsByGuarantee.values()) {
+    rows.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  }
+
+  const buckets = boundaries.map(({ key }) => ({
+    period: key,
+    countByState: emptyStateCounts(),
+  }));
+
+  for (const guarantee of guarantees) {
+    const transitions =
+      transitionsByGuarantee.get(guaranteeTimelineKey(guarantee.agencyId, guarantee.publicId)) ??
+      [];
+    const first = transitions[0];
+    let state: GuaranteeState = first ? first.from : guarantee.status;
+    let next = 0;
+    boundaries.forEach(({ endISO }, index) => {
+      let pending = transitions[next];
+      while (pending && pending.at < endISO) {
+        state = pending.to;
+        next++;
+        pending = transitions[next];
+      }
+      const bucket = buckets[index];
+      if (bucket) bucket.countByState[state]++;
+    });
+  }
+
+  return buckets;
+}
+
+/**
+ * Guarantee **state timeline** — one count per lifecycle state per period,
+ * for the same scopes, granularities and auth shape as `getActivityByPeriod`.
+ *
+ * `getActivityByPeriod` derives its four coarse series from `activatedAt` and
+ * `closure.closedAt`, the only two timestamps the guarantee row carries, so it
+ * can never show `in_arrears`, `default_verified`, `cover_committed` or
+ * `in_eviction`. This one replays `guaranteeHistory.transition` instead and
+ * therefore sees every state the machine can reach.
+ *
+ * Per-agency scope bounds both scans on an index (`by_agency_status`,
+ * `by_agency_guarantee`); platform scope collects both tables by design, the
+ * same trade `getActivityByPeriod` already makes — time-series aggregates stay
+ * deferred until the guarantees table crosses ~5–10k rows.
+ */
+export const getStateTimelineByPeriod = queryWithAuth({
+  args: {
+    scope: activityScopeValidator,
+    granularity: activityGranularityValidator,
+  },
+  handler: async (ctx, { scope, granularity }): Promise<StateTimelineBucket[]> => {
+    let guarantees: readonly TimelineGuarantee[];
+    let history: readonly TimelineHistory[];
+    if (scope.kind === "agency") {
+      await assertAgencyAccess(ctx, scope.agencyId);
+      guarantees = await ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", scope.agencyId))
+        .collect();
+      history = await ctx.db
+        .query("guaranteeHistory")
+        .withIndex("by_agency_guarantee", (q) => q.eq("agencyId", scope.agencyId))
+        .collect();
+    } else {
+      guarantees = await ctx.db.query("guarantees").collect();
+      history = await ctx.db.query("guaranteeHistory").collect();
+    }
+
+    const now = new Date();
+    const boundaries =
+      granularity === "month"
+        ? buildMonthBoundaries(now, ACTIVITY_MONTH_PERIODS)
+        : buildWeekBoundaries(now, ACTIVITY_WEEK_PERIODS);
+
+    return replayStateTimeline(guarantees, history, boundaries);
   },
 });
 

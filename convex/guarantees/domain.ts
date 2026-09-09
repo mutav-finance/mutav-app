@@ -91,6 +91,25 @@ export type ActivityBucket = {
 
 export type ActivityGranularity = "month" | "week";
 
+/**
+ * One bucket in the guarantee **state timeline**: the composition of the book
+ * at the END of the period, one count per lifecycle state.
+ *
+ * Distinct from `ActivityBucket`, which counts *events* (activations,
+ * closures) in the period and cannot express `in_arrears` at all — arrears is
+ * a state, not an event, and nothing on the guarantee row dates it. The
+ * timeline is reconstructed from `guaranteeHistory.transition`, so every
+ * state the machine can reach is visible.
+ *
+ * The counts sum to the number of guarantees in scope in every bucket: a
+ * guarantee is always somewhere on the machine, so the series reads as a
+ * true part-to-whole composition.
+ */
+export type StateTimelineBucket = {
+  period: string;
+  countByState: Record<GuaranteeState, number>;
+};
+
 // Transitional re-export: the entity-type family moved to the tenants
 // registry domain (`convex/tenants/domain.ts`). Kept here so existing
 // consumers compile until the narrow PR (#245) retargets their imports.

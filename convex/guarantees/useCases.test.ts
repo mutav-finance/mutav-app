@@ -12,7 +12,7 @@ import {
   type SeededUserId,
   seedFreshCreditAssessment,
 } from "../lib/testFixtures";
-import { GUARANTEE_STATE } from "./domain";
+import { GUARANTEE_STATE, type GuaranteeState } from "./domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee, splitCommission } from "./pricing";
 import schema from "../schema";
 
@@ -387,6 +387,220 @@ describe("getActivityByPeriod", () => {
       const d = new Date(Date.UTC(year, month - 1, day));
       expect(d.getUTCDay()).toBe(1);
     }
+  });
+});
+
+describe("getStateTimelineByPeriod", () => {
+  const now = new Date();
+
+  function monthsAgoISO(months: number, day: number): string {
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, day)).toISOString();
+  }
+
+  /** Buckets run oldest → newest, so the current month is the last of the 12. */
+  function bucketMonthsAgo(
+    buckets: { period: string; countByState: Record<string, number> }[],
+    months: number,
+  ) {
+    return buckets[buckets.length - 1 - months];
+  }
+
+  async function insertTransition(
+    t: ReturnType<typeof convexTest>,
+    row: {
+      agencyId: AgencyId;
+      guaranteePublicId: string;
+      at: string;
+      from: GuaranteeState;
+      to: GuaranteeState;
+    },
+  ) {
+    await t.run(async (ctx) => {
+      await ctx.db.insert("guaranteeHistory", {
+        agencyId: row.agencyId,
+        guaranteePublicId: row.guaranteePublicId,
+        at: row.at,
+        username: "tester",
+        message: `${row.from} -> ${row.to}`,
+        transition: { from: row.from, to: row.to },
+      });
+    });
+  }
+
+  test("replays history into one count per state at each period end", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const activatedAt = monthsAgoISO(6, 5);
+    const arrearsAt = monthsAgoISO(2, 5);
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId, status: GUARANTEE_STATE.IN_ARREARS, activatedAt },
+      "S1",
+    );
+    await insertTransition(t, {
+      agencyId,
+      guaranteePublicId: "S1",
+      at: activatedAt,
+      from: "drafted",
+      to: "active",
+    });
+    await insertTransition(t, {
+      agencyId,
+      guaranteePublicId: "S1",
+      at: arrearsAt,
+      from: "active",
+      to: "in_arrears",
+    });
+
+    const buckets = await asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+      scope: { kind: "agency", agencyId },
+      granularity: "month",
+    });
+
+    expect(buckets).toHaveLength(12);
+    // Before its first transition the guarantee sits in that transition's
+    // `from` state, so every bucket sums to the size of the book.
+    expect(bucketMonthsAgo(buckets, 11).countByState).toEqual({ ...ZERO_COUNTS, drafted: 1 });
+    expect(bucketMonthsAgo(buckets, 7).countByState).toEqual({ ...ZERO_COUNTS, drafted: 1 });
+    expect(bucketMonthsAgo(buckets, 6).countByState).toEqual({ ...ZERO_COUNTS, active: 1 });
+    expect(bucketMonthsAgo(buckets, 3).countByState).toEqual({ ...ZERO_COUNTS, active: 1 });
+    expect(bucketMonthsAgo(buckets, 2).countByState).toEqual({ ...ZERO_COUNTS, in_arrears: 1 });
+    expect(bucketMonthsAgo(buckets, 0).countByState).toEqual({ ...ZERO_COUNTS, in_arrears: 1 });
+  });
+
+  test("a guarantee with no transition history counts in its current status in every bucket", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId, status: GUARANTEE_STATE.COVER_COMMITTED, activatedAt: monthsAgoISO(4, 1) },
+      "S2",
+    );
+    // A free-text row is not a machine move and must not be replayed.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("guaranteeHistory", {
+        agencyId,
+        guaranteePublicId: "S2",
+        at: monthsAgoISO(4, 1),
+        username: "tester",
+        message: "Criada Solicitação #S2.",
+      });
+    });
+
+    const buckets = await asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+      scope: { kind: "agency", agencyId },
+      granularity: "month",
+    });
+
+    for (const bucket of buckets) {
+      expect(bucket.countByState).toEqual({ ...ZERO_COUNTS, cover_committed: 1 });
+    }
+  });
+
+  test("agency scope excludes another agency's guarantee even when both share a publicId", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyA = await seedAgencyWithMembership(t, userId);
+    const agencyB = await seedSecondAgency(t, userId, "00000000000999");
+
+    const activatedAt = monthsAgoISO(3, 2);
+    const evictionAt = monthsAgoISO(1, 2);
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId: agencyA, status: GUARANTEE_STATE.ACTIVE, activatedAt },
+      "SHARED",
+    );
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId: agencyB, status: GUARANTEE_STATE.IN_EVICTION, activatedAt },
+      "SHARED",
+    );
+    await insertTransition(t, {
+      agencyId: agencyA,
+      guaranteePublicId: "SHARED",
+      at: activatedAt,
+      from: "drafted",
+      to: "active",
+    });
+    await insertTransition(t, {
+      agencyId: agencyB,
+      guaranteePublicId: "SHARED",
+      at: activatedAt,
+      from: "drafted",
+      to: "active",
+    });
+    await insertTransition(t, {
+      agencyId: agencyB,
+      guaranteePublicId: "SHARED",
+      at: evictionAt,
+      from: "active",
+      to: "in_eviction",
+    });
+
+    const scopedToA = await asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+      scope: { kind: "agency", agencyId: agencyA },
+      granularity: "month",
+    });
+    expect(bucketMonthsAgo(scopedToA, 0).countByState).toEqual({ ...ZERO_COUNTS, active: 1 });
+
+    const platform = await asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+      scope: { kind: "platform" },
+      granularity: "month",
+    });
+    expect(bucketMonthsAgo(platform, 0).countByState).toEqual({
+      ...ZERO_COUNTS,
+      active: 1,
+      in_eviction: 1,
+    });
+    expect(bucketMonthsAgo(platform, 2).countByState).toEqual({ ...ZERO_COUNTS, active: 2 });
+  });
+
+  test("weekly granularity returns 52 buckets with ISO Monday period keys", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const buckets = await asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+      scope: { kind: "agency", agencyId },
+      granularity: "week",
+    });
+
+    expect(buckets).toHaveLength(52);
+    for (const bucket of buckets) {
+      expect(bucket.period).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(bucket.countByState).toEqual(ZERO_COUNTS);
+    }
+  });
+
+  test("refuses an agency the caller is not a member of", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    await seedAgencyWithMembership(t, userId);
+    const foreignAgencyId = await t.run(async (ctx) =>
+      ctx.db.insert("agencies", {
+        name: "Outsider",
+        cnpj: "00000000000111",
+        agencyType: "empresa",
+        onboardingState: "active",
+        createdAt: new Date().toISOString(),
+      }),
+    );
+
+    await expect(
+      asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+        scope: { kind: "agency", agencyId: foreignAgencyId },
+        granularity: "month",
+      }),
+    ).rejects.toThrow();
   });
 });
 
