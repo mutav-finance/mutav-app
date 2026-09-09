@@ -3,13 +3,13 @@
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useWorkspace } from "@/providers/workspace";
-import { ActivityChart } from "@/components/contracts/activity-chart";
+import { ActivityChart } from "@/components/guarantees/activity-chart";
 
 export function ChartAreaInteractive() {
   const { selectedAgency } = useWorkspace();
 
   const data = useQuery(
-    api.contracts.useCases.getActivityByPeriod,
+    api.guarantees.useCases.getActivityByPeriod,
     selectedAgency
       ? { scope: { kind: "agency", agencyId: selectedAgency._id }, granularity: "month" }
       : "skip",

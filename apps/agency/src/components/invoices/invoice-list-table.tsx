@@ -50,7 +50,7 @@ import {
 } from "@mutav/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
-import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
 import { InvoiceStatusTag } from "@/components/invoices/invoice-status-tag";
 
@@ -130,7 +130,7 @@ function buildColumns(
     {
       id: "contracts",
       accessorKey: "lineItemCount",
-      header: t("columns.contracts"),
+      header: t("columns.guarantees"),
       cell: ({ row }) => (
         <span className="text-muted-foreground tabular-nums">{row.original.lineItemCount}</span>
       ),

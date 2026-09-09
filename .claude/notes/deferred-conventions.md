@@ -150,6 +150,8 @@ Defer until the schema has at least one production record or a feature actually 
 
 `seed.ts` and `lib/testFixtures.ts` now write these only through the constants, so a rename is a constant + schema + message-key change, not a literal hunt.
 
+**The message keys are the mirrored half.** `guaranteeDetails.documents.status.{pendente,enviado,aprovado}` and `guaranteeDetails.tenant.approval.{aprovado,pendente,reprovado}` are dynamic lookups on those stored values (`tStatus(status)`, `tApproval(tenant.approvalStatus)`), so the key and the value object have to move in the same PR — renaming either half alone renders a raw key. Same pairing for `guarantees.terms.taxaFeeCents` / `prestamistaFeeCents`: PR4 anglicized the *labels* (`terms.fields.guaranteeFee` / `creditLifeFee`, static keys, safe to rename alone), and the field names follow whenever the terms snapshot next reshapes.
+
 **Migration approach:** rename all three in one wipe + reseed PR (`pending | submitted | approved`; `approved | pending | rejected`; `good | fair | poor | denied` with `tierRate: { good, fair, poor }`), updating the agency wizard/detail label maps and both message files in the same PR. Do it after the contracts facade is deleted (PR4) so the rename does not have to be mirrored twice; before the first real product row is written from the admin catalog UI, because `tierRate` keys become an API surface for that form.
 
 ## PT free text written by the server (history messages, invoice line descriptions)

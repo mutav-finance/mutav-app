@@ -17,7 +17,7 @@ export function AgencyNav() {
 
   const navMain = [
     { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
-    { title: tMain("contracts"), href: "/contracts", icon: <FileTextIcon /> },
+    { title: tMain("guarantees"), href: "/guarantees", icon: <FileTextIcon /> },
     { title: tMain("invoices"), href: "/invoices", icon: <ReceiptIcon /> },
     { title: tMain("delinquencies"), href: "/delinquencies", icon: <TriangleAlertIcon /> },
     { title: tMain("transparency"), href: "/transparency", icon: <ShieldCheckIcon /> },

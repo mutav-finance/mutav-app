@@ -1,0 +1,59 @@
+"use client";
+
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useState } from "react";
+import { Button } from "@mutav/ui/button";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@mutav/ui/collapsible";
+import { Mono } from "@mutav/ui/mono";
+import { formatDateTimeBR } from "@mutav/i18n/brazil";
+import type { GuaranteeHistoryEntry } from "@/lib/guarantees/types";
+
+export function GuaranteeHistoryCard({ history }: { history: GuaranteeHistoryEntry[] }) {
+  const t = useTranslations("guaranteeDetails.history");
+  const [open, setOpen] = useState(true);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} asChild>
+      <Card>
+        <CardHeader className="border-b">
+          <Eyebrow as={CardTitle} size="xs" className="font-medium">
+            {t("heading")}
+          </Eyebrow>
+          <CardAction>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={open ? t("collapse") : t("expand")}
+              >
+                {open ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              </Button>
+            </CollapsibleTrigger>
+          </CardAction>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent>
+            {history.length === 0 ? (
+              <p className="text-base-sm text-muted-foreground">{t("empty")}</p>
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {history.map((entry, idx) => (
+                  <li
+                    key={`${entry.at}-${idx}`}
+                    className="border-border text-base-sm border-b pb-3 leading-relaxed last:border-b-0 last:pb-0"
+                  >
+                    <Mono className="text-muted-foreground mr-2">{formatDateTimeBR(entry.at)}</Mono>
+                    {entry.message}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
