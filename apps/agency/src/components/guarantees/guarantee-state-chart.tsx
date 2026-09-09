@@ -23,8 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@mutav/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import {
-  AREA_FILL_OPACITY,
-  EVENT_BAR_FILL_OPACITY,
+  CHART_FILL_OPACITY,
   GUARANTEE_EVENT_CHART_COLOR,
   GUARANTEE_STATE_CHART_COLOR,
 } from "@/components/guarantees/state-chart-palette";
@@ -34,6 +33,7 @@ import {
 } from "@/components/guarantees/use-guarantee-state-chart";
 import {
   GUARANTEE_STATE_STACK_ORDER,
+  SHARED_X_AXIS_SCALE,
   type GuaranteeStateCounts,
   type GuaranteeStateLegendEntry,
 } from "@/lib/guarantees/state-chart";
@@ -53,6 +53,10 @@ type GuaranteeStateChartProps = {
 
 const CHART_STACK_ID = "book";
 const AXIS_WIDTH = 32;
+// Wide enough that a single event is a bar rather than a speck. At six months
+// each category is ~175px, so five series fit comfortably; at twelve the cap
+// stops binding and the category gap does the work.
+const EVENT_BAR_MAX_WIDTH_PX = 18;
 // Both plots must start their drawing area at the same x, or the shared time
 // axis lies. Identical y-axis width plus identical margins is what guarantees
 // it — Recharts has no cross-chart alignment primitive.
@@ -153,6 +157,7 @@ export function GuaranteeStateChart({
               <XAxis
                 dataKey="period"
                 hide={showEventPanel}
+                scale={SHARED_X_AXIS_SCALE}
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -163,6 +168,7 @@ export function GuaranteeStateChart({
                 axisLine={false}
                 tickMargin={8}
                 allowDecimals={false}
+                domain={[0, chart.compositionAxisMax]}
                 width={AXIS_WIDTH}
               />
               <ChartTooltip
@@ -178,7 +184,7 @@ export function GuaranteeStateChart({
                   stackId={CHART_STACK_ID}
                   type="natural"
                   fill={`var(--color-${state})`}
-                  fillOpacity={AREA_FILL_OPACITY}
+                  fillOpacity={CHART_FILL_OPACITY}
                   stroke={`var(--color-${state})`}
                   dot={false}
                 />
@@ -215,13 +221,19 @@ function EventPanel({
     <div className="flex flex-col gap-2">
       <p className="text-muted-foreground px-2 text-xs sm:px-0">{title}</p>
       {chart.isLoading ? (
-        <Skeleton className="h-[110px] w-full" />
+        <Skeleton className="h-[96px] w-full" />
       ) : chart.hasEvents ? (
-        <ChartContainer config={chart.eventConfig} className="aspect-auto h-[110px] w-full">
-          <BarChart data={[...chart.eventRows]} margin={SHARED_MARGIN} barGap={1}>
+        <ChartContainer config={chart.eventConfig} className="aspect-auto h-[96px] w-full">
+          <BarChart
+            data={[...chart.eventRows]}
+            margin={SHARED_MARGIN}
+            barGap={1}
+            barCategoryGap="12%"
+          >
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="period"
+              scale={SHARED_X_AXIS_SCALE}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
@@ -232,6 +244,8 @@ function EventPanel({
               axisLine={false}
               tickMargin={8}
               allowDecimals={false}
+              domain={[0, chart.eventAxisMax]}
+              tickCount={chart.eventTickCount}
               width={AXIS_WIDTH}
             />
             <ChartTooltip
@@ -245,8 +259,8 @@ function EventPanel({
                 key={event}
                 dataKey={event}
                 fill={`var(--color-${event})`}
-                fillOpacity={EVENT_BAR_FILL_OPACITY}
-                maxBarSize={10}
+                fillOpacity={CHART_FILL_OPACITY}
+                maxBarSize={EVENT_BAR_MAX_WIDTH_PX}
               />
             ))}
           </BarChart>
@@ -306,17 +320,17 @@ function StateLegend({
 }) {
   return (
     <div className="flex flex-col gap-2 px-2 sm:px-0">
-      <dl
-        aria-label={label}
-        className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3"
-      >
+      {/* Cells size to their content and sit in a wrapping row. A fixed grid
+          stretched each cell to a full column and flushed the count to the far
+          edge, where it read as belonging to nothing. */}
+      <dl aria-label={label} className="flex flex-wrap gap-x-6 gap-y-1">
         {GUARANTEE_STATE_STACK_ORDER.map((state) => {
           const count = entries?.find((entry) => entry.state === state)?.count;
           return (
-            <div key={state} className="flex h-6 items-center gap-2">
+            <div key={state} className="flex h-6 items-center gap-1.5">
               <Swatch color={GUARANTEE_STATE_CHART_COLOR[state]} />
-              <dt className="text-muted-foreground truncate text-xs">{labelFor(state)}</dt>
-              <dd className="text-foreground ml-auto text-sm font-semibold tabular-nums">
+              <dt className="text-muted-foreground text-xs">{labelFor(state)}</dt>
+              <dd className="text-foreground text-sm font-semibold tabular-nums">
                 {count === undefined ? <Skeleton className="h-4 w-6" /> : count}
               </dd>
             </div>

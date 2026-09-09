@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { GUARANTEE_EVENTS, GUARANTEE_STATES } from "@convex/guarantees/domain";
 import type { GuaranteeEvent, StateTimelineBucket } from "@convex/guarantees/domain";
 import {
-  EVENT_BAR_FILL_OPACITY,
+  CHART_FILL_OPACITY,
   GUARANTEE_EVENT_CHART_COLOR,
   GUARANTEE_SEVERITY_RAMP,
   GUARANTEE_STATE_CHART_COLOR,
@@ -11,9 +11,15 @@ import {
 import {
   GUARANTEE_CONTEXT_STATES,
   GUARANTEE_STATE_STACK_ORDER,
+  SHARED_X_AXIS_SCALE,
+  axisUpperBound,
+  bandScalePositions,
   buildContextFigures,
   buildStateLegend,
   hasAnyEvent,
+  maxEventCount,
+  maxStackedTotal,
+  pointScalePositions,
   sliceRecentPeriods,
   toCompositionRows,
   toEventRows,
@@ -125,9 +131,13 @@ describe("state chart palette", () => {
     );
   });
 
-  it("keeps the event bars lighter than the area they sit under", () => {
-    expect(EVENT_BAR_FILL_OPACITY).toBeGreaterThan(0);
-    expect(EVENT_BAR_FILL_OPACITY).toBeLessThan(1);
+  // Composited over the card, alpha compresses the ramp: at shadcn's 0.4 the
+  // adjacent bands land ~0.032 L apart, half the 0.06 ordinal floor, and the
+  // gradient that IS the encoding stops being visible. 0.85 is the lowest step
+  // that keeps the drawn bands passing.
+  it("keeps the fill alpha high enough for the ramp to survive compositing", () => {
+    expect(CHART_FILL_OPACITY).toBeGreaterThanOrEqual(0.85);
+    expect(CHART_FILL_OPACITY).toBeLessThanOrEqual(1);
   });
 });
 
@@ -284,5 +294,69 @@ describe("hasAnyEvent", () => {
       bucket("2026-04", { active: 2 }, { closed: 1 }),
     ]);
     expect(hasAnyEvent(rows)).toBe(true);
+  });
+});
+
+describe("shared x scale", () => {
+  // Recharts gives an area a POINT scale and bars a BAND scale unless told
+  // otherwise, so the same month landed half a band apart in the two panels —
+  // 44px on the frame this card renders at. Both panels now declare `band`.
+  const frame = { plotLeft: 380, plotWidth: 1052, periods: 12 };
+
+  it("is the band scale, so both panels place a period at the same x", () => {
+    expect(SHARED_X_AXIS_SCALE).toBe("band");
+    const area = bandScalePositions(frame);
+    const bars = bandScalePositions(frame);
+    expect(area[0]).toBe(bars[0]);
+    expect(area[area.length - 1]).toBe(bars[bars.length - 1]);
+    expect(area[0]).toBeCloseTo(423.83, 2);
+    expect(area[area.length - 1]).toBeCloseTo(1388.17, 2);
+  });
+
+  it("measures the defect the band scale removes", () => {
+    const band = bandScalePositions(frame);
+    const point = pointScalePositions(frame);
+    const halfBand = frame.plotWidth / (2 * frame.periods);
+    expect(band[0] - point[0]).toBeCloseTo(halfBand, 5);
+    expect(halfBand).toBeCloseTo(43.83, 2);
+  });
+
+  it("puts a single period in the middle of the frame", () => {
+    expect(bandScalePositions({ plotLeft: 0, plotWidth: 100, periods: 1 })).toEqual([50]);
+    expect(pointScalePositions({ plotLeft: 0, plotWidth: 100, periods: 1 })).toEqual([0]);
+  });
+});
+
+describe("axis domains", () => {
+  it("takes the peak of the stacked in-force total, ignoring context states", () => {
+    const rows = toCompositionRows([
+      bucket("2026-03", { active: 4, in_arrears: 1, closed: 40 }),
+      bucket("2026-04", { active: 2, closed: 90 }),
+    ]);
+    expect(maxStackedTotal(rows)).toBe(5);
+  });
+
+  it("takes the peak of a single event series, not their sum", () => {
+    const rows = toEventRows([
+      bucket("2026-03", {}, { created: 2, closed: 3 }),
+      bucket("2026-04", {}, { activated: 1 }),
+    ]);
+    expect(maxEventCount(rows)).toBe(3);
+  });
+
+  // The top of the data must never be the top of the panel: with no headroom
+  // the stack fills its frame and reads as a solid block.
+  it("always leaves headroom above the peak", () => {
+    for (const peak of [1, 2, 5, 6, 9, 10, 12, 40, 99, 120, 617]) {
+      expect(axisUpperBound(peak)).toBeGreaterThan(peak);
+    }
+  });
+
+  it("rounds to a tick a reader recognises", () => {
+    expect(axisUpperBound(0)).toBe(1);
+    expect(axisUpperBound(1)).toBe(2);
+    expect(axisUpperBound(6)).toBe(7);
+    expect(axisUpperBound(10)).toBe(12);
+    expect(axisUpperBound(120)).toBe(140);
   });
 });

@@ -45,18 +45,23 @@ export const GUARANTEE_EVENT_CHART_COLOR: Record<GuaranteeEvent, string> = {
 };
 
 /**
- * Fills are a wash, never a saturated block. Identity lives in the
- * full-strength stroke that caps each band and in the legend swatch — which is
- * where the ramp is shown at the value it was validated at. The 0.4 fill is
- * atmospheric: it gives the band its area without turning five stacked
- * segments into five loud blocks.
+ * Fill alpha for every plotted mark on this card.
  *
- * The stroke is also what separates touching bands, so there is no
- * surface-coloured gap: a band boundary drawn in the band's own colour reads
- * as the edge of that series, where a surface gap reads as empty space
- * between two things.
+ * NOT shadcn's 0.4. On an ordinal ramp the gradient IS the encoding — the
+ * reader is meant to see severity increase upward — and alpha compresses it:
+ * composited over the card, 0.4 leaves adjacent bands ~0.032 L apart, half the
+ * 0.06 floor, which is no perceptible ramp at all. shadcn's 0.4 is tuned for
+ * two- and three-series demos, not a five-band single-hue stack.
+ *
+ * 0.85 is the lowest step where the COMPOSITED bands still pass the ordinal
+ * checks in both modes: adjacent ΔL ≥ 0.067 light / 0.068 dark, and the palest
+ * band still clears the surface at 2.03:1. Below it the ramp fails as drawn
+ * even though the tokens pass on paper.
+ *
+ * The full-strength stroke on each band is what separates touching segments,
+ * so there is no surface-coloured gap: a boundary drawn in the band's own
+ * colour reads as the edge of that series, where a surface gap reads as empty
+ * space between two things — and the white 2px stroke it replaced drew even
+ * across zero-height bands, scratching a diagonal streak over the field.
  */
-export const AREA_FILL_OPACITY = 0.4;
-
-/** Same wash on the event bars, so the two panels read as one card. */
-export const EVENT_BAR_FILL_OPACITY = 0.4;
+export const CHART_FILL_OPACITY = 0.85;
