@@ -2,7 +2,13 @@ import type { convexTest, TestConvex } from "convex-test";
 import type schema from "../schema";
 import type { AgencyId } from "../agencies/domain";
 import {
+  CLOSE_REASON,
+  DEFAULT_GUARANTEE_PLAN,
+  DOCUMENT_KEY,
+  DOCUMENT_STATUS,
   GUARANTEE_STATE,
+  SCORE_TIER,
+  TENANT_APPROVAL_STATUS,
   tierForScore,
   type CloseReason,
   type GuaranteeId,
@@ -12,7 +18,7 @@ import {
 } from "../guarantees/domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee } from "../guarantees/pricing";
 import { insertGuaranteeAggregates } from "../guarantees/aggregateWrites";
-import type { LeaseId } from "../leases/domain";
+import { DEFAULT_PAYER, PROPERTY_KIND, type LeaseId } from "../leases/domain";
 import { DEFAULT_PRODUCT_SLUG, type ProductId } from "../products/domain";
 import type { TenantId } from "../tenants/domain";
 import { hashPii } from "./pii";
@@ -218,6 +224,7 @@ export async function seedGuaranteeWithLease(
     const product = await ctx.db.get(productId);
     if (!product) throw new Error("default product seed lost");
     const rentCents = spec.rentCents ?? 100_000;
+    const tier = spec.tier ?? SCORE_TIER.BOM;
     const tenantId = await ctx.db.insert("tenants", {
       entityType: "pf",
       taxId: spec.tenantTaxId ?? "11144477735",
@@ -230,7 +237,7 @@ export async function seedGuaranteeWithLease(
       agencyId: spec.agencyId,
       publicId: `LSE-${publicId}`,
       tenantId,
-      propertyKind: "residencial",
+      propertyKind: PROPERTY_KIND.RESIDENTIAL,
       property: {
         cep: "01000000",
         streetAndNumber: "Rua Teste, 1",
@@ -241,14 +248,14 @@ export async function seedGuaranteeWithLease(
       tag: "",
       description: "",
       rent: { rentCents, condoCents: 0, otherFeesCents: 0, totalRentCents: rentCents },
-      payer: "inquilino",
+      payer: DEFAULT_PAYER,
       openGuaranteeId: null,
     });
     const priced = priceGuarantee(
       {
         rentCents,
-        tier: spec.tier ?? "bom",
-        plan: spec.plan ?? "basic",
+        tier,
+        plan: spec.plan ?? DEFAULT_GUARANTEE_PLAN,
         productSlug: product.slug,
         appliedAt: "2026-01-01T00:00:00.000Z",
       },
@@ -258,7 +265,7 @@ export async function seedGuaranteeWithLease(
     const closure =
       spec.status === GUARANTEE_STATE.CLOSED
         ? {
-            reason: spec.closeReason ?? "end_of_lease",
+            reason: spec.closeReason ?? CLOSE_REASON.END_OF_LEASE,
             closedAt: spec.closedAt ?? "2026-06-01T00:00:00.000Z",
           }
         : undefined;
@@ -271,8 +278,8 @@ export async function seedGuaranteeWithLease(
       ...(closure ? { closure } : {}),
       activatedAt: spec.activatedAt ?? null,
       nextRenewalDate: spec.nextRenewalDate ?? "2026-12-31",
-      underwriting: { score: 750, tier: spec.tier ?? "bom" },
-      tenantApproval: { status: "pendente", termApprovedAt: null },
+      underwriting: { score: 750, tier },
+      tenantApproval: { status: TENANT_APPROVAL_STATUS.PENDENTE, termApprovedAt: null },
       terms: priced.terms,
       capacity: {
         ceilingCents: priced.capacity.ceilingCents,
@@ -280,9 +287,9 @@ export async function seedGuaranteeWithLease(
         reservedCents: priced.capacity.ceilingCents - availableCents,
       },
       documents: [
-        { key: "rentalContract", status: "pendente" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
+        { key: DOCUMENT_KEY.RENTAL_CONTRACT, status: DOCUMENT_STATUS.PENDENTE },
+        { key: DOCUMENT_KEY.INSPECTION, status: DOCUMENT_STATUS.PENDENTE },
+        { key: DOCUMENT_KEY.POLICY, status: DOCUMENT_STATUS.PENDENTE },
       ],
     });
     if (spec.status !== GUARANTEE_STATE.CLOSED) {

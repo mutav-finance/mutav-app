@@ -807,7 +807,7 @@ export const PII_FIELD_REGISTRY = {
       dataClass: CLASS.OPERATIONAL_REFERENCE,
       subjectType: SUBJECT.PAYER,
       legalNormRef: null,
-      note: "Not in §4.2. A role label ('inquilino'), not a named person.",
+      note: "Not in §4.2. A role label ('tenant'), not a named person.",
     },
     openGuaranteeId: {
       ...COUNSEL_PENDING,
@@ -990,13 +990,21 @@ export const PII_FIELD_REGISTRY = {
       subjectType: SUBJECT.TENANT,
       legalNormRef: null,
     },
-    "terms.setupInstallments": {
+    "terms.commissionRate": {
       ...COUNSEL_PENDING,
       tier: TIER.T3,
       dataClass: CLASS.OPERATIONAL_REFERENCE,
-      subjectType: SUBJECT.TENANT,
+      subjectType: SUBJECT.NONE,
       legalNormRef: null,
-      note: "Not in §4.2 — a count, not an amount.",
+      note: "Not in §4.2. Broker commission rate copied from the product; says nothing about the person.",
+    },
+    "terms.prestamistaCommissionRate": {
+      ...COUNSEL_PENDING,
+      tier: TIER.T3,
+      dataClass: CLASS.OPERATIONAL_REFERENCE,
+      subjectType: SUBJECT.NONE,
+      legalNormRef: null,
+      note: "Not in §4.2. Broker commission rate copied from the product; says nothing about the person.",
     },
     "terms.coverageCeilingMultiplier": {
       ...COUNSEL_PENDING,

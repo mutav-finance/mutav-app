@@ -108,7 +108,7 @@ async function insertNotice(
   fx: Fixture,
   overrides: {
     publicId: string;
-    status?: "open" | "resolved" | "canceled";
+    status?: "open" | "verified" | "resolved" | "canceled";
     rentDueDate?: string;
     originalAmountCents?: number;
     updatedAmountCents?: number;
@@ -130,6 +130,14 @@ async function insertNotice(
       evidenceSource: "agency_reported",
       openedAt: overrides.openedAt ?? "2026-06-10T09:00:00-03:00",
       openedByUserId: fx.userId,
+      ...(status === "verified"
+        ? {
+            verification: {
+              verifiedAt: "2026-06-12T09:00:00-03:00",
+              verifiedByUserId: fx.userId,
+            },
+          }
+        : {}),
       ...(status === "resolved"
         ? {
             resolution: {
@@ -557,6 +565,26 @@ describe("markResolved", () => {
     expect(resolvedAtMs).toBeLessThanOrEqual(after);
   });
 
+  test("staff-verified notice → NOTICE_VERIFIED; agency cannot make a confirmed default disappear", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-verified-r", status: "verified" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-verified-r",
+      resolution: { kind: "tenant_cured" },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOTICE_VERIFIED");
+
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("verified");
+    expect(row?.resolution).toBeUndefined();
+  });
+
   test("resolution kind='stale' is accepted (agency-side terminal resolution)", async () => {
     const t = setup();
     const fx = await makeFixture(t);
@@ -698,6 +726,26 @@ describe("markCanceled", () => {
     const canceledAtMs = Date.parse(cancellation.canceledAt);
     expect(canceledAtMs).toBeGreaterThanOrEqual(before);
     expect(canceledAtMs).toBeLessThanOrEqual(after);
+  });
+
+  test("staff-verified notice → NOTICE_VERIFIED and row preserved", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-verified-c", status: "verified" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-verified-c",
+      cancellation: { reason: "agency_withdrew" },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOTICE_VERIFIED");
+
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("verified");
+    expect(row?.cancellation).toBeUndefined();
   });
 
   test("reason='duplicate' accepted", async () => {
@@ -884,6 +932,28 @@ describe("staffMarkResolvedByCover", () => {
     expect(entries.length).toBe(1);
     expect(entries[0].action).toBe("delinquency.resolved_by_cover");
     expect(entries[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("verified → resolved by cover is the staff path the agency guard reserves", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, {
+      publicId: "DN-cover-verified",
+      status: "verified",
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-cover-verified", coverOperationPublicId: "COVER-V1" },
+    );
+    expect(result.success).toBe(true);
+
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("resolved");
+    expect(row?.resolution?.kind).toBe("cover_committed");
+    expect(row?.verification?.verifiedByUserId).toBe(fx.userId);
   });
 
   test("staff role='admin' also allowed (admin ≥ compliance)", async () => {

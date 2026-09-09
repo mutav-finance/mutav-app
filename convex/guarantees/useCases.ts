@@ -16,7 +16,7 @@ import type {
 import type { AgencyId } from "../agencies/domain";
 import type { Tenant, TenantInput } from "../tenants/domain";
 import type { Lease } from "../leases/domain";
-import type { Product, ProductId } from "../products/domain";
+import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { contractsByStatus, countByStatePlatform, sumInsuredExposure } from "./aggregate";
 import { insertGuaranteeAggregates, replaceGuaranteeAggregates } from "./aggregateWrites";
 import {
@@ -267,6 +267,10 @@ export const listByAgency = queryWithAgencyScope({
  * Lightweight summary of a guarantee for list views — drops the `terms`,
  * `documents` and lease join and carries only the tenant's display name.
  * Use `shapeGuarantee` for the detail view.
+ *
+ * `availableCapacityCents` is a projection, not the row: the row keeps
+ * `available + reserved = ceiling` for the whole life, but a closed guarantee
+ * covers nothing, so the list advertises 0 for it.
  */
 function shapeGuaranteeSummary(doc: Guarantee, tenantName: string, referenceDate: string) {
   const urgency = getUrgencyTier({
@@ -280,7 +284,7 @@ function shapeGuaranteeSummary(doc: Guarantee, tenantName: string, referenceDate
     status: doc.status,
     closure: doc.closure ?? null,
     nextRenewalDate: doc.nextRenewalDate,
-    availableCapacityCents: doc.capacity.availableCents,
+    availableCapacityCents: doc.status === GUARANTEE_STATE.CLOSED ? 0 : doc.capacity.availableCents,
     tenantName,
     creationTime: doc._creationTime,
     urgency,
@@ -335,7 +339,7 @@ export const getStatusCounts = queryWithAgencyScope({
  * O(log n) `contractsByStatus` aggregate; the `expiring` badge counts the
  * indexed `active` renewal range (same window `listByAgency` paginates).
  */
-export const getContractTabCounts = queryWithAgencyScope({
+export const getGuaranteeTabCounts = queryWithAgencyScope({
   args: { referenceDate: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const referenceDate = resolveReferenceDate(args.referenceDate);
@@ -547,8 +551,8 @@ export const getActivityByPeriod = queryWithAuth({
  * the period still earned commission for that period, so it stays in the
  * result. Commission is the same `splitCommission` the wizard previews (taxa
  * at `commissionRate` + prestamista premium at `prestamistaCommissionRate`),
- * with the rates read from the guarantee's product and the two fee portions
- * from its stored `terms`.
+ * read entirely from the guarantee's stored `terms` snapshot — never from the
+ * live product row, so a catalog edit cannot reprice commission already owed.
  */
 const COMMISSION_INSTALLMENTS_TOTAL = 12;
 const PERIOD_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -574,22 +578,6 @@ function isInForceDuring(g: Guarantee, period: string): g is ActivatedGuarantee 
   return true;
 }
 
-async function productsById(
-  ctx: QueryCtx,
-  docs: readonly Guarantee[],
-): Promise<Map<ProductId, Product>> {
-  const products = new Map<ProductId, Product>();
-  for (const doc of docs) {
-    if (products.has(doc.productId)) continue;
-    const product = await ctx.db.get(doc.productId);
-    // FK-integrity invariant: `productId` is required and product rows are
-    // never deleted (disabled instead), so a miss means corrupted data.
-    if (!product) throw new Error(`Guarantee ${doc.publicId} references a missing products row`);
-    products.set(doc.productId, product);
-  }
-  return products;
-}
-
 export const listForCommissionByMonth = queryWithAgencyScope({
   args: { periodMonth: v.string() },
   handler: async (ctx, { periodMonth }) => {
@@ -608,7 +596,6 @@ export const listForCommissionByMonth = queryWithAgencyScope({
 
     const inForce = guarantees.filter((g) => isInForceDuring(g, effectivePeriod));
     const tenantNames = await tenantNamesByGuarantee(ctx, inForce);
-    const products = await productsById(ctx, inForce);
 
     return inForce
       .map((g) => {
@@ -617,12 +604,11 @@ export const listForCommissionByMonth = queryWithAgencyScope({
           monthDiff(activatedMonth, effectivePeriod) + 1,
           COMMISSION_INSTALLMENTS_TOTAL,
         );
-        const product = products.get(g.productId);
         return {
           guaranteeId: g.publicId,
           tenantName: tenantNames.get(g._id) ?? "",
           rentCents: g.terms.rentCents,
-          commissionCents: splitCommission(g.terms, product?.terms).commissionCents,
+          commissionCents: splitCommission(g.terms).commissionCents,
           installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
           activatedAt: g.activatedAt,
         };
@@ -795,7 +781,7 @@ type CreateGuaranteeErrorResult = {
     | typeof GUARANTEE_ERROR_CODE.TENANT_DENIED
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENT
     | typeof GUARANTEE_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED
-    | typeof GUARANTEE_ERROR_CODE.PRODUCT_UNAVAILABLE;
+    | typeof PRODUCT_ERROR_CODE.PRODUCT_UNAVAILABLE;
 };
 
 /**
@@ -905,7 +891,7 @@ export const create = mutationWithAgencyScope({
     if (!productResult.success) {
       return {
         success: false,
-        error: { code: GUARANTEE_ERROR_CODE.PRODUCT_UNAVAILABLE },
+        error: { code: PRODUCT_ERROR_CODE.PRODUCT_UNAVAILABLE },
         message: productResult.message,
       };
     }

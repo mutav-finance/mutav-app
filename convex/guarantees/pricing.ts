@@ -15,7 +15,8 @@ import type { ProductTerms } from "../products/domain";
  * Parameters come from a `products` row (`ProductTerms`); the output is the
  * immutable `terms` snapshot stored on the guarantee plus its initial
  * capacity. `DEFAULT_PRICING_TABLE` is the seed constant for the default
- * product and the fallback for client-side previews before a product loads.
+ * product and the fallback for client-side previews before a product loads —
+ * it is never a runtime default on the server.
  */
 
 export type PricingTable = ProductTerms;
@@ -30,7 +31,6 @@ export const DEFAULT_PRICING_TABLE: PricingTable = {
   // the CNPJ to open the seguro prestamista); swap this one number when it lands.
   prestamistaPremiumCents: 1_280,
   prestamistaCommissionRate: 0.25,
-  setupInstallments: 1,
 };
 
 export type PriceGuaranteeInput = {
@@ -47,12 +47,17 @@ export type PricedGuarantee = {
   capacity: GuaranteeCapacity;
 };
 
+/**
+ * Every money figure is rounded to whole cents: multipliers are product data
+ * and may be fractional once the catalog is admin-editable, and a fractional
+ * ceiling would leak into `capacity` and the platform exposure aggregate.
+ */
 export function priceGuarantee(input: PriceGuaranteeInput, terms: PricingTable): PricedGuarantee {
   const taxaFeeCents = Math.round(input.rentCents * terms.tierRate[input.tier]);
   const prestamistaFeeCents =
     input.plan === GUARANTEE_PLAN.PLUS ? terms.prestamistaPremiumCents : 0;
-  const coverageCeilingCents = input.rentCents * terms.coverageCeilingMultiplier;
-  const exitCostCapCents = input.rentCents * terms.exitCostMultiplier;
+  const coverageCeilingCents = Math.round(input.rentCents * terms.coverageCeilingMultiplier);
+  const exitCostCapCents = Math.round(input.rentCents * terms.exitCostMultiplier);
   return {
     terms: {
       productSlug: input.productSlug,
@@ -62,7 +67,8 @@ export function priceGuarantee(input: PriceGuaranteeInput, terms: PricingTable):
       taxaFeeCents,
       prestamistaFeeCents,
       oneTimeActivationFeeCents: terms.activationFeeCents,
-      setupInstallments: terms.setupInstallments,
+      commissionRate: terms.commissionRate,
+      prestamistaCommissionRate: terms.prestamistaCommissionRate,
       coverageCeilingMultiplier: terms.coverageCeilingMultiplier,
       exitCostMultiplier: terms.exitCostMultiplier,
       coverageCeilingCents,
@@ -77,25 +83,6 @@ export function priceGuarantee(input: PriceGuaranteeInput, terms: PricingTable):
   };
 }
 
-/**
- * The taxa/prestamista split of a monthly fee, recovered from the fee + plan.
- * A stored `terms` snapshot already carries both portions; this exists for
- * callers that only hold a fee and a plan (the wizard preview).
- *
- * The premium is clamped to the fee so the split never goes negative and
- * always reconciles to `feeCents`.
- */
-export function feeBreakdown(
-  priced: { feeCents: number; plan: GuaranteePlan },
-  table: PricingTable = DEFAULT_PRICING_TABLE,
-): { taxaFeeCents: number; prestamistaFeeCents: number } {
-  const prestamistaFeeCents =
-    priced.plan === GUARANTEE_PLAN.PLUS
-      ? Math.min(table.prestamistaPremiumCents, priced.feeCents)
-      : 0;
-  return { taxaFeeCents: priced.feeCents - prestamistaFeeCents, prestamistaFeeCents };
-}
-
 export type CommissionSplit = {
   /** Broker commission rounded to whole cents. */
   commissionCents: number;
@@ -103,20 +90,24 @@ export type CommissionSplit = {
   totalCents: number;
 };
 
+export type CommissionTerms = Pick<
+  GuaranteeTerms,
+  "taxaFeeCents" | "prestamistaFeeCents" | "commissionRate" | "prestamistaCommissionRate"
+>;
+
 /**
  * Broker commission on the two fee portions, at their distinct rates: the
  * score-driven taxa at `commissionRate`, the plan-driven prestamista premium at
- * `prestamistaCommissionRate`. `totalCents` is derived by addition so
- * `total === fee + commission` holds for every input.
+ * `prestamistaCommissionRate`. Reads everything from the `terms` snapshot so
+ * the commission owed on a sold guarantee never moves when the product is
+ * edited. `totalCents` is derived by addition so `total === fee + commission`
+ * holds for every input.
  */
-export function splitCommission(
-  { taxaFeeCents, prestamistaFeeCents }: { taxaFeeCents: number; prestamistaFeeCents: number },
-  table: PricingTable = DEFAULT_PRICING_TABLE,
-): CommissionSplit {
+export function splitCommission(terms: CommissionTerms): CommissionSplit {
   const commissionCents =
-    Math.round(taxaFeeCents * table.commissionRate) +
-    Math.round(prestamistaFeeCents * table.prestamistaCommissionRate);
-  const feeCents = taxaFeeCents + prestamistaFeeCents;
+    Math.round(terms.taxaFeeCents * terms.commissionRate) +
+    Math.round(terms.prestamistaFeeCents * terms.prestamistaCommissionRate);
+  const feeCents = terms.taxaFeeCents + terms.prestamistaFeeCents;
   return {
     commissionCents,
     totalCents: feeCents + commissionCents,

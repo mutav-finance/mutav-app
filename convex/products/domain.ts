@@ -22,8 +22,36 @@ export const productTermsValidator = v.object({
   commissionRate: v.number(),
   prestamistaPremiumCents: v.number(),
   prestamistaCommissionRate: v.number(),
-  setupInstallments: v.number(),
 });
+
+/**
+ * Shape check for a product's pricing parameters before they reach a row.
+ * Amounts are integer cents and rates/multipliers are finite and
+ * non-negative; multipliers must be positive because a zero ceiling would
+ * price a guarantee with no coverage. Mirror of `isValidRentInput` on the
+ * lease side — the admin catalog write path (later) calls this at the
+ * boundary; `priceGuarantee` still rounds every derived figure so a row that
+ * slipped past it cannot produce fractional cents.
+ */
+export function isValidProductTerms(terms: ProductTerms): boolean {
+  const rates = [
+    terms.tierRate.bom,
+    terms.tierRate.regular,
+    terms.tierRate.ruim,
+    terms.commissionRate,
+    terms.prestamistaCommissionRate,
+  ];
+  const isRate = (value: number) => Number.isFinite(value) && value >= 0;
+  const isPositiveMultiplier = (value: number) => Number.isFinite(value) && value > 0;
+  const isCents = (value: number) => Number.isInteger(value) && value >= 0;
+  return (
+    rates.every(isRate) &&
+    isPositiveMultiplier(terms.coverageCeilingMultiplier) &&
+    isPositiveMultiplier(terms.exitCostMultiplier) &&
+    isCents(terms.activationFeeCents) &&
+    isCents(terms.prestamistaPremiumCents)
+  );
+}
 
 export const eligibilityValidator = v.object({
   agencyIds: v.union(v.array(v.id("agencies")), v.null()),

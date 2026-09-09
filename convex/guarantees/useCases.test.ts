@@ -158,7 +158,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
       agencyId,
       document,
       entityType: document.replace(/\D/g, "").length === 14 ? "pj" : "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310-100",
       rentCents: 250_000,
     });
@@ -390,7 +390,7 @@ describe("getActivityByPeriod", () => {
   });
 });
 
-describe("listByAgency / getContractTabCounts (urgency)", () => {
+describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
   const REFERENCE_DATE = "2026-07-18";
   const EXPIRING_10_DAYS = "2026-07-28";
   const CRITICAL_45_DAYS = "2026-09-01";
@@ -488,14 +488,46 @@ describe("listByAgency / getContractTabCounts (urgency)", () => {
     );
   });
 
-  test("getContractTabCounts: expiring === 2 with one bucket per state", async () => {
+  test("a closed row projects availableCapacityCents = 0 while its capacity invariant stays intact", async () => {
     const t = convexTest(schema);
     registerContractAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedUrgencyBook(t, agencyId);
 
-    const counts = await asUser.query(api.guarantees.useCases.getContractTabCounts, {
+    const page = await asUser.query(api.guarantees.useCases.listByAgency, {
+      agencyId,
+      paginationOpts: { numItems: 10, cursor: null },
+      referenceDate: REFERENCE_DATE,
+    });
+    const byId = new Map(page.page.map((row) => [row.id, row]));
+    expect(byId.get("U5")?.status).toBe(GUARANTEE_STATE.CLOSED);
+    expect(byId.get("U5")?.availableCapacityCents).toBe(0);
+    // Default seed: R$ 1.000,00 rent x 30 = R$ 30.000,00 ceiling, untouched.
+    expect(byId.get("U1")?.availableCapacityCents).toBe(3_000_000);
+    expect(byId.get("U4")?.availableCapacityCents).toBe(3_000_000);
+
+    const closedRow = await t.run((ctx) =>
+      ctx.db
+        .query("guarantees")
+        .withIndex("by_publicId", (q) => q.eq("publicId", "U5"))
+        .unique(),
+    );
+    expect(closedRow?.capacity).toEqual({
+      ceilingCents: 3_000_000,
+      availableCents: 3_000_000,
+      reservedCents: 0,
+    });
+  });
+
+  test("getGuaranteeTabCounts: expiring === 2 with one bucket per state", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+    await seedUrgencyBook(t, agencyId);
+
+    const counts = await asUser.query(api.guarantees.useCases.getGuaranteeTabCounts, {
       agencyId,
       referenceDate: REFERENCE_DATE,
     });
@@ -519,7 +551,7 @@ describe("create (lease + drafted guarantee)", () => {
   function createArgs(overrides: object = {}) {
     return {
       lease: {
-        propertyKind: "residencial" as const,
+        propertyKind: "residential" as const,
         property: {
           cep: "01000000",
           streetAndNumber: "Rua Teste, 1",
@@ -612,9 +644,9 @@ describe("create (lease + drafted guarantee)", () => {
     expect(lease).toMatchObject({
       agencyId,
       publicId: result.data.leasePublicId,
-      propertyKind: "residencial",
+      propertyKind: "residential",
       rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0, totalRentCents: 300000 },
-      payer: "inquilino",
+      payer: "tenant",
       openGuaranteeId: guarantee._id,
     });
     if (!lease) return;
@@ -755,7 +787,7 @@ describe("create (lease + drafted guarantee)", () => {
     });
     expect(pfGuarantee?.lease).toMatchObject({
       id: pf.data.leasePublicId,
-      propertyKind: "residencial",
+      propertyKind: "residential",
       rent: { rentCents: 300000, totalRentCents: 300000 },
     });
     expect(pfGuarantee?.terms.productSlug).toBe("mutav-fianca");
@@ -992,9 +1024,7 @@ describe("listForCommissionByMonth", () => {
     for (const row of rows) {
       const seeded = seededByPublicId.get(row.guaranteeId);
       if (!seeded) throw new Error(`missing seed for ${row.guaranteeId}`);
-      expect(row.commissionCents).toBe(
-        splitCommission(seeded.terms, DEFAULT_PRICING_TABLE).commissionCents,
-      );
+      expect(row.commissionCents).toBe(splitCommission(seeded.terms).commissionCents);
       expect(row.rentCents).toBe(seeded.terms.rentCents);
     }
 

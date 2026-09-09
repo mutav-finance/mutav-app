@@ -39,7 +39,7 @@ async function seedApplication(
       agencyId: args.agencyId,
       subjectHash: args.subjectHash,
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310100",
       rentCents: 250_000,
       openedBy: args.openedBy,
@@ -174,7 +174,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
       agencyId,
       document: SUBJECT_CPF,
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310-100",
       rentCents: 250_000,
     });
@@ -260,7 +260,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
       agencyId,
       document: "123",
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310-100",
       rentCents: 250_000,
     });
@@ -282,7 +282,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
       agencyId,
       document: "111.444.777-35",
       entityType: "pf",
-      propertyKind: "comercial",
+      propertyKind: "commercial",
       cep: "01310-100",
       rentCents: 250_000,
     });
@@ -292,7 +292,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
     expect(rows[0].openedBy).toBe(userId);
     expect(rows[0].agencyId).toBe(agencyId);
     expect(rows[0].cep).toBe("01310100");
-    expect(rows[0].propertyKind).toBe("comercial");
+    expect(rows[0].propertyKind).toBe("commercial");
     expect(rows[0].subjectHash).toBe(await hashPii(SUBJECT_CPF));
   });
 });

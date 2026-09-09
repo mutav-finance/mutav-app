@@ -42,7 +42,7 @@ async function seedApplication(
       agencyId,
       subjectHash: "hash-application",
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310100",
       rentCents: 250_000,
       openedBy,

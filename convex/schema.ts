@@ -45,7 +45,7 @@ const documentKey = v.union(
   v.literal("policy"),
 );
 
-const propertyKind = v.union(v.literal("residencial"), v.literal("comercial"));
+const propertyKind = v.union(v.literal("residential"), v.literal("commercial"));
 // Canonical `tenantEntityTypeValidator` lives in `convex/tenants/domain.ts`;
 // inlined here to avoid the entity-file → `_generated/dataModel` circular import.
 const tenantEntityType = v.union(v.literal("pf"), v.literal("pj"));
@@ -53,7 +53,7 @@ const tenantEntityType = v.union(v.literal("pf"), v.literal("pj"));
 // credit-life insurance). See convex/guarantees/domain.ts.
 const guaranteePlan = v.union(v.literal("basic"), v.literal("plus"));
 // Canonical `PAYER` lives in `convex/leases/domain.ts`.
-const payer = v.literal("inquilino");
+const payer = v.literal("tenant");
 
 // Canonical `mutavStaffRoleValidator` lives in `convex/mutavStaff/domain.ts`;
 // inlined here to avoid the entity-file → `_generated/dataModel` circular import.
@@ -456,7 +456,11 @@ export default defineSchema(
         taxaFeeCents: v.number(),
         prestamistaFeeCents: v.number(),
         oneTimeActivationFeeCents: v.number(),
-        setupInstallments: v.number(),
+        // Broker commission rates ride in the snapshot too: commission on a
+        // sold guarantee is owed at the rate it was sold under, not at
+        // whatever the product says later.
+        commissionRate: v.number(),
+        prestamistaCommissionRate: v.number(),
         coverageCeilingMultiplier: v.number(),
         exitCostMultiplier: v.number(),
         coverageCeilingCents: v.number(),
@@ -507,7 +511,6 @@ export default defineSchema(
         commissionRate: v.number(),
         prestamistaPremiumCents: v.number(),
         prestamistaCommissionRate: v.number(),
-        setupInstallments: v.number(),
       }),
       // `null` on every axis = no restriction. A non-null list restricts to
       // its members; `minTier` is the worst tier still eligible.

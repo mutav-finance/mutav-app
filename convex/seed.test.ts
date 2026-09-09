@@ -258,7 +258,7 @@ describe("seedReset", () => {
         agencyId,
         subjectHash: "hash-of-a-subject",
         entityType: "pf",
-        propertyKind: "residencial",
+        propertyKind: "residential",
         cep: "01310100",
         rentCents: 250_000,
         openedBy: userId,

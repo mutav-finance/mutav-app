@@ -10,13 +10,13 @@ export type PropertyKind = Lease["propertyKind"];
 export type Payer = Lease["payer"];
 
 export const PROPERTY_KIND = {
-  RESIDENCIAL: "residencial",
-  COMERCIAL: "comercial",
+  RESIDENTIAL: "residential",
+  COMMERCIAL: "commercial",
 } as const satisfies Record<Uppercase<PropertyKind>, PropertyKind>;
 
 export const propertyKindValidator = v.union(
-  v.literal(PROPERTY_KIND.RESIDENCIAL),
-  v.literal(PROPERTY_KIND.COMERCIAL),
+  v.literal(PROPERTY_KIND.RESIDENTIAL),
+  v.literal(PROPERTY_KIND.COMMERCIAL),
 );
 
 /**
@@ -24,12 +24,12 @@ export const propertyKindValidator = v.union(
  * display label; UI components translate to user-facing copy via i18n.
  */
 export const PAYER = {
-  INQUILINO: "inquilino",
+  TENANT: "tenant",
 } as const satisfies Record<Uppercase<Payer>, Payer>;
 
-export const payerValidator = v.literal(PAYER.INQUILINO);
+export const payerValidator = v.literal(PAYER.TENANT);
 
-export const DEFAULT_PAYER: Payer = PAYER.INQUILINO;
+export const DEFAULT_PAYER: Payer = PAYER.TENANT;
 
 export const leasePropertyValidator = v.object({
   cep: v.string(),

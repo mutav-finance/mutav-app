@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { priceGuarantee, splitCommission, feeBreakdown, DEFAULT_PRICING_TABLE } from "./pricing";
+import { priceGuarantee, splitCommission, DEFAULT_PRICING_TABLE } from "./pricing";
 
 const APPLIED_AT = "2026-07-18T12:00:00.000Z";
 const PRODUCT_SLUG = "mutav-fianca";
@@ -26,7 +26,8 @@ describe("priceGuarantee", () => {
         taxaFeeCents: 9_000,
         prestamistaFeeCents: 0,
         oneTimeActivationFeeCents: 15_000,
-        setupInstallments: 1,
+        commissionRate: 0.015,
+        prestamistaCommissionRate: 0.25,
         coverageCeilingMultiplier: 30,
         exitCostMultiplier: 6,
         coverageCeilingCents: 3_000_000,
@@ -63,6 +64,24 @@ describe("priceGuarantee", () => {
     expect(price({ rentCents: 33_333, tier: "bom", plan: "basic" }).terms.taxaFeeCents).toBe(3_000);
   });
 
+  test("ceiling and exit cap are rounded to whole cents under a fractional multiplier", () => {
+    const priced = priceGuarantee(
+      {
+        rentCents: 100_001,
+        tier: "bom",
+        plan: "basic",
+        productSlug: "custom",
+        appliedAt: APPLIED_AT,
+      },
+      { ...DEFAULT_PRICING_TABLE, coverageCeilingMultiplier: 12.5, exitCostMultiplier: 2.5 },
+    );
+    // 100_001 * 12.5 = 1_250_012.5 → 1_250_013; 100_001 * 2.5 = 250_002.5 → 250_003
+    expect(priced.terms.coverageCeilingCents).toBe(1_250_013);
+    expect(priced.terms.exitCostCapCents).toBe(250_003);
+    expect(Number.isInteger(priced.capacity.ceilingCents)).toBe(true);
+    expect(Number.isInteger(priced.capacity.availableCents)).toBe(true);
+  });
+
   test("ceiling, exit cap and initial capacity follow the product's multipliers", () => {
     const priced = priceGuarantee(
       {
@@ -85,38 +104,39 @@ describe("priceGuarantee", () => {
     });
   });
 
+  test("snapshots the product's commission rates so a later product edit cannot move them", () => {
+    const priced = priceGuarantee(
+      {
+        rentCents: 100_000,
+        tier: "bom",
+        plan: "plus",
+        productSlug: "custom",
+        appliedAt: APPLIED_AT,
+      },
+      { ...DEFAULT_PRICING_TABLE, commissionRate: 0.02, prestamistaCommissionRate: 0.3 },
+    );
+    expect(priced.terms.commissionRate).toBe(0.02);
+    expect(priced.terms.prestamistaCommissionRate).toBe(0.3);
+    // 9_000 x 2% = 180; 1_280 x 30% = 384
+    expect(splitCommission(priced.terms).commissionCents).toBe(564);
+  });
+
   test("capacity invariant holds at pricing time: available + reserved = ceiling", () => {
     const { capacity } = price({ rentCents: 123_456, tier: "regular", plan: "plus" });
     expect(capacity.availableCents + capacity.reservedCents).toBe(capacity.ceilingCents);
   });
 });
 
-describe("feeBreakdown", () => {
-  test("basic — the whole fee is taxa, no prestamista", () => {
-    expect(feeBreakdown({ feeCents: 9_000, plan: "basic" })).toEqual({
-      taxaFeeCents: 9_000,
-      prestamistaFeeCents: 0,
-    });
-  });
-
-  test("plus — recovers the taxa by subtracting the premium", () => {
-    expect(feeBreakdown({ feeCents: 10_280, plan: "plus" })).toEqual({
-      taxaFeeCents: 9_000,
-      prestamistaFeeCents: 1_280,
-    });
-  });
-
-  test("plus — clamps the premium to the fee so the split never goes negative", () => {
-    const split = feeBreakdown({ feeCents: 800, plan: "plus" });
-    expect(split.taxaFeeCents).toBe(0);
-    expect(split.prestamistaFeeCents).toBe(800);
-    expect(split.taxaFeeCents + split.prestamistaFeeCents).toBe(800);
-  });
-});
-
 describe("splitCommission", () => {
+  const DEFAULT_RATES = {
+    commissionRate: DEFAULT_PRICING_TABLE.commissionRate,
+    prestamistaCommissionRate: DEFAULT_PRICING_TABLE.prestamistaCommissionRate,
+  };
+
   test("taxa only — 1.5% of the taxa portion", () => {
-    expect(splitCommission({ taxaFeeCents: 10_000, prestamistaFeeCents: 0 })).toEqual({
+    expect(
+      splitCommission({ taxaFeeCents: 10_000, prestamistaFeeCents: 0, ...DEFAULT_RATES }),
+    ).toEqual({
       commissionCents: 150,
       totalCents: 10_150,
     });
@@ -124,7 +144,9 @@ describe("splitCommission", () => {
 
   test("plus — 1.5% of taxa plus 25% of the prestamista premium", () => {
     // 1.5% of 10_000 = 150; 25% of 1_280 = 320; fee = 11_280; total = 11_750.
-    expect(splitCommission({ taxaFeeCents: 10_000, prestamistaFeeCents: 1_280 })).toEqual({
+    expect(
+      splitCommission({ taxaFeeCents: 10_000, prestamistaFeeCents: 1_280, ...DEFAULT_RATES }),
+    ).toEqual({
       commissionCents: 470,
       totalCents: 11_750,
     });
@@ -143,7 +165,7 @@ describe("splitCommission", () => {
       { taxaFeeCents: 1_234_567, prestamistaFeeCents: 0 },
     ];
     for (const c of cases) {
-      const { commissionCents, totalCents } = splitCommission(c);
+      const { commissionCents, totalCents } = splitCommission({ ...c, ...DEFAULT_RATES });
       expect(totalCents).toBe(c.taxaFeeCents + c.prestamistaFeeCents + commissionCents);
     }
   });

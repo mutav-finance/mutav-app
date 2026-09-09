@@ -1,5 +1,6 @@
 import { queryWithAuth } from "../lib/auth";
 import { countByStatePlatform, countInsured, sumInsuredExposure } from "../guarantees/aggregate";
+import { GUARANTEE_STATE } from "../guarantees/domain";
 import { getMaxGuaranteeCapacityCents, getReserveContractId, getStellarNetwork } from "../lib/env";
 import type { GuaranteeAggregates, ReserveCoverage } from "./domain";
 
@@ -14,12 +15,16 @@ export const getContractAggregates = queryWithAuth({
     // The default rate needs the receivable ledger (spec 9h) to define its
     // denominator honestly — expose null so the UI shows "—" instead of a
     // misleading 0% on a transparency surface.
+    const countByState = await countByStatePlatform(ctx);
+    const insured = await countInsured(ctx);
     return {
-      countByState: await countByStatePlatform(ctx),
-      countInsured: await countInsured(ctx),
+      countByState,
+      countInsured: insured,
       sumInsuredCents: await sumInsuredExposure(ctx),
       defaultRate: null,
       maxCapacityCents: getMaxGuaranteeCapacityCents(),
+      countAtivos: insured,
+      countPendentes: countByState[GUARANTEE_STATE.DRAFTED],
     };
   },
 });

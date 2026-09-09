@@ -389,7 +389,7 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
     return {
       agencyId,
       lease: {
-        propertyKind: "residencial" as const,
+        propertyKind: "residential" as const,
         property: {
           cep: "01000000",
           streetAndNumber: "Rua Teste, 1",
@@ -515,7 +515,7 @@ describe("cross-agency tenant identity", () => {
     return {
       agencyId,
       lease: {
-        propertyKind: "residencial" as const,
+        propertyKind: "residential" as const,
         property: {
           cep: "01000000",
           streetAndNumber: "Rua Teste, 1",

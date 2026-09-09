@@ -179,13 +179,14 @@ export function tierForScore(score: number): ScoreTier {
   return SCORE_TIER.NEGADO;
 }
 
+// Codes owned by other domains (`PRODUCT_ERROR_CODE.PRODUCT_UNAVAILABLE`,
+// `LEASE_ERROR_CODE.LEASE_HAS_OPEN_GUARANTEE`) are composed into a mutation's
+// error union at the call site rather than duplicated here.
 export const GUARANTEE_ERROR_CODE = {
   TENANT_DENIED: "TENANT_DENIED",
   INVALID_RENT: "INVALID_RENT",
   CREDIT_ASSESSMENT_REQUIRED: "CREDIT_ASSESSMENT_REQUIRED",
   INVALID_TAX_ID: "INVALID_TAX_ID",
-  PRODUCT_UNAVAILABLE: "PRODUCT_UNAVAILABLE",
-  LEASE_HAS_OPEN_GUARANTEE: "LEASE_HAS_OPEN_GUARANTEE",
   NOT_FOUND: "NOT_FOUND",
   NOT_DRAFTED: "NOT_DRAFTED",
 } as const satisfies Record<string, string>;

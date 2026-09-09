@@ -18,6 +18,15 @@ import type { TransitionError } from "./machine";
 // codes map 1:1 onto the mutation-level error codes for transition failures.
 type TransitionErrorCode = TransitionError["code"];
 
+/**
+ * Agency-side dispositions act on `open` notices only. The machine allows
+ * `verified → resolved | canceled` because staff close verified notices
+ * (cover committed, dispute, dismissal); an agency must not be able to make a
+ * default that compliance has already confirmed disappear.
+ */
+const NOTICE_VERIFIED_ERROR_CODE = "NOTICE_VERIFIED";
+type NoticeVerifiedErrorCode = typeof NOTICE_VERIFIED_ERROR_CODE;
+
 // ---------------------------------------------------------------------------
 // openNotice — agency files a new delinquency notice
 // ---------------------------------------------------------------------------
@@ -175,7 +184,9 @@ export const openNotice = mutationWithAgencyScope({
 // ---------------------------------------------------------------------------
 
 type MarkResolvedSuccess = { publicId: string };
-type MarkResolvedError = { code: "NOTICE_NOT_FOUND" | TransitionErrorCode };
+type MarkResolvedError = {
+  code: "NOTICE_NOT_FOUND" | NoticeVerifiedErrorCode | TransitionErrorCode;
+};
 
 /**
  * Agency-side resolution. Deliberately excludes `cover_committed` and
@@ -215,6 +226,14 @@ export const markResolved = mutation({
     // the identity token — so no separate user re-fetch is needed.
     const membership = await assertAgencyAccess(ctx, notice.agencyId);
 
+    if (notice.status === DELINQUENCY_STATUS.VERIFIED) {
+      return {
+        success: false,
+        error: { code: NOTICE_VERIFIED_ERROR_CODE },
+        message: `Delinquency notice '${notice.publicId}' is staff-verified; only staff may close it.`,
+      };
+    }
+
     const guard = assertTransition(notice.status, DELINQUENCY_STATUS.RESOLVED);
     if (!guard.success) {
       return { success: false, error: { code: guard.error.code }, message: guard.message };
@@ -246,7 +265,9 @@ export const markResolved = mutation({
 // ---------------------------------------------------------------------------
 
 type MarkCanceledSuccess = { publicId: string };
-type MarkCanceledError = { code: "NOTICE_NOT_FOUND" | TransitionErrorCode };
+type MarkCanceledError = {
+  code: "NOTICE_NOT_FOUND" | NoticeVerifiedErrorCode | TransitionErrorCode;
+};
 
 /**
  * Agency-side cancellation. Validator excludes `staff_dismissed`, mirroring
@@ -281,6 +302,14 @@ export const markCanceled = mutation({
     // See markResolved above for why membership.userId (not a re-fetch) is
     // the authored-by id on a bare mutation.
     const membership = await assertAgencyAccess(ctx, notice.agencyId);
+
+    if (notice.status === DELINQUENCY_STATUS.VERIFIED) {
+      return {
+        success: false,
+        error: { code: NOTICE_VERIFIED_ERROR_CODE },
+        message: `Delinquency notice '${notice.publicId}' is staff-verified; only staff may close it.`,
+      };
+    }
 
     const guard = assertTransition(notice.status, DELINQUENCY_STATUS.CANCELED);
     if (!guard.success) {
