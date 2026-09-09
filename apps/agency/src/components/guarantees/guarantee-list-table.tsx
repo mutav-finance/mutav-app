@@ -50,7 +50,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
 import { GUARANTEE_STATE, type UrgencyTier } from "@convex/guarantees/domain";
-import { StatusTag } from "@/components/guarantees/status-tag";
+import { GuaranteeStateTag, StatusTag } from "@/components/guarantees/state-tag";
 import type { GuaranteeState } from "@/lib/guarantees/types";
 
 type GuaranteeListItem = {
@@ -64,31 +64,33 @@ type GuaranteeListItem = {
   urgencySortKey: number;
 };
 
-type StatusTab = "all" | GuaranteeState | "expiring";
+type StateTab = "all" | "expiring" | GuaranteeState;
 
-const STATUS_TABS: readonly StatusTab[] = [
+/**
+ * Tab order runs "everything → what needs attention soon → the in-force states
+ * in escalation order → the two states that cover nothing". It is authored,
+ * not derived from `GUARANTEE_STATES`, because the reading order is a product
+ * decision; `STATE_TABS` below still ties the set to the machine.
+ */
+const STATE_TABS: readonly StateTab[] = [
   "all",
   "expiring",
-  "ativo",
-  "pendente",
-  "encerrado",
-  "cancelado",
+  GUARANTEE_STATE.ACTIVE,
+  GUARANTEE_STATE.IN_ARREARS,
+  GUARANTEE_STATE.DEFAULT_VERIFIED,
+  GUARANTEE_STATE.COVER_COMMITTED,
+  GUARANTEE_STATE.IN_EVICTION,
+  GUARANTEE_STATE.DRAFTED,
+  GUARANTEE_STATE.CLOSED,
 ];
 
-function isStatusTab(value: string): value is StatusTab {
-  return STATUS_TABS.some((tab) => tab === value);
+function isStateTab(value: string): value is StateTab {
+  return STATE_TABS.some((tab) => tab === value);
 }
 
-const statusTone: Record<GuaranteeState, "accent" | "success" | "error" | "neutral"> = {
-  ativo: "success",
-  pendente: "accent",
-  encerrado: "neutral",
-  cancelado: "error",
-};
-
 function buildColumns(
-  t: ReturnType<typeof useTranslations<"contractList">>,
-  tStatus: ReturnType<typeof useTranslations<"contractDetails.status">>,
+  t: ReturnType<typeof useTranslations<"guaranteeList">>,
+  tState: ReturnType<typeof useTranslations<"guaranteeDetails.state">>,
 ): ColumnDef<GuaranteeListItem>[] {
   return [
     {
@@ -118,7 +120,7 @@ function buildColumns(
           if (urgency === "critical")
             return <StatusTag tone="caution">{t("urgency.critical")}</StatusTag>;
         }
-        return <StatusTag tone={statusTone[status]}>{tStatus(status)}</StatusTag>;
+        return <GuaranteeStateTag state={status}>{tState(status)}</GuaranteeStateTag>;
       },
       filterFn: (row, columnId, value) => row.getValue(columnId) === value,
     },
@@ -164,19 +166,19 @@ type Props = {
 };
 
 export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
-  const t = useTranslations("contractList");
-  const tStatus = useTranslations("contractDetails.status");
+  const t = useTranslations("guaranteeList");
+  const tState = useTranslations("guaranteeDetails.state");
 
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
   const referenceDate = new Date().toISOString().slice(0, 10);
-  const [statusTab, setStatusTab] = React.useState<StatusTab>("all");
+  const [stateTab, setStateTab] = React.useState<StateTab>("all");
 
   const result = useQuery(
     api.guarantees.useCases.listByAgency,
     agencyId
-      ? { agencyId, paginationOpts: { numItems: 200, cursor: null }, tab: statusTab, referenceDate }
+      ? { agencyId, paginationOpts: { numItems: 200, cursor: null }, tab: stateTab, referenceDate }
       : "skip",
   );
 
@@ -184,7 +186,7 @@ export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
   const noAgency = !workspaceLoading && agencyId === undefined;
 
-  const columns = React.useMemo(() => buildColumns(t, tStatus), [t, tStatus]);
+  const columns = React.useMemo(() => buildColumns(t, tState), [t, tState]);
 
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
@@ -232,13 +234,16 @@ export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
     api.guarantees.useCases.getGuaranteeTabCounts,
     agencyId ? { agencyId, referenceDate } : "skip",
   );
-  const counts: Record<StatusTab, number> = {
+  const counts: Record<StateTab, number> = {
     all: tabCounts?.all ?? 0,
     expiring: tabCounts?.expiring ?? 0,
-    ativo: tabCounts?.ativo ?? 0,
-    pendente: tabCounts?.pendente ?? 0,
-    encerrado: tabCounts?.encerrado ?? 0,
-    cancelado: tabCounts?.cancelado ?? 0,
+    drafted: tabCounts?.drafted ?? 0,
+    active: tabCounts?.active ?? 0,
+    in_arrears: tabCounts?.in_arrears ?? 0,
+    default_verified: tabCounts?.default_verified ?? 0,
+    cover_committed: tabCounts?.cover_committed ?? 0,
+    in_eviction: tabCounts?.in_eviction ?? 0,
+    closed: tabCounts?.closed ?? 0,
   };
 
   if (isLoading) {
@@ -257,15 +262,15 @@ export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
 
   return (
     <Tabs
-      value={statusTab}
+      value={stateTab}
       onValueChange={(v) => {
-        if (isStatusTab(v)) setStatusTab(v);
+        if (isStateTab(v)) setStateTab(v);
       }}
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 lg:px-6">
         <TabsList>
-          {STATUS_TABS.map((tab) => (
+          {STATE_TABS.map((tab) => (
             <TabsTrigger key={tab} value={tab}>
               {t(`tabs.${tab}`)} <Badge variant="count">{counts[tab]}</Badge>
             </TabsTrigger>
@@ -307,7 +312,7 @@ export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
       </div>
 
       <TabsContent
-        value={statusTab}
+        value={stateTab}
         forceMount
         className="relative flex flex-col gap-4 overflow-x-auto px-4 lg:px-6"
       >
@@ -342,7 +347,7 @@ export function GuaranteeListTable({ defaultSort, emptyStateCta }: Props) {
                   <TableCell colSpan={columns.length} className="h-24 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <span className="text-muted-foreground text-sm">{t("noResults")}</span>
-                      {emptyStateCta && data.length === 0 && statusTab === "all" && (
+                      {emptyStateCta && data.length === 0 && stateTab === "all" && (
                         <Link
                           href="/guarantees/new"
                           className="text-primary text-sm font-medium hover:underline"

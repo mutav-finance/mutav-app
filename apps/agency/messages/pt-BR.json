@@ -240,12 +240,12 @@
     }
   },
   "metrics": {
-    "ativo": {
-      "label": "Contratos Ativos",
-      "footer": "Contratos em vigor"
+    "active": {
+      "label": "Garantias ativas",
+      "footer": "Garantias em vigor"
     },
-    "pendente": {
-      "label": "Pendentes",
+    "drafted": {
+      "label": "Rascunhos",
       "footer": "Aguardando ativação"
     },
     "nextPayment": {
@@ -348,13 +348,12 @@
       "done": "Concluído"
     }
   },
-  "contractDetails": {
-    "backToDashboard": "Voltar",
-    "breadcrumb": "Detalhes do Contrato",
-    "heroTitle": "Contrato {status}",
+  "guaranteeDetails": {
+    "heroTitle": "Garantia {state}",
     "summary": {
       "heading": "Solicitação",
       "currentStatus": "Situação atual:",
+      "closureReason": "Motivo do encerramento:",
       "nextRenewal": "Próxima Renovação estimada:",
       "availableGuarantee": "Fiança disponível:",
       "guaranteeTooltip": "Este valor considera todas as inadimplências abertas, em análise, provisionadas e pagas.",
@@ -363,7 +362,6 @@
       "cancelProposal": "Cancelar proposta",
       "idLabel": "ID do contrato",
       "guaranteeTooltipLabel": "Detalhes da fiança disponível",
-      "copyId": "Copiar ID",
       "cancelProposalHint": "Disponível apenas para contratos pendentes",
       "cancelDialog": {
         "title": "Cancelar proposta?",
@@ -374,18 +372,30 @@
       },
       "errors": {
         "NOT_FOUND": "Proposta não encontrada.",
-        "NOT_PENDING": "Apenas propostas pendentes podem ser canceladas.",
+        "NOT_DRAFTED": "Apenas garantias em rascunho podem ser canceladas.",
         "UNEXPECTED": "Erro inesperado. Tente novamente."
       },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",
       "actionsMenu": "Ações do contrato"
     },
-    "status": {
-      "ativo": "Ativo",
-      "encerrado": "Encerrado",
-      "pendente": "Pendente",
-      "cancelado": "Cancelado"
+    "state": {
+      "drafted": "Rascunho",
+      "active": "Ativa",
+      "in_arrears": "Em inadimplência",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura registrada",
+      "in_eviction": "Em despejo",
+      "closed": "Encerrada"
+    },
+    "closeReason": {
+      "end_of_lease": "Fim da locação",
+      "rescission": "Rescisão",
+      "abandonment": "Abandono do imóvel",
+      "eviction": "Despejo",
+      "dispute_reversal": "Contestação revertida",
+      "canceled_pre_activation": "Cancelada antes da ativação",
+      "death": "Falecimento"
     },
     "rentalData": {
       "heading": "Dados da Locação",
@@ -397,8 +407,7 @@
       "groups": {
         "contract": "Dados do Contrato",
         "property": "Dados do Imóvel",
-        "optional": "Dados Opcionais",
-        "documents": "Documentos"
+        "optional": "Dados Opcionais"
       },
       "fields": {
         "propertyKind": "Tipo de Imóvel",
@@ -422,10 +431,9 @@
         "description": "Descrição"
       },
       "propertyKind": {
-        "residencial": "Residencial",
-        "comercial": "Comercial"
-      },
-      "empty": "—"
+        "residential": "Residencial",
+        "commercial": "Comercial"
+      }
     },
     "documents": {
       "heading": "Documentos",
@@ -469,22 +477,17 @@
       "approvalFailedHelp": "Reprovação registrada. Solicite documentação atualizada ao inquilino para reabrir a análise.",
       "initialsLabel": "Iniciais do inquilino"
     },
-    "notFound": {
-      "title": "Contrato não encontrado",
-      "body": "Não localizamos um contrato com este identificador."
-    },
     "errors": {
       "title": "Não foi possível carregar este contrato",
       "body": "Algo deu errado ao buscar os dados. Tente novamente ou volte ao painel.",
       "retry": "Tentar novamente",
-      "backToDashboard": "Voltar ao painel",
       "backToContracts": "Voltar aos contratos"
     },
     "loading": {
       "label": "Carregando contrato"
     }
   },
-  "contractList": {
+  "guaranteeList": {
     "meta": {
       "title": "Contratos | Mutav",
       "description": "Lista de contratos da imobiliária"
@@ -492,12 +495,15 @@
     "heading": "Contratos",
     "subheading": "Acompanhe os contratos da sua imobiliária",
     "tabs": {
-      "all": "Todos",
+      "all": "Todas",
       "expiring": "A vencer",
-      "ativo": "Ativos",
-      "pendente": "Pendentes",
-      "encerrado": "Encerrados",
-      "cancelado": "Cancelados"
+      "active": "Ativas",
+      "in_arrears": "Em inadimplência",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura registrada",
+      "in_eviction": "Em despejo",
+      "drafted": "Rascunhos",
+      "closed": "Encerradas"
     },
     "columns": {
       "publicId": "ID",
@@ -511,11 +517,7 @@
     "urgency": {
       "overdue": "Vencido",
       "expiring": "A vencer",
-      "critical": "Atenção",
-      "warning": "Em dia",
-      "pendente": "Pendente",
-      "ok": "OK",
-      "inactive": "Inativo"
+      "critical": "Atenção"
     },
     "search": {
       "placeholder": "Buscar por ID ou locatário"
@@ -811,7 +813,7 @@
       "label": "Carregando fatura"
     }
   },
-  "contractNew": {
+  "guaranteeNew": {
     "meta": {
       "title": "Novo Contrato | Mutav"
     },
@@ -832,18 +834,16 @@
       "cnpjPlaceholder": "00.000.000/0001-00"
     },
     "property": {
-      "heading": "Dados do Imóvel",
       "kindLabel": "Tipo de imóvel",
-      "residencial": "Residencial",
-      "comercial": "Comercial",
+      "residential": "Residencial",
+      "commercial": "Comercial",
       "cep": "CEP",
       "street": "Endereço",
       "addressNumber": "Número",
       "neighborhood": "Bairro",
       "city": "Cidade",
       "uf": "UF",
-      "complement": "Complemento (opcional)",
-      "lockedField": "Preenchido automaticamente"
+      "complement": "Complemento (opcional)"
     },
     "rent": {
       "heading": "Valores",
@@ -851,11 +851,9 @@
       "condo": "Condomínio",
       "otherFees": "Outras taxas",
       "total": "Total",
-      "placeholder": "0,00",
-      "prefix": "R$"
+      "placeholder": "0,00"
     },
     "tenant": {
-      "heading": "Dados do Inquilino",
       "fullName": "Nome completo",
       "companyName": "Razão social",
       "cpf": "CPF",
@@ -864,16 +862,13 @@
       "birthDate": "Data de nascimento",
       "email": "E-mail",
       "phone": "Telefone",
-      "scoreLoading": "Consultando score...",
       "scoreBom": "Bom",
       "scoreRegular": "Regular",
       "scoreRuim": "Ruim",
-      "scoreNegado": "Negado",
-      "scoreLabel": "Score de crédito"
+      "scoreNegado": "Negado"
     },
     "simulation": {
       "heading": "Resultado da Simulação",
-      "scoreLabel": "Score",
       "approvedValueLabel": "Valor locatício aprovado",
       "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
       "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
@@ -883,8 +878,6 @@
       "noApplicationAction": "Voltar para a etapa 1"
     },
     "coverage": {
-      "heading": "Plano de Cobertura",
-      "rentCoverage": "Cobertura de aluguel",
       "exitCoverage": "Cobertura de saída",
       "feeRate": "Taxa mensal",
       "planLabel": "Plano de Cobertura",
@@ -893,18 +886,13 @@
       "rentCoverageFull": "Cobertura de aluguel Completa",
       "rentCoverageIncludes": "Incluso água, luz, condomínio, IPTU e taxa de lixo",
       "prestamistaLabel": "Seguro Prestamista",
-      "included": "Incluso",
       "prestamistaTooltip": "Quita ou cobre o aluguel em casos como morte, invalidez ou desemprego involuntário do inquilino.",
       "prestamistaInfoAria": "O que é Seguro Prestamista?",
       "rentMultiplierLabel": "Cobertura de aluguel",
       "exitCostLabel": "Cobertura de saída",
-      "coverageDesc": "{x} meses de aluguel cobertos em caso de inadimplência",
-      "exitDesc": "{x} vezes o aluguel em caso de rescisão",
       "preview": {
-        "heading": "Prévia dos Valores",
         "fee": "Taxa mensal",
-        "activationFee": "Taxa de ativação",
-        "guarantee": "Garantia disponível"
+        "activationFee": "Taxa de ativação"
       },
       "summary": {
         "heading": "Resumo",
@@ -915,7 +903,6 @@
       }
     },
     "complementary": {
-      "heading": "Dados Complementares",
       "tenantSection": "Dados do Inquilino",
       "addressSection": "Endereço do Imóvel"
     },
@@ -926,9 +913,6 @@
       "tenantSection": "Dados do Inquilino",
       "planSection": "Dados do Plano",
       "score": "Score",
-      "fee": "Taxa mensal",
-      "activationFee": "Taxa de ativação",
-      "guarantee": "Garantia disponível",
       "submit": "Criar contrato",
       "submitting": "Criando...",
       "errorToast": "Erro ao criar contrato. Tente novamente.",
@@ -936,7 +920,8 @@
         "INVALID_TAX_ID": "Documento do inquilino inválido (CPF/CNPJ). Verifique o número e tente novamente.",
         "TENANT_DENIED": "O score de crédito do inquilino foi negado. Não é possível criar o contrato.",
         "INVALID_RENT": "Valores inválidos. O aluguel deve ser maior que zero.",
-        "CREDIT_ASSESSMENT_REQUIRED": "A análise de crédito deste inquilino expirou. Refaça a consulta antes de criar o contrato."
+        "CREDIT_ASSESSMENT_REQUIRED": "A análise de crédito deste inquilino expirou. Refaça a consulta antes de criar o contrato.",
+        "PRODUCT_UNAVAILABLE": "Nenhum produto de garantia disponível para esta imobiliária. Fale com a Mutav."
       },
       "missingFields": "Preencha todos os campos obrigatórios antes de confirmar.",
       "editBlock": "Editar dados",
@@ -954,8 +939,7 @@
       "back": "Voltar",
       "nextStep2": "Simular crédito",
       "nextStep3": "Continuar",
-      "nextStep4": "Confirmar",
-      "nextStep5": "Criar contrato"
+      "nextStep4": "Confirmar"
     },
     "errors": {
       "INVALID_TAX_ID": "CPF/CNPJ inválido",
@@ -1253,9 +1237,9 @@
     "heading": "Transparência",
     "subheading": "Transparência da posição de risco e treasury onchain.",
     "footer": "Dados de contratos em tempo real. Reserva de cobertura lida onchain e atualizada periodicamente.",
-    "contracts": {
-      "ativo": "Contratos ativos",
-      "pendente": "Em análise",
+    "guarantees": {
+      "insured": "Garantias em vigor",
+      "drafted": "Rascunhos",
       "defaultRate": "Taxa de inadimplência"
     },
     "capacity": {

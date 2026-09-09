@@ -7,12 +7,12 @@ import { CreateGuaranteeButton } from "@/components/guarantees/create-guarantee-
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "contractList.meta" });
+  const t = await getTranslations({ locale, namespace: "guaranteeList.meta" });
   return { title: t("title"), description: t("description") };
 }
 
 export default async function GuaranteesPage() {
-  const t = await getTranslations("contractList");
+  const t = await getTranslations("guaranteeList");
 
   return (
     <PageShell>

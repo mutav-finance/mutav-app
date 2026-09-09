@@ -40,7 +40,7 @@ type Props = {
 type MissingFields = Set<string>;
 
 export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Props) {
-  const t = useTranslations("contractNew");
+  const t = useTranslations("guaranteeNew");
   const createGuarantee = useMutation(api.guarantees.useCases.create);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [missing, setMissing] = React.useState<MissingFields>(new Set());
@@ -201,8 +201,8 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
                 variant="outline"
                 spacing={2}
               >
-                <ToggleGroupItem value="residential">{t("property.residencial")}</ToggleGroupItem>
-                <ToggleGroupItem value="commercial">{t("property.comercial")}</ToggleGroupItem>
+                <ToggleGroupItem value="residential">{t("property.residential")}</ToggleGroupItem>
+                <ToggleGroupItem value="commercial">{t("property.commercial")}</ToggleGroupItem>
               </ToggleGroup>
             </EditField>
             <EditField label={t("property.cep")}>
@@ -259,9 +259,9 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
               label={t("property.kindLabel")}
               value={
                 data.propertyKind === PROPERTY_KIND.RESIDENTIAL
-                  ? t("property.residencial")
+                  ? t("property.residential")
                   : data.propertyKind === PROPERTY_KIND.COMMERCIAL
-                    ? t("property.comercial")
+                    ? t("property.commercial")
                     : ""
               }
               missing={missingText("propertyKind")}

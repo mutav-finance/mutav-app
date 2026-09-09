@@ -35,7 +35,7 @@ function MetricCard({
 }
 
 export function GuaranteesPanel({ aggregates }: Props) {
-  const t = useTranslations("transparency.contracts");
+  const t = useTranslations("transparency.guarantees");
   const loading = aggregates === null;
 
   const defaultRatePct =
@@ -47,13 +47,13 @@ export function GuaranteesPanel({ aggregates }: Props) {
     <>
       <MetricCard
         icon={<FileTextIcon className="size-3.5" />}
-        label={t("ativo")}
+        label={t("insured")}
         value={String(aggregates?.countInsured ?? "—")}
         loading={loading}
       />
       <MetricCard
         icon={<ClockIcon className="size-3.5" />}
-        label={t("pendente")}
+        label={t("drafted")}
         value={String(aggregates?.countByState.drafted ?? "—")}
         loading={loading}
       />

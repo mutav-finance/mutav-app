@@ -31,35 +31,35 @@ export function SectionCards() {
 
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @md/main:grid-cols-2 @4xl/main:grid-cols-4">
-      {/* Ativos */}
+      {/* Active */}
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <FileTextIcon className="size-3.5" />
-            {t("ativo.label")}
+            {t("active.label")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {summary ? summary.ativo : "—"}
+            {summary ? summary.active : "—"}
           </CardTitle>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">{t("ativo.footer")}</div>
+          <div className="text-muted-foreground">{t("active.footer")}</div>
         </CardFooter>
       </Card>
 
-      {/* Pendentes */}
+      {/* Drafts */}
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <AlertTriangleIcon className="size-3.5" />
-            {t("pendente.label")}
+            {t("drafted.label")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {summary ? summary.pendente : "—"}
+            {summary ? summary.drafted : "—"}
           </CardTitle>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">{t("pendente.footer")}</div>
+          <div className="text-muted-foreground">{t("drafted.footer")}</div>
         </CardFooter>
       </Card>
 

@@ -14,7 +14,7 @@ import { wizardReducer, INITIAL_WIZARD_DATA, type DraftWizardData } from "@/lib/
 const GUARANTEE_WIZARD_STEPS = [1, 2, 3, 4, 5] as const;
 
 export function GuaranteeWizard() {
-  const t = useTranslations("contractNew");
+  const t = useTranslations("guaranteeNew");
   const [state, dispatch] = React.useReducer(wizardReducer, {
     step: 1,
     data: INITIAL_WIZARD_DATA,

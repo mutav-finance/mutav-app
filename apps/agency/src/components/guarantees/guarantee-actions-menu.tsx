@@ -14,7 +14,7 @@ import {
 } from "@mutav/ui/dropdown-menu";
 
 export function GuaranteeActionsMenu() {
-  const t = useTranslations("contractDetails.rentalData");
+  const t = useTranslations("guaranteeDetails.rentalData");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

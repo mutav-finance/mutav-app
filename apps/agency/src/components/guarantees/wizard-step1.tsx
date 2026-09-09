@@ -30,7 +30,7 @@ type Props = {
 type Errors = Partial<Record<string, string>>;
 
 export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
-  const t = useTranslations("contractNew");
+  const t = useTranslations("guaranteeNew");
   const [errors, setErrors] = React.useState<Errors>({});
   const [isOpeningApplication, setIsOpeningApplication] = React.useState(false);
   const openApplication = useMutation(api.guarantees.useCases.openContractApplication);
@@ -168,8 +168,8 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
             spacing={2}
             className="w-full *:data-[slot=toggle-group-item]:flex-1"
           >
-            <ToggleGroupItem value="residential">{t("property.residencial")}</ToggleGroupItem>
-            <ToggleGroupItem value="commercial">{t("property.comercial")}</ToggleGroupItem>
+            <ToggleGroupItem value="residential">{t("property.residential")}</ToggleGroupItem>
+            <ToggleGroupItem value="commercial">{t("property.commercial")}</ToggleGroupItem>
           </ToggleGroup>
           {errors.propertyKind && <p className="text-destructive text-xs">{errors.propertyKind}</p>}
         </div>

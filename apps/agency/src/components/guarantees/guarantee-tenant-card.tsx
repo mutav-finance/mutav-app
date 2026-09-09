@@ -7,7 +7,7 @@ import { maskCNPJ, maskCPF } from "@mutav/i18n/brazil";
 import { formatDateBR, formatDateTimeBR } from "@/lib/guarantees/format";
 import type { GuaranteeTenant } from "@/lib/guarantees/types";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";
-import { StatusTag } from "./status-tag";
+import { StatusTag } from "./state-tag";
 
 const approvalTone: Record<GuaranteeTenant["approvalStatus"], "accent" | "success" | "error"> = {
   aprovado: "success",
@@ -24,9 +24,9 @@ function getInitials(fullName: string): string {
 }
 
 export function GuaranteeTenantCard({ tenant }: { tenant: GuaranteeTenant }) {
-  const t = useTranslations("contractDetails.tenant");
-  const tFields = useTranslations("contractDetails.tenant.fields");
-  const tApproval = useTranslations("contractDetails.tenant.approval");
+  const t = useTranslations("guaranteeDetails.tenant");
+  const tFields = useTranslations("guaranteeDetails.tenant.fields");
+  const tApproval = useTranslations("guaranteeDetails.tenant.approval");
   const isRejected = tenant.approvalStatus === "reprovado";
 
   return (

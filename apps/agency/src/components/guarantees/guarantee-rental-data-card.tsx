@@ -7,10 +7,10 @@ import { GuaranteeActionsMenu } from "./guarantee-actions-menu";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";
 
 export function GuaranteeRentalDataCard({ guarantee }: { guarantee: Guarantee }) {
-  const t = useTranslations("contractDetails.rentalData");
-  const tFields = useTranslations("contractDetails.rentalData.fields");
-  const tGroups = useTranslations("contractDetails.rentalData.groups");
-  const tKind = useTranslations("contractDetails.rentalData.propertyKind");
+  const t = useTranslations("guaranteeDetails.rentalData");
+  const tFields = useTranslations("guaranteeDetails.rentalData.fields");
+  const tGroups = useTranslations("guaranteeDetails.rentalData.groups");
+  const tKind = useTranslations("guaranteeDetails.rentalData.propertyKind");
 
   const { rental, property, optional } = guarantee;
 

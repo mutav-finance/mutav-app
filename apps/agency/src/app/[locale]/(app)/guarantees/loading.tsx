@@ -4,7 +4,7 @@ import { PageShell } from "@mutav/ui/page/page-shell";
 import { Skeleton } from "@mutav/ui/skeleton";
 
 export default async function GuaranteesLoading() {
-  const t = await getTranslations("contractList");
+  const t = await getTranslations("guaranteeList");
   return (
     <PageShell aria-busy="true" aria-label={t("loading")}>
       <header className="flex flex-col gap-1 px-4 lg:px-6">

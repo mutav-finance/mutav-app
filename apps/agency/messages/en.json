@@ -240,12 +240,12 @@
     }
   },
   "metrics": {
-    "ativo": {
-      "label": "Active Contracts",
-      "footer": "Currently active"
+    "active": {
+      "label": "Active guarantees",
+      "footer": "Currently in force"
     },
-    "pendente": {
-      "label": "Pending",
+    "drafted": {
+      "label": "Drafts",
       "footer": "Awaiting activation"
     },
     "nextPayment": {
@@ -348,13 +348,12 @@
       "done": "Done"
     }
   },
-  "contractDetails": {
-    "backToDashboard": "Back",
-    "breadcrumb": "Contract Details",
-    "heroTitle": "Contract {status}",
+  "guaranteeDetails": {
+    "heroTitle": "Guarantee {state}",
     "summary": {
       "heading": "Request",
       "currentStatus": "Current status:",
+      "closureReason": "Closure reason:",
       "nextRenewal": "Estimated next renewal:",
       "availableGuarantee": "Available guarantee:",
       "guaranteeTooltip": "This value accounts for all open, under-review, provisioned, and paid delinquencies.",
@@ -363,7 +362,6 @@
       "cancelProposal": "Cancel proposal",
       "idLabel": "Contract ID",
       "guaranteeTooltipLabel": "Available guarantee details",
-      "copyId": "Copy ID",
       "cancelProposalHint": "Available only for pending contracts",
       "cancelDialog": {
         "title": "Cancel proposal?",
@@ -374,18 +372,30 @@
       },
       "errors": {
         "NOT_FOUND": "Proposal not found.",
-        "NOT_PENDING": "Only pending proposals can be canceled.",
+        "NOT_DRAFTED": "Only drafted guarantees can be canceled.",
         "UNEXPECTED": "Unexpected error. Please try again."
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this contract",
       "actionsMenu": "Contract actions"
     },
-    "status": {
-      "ativo": "Active",
-      "encerrado": "Ended",
-      "pendente": "Pending",
-      "cancelado": "Cancelled"
+    "state": {
+      "drafted": "Draft",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "closeReason": {
+      "end_of_lease": "End of lease",
+      "rescission": "Rescission",
+      "abandonment": "Abandonment",
+      "eviction": "Eviction",
+      "dispute_reversal": "Dispute reversed",
+      "canceled_pre_activation": "Canceled before activation",
+      "death": "Death"
     },
     "rentalData": {
       "heading": "Rental Data",
@@ -397,8 +407,7 @@
       "groups": {
         "contract": "Contract Data",
         "property": "Property Data",
-        "optional": "Optional Data",
-        "documents": "Documents"
+        "optional": "Optional Data"
       },
       "fields": {
         "propertyKind": "Property Type",
@@ -422,10 +431,9 @@
         "description": "Description"
       },
       "propertyKind": {
-        "residencial": "Residential",
-        "comercial": "Commercial"
-      },
-      "empty": "—"
+        "residential": "Residential",
+        "commercial": "Commercial"
+      }
     },
     "documents": {
       "heading": "Documents",
@@ -469,22 +477,17 @@
       "approvalFailedHelp": "Rejection on file. Request updated documentation from the tenant to reopen review.",
       "initialsLabel": "Tenant initials"
     },
-    "notFound": {
-      "title": "Contract not found",
-      "body": "We could not find a contract with this identifier."
-    },
     "errors": {
       "title": "We couldn't load this contract",
       "body": "Something went wrong fetching the data. Try again or go back to the dashboard.",
       "retry": "Try again",
-      "backToDashboard": "Back to dashboard",
       "backToContracts": "Back to contracts"
     },
     "loading": {
       "label": "Loading contract"
     }
   },
-  "contractList": {
+  "guaranteeList": {
     "meta": {
       "title": "Contracts | Mutav",
       "description": "Real estate agency contracts list"
@@ -494,10 +497,13 @@
     "tabs": {
       "all": "All",
       "expiring": "Expiring",
-      "ativo": "Active",
-      "pendente": "Pending",
-      "encerrado": "Closed",
-      "cancelado": "Canceled"
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "drafted": "Drafts",
+      "closed": "Closed"
     },
     "columns": {
       "publicId": "ID",
@@ -511,11 +517,7 @@
     "urgency": {
       "overdue": "Overdue",
       "expiring": "Expiring",
-      "critical": "Caution",
-      "warning": "On track",
-      "pendente": "Pending",
-      "ok": "OK",
-      "inactive": "Inactive"
+      "critical": "Caution"
     },
     "search": {
       "placeholder": "Search by ID or tenant"
@@ -811,7 +813,7 @@
       "label": "Loading invoice"
     }
   },
-  "contractNew": {
+  "guaranteeNew": {
     "meta": {
       "title": "New Contract | Mutav"
     },
@@ -832,18 +834,16 @@
       "cnpjPlaceholder": "00.000.000/0001-00"
     },
     "property": {
-      "heading": "Property Details",
       "kindLabel": "Property type",
-      "residencial": "Residential",
-      "comercial": "Commercial",
+      "residential": "Residential",
+      "commercial": "Commercial",
       "cep": "ZIP code",
       "street": "Street",
       "addressNumber": "Number",
       "neighborhood": "Neighborhood",
       "city": "City",
       "uf": "State",
-      "complement": "Complement (optional)",
-      "lockedField": "Auto-filled"
+      "complement": "Complement (optional)"
     },
     "rent": {
       "heading": "Values",
@@ -851,11 +851,9 @@
       "condo": "Condo fee",
       "otherFees": "Other fees",
       "total": "Total rent",
-      "placeholder": "0.00",
-      "prefix": "R$"
+      "placeholder": "0.00"
     },
     "tenant": {
-      "heading": "Tenant Details",
       "fullName": "Full name",
       "companyName": "Company name",
       "cpf": "CPF",
@@ -864,16 +862,13 @@
       "birthDate": "Date of birth",
       "email": "E-mail",
       "phone": "Phone",
-      "scoreLoading": "Looking up score...",
       "scoreBom": "Good",
       "scoreRegular": "Regular",
       "scoreRuim": "Poor",
-      "scoreNegado": "Denied",
-      "scoreLabel": "Credit score"
+      "scoreNegado": "Denied"
     },
     "simulation": {
       "heading": "Simulation Result",
-      "scoreLabel": "Score",
       "approvedValueLabel": "Approved rental value",
       "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
       "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
@@ -883,8 +878,6 @@
       "noApplicationAction": "Back to step 1"
     },
     "coverage": {
-      "heading": "Coverage Plan",
-      "rentCoverage": "Rent coverage",
       "exitCoverage": "Exit coverage",
       "feeRate": "Monthly fee rate",
       "planLabel": "Coverage Plan",
@@ -893,18 +886,13 @@
       "rentCoverageFull": "Complete rent coverage",
       "rentCoverageIncludes": "Includes water, electricity, condo fee, property tax and garbage fee",
       "prestamistaLabel": "Payment Protection Insurance",
-      "included": "Included",
       "prestamistaTooltip": "Pays or covers the rent in cases such as the tenant's death, disability or involuntary unemployment.",
       "prestamistaInfoAria": "What is Payment Protection Insurance?",
       "rentMultiplierLabel": "Rent coverage",
       "exitCostLabel": "Exit coverage",
-      "coverageDesc": "{x} months of rent covered in case of default",
-      "exitDesc": "{x} times the rent in case of early termination",
       "preview": {
-        "heading": "Estimated Values",
         "fee": "Monthly fee",
-        "activationFee": "Activation fee",
-        "guarantee": "Available guarantee"
+        "activationFee": "Activation fee"
       },
       "summary": {
         "heading": "Summary",
@@ -915,7 +903,6 @@
       }
     },
     "complementary": {
-      "heading": "Additional Details",
       "tenantSection": "Tenant Details",
       "addressSection": "Property Address"
     },
@@ -926,9 +913,6 @@
       "tenantSection": "Tenant Details",
       "planSection": "Plan Details",
       "score": "Score",
-      "fee": "Monthly fee",
-      "activationFee": "Activation fee",
-      "guarantee": "Available guarantee",
       "submit": "Create contract",
       "submitting": "Creating...",
       "missingFields": "Fill in all required fields before confirming.",
@@ -937,7 +921,8 @@
         "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again.",
         "TENANT_DENIED": "The tenant's credit score was denied. The contract cannot be created.",
         "INVALID_RENT": "Invalid amounts. Rent must be greater than zero.",
-        "CREDIT_ASSESSMENT_REQUIRED": "The credit assessment for this tenant has expired. Run the credit check again before creating the contract."
+        "CREDIT_ASSESSMENT_REQUIRED": "The credit assessment for this tenant has expired. Run the credit check again before creating the contract.",
+        "PRODUCT_UNAVAILABLE": "No guarantee product is available for this agency. Contact Mutav."
       },
       "editBlock": "Edit",
       "saveBlock": "Save",
@@ -954,8 +939,7 @@
       "back": "Back",
       "nextStep2": "Simulate credit",
       "nextStep3": "Continue",
-      "nextStep4": "Review",
-      "nextStep5": "Create contract"
+      "nextStep4": "Review"
     },
     "errors": {
       "INVALID_TAX_ID": "Invalid CPF/CNPJ",
@@ -1253,9 +1237,9 @@
     "heading": "Transparency",
     "subheading": "Risk position transparency and onchain treasury.",
     "footer": "Contract data in real time. Coverage reserve read onchain and refreshed periodically.",
-    "contracts": {
-      "ativo": "Active contracts",
-      "pendente": "Under review",
+    "guarantees": {
+      "insured": "Guarantees in force",
+      "drafted": "Drafts",
       "defaultRate": "Default rate"
     },
     "capacity": {

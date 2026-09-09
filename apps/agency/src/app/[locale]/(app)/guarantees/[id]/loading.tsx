@@ -4,7 +4,7 @@ import { PageShell } from "@mutav/ui/page/page-shell";
 import { Skeleton } from "@mutav/ui/skeleton";
 
 export default async function Loading() {
-  const tLoading = await getTranslations("contractDetails.loading");
+  const tLoading = await getTranslations("guaranteeDetails.loading");
 
   return (
     <PageShell>

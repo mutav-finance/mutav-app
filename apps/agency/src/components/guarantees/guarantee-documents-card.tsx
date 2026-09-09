@@ -9,7 +9,7 @@ import type {
   GuaranteeDocumentKey,
   DocumentStatus,
 } from "@/lib/guarantees/types";
-import { StatusTag } from "./status-tag";
+import { StatusTag } from "./state-tag";
 
 const docKeys: GuaranteeDocumentKey[] = ["rentalContract", "inspection", "policy"];
 const keysWithTemplate = new Set<GuaranteeDocumentKey>(["rentalContract", "inspection"]);
@@ -21,9 +21,9 @@ const statusTone: Record<DocumentStatus, "accent" | "neutral" | "success"> = {
 };
 
 export function GuaranteeDocumentsCard({ documents }: { documents: GuaranteeDocument[] }) {
-  const t = useTranslations("contractDetails.documents");
-  const tLabels = useTranslations("contractDetails.documents.labels");
-  const tStatus = useTranslations("contractDetails.documents.status");
+  const t = useTranslations("guaranteeDetails.documents");
+  const tLabels = useTranslations("guaranteeDetails.documents.labels");
+  const tStatus = useTranslations("guaranteeDetails.documents.status");
   const byKey = new Map(documents.map((d) => [d.key, d]));
 
   return (

@@ -223,7 +223,7 @@ describe("resolveScorePanelState", () => {
   });
 });
 
-describe("contractNew.simulation messages", () => {
+describe("guaranteeNew.simulation messages", () => {
   const NO_APPLICATION_KEYS = [
     "noApplicationTitle",
     "noApplicationMessage",
@@ -234,7 +234,7 @@ describe("contractNew.simulation messages", () => {
   for (const [locale, messages] of Object.entries({ "pt-BR": ptBR, en })) {
     test(`${locale} explains the refused consultation and offers a way out`, () => {
       for (const key of NO_APPLICATION_KEYS) {
-        expect(messages.contractNew.simulation[key].length, `${locale}.${key}`).toBeGreaterThan(0);
+        expect(messages.guaranteeNew.simulation[key].length, `${locale}.${key}`).toBeGreaterThan(0);
       }
     });
   }

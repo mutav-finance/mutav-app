@@ -31,9 +31,9 @@ export function GuaranteeDetailsPage({
   preloaded: Preloaded<typeof api.guarantees.useCases.getByPublicId>;
 }) {
   const guarantee = usePreloadedQuery(preloaded);
-  const t = useTranslations("contractDetails");
+  const t = useTranslations("guaranteeDetails");
   const tNav = useTranslations("nav.main");
-  const tStatus = useTranslations("contractDetails.status");
+  const tState = useTranslations("guaranteeDetails.state");
 
   if (guarantee === null) {
     notFound();
@@ -61,7 +61,7 @@ export function GuaranteeDetailsPage({
             </Eyebrow>
           </Breadcrumb>
         }
-        title={t("heroTitle", { status: tStatus(guarantee.status) })}
+        title={t("heroTitle", { state: tState(guarantee.status) })}
       />
       <PageContent variant="narrow">
         <GuaranteeSummaryCard guarantee={guarantee} />

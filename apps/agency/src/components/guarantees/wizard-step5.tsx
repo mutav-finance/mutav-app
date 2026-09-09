@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function WizardStep5({ publicId, onReset }: Props) {
-  const t = useTranslations("contractNew");
+  const t = useTranslations("guaranteeNew");
 
   return (
     <div className="flex flex-col items-center py-4">

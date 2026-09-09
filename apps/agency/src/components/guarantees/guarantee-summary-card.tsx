@@ -27,20 +27,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
 import { cn } from "@mutav/ui/cn";
 import { formatBRLCents, formatDateBR } from "@/lib/guarantees/format";
 import { GUARANTEE_STATE } from "@convex/guarantees/domain";
-import type { Guarantee, GuaranteeState } from "@/lib/guarantees/types";
+import type { Guarantee } from "@/lib/guarantees/types";
 import { api } from "@convex/_generated/api";
-import { StatusTag } from "./status-tag";
-
-const statusTone: Record<GuaranteeState, "accent" | "success" | "error" | "neutral"> = {
-  ativo: "success",
-  pendente: "accent",
-  encerrado: "neutral",
-  cancelado: "error",
-};
+import { GuaranteeStateTag } from "./state-tag";
 
 export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
-  const t = useTranslations("contractDetails.summary");
-  const tStatus = useTranslations("contractDetails.status");
+  const t = useTranslations("guaranteeDetails.summary");
+  const tState = useTranslations("guaranteeDetails.state");
+  const tCloseReason = useTranslations("guaranteeDetails.closeReason");
   const isDrafted = guarantee.status === GUARANTEE_STATE.DRAFTED;
   const cancelDraft = useMutation(api.guarantees.useCases.cancelDraft);
   const [cancelOpen, setCancelOpen] = React.useState(false);
@@ -143,14 +137,17 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
             <div className="flex items-center gap-3 sm:col-span-2">
               <dt className="text-muted-foreground">{t("currentStatus")}</dt>
               <dd>
-                <StatusTag
-                  tone={statusTone[guarantee.status]}
-                  pulse={guarantee.status === GUARANTEE_STATE.ACTIVE}
-                >
-                  {tStatus(guarantee.status)}
-                </StatusTag>
+                <GuaranteeStateTag state={guarantee.status}>
+                  {tState(guarantee.status)}
+                </GuaranteeStateTag>
               </dd>
             </div>
+            {guarantee.closure && (
+              <div className="flex flex-wrap items-baseline gap-3 sm:col-span-2">
+                <dt className="text-muted-foreground">{t("closureReason")}</dt>
+                <dd className="text-foreground">{tCloseReason(guarantee.closure.reason)}</dd>
+              </div>
+            )}
             <div className="flex flex-wrap items-baseline gap-3">
               <dt className="text-muted-foreground">{t("availableGuarantee")}</dt>
               <dd>

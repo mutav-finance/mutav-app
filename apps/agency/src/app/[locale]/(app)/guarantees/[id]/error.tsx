@@ -15,7 +15,7 @@ export default function GuaranteeError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const t = useTranslations("contractDetails.errors");
+  const t = useTranslations("guaranteeDetails.errors");
 
   return (
     <PageShell>

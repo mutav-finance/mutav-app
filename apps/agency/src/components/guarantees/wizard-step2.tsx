@@ -44,7 +44,7 @@ const TIER_CARD_STYLE: Record<ScoreTier, string> = {
 };
 
 export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
-  const t = useTranslations("contractNew");
+  const t = useTranslations("guaranteeNew");
   const { selectedAgency } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
@@ -314,7 +314,7 @@ function CoveragePlanCard({
   emphasized?: boolean;
   includesPrestamista?: boolean;
 }) {
-  const t = useTranslations("contractNew.coverage");
+  const t = useTranslations("guaranteeNew.coverage");
   return (
     <div
       role="radio"
@@ -382,7 +382,7 @@ function CoveragePlanCard({
 }
 
 function PrestamistaInfo() {
-  const t = useTranslations("contractNew.coverage");
+  const t = useTranslations("guaranteeNew.coverage");
   return (
     <Tooltip>
       <TooltipTrigger asChild>

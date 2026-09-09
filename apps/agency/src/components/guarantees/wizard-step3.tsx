@@ -26,7 +26,7 @@ type ErrorCode =
 type Errors = Partial<Record<string, ErrorCode>>;
 
 export function WizardStep3({ data, onChange, onNext, onBack }: Props) {
-  const t = useTranslations("contractNew");
+  const t = useTranslations("guaranteeNew");
   const [errors, setErrors] = React.useState<Errors>({});
   const [nameFromLookup] = React.useState(!!data.fullName);
 

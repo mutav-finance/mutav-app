@@ -6,12 +6,12 @@ import { GuaranteeWizard } from "@/components/guarantees/guarantee-wizard";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "contractNew.meta" });
+  const t = await getTranslations({ locale, namespace: "guaranteeNew.meta" });
   return { title: t("title") };
 }
 
 export default async function NewGuaranteePage() {
-  const t = await getTranslations("contractNew");
+  const t = await getTranslations("guaranteeNew");
 
   return (
     <PageShell>

@@ -12,7 +12,7 @@ import { formatDateTimeBR } from "@/lib/guarantees/format";
 import type { GuaranteeHistoryEntry } from "@/lib/guarantees/types";
 
 export function GuaranteeHistoryCard({ history }: { history: GuaranteeHistoryEntry[] }) {
-  const t = useTranslations("contractDetails.history");
+  const t = useTranslations("guaranteeDetails.history");
   const [open, setOpen] = useState(true);
 
   return (
