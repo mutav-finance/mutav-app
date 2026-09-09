@@ -177,7 +177,7 @@ export async function seedDefaultProduct(t: TestConvex<typeof schema>): Promise<
       name: "Mutav Fiança",
       enabled: true,
       isDefault: true,
-      effectiveFrom: "2026-01-01T00:00:00.000Z",
+      effectiveFrom: "2022-01-01T00:00:00.000Z",
       terms: DEFAULT_PRICING_TABLE,
       eligibility: { agencyIds: null, regionUFs: null, minTier: null, propertyKinds: null },
     });

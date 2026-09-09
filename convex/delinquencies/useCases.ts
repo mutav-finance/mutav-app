@@ -21,6 +21,17 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 // branch without hard-coding the number in two places.
 export const STATS_TAKE_LIMIT = 1000;
 
+// Temporary: the agency app's status tag knows `open | resolved | canceled`
+// only. A staff-verified notice is still outstanding from the agency's side,
+// so agency reads surface it as `open` (and count it with the open ones)
+// until the agency UI grows a `verified` state. Deleted with the contracts
+// facade.
+export type AgencyNoticeStatus = Exclude<DelinquencyStatus, typeof DELINQUENCY_STATUS.VERIFIED>;
+
+function toAgencyNoticeStatus(status: DelinquencyStatus): AgencyNoticeStatus {
+  return status === DELINQUENCY_STATUS.VERIFIED ? DELINQUENCY_STATUS.OPEN : status;
+}
+
 // ---- projection shapes -----------------------------------------------------
 // Server-owned response types. Callers (UI, tests, internal wrappers) couple
 // to THESE, not to `Doc<'guaranteeDelinquencyNotices'>` — so future schema
@@ -34,7 +45,7 @@ export const STATS_TAKE_LIMIT = 1000;
 export type DelinquencyNoticeRow = {
   publicId: string;
   guaranteeId: GuaranteeId;
-  status: DelinquencyStatus;
+  status: AgencyNoticeStatus;
   rentDueDate: string;
   originalAmountCents: number;
   updatedAmountCents: number;
@@ -86,7 +97,7 @@ function shapeDelinquencyNoticeRow(notice: DelinquencyNotice): DelinquencyNotice
   return {
     publicId: notice.publicId,
     guaranteeId: notice.guaranteeId,
-    status: notice.status,
+    status: toAgencyNoticeStatus(notice.status),
     rentDueDate: notice.rentDueDate,
     originalAmountCents: notice.originalAmountCents,
     updatedAmountCents: notice.updatedAmountCents,
@@ -186,8 +197,21 @@ export const listByAgency = queryWithAgencyScope({
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", status))
       .order("desc")
       .paginate(args.paginationOpts);
+    // Verified notices ride along with the open page (see `AgencyNoticeStatus`);
+    // the agency list reads a single page, so a bounded take is enough.
+    const verifiedRows =
+      status === DELINQUENCY_STATUS.OPEN
+        ? await ctx.db
+            .query("guaranteeDelinquencyNotices")
+            .withIndex("by_agency_status", (q) =>
+              q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.VERIFIED),
+            )
+            .order("desc")
+            .take(args.paginationOpts.numItems)
+        : [];
 
-    const page = result.page
+    const page = [...verifiedRows, ...result.page]
+      .sort((a, b) => b._creationTime - a._creationTime)
       .filter(
         (notice) =>
           (dueDateFrom == null || notice.rentDueDate.slice(0, 10) >= dueDateFrom) &&
@@ -270,11 +294,18 @@ export const openStats = queryWithAgencyScope({
     // would get resolvedCountLast30d/canceledCountLast30d = 0 (the 1000
     // oldest rows are all outside the window). `.order('desc')` + take
     // gives us the most-recent 1000 — the window we actually want.
-    const [openRows, resolvedRows, canceledRows] = await Promise.all([
+    const [openRows, verifiedRows, resolvedRows, canceledRows] = await Promise.all([
       ctx.db
         .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.OPEN),
+        )
+        .order("desc")
+        .take(STATS_TAKE_LIMIT),
+      ctx.db
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_agency_status", (q) =>
+          q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.VERIFIED),
         )
         .order("desc")
         .take(STATS_TAKE_LIMIT),
@@ -317,10 +348,10 @@ export const openStats = queryWithAgencyScope({
     }).length;
 
     return {
-      openCount: openRows.length,
+      openCount: openRows.length + verifiedRows.length,
       resolvedCountLast30d,
       canceledCountLast30d,
-      approxOpen: openRows.length === STATS_TAKE_LIMIT,
+      approxOpen: openRows.length === STATS_TAKE_LIMIT || verifiedRows.length === STATS_TAKE_LIMIT,
       approxResolved: resolvedRows.length === STATS_TAKE_LIMIT,
       approxCanceled: canceledRows.length === STATS_TAKE_LIMIT,
     };

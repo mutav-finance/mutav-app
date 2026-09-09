@@ -16,11 +16,14 @@ import {
   GUARANTEE_ERROR_CODE,
   GUARANTEE_STATE,
   guaranteePlanValidator,
+  INSURED_STATES,
   urgencySortKey,
   type ContractApplicationId,
   type Guarantee,
   type GuaranteeHistory,
   type GuaranteeId,
+  type GuaranteeState,
+  type UrgencyTier,
 } from "../guarantees/domain";
 import {
   LEGACY_CONTRACT_STATUS,
@@ -51,6 +54,13 @@ export {
 
 function legacyStatusOf(doc: Pick<Guarantee, "status" | "closure">): LegacyContractStatus {
   return toLegacyStatus(doc.status, doc.closure?.reason);
+}
+
+// The legacy row stored 0 on closed contracts; the guarantee row keeps
+// `available + reserved = ceiling` after close, so the projection reintroduces
+// the zero. One helper for list and detail so the two surfaces cannot drift.
+function legacyAvailableCents(doc: Pick<Guarantee, "status" | "capacity">): number {
+  return doc.status === GUARANTEE_STATE.CLOSED ? 0 : doc.capacity.availableCents;
 }
 
 const LEGACY_SETUP_INSTALLMENTS = 1;
@@ -88,7 +98,7 @@ function shapeContract({
     agencyId: guarantee.agencyId,
     status: legacyStatusOf(guarantee),
     nextRenewalDate: guarantee.nextRenewalDate,
-    availableGuaranteeCents: guarantee.capacity.availableCents,
+    availableGuaranteeCents: legacyAvailableCents(guarantee),
     rental: {
       propertyKind: toLegacyPropertyKind(lease.propertyKind),
       plan: guarantee.terms.plan,
@@ -190,19 +200,59 @@ const contractTabValidator = v.union(
   v.literal(CONTRACT_TAB.CANCELADO),
 );
 
-// Legacy `ativo` spans five states and `encerrado` / `cancelado` split
-// `closed` on the close reason, so neither is a single index range: the
-// narrowest index range is fetched and the page is narrowed in memory.
-function guaranteeStateForTab(tab: ContractTab) {
-  switch (tab) {
-    case CONTRACT_TAB.PENDENTE:
-      return GUARANTEE_STATE.DRAFTED;
-    case CONTRACT_TAB.ENCERRADO:
-    case CONTRACT_TAB.CANCELADO:
-      return GUARANTEE_STATE.CLOSED;
-    default:
-      return null;
-  }
+// Legacy `ativo` spans the five insured states and `encerrado` / `cancelado`
+// split `closed` on the close reason, so a legacy status tab is not one index
+// range. Each underlying state is read through its exact `by_agency_status`
+// range and the union is narrowed in memory — paginating the agency prefix
+// and filtering afterwards would let drafted/closed rows consume the page
+// before any in-force row (index order is by status string, `active` last).
+const GUARANTEE_STATES_FOR_LEGACY_TAB: Record<LegacyContractStatus, readonly GuaranteeState[]> = {
+  ativo: INSURED_STATES,
+  pendente: [GUARANTEE_STATE.DRAFTED],
+  encerrado: [GUARANTEE_STATE.CLOSED],
+  cancelado: [GUARANTEE_STATE.CLOSED],
+};
+
+function isLegacyStatusTab(tab: ContractTab): tab is LegacyContractStatus {
+  return tab !== CONTRACT_TAB.ALL && tab !== CONTRACT_TAB.EXPIRING;
+}
+
+type LegacyPage<TRow> = { page: TRow[]; isDone: boolean; continueCursor: string };
+
+type LegacyContractRow = {
+  id: string;
+  agencyId: AgencyId;
+  status: LegacyContractStatus;
+  nextRenewalDate: string;
+  availableGuaranteeCents: number;
+  tenantName: string;
+  creationTime: number;
+  urgency: UrgencyTier;
+  urgencySortKey: number;
+};
+
+// The agency list fetches one page (`numItems: 200`, `cursor: null`) and never
+// continues, so the per-state reads collect and slice instead of paginating.
+// An agency above `numItems` rows in one legacy tab sees the newest `numItems`
+// and `isDone: false`; the tab badge (a full count) keeps reporting the truth.
+async function collectLegacyStatusPage(
+  ctx: QueryCtx,
+  { agencyId, tab, numItems }: { agencyId: AgencyId; tab: LegacyContractStatus; numItems: number },
+): Promise<LegacyPage<Guarantee>> {
+  const perState = await Promise.all(
+    GUARANTEE_STATES_FOR_LEGACY_TAB[tab].map((state) =>
+      ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId).eq("status", state))
+        .collect(),
+    ),
+  );
+  const matching = perState
+    .flat()
+    .filter((doc) => legacyStatusOf(doc) === tab)
+    .sort((a, b) => b._creationTime - a._creationTime);
+  const page = matching.slice(0, numItems);
+  return { page, isDone: page.length === matching.length, continueCursor: "" };
 }
 
 export const listByAgency = queryWithAgencyScope({
@@ -211,49 +261,44 @@ export const listByAgency = queryWithAgencyScope({
     tab: v.optional(contractTabValidator),
     referenceDate: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<LegacyPage<LegacyContractRow>> => {
     const referenceDate = resolveReferenceDate(args.referenceDate);
     const tab: ContractTab = args.tab ?? CONTRACT_TAB.ALL;
-    const state = guaranteeStateForTab(tab);
 
-    const result = await (tab === CONTRACT_TAB.EXPIRING
-      ? (() => {
-          const bounds = expiringRenewalBounds(referenceDate);
-          return ctx.db
-            .query("guarantees")
-            .withIndex("by_agency_status_nextRenewalDate", (q) =>
-              q
-                .eq("agencyId", ctx.agencyId)
-                .eq("status", GUARANTEE_STATE.ACTIVE)
-                .gte("nextRenewalDate", bounds.gte)
-                .lte("nextRenewalDate", bounds.lte),
-            )
-            .order("asc")
-            .paginate(args.paginationOpts);
-        })()
-      : state === null
-        ? ctx.db
+    const result: LegacyPage<Guarantee> = isLegacyStatusTab(tab)
+      ? await collectLegacyStatusPage(ctx, {
+          agencyId: ctx.agencyId,
+          tab,
+          numItems: args.paginationOpts.numItems,
+        })
+      : tab === CONTRACT_TAB.EXPIRING
+        ? await (() => {
+            const bounds = expiringRenewalBounds(referenceDate);
+            return ctx.db
+              .query("guarantees")
+              .withIndex("by_agency_status_nextRenewalDate", (q) =>
+                q
+                  .eq("agencyId", ctx.agencyId)
+                  .eq("status", GUARANTEE_STATE.ACTIVE)
+                  .gte("nextRenewalDate", bounds.gte)
+                  .lte("nextRenewalDate", bounds.lte),
+              )
+              .order("asc")
+              .paginate(args.paginationOpts);
+          })()
+        : await ctx.db
             .query("guarantees")
             .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
             .order("desc")
-            .paginate(args.paginationOpts)
-        : ctx.db
-            .query("guarantees")
-            .withIndex("by_agency_status", (q) =>
-              q.eq("agencyId", ctx.agencyId).eq("status", state),
-            )
-            .order("desc")
-            .paginate(args.paginationOpts));
+            .paginate(args.paginationOpts);
 
-    const page =
-      tab === CONTRACT_TAB.ALL || tab === CONTRACT_TAB.EXPIRING
-        ? result.page
-        : result.page.filter((doc) => legacyStatusOf(doc) === tab);
+    const { page } = result;
     const tenantNames = await tenantNamesByGuarantee(ctx, page);
 
     return {
-      ...result,
-      page: page.map((doc) => {
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+      page: page.map((doc): LegacyContractRow => {
         const urgency = getUrgencyTier({
           status: doc.status,
           nextRenewalDate: doc.nextRenewalDate,
@@ -264,8 +309,7 @@ export const listByAgency = queryWithAgencyScope({
           agencyId: doc.agencyId,
           status: legacyStatusOf(doc),
           nextRenewalDate: doc.nextRenewalDate,
-          availableGuaranteeCents:
-            doc.status === GUARANTEE_STATE.CLOSED ? 0 : doc.capacity.availableCents,
+          availableGuaranteeCents: legacyAvailableCents(doc),
           tenantName: tenantNames.get(doc._id) ?? "",
           creationTime: doc._creationTime,
           urgency,

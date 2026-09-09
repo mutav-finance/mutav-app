@@ -11,10 +11,18 @@ import { generateInvoiceAccessToken } from "./lib/randomId";
 import { SettlementMethods, type SettlementMethod } from "./payments/domain";
 import type { AgencyId } from "./agencies/domain";
 import {
+  DELINQUENCY_STATUS,
+  NOTICE_EVIDENCE_SOURCE,
+  NOTICE_RESOLUTION_KIND,
+} from "./delinquencies/domain";
+import {
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
+  DOCUMENT_STATUS,
   GUARANTEE_STATE,
+  isInsured,
   SCORE_TIER,
+  TENANT_APPROVAL_STATUS,
   tierForScore,
   type CloseReason,
   type Guarantee,
@@ -24,6 +32,7 @@ import {
   type GuaranteeTerms,
   type TenantApprovalStatus,
 } from "./guarantees/domain";
+import type { UserId } from "./users/domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee } from "./guarantees/pricing";
 import {
   ativoInsuredCentsPlatform,
@@ -132,7 +141,9 @@ async function seedDefaultProduct(ctx: MutationCtx): Promise<Product> {
     name: "Mutav Fiança",
     enabled: true,
     isDefault: true,
-    effectiveFrom: d("2026-01-01T00:00:00.000Z"),
+    // Predates the earliest seeded pricing (2024-04) so every `terms`
+    // snapshot cites a product that was in effect at its `appliedAt`.
+    effectiveFrom: d("2022-01-01T00:00:00.000Z"),
     terms: DEFAULT_PRICING_TABLE,
     eligibility: {
       agencyIds: null,
@@ -180,6 +191,8 @@ type SeedLeaseSpec = {
     activatedAt: string | null;
     nextRenewalDate: string;
     plan?: GuaranteePlan;
+    /** Capacity reserved against committed cover; `available = ceiling - reserved`. */
+    reservedCents?: number;
     documents: Guarantee["documents"];
   };
   tenant: SeedTenantBlock;
@@ -248,10 +261,15 @@ async function insertSeedLeaseAndGuarantee(
       tier,
       plan: guarantee.plan ?? DEFAULT_GUARANTEE_PLAN,
       productSlug: product.slug,
-      appliedAt: guarantee.activatedAt ?? tenant.termApprovedAt ?? SEED_DRAFT_PRICED_AT,
+      // The terms snapshot is taken at activation; only drafts have nothing to date it.
+      appliedAt: guarantee.activatedAt ?? SEED_DRAFT_PRICED_AT,
     },
     product.terms,
   );
+  const reservedCents = guarantee.reservedCents ?? 0;
+  if (reservedCents > priced.capacity.ceilingCents) {
+    throw new Error(`Seed guarantee ${spec.publicId} reserves more than its coverage ceiling`);
+  }
 
   const guaranteeId = await ctx.db.insert("guarantees", {
     agencyId: spec.agencyId,
@@ -268,7 +286,11 @@ async function insertSeedLeaseAndGuarantee(
       termApprovedAt: tenant.termApprovedAt,
     },
     terms: priced.terms,
-    capacity: priced.capacity,
+    capacity: {
+      ceilingCents: priced.capacity.ceilingCents,
+      availableCents: priced.capacity.ceilingCents - reservedCents,
+      reservedCents,
+    },
     documents: guarantee.documents,
   });
 
@@ -376,11 +398,14 @@ type SeedFictionalResult = {
  * gets its `subject` patched (see `getOrCreateByIdentity`) so the
  * developer inherits the seeded memberships without re-onboarding.
  *
+ * `staffUserId` signs the staff-only notice dispositions (verification,
+ * cover) in the dataset, the way `mutationWithMutavRole` would in production.
+ *
  * Dev-only. Do NOT call from production.
  */
 async function seedFictional(
   ctx: MutationCtx,
-  args: { adminEmail?: string },
+  args: { adminEmail?: string; staffUserId: UserId },
 ): Promise<SeedFictionalResult> {
   {
     const product = await requireDefaultProduct(ctx);
@@ -505,16 +530,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-06-03T10:00:00-03:00"),
         nextRenewalDate: "2027-03-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Maria Silva Santos",
         cpf: "11111111200",
         birthDate: "1990-05-12",
@@ -543,16 +568,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-07-08T10:00:00-03:00"),
         nextRenewalDate: "2027-04-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Carlos Eduardo Ferreira",
         cpf: "22222222303",
         birthDate: "1985-08-20",
@@ -581,16 +606,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-08-12T10:00:00-03:00"),
         nextRenewalDate: "2027-05-15",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Tech Solutions Ltda",
         entityType: "pj",
         cpf: "33333333000191",
@@ -620,16 +645,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-09-05T10:00:00-03:00"),
         nextRenewalDate: "2026-11-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Ana Paula Rodrigues",
         cpf: "44444444525",
         birthDate: "1993-02-28",
@@ -658,16 +683,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-02-22T10:00:00-03:00"),
         nextRenewalDate: "2027-01-20",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Global Finance S.A.",
         entityType: "pj",
         cpf: "55555555000191",
@@ -697,16 +722,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-01-10T10:00:00-03:00"),
         nextRenewalDate: "2027-02-10",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Bruno Henrique Lima",
         cpf: "66666666747",
         birthDate: "1988-11-15",
@@ -735,16 +760,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-12-28T10:00:00-03:00"),
         nextRenewalDate: "2026-09-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "enviado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.ENVIADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Fernanda Costa Oliveira",
         cpf: "77777777858",
         birthDate: "1995-06-03",
@@ -773,16 +798,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-05-05T10:00:00-03:00"),
         nextRenewalDate: "2026-08-20",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Ricardo Monteiro Braga",
         cpf: "88888888969",
         birthDate: "1980-09-25",
@@ -811,16 +836,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-04-18T10:00:00-03:00"),
         nextRenewalDate: "2027-06-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "pendente" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Juliana Nascimento Souza",
         cpf: "00000000191",
         birthDate: "1997-12-08",
@@ -849,16 +874,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-03-25T10:00:00-03:00"),
         nextRenewalDate: "2026-12-15",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Inovação Digital Ltda",
         entityType: "pj",
         cpf: "10101010000177",
@@ -888,16 +913,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-03-15T10:00:00-03:00"),
         nextRenewalDate: "2027-07-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Lucas Andrade Pereira",
         cpf: "11111111383",
         birthDate: "1992-04-17",
@@ -926,16 +951,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-05-15T10:00:00-03:00"),
         nextRenewalDate: "2026-10-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Patrícia Gomes Tavares",
         cpf: "12121212108",
         birthDate: "1991-07-30",
@@ -967,13 +992,13 @@ async function seedFictional(
         activatedAt: null,
         nextRenewalDate: "2027-08-01",
         documents: [
-          { key: "rentalContract", status: "enviado" },
-          { key: "inspection", status: "pendente" },
-          { key: "policy", status: "pendente" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
+          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
         ],
       },
       tenant: {
-        approvalStatus: "pendente",
+        approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
         fullName: "Roberto Carvalho Neto",
         cpf: "13131313188",
         birthDate: "1987-03-22",
@@ -1005,13 +1030,13 @@ async function seedFictional(
         activatedAt: null,
         nextRenewalDate: "2027-09-01",
         documents: [
-          { key: "rentalContract", status: "pendente" },
-          { key: "inspection", status: "pendente" },
-          { key: "policy", status: "pendente" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
         ],
       },
       tenant: {
-        approvalStatus: "pendente",
+        approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
         fullName: "Soluções Web S.A.",
         entityType: "pj",
         cpf: "14141414000145",
@@ -1042,16 +1067,16 @@ async function seedFictional(
       guarantee: {
         state: GUARANTEE_STATE.CLOSED,
         closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-03-10T18:00:00-03:00") },
-        activatedAt: null,
+        activatedAt: d("2024-08-01T10:00:00-03:00"),
         nextRenewalDate: "2025-02-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Silvia Menezes Rocha",
         cpf: "15151515144",
         birthDate: "1983-10-05",
@@ -1083,16 +1108,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-06-15T10:00:00-03:00"),
         nextRenewalDate: "2027-03-15",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Mariana Figueiredo Costa",
         cpf: "16161616122",
         birthDate: "1989-01-14",
@@ -1121,16 +1146,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-07-22T10:00:00-03:00"),
         nextRenewalDate: "2027-05-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Atlântico Negócios S.A.",
         entityType: "pj",
         cpf: "17171717000107",
@@ -1160,16 +1185,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-03-05T10:00:00-03:00"),
         nextRenewalDate: "2026-11-20",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Eduardo Pinto Bastos",
         cpf: "18181818199",
         birthDate: "1984-07-19",
@@ -1198,16 +1223,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-01-20T10:00:00-03:00"),
         nextRenewalDate: "2027-01-10",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Tatiana Alves Mendes",
         cpf: "19191919177",
         birthDate: "1996-09-02",
@@ -1236,16 +1261,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-12-15T10:00:00-03:00"),
         nextRenewalDate: "2026-08-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Construtora Barra S.A.",
         entityType: "pj",
         cpf: "20202020000152",
@@ -1275,16 +1300,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-04-02T10:00:00-03:00"),
         nextRenewalDate: "2027-04-20",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Gustavo Ribeiro Leal",
         cpf: "21212121244",
         birthDate: "1990-12-11",
@@ -1313,16 +1338,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-06-03T10:00:00-03:00"),
         nextRenewalDate: "2026-07-15",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Camila Souza Barros",
         cpf: "22222222494",
         birthDate: "1994-05-28",
@@ -1351,16 +1376,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2026-05-22T10:00:00-03:00"),
         nextRenewalDate: "2027-02-28",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Petro Energy Ltda",
         entityType: "pj",
         cpf: "23232323000106",
@@ -1393,13 +1418,13 @@ async function seedFictional(
         activatedAt: null,
         nextRenewalDate: "2027-09-01",
         documents: [
-          { key: "rentalContract", status: "enviado" },
-          { key: "inspection", status: "pendente" },
-          { key: "policy", status: "pendente" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
+          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
         ],
       },
       tenant: {
-        approvalStatus: "pendente",
+        approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
         fullName: "Diego Mendonça Freitas",
         cpf: "24242424299",
         birthDate: "1993-08-17",
@@ -1431,13 +1456,13 @@ async function seedFictional(
         activatedAt: null,
         nextRenewalDate: "2027-10-01",
         documents: [
-          { key: "rentalContract", status: "pendente" },
-          { key: "inspection", status: "pendente" },
-          { key: "policy", status: "pendente" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
         ],
       },
       tenant: {
-        approvalStatus: "pendente",
+        approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
         fullName: "Logística Carioca Ltda",
         entityType: "pj",
         cpf: "25252525000145",
@@ -1468,16 +1493,16 @@ async function seedFictional(
       guarantee: {
         state: GUARANTEE_STATE.CLOSED,
         closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-01-20T18:00:00-03:00") },
-        activatedAt: null,
+        activatedAt: d("2024-06-15T10:00:00-03:00"),
         nextRenewalDate: "2024-12-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Isabela Torres Viana",
         cpf: "26262626255",
         birthDate: "1986-02-14",
@@ -1513,13 +1538,13 @@ async function seedFictional(
         activatedAt: null,
         nextRenewalDate: "2026-06-01",
         documents: [
-          { key: "rentalContract", status: "pendente" },
-          { key: "inspection", status: "pendente" },
-          { key: "policy", status: "pendente" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
         ],
       },
       tenant: {
-        approvalStatus: "reprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.REPROVADO,
         fullName: "Marcos Vinícius Santos",
         cpf: "27272727233",
         birthDate: "1990-06-20",
@@ -1531,7 +1556,7 @@ async function seedFictional(
     });
 
     // ── Leases + guarantees — Horizonte Imóveis (3) ───────────────────────────
-    // 2 active, 1 drafted
+    // 1 active, 1 in eviction (cover committed, reserved on capacity), 1 drafted
 
     const h1 = await insertLeaseAndGuarantee({
       agencyId: horizonteId,
@@ -1551,16 +1576,16 @@ async function seedFictional(
       },
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        activatedAt: d("2025-08-01T10:00:00-03:00"),
         nextRenewalDate: "2027-04-01",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Renata Campos Drumond",
         cpf: "28282828211",
         birthDate: "1991-03-05",
@@ -1570,6 +1595,10 @@ async function seedFictional(
         score: 760,
       },
     });
+
+    // Cover Mutav paid on the commercial lease before it went to eviction:
+    // reserved on the guarantee's capacity and recorded on the resolved notice.
+    const HORIZONTE_COVER_APPLIED_CENTS = 525_000;
 
     const h2 = await insertLeaseAndGuarantee({
       agencyId: horizonteId,
@@ -1588,17 +1617,18 @@ async function seedFictional(
         rent: { rentCents: 500_000, condoCents: 85_000, otherFeesCents: 12_000 },
       },
       guarantee: {
-        state: GUARANTEE_STATE.ACTIVE,
-        activatedAt: null,
+        state: GUARANTEE_STATE.IN_EVICTION,
+        activatedAt: d("2026-02-05T10:00:00-03:00"),
+        reservedCents: HORIZONTE_COVER_APPLIED_CENTS,
         nextRenewalDate: "2026-10-15",
         documents: [
-          { key: "rentalContract", status: "aprovado" },
-          { key: "inspection", status: "aprovado" },
-          { key: "policy", status: "aprovado" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
         ],
       },
       tenant: {
-        approvalStatus: "aprovado",
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Mineira Distribuidora Ltda",
         entityType: "pj",
         cpf: "29292929000113",
@@ -1631,13 +1661,13 @@ async function seedFictional(
         activatedAt: null,
         nextRenewalDate: "2027-08-10",
         documents: [
-          { key: "rentalContract", status: "enviado" },
-          { key: "inspection", status: "pendente" },
-          { key: "policy", status: "pendente" },
+          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
+          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
         ],
       },
       tenant: {
-        approvalStatus: "pendente",
+        approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
         fullName: "Felipe Augusto Corrêa",
         cpf: "30303030399",
         birthDate: "1998-01-25",
@@ -1648,42 +1678,30 @@ async function seedFictional(
       },
     });
 
-    // Seeded activation dates spread across recent windows for transparency
-    // dashboard demo data. Closed guarantees keep theirs too — the activity
-    // series needs the start of the life as well as its end (`closure.closedAt`).
-    const activationMap: Record<string, string> = {
-      [pid(1)]: "2025-06-03",
-      [pid(2)]: "2025-07-08",
-      [pid(3)]: "2025-08-12",
-      [pid(4)]: "2025-09-05",
-      [pid(15)]: "2024-08-01",
-      [pid(16)]: "2025-06-15",
-      [pid(17)]: "2025-07-22",
-      [pid(26)]: "2024-06-15",
-      [pid(28)]: "2025-08-01",
-      [pid(20)]: "2025-12-15",
-      [pid(7)]: "2025-12-28",
-      [pid(6)]: "2026-01-10",
-      [pid(19)]: "2026-01-20",
-      [pid(29)]: "2026-02-05",
-      [pid(5)]: "2026-02-22",
-      [pid(18)]: "2026-03-05",
-      [pid(11)]: "2026-03-15",
-      [pid(10)]: "2026-03-25",
-      [pid(21)]: "2026-04-02",
-      [pid(9)]: "2026-04-18",
-      [pid(8)]: "2026-05-05",
-      [pid(12)]: "2026-05-15",
-      [pid(23)]: "2026-05-22",
-      [pid(22)]: "2026-06-03",
-    };
-    for (const [publicId, activatedAt] of Object.entries(activationMap)) {
-      const guarantee = await ctx.db
-        .query("guarantees")
-        .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
-        .unique();
-      if (guarantee) await ctx.db.patch(guarantee._id, { activatedAt });
-    }
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${h2.publicId}-2026-04-15`,
+      guaranteeId: h2.guaranteeId,
+      agencyId: horizonteId,
+      status: DELINQUENCY_STATUS.RESOLVED,
+      rentDueDate: "2026-04-15",
+      originalAmountCents: 500_000,
+      updatedAmountCents: HORIZONTE_COVER_APPLIED_CENTS,
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
+      openedAt: d("2026-04-20T09:00:00-03:00"),
+      openedByUserId: horizonteOwnerId,
+      verification: {
+        verifiedAt: d("2026-04-30T14:00:00-03:00"),
+        verifiedByUserId: args.staffUserId,
+      },
+      resolution: {
+        kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+        resolvedAt: d("2026-05-05T15:00:00-03:00"),
+        resolvedByUserId: args.staffUserId,
+        coverOperationPublicId: "COV-2026-05-0001",
+        appliedCoverCents: HORIZONTE_COVER_APPLIED_CENTS,
+        note: "Cobertura paga; ação de despejo ajuizada em 2026-05-20.",
+      },
+    });
 
     // ── Sync aggregates ───────────────────────────────────────────────────────
     // Wipe above deleted all rows, but the aggregate B-trees are separate and
@@ -1751,6 +1769,14 @@ async function seedFictional(
       message: "Contrato 1000016 aprovado e ativado.",
     });
 
+    await ctx.db.insert("guaranteeHistory", {
+      agencyId: atlanticaId,
+      guaranteePublicId: pid(27),
+      at: d("2026-04-28T10:00:00-03:00"),
+      username: "admin.atlantica",
+      message:
+        "Criada Solicitação #1000027 — residencial Tijuca, inquilino Marcos Vinícius Santos.",
+    });
     await ctx.db.insert("guaranteeHistory", {
       agencyId: atlanticaId,
       guaranteePublicId: pid(27),
@@ -2339,16 +2365,21 @@ type SeedPersonasResult = Array<{
 
 /**
  * Populate the `agencyowner` persona's agency ("Imobiliária Aprovada")
- * with a believable dashboard: 4 active + 1 drafted + 1 closed
- * guarantees (each on its own lease), two months of paid history, one
- * month due. Distinct `publicId` range (1000031–1000036) so it doesn't
- * collide with the fictional Paulista/Atlântica/Horizonte ids.
+ * with a believable dashboard: one guarantee in each of `active`,
+ * `in_arrears`, `default_verified` and `cover_committed` (each with the
+ * notice that put it there), plus 1 drafted + 1 closed, every one on its
+ * own lease; two months of paid history, one month due. Distinct
+ * `publicId` range (1000031–1000036) so it doesn't collide with the
+ * fictional Paulista/Atlântica/Horizonte ids.
  *
  * Idempotent — if a guarantee in the seeded range already exists, the
  * function is a no-op. Called only by `seedReset` (post-wipe) as the step
  * that gives the `agencyowner` persona a populated dashboard.
  */
-async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
+async function populateAprovadaBook(
+  ctx: MutationCtx,
+  { agencyId, staffUserId }: { agencyId: AgencyId; staffUserId: UserId },
+) {
   const FIRST_PID = 31;
 
   // Idempotency must be GLOBAL, not per-agency. publicId carries no
@@ -2363,15 +2394,20 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     .withIndex("by_publicId", (q) => q.eq("publicId", pid(FIRST_PID)))
     .first();
   if (existingAtFirstPid) {
-    return { guaranteesInserted: 0, activeCount: 0, skipped: true as const };
+    return { guaranteesInserted: 0, insuredCount: 0, skipped: true as const };
   }
 
   const product = await requireDefaultProduct(ctx);
 
+  // Cover Mutav committed on the `cover_committed` row: reserved on the
+  // guarantee's capacity and recorded on its resolved notice.
+  const APROVADA_COVER_APPLIED_CENTS = 682_500;
+
   type AprovadaSpec = {
     n: number;
-    state: typeof GUARANTEE_STATE.ACTIVE | typeof GUARANTEE_STATE.DRAFTED;
+    state: Exclude<GuaranteeState, typeof GUARANTEE_STATE.CLOSED>;
     activatedAt: string | null;
+    reservedCents?: number;
     nextRenewalDate: string;
     rentCents: number;
     condoCents: number;
@@ -2418,7 +2454,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 1,
-      state: GUARANTEE_STATE.ACTIVE,
+      state: GUARANTEE_STATE.IN_ARREARS,
       activatedAt: d("2025-11-01T10:00:00-03:00"),
       nextRenewalDate: "2027-11-01",
       rentCents: 420_000,
@@ -2441,7 +2477,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 2,
-      state: GUARANTEE_STATE.ACTIVE,
+      state: GUARANTEE_STATE.DEFAULT_VERIFIED,
       activatedAt: d("2026-01-20T10:00:00-03:00"),
       nextRenewalDate: "2028-01-20",
       rentCents: 195_000,
@@ -2464,7 +2500,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 3,
-      state: GUARANTEE_STATE.ACTIVE,
+      state: GUARANTEE_STATE.COVER_COMMITTED,
+      reservedCents: APROVADA_COVER_APPLIED_CENTS,
       activatedAt: d("2026-03-10T10:00:00-03:00"),
       nextRenewalDate: "2028-03-10",
       rentCents: 650_000,
@@ -2568,20 +2605,23 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
             : {}),
           activatedAt: spec.activatedAt,
           nextRenewalDate: spec.nextRenewalDate,
+          ...(spec.reservedCents === undefined ? {} : { reservedCents: spec.reservedCents }),
           documents: isApproved
             ? [
-                { key: "rentalContract", status: "aprovado" },
-                { key: "inspection", status: "aprovado" },
-                { key: "policy", status: "aprovado" },
+                { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+                { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+                { key: "policy", status: DOCUMENT_STATUS.APROVADO },
               ]
             : [
-                { key: "rentalContract", status: "enviado" },
-                { key: "inspection", status: "pendente" },
-                { key: "policy", status: "pendente" },
+                { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
+                { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+                { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
               ],
         },
         tenant: {
-          approvalStatus: isApproved ? "aprovado" : "pendente",
+          approvalStatus: isApproved
+            ? TENANT_APPROVAL_STATUS.APROVADO
+            : TENANT_APPROVAL_STATUS.PENDENTE,
           fullName: spec.tenant.fullName,
           cpf: spec.tenant.cpf,
           birthDate: spec.tenant.birthDate,
@@ -2595,10 +2635,11 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     inserted.push({ spec, ...row });
   }
 
-  const activeRows = inserted.filter((r) => r.spec.state === GUARANTEE_STATE.ACTIVE);
+  // Every in-force guarantee bills its fee, arrears or not.
+  const insuredRows = inserted.filter((r) => isInsured({ status: r.spec.state }));
 
   const monthlyLineItems = (month: string) =>
-    activeRows.map((r) => ({
+    insuredRows.map((r) => ({
       guaranteeId: r.guaranteeId,
       guaranteePublicId: r.publicId,
       kind: INVOICE_LINE_ITEM_KIND.RECURRING,
@@ -2650,7 +2691,7 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     lineItems: may,
   });
 
-  for (const r of activeRows) {
+  for (const r of insuredRows) {
     await ctx.db.insert("guaranteeHistory", {
       agencyId,
       guaranteePublicId: r.publicId,
@@ -2660,10 +2701,9 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     });
   }
 
-  // A believable notice book on the Aprovada agency's active guarantees —
-  // covers every status so the delinquencies page renders realistic
-  // rows out of the box, replacing the mock data in
-  // apps/agency/src/components/delinquencies/delinquency-page.tsx.
+  // The notice book behind the Aprovada agency's in-force states — each
+  // guarantee carries the notice that put it where it is, so the
+  // delinquencies page renders every notice status out of the box.
   const ownerMembership = await ctx.db
     .query("memberships")
     .withIndex("by_agency", (q) => q.eq("agencyId", agencyId))
@@ -2671,58 +2711,87 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     .first();
   const openedByUserId = ownerMembership?.userId;
   let noticesInserted = 0;
-  if (openedByUserId && activeRows.length >= 3) {
-    const [n1, n2, n3] = activeRows;
+  if (openedByUserId && insuredRows.length >= 4) {
+    const [cured, inArrears, defaultVerified, covered] = insuredRows;
     // publicIds mirror the openNotice mutation shape: DN-<guarantee>-<yyyy-mm-dd>
     // (day granularity, matching the by_guarantee_dueDate collision domain).
     await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${n1.publicId}-2026-06-05`,
-      guaranteeId: n1.guaranteeId,
+      publicId: `DN-${cured.publicId}-2026-04-05`,
+      guaranteeId: cured.guaranteeId,
       agencyId,
-      status: "open",
-      rentDueDate: "2026-06-05",
-      originalAmountCents: n1.spec.rentCents,
-      updatedAmountCents: Math.round(n1.spec.rentCents * 1.02),
-      evidenceSource: "agency_reported",
-      openedAt: d("2026-06-10T09:19:00-03:00"),
-      openedByUserId,
-    });
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${n2.publicId}-2026-05-05`,
-      guaranteeId: n2.guaranteeId,
-      agencyId,
-      status: "open",
-      rentDueDate: "2026-05-05",
-      originalAmountCents: n2.spec.rentCents,
-      updatedAmountCents: Math.round(n2.spec.rentCents * 1.035),
-      evidenceSource: "agency_reported",
-      openedAt: d("2026-05-14T18:14:00-03:00"),
-      openedByUserId,
-    });
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${n3.publicId}-2026-04-05`,
-      guaranteeId: n3.guaranteeId,
-      agencyId,
-      status: "resolved",
+      status: DELINQUENCY_STATUS.RESOLVED,
       rentDueDate: "2026-04-05",
-      originalAmountCents: n3.spec.rentCents,
-      updatedAmountCents: Math.round(n3.spec.rentCents * 1.05),
-      evidenceSource: "agency_reported",
+      originalAmountCents: cured.spec.rentCents,
+      updatedAmountCents: Math.round(cured.spec.rentCents * 1.05),
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
       openedAt: d("2026-04-08T10:00:00-03:00"),
       openedByUserId,
       resolution: {
-        kind: "tenant_cured",
+        kind: NOTICE_RESOLUTION_KIND.TENANT_CURED,
         resolvedAt: d("2026-04-15T14:30:00-03:00"),
         resolvedByUserId: openedByUserId,
         note: "Inquilino quitou aluguel + encargos diretamente com o proprietário.",
       },
     });
-    noticesInserted = 3;
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${inArrears.publicId}-2026-06-05`,
+      guaranteeId: inArrears.guaranteeId,
+      agencyId,
+      status: DELINQUENCY_STATUS.OPEN,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: inArrears.spec.rentCents,
+      updatedAmountCents: Math.round(inArrears.spec.rentCents * 1.02),
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
+      openedAt: d("2026-06-10T09:19:00-03:00"),
+      openedByUserId,
+    });
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${defaultVerified.publicId}-2026-05-05`,
+      guaranteeId: defaultVerified.guaranteeId,
+      agencyId,
+      status: DELINQUENCY_STATUS.VERIFIED,
+      rentDueDate: "2026-05-05",
+      originalAmountCents: defaultVerified.spec.rentCents,
+      updatedAmountCents: Math.round(defaultVerified.spec.rentCents * 1.035),
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
+      openedAt: d("2026-05-14T18:14:00-03:00"),
+      openedByUserId,
+      verification: {
+        verifiedAt: d("2026-05-28T11:05:00-03:00"),
+        verifiedByUserId: staffUserId,
+        note: "Inadimplência confirmada junto ao proprietário; sem acordo de quitação.",
+      },
+    });
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${covered.publicId}-2026-03-10`,
+      guaranteeId: covered.guaranteeId,
+      agencyId,
+      status: DELINQUENCY_STATUS.RESOLVED,
+      rentDueDate: "2026-03-10",
+      originalAmountCents: covered.spec.rentCents,
+      updatedAmountCents: APROVADA_COVER_APPLIED_CENTS,
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
+      openedAt: d("2026-03-16T09:40:00-03:00"),
+      openedByUserId,
+      verification: {
+        verifiedAt: d("2026-03-27T16:20:00-03:00"),
+        verifiedByUserId: staffUserId,
+      },
+      resolution: {
+        kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+        resolvedAt: d("2026-04-02T10:15:00-03:00"),
+        resolvedByUserId: staffUserId,
+        coverOperationPublicId: "COV-2026-04-0001",
+        appliedCoverCents: APROVADA_COVER_APPLIED_CENTS,
+        note: "Cobertura paga ao proprietário; regresso contra o inquilino em andamento.",
+      },
+    });
+    noticesInserted = 4;
   }
 
   return {
     guaranteesInserted: inserted.length,
-    activeCount: activeRows.length,
+    insuredCount: insuredRows.length,
     noticesInserted,
   };
 }
@@ -2779,10 +2848,12 @@ async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
       continue;
     }
 
+    // Pricing dates the record for every state (drafts included), so the
+    // synthesized creation event never lands after an activation or closure.
     await ctx.db.insert("guaranteeHistory", {
       agencyId: guarantee.agencyId,
       guaranteePublicId: guarantee.publicId,
-      at: guarantee.activatedAt ?? d("2025-09-15T09:00:00-03:00"),
+      at: guarantee.terms.appliedAt,
       username: "seed",
       message: `Criada Solicitação #${guarantee.publicId}.`,
       tenantSnapshot: snapshot,
@@ -2793,8 +2864,9 @@ async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
 /**
  * One-shot full reset — the universal "give me a clean, fully-populated
  * dev DB" command. Wipes the demo tables, seeds the default product,
- * re-seeds the fictional dataset, attaches the four Auth0 test personas,
- * and tops the `agencyowner` persona's agency ("Imobiliária Aprovada")
+ * attaches the four Auth0 test personas (the `systemadmin` one signs the
+ * staff-side notice dispositions in the dataset), re-seeds the fictional
+ * dataset, and tops the `agencyowner` persona's agency ("Imobiliária Aprovada")
  * with a small believable guarantee book so logging in as that persona
  * lands on a populated dashboard. This is what the Vercel preview hook
  * (`scripts/seed-preview.sh`) and a developer's local reset both call.
@@ -2812,11 +2884,15 @@ export const seedReset = internalMutation({
   handler: async (ctx, args) => {
     await wipeDemoTables(ctx);
     const product = await seedDefaultProduct(ctx);
-    const fictional = await seedFictional(ctx, args);
     const personas = await seedAllPersonas(ctx);
+    const staffUserId = personas.find((p) => p.persona === "systemadmin")?.userId;
+    if (!staffUserId) throw new Error("seedReset requires the systemadmin persona");
+    const fictional = await seedFictional(ctx, { ...args, staffUserId });
 
     const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
-    const aprovada = aprovadaAgencyId ? await populateAprovadaBook(ctx, aprovadaAgencyId) : null;
+    const aprovada = aprovadaAgencyId
+      ? await populateAprovadaBook(ctx, { agencyId: aprovadaAgencyId, staffUserId })
+      : null;
 
     await attachTenantSnapshots(ctx);
 

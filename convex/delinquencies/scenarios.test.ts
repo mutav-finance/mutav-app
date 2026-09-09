@@ -2550,7 +2550,7 @@ describe("composition — assertTransition gates the write, so terminal / self-t
 // ---------------------------------------------------------------------------
 
 describe("seed integration — the seeded delinquency book matches the scenario doc's realistic shape", () => {
-  test("seedReset populates the agencyowner's agency with the expected notice mix (2 open + 1 resolved-tenant_cured), and resolvedByUserId points to a live user row", async () => {
+  test("seedReset populates the agencyowner's agency with one notice per status (open, verified, resolved-tenant_cured, resolved-cover_committed), each on the guarantee state it implies, with every user reference live", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
 
@@ -2561,39 +2561,58 @@ describe("seed integration — the seeded delinquency book matches the scenario 
     expect(aprovada).not.toBeNull();
     if (!aprovada) return;
 
-    const openRows = await t.run((ctx) =>
-      ctx.db
-        .query("guaranteeDelinquencyNotices")
-        .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovada._id).eq("status", "open"))
-        .collect(),
-    );
-    const resolvedRows = await t.run((ctx) =>
-      ctx.db
-        .query("guaranteeDelinquencyNotices")
-        .withIndex("by_agency_status", (q) =>
-          q.eq("agencyId", aprovada._id).eq("status", "resolved"),
-        )
-        .collect(),
-    );
+    const byStatus = (status: "open" | "verified" | "resolved" | "canceled") =>
+      t.run((ctx) =>
+        ctx.db
+          .query("guaranteeDelinquencyNotices")
+          .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovada._id).eq("status", status))
+          .collect(),
+      );
+    const [openRows, verifiedRows, resolvedRows, canceledRows] = await Promise.all([
+      byStatus("open"),
+      byStatus("verified"),
+      byStatus("resolved"),
+      byStatus("canceled"),
+    ]);
 
-    expect(openRows.length).toBe(2);
-    expect(resolvedRows.length).toBe(1);
-    expect(resolvedRows[0].resolution?.kind).toBe("tenant_cured");
-    for (const r of [...openRows, ...resolvedRows]) {
+    expect(openRows.length).toBe(1);
+    expect(verifiedRows.length).toBe(1);
+    expect(resolvedRows.length).toBe(2);
+    expect(canceledRows.length).toBe(0);
+    expect(resolvedRows.map((r) => r.resolution?.kind).sort()).toEqual([
+      "cover_committed",
+      "tenant_cured",
+    ]);
+    const all = [...openRows, ...verifiedRows, ...resolvedRows];
+    for (const r of all) {
       expect(r.publicId.startsWith("DN-")).toBe(true);
     }
 
-    // No dangling FKs — resolvedByUserId and openedByUserId must resolve to
-    // real seeded users. A regression that dropped the resolvedByUserId to a
-    // stale id (or forgot to reseed the user) would fail this.
-    const resolved = resolvedRows[0];
-    const resolution = resolved.resolution;
-    if (!resolution) {
-      throw new Error("Expected resolved notice to have a resolution envelope, got null.");
+    // The notice book and the guarantee states tell one story: an open notice
+    // sits on `in_arrears`, a verified one on `default_verified`, cover
+    // committed on `cover_committed`, and a cured tenant leaves `active`.
+    const guaranteeStatusOf = async (guaranteeId: (typeof all)[number]["guaranteeId"]) =>
+      (await t.run((ctx) => ctx.db.get(guaranteeId)))?.status ?? null;
+    expect(await guaranteeStatusOf(openRows[0].guaranteeId)).toBe("in_arrears");
+    expect(await guaranteeStatusOf(verifiedRows[0].guaranteeId)).toBe("default_verified");
+    for (const r of resolvedRows) {
+      expect(await guaranteeStatusOf(r.guaranteeId)).toBe(
+        r.resolution?.kind === "cover_committed" ? "cover_committed" : "active",
+      );
     }
-    const resolver = await t.run((ctx) => ctx.db.get(resolution.resolvedByUserId));
-    expect(resolver).not.toBeNull();
-    const opener = await t.run((ctx) => ctx.db.get(resolved.openedByUserId));
-    expect(opener).not.toBeNull();
+
+    // No dangling FKs — every opener, verifier and resolver must be a live
+    // seeded user. A regression that left a stale id (or forgot to reseed the
+    // user) would fail this.
+    for (const r of all) {
+      const { verification, resolution } = r;
+      expect(await t.run((ctx) => ctx.db.get(r.openedByUserId))).not.toBeNull();
+      if (verification) {
+        expect(await t.run((ctx) => ctx.db.get(verification.verifiedByUserId))).not.toBeNull();
+      }
+      if (resolution) {
+        expect(await t.run((ctx) => ctx.db.get(resolution.resolvedByUserId))).not.toBeNull();
+      }
+    }
   });
 });

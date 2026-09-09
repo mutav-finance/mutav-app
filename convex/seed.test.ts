@@ -3,10 +3,16 @@ import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { internal } from "./_generated/api";
 import type { AgencyId } from "./agencies/domain";
-import { GUARANTEE_STATE } from "./guarantees/domain";
+import { NOTICE_RESOLUTION_KIND } from "./delinquencies/domain";
+import { CLOSE_REASON, GUARANTEE_STATE } from "./guarantees/domain";
 import { DEFAULT_PRICING_TABLE } from "./guarantees/pricing";
 import { registerContractAggregateComponents } from "./lib/testFixtures";
+import { isEffective } from "./products/domain";
 import schema from "./schema";
+
+// Full ISO timestamp (date + time); date-only strings misbucket against the
+// `toISOString()` bounds the activity series compares them with.
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
 // `seedReset` creates every tenant through `getOrCreateTenant`, which hashes
 // the tax id via the PII crypto helpers. Without these keys the first
@@ -102,10 +108,19 @@ describe("seedReset", () => {
       };
     });
 
-    // 22 ativo + 4 Aprovada → active; 5 pendente + 1 Aprovada → drafted;
-    // 2 encerrado + 1 Aprovada → closed(end_of_lease); 1 cancelado →
-    // closed(canceled_pre_activation).
-    expect(byState.counts).toEqual({ active: 26, drafted: 6, closed: 4 });
+    // 21 fictional + 1 Aprovada → active; Horizonte pid(29) → in_eviction;
+    // Aprovada rows 1–3 → in_arrears / default_verified / cover_committed;
+    // 5 pendente + 1 Aprovada → drafted; 2 encerrado + 1 Aprovada →
+    // closed(end_of_lease); 1 cancelado → closed(canceled_pre_activation).
+    expect(byState.counts).toEqual({
+      active: 22,
+      in_arrears: 1,
+      default_verified: 1,
+      cover_committed: 1,
+      in_eviction: 1,
+      drafted: 6,
+      closed: 4,
+    });
     expect(byState.closedReasons).toEqual([
       "canceled_pre_activation",
       "end_of_lease",
@@ -188,13 +203,116 @@ describe("seedReset", () => {
       exitCostMultiplier: 6,
       coverageCeilingCents: 9_600_000,
       exitCostCapCents: 1_920_000,
-      appliedAt: "2025-03-01T10:00:00-03:00",
+      // The snapshot is dated at activation, not at the tenant's term approval.
+      appliedAt: "2025-06-03T10:00:00-03:00",
     });
     expect(probe.sample.capacity).toEqual({
       ceilingCents: 9_600_000,
       availableCents: 9_600_000,
       reservedCents: 0,
     });
+  });
+
+  test("the default product is in effect at every seeded guarantee's appliedAt", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const probe = await t.run(async (ctx) => {
+      const product = await ctx.db
+        .query("products")
+        .withIndex("by_slug", (q) => q.eq("slug", "mutav-fianca"))
+        .unique();
+      if (!product) throw new Error("default product missing");
+      const rows = await ctx.db.query("guarantees").collect();
+      return {
+        effectiveFrom: product.effectiveFrom,
+        pricedBeforeEffect: rows
+          .filter((row) => !isEffective(product, row.terms.appliedAt))
+          .map((row) => `${row.publicId}@${row.terms.appliedAt}`),
+        earliestAppliedAt: rows.map((row) => row.terms.appliedAt).sort()[0],
+      };
+    });
+
+    expect(probe.effectiveFrom).toBe("2022-01-01T00:00:00.000Z");
+    expect(probe.pricedBeforeEffect).toEqual([]);
+    // Aprovada's closed guarantee is the oldest life in the dataset.
+    expect(probe.earliestAppliedAt).toBe("2024-04-15T10:00:00-03:00");
+  });
+
+  test("every guarantee that has been in force carries a full ISO activatedAt; drafts and pre-activation cancellations carry none", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const audit = await t.run(async (ctx) => {
+      const rows = await ctx.db.query("guarantees").collect();
+      const neverActivated = (row: (typeof rows)[number]) =>
+        row.status === GUARANTEE_STATE.DRAFTED ||
+        row.closure?.reason === CLOSE_REASON.CANCELED_PRE_ACTIVATION;
+      return {
+        total: rows.length,
+        activatedWithoutTimestamp: rows
+          .filter((row) => !neverActivated(row) && !ISO_TIMESTAMP.test(row.activatedAt ?? ""))
+          .map((row) => `${row.publicId}:${row.activatedAt}`),
+        neverActivatedWithTimestamp: rows
+          .filter((row) => neverActivated(row) && row.activatedAt !== null)
+          .map((row) => row.publicId),
+        neverActivatedCount: rows.filter(neverActivated).length,
+      };
+    });
+
+    expect(audit.total).toBe(36);
+    expect(audit.activatedWithoutTimestamp).toEqual([]);
+    expect(audit.neverActivatedWithTimestamp).toEqual([]);
+    // 6 drafts + the one canceled_pre_activation.
+    expect(audit.neverActivatedCount).toBe(7);
+  });
+
+  test("capacity holds available + reserved = ceiling on every row, and the reserved leg matches the cover applied on the guarantee's resolved notice", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const audit = await t.run(async (ctx) => {
+      const rows = await ctx.db.query("guarantees").collect();
+      const brokenInvariant = rows
+        .filter(
+          (row) =>
+            row.capacity.availableCents + row.capacity.reservedCents !==
+              row.capacity.ceilingCents ||
+            row.capacity.availableCents < 0 ||
+            row.capacity.reservedCents < 0,
+        )
+        .map((row) => row.publicId);
+      const reserved = rows.filter((row) => row.capacity.reservedCents > 0);
+      const reservedDetails = await Promise.all(
+        reserved.map(async (row) => {
+          const notices = await ctx.db
+            .query("guaranteeDelinquencyNotices")
+            .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", row._id))
+            .collect();
+          const cover = notices.find(
+            (notice) => notice.resolution?.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+          );
+          return {
+            status: row.status,
+            reservedCents: row.capacity.reservedCents,
+            appliedCoverCents: cover?.resolution?.appliedCoverCents ?? null,
+          };
+        }),
+      );
+      return { brokenInvariant, reservedDetails };
+    });
+
+    expect(audit.brokenInvariant).toEqual([]);
+    expect(audit.reservedDetails.map((row) => row.status).sort()).toEqual([
+      "cover_committed",
+      "in_eviction",
+    ]);
+    expect(audit.reservedDetails.map((row) => row.reservedCents).sort((a, b) => a - b)).toEqual([
+      525_000, 682_500,
+    ]);
+    for (const row of audit.reservedDetails) {
+      expect(row.appliedCoverCents).toBe(row.reservedCents);
+    }
   });
 
   test("no lease carries more than one non-closed guarantee, and openGuaranteeId points at it", async () => {

@@ -140,6 +140,18 @@ The Phase-1 `payments`→`invoices` rename shipped via **wipe + reseed** instead
 
 Defer until the schema has at least one production record or a feature actually performs money arithmetic on these values; until then, a simple rename + seed-data update suffices.
 
+## PT value objects on the guarantee row (document status, tenant approval, score tier)
+
+**Rule:** stored enum values are English (CLAUDE.md § Code style). Three grandfathered PT value objects survived the `contracts → guarantees` rename because they are not lifecycle statuses and the rename PR was already one hard reseed:
+
+- `guarantees.documents[].status` — `DOCUMENT_STATUS = { PENDENTE, ENVIADO, APROVADO }` (`convex/guarantees/domain.ts`, validator `documentStatus` in `convex/schema.ts`).
+- `guarantees.tenantApproval.status` — `TENANT_APPROVAL_STATUS = { APROVADO, PENDENTE, REPROVADO }` (same files).
+- `SCORE_TIER = { bom, regular, ruim, negado }` — and, new with the products catalog, the PT keys are **frozen into data as field names**: `products.terms.tierRate: { bom, regular, ruim }` (`productTermsValidator`, `DEFAULT_PRICING_TABLE`, every `guarantees.terms` snapshot derives its fee from one of them).
+
+`seed.ts` and `lib/testFixtures.ts` now write these only through the constants, so a rename is a constant + schema + message-key change, not a literal hunt.
+
+**Migration approach:** rename all three in one wipe + reseed PR (`pending | submitted | approved`; `approved | pending | rejected`; `good | fair | poor | denied` with `tierRate: { good, fair, poor }`), updating the agency wizard/detail label maps and both message files in the same PR. Do it after the contracts facade is deleted (PR4) so the rename does not have to be mirrored twice; before the first real product row is written from the admin catalog UI, because `tierRate` keys become an API surface for that form.
+
 ## PT free text written by the server (history messages, invoice line descriptions)
 
 **Rule:** identifiers and stored enum values are English; Portuguese lives only in `messages/pt-BR.json` values (CLAUDE.md § Code style).
