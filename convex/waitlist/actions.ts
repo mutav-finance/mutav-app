@@ -2,26 +2,71 @@
 
 import { v } from "convex/values";
 import { Resend } from "resend";
-import { internalAction } from "../_generated/server";
+import { type ActionCtx, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getResendApiKey, getResendFromEmail, getWaitlistAudienceId } from "../lib/env";
 import { logError, logInfo, logWarn } from "../lib/logger";
-import { WAITLIST_AUDIENCE, summarizeBackfillFailures, waitlistAudienceValidator } from "./domain";
+import {
+  WAITLIST_AUDIENCE,
+  type WaitlistDelivery,
+  type WaitlistId,
+  summarizeBackfillFailures,
+  waitlistAudienceValidator,
+} from "./domain";
+
+// Both delivery actions take the waitlist row id, never the address itself.
+// Convex persists a function's arguments — on the `_scheduled_functions`
+// record for a scheduled call, and in the deployment function log, which is
+// US-hosted and readable from the dashboard, a surface outside every access
+// control in the security policy. An address handed over as an argument
+// therefore outlives the send by the whole retention window. Resolved here
+// instead, it exists only in this action's runtime memory and in the outbound
+// Resend payload.
+//
+// Resolution runs before the vendor-config guards on purpose: whether the row
+// still exists is the question that decides if there is anything to deliver at
+// all, and putting it first keeps the not-found branch reachable without a
+// configured vendor.
+//
+// Row-not-found contract: a warning, then a no-op return — never a throw. The
+// row can be erased between scheduling and execution (an LGPD erasure request,
+// a manual cleanup), and failing a fire-and-forget side effect over a benign
+// race would put a red scheduled-function entry on the dashboard for something
+// nobody needs to act on. A silent return would hide the other cause — a bad
+// id, i.e. a real bug — so the miss is logged rather than swallowed.
+async function resolveDelivery(
+  ctx: ActionCtx,
+  { waitlistId, caller }: { waitlistId: WaitlistId; caller: string },
+): Promise<WaitlistDelivery | null> {
+  const delivery = await ctx.runQuery(internal.waitlist.useCases.getForDeliveryInternal, {
+    waitlistId,
+  });
+
+  if (delivery === null) {
+    logWarn("[waitlist] row no longer exists, skipping", { caller, waitlistId });
+  }
+
+  return delivery;
+}
 
 // Best-effort write to a Resend audience so the team can run broadcast
 // campaigns later. Convex is the source of truth; this is a projection.
 //
 // Failure modes (all logged, none re-thrown):
+//   - waitlist row deleted before execution → skip
 //   - RESEND_API_KEY missing → skip (common in local dev without secrets)
 //   - Audience env var missing for the audience → skip
 //   - Resend API rejects (rate-limit, invalid email, etc.) → log and continue.
 //     The Convex row stays; backfill is a manual query+replay if needed.
 export const addToResendAudience = internalAction({
   args: {
-    email: v.string(),
-    audience: waitlistAudienceValidator,
+    waitlistId: v.id("waitlist"),
   },
-  handler: async (_ctx, { email, audience }) => {
+  handler: async (ctx, { waitlistId }) => {
+    const delivery = await resolveDelivery(ctx, { waitlistId, caller: "addToResendAudience" });
+    if (delivery === null) return;
+    const { email, audience } = delivery;
+
     if (!process.env.RESEND_API_KEY) {
       logWarn("[waitlist] RESEND_API_KEY not set, skipping Resend sync");
       return;
@@ -65,15 +110,19 @@ const MUTAV_LOGO_URL = "https://app.mutav.finance/email/mutav-logo.png";
 // audiences are skipped (logged) until their template lands — see mutav#57.
 //
 // Failure modes (all logged, none re-thrown):
+//   - waitlist row deleted before execution → skip
 //   - RESEND_API_KEY missing → skip (local dev without secrets)
 //   - audience without a template → skip
 //   - Resend API rejects (unverified domain, invalid address, …) → log
 export const sendWelcomeEmail = internalAction({
   args: {
-    email: v.string(),
-    audience: waitlistAudienceValidator,
+    waitlistId: v.id("waitlist"),
   },
-  handler: async (_ctx, { email, audience }) => {
+  handler: async (ctx, { waitlistId }) => {
+    const delivery = await resolveDelivery(ctx, { waitlistId, caller: "sendWelcomeEmail" });
+    if (delivery === null) return;
+    const { email, audience } = delivery;
+
     if (!process.env.RESEND_API_KEY) {
       logWarn("[waitlist] RESEND_API_KEY not set, skipping welcome email");
       return;
