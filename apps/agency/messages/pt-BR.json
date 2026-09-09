@@ -223,13 +223,15 @@
     }
   },
   "chart": {
-    "title": "Carteira por situação",
-    "descriptionLong": "Composição da carteira por situação nos últimos meses",
-    "descriptionShort": "Composição por situação",
+    "title": "Carteira vigente",
+    "descriptionLong": "Composição da carteira vigente e as movimentações por trás dela",
+    "descriptionShort": "Carteira vigente",
     "last6Months": "Últimos 6 meses",
     "last12Months": "Últimos 12 meses",
     "selectRangeAriaLabel": "Selecione um período",
-    "legendLabel": "Garantias por situação, contagem atual"
+    "legendLabel": "Garantias vigentes por situação, contagem atual",
+    "eventsTitle": "Movimentações por mês",
+    "eventsEmpty": "Nenhuma movimentação registrada neste período."
   },
   "metrics": {
     "inForce": {
@@ -1276,13 +1278,22 @@
       "viewExplorer": "Verificar na rede Stellar"
     },
     "timeline": {
-      "title": "Carteira da plataforma por situação",
-      "descriptionLong": "Composição semanal da carteira da plataforma por situação da garantia.",
-      "descriptionShort": "Composição por situação",
+      "title": "Carteira vigente da plataforma",
+      "descriptionLong": "Composição semanal da carteira vigente da plataforma, por situação da garantia.",
+      "descriptionShort": "Carteira vigente",
       "m6": "Últimos 6 meses",
       "m12": "Últimos 12 meses",
       "selectRangeAriaLabel": "Selecione um período",
-      "legendLabel": "Garantias por situação, contagem atual"
+      "legendLabel": "Garantias vigentes por situação, contagem atual",
+      "eventsTitle": "Movimentações por semana",
+      "eventsEmpty": "Nenhuma movimentação registrada neste período."
     }
+  },
+  "guaranteeEvents": {
+    "created": "Criadas",
+    "activated": "Ativadas",
+    "default_verified": "Inadimplência verificada",
+    "cover_paid": "Cobertura paga",
+    "closed": "Encerradas"
   }
 }

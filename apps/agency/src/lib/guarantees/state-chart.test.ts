@@ -1,25 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { GUARANTEE_STATES, type GuaranteeState } from "@convex/guarantees/machine";
-import type { StateTimelineBucket } from "@convex/guarantees/domain";
+import { GUARANTEE_EVENTS, GUARANTEE_STATES } from "@convex/guarantees/domain";
+import type { GuaranteeEvent, StateTimelineBucket } from "@convex/guarantees/domain";
 import {
-  CHART_COLOR_FAMILY,
+  EVENT_BAR_FILL_OPACITY,
+  GUARANTEE_EVENT_CHART_COLOR,
+  GUARANTEE_SEVERITY_RAMP,
   GUARANTEE_STATE_CHART_COLOR,
-  GUARANTEE_STATE_FILL_OPACITY,
 } from "@/components/guarantees/state-chart-palette";
 import {
+  GUARANTEE_CONTEXT_STATES,
   GUARANTEE_STATE_STACK_ORDER,
+  buildContextFigures,
   buildStateLegend,
+  hasAnyEvent,
   sliceRecentPeriods,
-  toChartRows,
+  toCompositionRows,
+  toEventRows,
   type GuaranteeStateCounts,
 } from "./state-chart";
 
-// The unified dashboard card is a chart plus a legend over the same seven
-// states. Everything the card decides — which bands exist, in what order, how
-// much of the series the range toggle shows, which states are told apart by
-// something other than hue — lives in these pure functions so it can be
-// asserted without a renderer.
+// The card is two plots and a legend over the same buckets: a composition of
+// the in-force book on top, the lifecycle moves that produced it underneath.
+// Everything the card decides — which bands exist, in what order, which counts
+// are context rather than composition, how much of the series the range toggle
+// shows, which colour each series wears — lives in these pure modules so it
+// can be asserted without a renderer.
 
 function counts(overrides: Partial<GuaranteeStateCounts> = {}): GuaranteeStateCounts {
   return {
@@ -34,82 +40,94 @@ function counts(overrides: Partial<GuaranteeStateCounts> = {}): GuaranteeStateCo
   };
 }
 
-function bucket(period: string, overrides: Partial<GuaranteeStateCounts>): StateTimelineBucket {
-  return { period, countByState: counts(overrides) };
+function events(overrides: Partial<Record<GuaranteeEvent, number>> = {}) {
+  return {
+    created: 0,
+    activated: 0,
+    default_verified: 0,
+    cover_paid: 0,
+    closed: 0,
+    ...overrides,
+  };
+}
+
+function bucket(
+  period: string,
+  overrides: Partial<GuaranteeStateCounts>,
+  eventOverrides: Partial<Record<GuaranteeEvent, number>> = {},
+): StateTimelineBucket {
+  return {
+    period,
+    countByState: counts(overrides),
+    eventCount: events(eventOverrides),
+  };
 }
 
 describe("GUARANTEE_STATE_STACK_ORDER", () => {
-  it("stacks every state exactly once", () => {
-    expect([...GUARANTEE_STATE_STACK_ORDER].sort()).toEqual([...GUARANTEE_STATES].sort());
-  });
-
-  it("keeps the five in-force states as one contiguous block at the bottom", () => {
-    expect(GUARANTEE_STATE_STACK_ORDER.slice(0, 5)).toEqual([
+  it("stacks exactly the five in-force states, least severe at the base", () => {
+    expect(GUARANTEE_STATE_STACK_ORDER).toEqual([
       "active",
       "in_arrears",
       "default_verified",
       "cover_committed",
       "in_eviction",
     ]);
-    expect(GUARANTEE_STATE_STACK_ORDER.slice(5)).toEqual(["drafted", "closed"]);
+  });
+
+  // `closed` only ever accumulates, so stacking it pins the total flat and the
+  // card stops describing the book under management; a draft carries no
+  // coverage and consumes no capacity, so it is not under management either.
+  it("keeps drafted and closed out of the stack and beside it as context", () => {
+    expect(GUARANTEE_STATE_STACK_ORDER).not.toContain("drafted");
+    expect(GUARANTEE_STATE_STACK_ORDER).not.toContain("closed");
+    expect(GUARANTEE_CONTEXT_STATES).toEqual(["drafted", "closed"]);
+  });
+
+  it("accounts for every state exactly once across the stack and the context", () => {
+    expect([...GUARANTEE_STATE_STACK_ORDER, ...GUARANTEE_CONTEXT_STATES].sort()).toEqual(
+      [...GUARANTEE_STATES].sort(),
+    );
   });
 });
 
 describe("state chart palette", () => {
-  it("gives every state a band colour and a fill strength", () => {
-    for (const state of GUARANTEE_STATES) {
-      expect(GUARANTEE_STATE_CHART_COLOR[state]).toMatch(/^var\(--color-[a-z0-9-]+\)$/);
-      expect(GUARANTEE_STATE_FILL_OPACITY[state]).toBeGreaterThan(0);
-      expect(GUARANTEE_STATE_FILL_OPACITY[state]).toBeLessThanOrEqual(1);
+  it("paints the stack with the ordered severity ramp, in ramp order", () => {
+    expect(GUARANTEE_STATE_STACK_ORDER.map((state) => GUARANTEE_STATE_CHART_COLOR[state])).toEqual([
+      ...GUARANTEE_SEVERITY_RAMP,
+    ]);
+  });
+
+  // A repeated step would put two bands at the same lightness, which is what
+  // made `drafted` and `closed` indistinguishable in the seven-band draft.
+  it("gives every band its own ramp step", () => {
+    const bandColors = GUARANTEE_STATE_STACK_ORDER.map(
+      (state) => GUARANTEE_STATE_CHART_COLOR[state],
+    );
+    expect(new Set(bandColors).size).toBe(bandColors.length);
+  });
+
+  it("keeps the context states off the ramp entirely", () => {
+    for (const state of GUARANTEE_CONTEXT_STATES) {
+      expect(GUARANTEE_SEVERITY_RAMP).not.toContain(GUARANTEE_STATE_CHART_COLOR[state]);
     }
   });
 
-  // Grouping by the CSS-var string would call `var(--color-warning)` and
-  // `var(--color-warning-strong)` two colours; they measure ΔE 1.6 for a
-  // deuteranope, i.e. one colour. `CHART_COLOR_FAMILY` is the resolved read,
-  // so the guard sees the pair the way a reader does.
-  it("separates any two states in the same colour family by fill strength", () => {
-    const byFamily = new Map<string, GuaranteeState[]>();
-    for (const state of GUARANTEE_STATES) {
-      const family = CHART_COLOR_FAMILY[state];
-      byFamily.set(family, [...(byFamily.get(family) ?? []), state]);
+  it("gives every event a colour and matches each one to the band it feeds", () => {
+    for (const event of GUARANTEE_EVENTS) {
+      expect(GUARANTEE_EVENT_CHART_COLOR[event]).toMatch(/^var\(--color-[a-z0-9-]+\)$/);
     }
-
-    const indistinguishable: string[] = [];
-    for (const [family, states] of byFamily) {
-      const opacities = states.map((state) => GUARANTEE_STATE_FILL_OPACITY[state]);
-      if (new Set(opacities).size !== states.length) {
-        indistinguishable.push(`${family}: ${states.join(", ")}`);
-      }
-    }
-
-    expect(indistinguishable).toEqual([]);
+    expect(GUARANTEE_EVENT_CHART_COLOR.activated).toBe(GUARANTEE_STATE_CHART_COLOR.active);
+    expect(GUARANTEE_EVENT_CHART_COLOR.default_verified).toBe(
+      GUARANTEE_STATE_CHART_COLOR.default_verified,
+    );
+    expect(GUARANTEE_EVENT_CHART_COLOR.cover_paid).toBe(
+      GUARANTEE_STATE_CHART_COLOR.cover_committed,
+    );
   });
 
-  it("gives every state that shares a colour a distinct family entry", () => {
-    // A state whose colour is shared but whose family says otherwise would slip
-    // past the guard above, so the two maps have to agree.
-    for (const a of GUARANTEE_STATES) {
-      for (const b of GUARANTEE_STATES) {
-        if (a === b) continue;
-        if (GUARANTEE_STATE_CHART_COLOR[a] !== GUARANTEE_STATE_CHART_COLOR[b]) continue;
-        expect(CHART_COLOR_FAMILY[a]).toBe(CHART_COLOR_FAMILY[b]);
-      }
-    }
-  });
-
-  it("makes every touching pair of bands resolvable without hover", () => {
-    const unresolvable: string[] = [];
-    for (let i = 1; i < GUARANTEE_STATE_STACK_ORDER.length; i++) {
-      const below = GUARANTEE_STATE_STACK_ORDER[i - 1];
-      const above = GUARANTEE_STATE_STACK_ORDER[i];
-      const sameFamily = CHART_COLOR_FAMILY[below] === CHART_COLOR_FAMILY[above];
-      const sameStrength =
-        GUARANTEE_STATE_FILL_OPACITY[below] === GUARANTEE_STATE_FILL_OPACITY[above];
-      if (sameFamily && sameStrength) unresolvable.push(`${below} / ${above}`);
-    }
-
-    expect(unresolvable).toEqual([]);
+  it("keeps the event bars lighter than the area they sit under", () => {
+    expect(EVENT_BAR_FILL_OPACITY).toBeGreaterThan(0);
+    expect(EVENT_BAR_FILL_OPACITY).toBeLessThan(1);
   });
 });
 
@@ -119,20 +137,18 @@ describe("buildStateLegend", () => {
     expect(buildStateLegend(undefined)).toBeNull();
   });
 
-  it("lists all seven states in lifecycle order", () => {
+  it("lists the five bands in stack order", () => {
     const legend = buildStateLegend(counts({ active: 4, closed: 2 }));
     expect(legend?.map((entry) => entry.state)).toEqual([
-      "drafted",
       "active",
       "in_arrears",
       "default_verified",
       "cover_committed",
       "in_eviction",
-      "closed",
     ]);
   });
 
-  it("keeps a state at zero rather than dropping it", () => {
+  it("keeps a band at zero rather than dropping it", () => {
     const legend = buildStateLegend(counts({ active: 6 }));
     expect(legend?.find((entry) => entry.state === "in_eviction")).toEqual({
       state: "in_eviction",
@@ -140,10 +156,24 @@ describe("buildStateLegend", () => {
     });
   });
 
-  it("carries the count of each state", () => {
-    const legend = buildStateLegend(counts({ drafted: 1, active: 5, in_arrears: 2 }));
+  it("carries the count of each band", () => {
+    const legend = buildStateLegend(counts({ active: 5, in_arrears: 2 }));
     expect(legend?.find((entry) => entry.state === "in_arrears")?.count).toBe(2);
     expect(legend?.find((entry) => entry.state === "active")?.count).toBe(5);
+  });
+});
+
+describe("buildContextFigures", () => {
+  it("returns null while the counts are still loading", () => {
+    expect(buildContextFigures(null)).toBeNull();
+    expect(buildContextFigures(undefined)).toBeNull();
+  });
+
+  it("carries drafted and closed, in lifecycle order", () => {
+    expect(buildContextFigures(counts({ drafted: 3, closed: 9 }))).toEqual([
+      { state: "drafted", count: 3 },
+      { state: "closed", count: 9 },
+    ]);
   });
 });
 
@@ -180,33 +210,79 @@ describe("sliceRecentPeriods", () => {
   });
 });
 
-describe("toChartRows", () => {
-  it("writes every state as a top-level key, zeros included", () => {
-    const [row] = toChartRows([bucket("2026-04", { active: 3, in_arrears: 1 })]);
+describe("toCompositionRows", () => {
+  it("writes every stacked band as a top-level key, zeros included", () => {
+    const [row] = toCompositionRows([bucket("2026-04", { active: 3, in_arrears: 1 })]);
+    for (const state of GUARANTEE_STATE_STACK_ORDER) {
+      expect(row?.[state]).toBeTypeOf("number");
+    }
+    expect(row?.active).toBe(3);
+    expect(row?.in_arrears).toBe(1);
+    expect(row?.in_eviction).toBe(0);
+    expect(row?.period).toBe("2026-04");
+  });
+
+  // The whole point of dropping `closed`: the silhouette has to be able to
+  // fall, which it cannot when a monotonically growing band is in the stack.
+  it("lets the stacked total fall when guarantees leave the book", () => {
+    const rows = toCompositionRows([
+      bucket("2026-03", { active: 4, in_arrears: 1, closed: 1 }),
+      bucket("2026-04", { active: 2, closed: 4 }),
+    ]);
+    const inForceTotal = (row: (typeof rows)[number]) =>
+      GUARANTEE_STATE_STACK_ORDER.reduce((sum, state) => sum + row[state], 0);
+    expect(rows.map(inForceTotal)).toEqual([5, 2]);
+  });
+
+  it("preserves period order", () => {
+    const rows = toCompositionRows([
+      bucket("2026-03", { active: 1 }),
+      bucket("2026-04", { active: 2 }),
+    ]);
+    expect(rows.map((row) => row.period)).toEqual(["2026-03", "2026-04"]);
+  });
+});
+
+describe("toEventRows", () => {
+  it("writes every event as a top-level key, zeros included", () => {
+    const [row] = toEventRows([bucket("2026-04", {}, { created: 2, cover_paid: 1 })]);
     expect(row).toEqual({
       period: "2026-04",
-      drafted: 0,
-      active: 3,
-      in_arrears: 1,
+      created: 2,
+      activated: 0,
       default_verified: 0,
-      cover_committed: 0,
-      in_eviction: 0,
+      cover_paid: 1,
       closed: 0,
     });
   });
 
-  it("keeps each row summing to the size of the book in that period", () => {
-    const rows = toChartRows([
-      bucket("2026-03", { drafted: 1, active: 4, closed: 1 }),
-      bucket("2026-04", { active: 3, in_arrears: 1, cover_committed: 1, closed: 1 }),
-    ]);
-    const total = (row: (typeof rows)[number]) =>
-      GUARANTEE_STATES.reduce((sum, state) => sum + row[state], 0);
-    expect(rows.map(total)).toEqual([6, 6]);
+  // `default_verified` names both a band and an event. Two row shapes is what
+  // keeps one from overwriting the other in a single flat record.
+  it("keeps the event series separate from the composition series", () => {
+    const source = [bucket("2026-04", { default_verified: 7 }, { default_verified: 1 })];
+    expect(toCompositionRows(source)[0]?.default_verified).toBe(7);
+    expect(toEventRows(source)[0]?.default_verified).toBe(1);
   });
 
-  it("preserves period order", () => {
-    const rows = toChartRows([bucket("2026-03", { active: 1 }), bucket("2026-04", { active: 2 })]);
-    expect(rows.map((row) => row.period)).toEqual(["2026-03", "2026-04"]);
+  it("shares the period order with the composition rows", () => {
+    const source = [bucket("2026-03", { active: 1 }), bucket("2026-04", { active: 2 })];
+    expect(toEventRows(source).map((row) => row.period)).toEqual(
+      toCompositionRows(source).map((row) => row.period),
+    );
+  });
+});
+
+describe("hasAnyEvent", () => {
+  it("is false for a range in which nothing moved", () => {
+    expect(hasAnyEvent(toEventRows([bucket("2026-03", { active: 2 })]))).toBe(false);
+    expect(hasAnyEvent([])).toBe(false);
+  });
+
+  it("is true as soon as one event lands anywhere in the range", () => {
+    const rows = toEventRows([
+      bucket("2026-03", { active: 2 }),
+      bucket("2026-04", { active: 2 }, { closed: 1 }),
+    ]);
+    expect(hasAnyEvent(rows)).toBe(true);
   });
 });

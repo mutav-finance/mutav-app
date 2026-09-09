@@ -1,67 +1,59 @@
-import type { GuaranteeState } from "@convex/guarantees/domain";
-import { GUARANTEE_STATE_TONE } from "./state-tag";
-
-type Tone = (typeof GUARANTEE_STATE_TONE)[GuaranteeState];
+import type { GuaranteeEvent, GuaranteeState } from "@convex/guarantees/domain";
 
 /**
- * The band colour a tone gets in a chart. Derived from the same tone map the
- * status tag reads, so a state never shows one colour in a list and another in
- * a plot — and a re-stepped tone reaches both surfaces in one edit.
+ * The composition stack is an ORDINAL ramp, not a set of categorical hues:
+ * swapping two states would change the meaning, so the reader has to see the
+ * order in the colour. One hue, lightness stepping monotonically with
+ * severity, defined once in `globals.css` as `--chart-severity-1..5`.
+ *
+ * Deliberately NOT the tag tones. `--warning` and `--warning-strong` are tuned
+ * for a labelled tag, where text carries the meaning; along the severity order
+ * their lightness zigzags (0.569 → 0.473 → 0.705 → 0.523), which a stacked
+ * area would read backwards.
  */
-const TONE_CHART_COLOR: Record<Tone, string> = {
-  accent: "var(--color-text-3)",
-  success: "var(--color-success)",
-  error: "var(--color-error)",
-  neutral: "var(--color-text-3)",
-  muted: "var(--color-text-3)",
-  expiring: "var(--color-warning)",
-  caution: "var(--color-warning-strong)",
-};
+export const GUARANTEE_SEVERITY_RAMP = [
+  "var(--color-chart-severity-1)",
+  "var(--color-chart-severity-2)",
+  "var(--color-chart-severity-3)",
+  "var(--color-chart-severity-4)",
+  "var(--color-chart-severity-5)",
+] as const;
 
 export const GUARANTEE_STATE_CHART_COLOR: Record<GuaranteeState, string> = {
-  drafted: TONE_CHART_COLOR[GUARANTEE_STATE_TONE.drafted],
-  active: TONE_CHART_COLOR[GUARANTEE_STATE_TONE.active],
-  in_arrears: TONE_CHART_COLOR[GUARANTEE_STATE_TONE.in_arrears],
-  default_verified: TONE_CHART_COLOR[GUARANTEE_STATE_TONE.default_verified],
-  cover_committed: TONE_CHART_COLOR[GUARANTEE_STATE_TONE.cover_committed],
-  in_eviction: TONE_CHART_COLOR[GUARANTEE_STATE_TONE.in_eviction],
-  closed: TONE_CHART_COLOR[GUARANTEE_STATE_TONE.closed],
+  drafted: "var(--color-text-3)",
+  active: GUARANTEE_SEVERITY_RAMP[0],
+  in_arrears: GUARANTEE_SEVERITY_RAMP[1],
+  default_verified: GUARANTEE_SEVERITY_RAMP[2],
+  cover_committed: GUARANTEE_SEVERITY_RAMP[3],
+  in_eviction: GUARANTEE_SEVERITY_RAMP[4],
+  closed: "var(--color-text-2)",
 };
 
 /**
- * Which band colours are too close to separate by hue alone, grouped under one
- * name. `--color-warning` and `--color-warning-strong` are two steps of the
- * same amber and sit at three consecutive positions in the stack, so a reader
- * — and every colourblind reader — sees one amber mass unless something else
- * tells the bands apart. `--color-text-3` carries `drafted` and `closed`
- * verbatim. Everything else is its own family.
- *
- * A tag can afford the near-duplicate because its label sits next to the dot;
- * a stacked band carries no adjacent label, so hue alone is not an encoding.
+ * An event bar wears the colour of the band it feeds, so the two panels read
+ * as one picture: the bar is the inflow to the state above it. `created` and
+ * `closed` move a guarantee into a state the stack does not draw, so they take
+ * the neutral context tones — grey has no chroma, which is exactly why it
+ * cannot impersonate a severity step.
  */
-export const CHART_COLOR_FAMILY: Record<GuaranteeState, string> = {
-  drafted: "neutral",
-  active: "success",
-  in_arrears: "amber",
-  default_verified: "amber",
-  cover_committed: "amber",
-  in_eviction: "error",
-  closed: "neutral",
+export const GUARANTEE_EVENT_CHART_COLOR: Record<GuaranteeEvent, string> = {
+  created: "var(--color-text-3)",
+  activated: GUARANTEE_STATE_CHART_COLOR.active,
+  default_verified: GUARANTEE_STATE_CHART_COLOR.default_verified,
+  cover_paid: GUARANTEE_STATE_CHART_COLOR.cover_committed,
+  closed: "var(--color-text-2)",
 };
 
 /**
- * Fill strength is the secondary encoding inside a colour family: every state
- * that shares a family gets its own strength, so a band is resolvable from the
- * legend swatch — painted with the same colour AND the same strength — rather
- * than from hue. Inside the amber family the strength also runs with severity,
- * darkest for the state closest to a payout.
+ * The event panel is a supporting read, so its bars sit below the area in
+ * weight: same hues, one wash lighter. Full-strength bars against a
+ * full-strength area make two charts compete for the same glance.
  */
-export const GUARANTEE_STATE_FILL_OPACITY: Record<GuaranteeState, number> = {
-  drafted: 0.6,
-  active: 0.85,
-  in_arrears: 0.45,
-  default_verified: 0.65,
-  cover_committed: 0.85,
-  in_eviction: 0.85,
-  closed: 0.35,
-};
+export const EVENT_BAR_FILL_OPACITY = 0.6;
+
+/**
+ * Width of the surface-coloured separator drawn between touching bands. It is
+ * a gap, not a border: the stroke is painted in the card's own surface colour,
+ * so what the reader sees is the card showing through.
+ */
+export const STACK_SURFACE_GAP_PX = 2;

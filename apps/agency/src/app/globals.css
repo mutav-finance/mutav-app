@@ -75,6 +75,19 @@
   --color-chart-4: var(--error);
   --color-chart-5: var(--text-3);
 
+  /* Ordered severity ramp for the guarantee-composition stack. One hue,
+     monotone OKLab lightness along the severity order, every step inside the
+     0.43–0.77 band, adjacent ΔL ≈ 0.08. NOT the same job as `--warning` /
+     `--warning-strong`, whose lightness zigzags along that order (#320) and
+     would read backwards in a stacked area. Steps carry no meaning on their
+     own — only their position in the ramp does, so never reuse one as a
+     status colour. */
+  --color-chart-severity-1: var(--chart-severity-1);
+  --color-chart-severity-2: var(--chart-severity-2);
+  --color-chart-severity-3: var(--chart-severity-3);
+  --color-chart-severity-4: var(--chart-severity-4);
+  --color-chart-severity-5: var(--chart-severity-5);
+
   --font-display: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
@@ -155,6 +168,13 @@
   --warning: #d97706;
   --warning-strong: #ea580c;
   --warning-dim: #fff4e0;
+  /* Severity ramp, light. L 0.750 / 0.669 / 0.589 / 0.511 / 0.430, hue spread
+     34°, lightest step 2.30:1 on #ffffff. Darker = worse. */
+  --chart-severity-1: #ee9820;
+  --chart-severity-2: #d77a1a;
+  --chart-severity-3: #c05d14;
+  --chart-severity-4: #a9400e;
+  --chart-severity-5: #8f2308;
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1a1a1a;
   --color-primary-foreground: #1a1a1a;
@@ -182,6 +202,15 @@
   --warning: #f59e0b;
   --warning-strong: #fb923c;
   --warning-dim: #4a2c0a;
+  /* Severity ramp, dark. The anchor flips — a sequential ramp is never
+     auto-inverted, it is re-anchored — so severity brightens against the dark
+     card. L 0.451 / 0.530 / 0.610 / 0.689 / 0.771, hue spread 34°, darkest
+     step 2.34:1 on #16181c. */
+  --chart-severity-1: #774a0a;
+  --chart-severity-2: #9d5810;
+  --chart-severity-3: #c96215;
+  --chart-severity-4: #f8682b;
+  --chart-severity-5: #fc947c;
   /* Restore canvas-on-accent for dark mode */
   --color-accent-foreground: var(--canvas);
   --color-primary-foreground: var(--canvas);

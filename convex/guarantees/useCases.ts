@@ -11,6 +11,7 @@ import type {
   Guarantee,
   GuaranteeHistory,
   GuaranteeId,
+  GuaranteeEvent,
   GuaranteeState,
   StateTimelineBucket,
 } from "./domain";
@@ -27,6 +28,7 @@ import {
   DOCUMENT_KEY,
   DOCUMENT_STATUS,
   GUARANTEE_ERROR_CODE,
+  GUARANTEE_EVENT,
   GUARANTEE_STATE,
   GUARANTEE_STATES,
   guaranteePlanValidator,
@@ -517,11 +519,11 @@ const activityGranularityValidator = v.union(v.literal("month"), v.literal("week
  * platform scope does a full `.collect()` by design. Time-series aggregates
  * are deliberately deferred until the guarantees table crosses ~5–10k rows.
  *
- * NO CLIENT TODAY. `getStateTimelineByPeriod` replaced it in both cards (the
- * dashboard and `/transparency`). It stays for the second half of the chart
- * redesign — event bars beneath the composition panel, which need exactly
- * these activation/closure counts — and should be deleted with its tests if
- * that panel is dropped.
+ * NO CLIENT. `getStateTimelineByPeriod` replaced it in both cards (the
+ * dashboard and `/transparency`), and the event-bar panel beneath the
+ * composition reads that query's `eventCount` rather than these coarser
+ * series — one replay, one round trip. Delete this with its tests in the
+ * cleanup PR.
  */
 export const getActivityByPeriod = queryWithAuth({
   args: {
@@ -572,6 +574,37 @@ function emptyStateCounts(): Record<GuaranteeState, number> {
   };
 }
 
+function emptyEventCounts(): Record<GuaranteeEvent, number> {
+  return {
+    created: 0,
+    activated: 0,
+    default_verified: 0,
+    cover_paid: 0,
+    closed: 0,
+  };
+}
+
+/**
+ * The event a transition counts as, or `null` when it is a move the event
+ * panel does not track (a cure, an eviction filing). `activated` is only the
+ * first sale — a return to `active` after arrears or a payout is a cure, not
+ * new business, so the `from` state is part of the test.
+ */
+function eventForTransition(from: GuaranteeState, to: GuaranteeState): GuaranteeEvent | null {
+  if (to === GUARANTEE_STATE.ACTIVE) {
+    return from === GUARANTEE_STATE.DRAFTED ? GUARANTEE_EVENT.ACTIVATED : null;
+  }
+  if (to === GUARANTEE_STATE.DEFAULT_VERIFIED) return GUARANTEE_EVENT.DEFAULT_VERIFIED;
+  if (to === GUARANTEE_STATE.COVER_COMMITTED) return GUARANTEE_EVENT.COVER_PAID;
+  if (to === GUARANTEE_STATE.CLOSED) return GUARANTEE_EVENT.CLOSED;
+  return null;
+}
+
+/** Index of the boundary whose half-open window contains `atISO`, else -1. */
+function boundaryIndexFor(atISO: string, boundaries: readonly PeriodBoundary[]): number {
+  return boundaries.findIndex(({ startISO, endISO }) => atISO >= startISO && atISO < endISO);
+}
+
 type ReplayedTransition = { at: string; from: GuaranteeState; to: GuaranteeState };
 
 type TimelineGuarantee = Pick<Guarantee, "agencyId" | "publicId" | "status">;
@@ -581,8 +614,9 @@ type TimelineHistory = Pick<
 >;
 
 /**
- * Composition of the book at the end of each boundary, by replaying the
- * structured `guaranteeHistory.transition` rows.
+ * Composition of the book at the end of each boundary, plus the lifecycle
+ * events inside it, by replaying the structured `guaranteeHistory.transition`
+ * rows.
  *
  * Semantics, so the series is readable without the code:
  * - a guarantee is counted only from the instant it exists — the earliest `at`
@@ -595,7 +629,10 @@ type TimelineHistory = Pick<
  *   `from` state — that IS the state it was in;
  * - a guarantee with no history rows at all is counted in its current status in
  *   every bucket. Nothing dates it, and `_creationTime` cannot stand in: it is
- *   the seed run time for every demo row and would empty the whole series.
+ *   the seed run time for every demo row and would empty the whole series;
+ * - an event lands in the bucket whose half-open window contains its
+ *   timestamp, so anything older than the window contributes no bar. A
+ *   guarantee with no history rows produces no events at all.
  *
  * History rows whose guarantee is out of scope are ignored, and a row with no
  * `transition` (creation, reprice) is not a machine move — but it still counts
@@ -626,12 +663,25 @@ function replayStateTimeline(
   const buckets = boundaries.map(({ key }) => ({
     period: key,
     countByState: emptyStateCounts(),
+    eventCount: emptyEventCounts(),
   }));
 
   for (const guarantee of guarantees) {
     const key = guaranteeTimelineKey(guarantee.agencyId, guarantee.publicId);
     const transitions = transitionsByGuarantee.get(key) ?? [];
     const existsFromISO = existsFromByGuarantee.get(key);
+
+    if (existsFromISO !== undefined) {
+      const createdIn = buckets[boundaryIndexFor(existsFromISO, boundaries)];
+      if (createdIn) createdIn.eventCount.created++;
+    }
+    for (const transition of transitions) {
+      const event = eventForTransition(transition.from, transition.to);
+      if (!event) continue;
+      const happenedIn = buckets[boundaryIndexFor(transition.at, boundaries)];
+      if (happenedIn) happenedIn.eventCount[event]++;
+    }
+
     const first = transitions[0];
     let state: GuaranteeState = first ? first.from : guarantee.status;
     let next = 0;

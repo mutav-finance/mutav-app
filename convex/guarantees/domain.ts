@@ -93,7 +93,12 @@ export type ActivityGranularity = "month" | "week";
 
 /**
  * One bucket in the guarantee **state timeline**: the composition of the book
- * at the END of the period, one count per lifecycle state.
+ * at the END of the period (`countByState`), plus the lifecycle moves that
+ * happened DURING it (`eventCount`).
+ *
+ * Both come from one replay of the same history rows, so the card draws its
+ * composition panel and its event panel from a single round trip. They are
+ * different units — a stock and a flow — and belong in different plots.
  *
  * Distinct from `ActivityBucket`, which counts *events* (activations,
  * closures) in the period and cannot express `in_arrears` at all — arrears is
@@ -108,7 +113,35 @@ export type ActivityGranularity = "month" | "week";
 export type StateTimelineBucket = {
   period: string;
   countByState: Record<GuaranteeState, number>;
+  eventCount: Record<GuaranteeEvent, number>;
 };
+
+export type GuaranteeEvent = "created" | "activated" | "default_verified" | "cover_paid" | "closed";
+
+/**
+ * The lifecycle moves worth counting per period. Each one is a machine
+ * transition (or, for `created`, the first history row a guarantee ever gets)
+ * — a flow, where `countByState` is a stock. The two never share a plot.
+ *
+ * Not every transition earns a series: a cure (`in_arrears -> active`) and an
+ * eviction filing are real moves but the reader asked for new business,
+ * activations, defaults, payouts and endings.
+ */
+export const GUARANTEE_EVENT = {
+  CREATED: "created",
+  ACTIVATED: "activated",
+  DEFAULT_VERIFIED: "default_verified",
+  COVER_PAID: "cover_paid",
+  CLOSED: "closed",
+} as const satisfies Record<Uppercase<GuaranteeEvent>, GuaranteeEvent>;
+
+export const GUARANTEE_EVENTS: readonly GuaranteeEvent[] = [
+  GUARANTEE_EVENT.CREATED,
+  GUARANTEE_EVENT.ACTIVATED,
+  GUARANTEE_EVENT.DEFAULT_VERIFIED,
+  GUARANTEE_EVENT.COVER_PAID,
+  GUARANTEE_EVENT.CLOSED,
+] as const;
 
 // Transitional re-export: the entity-type family moved to the tenants
 // registry domain (`convex/tenants/domain.ts`). Kept here so existing

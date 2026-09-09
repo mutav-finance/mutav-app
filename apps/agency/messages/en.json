@@ -223,13 +223,15 @@
     }
   },
   "chart": {
-    "title": "Book by state",
-    "descriptionLong": "Book composition by state over the last months",
-    "descriptionShort": "Composition by state",
+    "title": "Book in force",
+    "descriptionLong": "Composition of the book in force and the moves behind it",
+    "descriptionShort": "Book in force",
     "last6Months": "Last 6 months",
     "last12Months": "Last 12 months",
     "selectRangeAriaLabel": "Select a range",
-    "legendLabel": "Guarantees by state, current count"
+    "legendLabel": "Guarantees in force by state, current count",
+    "eventsTitle": "Moves per month",
+    "eventsEmpty": "No lifecycle moves recorded in this range."
   },
   "metrics": {
     "inForce": {
@@ -1276,13 +1278,22 @@
       "viewExplorer": "Verify on the Stellar network"
     },
     "timeline": {
-      "title": "Platform book by state",
-      "descriptionLong": "Weekly composition of the platform book by guarantee state.",
-      "descriptionShort": "Composition by state",
+      "title": "Platform book in force",
+      "descriptionLong": "Weekly composition of the platform book in force, by guarantee state.",
+      "descriptionShort": "Book in force",
       "m6": "Last 6 months",
       "m12": "Last 12 months",
       "selectRangeAriaLabel": "Select a range",
-      "legendLabel": "Guarantees by state, current count"
+      "legendLabel": "Guarantees in force by state, current count",
+      "eventsTitle": "Moves per week",
+      "eventsEmpty": "No lifecycle moves recorded in this range."
     }
+  },
+  "guaranteeEvents": {
+    "created": "Created",
+    "activated": "Activated",
+    "default_verified": "Default verified",
+    "cover_paid": "Cover paid",
+    "closed": "Closed"
   }
 }

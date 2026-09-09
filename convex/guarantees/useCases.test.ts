@@ -12,7 +12,7 @@ import {
   type SeededUserId,
   seedFreshCreditAssessment,
 } from "../lib/testFixtures";
-import { GUARANTEE_STATE, type GuaranteeState } from "./domain";
+import { GUARANTEE_STATE, type GuaranteeState, type StateTimelineBucket } from "./domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee, splitCommission } from "./pricing";
 import schema from "../schema";
 
@@ -398,10 +398,7 @@ describe("getStateTimelineByPeriod", () => {
   }
 
   /** Buckets run oldest → newest, so the current month is the last of the 12. */
-  function bucketMonthsAgo(
-    buckets: { period: string; countByState: Record<string, number> }[],
-    months: number,
-  ) {
+  function bucketMonthsAgo(buckets: StateTimelineBucket[], months: number) {
     return buckets[buckets.length - 1 - months];
   }
 
@@ -610,6 +607,57 @@ describe("getStateTimelineByPeriod", () => {
       in_eviction: 1,
     });
     expect(bucketMonthsAgo(platform, 2).countByState).toEqual({ ...ZERO_COUNTS, active: 2 });
+  });
+
+  test("counts the lifecycle moves of each period beside the composition", async () => {
+    const t = convexTest(schema);
+    registerContractAggregateComponents(t);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedAgencyWithMembership(t, userId);
+
+    const createdAt = monthsAgoISO(5, 3);
+    const activatedAt = monthsAgoISO(4, 3);
+    const arrearsAt = monthsAgoISO(3, 3);
+    const curedAt = monthsAgoISO(3, 20);
+    const reArrearsAt = monthsAgoISO(2, 3);
+    const defaultAt = monthsAgoISO(1, 3);
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId, status: GUARANTEE_STATE.DEFAULT_VERIFIED, activatedAt },
+      "E1",
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.insert("guaranteeHistory", {
+        agencyId,
+        guaranteePublicId: "E1",
+        at: createdAt,
+        username: "tester",
+        message: "created",
+      });
+    });
+    const moves: { at: string; from: GuaranteeState; to: GuaranteeState }[] = [
+      { at: activatedAt, from: "drafted", to: "active" },
+      { at: arrearsAt, from: "active", to: "in_arrears" },
+      { at: curedAt, from: "in_arrears", to: "active" },
+      { at: reArrearsAt, from: "active", to: "in_arrears" },
+      { at: defaultAt, from: "in_arrears", to: "default_verified" },
+    ];
+    for (const move of moves) {
+      await insertTransition(t, { agencyId, guaranteePublicId: "E1", ...move });
+    }
+
+    const buckets = await asUser.query(api.guarantees.useCases.getStateTimelineByPeriod, {
+      scope: { kind: "agency", agencyId },
+      granularity: "month",
+    });
+
+    expect(bucketMonthsAgo(buckets, 5).eventCount.created).toBe(1);
+    expect(bucketMonthsAgo(buckets, 4).eventCount.activated).toBe(1);
+    // A cure returns the guarantee to `active` but is not new business, so it
+    // must not show up as a second activation.
+    expect(bucketMonthsAgo(buckets, 3).eventCount.activated).toBe(0);
+    expect(bucketMonthsAgo(buckets, 1).eventCount.default_verified).toBe(1);
+    expect(bucketMonthsAgo(buckets, 0).eventCount.created).toBe(0);
   });
 
   test("weekly granularity returns 52 buckets with ISO Monday period keys", async () => {
