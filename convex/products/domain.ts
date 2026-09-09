@@ -63,6 +63,13 @@ export const eligibilityValidator = v.object({
 /** Slug of the product seeded with today's constants; the fallback when no requested slug is eligible. */
 export const DEFAULT_PRODUCT_SLUG = "mutav-fianca";
 
+/**
+ * A product as a client may see it: what it is called and what it prices at.
+ * The row's id, eligibility rules and effective window stay server-side —
+ * the wizard only needs the parameters its preview prices against.
+ */
+export type PublicProduct = Pick<Product, "slug" | "name" | "terms">;
+
 export type EligibilitySubject = {
   agencyId: AgencyId;
   uf: string | null;

@@ -1,4 +1,5 @@
 import { internalQuery, type QueryCtx } from "../_generated/server";
+import { queryWithAuth } from "../lib/auth";
 import type { Result } from "../lib/result";
 import {
   isEffective,
@@ -6,6 +7,7 @@ import {
   PRODUCT_ERROR_CODE,
   type EligibilitySubject,
   type Product,
+  type PublicProduct,
 } from "./domain";
 
 /**
@@ -30,6 +32,22 @@ export async function findProductBySlug(ctx: QueryCtx, slug: string): Promise<Pr
 export const getDefault = internalQuery({
   args: {},
   handler: async (ctx): Promise<Product | null> => findDefaultProduct(ctx),
+});
+
+/**
+ * The default product's pricing parameters, for the wizard's client-side
+ * quote. The catalog is platform data, not agency data, so identity is the
+ * only gate. Returns null before the catalog is seeded — the caller shows no
+ * figures rather than figures priced against a constant that may not be what
+ * `guarantees.create` will use.
+ */
+export const getDefaultPublic = queryWithAuth({
+  args: {},
+  handler: async (ctx): Promise<PublicProduct | null> => {
+    const product = await findDefaultProduct(ctx);
+    if (product === null) return null;
+    return { slug: product.slug, name: product.name, terms: product.terms };
+  },
 });
 
 type ResolveProductSuccessResult = { product: Product };

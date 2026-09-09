@@ -162,6 +162,11 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
                       <Mono className="text-base font-medium">
                         {formatBRLCents(availableCapacityCents)}
                       </Mono>
+                      <span className="text-muted-foreground text-xs">
+                        {t("ofCeiling", {
+                          ceiling: formatBRLCents(guarantee.capacity.ceilingCents),
+                        })}
+                      </span>
                       <span aria-hidden className="text-2xs text-muted-foreground">
                         ⓘ
                       </span>

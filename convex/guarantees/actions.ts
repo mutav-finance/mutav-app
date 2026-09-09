@@ -50,7 +50,7 @@ async function sendEmail(args: NotificationArgs): Promise<void> {
     return;
   }
   const resend = new Resend(getResendApiKey());
-  const activationLink = `${getAppUrl()}/contracts/${args.publicId}`;
+  const activationLink = `${getAppUrl()}/guarantees/${args.publicId}`;
 
   await resend.emails.send({
     from: getResendFromEmail(),
@@ -66,7 +66,7 @@ async function sendWhatsApp(args: NotificationArgs): Promise<void> {
 
   if (!apiUrl || !apiKey) return;
 
-  const activationLink = `${getAppUrl()}/contracts/${args.publicId}`;
+  const activationLink = `${getAppUrl()}/guarantees/${args.publicId}`;
   const message = buildWhatsAppMessage({ ...args, activationLink });
 
   await fetch(apiUrl, {

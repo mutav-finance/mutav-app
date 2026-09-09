@@ -240,9 +240,9 @@
     }
   },
   "metrics": {
-    "active": {
-      "label": "Garantias ativas",
-      "footer": "Garantias em vigor"
+    "inForce": {
+      "label": "Garantias em vigor",
+      "footer": "Ativas, inadimplentes e em cobertura"
     },
     "drafted": {
       "label": "Rascunhos",
@@ -258,7 +258,8 @@
       "label": "Inadimplências",
       "footerNone": "Nenhuma fatura em atraso",
       "footerSome": "{count, plural, one {# fatura em atraso} other {# faturas em atraso}}"
-    }
+    },
+    "byState": "Garantias por situação"
   },
   "dataTable": {
     "columns": {
@@ -362,7 +363,7 @@
       "cancelProposal": "Cancelar proposta",
       "idLabel": "ID do contrato",
       "guaranteeTooltipLabel": "Detalhes da fiança disponível",
-      "cancelProposalHint": "Disponível apenas para contratos pendentes",
+      "cancelProposalHint": "Disponível apenas para garantias em rascunho",
       "cancelDialog": {
         "title": "Cancelar proposta?",
         "description": "O contrato será marcado como cancelado. O histórico será preservado.",
@@ -377,7 +378,8 @@
       },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências deste contrato",
-      "actionsMenu": "Ações do contrato"
+      "actionsMenu": "Ações do contrato",
+      "ofCeiling": "de {ceiling}"
     },
     "state": {
       "drafted": "Rascunho",
@@ -397,15 +399,17 @@
       "canceled_pre_activation": "Cancelada antes da ativação",
       "death": "Falecimento"
     },
-    "rentalData": {
+    "actions": {
+      "trigger": "Ações",
+      "disabledHint": "Disponível em breve",
+      "edit": "Editar",
+      "duplicate": "Duplicar",
+      "archive": "Arquivar"
+    },
+    "lease": {
       "heading": "Dados da Locação",
-      "actions": "Ações",
-      "actionEdit": "Editar",
-      "actionDuplicate": "Duplicar",
-      "actionArchive": "Arquivar",
-      "actionDisabled": "Disponível em breve",
       "groups": {
-        "contract": "Dados do Contrato",
+        "rental": "Dados da Locação",
         "property": "Dados do Imóvel",
         "optional": "Dados Opcionais"
       },
@@ -415,13 +419,7 @@
         "condo": "Valor Condomínio",
         "otherFees": "Outras Taxas",
         "totalRent": "Valor Locatício Total",
-        "fee": "Valor da Taxa",
-        "oneTimeActivationFee": "Taxa única de ativação",
-        "setupInstallments": "Parcelas Setup",
-        "exitCost": "Custo de saída",
-        "rentMultiplier": "Multiplicador locatício",
         "payer": "Pagador",
-        "pviSchedule": "Agendamento para migração do PVI",
         "cep": "CEP",
         "addressNumber": "Endereço/Número",
         "neighborhood": "Bairro",
@@ -433,6 +431,34 @@
       "propertyKind": {
         "residential": "Residencial",
         "commercial": "Comercial"
+      },
+      "payer": {
+        "tenant": "Locatário"
+      }
+    },
+    "terms": {
+      "heading": "Condições Contratadas",
+      "groups": {
+        "product": "Produto",
+        "fees": "Taxas",
+        "coverage": "Cobertura"
+      },
+      "fields": {
+        "product": "Produto",
+        "plan": "Plano",
+        "appliedAt": "Precificado em",
+        "fee": "Taxa mensal",
+        "taxaFee": "Taxa de garantia",
+        "prestamistaFee": "Prêmio prestamista",
+        "activationFee": "Taxa única de ativação",
+        "ceilingMultiplier": "Multiplicador do teto",
+        "coverageCeiling": "Teto de cobertura",
+        "exitCostMultiplier": "Multiplicador do custo de saída",
+        "exitCostCap": "Limite do custo de saída"
+      },
+      "plan": {
+        "basic": "Mutav Fiança",
+        "plus": "Mutav Fiança +"
       }
     },
     "documents": {
@@ -517,7 +543,11 @@
     "urgency": {
       "overdue": "Vencido",
       "expiring": "A vencer",
-      "critical": "Atenção"
+      "critical": "Atenção",
+      "warning": "Atenção",
+      "drafted": "Rascunho",
+      "ok": "Em dia",
+      "inactive": "Sem renovação"
     },
     "search": {
       "placeholder": "Buscar por ID ou locatário"
@@ -1240,7 +1270,8 @@
     "guarantees": {
       "insured": "Garantias em vigor",
       "drafted": "Rascunhos",
-      "defaultRate": "Taxa de inadimplência"
+      "defaultRate": "Taxa de inadimplência",
+      "byState": "Garantias por situação"
     },
     "capacity": {
       "label": "Utilização da capacidade contratada",

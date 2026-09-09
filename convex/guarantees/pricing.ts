@@ -14,9 +14,9 @@ import type { ProductTerms } from "../products/domain";
  *
  * Parameters come from a `products` row (`ProductTerms`); the output is the
  * immutable `terms` snapshot stored on the guarantee plus its initial
- * capacity. `DEFAULT_PRICING_TABLE` is the seed constant for the default
- * product and the fallback for client-side previews before a product loads —
- * it is never a runtime default on the server.
+ * capacity. `DEFAULT_PRICING_TABLE` is only the seed constant for the default
+ * product: every caller — the server mutation and the wizard preview alike —
+ * passes the parameters it read from a `products` row.
  */
 
 export type PricingTable = ProductTerms;

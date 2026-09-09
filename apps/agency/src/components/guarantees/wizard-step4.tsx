@@ -25,13 +25,15 @@ import {
   type ReviewBlockKind,
 } from "@/lib/guarantees/wizard";
 import { formatBRLCents } from "@/lib/guarantees/format";
-import { priceGuarantee, splitCommission, DEFAULT_PRICING_TABLE } from "@convex/guarantees/pricing";
-import { DEFAULT_PRODUCT_SLUG } from "@convex/products/domain";
+import { priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
+import type { PublicProduct } from "@convex/products/domain";
 import { PROPERTY_KIND } from "@convex/leases/domain";
 
 type Props = {
   data: DraftWizardData;
   agencyId: AgencyId;
+  /** The default product, or null while the catalog query is in flight. */
+  product: PublicProduct | null;
   onChange: (patch: Partial<DraftWizardData>) => void;
   onComplete: (publicId: string) => void;
   onBack: () => void;
@@ -39,7 +41,7 @@ type Props = {
 
 type MissingFields = Set<string>;
 
-export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Props) {
+export function WizardStep4({ data, agencyId, product, onChange, onComplete, onBack }: Props) {
   const t = useTranslations("guaranteeNew");
   const createGuarantee = useMutation(api.guarantees.useCases.create);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -50,16 +52,16 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
   // Client-side preview only — the stored `terms` snapshot is priced by
   // `guarantees.create` against the product the server resolves.
   const preview =
-    priceableTier && data.rentCents > 0 && data.plan
+    product && priceableTier && data.rentCents > 0 && data.plan
       ? priceGuarantee(
           {
             rentCents: data.rentCents,
             tier: priceableTier,
             plan: data.plan,
-            productSlug: DEFAULT_PRODUCT_SLUG,
+            productSlug: product.slug,
             appliedAt: new Date().toISOString(),
           },
-          DEFAULT_PRICING_TABLE,
+          product.terms,
         ).terms
       : null;
   const commission = preview ? splitCommission(preview) : null;
@@ -474,18 +476,20 @@ export function WizardStep4({ data, agencyId, onChange, onComplete, onBack }: Pr
           {t("review.planSection")}
         </p>
         <div className="flex gap-8">
-          <div className="flex flex-1 flex-col gap-0.5">
-            <ReviewRow
-              label={t("coverage.rentMultiplierLabel")}
-              value={`${DEFAULT_PRICING_TABLE.coverageCeilingMultiplier}x`}
-              mono
-            />
-            <ReviewRow
-              label={t("coverage.exitCostLabel")}
-              value={`${DEFAULT_PRICING_TABLE.exitCostMultiplier}x`}
-              mono
-            />
-          </div>
+          {preview && (
+            <div className="flex flex-1 flex-col gap-0.5">
+              <ReviewRow
+                label={t("coverage.rentMultiplierLabel")}
+                value={`${preview.coverageCeilingMultiplier}x`}
+                mono
+              />
+              <ReviewRow
+                label={t("coverage.exitCostLabel")}
+                value={`${preview.exitCostMultiplier}x`}
+                mono
+              />
+            </div>
+          )}
           {preview && (
             <div className="flex flex-1 flex-col gap-0.5">
               <ReviewRow

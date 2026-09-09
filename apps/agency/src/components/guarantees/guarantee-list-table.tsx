@@ -152,9 +152,12 @@ function buildColumns(
       cell: ({ row }) => formatDateBR(new Date(row.original.creationTime).toISOString()),
     },
     {
+      // Sorted on the server-computed rank so the order matches
+      // `getUrgencyTier`'s severity scale, not the label's alphabet.
       id: "urgency",
       accessorKey: "urgencySortKey",
       header: t("columns.urgency"),
+      cell: ({ row }) => t(`urgency.${row.original.urgency}`),
       enableHiding: true,
     },
   ];

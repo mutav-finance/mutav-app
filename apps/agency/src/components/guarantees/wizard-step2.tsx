@@ -19,11 +19,13 @@ import {
 } from "@/lib/guarantees/wizard";
 import { formatBRLCents } from "@/lib/guarantees/format";
 import { GUARANTEE_PLAN, type ScoreTier } from "@convex/guarantees/domain";
-import { priceGuarantee, splitCommission, DEFAULT_PRICING_TABLE } from "@convex/guarantees/pricing";
-import { DEFAULT_PRODUCT_SLUG } from "@convex/products/domain";
+import { priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
+import type { ProductTerms, PublicProduct } from "@convex/products/domain";
 
 type Props = {
   data: DraftWizardData;
+  /** The default product, or null while the catalog query is in flight. */
+  product: PublicProduct | null;
   onChange: (patch: Partial<DraftWizardData>) => void;
   onNext: () => void;
   onBack: () => void;
@@ -43,7 +45,7 @@ const TIER_CARD_STYLE: Record<ScoreTier, string> = {
   negado: "border-red-500 bg-red-50/50 dark:bg-red-950/20",
 };
 
-export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
+export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) {
   const t = useTranslations("guaranteeNew");
   const { selectedAgency } = useWorkspace();
   const agencyId = selectedAgency?._id;
@@ -129,20 +131,20 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
   const hasNoApplication = panelState === SCORE_PANEL_STATE.NO_APPLICATION;
   const isScored = panelState === SCORE_PANEL_STATE.SCORED;
 
-  // Client-side preview only: prices against the default table so the broker
-  // sees a number before the server resolves the product. The stored `terms`
-  // snapshot is whatever `guarantees.create` prices on the server.
+  // Client-side preview only: prices the loaded product's own terms through
+  // the same function the server uses. The stored `terms` snapshot is whatever
+  // `guarantees.create` prices at submit time.
   const preview =
-    priceableTier && data.rentCents > 0 && data.plan
+    product && priceableTier && data.rentCents > 0 && data.plan
       ? priceGuarantee(
           {
             rentCents: data.rentCents,
             tier: priceableTier,
             plan: data.plan,
-            productSlug: DEFAULT_PRODUCT_SLUG,
+            productSlug: product.slug,
             appliedAt: new Date().toISOString(),
           },
-          DEFAULT_PRICING_TABLE,
+          product.terms,
         ).terms
       : null;
   const commission = preview ? splitCommission(preview) : null;
@@ -226,7 +228,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
       </section>
 
       {/* Coverage plans — two selectable cards; "+" carries a subtle premium accent */}
-      {isScored && priceableTier && (
+      {isScored && priceableTier && product && (
         <div
           role="radiogroup"
           aria-label={t("coverage.planLabel")}
@@ -234,13 +236,15 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
         >
           <CoveragePlanCard
             planName={t("coverage.planBasic")}
-            feeRatePct={DEFAULT_PRICING_TABLE.tierRate[priceableTier] * 100}
+            terms={product.terms}
+            feeRatePct={product.terms.tierRate[priceableTier] * 100}
             selected={selectedPlan === GUARANTEE_PLAN.BASIC}
             onSelect={() => onChange({ plan: GUARANTEE_PLAN.BASIC })}
           />
           <CoveragePlanCard
             planName={t("coverage.planPlus")}
-            feeRatePct={DEFAULT_PRICING_TABLE.tierRate[priceableTier] * 100}
+            terms={product.terms}
+            feeRatePct={product.terms.tierRate[priceableTier] * 100}
             selected={selectedPlan === GUARANTEE_PLAN.PLUS}
             emphasized
             includesPrestamista
@@ -257,8 +261,8 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
             <SummaryRow
               label={t("coverage.summary.exitCost")}
               value={
-                data.rentCents > 0
-                  ? formatBRLCents(DEFAULT_PRICING_TABLE.exitCostMultiplier * data.rentCents)
+                product && data.rentCents > 0
+                  ? formatBRLCents(product.terms.exitCostMultiplier * data.rentCents)
                   : null
               }
             />
@@ -301,6 +305,7 @@ export function WizardStep2({ data, onChange, onNext, onBack }: Props) {
 
 function CoveragePlanCard({
   planName,
+  terms,
   feeRatePct,
   selected,
   onSelect,
@@ -308,6 +313,7 @@ function CoveragePlanCard({
   includesPrestamista = false,
 }: {
   planName: string;
+  terms: ProductTerms;
   feeRatePct: number;
   selected: boolean;
   onSelect: () => void;
@@ -363,7 +369,7 @@ function CoveragePlanCard({
           <span className="text-sm font-semibold">{t("rentCoverageFull")}</span>
           <span className="text-muted-foreground text-xs">{t("rentCoverageIncludes")}</span>
         </div>
-        <PlanRow label={t("exitCoverage")} value={`${DEFAULT_PRICING_TABLE.exitCostMultiplier}x`} />
+        <PlanRow label={t("exitCoverage")} value={`${terms.exitCostMultiplier}x`} />
         {includesPrestamista && (
           <div className="bg-primary/[0.06] flex items-center justify-between gap-2 rounded-md p-3">
             <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -371,7 +377,7 @@ function CoveragePlanCard({
               <PrestamistaInfo />
             </span>
             <span className="text-primary text-sm font-semibold">
-              +{formatBRLCents(DEFAULT_PRICING_TABLE.prestamistaPremiumCents)}
+              +{formatBRLCents(terms.prestamistaPremiumCents)}
             </span>
           </div>
         )}

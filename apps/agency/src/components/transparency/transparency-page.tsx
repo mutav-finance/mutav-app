@@ -6,6 +6,7 @@ import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { ActivityBucket } from "@convex/guarantees/domain";
 import type { GuaranteeAggregates, ReserveCoverage } from "@convex/transparency/domain";
+import { GuaranteeStateBreakdown } from "@/components/guarantees/guarantee-state-breakdown";
 import { GuaranteesPanel } from "./guarantees-panel";
 import { CapacityPanel } from "./capacity-panel";
 import { ReservePanel } from "./reserve-panel";
@@ -43,6 +44,8 @@ function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps)
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <GuaranteesPanel aggregates={agg} />
       </div>
+
+      <GuaranteeStateBreakdown heading={t("guarantees.byState")} counts={agg?.countByState} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <CapacityPanel aggregates={agg} />

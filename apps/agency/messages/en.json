@@ -240,9 +240,9 @@
     }
   },
   "metrics": {
-    "active": {
-      "label": "Active guarantees",
-      "footer": "Currently in force"
+    "inForce": {
+      "label": "Guarantees in force",
+      "footer": "Active, in arrears and under cover"
     },
     "drafted": {
       "label": "Drafts",
@@ -258,7 +258,8 @@
       "label": "Delinquencies",
       "footerNone": "No overdue invoices",
       "footerSome": "{count, plural, one {# overdue invoice} other {# overdue invoices}}"
-    }
+    },
+    "byState": "Guarantees by state"
   },
   "dataTable": {
     "columns": {
@@ -362,7 +363,7 @@
       "cancelProposal": "Cancel proposal",
       "idLabel": "Contract ID",
       "guaranteeTooltipLabel": "Available guarantee details",
-      "cancelProposalHint": "Available only for pending contracts",
+      "cancelProposalHint": "Available only for drafted guarantees",
       "cancelDialog": {
         "title": "Cancel proposal?",
         "description": "The contract will be marked as canceled. History will be preserved.",
@@ -377,7 +378,8 @@
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this contract",
-      "actionsMenu": "Contract actions"
+      "actionsMenu": "Contract actions",
+      "ofCeiling": "of {ceiling}"
     },
     "state": {
       "drafted": "Draft",
@@ -397,15 +399,17 @@
       "canceled_pre_activation": "Canceled before activation",
       "death": "Death"
     },
-    "rentalData": {
-      "heading": "Rental Data",
-      "actions": "Actions",
-      "actionEdit": "Edit",
-      "actionDuplicate": "Duplicate",
-      "actionArchive": "Archive",
-      "actionDisabled": "Coming soon",
+    "actions": {
+      "trigger": "Actions",
+      "disabledHint": "Coming soon",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "archive": "Archive"
+    },
+    "lease": {
+      "heading": "Lease",
       "groups": {
-        "contract": "Contract Data",
+        "rental": "Lease Data",
         "property": "Property Data",
         "optional": "Optional Data"
       },
@@ -415,13 +419,7 @@
         "condo": "Condo Fee",
         "otherFees": "Other Fees",
         "totalRent": "Total Rent",
-        "fee": "Fee Amount",
-        "oneTimeActivationFee": "One-time activation fee",
-        "setupInstallments": "Setup Installments",
-        "exitCost": "Exit cost",
-        "rentMultiplier": "Rent multiplier",
         "payer": "Payer",
-        "pviSchedule": "PVI migration schedule",
         "cep": "ZIP",
         "addressNumber": "Street/Number",
         "neighborhood": "Neighborhood",
@@ -433,6 +431,34 @@
       "propertyKind": {
         "residential": "Residential",
         "commercial": "Commercial"
+      },
+      "payer": {
+        "tenant": "Tenant"
+      }
+    },
+    "terms": {
+      "heading": "Priced Terms",
+      "groups": {
+        "product": "Product",
+        "fees": "Fees",
+        "coverage": "Coverage"
+      },
+      "fields": {
+        "product": "Product",
+        "plan": "Plan",
+        "appliedAt": "Priced on",
+        "fee": "Monthly fee",
+        "taxaFee": "Guarantee fee",
+        "prestamistaFee": "Credit-life premium",
+        "activationFee": "One-time activation fee",
+        "ceilingMultiplier": "Ceiling multiplier",
+        "coverageCeiling": "Coverage ceiling",
+        "exitCostMultiplier": "Exit cost multiplier",
+        "exitCostCap": "Exit cost cap"
+      },
+      "plan": {
+        "basic": "Mutav Fiança",
+        "plus": "Mutav Fiança +"
       }
     },
     "documents": {
@@ -517,7 +543,11 @@
     "urgency": {
       "overdue": "Overdue",
       "expiring": "Expiring",
-      "critical": "Caution"
+      "critical": "Caution",
+      "warning": "Watch",
+      "drafted": "Draft",
+      "ok": "On track",
+      "inactive": "No renewal"
     },
     "search": {
       "placeholder": "Search by ID or tenant"
@@ -1240,7 +1270,8 @@
     "guarantees": {
       "insured": "Guarantees in force",
       "drafted": "Drafts",
-      "defaultRate": "Default rate"
+      "defaultRate": "Default rate",
+      "byState": "Guarantees by state"
     },
     "capacity": {
       "label": "Contracted capacity utilization",

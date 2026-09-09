@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { StepIndicator } from "@mutav/ui/step-indicator";
 import { useWorkspace } from "@/providers/workspace";
 import { WizardStep1 } from "@/components/guarantees/wizard-step1";
@@ -22,6 +24,11 @@ export function GuaranteeWizard() {
 
   const { selectedAgency } = useWorkspace();
   const agencyId = selectedAgency?._id;
+
+  // The product the server will price against. Steps 2 and 4 quote from its
+  // terms so the broker's preview and the stored snapshot come from the same
+  // parameters; until it loads they show no figures rather than stale ones.
+  const product = useQuery(api.products.useCases.getDefaultPublic, {});
 
   const patch = React.useCallback((p: Partial<DraftWizardData>) => {
     dispatch({ type: "PATCH", patch: p });
@@ -58,6 +65,7 @@ export function GuaranteeWizard() {
       {state.step === 2 && (
         <WizardStep2
           data={state.data}
+          product={product ?? null}
           onChange={patch}
           onNext={() => dispatch({ type: "GO_TO", step: 3 })}
           onBack={() => dispatch({ type: "GO_TO", step: 1 })}
@@ -77,6 +85,7 @@ export function GuaranteeWizard() {
         <WizardStep4
           data={state.data}
           agencyId={agencyId}
+          product={product ?? null}
           onChange={patch}
           onComplete={(publicId) => dispatch({ type: "COMPLETE", publicId })}
           onBack={() => dispatch({ type: "GO_TO", step: 3 })}

@@ -21,8 +21,9 @@ import { Link } from "@mutav/i18n/navigation";
 import type { api } from "@convex/_generated/api";
 import { GuaranteeDocumentsCard } from "./guarantee-documents-card";
 import { GuaranteeHistoryCard } from "./guarantee-history-card";
-import { GuaranteeRentalDataCard } from "./guarantee-rental-data-card";
+import { GuaranteeLeaseCard } from "./guarantee-lease-card";
 import { GuaranteeSummaryCard } from "./guarantee-summary-card";
+import { GuaranteeTermsCard } from "./guarantee-terms-card";
 import { GuaranteeTenantCard } from "./guarantee-tenant-card";
 
 export function GuaranteeDetailsPage({
@@ -66,7 +67,8 @@ export function GuaranteeDetailsPage({
       <PageContent variant="narrow">
         <GuaranteeSummaryCard guarantee={guarantee} />
         <GuaranteeTenantCard tenant={guarantee.tenant} />
-        <GuaranteeRentalDataCard guarantee={guarantee} />
+        <GuaranteeLeaseCard lease={guarantee.lease} />
+        <GuaranteeTermsCard terms={guarantee.terms} />
         <GuaranteeDocumentsCard documents={guarantee.documents} />
         <GuaranteeHistoryCard history={guarantee.history} />
       </PageContent>
