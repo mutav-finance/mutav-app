@@ -173,7 +173,7 @@ apps/agency/src/app/
 │   ├── not-found.tsx           # <BareShell> — notFound() thrown under [locale]
 │   └── (app)/                  # dashboard route group
 │       ├── layout.tsx          # guard + <AppShell>, nav passed as props
-│       └── contracts/
+│       └── guarantees/
 │           └── [id]/
 │               ├── page.tsx
 │               └── error.tsx
@@ -237,16 +237,16 @@ convex/
     └── actions.ts              # 'use node' integrations (HTTP, Buffer, crypto)
 ```
 
-**Migration trigger:** the moment a flat file gains a second function (or the first non-trivial one), move it to a domain folder. Don't let `convex/contracts.ts` keep growing past 100 lines — promote to `convex/contracts/{domain.ts,useCases.ts}` immediately.
+**Migration trigger:** the moment a flat file gains a second function (or the first non-trivial one), move it to a domain folder. Don't let `convex/guarantees.ts` keep growing past 100 lines — promote to `convex/guarantees/{domain.ts,useCases.ts}` immediately.
 
-The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outside the entity file — export aliases (e.g. `Contract`, `ContractId`) and import those everywhere else. See `convex-document-types` skill for the full rules.
+The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outside the entity file — export aliases (e.g. `Guarantee`, `GuaranteeId`) and import those everywhere else. See `convex-document-types` skill for the full rules.
 
 ### Schema changes & migrations — reseed-first (pre-production)
 
 **The app is pre-production: there is no real data. So schema changes ship as wipe + reseed, NOT in-place migrations.** When you change the schema:
 
 - **Do NOT write a data migration.** Update `convex/schema.ts` and update `convex/seed.ts` so `seed:seedReset` produces data in the new shape. Reshape the seed, not the data at rest.
-- **The reseed wipe is app-demo-only — never touch marketing or other real data.** `seedReset` clears only `DEMO_TABLES` (agencies, users, memberships, contracts, contractHistory, tenants, invoices, payments, providerOrders). It must **never** wipe the **`waitlist`** table (marketing leads synced to Resend audiences), nor `mutavAuditLog`/`mutavAuditAnchors`, `mutavStaff`, `reserveSnapshots`, or `creditAnalysis*`. These hold real/operational data, are deliberately excluded from `DEMO_TABLES`, and a `convex/seed.test.ts` test asserts a `waitlist` row survives a reseed. Never add them to the wipe.
+- **The reseed wipe is app-demo-only — never touch marketing or other real data.** `seedReset` clears only `DEMO_TABLES` (agencies, users, memberships, leases, guarantees, guaranteeHistory, guaranteeDelinquencyNotices, products, tenants, invoices, payments, providerOrders). It must **never** wipe the **`waitlist`** table (marketing leads synced to Resend audiences), nor `mutavAuditLog`/`mutavAuditAnchors`, `mutavStaff`, `reserveSnapshots`, `creditAnalysis*`, or `contractApplications` (the Lei 12.414 bureau-consult relationship record `creditAnalysisSignals` points at). These hold real/operational data, are deliberately excluded from `DEMO_TABLES`, and a `convex/seed.test.ts` test asserts a `waitlist` row survives a reseed. Never add them to the wipe.
 - `convex/migrations.ts` stays a **no-op runner** (`runAll = [noop]`); leave the migration infrastructure in place but empty. Operational backfills (aggregate rebuild, Resend audience sync, reserve snapshot clear) are **not** migrations and stay out of the runner.
 - `schemaValidation: false` is intentional for this window — a deploy tolerates older data at rest until the operator reseeds (`bun run seed`). Don't flip it to `true` yet.
 - Deploy runbook: `convex deploy` → `bun run seed`. Never assume in-place data preservation.
@@ -281,9 +281,9 @@ Width tokens live in each app's `src/app/globals.css`:
 ```tsx
 // List / dashboard — full-bleed-aware children
 <PageShell>
-  <PageHeader title="Contratos" subtitle="..." />
+  <PageHeader title="Garantias" subtitle="..." />
   <PageContent variant="full">
-    <ContractListTable />
+    <GuaranteeListTable />
   </PageContent>
 </PageShell>
 
@@ -315,7 +315,7 @@ Each Next.js route segment can declare conventional files. Use them at the segme
 | `global-not-found.tsx` | App-dir root only. Renders for URLs that match no route; replaces the root layout, so it returns a full document |
 | `global-error.tsx`     | Catches errors in the root `layout.tsx` itself — replaces the entire HTML                                        |
 
-Co-locate the i18n keys these files use under a namespace that matches the segment (e.g. `contractDetails.errors` for `contracts/[id]/error.tsx`).
+Co-locate the i18n keys these files use under a namespace that matches the segment (e.g. `guaranteeDetails.errors` for `guarantees/[id]/error.tsx`).
 
 ## Code style
 
@@ -325,10 +325,10 @@ Follow standard clean code principles, opinionated:
 - **Named constants over magic values** — `const RENT_MULTIPLIER_DEFAULT = 12` beats `12` in expressions.
 - **Guard clauses over nesting** — early return for invariant violations; the happy path stays at the top indent level.
 - **Object parameters over long argument lists** — three or more args, switch to `{ ... }`. Self-documenting and reorderable.
-- **No boolean flag arguments** — split into named functions (`approveContract` / `rejectContract`, not `setContractStatus(id, approved)`).
+- **No boolean flag arguments** — split into named functions (`approveGuarantee` / `rejectGuarantee`, not `setGuaranteeStatus(id, approved)`).
 - **No barrel files** — every import references the actual file path (`./Foo`, never `.` or `./index`).
 - **No comments by default** — only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader. Don't explain WHAT (well-named identifiers do that) and don't reference the current task or PR (that belongs in the PR description, not the code — comments rot, PRs don't).
-- **English-only code identifiers** — all types, `as const` value objects, string literal enum values, DB field values, function/variable names, and i18n **keys** are English (American spelling: `canceled`, not `cancelled`). Portuguese belongs ONLY in `messages/pt-BR.json` **values**. When touching a page that uses PT literals in code, translate them in the same commit — never propagate PT into new code just because the surrounding UI has it. Pre-existing PT identifiers (e.g. `CONTRACT_STATUS = { ATIVO: "ativo", ... }`) are grandfathered — flag them but don't drive-by-rename unless the surrounding change makes it cheap.
+- **English-only code identifiers** — all types, `as const` value objects, string literal enum values, DB field values, function/variable names, and i18n **keys** are English (American spelling: `canceled`, not `cancelled`). Portuguese belongs ONLY in `messages/pt-BR.json` **values**. When touching a page that uses PT literals in code, translate them in the same commit — never propagate PT into new code just because the surrounding UI has it. A few PT identifiers are sanctioned rather than grandfathered: `SCORE_TIER` (`bom` / `regular` / `ruim` / `negado`) and the `terms.tierRate.{bom,regular,ruim}` keys that mirror it name a Brazilian credit-tier vocabulary with no English equivalent in use. PT free text still sitting in `guaranteeHistory.message` and `invoices.lineItems[].description` is a recorded deferral (`.claude/notes/deferred-conventions.md`), not a precedent — flag it but don't drive-by-rename unless the surrounding change makes it cheap.
 - **TypeScript strict** — see Key Patterns / TypeScript escape hatches below.
 - **Branch workflow** — feature branches → squash merge PRs to main. Commit subjects are commitlint-gated (`.husky/commit-msg`): lowercase `type(scope):`, **lowercase subject** (sentence-case / Start Case / PascalCase / UPPER all rejected), no trailing period, header ≤100 chars, and **every body and footer line ≤100 chars** (hard error — wrap bullets). Types: `build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test` — no `wip`. `pre-commit` runs a whole-monorepo `bun run typecheck` plus `eslint --fix --max-warnings=0` on staged files (one warning blocks the commit); `pre-push` runs `bun run changelog:validate` and refuses direct pushes to `main`.
 
@@ -341,16 +341,16 @@ Domain operations return `Result<TData, TError>` from `@/lib/result` instead of 
 ```typescript
 import type { Result } from "@/lib/result";
 
-type CreateContractSuccessResult = { contractId: ContractId; status: ContractStatus };
-type CreateContractErrorResult = { code: "INVALID_INPUT" | "DUPLICATE_CONTRACT" };
+type CreateGuaranteeSuccessResult = { guaranteeId: GuaranteeId; status: GuaranteeState };
+type CreateGuaranteeErrorResult = { code: "INVALID_INPUT" | "LEASE_HAS_OPEN_GUARANTEE" };
 
-function createContract(
-  args: CreateContractArgs,
-): Result<CreateContractSuccessResult, CreateContractErrorResult> {
+function createGuarantee(
+  args: CreateGuaranteeArgs,
+): Result<CreateGuaranteeSuccessResult, CreateGuaranteeErrorResult> {
   if (!args.tenant.cpf) {
     return { success: false, error: { code: "INVALID_INPUT" }, message: "Tenant CPF is required" };
   }
-  return { success: true, data: { contractId, status: "pendente" }, message: "Contract created" };
+  return { success: true, data: { guaranteeId, status: "drafted" }, message: "Guarantee created" };
 }
 ```
 
@@ -365,7 +365,7 @@ import { mutationWithAgencyScope, queryWithAgencyScope, assertAgencyAccess } fro
 
 // Agency-scoped (the common case). Wrapper consumes agencyId, exposes
 // ctx.user, ctx.membership, ctx.agencyId. Handler args do NOT redeclare agencyId.
-export const cancelProposal = mutationWithAgencyScope({
+export const cancelDraft = mutationWithAgencyScope({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
     /* ctx.agencyId is guaranteed */
@@ -380,17 +380,17 @@ Strict-compliance rule (enforced in review):
 - **Identity-only exception:** `queryWithAuth` / `mutationWithAuth` for handlers that don't have a natural agency (e.g. listing the current user's own agencies).
 - **Internal writers (`internalMutation` / `internalQuery`):** no wrapper — auth was already enforced by the public caller.
 - **Actions (`ActionCtx`):** no DB access for membership lookup; use `requireIdentity(ctx)` + an `internalQuery` for membership. Per-action wrappers may come later.
-- **Calling wrapped functions from actions:** `ctx.runQuery(api.X.wrapped, …)` inherits the action's identity — fine when the action runs from an authenticated dashboard route, **broken post-Auth0** when the action runs from a tenant/public/webhook context. For those, route through an `internal.X.Y` companion (e.g. `tenants.getByIdInternal`, `contracts.getTenantIdentityInternal`). A companion drops the wrapper's auth, so it must take every scope the wrapper would have enforced as an explicit arg — `getTenantIdentityInternal` requires `agencyId` because `publicId` alone resolves across agencies. When wrapping a new domain, grep `ctx\.runQuery(api\.<domain>\.` and fix every tenant-facing hit. See [`docs/auth.md`](docs/auth.md) for the full pattern.
+- **Calling wrapped functions from actions:** `ctx.runQuery(api.X.wrapped, …)` inherits the action's identity — fine when the action runs from an authenticated dashboard route, **broken post-Auth0** when the action runs from a tenant/public/webhook context. For those, route through an `internal.X.Y` companion (e.g. `tenants.getByIdInternal`, `guarantees.getTenantIdentityInternal`). A companion drops the wrapper's auth, so it must take every scope the wrapper would have enforced as an explicit arg — `getTenantIdentityInternal` requires `agencyId` because `publicId` alone resolves across agencies. When wrapping a new domain, grep `ctx\.runQuery(api\.<domain>\.` and fix every tenant-facing hit. See [`docs/auth.md`](docs/auth.md) for the full pattern.
 
 ### Convex import paths
 
 The `@` alias is **not available** inside `convex/` files (Convex module resolver). Use relative paths for server-to-server imports:
 
 ```typescript
-// Inside convex/contracts/useCases.ts
+// Inside convex/guarantees/useCases.ts
 import { mutation, query } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
-import { contractStatusValidator } from "./domain";
+import { guaranteeStateValidator } from "./domain";
 ```
 
 Client code in an app uses the `@convex/...` alias (each app's tsconfig maps `@convex/*` → `../../convex/*`; `@/*` → that app's `./src/*`):
@@ -511,7 +511,7 @@ The app is bilingual: `pt-BR` (default) and `en`. Locale prefix is `as-needed` �
 
 ### Message files
 
-Strings live in `messages/{locale}.json` at project root, organized by namespace (`meta`, `common`, `nav`, `contractDetails`, etc.). Add new keys to **both** `pt-BR.json` and `en.json` in the same change — out-of-sync keys silently fall back to the key string at runtime.
+Strings live in `messages/{locale}.json` at project root, organized by namespace (`meta`, `common`, `nav`, `guaranteeDetails`, etc.). Add new keys to **both** `pt-BR.json` and `en.json` in the same change — out-of-sync keys silently fall back to the key string at runtime.
 
 ### Reading messages
 
@@ -519,12 +519,12 @@ Strings live in `messages/{locale}.json` at project root, organized by namespace
 // Client component
 "use client";
 import { useTranslations } from "next-intl";
-const t = useTranslations("contractDetails.errors");
+const t = useTranslations("guaranteeDetails.errors");
 return <h1>{t("title")}</h1>;
 
 // Server component
 import { getTranslations } from "next-intl/server";
-const t = await getTranslations("contractDetails.errors");
+const t = await getTranslations("guaranteeDetails.errors");
 // or with explicit locale: getTranslations({ locale, namespace: 'meta' })
 ```
 
@@ -546,7 +546,7 @@ if (!result.success) {
 }
 ```
 
-Define error codes as `as const` value objects in the entity file (e.g. `CONTRACT_ERROR_CODE` in `convex/contracts/domain.ts`). Never display raw error messages from the server to users — only codes.
+Define error codes as `as const` value objects in the entity file (e.g. `GUARANTEE_ERROR_CODE` in `convex/guarantees/domain.ts`). Never display raw error messages from the server to users — only codes.
 
 ## Domain conventions (Brazil)
 
@@ -597,26 +597,28 @@ Each Convex domain folder (`convex/{domain}/`) is a bounded context. Keep the bo
 
 **One concern per domain**
 
-| Domain       | Owns                                                                 | Does NOT own                                                |
-| ------------ | -------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `users/`     | Identity, profile, user resolution                                   | Roles, org membership, auth tokens                          |
-| `agencies/`  | Organization data, membership, roles                                 | User profile fields, contract data                          |
-| `contracts/` | Rental lifecycle, documents, tenant, history                         | Payment state, agency billing                               |
-| `invoices/`  | Invoice lifecycle (the bill), line items, status (`overdue` derived) | Settlement/payment processing, contract status, tenant info |
+| Domain        | Owns                                                                                                 | Does NOT own                                                         |
+| ------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `users/`      | Identity, profile, user resolution                                                                   | Roles, org membership, auth tokens                                   |
+| `agencies/`   | Organization data, membership, roles                                                                 | User profile fields, lease or guarantee data                         |
+| `leases/`     | The rental relationship — property, rent, payer, tenant pointer, and which guarantee is open on it   | Pricing, coverage, guarantee state                                   |
+| `guarantees/` | What Mutav sells against a lease — 7-state lifecycle, `terms` snapshot, capacity, documents, history | Lease attributes, product parameters, payment state                  |
+| `products/`   | Pricing parameters as data — `terms` bundle, eligibility, effective window                           | Anything about a sold guarantee (that lives in its `terms` snapshot) |
+| `invoices/`   | Invoice lifecycle (the bill), line items, status (`overdue` derived)                                 | Settlement/payment processing, guarantee state, tenant info          |
 
 When a query needs data from two domains (e.g. membership + user info), the enrichment belongs in the domain that drives the use case — `agencies/useCases.ts` enriches membership rows with user data because the agency domain drives the members list. The user domain does not reach into memberships.
 
 **`domain.ts` is the type source of truth**
 
 - Export `Doc<'tableName'>` and `Id<'tableName'>` aliases (`User`, `UserId`) — never use raw generics outside the entity file.
-- Export value-object constants (`MEMBER_ROLE`, `CONTRACT_STATUS`) as `as const satisfies Record<...>` — keyof safety with literal inference.
+- Export value-object constants (`MEMBER_ROLE`, `GUARANTEE_STATE`) as `as const satisfies Record<...>` — keyof safety with literal inference.
 - Export Convex `v.*` validators (`memberRoleValidator`) alongside the constants — one import gets both the type and the validator.
-- Export domain helpers that encode business rules (`hasRole`, `isActiveContract`) — single place, no duplication.
+- Export domain helpers that encode business rules (`hasRole`, `isInsured`) — single place, no duplication.
 
 **`useCases.ts` is the query/mutation anti-corruption layer**
 
 - Every function must use an index — no `.filter()` (full table scans in Convex).
-- `shape*` helpers inside `useCases.ts` define the projection between the DB schema and the UI. Name them `shapeContractSummary` / `shapeContract` etc. — not generic names like `toDTO`.
+- `shape*` helpers inside `useCases.ts` define the projection between the DB schema and the UI. Name them `shapeGuaranteeSummary` / `shapeGuarantee` etc. — not generic names like `toDTO`.
 - Public handlers must use the auth wrappers from `convex/lib/auth.ts` — see Key Patterns / Auth & agency scoping and [`docs/auth.md`](docs/auth.md). Resolved `ctx.user`, `ctx.membership`, and `ctx.agencyId` come from the wrapper; do not hand-roll identity or membership lookups in handlers.
 
 **Workspace / multi-tenancy**

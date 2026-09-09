@@ -27,12 +27,12 @@ Mutav-internal users are a distinct actor from agency staff. They are not "an ag
 
 Sub-roles encode "what can this Mutav staff member do":
 
-| Role         | Permissions (architectural intent)                                   |
-| ------------ | -------------------------------------------------------------------- |
-| `admin`      | All operations across all pillars. Owner-equivalent.                 |
-| `compliance` | A2 (onboarding review, approve/reject). Read-only on other pillars.  |
-| `support`    | Read all agencies/contracts/payments for support tickets. No writes. |
-| `treasury`   | A4 (fund payments) + A3 (default approval). No A2.                   |
+| Role         | Permissions (architectural intent)                                    |
+| ------------ | --------------------------------------------------------------------- |
+| `admin`      | All operations across all pillars. Owner-equivalent.                  |
+| `compliance` | A2 (onboarding review, approve/reject). Read-only on other pillars.   |
+| `support`    | Read all agencies/guarantees/payments for support tickets. No writes. |
+| `treasury`   | A4 (fund payments) + A3 (default approval). No A2.                    |
 
 Sub-roles are additive in effect (a `compliance` user can do compliance writes; a user with both `compliance` and `support` can do both). A user has zero or more `mutavStaff` rows, one per role. (Alternative — a single row with a role array — is simpler but loses per-role audit attribution. Defer that choice to implementation.)
 
@@ -139,8 +139,8 @@ The whitepaper's Liquidação Programável flow puts Mutav-admin in a mandatory 
 ```
 
 - Step 1 (agency): existing `(app)` button opens a delinquency row
-- Step 2 (Convex): `delinquencies` domain logs the request, triggers a read-only contract simulation via a Convex action
-- Step 3 (Soroban): smart contract validates contract terms, returns pre-approval verdict (no state change yet)
+- Step 2 (Convex): `delinquencies` domain logs the request, triggers a read-only Soroban simulation via a Convex action
+- Step 3 (Soroban): the smart contract validates the guarantee's terms, returns a pre-approval verdict (no state change yet)
 - Step 4 (Mutav-admin): pre-approved requests land in an approval queue in `(admin)`. Mutav-admin attests with a sub-role of `admin` or `treasury`. **Convex records the attestation but does not sign.**
 - Step 5 (external multisig + Soroban): the signed liquidation transaction is submitted via the multisig tool. The indexer (see [`onchain-integration.md`](onchain-integration.md)) observes execution and updates `delinquencies` row state.
 
@@ -150,7 +150,7 @@ A3 owns:
 
 - `delinquencies` domain — request lifecycle (`opened` / `pre-approved` / `rejected` / `attested` / `submitted` / `executed` / `failed`)
 - The workflow handler that coordinates the 5 steps
-- Read: `contracts` (the contract being liquidated), `fundState` (which fund covers this contract — see [`onchain-integration.md`](onchain-integration.md))
+- Read: `guarantees` (the guarantee being liquidated), `fundState` (which fund covers it — see [`onchain-integration.md`](onchain-integration.md))
 - Write: `delinquencies.requests`, `mutavAuditLog`
 - Gates: every state-changing operation in this flow consults `compliance` (per [`compliance.md`](compliance.md)) — e.g., `regulatory pause` halts new attestations
 
@@ -163,7 +163,7 @@ A3 **does** own the **proposal queue UI** inside the `(admin)` shell — Mutav's
 
 ### A4 — Fund payments management
 
-`Mutav-BR` charges agencies for guarantees (per-contract activation fee + ongoing percentage). The money flow now crosses entities: tenant pays agency invoice → agency pays `Mutav-BR` → `Mutav-BR` retains 20% → `Mutav-BR` cedes 80% via cessão de recebíveis to `Mutav-Fund` (which mints TESOURO into its Stellar address) → `Mutav-Fund` covers liquidations on `Mutav-Mgmt`'s instruction (per A3). The existing `payments` domain handles tenant → agency invoices (the Pix portal under `(public)/pay/[publicId]`). A4 adds the **Mutav-side** layer: agency → `Mutav-BR` settlement, `Mutav-BR` → `Mutav-Fund` cessão, plus the Mutav-internal view across both legs.
+`Mutav-BR` charges agencies for guarantees (per-guarantee activation fee + ongoing percentage). The money flow now crosses entities: tenant pays agency invoice → agency pays `Mutav-BR` → `Mutav-BR` retains 20% → `Mutav-BR` cedes 80% via cessão de recebíveis to `Mutav-Fund` (which mints TESOURO into its Stellar address) → `Mutav-Fund` covers liquidations on `Mutav-Mgmt`'s instruction (per A3). The existing `payments` domain handles tenant → agency invoices (the Pix portal under `(public)/pay/[publicId]`). A4 adds the **Mutav-side** layer: agency → `Mutav-BR` settlement, `Mutav-BR` → `Mutav-Fund` cessão, plus the Mutav-internal view across both legs.
 
 **Treasury denomination: TESOURO.** `Mutav-Fund` holds Etherfuse's tokenized Brazilian Treasury bonds as the treasury asset — BRL-denominated, yield-bearing. Agency settlement lands in `Mutav-BR`'s BR bank account first; the cessão step mints TESOURO into `Mutav-Fund`'s Stellar address via the primary Etherfuse rail (BRL Pix → TESOURO direct); the BaaS rail (Transfero / Bitso / Foxbit) exists as capacity/concentration hedge per [`onchain-integration.md`](onchain-integration.md) § Agency settlement. The câmbio reporting on the cessão step is owned by `Mutav-BR` per [`regulatory.md`](regulatory.md) § BACEN câmbio reporting.
 

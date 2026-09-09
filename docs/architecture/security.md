@@ -74,10 +74,10 @@ claimedDocuments: defineTable({
 
 The Convex backend has two runtimes; the crypto layer respects that split intentionally.
 
-| Module                                                 | Runtime             | Why                                                                                                                                                                                                            |
-| ------------------------------------------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`convex/lib/pii.ts`](../../convex/lib/pii.ts)         | V8 (WebCrypto)      | PII reads and writes happen inside queries and mutations everywhere — agency profile, contract creation, payment receipts, admin review. Forcing them through an action boundary would double request latency. |
-| [`convex/lib/secrets.ts`](../../convex/lib/secrets.ts) | Node (`"use node"`) | The only consumer is the Stellar treasury / proxy seed encryption path. Seeds are only decrypted inside SEP-10 signing actions, which are Node-resident anyway. Node's `node:crypto` is the natural fit.       |
+| Module                                                 | Runtime             | Why                                                                                                                                                                                                             |
+| ------------------------------------------------------ | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`convex/lib/pii.ts`](../../convex/lib/pii.ts)         | V8 (WebCrypto)      | PII reads and writes happen inside queries and mutations everywhere — agency profile, guarantee creation, payment receipts, admin review. Forcing them through an action boundary would double request latency. |
+| [`convex/lib/secrets.ts`](../../convex/lib/secrets.ts) | Node (`"use node"`) | The only consumer is the Stellar treasury / proxy seed encryption path. Seeds are only decrypted inside SEP-10 signing actions, which are Node-resident anyway. Node's `node:crypto` is the natural fit.        |
 
 The two modules export the same `{ciphertext, iv, authTag}` envelope shape so the on-disk contract is identical — a future migration could collapse them into one V8 implementation that handles both, but that's not justified today. The Stellar seeds and the PII data have different threat models and different rotation cadences; keeping them apart keeps blast radius localized.
 
@@ -163,7 +163,7 @@ Retention policy — how long do audit entries live, when does the table truncat
 
 ### Wired consumers (current)
 
-Every state-changing mutation in `convex/payments/` and `convex/contracts/` calls `appendAuditEntry`. Internal mutations called by webhooks/cron use `{kind: "system", source: "..."}` actors; public mutations use `{kind: "user", userId: ctx.user._id}`. The actor passthrough refinement (so an admin-initiated internal mutation records the admin user, not "system") lands with the `(admin)` shell and `mutationWithMutavStaff` wrapper.
+Every state-changing mutation in `convex/invoices/` and `convex/guarantees/` calls `appendAuditEntry`. Internal mutations called by webhooks/cron use `{kind: "system", source: "..."}` actors; public mutations use `{kind: "user", userId: ctx.user._id}`. The actor passthrough refinement (so an admin-initiated internal mutation records the admin user, not "system") lands with the `(admin)` shell and `mutationWithMutavStaff` wrapper.
 
 ### Atomicity
 
