@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { internalMutation, type MutationCtx } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
 import {
   accessTokenExpiryFrom,
   INVOICE_LINE_ITEM_KIND,
@@ -15,6 +14,7 @@ import {
   DELINQUENCY_STATUS,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
+  type DelinquencyNotice,
 } from "./delinquencies/domain";
 import {
   assertClose,
@@ -2896,7 +2896,7 @@ function seedDaysAfter(at: string, days: number): string {
   return `${shifted.toISOString().slice(0, 10)}T${timePart}`;
 }
 
-type SeedNotice = Doc<"guaranteeDelinquencyNotices">;
+type SeedNotice = DelinquencyNotice;
 
 type NoticeEvent = {
   at: string;
