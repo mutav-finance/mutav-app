@@ -11,27 +11,47 @@ import { generateInvoiceAccessToken } from "./lib/randomId";
 import { SettlementMethods, type SettlementMethod } from "./payments/domain";
 import type { AgencyId } from "./agencies/domain";
 import {
-  DEFAULT_CONTRACT_PLAN,
-  DEFAULT_EXIT_COST_MULTIPLIER,
-  DEFAULT_PAYER,
-  DEFAULT_RENT_MULTIPLIER,
-  type Contract,
-  type ContractId,
+  CLOSE_REASON,
+  DEFAULT_GUARANTEE_PLAN,
+  GUARANTEE_STATE,
+  SCORE_TIER,
+  tierForScore,
+  type CloseReason,
+  type Guarantee,
+  type GuaranteeId,
+  type GuaranteePlan,
+  type GuaranteeState,
+  type GuaranteeTerms,
   type TenantApprovalStatus,
-} from "./contracts/domain";
+} from "./guarantees/domain";
+import { DEFAULT_PRICING_TABLE, priceGuarantee } from "./guarantees/pricing";
 import {
   ativoInsuredCentsPlatform,
   contractsByStatus,
   contractsByStatusPlatform,
-} from "./contracts/aggregate";
-import { insertContractAggregates } from "./contracts/aggregateWrites";
+} from "./guarantees/aggregate";
+import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
+import {
+  buildLeaseRent,
+  DEFAULT_PAYER,
+  PROPERTY_KIND,
+  type LeaseId,
+  type LeaseProperty,
+  type LeaseRentInput,
+  type PropertyKind,
+} from "./leases/domain";
+import { DEFAULT_PRODUCT_SLUG, type Product } from "./products/domain";
+import { findDefaultProduct } from "./products/useCases";
 import { normalizeEmbeddedTenant, type EmbeddedTenantSnapshot } from "./tenants/domain";
 import { getOrCreateTenant } from "./tenants/useCases";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Zero-padded public contract ID, e.g. "1000007" */
+/** Zero-padded public guarantee ID, e.g. "1000007" */
 const pid = (n: number) => String(1_000_000 + n);
+
+/** Seed lease reference derived from its guarantee's public id (`LSE-1000007`). */
+const leasePid = (guaranteePublicId: string) => `LSE-${guaranteePublicId}`;
 
 /** ISO date string */
 const d = (s: string) => s;
@@ -69,12 +89,17 @@ const DEMO_TABLES = [
   // pointers mid-wipe.
   "payments",
   "invoices",
-  // Notices FK-reference contracts + users. Wipe before contracts so we
-  // don't leave dangling contractId pointers mid-wipe.
-  "contractDelinquencyNotices",
-  "contractHistory",
-  "contracts",
-  // tenants after contracts — contracts FK-reference tenants via tenantId.
+  // Notices FK-reference guarantees + users. Wipe before guarantees so we
+  // don't leave dangling guaranteeId pointers mid-wipe.
+  "guaranteeDelinquencyNotices",
+  "guaranteeHistory",
+  // guarantees ↔ leases point at each other (`leaseId` / `openGuaranteeId`);
+  // guarantees go first so no lease pointer outlives its target, and the
+  // product a guarantee priced against goes after every guarantee.
+  "guarantees",
+  "leases",
+  "products",
+  // tenants after leases — leases FK-reference tenants via tenantId.
   "tenants",
   "memberships",
   "users",
@@ -92,51 +117,171 @@ async function wipeDemoTables(ctx: MutationCtx) {
 }
 
 /**
+ * The one guarantee product the demo dataset sells. Its `terms` are today's
+ * pricing constants verbatim, so every seeded guarantee prices exactly as the
+ * pre-catalog code did. Idempotent by slug.
+ */
+async function seedDefaultProduct(ctx: MutationCtx): Promise<Product> {
+  const existing = await ctx.db
+    .query("products")
+    .withIndex("by_slug", (q) => q.eq("slug", DEFAULT_PRODUCT_SLUG))
+    .unique();
+  if (existing) return existing;
+  const productId = await ctx.db.insert("products", {
+    slug: DEFAULT_PRODUCT_SLUG,
+    name: "Mutav Fiança",
+    enabled: true,
+    isDefault: true,
+    effectiveFrom: d("2026-01-01T00:00:00.000Z"),
+    terms: DEFAULT_PRICING_TABLE,
+    eligibility: {
+      agencyIds: null,
+      regionUFs: null,
+      minTier: null,
+      propertyKinds: null,
+    },
+  });
+  const product = await ctx.db.get(productId);
+  if (!product) throw new Error("Default product insert failed");
+  return product;
+}
+
+async function requireDefaultProduct(ctx: MutationCtx): Promise<Product> {
+  const product = await findDefaultProduct(ctx);
+  if (!product) throw new Error("Seed requires the default product; run seedDefaultProduct first");
+  return product;
+}
+
+/**
  * Seed-local tenant block: the wizard-era embedded shape plus the
- * contract-level approval/score fields, kept so the seed data reads like
- * one self-contained record per contract.
+ * guarantee-level approval/score fields, kept so the seed data reads like
+ * one self-contained record per lease.
  */
 type SeedTenantBlock = EmbeddedTenantSnapshot & {
   approvalStatus: TenantApprovalStatus;
   termApprovedAt: string | null;
-  score?: number;
+  score: number;
 };
 
-type SeedContractSpec = Omit<
-  Contract,
-  "_id" | "_creationTime" | "tenantId" | "tenantApproval" | "score" | "rental"
-> & { rental: Omit<Contract["rental"], "plan">; tenant: SeedTenantBlock };
+type SeedLeaseSpec = {
+  agencyId: AgencyId;
+  /** Guarantee public id; the lease derives its own via `leasePid`. */
+  publicId: string;
+  lease: {
+    propertyKind: PropertyKind;
+    property: LeaseProperty;
+    tag: string;
+    description: string;
+    rent: LeaseRentInput;
+  };
+  guarantee: {
+    state: GuaranteeState;
+    closure?: { reason: CloseReason; closedAt: string; note?: string };
+    activatedAt: string | null;
+    nextRenewalDate: string;
+    plan?: GuaranteePlan;
+    documents: Guarantee["documents"];
+  };
+  tenant: SeedTenantBlock;
+};
+
+type SeededLeaseAndGuarantee = {
+  guaranteeId: GuaranteeId;
+  leaseId: LeaseId;
+  publicId: string;
+  terms: GuaranteeTerms;
+};
+
+// Drafts were never activated or approved, so nothing on the record dates
+// their pricing; the demo book was priced on this day.
+const SEED_DRAFT_PRICED_AT = d("2026-05-01T09:00:00-03:00");
 
 /**
- * Registry-only contract insert: resolves (or creates) the `tenants` row
- * through `getOrCreateTenant` — same dedup / last-write-wins / conflict
- * audit-logging semantics as `contracts.create` — then writes the contract
- * with the required `tenantId` + `tenantApproval` link and the
- * contract-level `score` snapshot. Seed data must be checksum-valid, so a
- * non-normalizable tenant throws instead of silently skipping.
+ * Registry-only lease + guarantee insert: resolves (or creates) the `tenants`
+ * row through `getOrCreateTenant` — same dedup / last-write-wins / conflict
+ * audit-logging semantics as `guarantees.create` — inserts the lease, prices
+ * the guarantee through the default product with `priceGuarantee` (so fee,
+ * ceiling and exit cap reconcile with the product, never hand-typed), writes
+ * the guarantee with its `terms` snapshot + `capacity`, points the lease at
+ * it when it is not closed, and registers it in every aggregate. Seed data
+ * must be checksum-valid and priceable, so a non-normalizable tenant or a
+ * denied score throws instead of silently skipping.
  */
-async function insertSeedContract(ctx: MutationCtx, spec: SeedContractSpec): Promise<ContractId> {
-  const { tenant, ...contract } = spec;
+async function insertSeedLeaseAndGuarantee(
+  ctx: MutationCtx,
+  { product, spec }: { product: Product; spec: SeedLeaseSpec },
+): Promise<SeededLeaseAndGuarantee> {
+  const { tenant, lease, guarantee } = spec;
   const input = normalizeEmbeddedTenant(tenant);
   if (!input) {
-    throw new Error(`Seed tenant for contract ${contract.publicId} failed tax-id normalization`);
+    throw new Error(`Seed tenant for guarantee ${spec.publicId} failed tax-id normalization`);
   }
   const result = await getOrCreateTenant(ctx, {
     input,
     actor: { kind: "system", source: "seed" },
   });
   if (!result.success) {
-    throw new Error(`Seed tenant for contract ${contract.publicId}: ${result.message}`);
+    throw new Error(`Seed tenant for guarantee ${spec.publicId}: ${result.message}`);
   }
-  return ctx.db.insert("contracts", {
-    ...contract,
-    rental: { ...contract.rental, plan: DEFAULT_CONTRACT_PLAN },
-    tenantId: result.data.tenantId,
-    tenantApproval: { status: tenant.approvalStatus, termApprovedAt: tenant.termApprovedAt },
-    score: tenant.score,
-  });
-}
 
+  const tier = tierForScore(tenant.score);
+  if (tier === SCORE_TIER.NEGADO) {
+    throw new Error(`Seed tenant for guarantee ${spec.publicId} has a denied score`);
+  }
+
+  const leaseId = await ctx.db.insert("leases", {
+    agencyId: spec.agencyId,
+    publicId: leasePid(spec.publicId),
+    tenantId: result.data.tenantId,
+    propertyKind: lease.propertyKind,
+    property: lease.property,
+    tag: lease.tag,
+    description: lease.description,
+    rent: buildLeaseRent(lease.rent),
+    payer: DEFAULT_PAYER,
+    openGuaranteeId: null,
+  });
+
+  const priced = priceGuarantee(
+    {
+      rentCents: lease.rent.rentCents,
+      tier,
+      plan: guarantee.plan ?? DEFAULT_GUARANTEE_PLAN,
+      productSlug: product.slug,
+      appliedAt: guarantee.activatedAt ?? tenant.termApprovedAt ?? SEED_DRAFT_PRICED_AT,
+    },
+    product.terms,
+  );
+
+  const guaranteeId = await ctx.db.insert("guarantees", {
+    agencyId: spec.agencyId,
+    leaseId,
+    publicId: spec.publicId,
+    productId: product._id,
+    status: guarantee.state,
+    ...(guarantee.closure ? { closure: guarantee.closure } : {}),
+    activatedAt: guarantee.activatedAt,
+    nextRenewalDate: guarantee.nextRenewalDate,
+    underwriting: { score: tenant.score, tier },
+    tenantApproval: {
+      status: tenant.approvalStatus,
+      termApprovedAt: tenant.termApprovedAt,
+    },
+    terms: priced.terms,
+    capacity: priced.capacity,
+    documents: guarantee.documents,
+  });
+
+  if (guarantee.state !== GUARANTEE_STATE.CLOSED) {
+    await ctx.db.patch(leaseId, { openGuaranteeId: guaranteeId });
+  }
+
+  const doc = await ctx.db.get(guaranteeId);
+  if (!doc) throw new Error(`Seed guarantee ${spec.publicId} insert failed`);
+  await insertGuaranteeAggregates(ctx, doc);
+
+  return { guaranteeId, leaseId, publicId: spec.publicId, terms: priced.terms };
+}
 /**
  * Insert a paid invoice plus its mirroring `payments` settlement row in
  * one call. The settlement reuses the invoice's own `paidAt`, total, and
@@ -155,8 +300,8 @@ async function seedPaidInvoice(
     paidAt: string;
     method: SettlementMethod;
     lineItems: Array<{
-      contractId: ContractId;
-      contractPublicId: string;
+      guaranteeId: GuaranteeId;
+      guaranteePublicId: string;
       kind: "recurring" | "activation";
       amountCents: number;
       description: string;
@@ -211,12 +356,13 @@ function externalRefForSettlement(method: SettlementMethod): string | undefined 
 
 type SeedFictionalResult = {
   agencies: { paulistaId: AgencyId; atlanticaId: AgencyId; horizonteId: AgencyId };
-  contractCounts: { paulista: number; atlantica: number; horizonte: number };
+  guaranteeCounts: { paulista: number; atlantica: number; horizonte: number };
 };
 
 /**
- * Additive dev seed — inserts 3 agencies, 30 contracts, contract history,
- * and historical payments covering the last two months. Does NOT wipe
+ * Additive dev seed — inserts 3 agencies, 30 leases each carrying one
+ * guarantee priced through the default product, guarantee history, and
+ * historical payments covering the last two months. Does NOT wipe
  * existing rows and does NOT seed the `agencyowner` persona's own agency
  * ("Imobiliária Aprovada"). It is deliberately a private helper, not a
  * runnable entrypoint: running it by hand leaves `agencyowner` staring at
@@ -237,6 +383,10 @@ async function seedFictional(
   args: { adminEmail?: string },
 ): Promise<SeedFictionalResult> {
   {
+    const product = await requireDefaultProduct(ctx);
+    const insertLeaseAndGuarantee = (spec: SeedLeaseSpec) =>
+      insertSeedLeaseAndGuarantee(ctx, { product, spec });
+
     // ── Agencies ──────────────────────────────────────────────────────────────
 
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
@@ -334,42 +484,35 @@ async function seedFictional(
       joinedAt: d("2025-01-10T00:00:00-03:00"),
     });
 
-    // ── Contracts — Imobiliária Paulista (15) ─────────────────────────────────    // 12 ativo, 2 pendente, 1 encerrado
+    // ── Leases + guarantees — Imobiliária Paulista (15) ───────────────────────
+    // 12 active, 2 drafted, 1 closed (end_of_lease)
 
-    const p1 = await insertSeedContract(ctx, {
+    const p1 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(1),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-03-01",
-      availableGuaranteeCents: 12_800_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 320_000,
-        condoCents: 45_000,
-        otherFeesCents: 0,
-        totalRentCents: 365_000,
-        feeCents: 512_000,
-        oneTimeActivationFeeCents: 20_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "01310-100",
+          streetAndNumber: "Av. Paulista, 1500",
+          neighborhood: "Bela Vista",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 204",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 320_000, condoCents: 45_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "01310-100",
-        streetAndNumber: "Av. Paulista, 1500",
-        neighborhood: "Bela Vista",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-03-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 204", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Maria Silva Santos",
@@ -382,40 +525,32 @@ async function seedFictional(
       },
     });
 
-    const p2 = await insertSeedContract(ctx, {
+    const p2 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(2),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-04-01",
-      availableGuaranteeCents: 16_000_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 400_000,
-        condoCents: 60_000,
-        otherFeesCents: 5_000,
-        totalRentCents: 465_000,
-        feeCents: 640_000,
-        oneTimeActivationFeeCents: 25_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "01402-000",
+          streetAndNumber: "Rua Augusta, 800",
+          neighborhood: "Consolação",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 101",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 400_000, condoCents: 60_000, otherFeesCents: 5_000 },
       },
-      property: {
-        cep: "01402-000",
-        streetAndNumber: "Rua Augusta, 800",
-        neighborhood: "Consolação",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-04-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 101", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Carlos Eduardo Ferreira",
@@ -428,44 +563,32 @@ async function seedFictional(
       },
     });
 
-    const p3 = await insertSeedContract(ctx, {
+    const p3 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(3),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-05-15",
-      availableGuaranteeCents: 22_000_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 550_000,
-        condoCents: 90_000,
-        otherFeesCents: 15_000,
-        totalRentCents: 655_000,
-        feeCents: 880_000,
-        oneTimeActivationFeeCents: 35_000,
-        setupInstallments: 2,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01310-200",
-        streetAndNumber: "Av. Paulista, 900",
-        neighborhood: "Bela Vista",
-        cityUF: "São Paulo/SP",
-      },
-      optional: {
-        complement: "Sala 305",
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "01310-200",
+          streetAndNumber: "Av. Paulista, 900",
+          neighborhood: "Bela Vista",
+          cityUF: "São Paulo/SP",
+          complement: "Sala 305",
+        },
         tag: "comercial",
         description: "Escritório para startups.",
+        rent: { rentCents: 550_000, condoCents: 90_000, otherFeesCents: 15_000 },
       },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-05-15",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
+      },
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Tech Solutions Ltda",
@@ -479,40 +602,32 @@ async function seedFictional(
       },
     });
 
-    const p4 = await insertSeedContract(ctx, {
+    const p4 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(4),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-11-01",
-      availableGuaranteeCents: 9_600_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 240_000,
-        condoCents: 30_000,
-        otherFeesCents: 0,
-        totalRentCents: 270_000,
-        feeCents: 384_000,
-        oneTimeActivationFeeCents: 15_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "04571-010",
+          streetAndNumber: "Av. das Nações Unidas, 12000",
+          neighborhood: "Brooklin",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 802",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 240_000, condoCents: 30_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "04571-010",
-        streetAndNumber: "Av. das Nações Unidas, 12000",
-        neighborhood: "Brooklin",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-11-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 802", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Ana Paula Rodrigues",
@@ -525,44 +640,32 @@ async function seedFictional(
       },
     });
 
-    const p5 = await insertSeedContract(ctx, {
+    const p5 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(5),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-01-20",
-      availableGuaranteeCents: 28_000_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 700_000,
-        condoCents: 120_000,
-        otherFeesCents: 20_000,
-        totalRentCents: 840_000,
-        feeCents: 1_120_000,
-        oneTimeActivationFeeCents: 50_000,
-        setupInstallments: 3,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "04538-133",
-        streetAndNumber: "Rua Funchal, 418",
-        neighborhood: "Vila Olímpia",
-        cityUF: "São Paulo/SP",
-      },
-      optional: {
-        complement: "Andar 8 completo",
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "04538-133",
+          streetAndNumber: "Rua Funchal, 418",
+          neighborhood: "Vila Olímpia",
+          cityUF: "São Paulo/SP",
+          complement: "Andar 8 completo",
+        },
         tag: "premium",
         description: "Laje corporativa.",
+        rent: { rentCents: 700_000, condoCents: 120_000, otherFeesCents: 20_000 },
       },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-01-20",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
+      },
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Global Finance S.A.",
@@ -576,40 +679,32 @@ async function seedFictional(
       },
     });
 
-    const p6 = await insertSeedContract(ctx, {
+    const p6 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(6),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-02-10",
-      availableGuaranteeCents: 11_200_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 280_000,
-        condoCents: 40_000,
-        otherFeesCents: 0,
-        totalRentCents: 320_000,
-        feeCents: 448_000,
-        oneTimeActivationFeeCents: 18_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "05422-010",
+          streetAndNumber: "Rua dos Pinheiros, 330",
+          neighborhood: "Pinheiros",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 52",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 280_000, condoCents: 40_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "05422-010",
-        streetAndNumber: "Rua dos Pinheiros, 330",
-        neighborhood: "Pinheiros",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-02-10",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 52", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Bruno Henrique Lima",
@@ -622,40 +717,32 @@ async function seedFictional(
       },
     });
 
-    const p7 = await insertSeedContract(ctx, {
+    const p7 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(7),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-09-01",
-      availableGuaranteeCents: 7_200_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 180_000,
-        condoCents: 25_000,
-        otherFeesCents: 0,
-        totalRentCents: 205_000,
-        feeCents: 288_000,
-        oneTimeActivationFeeCents: 12_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "03301-000",
+          streetAndNumber: "Av. Radial Leste, 1200",
+          neighborhood: "Tatuapé",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 12",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 180_000, condoCents: 25_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "03301-000",
-        streetAndNumber: "Av. Radial Leste, 1200",
-        neighborhood: "Tatuapé",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-09-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "enviado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 12", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "enviado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Fernanda Costa Oliveira",
@@ -668,40 +755,32 @@ async function seedFictional(
       },
     });
 
-    const p8 = await insertSeedContract(ctx, {
+    const p8 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(8),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-08-20",
-      availableGuaranteeCents: 14_400_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 360_000,
-        condoCents: 55_000,
-        otherFeesCents: 8_000,
-        totalRentCents: 423_000,
-        feeCents: 576_000,
-        oneTimeActivationFeeCents: 22_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "01423-001",
+          streetAndNumber: "Rua Oscar Freire, 500",
+          neighborhood: "Jardim Paulista",
+          cityUF: "São Paulo/SP",
+          complement: "Cobertura 1",
+        },
+        tag: "premium",
+        description: "",
+        rent: { rentCents: 360_000, condoCents: 55_000, otherFeesCents: 8_000 },
       },
-      property: {
-        cep: "01423-001",
-        streetAndNumber: "Rua Oscar Freire, 500",
-        neighborhood: "Jardim Paulista",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-08-20",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Cobertura 1", tag: "premium", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Ricardo Monteiro Braga",
@@ -714,40 +793,32 @@ async function seedFictional(
       },
     });
 
-    const p9 = await insertSeedContract(ctx, {
+    const p9 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(9),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-06-01",
-      availableGuaranteeCents: 6_000_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 150_000,
-        condoCents: 20_000,
-        otherFeesCents: 0,
-        totalRentCents: 170_000,
-        feeCents: 240_000,
-        oneTimeActivationFeeCents: 10_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "02040-000",
+          streetAndNumber: "Av. Nova Cantareira, 600",
+          neighborhood: "Mandaqui",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 31",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 150_000, condoCents: 20_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "02040-000",
-        streetAndNumber: "Av. Nova Cantareira, 600",
-        neighborhood: "Mandaqui",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-06-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "pendente" },
+        ],
       },
-      optional: { complement: "Apto 31", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "pendente" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Juliana Nascimento Souza",
@@ -760,44 +831,32 @@ async function seedFictional(
       },
     });
 
-    const p10 = await insertSeedContract(ctx, {
+    const p10 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(10),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-12-15",
-      availableGuaranteeCents: 19_200_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 480_000,
-        condoCents: 80_000,
-        otherFeesCents: 10_000,
-        totalRentCents: 570_000,
-        feeCents: 768_000,
-        oneTimeActivationFeeCents: 30_000,
-        setupInstallments: 2,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "04547-130",
-        streetAndNumber: "Av. Brigadeiro Faria Lima, 3400",
-        neighborhood: "Itaim Bibi",
-        cityUF: "São Paulo/SP",
-      },
-      optional: {
-        complement: "Sala 1201",
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "04547-130",
+          streetAndNumber: "Av. Brigadeiro Faria Lima, 3400",
+          neighborhood: "Itaim Bibi",
+          cityUF: "São Paulo/SP",
+          complement: "Sala 1201",
+        },
         tag: "comercial-premium",
         description: "Escritório em torre AAA.",
+        rent: { rentCents: 480_000, condoCents: 80_000, otherFeesCents: 10_000 },
       },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-12-15",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
+      },
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Inovação Digital Ltda",
@@ -811,40 +870,32 @@ async function seedFictional(
       },
     });
 
-    const p11 = await insertSeedContract(ctx, {
+    const p11 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(11),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-07-01",
-      availableGuaranteeCents: 8_000_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 200_000,
-        condoCents: 28_000,
-        otherFeesCents: 0,
-        totalRentCents: 228_000,
-        feeCents: 320_000,
-        oneTimeActivationFeeCents: 14_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "05051-000",
+          streetAndNumber: "Av. Queiroz Filho, 1200",
+          neighborhood: "Vila Hamburguesa",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 73",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 200_000, condoCents: 28_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "05051-000",
-        streetAndNumber: "Av. Queiroz Filho, 1200",
-        neighborhood: "Vila Hamburguesa",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-07-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 73", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Lucas Andrade Pereira",
@@ -857,40 +908,32 @@ async function seedFictional(
       },
     });
 
-    const p12 = await insertSeedContract(ctx, {
+    const p12 = await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(12),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-10-01",
-      availableGuaranteeCents: 10_400_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 260_000,
-        condoCents: 35_000,
-        otherFeesCents: 5_000,
-        totalRentCents: 300_000,
-        feeCents: 416_000,
-        oneTimeActivationFeeCents: 16_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "04040-001",
+          streetAndNumber: "Rua Domingos de Morais, 2000",
+          neighborhood: "Vila Mariana",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 45",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 260_000, condoCents: 35_000, otherFeesCents: 5_000 },
       },
-      property: {
-        cep: "04040-001",
-        streetAndNumber: "Rua Domingos de Morais, 2000",
-        neighborhood: "Vila Mariana",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-10-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 45", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Patrícia Gomes Tavares",
@@ -903,40 +946,32 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(13),
-      status: "pendente",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-08-01",
-      availableGuaranteeCents: 13_200_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 330_000,
-        condoCents: 50_000,
-        otherFeesCents: 0,
-        totalRentCents: 380_000,
-        feeCents: 528_000,
-        oneTimeActivationFeeCents: 20_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "01530-001",
+          streetAndNumber: "Rua da Consolação, 1500",
+          neighborhood: "Consolação",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 88",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 330_000, condoCents: 50_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "01530-001",
-        streetAndNumber: "Rua da Consolação, 1500",
-        neighborhood: "Consolação",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.DRAFTED,
+        activatedAt: null,
+        nextRenewalDate: "2027-08-01",
+        documents: [
+          { key: "rentalContract", status: "enviado" },
+          { key: "inspection", status: "pendente" },
+          { key: "policy", status: "pendente" },
+        ],
       },
-      optional: { complement: "Apto 88", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "enviado" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
-      ],
       tenant: {
         approvalStatus: "pendente",
         fullName: "Roberto Carvalho Neto",
@@ -949,40 +984,32 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(14),
-      status: "pendente",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-09-01",
-      availableGuaranteeCents: 15_600_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 390_000,
-        condoCents: 65_000,
-        otherFeesCents: 8_000,
-        totalRentCents: 463_000,
-        feeCents: 624_000,
-        oneTimeActivationFeeCents: 28_000,
-        setupInstallments: 2,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "04578-000",
+          streetAndNumber: "Rua Verbo Divino, 1488",
+          neighborhood: "Chácara Santo Antônio",
+          cityUF: "São Paulo/SP",
+          complement: "Sala 402",
+        },
+        tag: "comercial",
+        description: "",
+        rent: { rentCents: 390_000, condoCents: 65_000, otherFeesCents: 8_000 },
       },
-      property: {
-        cep: "04578-000",
-        streetAndNumber: "Rua Verbo Divino, 1488",
-        neighborhood: "Chácara Santo Antônio",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.DRAFTED,
+        activatedAt: null,
+        nextRenewalDate: "2027-09-01",
+        documents: [
+          { key: "rentalContract", status: "pendente" },
+          { key: "inspection", status: "pendente" },
+          { key: "policy", status: "pendente" },
+        ],
       },
-      optional: { complement: "Sala 402", tag: "comercial", description: "" },
-      documents: [
-        { key: "rentalContract", status: "pendente" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
-      ],
       tenant: {
         approvalStatus: "pendente",
         fullName: "Soluções Web S.A.",
@@ -996,40 +1023,33 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: paulistaId,
       publicId: pid(15),
-      status: "encerrado",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2025-02-01",
-      availableGuaranteeCents: 0,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 220_000,
-        condoCents: 32_000,
-        otherFeesCents: 0,
-        totalRentCents: 252_000,
-        feeCents: 352_000,
-        oneTimeActivationFeeCents: 15_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "01301-001",
+          streetAndNumber: "Av. São João, 300",
+          neighborhood: "República",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 3",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 220_000, condoCents: 32_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "01301-001",
-        streetAndNumber: "Av. São João, 300",
-        neighborhood: "República",
-        cityUF: "São Paulo/SP",
+      guarantee: {
+        state: GUARANTEE_STATE.CLOSED,
+        closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-03-10T18:00:00-03:00") },
+        activatedAt: null,
+        nextRenewalDate: "2025-02-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 3", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Silvia Menezes Rocha",
@@ -1042,43 +1062,35 @@ async function seedFictional(
       },
     });
 
-    // ── Contracts — Imobiliária Atlântica (12) ────────────────────────────────
-    // 8 ativo, 2 pendente, 1 encerrado, 1 cancelado
+    // ── Leases + guarantees — Imobiliária Atlântica (12) ──────────────────────
+    // 8 active, 2 drafted, 1 closed (end_of_lease), 1 closed (canceled_pre_activation)
 
-    const a1 = await insertSeedContract(ctx, {
+    const a1 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(16),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-03-15",
-      availableGuaranteeCents: 23_200_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 580_000,
-        condoCents: 95_000,
-        otherFeesCents: 12_000,
-        totalRentCents: 687_000,
-        feeCents: 928_000,
-        oneTimeActivationFeeCents: 40_000,
-        setupInstallments: 2,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "22250-040",
+          streetAndNumber: "Rua Visconde de Pirajá, 414",
+          neighborhood: "Ipanema",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 701",
+        },
+        tag: "premium",
+        description: "Vista para o mar.",
+        rent: { rentCents: 580_000, condoCents: 95_000, otherFeesCents: 12_000 },
       },
-      property: {
-        cep: "22250-040",
-        streetAndNumber: "Rua Visconde de Pirajá, 414",
-        neighborhood: "Ipanema",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-03-15",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 701", tag: "premium", description: "Vista para o mar." },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Mariana Figueiredo Costa",
@@ -1091,44 +1103,32 @@ async function seedFictional(
       },
     });
 
-    const a2 = await insertSeedContract(ctx, {
+    const a2 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(17),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-05-01",
-      availableGuaranteeCents: 30_000_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 750_000,
-        condoCents: 130_000,
-        otherFeesCents: 20_000,
-        totalRentCents: 900_000,
-        feeCents: 1_200_000,
-        oneTimeActivationFeeCents: 60_000,
-        setupInstallments: 3,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "20021-290",
-        streetAndNumber: "Av. Rio Branco, 156",
-        neighborhood: "Centro",
-        cityUF: "Rio de Janeiro/RJ",
-      },
-      optional: {
-        complement: "Andar 12",
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "20021-290",
+          streetAndNumber: "Av. Rio Branco, 156",
+          neighborhood: "Centro",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Andar 12",
+        },
         tag: "comercial-premium",
         description: "Torre corporativa Centro RJ.",
+        rent: { rentCents: 750_000, condoCents: 130_000, otherFeesCents: 20_000 },
       },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-05-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
+      },
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Atlântico Negócios S.A.",
@@ -1142,40 +1142,32 @@ async function seedFictional(
       },
     });
 
-    const a3 = await insertSeedContract(ctx, {
+    const a3 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(18),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-11-20",
-      availableGuaranteeCents: 17_600_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 440_000,
-        condoCents: 70_000,
-        otherFeesCents: 8_000,
-        totalRentCents: 518_000,
-        feeCents: 704_000,
-        oneTimeActivationFeeCents: 28_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "22411-011",
+          streetAndNumber: "Rua Dias Ferreira, 417",
+          neighborhood: "Leblon",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 301",
+        },
+        tag: "premium",
+        description: "",
+        rent: { rentCents: 440_000, condoCents: 70_000, otherFeesCents: 8_000 },
       },
-      property: {
-        cep: "22411-011",
-        streetAndNumber: "Rua Dias Ferreira, 417",
-        neighborhood: "Leblon",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-11-20",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 301", tag: "premium", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Eduardo Pinto Bastos",
@@ -1188,40 +1180,32 @@ async function seedFictional(
       },
     });
 
-    const a4 = await insertSeedContract(ctx, {
+    const a4 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(19),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-01-10",
-      availableGuaranteeCents: 8_800_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 220_000,
-        condoCents: 30_000,
-        otherFeesCents: 0,
-        totalRentCents: 250_000,
-        feeCents: 352_000,
-        oneTimeActivationFeeCents: 15_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "20551-013",
+          streetAndNumber: "Rua Visconde de Santa Isabel, 100",
+          neighborhood: "Vila Isabel",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 23",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 220_000, condoCents: 30_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "20551-013",
-        streetAndNumber: "Rua Visconde de Santa Isabel, 100",
-        neighborhood: "Vila Isabel",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-01-10",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 23", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Tatiana Alves Mendes",
@@ -1234,40 +1218,32 @@ async function seedFictional(
       },
     });
 
-    const a5 = await insertSeedContract(ctx, {
+    const a5 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(20),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-08-01",
-      availableGuaranteeCents: 26_400_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 660_000,
-        condoCents: 110_000,
-        otherFeesCents: 18_000,
-        totalRentCents: 788_000,
-        feeCents: 1_056_000,
-        oneTimeActivationFeeCents: 45_000,
-        setupInstallments: 3,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "22640-101",
+          streetAndNumber: "Av. das Américas, 3434",
+          neighborhood: "Barra da Tijuca",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Sala 800",
+        },
+        tag: "comercial",
+        description: "Complexo Downtown.",
+        rent: { rentCents: 660_000, condoCents: 110_000, otherFeesCents: 18_000 },
       },
-      property: {
-        cep: "22640-101",
-        streetAndNumber: "Av. das Américas, 3434",
-        neighborhood: "Barra da Tijuca",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-08-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Sala 800", tag: "comercial", description: "Complexo Downtown." },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Construtora Barra S.A.",
@@ -1281,40 +1257,32 @@ async function seedFictional(
       },
     });
 
-    const a6 = await insertSeedContract(ctx, {
+    const a6 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(21),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-04-20",
-      availableGuaranteeCents: 12_000_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 300_000,
-        condoCents: 42_000,
-        otherFeesCents: 5_000,
-        totalRentCents: 347_000,
-        feeCents: 480_000,
-        oneTimeActivationFeeCents: 19_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "20521-180",
+          streetAndNumber: "Rua São Francisco Xavier, 524",
+          neighborhood: "Maracanã",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 1104",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 300_000, condoCents: 42_000, otherFeesCents: 5_000 },
       },
-      property: {
-        cep: "20521-180",
-        streetAndNumber: "Rua São Francisco Xavier, 524",
-        neighborhood: "Maracanã",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-04-20",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 1104", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Gustavo Ribeiro Leal",
@@ -1327,40 +1295,32 @@ async function seedFictional(
       },
     });
 
-    const a7 = await insertSeedContract(ctx, {
+    const a7 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(22),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-07-15",
-      availableGuaranteeCents: 9_200_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 230_000,
-        condoCents: 33_000,
-        otherFeesCents: 0,
-        totalRentCents: 263_000,
-        feeCents: 368_000,
-        oneTimeActivationFeeCents: 14_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "20240-000",
+          streetAndNumber: "Rua Mem de Sá, 90",
+          neighborhood: "Lapa",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 2",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 230_000, condoCents: 33_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "20240-000",
-        streetAndNumber: "Rua Mem de Sá, 90",
-        neighborhood: "Lapa",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-07-15",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 2", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Camila Souza Barros",
@@ -1373,44 +1333,32 @@ async function seedFictional(
       },
     });
 
-    const a8 = await insertSeedContract(ctx, {
+    const a8 = await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(23),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-02-28",
-      availableGuaranteeCents: 34_000_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 850_000,
-        condoCents: 150_000,
-        otherFeesCents: 25_000,
-        totalRentCents: 1_025_000,
-        feeCents: 1_360_000,
-        oneTimeActivationFeeCents: 70_000,
-        setupInstallments: 4,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "22793-080",
-        streetAndNumber: "Av. Ayrton Senna, 2600",
-        neighborhood: "Barra da Tijuca",
-        cityUF: "Rio de Janeiro/RJ",
-      },
-      optional: {
-        complement: "Torre Sul, Andar 15",
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "22793-080",
+          streetAndNumber: "Av. Ayrton Senna, 2600",
+          neighborhood: "Barra da Tijuca",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Torre Sul, Andar 15",
+        },
         tag: "premium",
         description: "Sede corporativa.",
+        rent: { rentCents: 850_000, condoCents: 150_000, otherFeesCents: 25_000 },
       },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-02-28",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
+      },
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Petro Energy Ltda",
@@ -1424,40 +1372,32 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(24),
-      status: "pendente",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-09-01",
-      availableGuaranteeCents: 14_000_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 350_000,
-        condoCents: 52_000,
-        otherFeesCents: 0,
-        totalRentCents: 402_000,
-        feeCents: 560_000,
-        oneTimeActivationFeeCents: 22_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "22071-900",
+          streetAndNumber: "Rua Siqueira Campos, 45",
+          neighborhood: "Copacabana",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 601",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 350_000, condoCents: 52_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "22071-900",
-        streetAndNumber: "Rua Siqueira Campos, 45",
-        neighborhood: "Copacabana",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.DRAFTED,
+        activatedAt: null,
+        nextRenewalDate: "2027-09-01",
+        documents: [
+          { key: "rentalContract", status: "enviado" },
+          { key: "inspection", status: "pendente" },
+          { key: "policy", status: "pendente" },
+        ],
       },
-      optional: { complement: "Apto 601", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "enviado" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
-      ],
       tenant: {
         approvalStatus: "pendente",
         fullName: "Diego Mendonça Freitas",
@@ -1470,40 +1410,32 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(25),
-      status: "pendente",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-10-01",
-      availableGuaranteeCents: 18_000_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 450_000,
-        condoCents: 75_000,
-        otherFeesCents: 10_000,
-        totalRentCents: 535_000,
-        feeCents: 720_000,
-        oneTimeActivationFeeCents: 32_000,
-        setupInstallments: 2,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "20040-020",
+          streetAndNumber: "Av. Presidente Vargas, 500",
+          neighborhood: "Centro",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Sala 204",
+        },
+        tag: "comercial",
+        description: "",
+        rent: { rentCents: 450_000, condoCents: 75_000, otherFeesCents: 10_000 },
       },
-      property: {
-        cep: "20040-020",
-        streetAndNumber: "Av. Presidente Vargas, 500",
-        neighborhood: "Centro",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.DRAFTED,
+        activatedAt: null,
+        nextRenewalDate: "2027-10-01",
+        documents: [
+          { key: "rentalContract", status: "pendente" },
+          { key: "inspection", status: "pendente" },
+          { key: "policy", status: "pendente" },
+        ],
       },
-      optional: { complement: "Sala 204", tag: "comercial", description: "" },
-      documents: [
-        { key: "rentalContract", status: "pendente" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
-      ],
       tenant: {
         approvalStatus: "pendente",
         fullName: "Logística Carioca Ltda",
@@ -1517,40 +1449,33 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(26),
-      status: "encerrado",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2024-12-01",
-      availableGuaranteeCents: 0,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 270_000,
-        condoCents: 40_000,
-        otherFeesCents: 0,
-        totalRentCents: 310_000,
-        feeCents: 432_000,
-        oneTimeActivationFeeCents: 16_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "22421-030",
+          streetAndNumber: "Rua Ataulfo de Paiva, 600",
+          neighborhood: "Leblon",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 11",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 270_000, condoCents: 40_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "22421-030",
-        streetAndNumber: "Rua Ataulfo de Paiva, 600",
-        neighborhood: "Leblon",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.CLOSED,
+        closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-01-20T18:00:00-03:00") },
+        activatedAt: null,
+        nextRenewalDate: "2024-12-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 11", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Isabela Torres Viana",
@@ -1563,40 +1488,36 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: atlanticaId,
       publicId: pid(27),
-      status: "cancelado",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-06-01",
-      availableGuaranteeCents: 0,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 310_000,
-        condoCents: 45_000,
-        otherFeesCents: 0,
-        totalRentCents: 355_000,
-        feeCents: 496_000,
-        oneTimeActivationFeeCents: 18_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "20560-120",
+          streetAndNumber: "Rua Conde de Bonfim, 300",
+          neighborhood: "Tijuca",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 55",
+        },
+        tag: "",
+        description: "Cancelado antes da assinatura.",
+        rent: { rentCents: 310_000, condoCents: 45_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "20560-120",
-        streetAndNumber: "Rua Conde de Bonfim, 300",
-        neighborhood: "Tijuca",
-        cityUF: "Rio de Janeiro/RJ",
+      guarantee: {
+        state: GUARANTEE_STATE.CLOSED,
+        closure: {
+          reason: CLOSE_REASON.CANCELED_PRE_ACTIVATION,
+          closedAt: d("2026-05-01T09:00:00-03:00"),
+        },
+        activatedAt: null,
+        nextRenewalDate: "2026-06-01",
+        documents: [
+          { key: "rentalContract", status: "pendente" },
+          { key: "inspection", status: "pendente" },
+          { key: "policy", status: "pendente" },
+        ],
       },
-      optional: { complement: "Apto 55", tag: "", description: "Cancelado antes da assinatura." },
-      documents: [
-        { key: "rentalContract", status: "pendente" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
-      ],
       tenant: {
         approvalStatus: "reprovado",
         fullName: "Marcos Vinícius Santos",
@@ -1609,43 +1530,35 @@ async function seedFictional(
       },
     });
 
-    // ── Contracts — Horizonte Imóveis (3) ─────────────────────────────────────
-    // 2 ativo, 1 pendente
+    // ── Leases + guarantees — Horizonte Imóveis (3) ───────────────────────────
+    // 2 active, 1 drafted
 
-    const h1 = await insertSeedContract(ctx, {
+    const h1 = await insertLeaseAndGuarantee({
       agencyId: horizonteId,
       publicId: pid(28),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-04-01",
-      availableGuaranteeCents: 13_600_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 340_000,
-        condoCents: 48_000,
-        otherFeesCents: 6_000,
-        totalRentCents: 394_000,
-        feeCents: 544_000,
-        oneTimeActivationFeeCents: 21_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "30112-010",
+          streetAndNumber: "Av. Afonso Pena, 2000",
+          neighborhood: "Centro",
+          cityUF: "Belo Horizonte/MG",
+          complement: "Apto 901",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 340_000, condoCents: 48_000, otherFeesCents: 6_000 },
       },
-      property: {
-        cep: "30112-010",
-        streetAndNumber: "Av. Afonso Pena, 2000",
-        neighborhood: "Centro",
-        cityUF: "Belo Horizonte/MG",
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2027-04-01",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
       },
-      optional: { complement: "Apto 901", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Renata Campos Drumond",
@@ -1658,44 +1571,32 @@ async function seedFictional(
       },
     });
 
-    const h2 = await insertSeedContract(ctx, {
+    const h2 = await insertLeaseAndGuarantee({
       agencyId: horizonteId,
       publicId: pid(29),
-      status: "ativo",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2026-10-15",
-      availableGuaranteeCents: 20_000_000,
-      rental: {
-        propertyKind: "comercial",
-        rentCents: 500_000,
-        condoCents: 85_000,
-        otherFeesCents: 12_000,
-        totalRentCents: 597_000,
-        feeCents: 800_000,
-        oneTimeActivationFeeCents: 38_000,
-        setupInstallments: 2,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "30140-110",
-        streetAndNumber: "Rua da Bahia, 1148",
-        neighborhood: "Funcionários",
-        cityUF: "Belo Horizonte/MG",
-      },
-      optional: {
-        complement: "Sala 601",
+      lease: {
+        propertyKind: PROPERTY_KIND.COMMERCIAL,
+        property: {
+          cep: "30140-110",
+          streetAndNumber: "Rua da Bahia, 1148",
+          neighborhood: "Funcionários",
+          cityUF: "Belo Horizonte/MG",
+          complement: "Sala 601",
+        },
         tag: "comercial",
         description: "Escritório em edifício A+",
+        rent: { rentCents: 500_000, condoCents: 85_000, otherFeesCents: 12_000 },
       },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
+      guarantee: {
+        state: GUARANTEE_STATE.ACTIVE,
+        activatedAt: null,
+        nextRenewalDate: "2026-10-15",
+        documents: [
+          { key: "rentalContract", status: "aprovado" },
+          { key: "inspection", status: "aprovado" },
+          { key: "policy", status: "aprovado" },
+        ],
+      },
       tenant: {
         approvalStatus: "aprovado",
         fullName: "Mineira Distribuidora Ltda",
@@ -1709,40 +1610,32 @@ async function seedFictional(
       },
     });
 
-    await insertSeedContract(ctx, {
+    await insertLeaseAndGuarantee({
       agencyId: horizonteId,
       publicId: pid(30),
-      status: "pendente",
-      activatedAt: null,
-      deactivatedAt: null,
-      nextRenewalDate: "2027-08-10",
-      availableGuaranteeCents: 10_800_000,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: 270_000,
-        condoCents: 38_000,
-        otherFeesCents: 0,
-        totalRentCents: 308_000,
-        feeCents: 432_000,
-        oneTimeActivationFeeCents: 17_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "30510-010",
+          streetAndNumber: "Av. Raja Gabaglia, 3200",
+          neighborhood: "Estoril",
+          cityUF: "Belo Horizonte/MG",
+          complement: "Apto 62",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 270_000, condoCents: 38_000, otherFeesCents: 0 },
       },
-      property: {
-        cep: "30510-010",
-        streetAndNumber: "Av. Raja Gabaglia, 3200",
-        neighborhood: "Estoril",
-        cityUF: "Belo Horizonte/MG",
+      guarantee: {
+        state: GUARANTEE_STATE.DRAFTED,
+        activatedAt: null,
+        nextRenewalDate: "2027-08-10",
+        documents: [
+          { key: "rentalContract", status: "enviado" },
+          { key: "inspection", status: "pendente" },
+          { key: "policy", status: "pendente" },
+        ],
       },
-      optional: { complement: "Apto 62", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "enviado" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
-      ],
       tenant: {
         approvalStatus: "pendente",
         fullName: "Felipe Augusto Corrêa",
@@ -1755,7 +1648,9 @@ async function seedFictional(
       },
     });
 
-    // Seeded contract dates spread across recent windows for transparency dashboard demo data
+    // Seeded activation dates spread across recent windows for transparency
+    // dashboard demo data. Closed guarantees keep theirs too — the activity
+    // series needs the start of the life as well as its end (`closure.closedAt`).
     const activationMap: Record<string, string> = {
       [pid(1)]: "2025-06-03",
       [pid(2)]: "2025-07-08",
@@ -1783,26 +1678,11 @@ async function seedFictional(
       [pid(22)]: "2026-06-03",
     };
     for (const [publicId, activatedAt] of Object.entries(activationMap)) {
-      const contract = await ctx.db
-        .query("contracts")
+      const guarantee = await ctx.db
+        .query("guarantees")
         .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
         .unique();
-      if (contract) await ctx.db.patch(contract._id, { activatedAt });
-    }
-
-    // ── Assign historical deactivatedAt dates ────────────────────────────────
-    // Only contracts that were once ativo and are now encerrado need this.
-    // pid(27) is cancelado but was never activated → no deactivatedAt.
-    const deactivationMap: Record<string, string> = {
-      [pid(15)]: "2025-03-10", // Paulista encerrado — active ~7 months
-      [pid(26)]: "2025-01-20", // Atlântica encerrado — active ~7 months
-    };
-    for (const [publicId, deactivatedAt] of Object.entries(deactivationMap)) {
-      const contract = await ctx.db
-        .query("contracts")
-        .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
-        .unique();
-      if (contract) await ctx.db.patch(contract._id, { deactivatedAt });
+      if (guarantee) await ctx.db.patch(guarantee._id, { activatedAt });
     }
 
     // ── Sync aggregates ───────────────────────────────────────────────────────
@@ -1815,81 +1695,81 @@ async function seedFictional(
     await contractsByStatusPlatform.clear(ctx);
     await ativoInsuredCentsPlatform.clear(ctx);
     {
-      const allContracts = await ctx.db.query("contracts").collect();
-      for (const doc of allContracts) {
-        await insertContractAggregates(ctx, doc);
+      const allGuarantees = await ctx.db.query("guarantees").collect();
+      for (const doc of allGuarantees) {
+        await insertGuaranteeAggregates(ctx, doc);
       }
     }
 
-    // ── Contract history ──────────────────────────────────────────────────────
+    // ── Guarantee history ─────────────────────────────────────────────────────
 
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: paulistaId,
-      contractPublicId: pid(1),
+      guaranteePublicId: pid(1),
       at: d("2025-03-01T09:00:00-03:00"),
       username: "admin.paulista",
       message:
         "Criada Solicitação #1000001 — residencial Bela Vista, inquilino Maria Silva Santos, aluguel R$ 3.200,00.",
     });
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: paulistaId,
-      contractPublicId: pid(1),
+      guaranteePublicId: pid(1),
       at: d("2025-03-01T17:00:00-03:00"),
       username: "admin.paulista",
       message: "Contrato 1000001 aprovado e ativado.",
     });
 
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: paulistaId,
-      contractPublicId: pid(5),
+      guaranteePublicId: pid(5),
       at: d("2025-01-20T10:00:00-03:00"),
       username: "admin.paulista",
       message:
         "Criada Solicitação #1000005 — comercial Vila Olímpia, inquilino Global Finance S.A.",
     });
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: paulistaId,
-      contractPublicId: pid(5),
+      guaranteePublicId: pid(5),
       at: d("2025-01-21T14:30:00-03:00"),
       username: "admin.paulista",
       message: "Contrato 1000005 aprovado e ativado.",
     });
 
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: atlanticaId,
-      contractPublicId: pid(16),
+      guaranteePublicId: pid(16),
       at: d("2025-03-15T09:00:00-03:00"),
       username: "admin.atlantica",
       message:
         "Criada Solicitação #1000016 — residencial Ipanema, inquilina Mariana Figueiredo Costa.",
     });
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: atlanticaId,
-      contractPublicId: pid(16),
+      guaranteePublicId: pid(16),
       at: d("2025-03-16T11:00:00-03:00"),
       username: "admin.atlantica",
       message: "Contrato 1000016 aprovado e ativado.",
     });
 
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: atlanticaId,
-      contractPublicId: pid(27),
+      guaranteePublicId: pid(27),
       at: d("2026-05-01T09:00:00-03:00"),
       username: "admin.atlantica",
       message: "Contrato 1000027 cancelado — inquilino reprovado na análise de crédito.",
     });
 
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: horizonteId,
-      contractPublicId: pid(28),
+      guaranteePublicId: pid(28),
       at: d("2025-04-01T10:00:00-03:00"),
       username: "admin.horizonte",
       message:
         "Criada Solicitação #1000028 — residencial Centro BH, inquilina Renata Campos Drumond.",
     });
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: horizonteId,
-      contractPublicId: pid(28),
+      guaranteePublicId: pid(28),
       at: d("2025-04-02T15:00:00-03:00"),
       username: "admin.horizonte",
       message: "Contrato 1000028 aprovado e ativado.",
@@ -1898,40 +1778,23 @@ async function seedFictional(
     // ── Historical payments (6 months: Nov 2025 – Apr 2026) ──────────────────
     // Paulista & Atlântica: all paid. Horizonte: paid Nov–Jan, overdue Feb–Apr.
 
-    // Helper to build line items for Paulista (12 ativo contracts)
+    // Recurring line items bill each active guarantee's own priced fee
+    // (`terms.feeCents`), the figure `generateMonthlyInvoices` uses, so seeded
+    // history reconciles with what production billing would produce.
+    const recurringLineItems = (rows: SeededLeaseAndGuarantee[], month: string) =>
+      rows.map((row) => ({
+        guaranteeId: row.guaranteeId,
+        guaranteePublicId: row.publicId,
+        kind: "recurring" as const,
+        amountCents: row.terms.feeCents,
+        description: `Mensalidade contrato ${row.publicId} — ${month}`,
+      }));
+
     const paulistaLineItems = (month: string) =>
-      [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12].map((cid, i) => ({
-        contractId: cid,
-        contractPublicId: pid(i + 1),
-        kind: "recurring" as const,
-        amountCents: [
-          512_000, 640_000, 880_000, 384_000, 1_120_000, 448_000, 288_000, 576_000, 240_000,
-          768_000, 320_000, 416_000,
-        ][i]!,
-        description: `Mensalidade contrato ${pid(i + 1)} — ${month}`,
-      }));
-
-    // Helper to build line items for Atlântica (8 ativo contracts)
+      recurringLineItems([p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12], month);
     const atlanticaLineItems = (month: string) =>
-      [a1, a2, a3, a4, a5, a6, a7, a8].map((cid, i) => ({
-        contractId: cid,
-        contractPublicId: pid(i + 16),
-        kind: "recurring" as const,
-        amountCents: [928_000, 1_200_000, 704_000, 352_000, 1_056_000, 480_000, 368_000, 1_360_000][
-          i
-        ]!,
-        description: `Mensalidade contrato ${pid(i + 16)} — ${month}`,
-      }));
-
-    // Helper to build line items for Horizonte (2 ativo contracts)
-    const horizonteLineItems = (month: string) =>
-      [h1, h2].map((cid, i) => ({
-        contractId: cid,
-        contractPublicId: pid(i + 28),
-        kind: "recurring" as const,
-        amountCents: [544_000, 800_000][i]!,
-        description: `Mensalidade contrato ${pid(i + 28)} — ${month}`,
-      }));
+      recurringLineItems([a1, a2, a3, a4, a5, a6, a7, a8], month);
+    const horizonteLineItems = (month: string) => recurringLineItems([h1, h2], month);
 
     // ── Nov 2025 ──────────────────────────────────────────────────────────────
 
@@ -2259,12 +2122,12 @@ async function seedFictional(
     // anchor method (Pix sep-6 / AnchorTest sep-24) will pass validation.
     const testAgencies: ReadonlyArray<{
       agencyId: AgencyId;
-      contractId: ContractId;
-      contractPublicId: string;
+      guaranteeId: GuaranteeId;
+      guaranteePublicId: string;
     }> = [
-      { agencyId: paulistaId, contractId: p1, contractPublicId: pid(1) },
-      { agencyId: atlanticaId, contractId: a1, contractPublicId: pid(16) },
-      { agencyId: horizonteId, contractId: h1, contractPublicId: pid(28) },
+      { agencyId: paulistaId, guaranteeId: p1.guaranteeId, guaranteePublicId: pid(1) },
+      { agencyId: atlanticaId, guaranteeId: a1.guaranteeId, guaranteePublicId: pid(16) },
+      { agencyId: horizonteId, guaranteeId: h1.guaranteeId, guaranteePublicId: pid(28) },
     ];
 
     // 12 amounts in the safe band (R$5–R$50), four per agency.
@@ -2276,8 +2139,8 @@ async function seedFictional(
       return {
         publicId: `INV-TEST-${n}`,
         agencyId: agency.agencyId,
-        contractId: agency.contractId,
-        contractPublicId: agency.contractPublicId,
+        guaranteeId: agency.guaranteeId,
+        guaranteePublicId: agency.guaranteePublicId,
         amountCents,
       };
     });
@@ -2296,8 +2159,8 @@ async function seedFictional(
         muxedId: generateInvoiceMuxedId(),
         lineItems: [
           {
-            contractId: t.contractId,
-            contractPublicId: t.contractPublicId,
+            guaranteeId: t.guaranteeId,
+            guaranteePublicId: t.guaranteePublicId,
             kind: INVOICE_LINE_ITEM_KIND.RECURRING,
             amountCents: t.amountCents,
             description: `Testnet invoice — ${t.publicId}`,
@@ -2308,7 +2171,7 @@ async function seedFictional(
 
     return {
       agencies: { paulistaId, atlanticaId, horizonteId },
-      contractCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
+      guaranteeCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
     };
   }
 }
@@ -2476,44 +2339,43 @@ type SeedPersonasResult = Array<{
 
 /**
  * Populate the `agencyowner` persona's agency ("Imobiliária Aprovada")
- * with a believable dashboard: 4 ativo + 1 pendente + 1 encerrado
- * contracts, two months of paid history, one month due. Distinct
- * `publicId` range (1000031–1000036) so it doesn't collide with the
- * fictional Paulista/Atlântica/Horizonte ids.
+ * with a believable dashboard: 4 active + 1 drafted + 1 closed
+ * guarantees (each on its own lease), two months of paid history, one
+ * month due. Distinct `publicId` range (1000031–1000036) so it doesn't
+ * collide with the fictional Paulista/Atlântica/Horizonte ids.
  *
- * Idempotent — if a contract in the seeded range already exists, the
+ * Idempotent — if a guarantee in the seeded range already exists, the
  * function is a no-op. Called only by `seedReset` (post-wipe) as the step
  * that gives the `agencyowner` persona a populated dashboard.
  */
 async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
   const FIRST_PID = 31;
-  const FEE_MULTIPLIER = 1.6;
 
   // Idempotency must be GLOBAL, not per-agency. publicId carries no
   // DB-level uniqueness constraint; this range (1000031–1000036) is the
-  // single canonical Aprovada starter book — if any contract already
+  // single canonical Aprovada starter book — if any guarantee already
   // claims it, abort regardless of which agency owns it. Earlier the
   // check filtered by agencyId, which let `seedAprovadaContracts`
   // populate two agencies at the same publicIds and broke
   // `getByPublicId` (`.unique()` threw on duplicates).
   const existingAtFirstPid = await ctx.db
-    .query("contracts")
+    .query("guarantees")
     .withIndex("by_publicId", (q) => q.eq("publicId", pid(FIRST_PID)))
     .first();
   if (existingAtFirstPid) {
-    return { contractsInserted: 0, ativoCount: 0, skipped: true as const };
+    return { guaranteesInserted: 0, activeCount: 0, skipped: true as const };
   }
 
-  type ContractSpec = {
+  const product = await requireDefaultProduct(ctx);
+
+  type AprovadaSpec = {
     n: number;
-    status: "ativo" | "pendente" | "encerrado";
+    state: typeof GUARANTEE_STATE.ACTIVE | typeof GUARANTEE_STATE.DRAFTED;
     activatedAt: string | null;
-    deactivatedAt: string | null;
     nextRenewalDate: string;
     rentCents: number;
     condoCents: number;
-    property: { cep: string; streetAndNumber: string; neighborhood: string; cityUF: string };
-    complement: string;
+    property: LeaseProperty;
     tenant: {
       fullName: string;
       cpf: string;
@@ -2524,12 +2386,17 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     };
   };
 
-  const specs: ContractSpec[] = [
+  type AprovadaClosedSpec = Omit<AprovadaSpec, "state" | "activatedAt"> & {
+    state: typeof GUARANTEE_STATE.CLOSED;
+    activatedAt: string;
+    closedAt: string;
+  };
+
+  const specs: Array<AprovadaSpec | AprovadaClosedSpec> = [
     {
       n: 0,
-      status: "ativo",
+      state: GUARANTEE_STATE.ACTIVE,
       activatedAt: d("2025-09-15T10:00:00-03:00"),
-      deactivatedAt: null,
       nextRenewalDate: "2027-09-15",
       rentCents: 285_000,
       condoCents: 42_000,
@@ -2538,8 +2405,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
         streetAndNumber: "Rua Joaquim Floriano, 533",
         neighborhood: "Itaim Bibi",
         cityUF: "São Paulo/SP",
+        complement: "Apto 82",
       },
-      complement: "Apto 82",
       tenant: {
         fullName: "Beatriz Almeida Carvalho",
         cpf: "23232323200",
@@ -2551,9 +2418,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 1,
-      status: "ativo",
+      state: GUARANTEE_STATE.ACTIVE,
       activatedAt: d("2025-11-01T10:00:00-03:00"),
-      deactivatedAt: null,
       nextRenewalDate: "2027-11-01",
       rentCents: 420_000,
       condoCents: 65_000,
@@ -2562,8 +2428,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
         streetAndNumber: "Rua Oscar Freire, 1200",
         neighborhood: "Jardins",
         cityUF: "São Paulo/SP",
+        complement: "Apto 1502",
       },
-      complement: "Apto 1502",
       tenant: {
         fullName: "Rafael Monteiro Lima",
         cpf: "32323232355",
@@ -2575,9 +2441,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 2,
-      status: "ativo",
+      state: GUARANTEE_STATE.ACTIVE,
       activatedAt: d("2026-01-20T10:00:00-03:00"),
-      deactivatedAt: null,
       nextRenewalDate: "2028-01-20",
       rentCents: 195_000,
       condoCents: 28_000,
@@ -2586,8 +2451,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
         streetAndNumber: "Rua Cardeal Arcoverde, 1820",
         neighborhood: "Pinheiros",
         cityUF: "São Paulo/SP",
+        complement: "Apto 41",
       },
-      complement: "Apto 41",
       tenant: {
         fullName: "Letícia Andrade Pires",
         cpf: "42424242488",
@@ -2599,9 +2464,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 3,
-      status: "ativo",
+      state: GUARANTEE_STATE.ACTIVE,
       activatedAt: d("2026-03-10T10:00:00-03:00"),
-      deactivatedAt: null,
       nextRenewalDate: "2028-03-10",
       rentCents: 650_000,
       condoCents: 98_000,
@@ -2610,8 +2474,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
         streetAndNumber: "Av. Paulista, 2100",
         neighborhood: "Bela Vista",
         cityUF: "São Paulo/SP",
+        complement: "Cobertura 18",
       },
-      complement: "Cobertura 18",
       tenant: {
         fullName: "Fernanda Lopes Cavalcanti",
         cpf: "52525252500",
@@ -2623,9 +2487,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 4,
-      status: "pendente",
+      state: GUARANTEE_STATE.DRAFTED,
       activatedAt: null,
-      deactivatedAt: null,
       nextRenewalDate: "2028-06-01",
       rentCents: 340_000,
       condoCents: 52_000,
@@ -2634,8 +2497,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
         streetAndNumber: "Rua Vergueiro, 3800",
         neighborhood: "Vila Mariana",
         cityUF: "São Paulo/SP",
+        complement: "Apto 73",
       },
-      complement: "Apto 73",
       tenant: {
         fullName: "Gustavo Ribeiro Tavares",
         cpf: "62626262633",
@@ -2647,9 +2510,9 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
     {
       n: 5,
-      status: "encerrado",
+      state: GUARANTEE_STATE.CLOSED,
       activatedAt: d("2024-04-15T10:00:00-03:00"),
-      deactivatedAt: d("2026-03-31T18:00:00-03:00"),
+      closedAt: d("2026-03-31T18:00:00-03:00"),
       nextRenewalDate: "2026-04-15",
       rentCents: 225_000,
       condoCents: 38_000,
@@ -2658,8 +2521,8 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
         streetAndNumber: "Rua Voluntários da Pátria, 990",
         neighborhood: "Santana",
         cityUF: "São Paulo/SP",
+        complement: "Apto 22",
       },
-      complement: "Apto 22",
       tenant: {
         fullName: "Bruno Tavares Macedo",
         cpf: "72727272766",
@@ -2671,75 +2534,75 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     },
   ];
 
-  const inserted: { spec: ContractSpec; id: ContractId; publicId: string; feeCents: number }[] = [];
+  const inserted: Array<{ spec: AprovadaSpec | AprovadaClosedSpec } & SeededLeaseAndGuarantee> = [];
 
   for (const spec of specs) {
     const publicId = pid(FIRST_PID + spec.n);
-    const feeCents = Math.round(spec.rentCents * FEE_MULTIPLIER);
-    const isApproved = spec.status !== "pendente";
+    const isApproved = spec.state !== GUARANTEE_STATE.DRAFTED;
 
-    const id = await insertSeedContract(ctx, {
-      agencyId,
-      publicId,
-      status: spec.status,
-      activatedAt: spec.activatedAt,
-      deactivatedAt: spec.deactivatedAt,
-      nextRenewalDate: spec.nextRenewalDate,
-      availableGuaranteeCents: spec.status === "encerrado" ? 0 : spec.rentCents * 40,
-      rental: {
-        propertyKind: "residencial",
-        rentCents: spec.rentCents,
-        condoCents: spec.condoCents,
-        otherFeesCents: 0,
-        totalRentCents: spec.rentCents + spec.condoCents,
-        feeCents,
-        oneTimeActivationFeeCents: 20_000,
-        setupInstallments: 1,
-        exitCostMultiplier: DEFAULT_EXIT_COST_MULTIPLIER,
-        rentMultiplier: DEFAULT_RENT_MULTIPLIER,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: spec.property,
-      optional: { complement: spec.complement, tag: "", description: "" },
-      documents: isApproved
-        ? [
-            { key: "rentalContract", status: "aprovado" },
-            { key: "inspection", status: "aprovado" },
-            { key: "policy", status: "aprovado" },
-          ]
-        : [
-            { key: "rentalContract", status: "enviado" },
-            { key: "inspection", status: "pendente" },
-            { key: "policy", status: "pendente" },
-          ],
-      tenant: {
-        approvalStatus: isApproved ? "aprovado" : "pendente",
-        fullName: spec.tenant.fullName,
-        cpf: spec.tenant.cpf,
-        birthDate: spec.tenant.birthDate,
-        email: `${spec.tenant.emailLocal}@example.com`,
-        phone: `119000000${spec.tenant.phoneSuffix}`,
-        termApprovedAt: isApproved ? (spec.activatedAt ?? d("2025-09-15T09:00:00-03:00")) : null,
-        score: spec.tenant.score,
+    const row = await insertSeedLeaseAndGuarantee(ctx, {
+      product,
+      spec: {
+        agencyId,
+        publicId,
+        lease: {
+          propertyKind: PROPERTY_KIND.RESIDENTIAL,
+          property: spec.property,
+          tag: "",
+          description: "",
+          rent: {
+            rentCents: spec.rentCents,
+            condoCents: spec.condoCents,
+            otherFeesCents: 0,
+          },
+        },
+        guarantee: {
+          state: spec.state,
+          ...(spec.state === GUARANTEE_STATE.CLOSED
+            ? {
+                closure: {
+                  reason: CLOSE_REASON.END_OF_LEASE,
+                  closedAt: spec.closedAt,
+                },
+              }
+            : {}),
+          activatedAt: spec.activatedAt,
+          nextRenewalDate: spec.nextRenewalDate,
+          documents: isApproved
+            ? [
+                { key: "rentalContract", status: "aprovado" },
+                { key: "inspection", status: "aprovado" },
+                { key: "policy", status: "aprovado" },
+              ]
+            : [
+                { key: "rentalContract", status: "enviado" },
+                { key: "inspection", status: "pendente" },
+                { key: "policy", status: "pendente" },
+              ],
+        },
+        tenant: {
+          approvalStatus: isApproved ? "aprovado" : "pendente",
+          fullName: spec.tenant.fullName,
+          cpf: spec.tenant.cpf,
+          birthDate: spec.tenant.birthDate,
+          email: `${spec.tenant.emailLocal}@example.com`,
+          phone: `119000000${spec.tenant.phoneSuffix}`,
+          termApprovedAt: isApproved ? (spec.activatedAt ?? d("2025-09-15T09:00:00-03:00")) : null,
+          score: spec.tenant.score,
+        },
       },
     });
-    inserted.push({ spec, id, publicId, feeCents });
+    inserted.push({ spec, ...row });
   }
 
-  for (const row of inserted) {
-    const doc = await ctx.db.get(row.id);
-    if (doc) await insertContractAggregates(ctx, doc);
-  }
-
-  const ativoRows = inserted.filter((r) => r.spec.status === "ativo");
+  const activeRows = inserted.filter((r) => r.spec.state === GUARANTEE_STATE.ACTIVE);
 
   const monthlyLineItems = (month: string) =>
-    ativoRows.map((r) => ({
-      contractId: r.id,
-      contractPublicId: r.publicId,
+    activeRows.map((r) => ({
+      guaranteeId: r.guaranteeId,
+      guaranteePublicId: r.publicId,
       kind: INVOICE_LINE_ITEM_KIND.RECURRING,
-      amountCents: r.feeCents,
+      amountCents: r.terms.feeCents,
       description: `Mensalidade contrato ${r.publicId} — ${month}`,
     }));
 
@@ -2787,17 +2650,17 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     lineItems: may,
   });
 
-  for (const r of ativoRows) {
-    await ctx.db.insert("contractHistory", {
+  for (const r of activeRows) {
+    await ctx.db.insert("guaranteeHistory", {
       agencyId,
-      contractPublicId: r.publicId,
+      guaranteePublicId: r.publicId,
       at: r.spec.activatedAt ?? d("2025-09-15T09:00:00-03:00"),
       username: "agency.owner",
       message: `Criada Solicitação #${r.publicId} — ${r.spec.tenant.fullName}, aluguel R$ ${(r.spec.rentCents / 100).toLocaleString("pt-BR")}.`,
     });
   }
 
-  // A believable notice book on the Aprovada agency's ativo contracts —
+  // A believable notice book on the Aprovada agency's active guarantees —
   // covers every status so the delinquencies page renders realistic
   // rows out of the box, replacing the mock data in
   // apps/agency/src/components/delinquencies/delinquency-page.tsx.
@@ -2808,13 +2671,13 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
     .first();
   const openedByUserId = ownerMembership?.userId;
   let noticesInserted = 0;
-  if (openedByUserId && ativoRows.length >= 3) {
-    const [n1, n2, n3] = ativoRows;
-    // publicIds mirror the openNotice mutation shape: DN-<contract>-<yyyy-mm-dd>
-    // (day granularity, matching the by_contract_dueDate collision domain).
-    await ctx.db.insert("contractDelinquencyNotices", {
+  if (openedByUserId && activeRows.length >= 3) {
+    const [n1, n2, n3] = activeRows;
+    // publicIds mirror the openNotice mutation shape: DN-<guarantee>-<yyyy-mm-dd>
+    // (day granularity, matching the by_guarantee_dueDate collision domain).
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${n1.publicId}-2026-06-05`,
-      contractId: n1.id,
+      guaranteeId: n1.guaranteeId,
       agencyId,
       status: "open",
       rentDueDate: "2026-06-05",
@@ -2824,9 +2687,9 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       openedAt: d("2026-06-10T09:19:00-03:00"),
       openedByUserId,
     });
-    await ctx.db.insert("contractDelinquencyNotices", {
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${n2.publicId}-2026-05-05`,
-      contractId: n2.id,
+      guaranteeId: n2.guaranteeId,
       agencyId,
       status: "open",
       rentDueDate: "2026-05-05",
@@ -2836,9 +2699,9 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
       openedAt: d("2026-05-14T18:14:00-03:00"),
       openedByUserId,
     });
-    await ctx.db.insert("contractDelinquencyNotices", {
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${n3.publicId}-2026-04-05`,
-      contractId: n3.id,
+      guaranteeId: n3.guaranteeId,
       agencyId,
       status: "resolved",
       rentDueDate: "2026-04-05",
@@ -2858,43 +2721,28 @@ async function populateAprovadaBook(ctx: MutationCtx, agencyId: AgencyId) {
   }
 
   return {
-    contractsInserted: inserted.length,
-    ativoCount: ativoRows.length,
+    guaranteesInserted: inserted.length,
+    activeCount: activeRows.length,
     noticesInserted,
   };
 }
 
 /**
- * One-shot full reset — the universal "give me a clean, fully-populated
- * dev DB" command. Wipes the demo tables, re-seeds the fictional dataset,
- * attaches the four Auth0 test personas, and tops the `agencyowner`
- * persona's agency ("Imobiliária Aprovada") with a small believable
- * contract set so logging in as that persona lands on a populated
- * dashboard. This is what the Vercel preview hook
- * (`scripts/seed-preview.sh`) and a developer's local reset both call.
+ * Give every seeded guarantee the tenant identity its own agency submitted,
+ * the shape `guarantees.create` writes in production.
  *
- * Every step runs as a plain in-process call inside this single mutation,
- * so the whole reset is one atomic Convex transaction — the same
- * footprint the earlier `ctx.runMutation` chaining produced, minus the
- * partial-seed footgun of exposing the intermediate steps as their own
- * runnable entrypoints.
- *
- * Dev-only. Do NOT call from production.
- */
-/**
- * Give every seeded contract the tenant identity its own agency submitted,
- * the shape `contracts.create` writes in production.
- *
- * Without it a seeded contract has no per-agency submission to resolve, and
+ * Without it a seeded guarantee has no per-agency submission to resolve, and
  * the read paths would need a fallback to the shared `tenants` registry row —
  * which is the cross-agency disclosure this domain exists to prevent, not to
- * reproduce in the dev dataset. The seed gives each contract its own tenant,
- * so submission and registry agree here; what matters is that the *shape*
+ * reproduce in the dev dataset. The seed gives each lease its own tenant, so
+ * submission and registry agree here; what matters is that the *shape*
  * matches production so the read paths can fail closed.
  */
 async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
-  for (const contract of await ctx.db.query("contracts").collect()) {
-    const tenant = await ctx.db.get(contract.tenantId);
+  for (const guarantee of await ctx.db.query("guarantees").collect()) {
+    const lease = await ctx.db.get(guarantee.leaseId);
+    if (!lease) continue;
+    const tenant = await ctx.db.get(lease.tenantId);
     if (!tenant) continue;
 
     const snapshot =
@@ -2920,9 +2768,9 @@ async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
     // here in one pass. Readers must NOT select this way — they find the row
     // that carries a snapshot, because a later row can sort earlier.
     const creation = await ctx.db
-      .query("contractHistory")
-      .withIndex("by_agency_contract", (q) =>
-        q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
+      .query("guaranteeHistory")
+      .withIndex("by_agency_guarantee", (q) =>
+        q.eq("agencyId", guarantee.agencyId).eq("guaranteePublicId", guarantee.publicId),
       )
       .first();
 
@@ -2931,21 +2779,39 @@ async function attachTenantSnapshots(ctx: MutationCtx): Promise<void> {
       continue;
     }
 
-    await ctx.db.insert("contractHistory", {
-      agencyId: contract.agencyId,
-      contractPublicId: contract.publicId,
-      at: contract.activatedAt ?? d("2025-09-15T09:00:00-03:00"),
+    await ctx.db.insert("guaranteeHistory", {
+      agencyId: guarantee.agencyId,
+      guaranteePublicId: guarantee.publicId,
+      at: guarantee.activatedAt ?? d("2025-09-15T09:00:00-03:00"),
       username: "seed",
-      message: `Criada Solicitação #${contract.publicId}.`,
+      message: `Criada Solicitação #${guarantee.publicId}.`,
       tenantSnapshot: snapshot,
     });
   }
 }
 
+/**
+ * One-shot full reset — the universal "give me a clean, fully-populated
+ * dev DB" command. Wipes the demo tables, seeds the default product,
+ * re-seeds the fictional dataset, attaches the four Auth0 test personas,
+ * and tops the `agencyowner` persona's agency ("Imobiliária Aprovada")
+ * with a small believable guarantee book so logging in as that persona
+ * lands on a populated dashboard. This is what the Vercel preview hook
+ * (`scripts/seed-preview.sh`) and a developer's local reset both call.
+ *
+ * Every step runs as a plain in-process call inside this single mutation,
+ * so the whole reset is one atomic Convex transaction — the same
+ * footprint the earlier `ctx.runMutation` chaining produced, minus the
+ * partial-seed footgun of exposing the intermediate steps as their own
+ * runnable entrypoints.
+ *
+ * Dev-only. Do NOT call from production.
+ */
 export const seedReset = internalMutation({
   args: { adminEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
     await wipeDemoTables(ctx);
+    const product = await seedDefaultProduct(ctx);
     const fictional = await seedFictional(ctx, args);
     const personas = await seedAllPersonas(ctx);
 
@@ -2954,6 +2820,6 @@ export const seedReset = internalMutation({
 
     await attachTenantSnapshots(ctx);
 
-    return { fictional, personas, aprovada };
+    return { product: product.slug, fictional, personas, aprovada };
   },
 });
