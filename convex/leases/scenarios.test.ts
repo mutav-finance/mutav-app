@@ -4,8 +4,16 @@ import { defineSchema, type WithoutSystemFields } from "convex/server";
 import { describe, expect, test } from "vitest";
 import type { MutationCtx } from "../_generated/server";
 import type { AgencyId } from "../agencies/domain";
-import type { Guarantee, GuaranteeId } from "../guarantees/domain";
+import {
+  CLOSE_REASONS,
+  GUARANTEE_STATES,
+  type CloseReason,
+  type Guarantee,
+  type GuaranteeId,
+  type GuaranteeState,
+} from "../guarantees/domain";
 import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { isEligible, type ProductEligibility } from "../products/domain";
 import schema from "../schema";
 import type { TenantId } from "../tenants/domain";
 import {
@@ -410,32 +418,199 @@ describe("schema conformance — leases table (strict harness)", () => {
     ).rejects.toThrow(/complement/);
   });
 
-  test("round-trips openGuaranteeId as null and as an Id<guarantees> and refuses an omitted pointer", async () => {
+  test("round-trips an openGuaranteeId the test writes as null and as an Id<guarantees>, and refuses an id from the leases, agencies or tenants table", async () => {
     const t = setupStrict();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
-    const pointed = await seedGuaranteeWithLease(t, { agencyId, status: "active" }, "P1");
-    const released = await seedGuaranteeWithLease(t, { agencyId, status: "closed" }, "P2");
+    // The fixture supplies a real guarantee row to point at; the pointer itself
+    // is written by this test so the union validator, not the fixture, is what
+    // accepts the Id. The lease↔guarantee relationship is the sweep's concern.
+    const { guaranteeId, tenantId } = await seedGuaranteeWithLease(
+      t,
+      { agencyId, status: "closed" },
+      "P0",
+    );
 
-    const { pointedLease, releasedLease } = await t.run(async (ctx) => ({
-      pointedLease: await getLease(ctx, pointed.leaseId),
-      releasedLease: await getLease(ctx, released.leaseId),
-    }));
+    const { setId, nullId, pointers } = await t.run(async (ctx) => {
+      const setId = await ctx.db.insert("leases", {
+        ...leaseDoc({ agencyId, tenantId, publicId: "LSE-P-SET" }),
+        openGuaranteeId: guaranteeId,
+      });
+      const nullId = await ctx.db.insert("leases", {
+        ...leaseDoc({ agencyId, tenantId, publicId: "LSE-P-NULL" }),
+        openGuaranteeId: null,
+      });
+      const set = await getLease(ctx, setId);
+      const nul = await getLease(ctx, nullId);
+      return {
+        setId,
+        nullId,
+        pointers: [
+          { publicId: set.publicId, openGuaranteeId: set.openGuaranteeId },
+          { publicId: nul.publicId, openGuaranteeId: nul.openGuaranteeId },
+        ],
+      };
+    });
 
-    expect(pointedLease.openGuaranteeId).toBe(pointed.guaranteeId);
-    expect(releasedLease.openGuaranteeId).toBe(null);
+    expect(setId).not.toBe(nullId);
+    expect(pointers).toEqual([
+      { publicId: "LSE-P-SET", openGuaranteeId: guaranteeId },
+      { publicId: "LSE-P-NULL", openGuaranteeId: null },
+    ]);
+
+    // Inside `v.union(v.id("guarantees"), v.null())` the per-branch message is
+    // swallowed; the validator reports the union's member types instead.
+    for (const wrongTable of [setId, agencyId, tenantId]) {
+      await expect(
+        t.run((ctx) =>
+          ctx.db.insert(
+            "leases",
+            // hook-ok: deliberately wrong-table id for a validator test
+            malformed(leaseDoc({ agencyId, tenantId, publicId: "LSE-P-WRONG" }), {
+              openGuaranteeId: wrongTable,
+            }),
+          ),
+        ),
+      ).rejects.toThrow(/Expected one of id, null/);
+    }
+  });
+
+  test("refuses a propertyKind outside residential|commercial and a payer other than tenant", async () => {
+    const t = setupStrict();
+    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+    const tenantId = await t.run((ctx) => insertTenantRow(ctx));
 
     await expect(
       t.run((ctx) =>
         ctx.db.insert(
           "leases",
-          withoutKey(
-            leaseDoc({ agencyId, tenantId: pointed.tenantId, publicId: "LSE-P3" }),
-            "openGuaranteeId",
-          ),
+          malformed(leaseDoc({ agencyId, tenantId, publicId: "LSE-KIND" }), {
+            propertyKind: "industrial",
+          }),
         ),
       ),
-    ).rejects.toThrow(/openGuaranteeId/);
+    ).rejects.toThrow(/Expected one of literal, literal, got `"industrial"`/);
+
+    for (const payer of ["landlord", "agency"]) {
+      await expect(
+        t.run((ctx) =>
+          ctx.db.insert(
+            "leases",
+            malformed(leaseDoc({ agencyId, tenantId, publicId: "LSE-PAYER" }), { payer }),
+          ),
+        ),
+      ).rejects.toThrow(new RegExp(`Expected \`tenant\`, got \`${payer}\``));
+    }
+
+    const persisted = await t.run(async (ctx) => publicIds(await leasesByAgency(ctx, agencyId)));
+    expect(persisted).toEqual([]);
   });
+
+  test("refuses embedded tenant fields and unknown keys inside property and rent — tenantId is the only tenant reference", async () => {
+    const t = setupStrict();
+    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+    const tenantId = await t.run((ctx) => insertTenantRow(ctx));
+    const valid = leaseDoc({ agencyId, tenantId, publicId: "LSE-EXTRA" });
+
+    await expect(
+      t.run((ctx) => ctx.db.insert("leases", malformed(valid, { tenantCpf: "52998224725" }))),
+    ).rejects.toThrow(/Unexpected field `tenantCpf` in object/);
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db.insert(
+          "leases",
+          malformed(valid, { tenant: { cpf: "52998224725", fullName: "Embedded Tenant" } }),
+        ),
+      ),
+    ).rejects.toThrow(/Unexpected field `tenant` in object/);
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db.insert(
+          "leases",
+          malformed(valid, { property: { ...valid.property, city: "São Paulo" } }),
+        ),
+      ),
+    ).rejects.toThrow(/Unexpected field `city` in object/);
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db.insert("leases", malformed(valid, { rent: { ...valid.rent, iptuCents: 0 } })),
+      ),
+    ).rejects.toThrow(/Unexpected field `iptuCents` in object/);
+
+    const persisted = await t.run(async (ctx) => publicIds(await leasesByAgency(ctx, agencyId)));
+    expect(persisted).toEqual([]);
+  });
+
+  test("refuses a wrong-typed tag, cep and rentCents and a rent object missing totalRentCents (the 3-field input shape)", async () => {
+    const t = setupStrict();
+    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+    const tenantId = await t.run((ctx) => insertTenantRow(ctx));
+    const valid = leaseDoc({ agencyId, tenantId, publicId: "LSE-TYPES" });
+
+    await expect(
+      t.run((ctx) => ctx.db.insert("leases", malformed(valid, { tag: 402 }))),
+    ).rejects.toThrow(/Expected `string`, got `402`/);
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db.insert(
+          "leases",
+          malformed(valid, { property: { ...valid.property, cep: 1000000 } }),
+        ),
+      ),
+    ).rejects.toThrow(/Expected `string`, got `1000000`/);
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db.insert("leases", malformed(valid, { rent: { ...valid.rent, rentCents: "100000" } })),
+      ),
+    ).rejects.toThrow(/Expected `number`, got `100000`/);
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db.insert(
+          "leases",
+          malformed(valid, { rent: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0 } }),
+        ),
+      ),
+    ).rejects.toThrow(/Missing required field `totalRentCents` in object/);
+
+    const persisted = await t.run(async (ctx) => publicIds(await leasesByAgency(ctx, agencyId)));
+    expect(persisted).toEqual([]);
+  });
+
+  const REQUIRED_TOP_LEVEL_KEYS: (keyof NewLease)[] = [
+    "agencyId",
+    "publicId",
+    "tenantId",
+    "propertyKind",
+    "property",
+    "tag",
+    "description",
+    "rent",
+    "payer",
+    "openGuaranteeId",
+  ];
+
+  test.each(REQUIRED_TOP_LEVEL_KEYS)(
+    "refuses a lease missing the required top-level field `%s`",
+    async (key) => {
+      const t = setupStrict();
+      const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+      const tenantId = await t.run((ctx) => insertTenantRow(ctx));
+
+      await expect(
+        t.run((ctx) =>
+          ctx.db.insert(
+            "leases",
+            withoutKey(leaseDoc({ agencyId, tenantId, publicId: "LSE-MISSING" }), key),
+          ),
+        ),
+      ).rejects.toThrow(new RegExp(`Missing required field \`${key}\` in object`));
+    },
+  );
 
   test("refuses a tenantId from the agencies table and an agencyId from the tenants table", async () => {
     const t = setupStrict();
@@ -554,6 +729,43 @@ describe("rent bundle — totals as persisted", () => {
 
     expect(problems).toEqual([]);
     expect(rowCount).toBe(5);
+
+    // Planted rows prove every branch of the oracle fires, so the empty list
+    // above is evidence rather than a silent no-op. Agency B stays clean.
+    const planted = await t.run(async (ctx) => {
+      const tenantId = await insertTenantRow(ctx, TENANT_T_TAX_ID);
+      await insertLeaseRow(ctx, {
+        agencyId: agencyA,
+        tenantId,
+        publicId: "LSE-FLOAT",
+        rent: { rentCents: 1000.5, condoCents: 0, otherFeesCents: 0, totalRentCents: 1000.5 },
+      });
+      await insertLeaseRow(ctx, {
+        agencyId: agencyA,
+        tenantId,
+        publicId: "LSE-ZERO",
+        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0 },
+      });
+      await insertLeaseRow(ctx, {
+        agencyId: agencyA,
+        tenantId,
+        publicId: "LSE-NEGFEES",
+        rent: { rentCents: 1000, condoCents: 0, otherFeesCents: -5, totalRentCents: 1000 },
+      });
+      return {
+        problemsA: rentProblems(await leasesByAgency(ctx, agencyA)),
+        problemsB: rentProblems(await leasesByAgency(ctx, agencyB)),
+      };
+    });
+
+    expect(planted.problemsA).toEqual([
+      { lease: "LSE-FLOAT", problem: "non-integer rent leg" },
+      { lease: "LSE-FLOAT", problem: "rejected by isValidRentInput" },
+      { lease: "LSE-NEGFEES", problem: "rejected by isValidRentInput" },
+      { lease: "LSE-NEGFEES", problem: "total does not equal the sum of the legs" },
+      { lease: "LSE-ZERO", problem: "rejected by isValidRentInput" },
+    ]);
+    expect(planted.problemsB).toEqual([]);
   });
 
   test("a partial rent patch leaves a stale totalRentCents the sweep catches; rebuilding through buildLeaseRent clears it", async () => {
@@ -605,11 +817,11 @@ describe("rent bundle — totals as persisted", () => {
     expect(rebuilt.problems).toEqual([]);
   });
 
-  test("the strict schema accepts a float and a negative rentCents; isValidRentInput refuses both on read-back", async () => {
+  test("the strict schema persists a float, a negative and a zero rentCents unchanged — v.number() enforces neither integrality nor sign, so isValidRentInput is the only guard", async () => {
     const t = setupStrict();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
 
-    const validity = await t.run(async (ctx) => {
+    const rents = await t.run(async (ctx) => {
       const tenantId = await insertTenantRow(ctx);
       await insertLeaseRow(ctx, {
         agencyId,
@@ -635,73 +847,122 @@ describe("rent bundle — totals as persisted", () => {
         publicId: "LSE-OK",
         rent: buildLeaseRent({ rentCents: 1, condoCents: 0, otherFeesCents: 0 }),
       });
-      const rows = byPublicId(await leasesByAgency(ctx, agencyId));
-      return {
-        order: publicIds(rows),
-        valid: rows.map((row) => isValidRentInput(row.rent)),
-      };
+      return byPublicId(await leasesByAgency(ctx, agencyId)).map((row) => ({
+        publicId: row.publicId,
+        rent: row.rent,
+      }));
     });
 
-    expect(validity.order).toEqual(["LSE-FLOAT", "LSE-NEG", "LSE-OK", "LSE-ZERO"]);
-    expect(validity.valid).toEqual([false, false, true, false]);
+    expect(rents).toEqual([
+      {
+        publicId: "LSE-FLOAT",
+        rent: { rentCents: 1000.5, condoCents: 0, otherFeesCents: 0, totalRentCents: 1000.5 },
+      },
+      {
+        publicId: "LSE-NEG",
+        rent: { rentCents: -100, condoCents: 0, otherFeesCents: 0, totalRentCents: -100 },
+      },
+      {
+        publicId: "LSE-OK",
+        rent: { rentCents: 1, condoCents: 0, otherFeesCents: 0, totalRentCents: 1 },
+      },
+      {
+        publicId: "LSE-ZERO",
+        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0 },
+      },
+    ]);
   });
 });
 
-describe("property — ufFromCityUF over persisted cityUF", () => {
-  test("derives the UF from every well-formed Cidade/UF variant persisted on a lease", async () => {
+describe("property — persisted cityUF drives product eligibility", () => {
+  // The path `guarantees.create` takes: read the lease, derive the UF from the
+  // persisted `cityUF`, and hand it to `isEligible` as the subject. The
+  // eligibility objects are literals — products are not this domain's table.
+  const OPEN: ProductEligibility = {
+    agencyIds: null,
+    regionUFs: null,
+    minTier: null,
+    propertyKinds: null,
+  };
+  const RS_ONLY: ProductEligibility = { ...OPEN, regionUFs: ["RS"] };
+  const SP_ONLY: ProductEligibility = { ...OPEN, regionUFs: ["SP"] };
+  const COMMERCIAL_ONLY: ProductEligibility = { ...OPEN, propertyKinds: ["commercial"] };
+
+  test("persisted cityUF drives product eligibility: well-formed UF matches regionUFs, malformed UF never matches a region-restricted product", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
 
-    const ufs = await t.run(async (ctx) => {
+    const verdicts = await t.run(async (ctx) => {
       const tenantId = await insertTenantRow(ctx);
-      const variants = [
-        "Porto Alegre/RS",
-        "Porto Alegre / RS",
-        "porto alegre/rs",
-        "Rio de Janeiro/RJ",
-        "/RS",
-        "Santana/Livramento/RS",
-      ];
-      for (const [i, cityUF] of variants.entries()) {
-        await insertLeaseRow(ctx, { agencyId, tenantId, publicId: `LSE-U${i + 1}`, cityUF });
-      }
-      return byPublicId(await leasesByAgency(ctx, agencyId)).map((row) =>
-        ufFromCityUF(row.property.cityUF),
-      );
+      await insertLeaseRow(ctx, {
+        agencyId,
+        tenantId,
+        publicId: "LSE-POA-RES",
+        cityUF: "Porto Alegre/RS",
+      });
+      await insertLeaseRow(ctx, {
+        agencyId,
+        tenantId,
+        publicId: "LSE-POA-COM",
+        cityUF: "porto alegre / rs",
+        propertyKind: "commercial",
+      });
+      await insertLeaseRow(ctx, {
+        agencyId,
+        tenantId,
+        publicId: "LSE-NO-UF",
+        cityUF: "Brasília",
+      });
+      return byPublicId(await leasesByAgency(ctx, agencyId)).map((lease) => {
+        const subject = {
+          agencyId: lease.agencyId,
+          uf: ufFromCityUF(lease.property.cityUF),
+          tier: "bom" as const,
+          propertyKind: lease.propertyKind,
+        };
+        return {
+          publicId: lease.publicId,
+          uf: subject.uf,
+          open: isEligible({ eligibility: OPEN }, subject),
+          rsOnly: isEligible({ eligibility: RS_ONLY }, subject),
+          spOnly: isEligible({ eligibility: SP_ONLY }, subject),
+          commercialOnly: isEligible({ eligibility: COMMERCIAL_ONLY }, subject),
+        };
+      });
     });
 
-    expect(ufs).toEqual(["RS", "RS", "RS", "RJ", "RS", "RS"]);
-  });
-
-  test("returns null for malformed persisted cityUF so region-restricted products cannot match a garbage token", async () => {
-    const t = setup();
-    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
-
-    const ufs = await t.run(async (ctx) => {
-      const tenantId = await insertTenantRow(ctx);
-      const variants = [
-        "Brasília",
-        "Porto Alegre/",
-        "Porto Alegre/RSS",
-        "Porto Alegre/1A",
-        "",
-        "Porto Alegre/R S",
-      ];
-      for (const [i, cityUF] of variants.entries()) {
-        await insertLeaseRow(ctx, { agencyId, tenantId, publicId: `LSE-M${i + 1}`, cityUF });
-      }
-      return byPublicId(await leasesByAgency(ctx, agencyId)).map((row) =>
-        ufFromCityUF(row.property.cityUF),
-      );
-    });
-
-    expect(ufs).toEqual([null, null, null, null, null, null]);
+    expect(verdicts).toEqual([
+      {
+        publicId: "LSE-NO-UF",
+        uf: null,
+        open: true,
+        rsOnly: false,
+        spOnly: false,
+        commercialOnly: false,
+      },
+      {
+        publicId: "LSE-POA-COM",
+        uf: "RS",
+        open: true,
+        rsOnly: true,
+        spOnly: false,
+        commercialOnly: true,
+      },
+      {
+        publicId: "LSE-POA-RES",
+        uf: "RS",
+        open: true,
+        rsOnly: true,
+        spOnly: false,
+        commercialOnly: false,
+      },
+    ]);
   });
 });
 
 describe("field mutability — patches in place", () => {
   test("patches tag, description, complement and propertyKind in place without touching rent, payer, tenantId or the pointer", async () => {
-    const t = setup();
+    const t = setupStrict();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId, leaseId, tenantId } = await seedGuaranteeWithLease(
       t,
@@ -741,6 +1002,93 @@ describe("field mutability — patches in place", () => {
       openGuaranteeId: guaranteeId,
     });
   });
+
+  test("strict harness validates patches too — bad literals and the input rent shape are refused on patch and the row is left unchanged", async () => {
+    const t = setupStrict();
+    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+    const leaseId = await t.run(async (ctx) => {
+      const tenantId = await insertTenantRow(ctx);
+      return insertLeaseRow(ctx, { agencyId, tenantId, publicId: "LSE-PATCH" });
+    });
+
+    await expect(
+      // hook-ok: deliberately undeclared literal to exercise the validator on patch
+      t.run((ctx) => ctx.db.patch(leaseId, malformed({}, { propertyKind: "industrial" }))),
+    ).rejects.toThrow(/Expected one of literal, literal, got `"industrial"`/);
+
+    await expect(
+      // hook-ok: deliberately undeclared literal to exercise the validator on patch
+      t.run((ctx) => ctx.db.patch(leaseId, malformed({}, { payer: "landlord" }))),
+    ).rejects.toThrow(/Expected `tenant`, got `landlord`/);
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db.patch(
+          leaseId,
+          // hook-ok: deliberately incomplete rent bundle to exercise the validator on patch
+          malformed({}, { rent: { rentCents: 200_000, condoCents: 0, otherFeesCents: 0 } }),
+        ),
+      ),
+    ).rejects.toThrow(/Missing required field `totalRentCents` in object/);
+
+    await expect(
+      // hook-ok: deliberately undeclared field to exercise the validator on patch
+      t.run((ctx) => ctx.db.patch(leaseId, malformed({}, { tenantCpf: "52998224725" }))),
+    ).rejects.toThrow(/Unexpected field `tenantCpf` in object/);
+
+    const unchanged = await t.run((ctx) => getLease(ctx, leaseId));
+    expect(unchanged.propertyKind).toBe("residential");
+    expect(unchanged.payer).toBe("tenant");
+    expect(unchanged.rent).toEqual({
+      rentCents: 100_000,
+      condoCents: 0,
+      otherFeesCents: 0,
+      totalRentCents: 100_000,
+    });
+  });
+
+  test("a rent patch on the lease changes the living rent and leaves the open guarantee's terms.rentCents snapshot untouched", async () => {
+    const t = setupStrict();
+    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+    const { guaranteeId, leaseId } = await seedGuaranteeWithLease(
+      t,
+      { agencyId, status: "active", rentCents: 100_000 },
+      "RJ1",
+    );
+
+    const before = await t.run(async (ctx) => {
+      const guarantee = await ctx.db.get(guaranteeId);
+      return { snapshot: guarantee?.terms.rentCents, living: (await getLease(ctx, leaseId)).rent };
+    });
+    expect(before).toEqual({
+      snapshot: 100_000,
+      living: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, totalRentCents: 100_000 },
+    });
+
+    const after = await t.run(async (ctx) => {
+      await ctx.db.patch(leaseId, {
+        rent: buildLeaseRent({ rentCents: 110_000, condoCents: 30_000, otherFeesCents: 0 }),
+      });
+      const guarantee = await ctx.db.get(guaranteeId);
+      const lease = await getLease(ctx, leaseId);
+      return {
+        snapshot: guarantee?.terms.rentCents,
+        living: lease.rent,
+        pointer: lease.openGuaranteeId,
+      };
+    });
+
+    expect(after).toEqual({
+      snapshot: 100_000,
+      living: {
+        rentCents: 110_000,
+        condoCents: 30_000,
+        otherFeesCents: 0,
+        totalRentCents: 140_000,
+      },
+      pointer: guaranteeId,
+    });
+  });
 });
 
 describe("index reads — leases", () => {
@@ -748,12 +1096,13 @@ describe("index reads — leases", () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
 
-    const { leaseBId, hit, miss } = await t.run(async (ctx) => {
+    const { tenantId, leaseBId, hit, miss } = await t.run(async (ctx) => {
       const tenantId = await insertTenantRow(ctx);
       await insertLeaseRow(ctx, { agencyId, tenantId, publicId: "LSE-A" });
       const leaseBId = await insertLeaseRow(ctx, { agencyId, tenantId, publicId: "LSE-B" });
       await insertLeaseRow(ctx, { agencyId, tenantId, publicId: "LSE-C" });
       return {
+        tenantId,
         leaseBId,
         hit: await ctx.db
           .query("leases")
@@ -766,9 +1115,60 @@ describe("index reads — leases", () => {
       };
     });
 
-    expect(hit?.publicId).toBe("LSE-B");
-    expect(hit?._id).toBe(leaseBId);
+    expect(hit).toEqual({
+      _id: leaseBId,
+      _creationTime: expect.any(Number),
+      agencyId,
+      publicId: "LSE-B",
+      tenantId,
+      propertyKind: "residential",
+      property: {
+        cep: "01000000",
+        streetAndNumber: "Rua Teste, 1",
+        neighborhood: "Centro",
+        cityUF: "São Paulo/SP",
+        complement: "",
+      },
+      tag: "",
+      description: "",
+      rent: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, totalRentCents: 100_000 },
+      payer: "tenant",
+      openGuaranteeId: null,
+    });
     expect(miss).toBe(null);
+  });
+
+  test("by_agency_tenant ordered desc returns the tenant's leases newest-first — the prefill consumer's contract; by_tenant desc agrees", async () => {
+    const t = setup();
+    const agencyA = await seedAgency(t, "Agency A", "00000000000101");
+
+    const result = await t.run(async (ctx) => {
+      const tenantT = await insertTenantRow(ctx, TENANT_T_TAX_ID);
+      await insertLeaseRow(ctx, { agencyId: agencyA, tenantId: tenantT, publicId: "LSE-T1" });
+      await insertLeaseRow(ctx, { agencyId: agencyA, tenantId: tenantT, publicId: "LSE-T2" });
+      await insertLeaseRow(ctx, { agencyId: agencyA, tenantId: tenantT, publicId: "LSE-T3" });
+      const newestFirst = await ctx.db
+        .query("leases")
+        .withIndex("by_agency_tenant", (q) => q.eq("agencyId", agencyA).eq("tenantId", tenantT))
+        .order("desc")
+        .collect();
+      const byTenantNewestFirst = await ctx.db
+        .query("leases")
+        .withIndex("by_tenant", (q) => q.eq("tenantId", tenantT))
+        .order("desc")
+        .collect();
+      return {
+        newestFirst: publicIds(newestFirst),
+        byTenantNewestFirst: publicIds(byTenantNewestFirst),
+        strictlyDescending: newestFirst.every(
+          (row, i, rows) => i === 0 || (rows[i - 1]?._creationTime ?? 0) > row._creationTime,
+        ),
+      };
+    });
+
+    expect(result.newestFirst).toEqual(["LSE-T3", "LSE-T2", "LSE-T1"]);
+    expect(result.byTenantNewestFirst).toEqual(["LSE-T3", "LSE-T2", "LSE-T1"]);
+    expect(result.strictlyDescending).toBe(true);
   });
 
   test("by_agency returns the agency's leases in insertion order and an empty list for an agency without leases", async () => {
@@ -828,6 +1228,8 @@ describe("index reads — leases", () => {
     const t = setup();
     const agencyA = await seedAgency(t, "Agency A", "00000000000101");
 
+    // The prefix read sorts by (agencyId, tenantId, _creationTime); tenant ids
+    // are opaque, so the assertion is set equality with by_agency, not order.
     const { prefixIds, prefixRowIds, byAgencyRowIds } = await t.run(async (ctx) => {
       const tenantT = await insertTenantRow(ctx, TENANT_T_TAX_ID);
       const tenantU = await insertTenantRow(ctx, TENANT_U_TAX_ID);
@@ -840,7 +1242,7 @@ describe("index reads — leases", () => {
         .collect();
       const byAgency = await leasesByAgency(ctx, agencyA);
       return {
-        prefixIds: publicIds(prefix),
+        prefixIds: publicIds(byPublicId(prefix)),
         prefixRowIds: prefix.map((row) => row._id).sort(),
         byAgencyRowIds: byAgency.map((row) => row._id).sort(),
       };
@@ -848,7 +1250,37 @@ describe("index reads — leases", () => {
 
     expect(prefixIds).toEqual(["LSE-T1", "LSE-T2", "LSE-U1"]);
     expect(prefixRowIds).toEqual(byAgencyRowIds);
-    expect(prefixRowIds).toHaveLength(3);
+  });
+
+  test("by_agency and by_agency_tenant follow an agencyId patch on a lease while by_tenant is unaffected", async () => {
+    const t = setupStrict();
+    const agencyA = await seedAgency(t, "Agency A", "00000000000101");
+    const agencyB = await seedAgency(t, "Agency B", "00000000000202");
+
+    const result = await t.run(async (ctx) => {
+      const tenantT = await insertTenantRow(ctx, TENANT_T_TAX_ID);
+      const leaseId = await insertLeaseRow(ctx, {
+        agencyId: agencyA,
+        tenantId: tenantT,
+        publicId: "LSE-MOVE",
+      });
+      await ctx.db.patch(leaseId, { agencyId: agencyB });
+      return {
+        byAgencyA: publicIds(await leasesByAgency(ctx, agencyA)),
+        byAgencyB: publicIds(await leasesByAgency(ctx, agencyB)),
+        aT: publicIds(await leasesByAgencyTenant(ctx, agencyA, tenantT)),
+        bT: publicIds(await leasesByAgencyTenant(ctx, agencyB, tenantT)),
+        byTenant: publicIds(await leasesByTenant(ctx, tenantT)),
+      };
+    });
+
+    expect(result).toEqual({
+      byAgencyA: [],
+      byAgencyB: ["LSE-MOVE"],
+      aT: [],
+      bT: ["LSE-MOVE"],
+      byTenant: ["LSE-MOVE"],
+    });
   });
 
   test("by_tenant and by_agency_tenant follow a tenantId patch on a lease", async () => {
@@ -906,6 +1338,37 @@ describe("cross-agency isolation via ctx.db", () => {
     expect(publicIds(forB)).toEqual(["LSE-DUP", "LSE-ONLY-B"]);
     for (const row of forB) expect(row.agencyId).toBe(agencyB);
     expect(collisions).toHaveLength(2);
+  });
+
+  test("by_publicId .unique() throws when two agencies share a publicId — the index enforces no uniqueness, so a deep-link resolver must scope by agency or enforce uniqueness at create time", async () => {
+    const t = setup();
+    const agencyA = await seedAgency(t, "Agency A", "00000000000101");
+    const agencyB = await seedAgency(t, "Agency B", "00000000000202");
+
+    await t.run(async (ctx) => {
+      const tenantId = await insertTenantRow(ctx);
+      await insertLeaseRow(ctx, { agencyId: agencyA, tenantId, publicId: "LSE-DUP" });
+      await insertLeaseRow(ctx, { agencyId: agencyB, tenantId, publicId: "LSE-DUP" });
+    });
+
+    await expect(
+      t.run((ctx) =>
+        ctx.db
+          .query("leases")
+          .withIndex("by_publicId", (q) => q.eq("publicId", "LSE-DUP"))
+          .unique(),
+      ),
+    ).rejects.toThrow(/unique\(\) query returned more than one result from table leases/);
+
+    // The agency-scoped read the resolver has to fall back to.
+    const scoped = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("leases")
+        .withIndex("by_publicId", (q) => q.eq("publicId", "LSE-DUP"))
+        .collect();
+      return rows.filter((row) => row.agencyId === agencyA).map((row) => row.agencyId);
+    });
+    expect(scoped).toEqual([agencyA]);
   });
 
   test("by_tenant is platform-wide across agencies while by_agency_tenant hides the foreign agency's lease for the same tenant", async () => {
@@ -978,36 +1441,232 @@ describe("one-open-guarantee rule — lease side", () => {
     });
   });
 
-  test("lease-side pointer sweep across two agencies is clean and every pointer state matches the guarantee state it was seeded with", async () => {
+  test("lease-side pointer sweep across two agencies is clean with one lease per GUARANTEE_STATE; the six non-closed states hold the pointer and closed releases it", async () => {
     const t = setup();
     const agencyA = await seedAgency(t, "Agency A", "00000000000101");
     const agencyB = await seedAgency(t, "Agency B", "00000000000202");
+    // Order is GUARANTEE_STATES; the literal below is indexed the same way.
     const seeded = [
-      await seedGuaranteeWithLease(t, { agencyId: agencyA, status: "active" }, "S1"),
-      await seedGuaranteeWithLease(t, { agencyId: agencyA, status: "drafted" }, "S2"),
-      await seedGuaranteeWithLease(t, { agencyId: agencyA, status: "closed" }, "S3"),
-      await seedGuaranteeWithLease(t, { agencyId: agencyB, status: "in_arrears" }, "S4"),
-      await seedGuaranteeWithLease(t, { agencyId: agencyB, status: "closed" }, "S5"),
+      await seedGuaranteeWithLease(t, { agencyId: agencyA, status: "drafted" }, "S1"),
+      await seedGuaranteeWithLease(t, { agencyId: agencyA, status: "active" }, "S2"),
+      await seedGuaranteeWithLease(t, { agencyId: agencyA, status: "in_arrears" }, "S3"),
+      await seedGuaranteeWithLease(t, { agencyId: agencyB, status: "default_verified" }, "S4"),
+      await seedGuaranteeWithLease(t, { agencyId: agencyB, status: "cover_committed" }, "S5"),
+      await seedGuaranteeWithLease(t, { agencyId: agencyB, status: "in_eviction" }, "S6"),
+      await seedGuaranteeWithLease(t, { agencyId: agencyB, status: "closed" }, "S7"),
     ];
 
-    const { problemsA, problemsB, pointsAtOwnGuarantee, closedPointers } = await t.run(
+    const { problemsA, problemsB, statuses, pointsAtOwnGuarantee, closedPointer } = await t.run(
       async (ctx) => {
         const leases = await Promise.all(seeded.map((s) => getLease(ctx, s.leaseId)));
+        const guarantees = await Promise.all(seeded.map((s) => ctx.db.get(s.guaranteeId)));
         return {
           problemsA: await leasePointerProblems(ctx, agencyA),
           problemsB: await leasePointerProblems(ctx, agencyB),
+          statuses: guarantees.map((g) => g?.status),
           pointsAtOwnGuarantee: leases.map(
             (lease, i) => lease.openGuaranteeId === seeded[i]?.guaranteeId,
           ),
-          closedPointers: [leases[2]?.openGuaranteeId, leases[4]?.openGuaranteeId],
+          closedPointer: leases[6]?.openGuaranteeId,
         };
       },
     );
 
+    expect(statuses).toEqual([
+      "drafted",
+      "active",
+      "in_arrears",
+      "default_verified",
+      "cover_committed",
+      "in_eviction",
+      "closed",
+    ]);
+    expect(statuses).toEqual([...GUARANTEE_STATES]);
     expect(problemsA).toEqual([]);
     expect(problemsB).toEqual([]);
-    expect(pointsAtOwnGuarantee).toEqual([true, true, false, true, false]);
-    expect(closedPointers).toEqual([null, null]);
+    expect(pointsAtOwnGuarantee).toEqual([true, true, true, true, true, true, false]);
+    expect(closedPointer).toBe(null);
+  });
+
+  const NON_CLOSED_STATES: GuaranteeState[] = [
+    "drafted",
+    "active",
+    "in_arrears",
+    "default_verified",
+    "cover_committed",
+    "in_eviction",
+  ];
+
+  test("NON_CLOSED_STATES is every GUARANTEE_STATE except closed", () => {
+    expect([...NON_CLOSED_STATES, "closed"]).toEqual([...GUARANTEE_STATES]);
+  });
+
+  test.each(NON_CLOSED_STATES)(
+    "a %s guarantee holds the lease pointer, makes the guard refuse with the literal error, and leaves the sweep clean",
+    async (status) => {
+      const t = setup();
+      const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+      const { guaranteeId, leaseId } = await seedGuaranteeWithLease(
+        t,
+        { agencyId, status },
+        `ST-${status}`,
+      );
+
+      const { pointer, guard, sweep } = await t.run(async (ctx) => {
+        const lease = await getLease(ctx, leaseId);
+        return {
+          pointer: lease.openGuaranteeId,
+          guard: assertLeaseAcceptsGuarantee(lease),
+          sweep: await leasePointerProblems(ctx, agencyId),
+        };
+      });
+
+      expect(pointer).toBe(guaranteeId);
+      expect(guard).toEqual({
+        success: false,
+        error: { code: "LEASE_HAS_OPEN_GUARANTEE" },
+        message: `Lease ${leaseId} already has an open guarantee (${guaranteeId}).`,
+      });
+      expect(sweep).toEqual([]);
+    },
+  );
+
+  test("a lease whose only guarantee is closed has a null pointer, the guard accepts, and the sweep is clean", async () => {
+    const t = setup();
+    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+    const { leaseId } = await seedGuaranteeWithLease(
+      t,
+      { agencyId, status: "closed" },
+      "ST-closed",
+    );
+
+    const { pointer, guard, sweep } = await t.run(async (ctx) => {
+      const lease = await getLease(ctx, leaseId);
+      return {
+        pointer: lease.openGuaranteeId,
+        guard: assertLeaseAcceptsGuarantee(lease),
+        sweep: await leasePointerProblems(ctx, agencyId),
+      };
+    });
+
+    expect(pointer).toBe(null);
+    expect(guard).toEqual({
+      success: true,
+      data: { leaseId },
+      message: "Lease accepts a new guarantee.",
+    });
+    expect(sweep).toEqual([]);
+  });
+
+  test("CLOSE_REASONS lists the seven documented reasons", () => {
+    expect([...CLOSE_REASONS]).toEqual([
+      "end_of_lease",
+      "rescission",
+      "abandonment",
+      "eviction",
+      "dispute_reversal",
+      "canceled_pre_activation",
+      "death",
+    ]);
+  });
+
+  test.each([...CLOSE_REASONS])(
+    "a lease whose guarantee closed under %s has a null pointer and accepts a new guarantee — the lease side is indifferent to why",
+    async (closeReason: CloseReason) => {
+      const t = setup();
+      const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+      const { guaranteeId, leaseId } = await seedGuaranteeWithLease(
+        t,
+        { agencyId, status: "closed", closeReason },
+        `CR-${closeReason}`,
+      );
+
+      const { reason, pointer, guard } = await t.run(async (ctx) => {
+        const guarantee = await ctx.db.get(guaranteeId);
+        const lease = await getLease(ctx, leaseId);
+        return {
+          reason: guarantee?.closure?.reason,
+          pointer: lease.openGuaranteeId,
+          guard: assertLeaseAcceptsGuarantee(lease),
+        };
+      });
+
+      expect(reason).toBe(closeReason);
+      expect(pointer).toBe(null);
+      expect(guard).toEqual({
+        success: true,
+        data: { leaseId },
+        message: "Lease accepts a new guarantee.",
+      });
+    },
+  );
+
+  test("lease with two closed lives and one open guarantee: sweep clean, pointer at the open row", async () => {
+    const t = setup();
+    const agencyId = await seedAgency(t, "Agency A", "00000000000101");
+    // The fixture seeds one guarantee per lease; the two closed lives are
+    // re-parented onto the first lease at the db layer, mirroring a lease that
+    // has been guaranteed three times over the years.
+    const first = await seedGuaranteeWithLease(
+      t,
+      {
+        agencyId,
+        status: "closed",
+        closeReason: "end_of_lease",
+        closedAt: "2024-06-01T00:00:00.000Z",
+      },
+      "L1",
+    );
+    const second = await seedGuaranteeWithLease(
+      t,
+      {
+        agencyId,
+        status: "closed",
+        closeReason: "rescission",
+        closedAt: "2025-06-01T00:00:00.000Z",
+      },
+      "L2",
+    );
+    const open = await seedGuaranteeWithLease(t, { agencyId, status: "active" }, "L3");
+
+    const result = await t.run(async (ctx) => {
+      await ctx.db.patch(second.guaranteeId, { leaseId: first.leaseId });
+      await ctx.db.patch(open.guaranteeId, { leaseId: first.leaseId });
+      await ctx.db.patch(first.leaseId, { openGuaranteeId: open.guaranteeId });
+      await ctx.db.patch(open.leaseId, { openGuaranteeId: null });
+      await ctx.db.delete(second.leaseId);
+      await ctx.db.delete(open.leaseId);
+
+      const lease = await getLease(ctx, first.leaseId);
+      const rows = await guaranteesByLease(ctx, first.leaseId);
+      return {
+        history: rows
+          .map((row) => ({
+            publicId: row.publicId,
+            status: row.status,
+            closeReason: row.closure?.reason ?? null,
+          }))
+          .sort((a, b) => a.publicId.localeCompare(b.publicId)),
+        pointer: lease.openGuaranteeId,
+        guard: assertLeaseAcceptsGuarantee(lease),
+        sweep: await leasePointerProblems(ctx, agencyId),
+        leaseCount: (await leasesByAgency(ctx, agencyId)).length,
+      };
+    });
+
+    expect(result.history).toEqual([
+      { publicId: "L1", status: "closed", closeReason: "end_of_lease" },
+      { publicId: "L2", status: "closed", closeReason: "rescission" },
+      { publicId: "L3", status: "active", closeReason: null },
+    ]);
+    expect(result.pointer).toBe(open.guaranteeId);
+    expect(result.guard).toEqual({
+      success: false,
+      error: { code: "LEASE_HAS_OPEN_GUARANTEE" },
+      message: `Lease ${first.leaseId} already has an open guarantee (${open.guaranteeId}).`,
+    });
+    expect(result.sweep).toEqual([]);
+    expect(result.leaseCount).toBe(1);
   });
 
   type PlantedDefect = {
