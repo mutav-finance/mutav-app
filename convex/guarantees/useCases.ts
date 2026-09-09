@@ -18,10 +18,9 @@ import type { Tenant, TenantInput } from "../tenants/domain";
 import type { Lease } from "../leases/domain";
 import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { contractsByStatus, countByStatePlatform, sumInsuredExposure } from "./aggregate";
-import { insertGuaranteeAggregates, replaceGuaranteeAggregates } from "./aggregateWrites";
+import { insertGuaranteeAggregates } from "./aggregateWrites";
+import { applyGuaranteeTransition } from "./transitions";
 import {
-  assertClose,
-  assertTransition,
   CLOSE_REASON,
   CONTRACT_APPLICATION_VALIDITY_MS,
   DOCUMENT_KEY,
@@ -1024,9 +1023,10 @@ type CancelDraftErrorResult = {
 
 /**
  * Close a draft before activation (`drafted → closed`, reason
- * `canceled_pre_activation`). Both machine guards run before the patch; the
- * lease pointer is released in the same transaction so the lease can take a
- * new guarantee immediately.
+ * `canceled_pre_activation`). Lives here rather than in `mutations.ts` because
+ * the agency detail page binds to `api.guarantees.useCases.cancelDraft`; the
+ * lifecycle mechanics belong to the shared helper, so there is still exactly
+ * one implementation of the transition.
  */
 export const cancelDraft = mutationWithAgencyScope({
   args: { publicId: v.string() },
@@ -1047,52 +1047,24 @@ export const cancelDraft = mutationWithAgencyScope({
       };
     }
 
-    const closing = assertClose(guarantee.status, CLOSE_REASON.CANCELED_PRE_ACTIVATION);
-    const transition = assertTransition(guarantee.status, GUARANTEE_STATE.CLOSED);
-    if (!closing.success || !transition.success) {
+    const applied = await applyGuaranteeTransition(ctx, {
+      guarantee,
+      to: GUARANTEE_STATE.CLOSED,
+      closure: { reason: CLOSE_REASON.CANCELED_PRE_ACTIVATION },
+      actor: { userId: ctx.user._id, username: ctx.user.name },
+      message: "Proposta cancelada",
+    });
+    // Every machine refusal collapses to one agency-facing code: from an
+    // agency's point of view the only thing that can be wrong here is that the
+    // guarantee is no longer a draft, and `guaranteeDetails.errors.NOT_DRAFTED`
+    // is the message it already renders.
+    if (!applied.success) {
       return {
         success: false,
         error: { code: GUARANTEE_ERROR_CODE.NOT_DRAFTED },
-        message: closing.success ? transition.message : closing.message,
+        message: applied.message,
       };
     }
-
-    const nowISO = new Date().toISOString();
-    await ctx.db.patch(guarantee._id, {
-      status: GUARANTEE_STATE.CLOSED,
-      closure: { reason: CLOSE_REASON.CANCELED_PRE_ACTIVATION, closedAt: nowISO },
-    });
-    const after = await ctx.db.get(guarantee._id);
-    if (!after) throw new Error("Guarantee disappeared mid-mutation");
-    await replaceGuaranteeAggregates(ctx, guarantee, after);
-
-    const lease = await ctx.db.get(guarantee.leaseId);
-    if (lease && lease.openGuaranteeId === guarantee._id) {
-      await ctx.db.patch(lease._id, { openGuaranteeId: null });
-    }
-
-    await ctx.db.insert("guaranteeHistory", {
-      agencyId: guarantee.agencyId,
-      guaranteePublicId: args.publicId,
-      at: nowISO,
-      username: ctx.user.name,
-      message: "Proposta cancelada",
-    });
-
-    await appendAuditEntry(ctx, {
-      actor: { kind: "user", userId: ctx.user._id },
-      action: AUDIT_ACTION.GUARANTEE_TRANSITIONED,
-      resourceType: "guarantees",
-      resourceId: args.publicId,
-      payload: {
-        guaranteeId: guarantee._id,
-        leaseId: guarantee.leaseId,
-        agencyId: guarantee.agencyId,
-        from: transition.data.from,
-        to: transition.data.to,
-        reason: closing.data.reason,
-      },
-    });
 
     return { success: true, data: { canceled: true }, message: "Draft canceled" };
   },

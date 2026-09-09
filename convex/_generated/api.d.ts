@@ -34,8 +34,10 @@ import type * as guarantees_aggregateWrites from "../guarantees/aggregateWrites.
 import type * as guarantees_backfill from "../guarantees/backfill.js";
 import type * as guarantees_domain from "../guarantees/domain.js";
 import type * as guarantees_machine from "../guarantees/machine.js";
+import type * as guarantees_mutations from "../guarantees/mutations.js";
 import type * as guarantees_pricing from "../guarantees/pricing.js";
 import type * as guarantees_tenantIdentity from "../guarantees/tenantIdentity.js";
+import type * as guarantees_transitions from "../guarantees/transitions.js";
 import type * as guarantees_useCases from "../guarantees/useCases.js";
 import type * as http from "../http.js";
 import type * as invoices_actions from "../invoices/actions.js";
@@ -129,8 +131,10 @@ declare const fullApi: ApiFromModules<{
   "guarantees/backfill": typeof guarantees_backfill;
   "guarantees/domain": typeof guarantees_domain;
   "guarantees/machine": typeof guarantees_machine;
+  "guarantees/mutations": typeof guarantees_mutations;
   "guarantees/pricing": typeof guarantees_pricing;
   "guarantees/tenantIdentity": typeof guarantees_tenantIdentity;
+  "guarantees/transitions": typeof guarantees_transitions;
   "guarantees/useCases": typeof guarantees_useCases;
   http: typeof http;
   "invoices/actions": typeof invoices_actions;
