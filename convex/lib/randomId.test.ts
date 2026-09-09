@@ -1,24 +1,24 @@
 import { describe, expect, test } from "vitest";
 
-import { generateContractPublicId, generateInvoiceAccessToken } from "./randomId";
+import { generateGuaranteePublicId, generateInvoiceAccessToken } from "./randomId";
 
 const SAMPLE_SIZE = 2000;
 
-describe("generateContractPublicId", () => {
+describe("generateGuaranteePublicId", () => {
   test("carries the CTR- prefix and eight body characters", () => {
-    const id = generateContractPublicId();
+    const id = generateGuaranteePublicId();
     expect(id).toMatch(/^CTR-[0-9A-HJKMNP-TV-Z]{8}$/);
   });
 
   test("never emits the ambiguous characters I, L, O or U", () => {
     const body = Array.from({ length: SAMPLE_SIZE }, () =>
-      generateContractPublicId().slice(4),
+      generateGuaranteePublicId().slice(4),
     ).join("");
     expect(body).not.toMatch(/[ILOU]/);
   });
 
   test("does not collide across a large sample", () => {
-    const ids = new Set(Array.from({ length: SAMPLE_SIZE }, generateContractPublicId));
+    const ids = new Set(Array.from({ length: SAMPLE_SIZE }, generateGuaranteePublicId));
     expect(ids.size).toBe(SAMPLE_SIZE);
   });
 });

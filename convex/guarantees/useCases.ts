@@ -3,37 +3,51 @@ import { paginationOptsValidator } from "convex/server";
 import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
-import { priceContract, splitCommission, feeBreakdown } from "./pricing";
+import { priceGuarantee, splitCommission } from "./pricing";
 import type {
-  Contract,
+  ActivityBucket,
   ContractApplication,
   ContractApplicationId,
-  ContractHistory,
-  ContractId,
+  Guarantee,
+  GuaranteeHistory,
+  GuaranteeId,
+  GuaranteeState,
 } from "./domain";
 import type { AgencyId } from "../agencies/domain";
 import type { Tenant, TenantInput } from "../tenants/domain";
+import type { Lease } from "../leases/domain";
+import type { Product, ProductId } from "../products/domain";
+import { contractsByStatus, contractsByStatusPlatform, sumInsuredExposure } from "./aggregate";
+import { insertGuaranteeAggregates, replaceGuaranteeAggregates } from "./aggregateWrites";
 import {
-  ativoInsuredCentsPlatform,
-  contractsByStatus,
-  contractsByStatusPlatform,
-} from "./aggregate";
-import { insertContractAggregates, replaceContractAggregates } from "./aggregateWrites";
-import {
+  assertClose,
+  assertTransition,
+  CLOSE_REASON,
   CONTRACT_APPLICATION_VALIDITY_MS,
-  CONTRACT_STATUS,
-  CONTRACT_ERROR_CODE,
-  contractPlanValidator,
-  propertyKindValidator,
-  DEFAULT_EXIT_COST_MULTIPLIER,
-  DEFAULT_PAYER,
-  DEFAULT_RENT_MULTIPLIER,
+  DOCUMENT_KEY,
+  DOCUMENT_STATUS,
+  GUARANTEE_ERROR_CODE,
+  GUARANTEE_STATE,
+  GUARANTEE_STATES,
+  guaranteePlanValidator,
+  guaranteeStateValidator,
   SCORE_TIER,
+  TENANT_APPROVAL_STATUS,
   tierForScore,
   getUrgencyTier,
   urgencySortKey,
   expiringRenewalBounds,
 } from "./domain";
+import {
+  buildLeaseRent,
+  DEFAULT_PAYER,
+  isValidRentInput,
+  leasePropertyValidator,
+  leaseRentInputValidator,
+  propertyKindValidator,
+  ufFromCityUF,
+} from "../leases/domain";
+import { resolveProduct } from "../products/useCases";
 import {
   normalizeEmbeddedTenant,
   tenantEntityTypeValidator,
@@ -44,9 +58,8 @@ import { getOrCreateTenant } from "../tenants/useCases";
 import type { Result } from "../lib/result";
 import { findFreshAssessment } from "../creditAnalysis/useCases";
 import { CAPABILITY, SUBJECT_TYPE } from "../creditAnalysis/domain";
-import type { ActivityBucket } from "./domain";
 import { getMaxGuaranteeCapacityCents } from "../lib/env";
-import { generateContractPublicId } from "../lib/randomId";
+import { generateGuaranteePublicId, generateLeasePublicId } from "../lib/randomId";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import {
@@ -68,54 +81,53 @@ export const getByPublicId = query({
   handler: async (ctx, args) => {
     // `.collect()` instead of `.unique()` because `publicId` carries no
     // DB-level uniqueness constraint — seed re-runs across multiple
-    // agencies can produce collisions (e.g. publicId `1000036` seeded
-    // into both Paulista and Aprovada). We disambiguate by membership:
-    // return the first contract whose `agencyId` the caller has access
+    // agencies can produce collisions. We disambiguate by membership:
+    // return the first guarantee whose `agencyId` the caller has access
     // to. Returns null on "no such id" AND "not a member of any owning
     // agency" — same shape as before, no cross-agency existence leak.
     const candidates = await ctx.db
-      .query("contracts")
+      .query("guarantees")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .collect();
 
-    for (const contract of candidates) {
+    for (const guarantee of candidates) {
       try {
-        await assertAgencyAccess(ctx, contract.agencyId);
+        await assertAgencyAccess(ctx, guarantee.agencyId);
       } catch {
         continue;
       }
 
-      const tenant = await ctx.db.get(contract.tenantId);
-      // FK-integrity invariant, not a leak case: `tenantId` is required and
-      // registry rows are never deleted, so a miss means corrupted data.
-      if (!tenant) {
-        throw new Error(`Contract ${contract.publicId} references a missing tenants row`);
+      // FK-integrity invariants, not leak cases: `leaseId` is required and
+      // lease rows are never deleted, so a miss means corrupted data.
+      const lease = await ctx.db.get(guarantee.leaseId);
+      if (!lease) {
+        throw new Error(`Guarantee ${guarantee.publicId} references a missing leases row`);
       }
 
       // Scoped by agency, not by publicId alone: publicId carries no DB-level
-      // uniqueness constraint, so `by_contract` would fold another agency's
+      // uniqueness constraint, so `by_guarantee` would fold another agency's
       // history rows — username and message included — into this response.
       const history = await ctx.db
-        .query("contractHistory")
-        .withIndex("by_agency_contract", (q) =>
-          q.eq("agencyId", contract.agencyId).eq("contractPublicId", args.publicId),
+        .query("guaranteeHistory")
+        .withIndex("by_agency_guarantee", (q) =>
+          q.eq("agencyId", guarantee.agencyId).eq("guaranteePublicId", args.publicId),
         )
         .order("desc")
-        // Hard cap; if contracts exceed 100 history entries we'll need pagination.
+        // Hard cap; if guarantees exceed 100 history entries we'll need pagination.
         .take(100);
 
-      // No fallback to `tenant`. The registry row keeps its first writer's
-      // values, so serving it here shows this agency whatever the *other*
-      // agency submitted for the same person — the disclosure this domain
-      // exists to prevent. Every contract carries its own submission
-      // (`contracts.create` in production, `attachTenantSnapshots` in seed),
-      // so an absent one is corrupted data, not a case to paper over.
-      const submitted = await agencySubmittedTenant(ctx, contract);
+      // No fallback to the registry row. It keeps its first writer's values,
+      // so serving it here shows this agency whatever the *other* agency
+      // submitted for the same person — the disclosure this domain exists to
+      // prevent. Every guarantee carries its own submission (`create` in
+      // production, the seed's snapshot pass otherwise), so an absent one is
+      // corrupted data, not a case to paper over.
+      const submitted = await agencySubmittedTenant(ctx, guarantee);
       if (!submitted) {
-        throw new Error(`Contract ${contract.publicId} has no tenant submission of its own`);
+        throw new Error(`Guarantee ${guarantee.publicId} has no tenant submission of its own`);
       }
 
-      return shapeContract(contract, submitted, history);
+      return shapeGuarantee({ guarantee, lease, identity: submitted, history });
     }
 
     return null;
@@ -123,48 +135,48 @@ export const getByPublicId = query({
 });
 
 /**
- * Tenant identity for a contract as the *owning* agency submitted it, for
+ * Tenant identity for a guarantee as the *owning* agency submitted it, for
  * actions that have no `ctx.db` (anchor SEP-9 prefill). This is the one read
  * path that hands tenant PII to a third party, so it is scoped and fail-closed
  * on both axes.
  *
  * `agencyId` is required, not derived: `publicId` carries no DB-level
  * uniqueness constraint, so resolving by it alone either throws on `.unique()`
- * or picks whichever agency's contract sorts first and ships that tenant's data
- * under the caller's session.
+ * or picks whichever agency's guarantee sorts first and ships that tenant's
+ * data under the caller's session.
  *
  * The shared registry row is never a fallback here. It keeps its first writer's
  * values and is never patched, so serving it would disclose another agency's
- * contact data to the anchor and pin it there permanently (LGPD-26). A contract
- * with no submission of its own yields `null`; prefill is a convenience and the
- * deposit still works without it.
+ * contact data to the anchor and pin it there permanently (LGPD-26). A
+ * guarantee with no submission of its own yields `null`; prefill is a
+ * convenience and the deposit still works without it.
  */
 export const getTenantIdentityInternal = internalQuery({
   args: { agencyId: v.id("agencies"), publicId: v.string() },
   handler: async (ctx, { agencyId, publicId }): Promise<TenantInput | null> => {
     const candidates = await ctx.db
-      .query("contracts")
+      .query("guarantees")
       .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
       .collect();
 
-    const contract = candidates.find((candidate) => candidate.agencyId === agencyId);
-    if (!contract) return null;
+    const guarantee = candidates.find((candidate) => candidate.agencyId === agencyId);
+    if (!guarantee) return null;
 
-    return agencySubmittedTenant(ctx, contract);
+    return agencySubmittedTenant(ctx, guarantee);
   },
 });
 
 /**
- * Resolve each contract's tenant display name from the identity the listing
+ * Resolve each guarantee's tenant display name from the identity the listing
  * agency itself submitted. The shared `tenants` registry is deliberately not
  * consulted: it holds its first writer's values, so reading it here would put
  * another agency's version of the same person in this agency's list.
  */
-async function tenantNamesByContract(
+async function tenantNamesByGuarantee(
   ctx: QueryCtx,
-  docs: readonly Contract[],
-): Promise<Map<ContractId, string>> {
-  const names = new Map<ContractId, string>();
+  docs: readonly Guarantee[],
+): Promise<Map<GuaranteeId, string>> {
+  const names = new Map<GuaranteeId, string>();
   await Promise.all(
     docs.map(async (doc) => {
       const submitted = await agencySubmittedTenant(ctx, doc);
@@ -187,79 +199,76 @@ function resolveReferenceDate(input: string | undefined): string {
   return input && REFERENCE_DATE_PATTERN.test(input) ? input : currentReferenceDate();
 }
 
-const CONTRACT_TAB = {
+const GUARANTEE_TAB = {
   ALL: "all",
   EXPIRING: "expiring",
-  ATIVO: "ativo",
-  PENDENTE: "pendente",
-  ENCERRADO: "encerrado",
-  CANCELADO: "cancelado",
 } as const;
-type ContractTab = (typeof CONTRACT_TAB)[keyof typeof CONTRACT_TAB];
-const contractTabValidator = v.union(
-  v.literal(CONTRACT_TAB.ALL),
-  v.literal(CONTRACT_TAB.EXPIRING),
-  v.literal(CONTRACT_TAB.ATIVO),
-  v.literal(CONTRACT_TAB.PENDENTE),
-  v.literal(CONTRACT_TAB.ENCERRADO),
-  v.literal(CONTRACT_TAB.CANCELADO),
+const guaranteeTabValidator = v.union(
+  v.literal(GUARANTEE_TAB.ALL),
+  v.literal(GUARANTEE_TAB.EXPIRING),
+  guaranteeStateValidator,
 );
 
-/** Paginated list scoped to one agency, filtered by tab. */
+/**
+ * Paginated list scoped to one agency, filtered by tab: `all`, `expiring`, or
+ * one of the seven guarantee states. `expiring` scans the indexed `active`
+ * renewal window only — a guarantee in arrears or under cover is chased
+ * through the delinquency queue, not the renewal list.
+ */
 export const listByAgency = queryWithAgencyScope({
   args: {
     paginationOpts: paginationOptsValidator,
-    tab: v.optional(contractTabValidator),
+    tab: v.optional(guaranteeTabValidator),
     referenceDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const referenceDate = resolveReferenceDate(args.referenceDate);
-    const tab: ContractTab = args.tab ?? CONTRACT_TAB.ALL;
+    const tab = args.tab ?? GUARANTEE_TAB.ALL;
 
-    const result = await (tab === CONTRACT_TAB.EXPIRING
+    const result = await (tab === GUARANTEE_TAB.EXPIRING
       ? (() => {
           const bounds = expiringRenewalBounds(referenceDate);
           return ctx.db
-            .query("contracts")
+            .query("guarantees")
             .withIndex("by_agency_status_nextRenewalDate", (q) =>
               q
                 .eq("agencyId", ctx.agencyId)
-                .eq("status", CONTRACT_STATUS.ATIVO)
+                .eq("status", GUARANTEE_STATE.ACTIVE)
                 .gte("nextRenewalDate", bounds.gte)
                 .lte("nextRenewalDate", bounds.lte),
             )
             .order("asc")
             .paginate(args.paginationOpts);
         })()
-      : tab === CONTRACT_TAB.ALL
+      : tab === GUARANTEE_TAB.ALL
         ? ctx.db
-            .query("contracts")
+            .query("guarantees")
             .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
             .order("desc")
             .paginate(args.paginationOpts)
         : ctx.db
-            .query("contracts")
+            .query("guarantees")
             .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", tab))
             .order("desc")
             .paginate(args.paginationOpts));
 
-    const tenantNames = await tenantNamesByContract(ctx, result.page);
+    const tenantNames = await tenantNamesByGuarantee(ctx, result.page);
 
     return {
       ...result,
       page: result.page.map((doc) =>
-        shapeContractSummary(doc, tenantNames.get(doc._id) ?? "", referenceDate),
+        shapeGuaranteeSummary(doc, tenantNames.get(doc._id) ?? "", referenceDate),
       ),
     };
   },
 });
 
 /**
- * Lightweight summary of a contract for list views — drops the heavy
- * `rental`/`property`/`optional`/`documents` fields and joins only the
- * tenant's display name. Use shapeContract for the detail view.
+ * Lightweight summary of a guarantee for list views — drops the `terms`,
+ * `documents` and lease join and carries only the tenant's display name.
+ * Use `shapeGuarantee` for the detail view.
  */
-function shapeContractSummary(doc: Contract, tenantName: string, referenceDate: string) {
+function shapeGuaranteeSummary(doc: Guarantee, tenantName: string, referenceDate: string) {
   const urgency = getUrgencyTier({
     status: doc.status,
     nextRenewalDate: doc.nextRenewalDate,
@@ -269,8 +278,9 @@ function shapeContractSummary(doc: Contract, tenantName: string, referenceDate: 
     id: doc.publicId,
     agencyId: doc.agencyId,
     status: doc.status,
+    closure: doc.closure ?? null,
     nextRenewalDate: doc.nextRenewalDate,
-    availableGuaranteeCents: doc.availableGuaranteeCents,
+    availableCapacityCents: doc.capacity.availableCents,
     tenantName,
     creationTime: doc._creationTime,
     urgency,
@@ -278,132 +288,107 @@ function shapeContractSummary(doc: Contract, tenantName: string, referenceDate: 
   };
 }
 
-const STATUS_KEYS = [
-  CONTRACT_STATUS.ATIVO,
-  CONTRACT_STATUS.PENDENTE,
-  CONTRACT_STATUS.ENCERRADO,
-  CONTRACT_STATUS.CANCELADO,
-] as const;
+type StateCounts = Record<GuaranteeState, number>;
 
-type StatusCounts = {
-  ativo: number;
-  pendente: number;
-  encerrado: number;
-  cancelado: number;
-};
-
-function shapeStatusCountsResult(counts: readonly number[]): StatusCounts {
+function singleKeyBounds(state: GuaranteeState) {
   return {
-    ativo: counts[0] ?? 0,
-    pendente: counts[1] ?? 0,
-    encerrado: counts[2] ?? 0,
-    cancelado: counts[3] ?? 0,
+    lower: { key: state, inclusive: true },
+    upper: { key: state, inclusive: true },
   };
 }
 
 /**
- * Per-agency status counts. O(log n) via the namespaced `contractsByStatus`
- * aggregate. Used by `section-cards.tsx` (Painel) KPI tiles.
+ * Zip a `countBatch` result back onto the seven states. The batch is issued
+ * in `GUARANTEE_STATES` order, so position i is the count for state i.
+ */
+function shapeStateCounts(counts: readonly number[]): StateCounts {
+  return {
+    drafted: counts[0] ?? 0,
+    active: counts[1] ?? 0,
+    in_arrears: counts[2] ?? 0,
+    default_verified: counts[3] ?? 0,
+    cover_committed: counts[4] ?? 0,
+    in_eviction: counts[5] ?? 0,
+    closed: counts[6] ?? 0,
+  };
+}
+
+async function stateCountsForAgency(ctx: QueryCtx, agencyId: AgencyId): Promise<StateCounts> {
+  const counts = await contractsByStatus.countBatch(
+    ctx,
+    GUARANTEE_STATES.map((state) => ({ namespace: agencyId, bounds: singleKeyBounds(state) })),
+  );
+  return shapeStateCounts(counts);
+}
+
+/**
+ * Per-agency state counts, one key per guarantee state. O(log n) via the
+ * namespaced `contractsByStatus` aggregate. Used by the dashboard KPI tiles.
  */
 export const getStatusCounts = queryWithAgencyScope({
   args: {},
-  handler: async (ctx) => {
-    const counts = await contractsByStatus.countBatch(
-      ctx,
-      STATUS_KEYS.map((status) => ({
-        namespace: ctx.agencyId,
-        bounds: {
-          lower: { key: status, inclusive: true },
-          upper: { key: status, inclusive: true },
-        },
-      })),
-    );
-
-    return shapeStatusCountsResult(counts);
-  },
+  handler: async (ctx): Promise<StateCounts> => stateCountsForAgency(ctx, ctx.agencyId),
 });
 
 /**
- * Per-tab badge counts for the contracts list. Status buckets reuse the
+ * Per-tab badge counts for the guarantees list. State buckets reuse the
  * O(log n) `contractsByStatus` aggregate; the `expiring` badge counts the
- * indexed ativo renewal range.
+ * indexed `active` renewal range (same window `listByAgency` paginates).
  */
 export const getContractTabCounts = queryWithAgencyScope({
   args: { referenceDate: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const referenceDate = resolveReferenceDate(args.referenceDate);
-    const statusCounts = await contractsByStatus.countBatch(
-      ctx,
-      STATUS_KEYS.map((status) => ({
-        namespace: ctx.agencyId,
-        bounds: {
-          lower: { key: status, inclusive: true },
-          upper: { key: status, inclusive: true },
-        },
-      })),
-    );
-    const counts = shapeStatusCountsResult(statusCounts);
+    const counts = await stateCountsForAgency(ctx, ctx.agencyId);
 
     const bounds = expiringRenewalBounds(referenceDate);
-    // Bounded range scan over ativo renewals; revisit with a date-aware aggregate if it outgrows this.
+    // Bounded range scan over active renewals; revisit with a date-aware
+    // aggregate if it outgrows this.
     const expiringRows = await ctx.db
-      .query("contracts")
+      .query("guarantees")
       .withIndex("by_agency_status_nextRenewalDate", (q) =>
         q
           .eq("agencyId", ctx.agencyId)
-          .eq("status", CONTRACT_STATUS.ATIVO)
+          .eq("status", GUARANTEE_STATE.ACTIVE)
           .gte("nextRenewalDate", bounds.gte)
           .lte("nextRenewalDate", bounds.lte),
       )
       .collect();
 
     return {
-      all: counts.ativo + counts.pendente + counts.encerrado + counts.cancelado,
+      all: GUARANTEE_STATES.reduce((sum, state) => sum + counts[state], 0),
       expiring: expiringRows.length,
-      ativo: counts.ativo,
-      pendente: counts.pendente,
-      encerrado: counts.encerrado,
-      cancelado: counts.cancelado,
+      ...counts,
     };
   },
 });
 
 /**
- * Platform-wide status counts. O(log n) via the un-namespaced
- * `contractsByStatusPlatform` aggregate. Used by the health/transparency page.
+ * Platform-wide state counts, one key per guarantee state. O(log n) via the
+ * un-namespaced `contractsByStatusPlatform` aggregate. Used by the
+ * health/transparency page.
  */
 export const getStatusCountsGlobal = queryWithAuth({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<StateCounts> => {
     const counts = await contractsByStatusPlatform.countBatch(
       ctx,
-      STATUS_KEYS.map((status) => ({
-        bounds: {
-          lower: { key: status, inclusive: true },
-          upper: { key: status, inclusive: true },
-        },
-      })),
+      GUARANTEE_STATES.map((state) => ({ bounds: singleKeyBounds(state) })),
     );
-
-    return shapeStatusCountsResult(counts);
+    return shapeStateCounts(counts);
   },
 });
 
 /**
- * Platform-wide insured capacity. Sum of worst-case exposure (30x rent-coverage
- * ceiling + 6x exit sublimit) across every contract in status `ativo`, plus the
- * configured global capacity cap. O(log n) via the `ativoInsuredCentsPlatform`
- * aggregate.
+ * Platform-wide insured capacity. Sum of worst-case exposure (remaining
+ * rent-coverage capacity + exit-cost sublimit) across every in-force
+ * guarantee, plus the configured global capacity cap. O(log n) per insured
+ * state via the `ativoInsuredCentsPlatform` aggregate.
  */
 export const getInsuredCapacityGlobal = queryWithAuth({
   args: {},
   handler: async (ctx) => {
-    const sumInsuredCents = await ativoInsuredCentsPlatform.sum(ctx, {
-      bounds: {
-        lower: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
-        upper: { key: CONTRACT_STATUS.ATIVO, inclusive: true },
-      },
-    });
+    const sumInsuredCents = await sumInsuredExposure(ctx);
 
     return {
       sumInsuredCents,
@@ -477,14 +462,15 @@ function buildWeekBoundaries(now: Date, count: number): PeriodBoundary[] {
   return boundaries;
 }
 
-type ContractTimePoint = {
-  activatedAt: string | null;
-  deactivatedAt?: string | null;
-  status: Contract["status"];
-};
+type GuaranteeTimePoint = Pick<Guarantee, "activatedAt" | "closure">;
 
-function bucketsForContracts(
-  contracts: readonly ContractTimePoint[],
+/**
+ * A guarantee leaves the in-force book at `closure.closedAt`. A draft
+ * canceled before activation counts as `cancelled`; every other close
+ * reason (end of lease, rescission, eviction, …) counts as `expired`.
+ */
+function bucketsForGuarantees(
+  guarantees: readonly GuaranteeTimePoint[],
   boundaries: readonly PeriodBoundary[],
 ): ActivityBucket[] {
   return boundaries.map(({ startISO, endISO, key }) => {
@@ -493,21 +479,21 @@ function bucketsForContracts(
     let expired = 0;
     let netActive = 0;
 
-    for (const c of contracts) {
-      const activatedAt = c.activatedAt;
-      const deactivatedAt = c.deactivatedAt ?? null;
+    for (const g of guarantees) {
+      const activatedAt = g.activatedAt;
+      const closedAt = g.closure?.closedAt ?? null;
 
       if (activatedAt && activatedAt >= startISO && activatedAt < endISO) {
         activated++;
       }
-      if (deactivatedAt && deactivatedAt >= startISO && deactivatedAt < endISO) {
-        if (c.status === CONTRACT_STATUS.CANCELADO) cancelled++;
-        else if (c.status === CONTRACT_STATUS.ENCERRADO) expired++;
+      if (closedAt && closedAt >= startISO && closedAt < endISO) {
+        if (g.closure?.reason === CLOSE_REASON.CANCELED_PRE_ACTIVATION) cancelled++;
+        else expired++;
       }
 
       if (!activatedAt) continue;
       if (activatedAt >= endISO) continue;
-      if (deactivatedAt && deactivatedAt < endISO) continue;
+      if (closedAt && closedAt < endISO) continue;
       netActive++;
     }
 
@@ -523,7 +509,7 @@ const activityScopeValidator = v.union(
 const activityGranularityValidator = v.union(v.literal("month"), v.literal("week"));
 
 /**
- * Contract-activity time series, scoped to either one agency or the platform.
+ * Guarantee-activity time series, scoped to either one agency or the platform.
  *
  * Auth: `queryWithAuth` + inline `assertAgencyAccess` for the agency arm —
  * since wrapper choice is static per handler, the scope discriminator is the
@@ -531,7 +517,7 @@ const activityGranularityValidator = v.union(v.literal("month"), v.literal("week
  *
  * Per-agency scope uses the `by_agency_status` index to bound the scan;
  * platform scope does a full `.collect()` by design. Time-series aggregates
- * are deliberately deferred until the contracts table crosses ~5–10k rows.
+ * are deliberately deferred until the guarantees table crosses ~5–10k rows.
  */
 export const getActivityByPeriod = queryWithAuth({
   args: {
@@ -539,15 +525,15 @@ export const getActivityByPeriod = queryWithAuth({
     granularity: activityGranularityValidator,
   },
   handler: async (ctx, { scope, granularity }): Promise<ActivityBucket[]> => {
-    let contracts: readonly ContractTimePoint[];
+    let guarantees: readonly GuaranteeTimePoint[];
     if (scope.kind === "agency") {
       await assertAgencyAccess(ctx, scope.agencyId);
-      contracts = await ctx.db
-        .query("contracts")
+      guarantees = await ctx.db
+        .query("guarantees")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", scope.agencyId))
         .collect();
     } else {
-      contracts = await ctx.db.query("contracts").collect();
+      guarantees = await ctx.db.query("guarantees").collect();
     }
 
     const now = new Date();
@@ -556,18 +542,19 @@ export const getActivityByPeriod = queryWithAuth({
         ? buildMonthBoundaries(now, ACTIVITY_MONTH_PERIODS)
         : buildWeekBoundaries(now, ACTIVITY_WEEK_PERIODS);
 
-    return bucketsForContracts(contracts, boundaries);
+    return bucketsForGuarantees(guarantees, boundaries);
   },
 });
 
 /**
- * Active contracts during the given `YYYY-MM` period, shaped for the
- * Commission page. "Active during" means `activatedAt` is on or before
- * the period and the contract wasn't deactivated *before* it — a
- * contract deactivated during the period still earned commission for
- * that period, so it stays in the result. Commission is the same
- * `splitCommission` the wizard previews (taxa at `commissionRate` + prestamista
- * premium at `prestamistaCommissionRate`), recovered from the stored fee + plan.
+ * Guarantees in force during the given `YYYY-MM` period, shaped for the
+ * Commission page. "In force during" means `activatedAt` is on or before
+ * the period and the guarantee wasn't closed *before* it — one closed during
+ * the period still earned commission for that period, so it stays in the
+ * result. Commission is the same `splitCommission` the wizard previews (taxa
+ * at `commissionRate` + prestamista premium at `prestamistaCommissionRate`),
+ * with the rates read from the guarantee's product and the two fee portions
+ * from its stored `terms`.
  */
 const COMMISSION_INSTALLMENTS_TOTAL = 12;
 const PERIOD_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -583,13 +570,30 @@ function currentPeriodMonth(): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-type ActivatedContract = Contract & { activatedAt: string };
+type ActivatedGuarantee = Guarantee & { activatedAt: string };
 
-function isActiveDuring(c: Contract, period: string): c is ActivatedContract {
-  if (!c.activatedAt) return false;
-  if (c.activatedAt.slice(0, 7) > period) return false;
-  if (c.deactivatedAt && c.deactivatedAt.slice(0, 7) < period) return false;
+function isInForceDuring(g: Guarantee, period: string): g is ActivatedGuarantee {
+  if (!g.activatedAt) return false;
+  if (g.activatedAt.slice(0, 7) > period) return false;
+  const closedAt = g.closure?.closedAt;
+  if (closedAt && closedAt.slice(0, 7) < period) return false;
   return true;
+}
+
+async function productsById(
+  ctx: QueryCtx,
+  docs: readonly Guarantee[],
+): Promise<Map<ProductId, Product>> {
+  const products = new Map<ProductId, Product>();
+  for (const doc of docs) {
+    if (products.has(doc.productId)) continue;
+    const product = await ctx.db.get(doc.productId);
+    // FK-integrity invariant: `productId` is required and product rows are
+    // never deleted (disabled instead), so a miss means corrupted data.
+    if (!product) throw new Error(`Guarantee ${doc.publicId} references a missing products row`);
+    products.set(doc.productId, product);
+  }
+  return products;
 }
 
 export const listForCommissionByMonth = queryWithAgencyScope({
@@ -603,28 +607,30 @@ export const listForCommissionByMonth = queryWithAgencyScope({
     // direct caller could still request a future period.
     const effectivePeriod = periodMonth > currentPeriodMonth() ? currentPeriodMonth() : periodMonth;
 
-    const contracts = await ctx.db
-      .query("contracts")
+    const guarantees = await ctx.db
+      .query("guarantees")
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId))
       .collect();
 
-    const activeContracts = contracts.filter((c) => isActiveDuring(c, effectivePeriod));
-    const tenantNames = await tenantNamesByContract(ctx, activeContracts);
+    const inForce = guarantees.filter((g) => isInForceDuring(g, effectivePeriod));
+    const tenantNames = await tenantNamesByGuarantee(ctx, inForce);
+    const products = await productsById(ctx, inForce);
 
-    return activeContracts
-      .map((c) => {
-        const activatedMonth = c.activatedAt.slice(0, 7);
+    return inForce
+      .map((g) => {
+        const activatedMonth = g.activatedAt.slice(0, 7);
         const monthsElapsed = Math.min(
           monthDiff(activatedMonth, effectivePeriod) + 1,
           COMMISSION_INSTALLMENTS_TOTAL,
         );
+        const product = products.get(g.productId);
         return {
-          contractId: c.publicId,
-          tenantName: tenantNames.get(c._id) ?? "",
-          rentCents: c.rental.rentCents,
-          commissionCents: splitCommission(feeBreakdown(c.rental)).commissionCents,
+          guaranteeId: g.publicId,
+          tenantName: tenantNames.get(g._id) ?? "",
+          rentCents: g.terms.rentCents,
+          commissionCents: splitCommission(g.terms, product?.terms).commissionCents,
           installment: `${monthsElapsed}/${COMMISSION_INSTALLMENTS_TOTAL}`,
-          activatedAt: c.activatedAt,
+          activatedAt: g.activatedAt,
         };
       })
       .sort((a, b) => a.activatedAt.localeCompare(b.activatedAt));
@@ -697,7 +703,7 @@ export const getCachedCreditScore = queryWithAgencyScope({
 });
 
 type OpenContractApplicationSuccessResult = { applicationId: ContractApplicationId };
-type OpenContractApplicationErrorResult = { code: typeof CONTRACT_ERROR_CODE.INVALID_TAX_ID };
+type OpenContractApplicationErrorResult = { code: typeof GUARANTEE_ERROR_CODE.INVALID_TAX_ID };
 
 /**
  * Record the agency's intent to rent to this subject. Attributable to the
@@ -720,7 +726,7 @@ export const openContractApplication = mutationWithAgencyScope({
     if (!isSupportedTaxIdLength(digits)) {
       return {
         success: false,
-        error: { code: CONTRACT_ERROR_CODE.INVALID_TAX_ID },
+        error: { code: GUARANTEE_ERROR_CODE.INVALID_TAX_ID },
         message: "Tax ID must be 11 (CPF) or 14 (CNPJ) digits",
       };
     }
@@ -788,45 +794,44 @@ export const requestCreditScore = mutationWithAgencyScope({
   },
 });
 
-type CreateContractSuccessResult = { publicId: string };
-type CreateContractErrorResult = {
+type CreateGuaranteeSuccessResult = { publicId: string; leasePublicId: string };
+type CreateGuaranteeErrorResult = {
   code:
     | typeof TENANT_ERROR_CODE.INVALID_TAX_ID
-    | typeof CONTRACT_ERROR_CODE.TENANT_DENIED
-    | typeof CONTRACT_ERROR_CODE.INVALID_RENT
-    | typeof CONTRACT_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED;
+    | typeof GUARANTEE_ERROR_CODE.TENANT_DENIED
+    | typeof GUARANTEE_ERROR_CODE.INVALID_RENT
+    | typeof GUARANTEE_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED
+    | typeof GUARANTEE_ERROR_CODE.PRODUCT_UNAVAILABLE;
 };
 
 /**
- * Create a new contract with server-side fee calculation.
+ * Create a lease and its first guarantee, priced server-side against the
+ * resolved product.
  *
- * Registry-only write: resolves the tenant registry row via
- * `getOrCreateTenant` and stores `tenantId` + `tenantApproval` + the
- * creation-time `score`; the resolved registry fields are also captured on
- * the creation history event (`tenantSnapshot`, the as-signed mitigation).
- * The tax-id checksum rejection is the only error Result and happens
+ * Pilot shape: every create opens a fresh lease (`openGuaranteeId` set to the
+ * new guarantee in the same transaction — the one-open-guarantee rule holds
+ * trivially). Re-guaranteeing an existing lease arrives with the lifecycle
+ * mutations and goes through `assertLeaseAcceptsGuarantee`.
+ *
+ * Registry-only tenant write: resolves the tenant registry row via
+ * `getOrCreateTenant` and stores `tenantId` on the lease; the resolved
+ * registry fields are also captured on the creation history event
+ * (`tenantSnapshot`, the as-signed mitigation). Every error Result happens
  * before any write.
  */
 export const create = mutationWithAgencyScope({
   args: {
-    property: v.object({
-      cep: v.string(),
-      streetAndNumber: v.string(),
-      neighborhood: v.string(),
-      cityUF: v.string(),
-    }),
-    optional: v.object({
-      complement: v.string(),
+    lease: v.object({
+      propertyKind: propertyKindValidator,
+      property: leasePropertyValidator,
       tag: v.string(),
       description: v.string(),
+      rent: leaseRentInputValidator,
     }),
-    propertyKind: v.union(v.literal("residencial"), v.literal("comercial")),
-    plan: contractPlanValidator,
-    rentCents: v.number(),
-    condoCents: v.number(),
-    otherFeesCents: v.number(),
+    plan: guaranteePlanValidator,
+    productSlug: v.optional(v.string()),
     tenant: v.object({
-      entityType: v.union(v.literal("pf"), v.literal("pj")),
+      entityType: tenantEntityTypeValidator,
       fullName: v.string(),
       cpf: v.string(),
       cnpj: v.optional(v.string()),
@@ -838,7 +843,7 @@ export const create = mutationWithAgencyScope({
   handler: async (
     ctx,
     args,
-  ): Promise<Result<CreateContractSuccessResult, CreateContractErrorResult>> => {
+  ): Promise<Result<CreateGuaranteeSuccessResult, CreateGuaranteeErrorResult>> => {
     const registryInput = normalizeEmbeddedTenant(args.tenant);
     if (!registryInput) {
       return {
@@ -850,18 +855,12 @@ export const create = mutationWithAgencyScope({
 
     // Money inputs are integer cents; rent must be positive. The wizard guards
     // this client-side, but the mutation is the trust boundary — a negative rent
-    // would flow into fees, the guarantee, and the platform exposure aggregate.
-    if (
-      !Number.isInteger(args.rentCents) ||
-      args.rentCents <= 0 ||
-      !Number.isInteger(args.condoCents) ||
-      args.condoCents < 0 ||
-      !Number.isInteger(args.otherFeesCents) ||
-      args.otherFeesCents < 0
-    ) {
+    // would flow into fees, the capacity ceiling, and the platform exposure
+    // aggregate.
+    if (!isValidRentInput(args.lease.rent)) {
       return {
         success: false,
-        error: { code: CONTRACT_ERROR_CODE.INVALID_RENT },
+        error: { code: GUARANTEE_ERROR_CODE.INVALID_RENT },
         message: "Rent and fee amounts must be non-negative integer cents (rent > 0)",
       };
     }
@@ -880,23 +879,43 @@ export const create = mutationWithAgencyScope({
     if (!assessment || assessment.status !== "ok" || assessment.score == null) {
       return {
         success: false,
-        error: { code: CONTRACT_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED },
+        error: { code: GUARANTEE_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED },
         message: "No fresh credit assessment for this tenant; request one before creating",
       };
     }
     const score = assessment.score;
 
-    // A denied credit tier cannot be priced (no rate exists for `negado`) and
-    // must never become a contract. Reject before any write; the narrowed
-    // `tier` below is what makes `priceContract` type-check.
+    // A denied credit tier cannot be priced (no product carries a rate for
+    // `negado`) and must never become a guarantee. Reject before any write;
+    // the narrowed `tier` below is what makes `priceGuarantee` type-check.
     const tier = tierForScore(score);
     if (tier === SCORE_TIER.NEGADO) {
       return {
         success: false,
-        error: { code: CONTRACT_ERROR_CODE.TENANT_DENIED },
+        error: { code: GUARANTEE_ERROR_CODE.TENANT_DENIED },
         message: "Tenant credit tier is denied",
       };
     }
+
+    const now = new Date();
+    const nowISO = now.toISOString();
+
+    const productResult = await resolveProduct(ctx, {
+      agencyId: ctx.agencyId,
+      uf: ufFromCityUF(args.lease.property.cityUF),
+      tier,
+      propertyKind: args.lease.propertyKind,
+      requestedSlug: args.productSlug,
+      at: nowISO,
+    });
+    if (!productResult.success) {
+      return {
+        success: false,
+        error: { code: GUARANTEE_ERROR_CODE.PRODUCT_UNAVAILABLE },
+        message: productResult.message,
+      };
+    }
+    const product = productResult.data.product;
 
     const tenantResult = await getOrCreateTenant(ctx, {
       input: registryInput,
@@ -910,69 +929,66 @@ export const create = mutationWithAgencyScope({
       };
     }
 
-    const priced = priceContract({
-      rentCents: args.rentCents,
-      condoCents: args.condoCents,
-      otherFeesCents: args.otherFeesCents,
-      tier,
-      plan: args.plan,
+    const leasePublicId = generateLeasePublicId();
+    const leaseId = await ctx.db.insert("leases", {
+      agencyId: ctx.agencyId,
+      publicId: leasePublicId,
+      tenantId: tenantResult.data.tenantId,
+      propertyKind: args.lease.propertyKind,
+      property: args.lease.property,
+      tag: args.lease.tag,
+      description: args.lease.description,
+      rent: buildLeaseRent(args.lease.rent),
+      payer: DEFAULT_PAYER,
+      openGuaranteeId: null,
     });
 
-    const publicId = generateContractPublicId();
-    const today = new Date();
-    const nextRenewalDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate())
+    const publicId = generateGuaranteePublicId();
+    const priced = priceGuarantee(
+      {
+        rentCents: args.lease.rent.rentCents,
+        tier,
+        plan: args.plan,
+        productSlug: product.slug,
+        appliedAt: nowISO,
+      },
+      product.terms,
+    );
+    const nextRenewalDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
       .toISOString()
       .slice(0, 10);
 
-    // Single source for the multipliers written below, so the audit entry
-    // mirrors exactly what the rental bundle persisted (they must not drift).
-    const rentMultiplier = DEFAULT_RENT_MULTIPLIER;
-    const exitCostMultiplier = DEFAULT_EXIT_COST_MULTIPLIER;
-
-    const contractId = await ctx.db.insert("contracts", {
+    const guaranteeId = await ctx.db.insert("guarantees", {
       agencyId: ctx.agencyId,
+      leaseId,
       publicId,
-      tenantId: tenantResult.data.tenantId,
-      tenantApproval: { status: "pendente", termApprovedAt: null },
-      score,
-      status: "pendente",
+      productId: product._id,
+      status: GUARANTEE_STATE.DRAFTED,
       activatedAt: null,
       nextRenewalDate,
-      availableGuaranteeCents: priced.availableGuaranteeCents,
-      rental: {
-        propertyKind: args.propertyKind,
-        plan: args.plan,
-        rentCents: args.rentCents,
-        condoCents: args.condoCents,
-        otherFeesCents: args.otherFeesCents,
-        totalRentCents: priced.totalRentCents,
-        feeCents: priced.feeCents,
-        oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
-        setupInstallments: 1,
-        exitCostMultiplier,
-        rentMultiplier,
-        payer: DEFAULT_PAYER,
-        pviMigrationSchedule: null,
-      },
-      property: args.property,
-      optional: args.optional,
+      underwriting: { score, tier, assessmentId: assessment._id },
+      tenantApproval: { status: TENANT_APPROVAL_STATUS.PENDENTE, termApprovedAt: null },
+      terms: priced.terms,
+      capacity: priced.capacity,
       documents: [
-        { key: "rentalContract", status: "pendente" },
-        { key: "inspection", status: "pendente" },
-        { key: "policy", status: "pendente" },
+        { key: DOCUMENT_KEY.RENTAL_CONTRACT, status: DOCUMENT_STATUS.PENDENTE },
+        { key: DOCUMENT_KEY.INSPECTION, status: DOCUMENT_STATUS.PENDENTE },
+        { key: DOCUMENT_KEY.POLICY, status: DOCUMENT_STATUS.PENDENTE },
       ],
     });
 
-    const doc = await ctx.db.get(contractId);
-    if (!doc) throw new Error("Contract insert failed");
-    await insertContractAggregates(ctx, doc);
+    const doc = await ctx.db.get(guaranteeId);
+    if (!doc) throw new Error("Guarantee insert failed");
+    await insertGuaranteeAggregates(ctx, doc);
 
-    await ctx.db.insert("contractHistory", {
+    await ctx.db.patch(leaseId, { openGuaranteeId: guaranteeId });
+
+    await ctx.db.insert("guaranteeHistory", {
       agencyId: ctx.agencyId,
-      contractPublicId: publicId,
-      at: new Date().toISOString(),
+      guaranteePublicId: publicId,
+      at: nowISO,
       username: ctx.user.name,
-      message: "Contrato criado",
+      message: "Garantia criada",
       // As-signed snapshot: the checksum-normalized registry fields at
       // creation time, frozen on the append-only history event.
       tenantSnapshot: registryInput,
@@ -980,89 +996,135 @@ export const create = mutationWithAgencyScope({
 
     await appendAuditEntry(ctx, {
       actor: { kind: "user", userId: ctx.user._id },
-      action: AUDIT_ACTION.CONTRACT_CREATED,
-      resourceType: "contracts",
-      resourceId: publicId,
+      action: AUDIT_ACTION.LEASE_CREATED,
+      resourceType: "leases",
+      resourceId: leasePublicId,
       payload: {
-        contractId,
+        leaseId,
         agencyId: ctx.agencyId,
-        propertyKind: args.propertyKind,
-        rentCents: args.rentCents,
-        totalRentCents: priced.totalRentCents,
-        feeCents: priced.feeCents,
-        oneTimeActivationFeeCents: priced.oneTimeActivationFeeCents,
-        availableGuaranteeCents: priced.availableGuaranteeCents,
-        rentMultiplier,
-        exitCostMultiplier,
+        propertyKind: args.lease.propertyKind,
+        rent: buildLeaseRent(args.lease.rent),
       },
     });
 
-    await ctx.scheduler.runAfter(0, internal.contracts.actions.sendProposalNotifications, {
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.GUARANTEE_CREATED,
+      resourceType: "guarantees",
+      resourceId: publicId,
+      payload: {
+        guaranteeId,
+        leaseId,
+        agencyId: ctx.agencyId,
+        productId: product._id,
+        status: GUARANTEE_STATE.DRAFTED,
+        terms: priced.terms,
+        capacity: priced.capacity,
+      },
+    });
+
+    await ctx.scheduler.runAfter(0, internal.guarantees.actions.sendProposalNotifications, {
       publicId,
       tenantName: args.tenant.fullName,
       tenantEmail: args.tenant.email,
       tenantPhone: args.tenant.phone,
-      rentCents: args.rentCents,
-      availableGuaranteeCents: priced.availableGuaranteeCents,
-      feeCents: priced.feeCents,
+      rentCents: args.lease.rent.rentCents,
+      availableGuaranteeCents: priced.capacity.availableCents,
+      feeCents: priced.terms.feeCents,
     });
 
-    return { success: true, data: { publicId }, message: "Contract created" };
+    return { success: true, data: { publicId, leasePublicId }, message: "Guarantee created" };
   },
 });
 
-export const cancelProposal = mutationWithAgencyScope({
+type CancelDraftSuccessResult = { canceled: true };
+type CancelDraftErrorResult = {
+  code: typeof GUARANTEE_ERROR_CODE.NOT_FOUND | typeof GUARANTEE_ERROR_CODE.NOT_DRAFTED;
+};
+
+/**
+ * Close a draft before activation (`drafted → closed`, reason
+ * `canceled_pre_activation`). Both machine guards run before the patch; the
+ * lease pointer is released in the same transaction so the lease can take a
+ * new guarantee immediately.
+ */
+export const cancelDraft = mutationWithAgencyScope({
   args: { publicId: v.string() },
-  handler: async (ctx, args) => {
-    const contract = await ctx.db
-      .query("contracts")
+  handler: async (ctx, args): Promise<Result<CancelDraftSuccessResult, CancelDraftErrorResult>> => {
+    const candidates = await ctx.db
+      .query("guarantees")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
-      .unique();
+      .collect();
+    const guarantee = candidates.find((candidate) => candidate.agencyId === ctx.agencyId);
 
     // NOT_FOUND covers both "no such publicId" and "publicId exists but in a
     // different agency" — don't leak cross-agency existence.
-    if (!contract || contract.agencyId !== ctx.agencyId) {
-      return { success: false, error: { code: "NOT_FOUND" } } as const;
-    }
-    if (contract.status !== "pendente") {
-      return { success: false, error: { code: "NOT_PENDING" } } as const;
+    if (!guarantee) {
+      return {
+        success: false,
+        error: { code: GUARANTEE_ERROR_CODE.NOT_FOUND },
+        message: "Guarantee not found",
+      };
     }
 
-    await ctx.db.patch(contract._id, { status: "cancelado" });
-    const after = await ctx.db.get(contract._id);
-    if (after) await replaceContractAggregates(ctx, contract, after);
+    const closing = assertClose(guarantee.status, CLOSE_REASON.CANCELED_PRE_ACTIVATION);
+    const transition = assertTransition(guarantee.status, GUARANTEE_STATE.CLOSED);
+    if (!closing.success || !transition.success) {
+      return {
+        success: false,
+        error: { code: GUARANTEE_ERROR_CODE.NOT_DRAFTED },
+        message: closing.success ? transition.message : closing.message,
+      };
+    }
 
-    await ctx.db.insert("contractHistory", {
-      agencyId: contract.agencyId,
-      contractPublicId: args.publicId,
-      at: new Date().toISOString(),
+    const nowISO = new Date().toISOString();
+    await ctx.db.patch(guarantee._id, {
+      status: GUARANTEE_STATE.CLOSED,
+      closure: { reason: CLOSE_REASON.CANCELED_PRE_ACTIVATION, closedAt: nowISO },
+    });
+    const after = await ctx.db.get(guarantee._id);
+    if (!after) throw new Error("Guarantee disappeared mid-mutation");
+    await replaceGuaranteeAggregates(ctx, guarantee, after);
+
+    const lease = await ctx.db.get(guarantee.leaseId);
+    if (lease && lease.openGuaranteeId === guarantee._id) {
+      await ctx.db.patch(lease._id, { openGuaranteeId: null });
+    }
+
+    await ctx.db.insert("guaranteeHistory", {
+      agencyId: guarantee.agencyId,
+      guaranteePublicId: args.publicId,
+      at: nowISO,
       username: ctx.user.name,
       message: "Proposta cancelada",
     });
 
     await appendAuditEntry(ctx, {
       actor: { kind: "user", userId: ctx.user._id },
-      action: AUDIT_ACTION.CONTRACT_CANCELED,
-      resourceType: "contracts",
+      action: AUDIT_ACTION.GUARANTEE_TRANSITIONED,
+      resourceType: "guarantees",
       resourceId: args.publicId,
       payload: {
-        contractId: contract._id,
-        agencyId: contract.agencyId,
-        previousStatus: contract.status,
+        guaranteeId: guarantee._id,
+        leaseId: guarantee.leaseId,
+        agencyId: guarantee.agencyId,
+        from: transition.data.from,
+        to: transition.data.to,
+        reason: closing.data.reason,
       },
     });
 
-    return { success: true, data: { cancelled: true } } as const;
+    return { success: true, data: { canceled: true }, message: "Draft canceled" };
   },
 });
 
 /**
- * Discriminated pf/pj tenant view. Approval fields are contract-level
+ * Discriminated pf/pj tenant view. Approval fields are guarantee-level
  * (`tenantApproval`); identity/contact fields come from `identity`, which the
  * caller resolves to the owning agency's own submission — never another
  * agency's values on the shared registry row (LGPD-26).
  */
-function shapeContractTenant(doc: Contract, identity: Tenant | TenantInput) {
+function shapeGuaranteeTenant(doc: Guarantee, identity: Tenant | TenantInput) {
   const shared = {
     approvalStatus: doc.tenantApproval.status,
     termApprovedAt: doc.tenantApproval.termApprovedAt,
@@ -1077,23 +1139,47 @@ function shapeContractTenant(doc: Contract, identity: Tenant | TenantInput) {
   return { ...shared, entityType: "pf" as const, birthDate: identity.birthDate };
 }
 
-/**
- * Reshape a Convex `contracts` doc + its resolved tenant identity + history
- * into the UI Contract type. Strips system fields (`_id`,
- * `_creationTime`); renames publicId → id.
- */
-function shapeContract(doc: Contract, identity: Tenant | TenantInput, history: ContractHistory[]) {
+function shapeLease(lease: Lease) {
   return {
-    id: doc.publicId,
-    agencyId: doc.agencyId,
-    status: doc.status,
-    nextRenewalDate: doc.nextRenewalDate,
-    availableGuaranteeCents: doc.availableGuaranteeCents,
-    rental: doc.rental,
-    property: doc.property,
-    optional: doc.optional,
-    documents: doc.documents,
-    tenant: shapeContractTenant(doc, identity),
+    id: lease.publicId,
+    propertyKind: lease.propertyKind,
+    property: lease.property,
+    tag: lease.tag,
+    description: lease.description,
+    rent: lease.rent,
+    payer: lease.payer,
+  };
+}
+
+/**
+ * Reshape a `guarantees` doc + its lease + resolved tenant identity + history
+ * into the UI detail type. Strips system fields (`_id`, `_creationTime`);
+ * renames publicId → id.
+ */
+function shapeGuarantee({
+  guarantee,
+  lease,
+  identity,
+  history,
+}: {
+  guarantee: Guarantee;
+  lease: Lease;
+  identity: Tenant | TenantInput;
+  history: GuaranteeHistory[];
+}) {
+  return {
+    id: guarantee.publicId,
+    agencyId: guarantee.agencyId,
+    status: guarantee.status,
+    closure: guarantee.closure ?? null,
+    activatedAt: guarantee.activatedAt,
+    nextRenewalDate: guarantee.nextRenewalDate,
+    underwriting: guarantee.underwriting,
+    terms: guarantee.terms,
+    capacity: guarantee.capacity,
+    documents: guarantee.documents,
+    lease: shapeLease(lease),
+    tenant: shapeGuaranteeTenant(guarantee, identity),
     history: history.map((h) => ({
       at: h.at,
       username: h.username,

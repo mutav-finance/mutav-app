@@ -1,5 +1,5 @@
 import type { MutationCtx } from "../_generated/server";
-import type { Contract } from "./domain";
+import type { Guarantee } from "./domain";
 import {
   ativoInsuredCentsPlatform,
   contractsByStatus,
@@ -7,35 +7,35 @@ import {
 } from "./aggregate";
 
 /**
- * Central dual-write helpers for every contract aggregate.
+ * Central dual-write helpers for every guarantee aggregate.
  *
- * Three aggregates must stay in lockstep on every contract write:
- *   - `contractsByStatus` (per-agency status counts)
- *   - `contractsByStatusPlatform` (platform-wide status counts)
- *   - `ativoInsuredCentsPlatform` (platform-wide worst-case exposure: 30x ceiling + 6x exit)
+ * Three aggregates must stay in lockstep on every guarantee write:
+ *   - `contractsByStatus` (per-agency state counts)
+ *   - `contractsByStatusPlatform` (platform-wide state counts)
+ *   - `ativoInsuredCentsPlatform` (platform-wide worst-case exposure)
  *
- * Every mutation that inserts/replaces/deletes a contract MUST go through one
+ * Every mutation that inserts/replaces/deletes a guarantee MUST go through one
  * of the helpers below — never call `.insert` / `.replace` / `.delete` directly
  * on an aggregate from outside this file.
  */
 
-export async function insertContractAggregates(ctx: MutationCtx, doc: Contract): Promise<void> {
+export async function insertGuaranteeAggregates(ctx: MutationCtx, doc: Guarantee): Promise<void> {
   await contractsByStatus.insert(ctx, doc);
   await contractsByStatusPlatform.insert(ctx, doc);
   await ativoInsuredCentsPlatform.insert(ctx, doc);
 }
 
-export async function replaceContractAggregates(
+export async function replaceGuaranteeAggregates(
   ctx: MutationCtx,
-  before: Contract,
-  after: Contract,
+  before: Guarantee,
+  after: Guarantee,
 ): Promise<void> {
   await contractsByStatus.replace(ctx, before, after);
   await contractsByStatusPlatform.replace(ctx, before, after);
   await ativoInsuredCentsPlatform.replace(ctx, before, after);
 }
 
-export async function deleteContractAggregates(ctx: MutationCtx, doc: Contract): Promise<void> {
+export async function deleteGuaranteeAggregates(ctx: MutationCtx, doc: Guarantee): Promise<void> {
   await contractsByStatus.delete(ctx, doc);
   await contractsByStatusPlatform.delete(ctx, doc);
   await ativoInsuredCentsPlatform.delete(ctx, doc);
@@ -45,9 +45,9 @@ export async function deleteContractAggregates(ctx: MutationCtx, doc: Contract):
  * Idempotent variant used by the backfill paths. Re-running is safe and a
  * no-op for docs already present in every aggregate.
  */
-export async function insertContractAggregatesIfMissing(
+export async function insertGuaranteeAggregatesIfMissing(
   ctx: MutationCtx,
-  doc: Contract,
+  doc: Guarantee,
 ): Promise<void> {
   await contractsByStatus.insertIfDoesNotExist(ctx, doc);
   await contractsByStatusPlatform.insertIfDoesNotExist(ctx, doc);

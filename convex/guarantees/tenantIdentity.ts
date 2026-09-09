@@ -1,21 +1,21 @@
 import type { QueryCtx } from "../_generated/server";
 import { tenantInputFromSubmission, type TenantInput } from "../tenants/domain";
-import type { Contract } from "./domain";
+import type { Guarantee } from "./domain";
 
 /**
  * The tenant identity the owning agency itself submitted, frozen on its
- * contract creation event. The registry row is shared by every agency
+ * guarantee creation event. The registry row is shared by every agency
  * transacting with that tax ID and keeps its first writer's values, so it is
- * not what a later agency may read back (LGPD-26). `null` for contracts
+ * not what a later agency may read back (LGPD-26). `null` for guarantees
  * created before the snapshot existed — those fall back to the registry.
  *
- * Lives outside `useCases.ts` because both the contracts read paths and the
- * tenants prefill lookup resolve identity through it, and `contracts/useCases`
+ * Lives outside `useCases.ts` because both the guarantees read paths and the
+ * tenants prefill lookup resolve identity through it, and `guarantees/useCases`
  * already imports `tenants/useCases`.
  */
 export async function agencySubmittedTenant(
   ctx: QueryCtx,
-  contract: Contract,
+  guarantee: Pick<Guarantee, "agencyId" | "publicId">,
 ): Promise<TenantInput | null> {
   // Selected by CARRYING a snapshot, never by sort position. `at` is indexed
   // as a plain string, so an offset-form timestamp sorts before the Z form the
@@ -23,11 +23,11 @@ export async function agencySubmittedTenant(
   // `convex/seed.ts` writes. Taking the first row would let any such entry hide
   // the creation event, and a `null` here sends callers to the shared registry
   // row, i.e. to another agency's contact data. Exactly one row carries a
-  // snapshot: `contracts.create` writes it on the creation event only.
+  // snapshot: `guarantees.create` writes it on the creation event only.
   const history = await ctx.db
-    .query("contractHistory")
-    .withIndex("by_agency_contract", (q) =>
-      q.eq("agencyId", contract.agencyId).eq("contractPublicId", contract.publicId),
+    .query("guaranteeHistory")
+    .withIndex("by_agency_guarantee", (q) =>
+      q.eq("agencyId", guarantee.agencyId).eq("guaranteePublicId", guarantee.publicId),
     )
     .collect();
   const snapshot = history.find((entry) => entry.tenantSnapshot !== undefined)?.tenantSnapshot;

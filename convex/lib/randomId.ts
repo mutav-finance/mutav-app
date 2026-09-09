@@ -22,18 +22,24 @@ function randomChars(length: number): string {
   return out;
 }
 
-const CONTRACT_ID_CHARS = 8;
+const PUBLIC_REFERENCE_CHARS = 8;
 const INVOICE_ACCESS_TOKEN_CHARS = 32;
 const AGENCY_INVOICE_REF_CHARS = 4;
 
 /**
- * Agency-facing contract reference (`CTR-XXXXXXXX`). Reads that resolve it are
+ * Agency-facing guarantee reference (`CTR-XXXXXXXX`). Reads that resolve it are
  * membership-gated, so this is a readability aid rather than a secret; 40 bits
  * of entropy keeps it unguessable anyway so a leaked id in a URL or a support
- * ticket discloses nothing on its own.
+ * ticket discloses nothing on its own. The `CTR-` prefix is what agencies
+ * already know from printed proposals, so it survives the domain rename.
  */
-export function generateContractPublicId(): string {
-  return `CTR-${randomChars(CONTRACT_ID_CHARS)}`;
+export function generateGuaranteePublicId(): string {
+  return `CTR-${randomChars(PUBLIC_REFERENCE_CHARS)}`;
+}
+
+/** Agency-facing lease reference (`LSE-XXXXXXXX`); same entropy and gating as above. */
+export function generateLeasePublicId(): string {
+  return `LSE-${randomChars(PUBLIC_REFERENCE_CHARS)}`;
 }
 
 /**

@@ -34,10 +34,16 @@ export const GENESIS_PREV_HASH = "0".repeat(64);
  * deprecate by adding a new key.
  */
 export const AUDIT_ACTION = {
-  // contracts/
+  // contracts/ (frozen wire values — historical rows only; the domain is now
+  // `guarantees/` and emits the `guarantee.*` keys below).
   CONTRACT_CREATED: "contract.created",
   CONTRACT_CANCELED: "contract.canceled",
   CONTRACT_STATUS_UPDATED: "contract.status_updated",
+  // guarantees/ (current — emitted by convex/guarantees/useCases.ts).
+  GUARANTEE_CREATED: "guarantee.created",
+  GUARANTEE_TRANSITIONED: "guarantee.transitioned",
+  // leases/ (current — emitted alongside guarantee creation).
+  LEASE_CREATED: "lease.created",
   // payments/ (frozen wire values — historical rows only; never emitted by
   // current code, kept so the hash chain still verifies pre-rename entries).
   PAYMENT_BATCH_GENERATED: "payment.batch_generated",
@@ -76,6 +82,9 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.CONTRACT_CREATED),
   v.literal(AUDIT_ACTION.CONTRACT_CANCELED),
   v.literal(AUDIT_ACTION.CONTRACT_STATUS_UPDATED),
+  v.literal(AUDIT_ACTION.GUARANTEE_CREATED),
+  v.literal(AUDIT_ACTION.GUARANTEE_TRANSITIONED),
+  v.literal(AUDIT_ACTION.LEASE_CREATED),
   v.literal(AUDIT_ACTION.PAYMENT_BATCH_GENERATED),
   v.literal(AUDIT_ACTION.PAYMENT_MARKED_OVERDUE),
   v.literal(AUDIT_ACTION.PAYMENT_METHOD_SET),
