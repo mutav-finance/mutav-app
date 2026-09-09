@@ -50,7 +50,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { GUARANTEE_STATE, type UrgencyTier } from "@convex/guarantees/domain";
-import { GuaranteeStateTag, StatusTag } from "@/components/guarantees/state-tag";
+import { GuaranteeStateTag, StatusTag } from "@mutav/ui/guarantee-state-tag";
 import type { GuaranteeState } from "@/lib/guarantees/types";
 
 type GuaranteeListItem = {

@@ -22,6 +22,7 @@
     "./edit-field": "./src/edit-field.tsx",
     "./eyebrow": "./src/eyebrow.tsx",
     "./field": "./src/field.tsx",
+    "./guarantee-state-tag": "./src/guarantee-state-tag.tsx",
     "./input": "./src/input.tsx",
     "./item": "./src/item.tsx",
     "./label": "./src/label.tsx",

@@ -8,7 +8,7 @@ import {
   GUARANTEE_STATE_SWATCH_COLOR,
   IN_FORCE_AREA_COLOR,
 } from "@/components/guarantees/state-chart-palette";
-import { GUARANTEE_STATE_TONE } from "@/components/guarantees/state-tag";
+import { GUARANTEE_STATE_TONE } from "@mutav/ui/guarantee-state-tag";
 import {
   GUARANTEE_CONTEXT_STATES,
   GUARANTEE_IN_FORCE_STATES,
