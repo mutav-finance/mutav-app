@@ -233,6 +233,14 @@
     "eventsTitle": "Movimentações por mês",
     "inForceLabel": "Vigentes"
   },
+  "lifecycle": {
+    "title": "Onde a carteira está",
+    "description": "Garantias por estado do ciclo de vida — selecione um para filtrar a lista abaixo",
+    "spineLabel": "Ciclo de vida da garantia",
+    "exitsLabel": "Saídas",
+    "cureReturn": "Regularização volta para {state}",
+    "nodeAriaLabel": "{state}: {count}. Filtrar a lista por este estado."
+  },
   "metrics": {
     "inForce": {
       "label": "Garantias em vigor",

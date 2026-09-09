@@ -233,6 +233,14 @@
     "eventsTitle": "Moves per month",
     "inForceLabel": "In force"
   },
+  "lifecycle": {
+    "title": "Where the book sits",
+    "description": "Guarantees by lifecycle state — select one to filter the list below",
+    "spineLabel": "Guarantee lifecycle",
+    "exitsLabel": "Exits",
+    "cureReturn": "Regularization returns to {state}",
+    "nodeAriaLabel": "{state}: {count}. Filter the list by this state."
+  },
   "metrics": {
     "inForce": {
       "label": "Guarantees in force",

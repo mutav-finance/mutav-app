@@ -51,6 +51,14 @@ type GuaranteeStateChartProps = {
   i18nNamespace: string;
   showTrendIcon?: boolean;
   showEvents?: boolean;
+  /**
+   * Off where a per-state count row already exists on the page. The agency
+   * dashboard's lifecycle pipeline carries those counts on the machine's own
+   * topology directly above this card; repeating them here would be the same
+   * seven numbers twice. The transparency page has no pipeline, so the row
+   * stays its only per-state granularity.
+   */
+  showStateCounts?: boolean;
 };
 
 const AXIS_WIDTH = 32;
@@ -80,7 +88,8 @@ const CHART_MARGIN = { top: 4, right: 12, bottom: 0, left: 12 };
  * tooltip.
  *
  * The **count row** carries the per-state granularity, with the same swatch
- * the status tags in the table below use.
+ * the status tags in the table below use. It is opt-out: a page that already
+ * shows those seven numbers turns it off (`showStateCounts`).
  */
 export function GuaranteeStateChart({
   timeline,
@@ -91,6 +100,7 @@ export function GuaranteeStateChart({
   i18nNamespace,
   showTrendIcon = false,
   showEvents = false,
+  showStateCounts = true,
 }: GuaranteeStateChartProps) {
   const t = useTranslations(i18nNamespace);
   const chart = useGuaranteeStateChart({
@@ -211,12 +221,14 @@ export function GuaranteeStateChart({
 
         {showEvents ? <EventLegend label={t("eventsTitle")} labelFor={chart.eventLabel} /> : null}
 
-        <StateLegend
-          entries={chart.legend}
-          contextEntries={chart.contextFigures}
-          label={t("legendLabel")}
-          labelFor={chart.stateLabel}
-        />
+        {showStateCounts ? (
+          <StateLegend
+            entries={chart.legend}
+            contextEntries={chart.contextFigures}
+            label={t("legendLabel")}
+            labelFor={chart.stateLabel}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );
