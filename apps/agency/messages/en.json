@@ -230,7 +230,7 @@
     "last12Months": "Last 12 months",
     "selectRangeAriaLabel": "Select a range",
     "legendLabel": "Guarantees in force by state, current count",
-    "eventsTitle": "Moves per month",
+    "seriesLabel": "Plotted series: book in force and moves per month",
     "inForceLabel": "In force"
   },
   "lifecycle": {
@@ -1293,7 +1293,7 @@
       "m12": "Last 12 months",
       "selectRangeAriaLabel": "Select a range",
       "legendLabel": "Guarantees in force by state, current count",
-      "eventsTitle": "Moves per week",
+      "seriesLabel": "Plotted series: book in force and moves per week",
       "inForceLabel": "In force"
     }
   },

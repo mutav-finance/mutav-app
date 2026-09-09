@@ -230,7 +230,7 @@
     "last12Months": "Últimos 12 meses",
     "selectRangeAriaLabel": "Selecione um período",
     "legendLabel": "Garantias vigentes por situação, contagem atual",
-    "eventsTitle": "Movimentações por mês",
+    "seriesLabel": "Séries do gráfico: carteira vigente e movimentações por mês",
     "inForceLabel": "Vigentes"
   },
   "lifecycle": {
@@ -1293,7 +1293,7 @@
       "m12": "Últimos 12 meses",
       "selectRangeAriaLabel": "Selecione um período",
       "legendLabel": "Garantias vigentes por situação, contagem atual",
-      "eventsTitle": "Movimentações por semana",
+      "seriesLabel": "Séries do gráfico: carteira vigente e movimentações por semana",
       "inForceLabel": "Vigentes"
     }
   },

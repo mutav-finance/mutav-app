@@ -28,6 +28,7 @@ import {
   EVENT_BAR_RADIUS,
   GUARANTEE_EVENT_CHART_COLOR,
   GUARANTEE_STATE_SWATCH_COLOR,
+  IN_FORCE_AREA_COLOR,
 } from "@/components/guarantees/state-chart-palette";
 import {
   useGuaranteeStateChart,
@@ -219,7 +220,13 @@ export function GuaranteeStateChart({
           </ChartContainer>
         )}
 
-        {showEvents ? <EventLegend label={t("eventsTitle")} labelFor={chart.eventLabel} /> : null}
+        {showEvents ? (
+          <SeriesLegend
+            label={t("seriesLabel")}
+            inForceLabel={t("inForceLabel")}
+            labelFor={chart.eventLabel}
+          />
+        ) : null}
 
         {showStateCounts ? (
           <StateLegend
@@ -234,15 +241,28 @@ export function GuaranteeStateChart({
   );
 }
 
-function EventLegend({
+/**
+ * Every mark on the plot, named: the area first, then the five event bars.
+ *
+ * The area used to be identified by the count row underneath it. A page that
+ * turns that row off leaves the plot's biggest mark unlabelled outside the
+ * tooltip, so the series it draws leads the legend it already had.
+ */
+function SeriesLegend({
   label,
+  inForceLabel,
   labelFor,
 }: {
   label: string;
+  inForceLabel: string;
   labelFor: (event: GuaranteeEvent) => string;
 }) {
   return (
     <ul aria-label={label} className="flex flex-wrap gap-x-4 gap-y-1 px-2 sm:px-0">
+      <li className="text-muted-foreground flex h-5 items-center gap-1.5 text-xs">
+        <Swatch color={IN_FORCE_AREA_COLOR} />
+        {inForceLabel}
+      </li>
       {GUARANTEE_EVENTS.map((event) => (
         <li key={event} className="text-muted-foreground flex h-5 items-center gap-1.5 text-xs">
           <Swatch color={GUARANTEE_EVENT_CHART_COLOR[event]} />

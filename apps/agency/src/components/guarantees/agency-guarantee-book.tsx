@@ -14,7 +14,7 @@ function isGuaranteeState(tab: StateTab): tab is GuaranteeState {
 }
 
 /**
- * The dashboard's guarantee book: where it sits, how it moved, and the rows.
+ * The dashboard's guarantee book: how it moved, where it sits, and the rows.
  *
  * The three pieces are one component because they share one filter. The table's
  * tabs already own that state, so the pipeline drives the tabs rather than
@@ -35,14 +35,16 @@ export function AgencyGuaranteeBook() {
   return (
     <>
       <div className="px-4 lg:px-6">
+        <AgencyStateChart />
+      </div>
+      {/* Directly above the table it filters: a click here changes the rows
+          immediately below, so the control and its effect stay in one glance. */}
+      <div className="px-4 lg:px-6">
         <GuaranteeLifecyclePipeline
           counts={counts ?? null}
           selectedState={isGuaranteeState(stateTab) ? stateTab : null}
           onSelectState={(state) => setStateTab(state ?? "all")}
         />
-      </div>
-      <div className="px-4 lg:px-6">
-        <AgencyStateChart />
       </div>
       <GuaranteeListTable
         defaultSort={[{ id: "urgency", desc: false }]}
