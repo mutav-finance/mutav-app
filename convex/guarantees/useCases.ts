@@ -17,7 +17,7 @@ import type { AgencyId } from "../agencies/domain";
 import type { Tenant, TenantInput } from "../tenants/domain";
 import type { Lease } from "../leases/domain";
 import type { Product, ProductId } from "../products/domain";
-import { contractsByStatus, contractsByStatusPlatform, sumInsuredExposure } from "./aggregate";
+import { contractsByStatus, countByStatePlatform, sumInsuredExposure } from "./aggregate";
 import { insertGuaranteeAggregates, replaceGuaranteeAggregates } from "./aggregateWrites";
 import {
   assertClose,
@@ -370,13 +370,7 @@ export const getContractTabCounts = queryWithAgencyScope({
  */
 export const getStatusCountsGlobal = queryWithAuth({
   args: {},
-  handler: async (ctx): Promise<StateCounts> => {
-    const counts = await contractsByStatusPlatform.countBatch(
-      ctx,
-      GUARANTEE_STATES.map((state) => ({ bounds: singleKeyBounds(state) })),
-    );
-    return shapeStateCounts(counts);
-  },
+  handler: async (ctx): Promise<StateCounts> => countByStatePlatform(ctx),
 });
 
 /**

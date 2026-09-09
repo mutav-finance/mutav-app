@@ -3,7 +3,9 @@ import { components } from "../_generated/api";
 import type { DataModel } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import type { AgencyId } from "../agencies/domain";
-import { INSURED_STATES, type GuaranteeState } from "./domain";
+import { GUARANTEE_STATES, INSURED_STATES, type GuaranteeState } from "./domain";
+
+export type GuaranteeStateCounts = Record<GuaranteeState, number>;
 
 /**
  * Aggregate that counts guarantees grouped by (agencyId, status).
@@ -73,6 +75,31 @@ function singleKeyBounds(state: GuaranteeState) {
     lower: { key: state, inclusive: true },
     upper: { key: state, inclusive: true },
   };
+}
+
+/**
+ * Zip a `countBatch` result back onto the seven states. The batch is issued
+ * in `GUARANTEE_STATES` order, so position i is the count for state i.
+ */
+function shapeStateCounts(counts: readonly number[]): GuaranteeStateCounts {
+  return {
+    drafted: counts[0] ?? 0,
+    active: counts[1] ?? 0,
+    in_arrears: counts[2] ?? 0,
+    default_verified: counts[3] ?? 0,
+    cover_committed: counts[4] ?? 0,
+    in_eviction: counts[5] ?? 0,
+    closed: counts[6] ?? 0,
+  };
+}
+
+/** Platform-wide guarantee count per lifecycle state, one O(log n) read each. */
+export async function countByStatePlatform(ctx: QueryCtx): Promise<GuaranteeStateCounts> {
+  const counts = await contractsByStatusPlatform.countBatch(
+    ctx,
+    GUARANTEE_STATES.map((state) => ({ bounds: singleKeyBounds(state) })),
+  );
+  return shapeStateCounts(counts);
 }
 
 /** Platform-wide worst-case exposure over every in-force guarantee. */

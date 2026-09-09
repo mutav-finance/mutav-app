@@ -6,7 +6,7 @@ import { AUDIT_ACTION, auditActorValidator, type AuditActor } from "../audit/dom
 import { appendAuditEntry } from "../audit/useCases";
 import { queryWithAgencyScope } from "../lib/auth";
 import { digitsOnly } from "../lib/taxId";
-import { agencySubmittedTenant } from "../contracts/tenantIdentity";
+import { agencySubmittedTenant } from "../guarantees/tenantIdentity";
 import {
   TENANT_ENTITY_TYPE,
   tenantInputValidator,
@@ -56,7 +56,7 @@ function identityConflicts(existing: Tenant, input: TenantInput): Record<string,
 
 /**
  * Resolve the registry row for a tax ID, inserting it on first encounter.
- * Plain `MutationCtx` helper on purpose: `contracts.create` and the
+ * Plain `MutationCtx` helper on purpose: `guarantees.create` and the
  * backfill migration both call it inside their own transaction (MutationCtx
  * has no `runMutation`, and scheduling would break atomicity). The
  * `getOrCreate` internalMutation below is a thin wrapper for external
@@ -70,7 +70,7 @@ function identityConflicts(existing: Tenant, input: TenantInput): Record<string,
  * this tax ID, so NO identity field is ever overwritten (LGPD-26). Any
  * divergence — name, contact, birth date, contact CPF — appends one audit
  * entry for staff review and leaves the row alone; each agency reads its own
- * submission back from its contract creation event.
+ * submission back from its guarantee creation event.
  *
  * The tax-id checksum rejection is the only error Result and happens
  * before any write.
@@ -134,14 +134,14 @@ export const getByIdInternal = internalQuery({
 
 /**
  * Relationship-gated prefill lookup (spec § Domain rules): an agency reads
- * tenant data only when it has (or had) a contract with that tenant.
+ * tenant data only when it has (or had) a lease with that tenant.
  * Unknown-to-the-platform and known-but-unrelated tax IDs both return
  * `null` — indistinguishable by design, so there is no existence leak.
  * `contactCpf` is deliberately NOT an identity key: a pj tenant's contact
  * CPF never resolves company data into a pf flow.
  *
  * The values returned are the caller's OWN latest submission, resolved from
- * its contract creation snapshot — never the shared registry row, which keeps
+ * its guarantee creation snapshot — never the shared registry row, which keeps
  * its first writer's values and would hand this agency another one's contact
  * data (LGPD-26). No submission means `null`, not the registry: this is a
  * convenience that saves retyping, and an isolation boundary must not default
@@ -159,18 +159,28 @@ export const lookupTenantByTaxId = queryWithAgencyScope({
       .unique();
     if (!tenant) return null;
 
-    const relatedContracts = await ctx.db
-      .query("contracts")
+    // The relationship lives on the lease; the submission lives on the
+    // guarantee's creation event. Newest first on both axes so the prefill is
+    // the agency's latest wording of the same person.
+    const relatedLeases = await ctx.db
+      .query("leases")
       .withIndex("by_agency_tenant", (q) =>
         q.eq("agencyId", ctx.agencyId).eq("tenantId", tenant._id),
       )
       .order("desc")
       .collect();
-    if (relatedContracts.length === 0) return null;
+    if (relatedLeases.length === 0) return null;
 
-    for (const contract of relatedContracts) {
-      const submitted = await agencySubmittedTenant(ctx, contract);
-      if (submitted) return { fullName: submitted.fullName, email: submitted.email };
+    for (const lease of relatedLeases) {
+      const guarantees = await ctx.db
+        .query("guarantees")
+        .withIndex("by_lease", (q) => q.eq("leaseId", lease._id))
+        .order("desc")
+        .collect();
+      for (const guarantee of guarantees) {
+        const submitted = await agencySubmittedTenant(ctx, guarantee);
+        if (submitted) return { fullName: submitted.fullName, email: submitted.email };
+      }
     }
 
     return null;

@@ -5,7 +5,7 @@ import { internalQuery, query } from "../_generated/server";
 import { assertAgencyAccess, queryWithAgencyScope, queryWithMutavRole } from "../lib/auth";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractId } from "../contracts/domain";
+import type { GuaranteeId } from "../guarantees/domain";
 import {
   DELINQUENCY_STATUS,
   delinquencyStatusValidator,
@@ -23,7 +23,7 @@ export const STATS_TAKE_LIMIT = 1000;
 
 // ---- projection shapes -----------------------------------------------------
 // Server-owned response types. Callers (UI, tests, internal wrappers) couple
-// to THESE, not to `Doc<'contractDelinquencyNotices'>` — so future schema
+// to THESE, not to `Doc<'guaranteeDelinquencyNotices'>` — so future schema
 // tweaks (new envelope fields, renamed system columns) do not ripple out.
 
 /**
@@ -33,7 +33,7 @@ export const STATS_TAKE_LIMIT = 1000;
  */
 export type DelinquencyNoticeRow = {
   publicId: string;
-  contractId: ContractId;
+  guaranteeId: GuaranteeId;
   status: DelinquencyStatus;
   rentDueDate: string;
   originalAmountCents: number;
@@ -74,7 +74,7 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
 export type DelinquencyAdminQueueRow = {
   publicId: string;
   agencyId: AgencyId;
-  contractId: ContractId;
+  guaranteeId: GuaranteeId;
   rentDueDate: string;
   originalAmountCents: number;
   updatedAmountCents: number;
@@ -85,7 +85,7 @@ export type DelinquencyAdminQueueRow = {
 function shapeDelinquencyNoticeRow(notice: DelinquencyNotice): DelinquencyNoticeRow {
   return {
     publicId: notice.publicId,
-    contractId: notice.contractId,
+    guaranteeId: notice.guaranteeId,
     status: notice.status,
     rentDueDate: notice.rentDueDate,
     originalAmountCents: notice.originalAmountCents,
@@ -126,7 +126,7 @@ function shapeDelinquencyAdminQueueRow(notice: DelinquencyNotice): DelinquencyAd
   return {
     publicId: notice.publicId,
     agencyId: notice.agencyId,
-    contractId: notice.contractId,
+    guaranteeId: notice.guaranteeId,
     rentDueDate: notice.rentDueDate,
     originalAmountCents: notice.originalAmountCents,
     updatedAmountCents: notice.updatedAmountCents,
@@ -157,7 +157,7 @@ function shapeDelinquencyAdminQueueRow(notice: DelinquencyNotice): DelinquencyAd
  * `DelinquencyRow` shape with `propertyId` + formatted `noticeAt`. That
  * adapter (property join + `Intl` date formatting per active locale) lives
  * client-side in `apps/agency/src/components/delinquencies/` — the property
- * join needs a `contracts.get` per row and the date format is locale-aware,
+ * join needs a guarantee → lease read per row and the date format is locale-aware,
  * neither of which belongs in this projection.
  */
 export const listByAgency = queryWithAgencyScope({
@@ -182,7 +182,7 @@ export const listByAgency = queryWithAgencyScope({
     const dueDateFrom = args.dueDateFrom?.slice(0, 10);
     const dueDateTo = args.dueDateTo?.slice(0, 10);
     const result = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", status))
       .order("desc")
       .paginate(args.paginationOpts);
@@ -204,13 +204,13 @@ export const listByAgency = queryWithAgencyScope({
 /**
  * Resource-by-id read. Returns null on both not-found and cross-agency
  * access-denied to avoid leaking existence — same shape as
- * `invoices.getByPublicId` and `contracts.getByPublicId`.
+ * `invoices.getByPublicId` and `guarantees.getByPublicId`.
  */
 export const getByPublicId = query({
   args: { publicId: v.string() },
   handler: async (ctx, args): Promise<DelinquencyNoticeDetail | null> => {
     const notice = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
     if (!notice) return null;
@@ -272,21 +272,21 @@ export const openStats = queryWithAgencyScope({
     // gives us the most-recent 1000 — the window we actually want.
     const [openRows, resolvedRows, canceledRows] = await Promise.all([
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.OPEN),
         )
         .order("desc")
         .take(STATS_TAKE_LIMIT),
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.RESOLVED),
         )
         .order("desc")
         .take(STATS_TAKE_LIMIT),
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.CANCELED),
         )
@@ -344,7 +344,7 @@ export const listOpenAdminQueue = queryWithMutavRole({ minRole: "compliance" })(
     continueCursor: string;
   }> => {
     const result = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_status_openedAt", (q) => q.eq("status", DELINQUENCY_STATUS.OPEN))
       .order("asc")
       .paginate(args.paginationOpts);
@@ -371,7 +371,7 @@ export const getByPublicIdInternal = internalQuery({
   args: { publicId: v.string() },
   handler: async (ctx, { publicId }): Promise<DelinquencyNotice | null> => {
     return ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
       .unique();
   },

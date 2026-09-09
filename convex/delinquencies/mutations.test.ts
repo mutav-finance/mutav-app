@@ -2,16 +2,16 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { registerContractAggregateComponents } from "../lib/testFixtures";
+import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractId } from "../contracts/domain";
+import type { GuaranteeId, GuaranteeState } from "../guarantees/domain";
 import type { DelinquencyNoticeId } from "./domain";
 import schema from "../schema";
 
 // A convexTest instance factory. Aggregate components must be registered per
-// instance — the contracts domain's shared schema wires them in, and
+// instance — the guarantees domain's shared schema wires them in, and
 // unregistered lookups throw on first query.
 function setup() {
   const t = convexTest(schema);
@@ -31,20 +31,20 @@ function orThrow<TValue>(value: TValue | null | undefined, label: string): TValu
   return value;
 }
 
-// One-user, one-agency, one-active-contract fixture. Mirrors the shape used
+// One-user, one-agency, one-active-guarantee fixture. Mirrors the shape used
 // in useCases.test.ts so mutation calls resolve identity end-to-end.
 type Fixture = {
   subject: string;
   userId: UserId;
   agencyId: AgencyId;
-  contractId: ContractId;
-  contractPublicId: string;
+  guaranteeId: GuaranteeId;
+  guaranteePublicId: string;
 };
 
 async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
   const subject = `auth0|user-${suffix}`;
-  const contractPublicId = `CT-${suffix}`;
-  const fx = await t.run(async (ctx) => {
+  const guaranteePublicId = `CT-${suffix}`;
+  const { userId, agencyId } = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", {
       publicId: `user-${suffix}`,
       subject,
@@ -65,55 +65,20 @@ async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
       role: "owner",
       joinedAt: "2024-01-01T00:00:00-03:00",
     });
-    const tenantId = await ctx.db.insert("tenants", {
-      entityType: "pf",
-      taxId: `1114447773${suffix}`.slice(-11),
-      fullName: `Tenant ${suffix}`,
-      birthDate: "1990-01-01",
-      email: `tenant-${suffix}@test.br`,
-      phone: "11999999999",
-    });
-    const contractId = await ctx.db.insert("contracts", {
-      agencyId,
-      publicId: contractPublicId,
-      tenantId,
-      tenantApproval: { status: "aprovado", termApprovedAt: "2024-06-01" },
-      status: "ativo",
-      activatedAt: "2024-06-01",
-      deactivatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: 3_600_000,
-      rental: {
-        propertyKind: "residencial",
-        plan: "basic",
-        rentCents: 300_000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 300_000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "12x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
-    });
-    return { userId, agencyId, contractId };
+    return { userId, agencyId };
   });
-  return { subject, contractPublicId, ...fx };
+  const { guaranteeId } = await seedGuaranteeWithLease(
+    t,
+    {
+      agencyId,
+      status: "active",
+      activatedAt: "2024-06-01T00:00:00.000Z",
+      rentCents: 300_000,
+      tenantTaxId: `1114447773${suffix}`.slice(-11),
+    },
+    guaranteePublicId,
+  );
+  return { subject, guaranteePublicId, userId, agencyId, guaranteeId };
 }
 
 async function grantStaffRole(t: T, userId: UserId, role: MutavStaffRole): Promise<void> {
@@ -126,13 +91,15 @@ async function grantStaffRole(t: T, userId: UserId, role: MutavStaffRole): Promi
   });
 }
 
-async function setContractStatus(
+// Direct status patch — the aggregates are deliberately left stale because no
+// test in this file reads them; the point is only what `openNotice` accepts.
+async function setGuaranteeStatus(
   t: T,
-  contractId: ContractId,
-  status: "ativo" | "pendente" | "encerrado" | "cancelado",
+  guaranteeId: GuaranteeId,
+  status: GuaranteeState,
 ): Promise<void> {
   await t.run(async (ctx) => {
-    await ctx.db.patch(contractId, { status });
+    await ctx.db.patch(guaranteeId, { status });
   });
 }
 
@@ -152,9 +119,9 @@ async function insertNotice(
 ): Promise<DelinquencyNoticeId> {
   return t.run(async (ctx) => {
     const status = overrides.status ?? "open";
-    return ctx.db.insert("contractDelinquencyNotices", {
+    return ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: overrides.publicId,
-      contractId: fx.contractId,
+      guaranteeId: fx.guaranteeId,
       agencyId: fx.agencyId,
       status,
       rentDueDate: overrides.rentDueDate ?? "2026-06-05",
@@ -196,7 +163,7 @@ describe("openNotice", () => {
     await expect(
       t.mutation(api.delinquencies.mutations.openNotice, {
         agencyId: fx.agencyId,
-        contractPublicId: fx.contractPublicId,
+        guaranteePublicId: fx.guaranteePublicId,
         rentDueDate: "2026-06-05",
         originalAmountCents: 300_000,
       }),
@@ -211,7 +178,7 @@ describe("openNotice", () => {
     await expect(
       asA.mutation(api.delinquencies.mutations.openNotice, {
         agencyId: b.agencyId,
-        contractPublicId: b.contractPublicId,
+        guaranteePublicId: b.guaranteePublicId,
         rentDueDate: "2026-06-05",
         originalAmountCents: 300_000,
       }),
@@ -226,7 +193,7 @@ describe("openNotice", () => {
     const before = Date.now();
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -238,13 +205,13 @@ describe("openNotice", () => {
 
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
     expect(row).not.toBeNull();
     expect(row?.status).toBe("open");
-    expect(row?.contractId).toBe(fx.contractId);
+    expect(row?.guaranteeId).toBe(fx.guaranteeId);
     expect(row?.agencyId).toBe(fx.agencyId);
     expect(row?.openedByUserId).toBe(fx.userId);
     expect(row?.updatedAmountCents).toBe(300_000);
@@ -261,7 +228,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-07-05",
       originalAmountCents: 250_000,
     });
@@ -269,7 +236,7 @@ describe("openNotice", () => {
     if (!result.success) return;
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
@@ -282,7 +249,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
       evidenceSource: "bank_attested",
@@ -298,7 +265,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
       evidenceSource: "onchain_observed",
@@ -314,7 +281,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05T00:00:00Z",
       originalAmountCents: 300_000,
     });
@@ -329,7 +296,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 0,
     });
@@ -344,7 +311,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: -1,
     });
@@ -359,7 +326,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300.5,
     });
@@ -368,61 +335,61 @@ describe("openNotice", () => {
     expect(result.error.code).toBe("INVALID_AMOUNT");
   });
 
-  test("unknown contract publicId → CONTRACT_NOT_FOUND", async () => {
+  test("unknown guarantee publicId → GUARANTEE_NOT_FOUND", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: "CT-does-not-exist",
+      guaranteePublicId: "CT-does-not-exist",
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.code).toBe("CONTRACT_NOT_FOUND");
+    expect(result.error.code).toBe("GUARANTEE_NOT_FOUND");
   });
 
-  test("contract exists but in a different agency → CONTRACT_NOT_FOUND (existence not leaked)", async () => {
+  test("guarantee exists but in a different agency → GUARANTEE_NOT_FOUND (existence not leaked)", async () => {
     const t = setup();
     const a = await makeFixture(t, "1");
     const b = await makeFixture(t, "2");
     const asA = t.withIdentity({ subject: a.subject });
     const result = await asA.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: a.agencyId,
-      contractPublicId: b.contractPublicId,
+      guaranteePublicId: b.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.code).toBe("CONTRACT_NOT_FOUND");
+    expect(result.error.code).toBe("GUARANTEE_NOT_FOUND");
   });
 
-  test("contract exists but status='pendente' → CONTRACT_NOT_ACTIVE", async () => {
+  test("guarantee exists but status='drafted' → GUARANTEE_NOT_INSURED", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    await setContractStatus(t, fx.contractId, "pendente");
+    await setGuaranteeStatus(t, fx.guaranteeId, "drafted");
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.code).toBe("CONTRACT_NOT_ACTIVE");
+    expect(result.error.code).toBe("GUARANTEE_NOT_INSURED");
   });
 
-  test("second open notice for same (contract, rentDueDate) → DUPLICATE_NOTICE", async () => {
+  test("second open notice for same (guarantee, rentDueDate) → DUPLICATE_NOTICE", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     const asUser = t.withIdentity({ subject: fx.subject });
 
     const first = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -430,7 +397,7 @@ describe("openNotice", () => {
 
     const second = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -439,7 +406,7 @@ describe("openNotice", () => {
     expect(second.error.code).toBe("DUPLICATE_NOTICE");
   });
 
-  test("prior canceled notice for same (contract, dueDate) does NOT block a re-file; suffixed publicId", async () => {
+  test("prior canceled notice for same (guarantee, dueDate) does NOT block a re-file; suffixed publicId", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     // Seed a prior canceled notice on the exact same rentDueDate — the
@@ -454,7 +421,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -463,11 +430,11 @@ describe("openNotice", () => {
     expect(result.data.publicId).toBe("DN-CT-1-2026-06-05-2");
   });
 
-  test("two notices on same contract in same month, different due dates → distinct publicIds retrievable via getByPublicId", async () => {
+  test("two notices on same guarantee in same month, different due dates → distinct publicIds retrievable via getByPublicId", async () => {
     // Regression for the month-granularity collision: previously both notices
     // would base on `DN-CT-1-2026-04` and rely on the suffix loop. That loop
-    // only saw prior rows on the SAME (contract, rentDueDate) tuple via
-    // `by_contract_dueDate`, so the second notice would get the same base
+    // only saw prior rows on the SAME (guarantee, rentDueDate) tuple via
+    // `by_guarantee_dueDate`, so the second notice would get the same base
     // publicId as the first and permanently break getByPublicId's `.unique()`.
     const t = setup();
     const fx = await makeFixture(t);
@@ -475,7 +442,7 @@ describe("openNotice", () => {
 
     const first = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-04-05",
       originalAmountCents: 300_000,
     });
@@ -494,7 +461,7 @@ describe("openNotice", () => {
 
     const second = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-04-20",
       originalAmountCents: 300_000,
     });
@@ -603,7 +570,7 @@ describe("markResolved", () => {
     if (!result.success) return;
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
@@ -623,7 +590,7 @@ describe("markResolved", () => {
     expect(first.success).toBe(true);
     const rowAfterFirstRaw = await t.run(async (ctx) => {
       const notice = await ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", "DN-double-r"))
         .unique();
       return notice;
@@ -746,7 +713,7 @@ describe("markCanceled", () => {
     if (!result.success) return;
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
@@ -767,7 +734,7 @@ describe("markCanceled", () => {
 
     const rowAfterFirstRaw = await t.run(async (ctx) => {
       return ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", "DN-double-c"))
         .unique();
     });
@@ -910,7 +877,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cover-happy"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cover-happy"),
         )
         .collect(),
     );
@@ -961,7 +928,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cross-agency"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cross-agency"),
         )
         .collect(),
     );
@@ -991,7 +958,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cover-terminal"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cover-terminal"),
         )
         .collect(),
     );
@@ -1016,7 +983,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cover-self"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cover-self"),
         )
         .collect(),
     );
@@ -1116,7 +1083,7 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-dismiss-happy"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-dismiss-happy"),
         )
         .collect(),
     );
@@ -1155,7 +1122,7 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-dispute-happy"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-dispute-happy"),
         )
         .collect(),
     );
@@ -1188,7 +1155,7 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cross-dismiss"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cross-dismiss"),
         )
         .collect(),
     );
@@ -1219,7 +1186,7 @@ describe("staffMarkCanceledByDismissal", () => {
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
           q
-            .eq("resourceType", "contractDelinquencyNotices")
+            .eq("resourceType", "guaranteeDelinquencyNotices")
             .eq("resourceId", "DN-dismiss-terminal"),
         )
         .collect(),
@@ -1245,7 +1212,7 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-dismiss-self"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-dismiss-self"),
         )
         .collect(),
     );

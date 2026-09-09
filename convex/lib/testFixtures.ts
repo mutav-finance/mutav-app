@@ -1,4 +1,5 @@
-import type { convexTest } from "convex-test";
+import type { convexTest, TestConvex } from "convex-test";
+import type schema from "../schema";
 import type { AgencyId } from "../agencies/domain";
 import {
   GUARANTEE_STATE,
@@ -158,7 +159,7 @@ export async function seedFreshCreditAssessment(
  * constants). Idempotent: returns the existing row's id when it is already
  * there, so a test may call it before every guarantee it seeds.
  */
-export async function seedDefaultProduct(t: ReturnType<typeof convexTest>): Promise<ProductId> {
+export async function seedDefaultProduct(t: TestConvex<typeof schema>): Promise<ProductId> {
   return t.run(async (ctx) => {
     const existing = await ctx.db
       .query("products")
@@ -208,7 +209,7 @@ export type SeededGuarantee = {
  * tests; use the real mutation when the test is about `create` itself.
  */
 export async function seedGuaranteeWithLease(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   spec: SeedGuaranteeSpec,
   publicId: string,
 ): Promise<SeededGuarantee> {

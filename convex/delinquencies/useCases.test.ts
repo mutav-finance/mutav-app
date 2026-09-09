@@ -2,19 +2,18 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
-import { registerContractAggregateComponents } from "../lib/testFixtures";
+import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractId } from "../contracts/domain";
+import type { GuaranteeId } from "../guarantees/domain";
 import type { DelinquencyNoticeId } from "./domain";
 import schema from "../schema";
 import { STATS_TAKE_LIMIT } from "./useCases";
 
 // convexTest instance factory. Aggregate components must be registered per
-// instance even though this suite never mutates contracts — the shared
-// schema wires the components in, and unregistered lookups throw on first
-// query. Cheap to register, expensive to forget.
+// instance — the guarantee fixture writes to them, and unregistered lookups
+// throw on first query. Cheap to register, expensive to forget.
 function setup() {
   const t = convexTest(schema);
   registerContractAggregateComponents(t);
@@ -23,20 +22,20 @@ function setup() {
 
 type T = ReturnType<typeof setup>;
 
-// A one-user, one-agency, one-contract fixture — the smallest shape that lets
-// us insert notices against a real (agencyId, contractId, userId) tuple. Mirrors
-// the scenarios.test.ts pattern but seeds the users row with a `subject` so
-// `t.withIdentity({ subject })` resolves the same user.
+// A one-user, one-agency, one-guarantee fixture — the smallest shape that lets
+// us insert notices against a real (agencyId, guaranteeId, userId) tuple.
+// Mirrors the scenarios.test.ts pattern but seeds the users row with a
+// `subject` so `t.withIdentity({ subject })` resolves the same user.
 type Fixture = {
   subject: string;
   userId: UserId;
   agencyId: AgencyId;
-  contractId: ContractId;
+  guaranteeId: GuaranteeId;
 };
 
 async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
   const subject = `auth0|user-${suffix}`;
-  const fx = await t.run(async (ctx) => {
+  const { userId, agencyId } = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", {
       publicId: `user-${suffix}`,
       subject,
@@ -57,55 +56,20 @@ async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
       role: "owner",
       joinedAt: "2024-01-01T00:00:00-03:00",
     });
-    const tenantId = await ctx.db.insert("tenants", {
-      entityType: "pf",
-      taxId: `1114447773${suffix}`.slice(-11),
-      fullName: `Tenant ${suffix}`,
-      birthDate: "1990-01-01",
-      email: `tenant-${suffix}@test.br`,
-      phone: "11999999999",
-    });
-    const contractId = await ctx.db.insert("contracts", {
-      agencyId,
-      publicId: `CT-${suffix}`,
-      tenantId,
-      tenantApproval: { status: "aprovado", termApprovedAt: "2024-06-01" },
-      status: "ativo",
-      activatedAt: "2024-06-01",
-      deactivatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: 3_600_000,
-      rental: {
-        propertyKind: "residencial",
-        plan: "basic",
-        rentCents: 300_000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 300_000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "12x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
-    });
-    return { userId, agencyId, contractId };
+    return { userId, agencyId };
   });
-  return { subject, ...fx };
+  const { guaranteeId } = await seedGuaranteeWithLease(
+    t,
+    {
+      agencyId,
+      status: "active",
+      activatedAt: "2024-06-01T00:00:00.000Z",
+      rentCents: 300_000,
+      tenantTaxId: `1114447773${suffix}`.slice(-11),
+    },
+    `CT-${suffix}`,
+  );
+  return { subject, userId, agencyId, guaranteeId };
 }
 
 // Seed a mutavStaff row for an existing user. Mirrors mutavStaff/useCases.test.ts.
@@ -136,9 +100,9 @@ async function insertNotice(
 ): Promise<DelinquencyNoticeId> {
   return t.run(async (ctx) => {
     const status = overrides.status ?? "open";
-    return ctx.db.insert("contractDelinquencyNotices", {
+    return ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: overrides.publicId,
-      contractId: fx.contractId,
+      guaranteeId: fx.guaranteeId,
       agencyId: fx.agencyId,
       status,
       rentDueDate: overrides.rentDueDate ?? "2026-06-05",
@@ -516,9 +480,9 @@ describe("openStats", () => {
     const recent = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
     await t.run(async (ctx) => {
       for (let i = 0; i < STATS_TAKE_LIMIT; i++) {
-        await ctx.db.insert("contractDelinquencyNotices", {
+        await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-saturate-resolved-${i}`,
-          contractId: fx.contractId,
+          guaranteeId: fx.guaranteeId,
           agencyId: fx.agencyId,
           status: "resolved",
           rentDueDate: "2026-06-05",
@@ -535,9 +499,9 @@ describe("openStats", () => {
         });
       }
       for (let i = 0; i < STATS_TAKE_LIMIT; i++) {
-        await ctx.db.insert("contractDelinquencyNotices", {
+        await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-saturate-canceled-${i}`,
-          contractId: fx.contractId,
+          guaranteeId: fx.guaranteeId,
           agencyId: fx.agencyId,
           status: "canceled",
           rentDueDate: "2026-06-05",

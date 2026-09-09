@@ -6,8 +6,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 // (resolution kind, cancellation reason, evidence source), plus the
 // Doc<>/Id<> aliases so callers never touch raw generics.
 
-export type DelinquencyNotice = Doc<"contractDelinquencyNotices">;
-export type DelinquencyNoticeId = Id<"contractDelinquencyNotices">;
+export type DelinquencyNotice = Doc<"guaranteeDelinquencyNotices">;
+export type DelinquencyNoticeId = Id<"guaranteeDelinquencyNotices">;
 
 export {
   DELINQUENCY_STATUS,
@@ -102,6 +102,7 @@ export const noticeEvidenceSourceValidator = v.union(
  */
 export const delinquencyStatusValidator = v.union(
   v.literal(DELINQUENCY_STATUS.OPEN),
+  v.literal(DELINQUENCY_STATUS.VERIFIED),
   v.literal(DELINQUENCY_STATUS.RESOLVED),
   v.literal(DELINQUENCY_STATUS.CANCELED),
 );

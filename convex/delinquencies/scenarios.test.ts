@@ -2,11 +2,11 @@
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { internal } from "../_generated/api";
-import { registerContractAggregateComponents } from "../lib/testFixtures";
+import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import schema from "../schema";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractId } from "../contracts/domain";
+import type { GuaranteeId } from "../guarantees/domain";
 import type { DelinquencyNoticeId } from "./domain";
 import {
   NOTICE_CANCELLATION_REASON,
@@ -35,17 +35,17 @@ function setup() {
 }
 
 // A fully-populated fixture the tests can lean on: one user, one agency with
-// owner membership, one contract with a registry-linked tenant. Everything is
-// inserted inline inside a single t.run so downstream tests can assume the
-// row shape holds against the real schema validator.
+// owner membership, one active guarantee on a lease with a registry-linked
+// tenant. The guarantee goes through `seedGuaranteeWithLease`, so its row
+// shape holds against the real schema validator and the aggregates.
 type Fixture = {
   userId: UserId;
   agencyId: AgencyId;
-  contractId: ContractId;
+  guaranteeId: GuaranteeId;
 };
 
 async function makeFixture(t: ReturnType<typeof setup>, suffix = "1"): Promise<Fixture> {
-  return t.run(async (ctx) => {
+  const { userId, agencyId } = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", {
       publicId: `user-${suffix}`,
       name: `Fixture User ${suffix}`,
@@ -65,111 +65,41 @@ async function makeFixture(t: ReturnType<typeof setup>, suffix = "1"): Promise<F
       role: "owner",
       joinedAt: "2024-01-01T00:00:00-03:00",
     });
-    const tenantId = await ctx.db.insert("tenants", {
-      entityType: "pf",
-      taxId: `1114447773${suffix}`.slice(-11),
-      fullName: `Tenant ${suffix}`,
-      birthDate: "1990-01-01",
-      email: `tenant-${suffix}@test.br`,
-      phone: "11999999999",
-    });
-    const contractId = await ctx.db.insert("contracts", {
-      agencyId,
-      publicId: `CT-${suffix}`,
-      tenantId,
-      tenantApproval: { status: "aprovado", termApprovedAt: "2024-06-01" },
-      status: "ativo",
-      activatedAt: "2024-06-01",
-      deactivatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: 3_600_000,
-      rental: {
-        propertyKind: "residencial",
-        plan: "basic",
-        rentCents: 300_000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 300_000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "12x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
-    });
-    return { userId, agencyId, contractId };
+    return { userId, agencyId };
   });
+  const { guaranteeId } = await seedGuaranteeWithLease(
+    t,
+    {
+      agencyId,
+      status: "active",
+      activatedAt: "2024-06-01T00:00:00.000Z",
+      rentCents: 300_000,
+      tenantTaxId: `1114447773${suffix}`.slice(-11),
+    },
+    `CT-${suffix}`,
+  );
+  return { userId, agencyId, guaranteeId };
 }
 
-// Insert a second contract inside an existing agency. Used to prove
-// by_contract_dueDate is truly scoped by contractId.
-async function insertSecondContract(
+// Insert a second guarantee inside an existing agency. Used to prove
+// by_guarantee_dueDate is truly scoped by guaranteeId.
+async function insertSecondGuarantee(
   t: ReturnType<typeof setup>,
   agencyId: AgencyId,
   suffix: string,
-): Promise<ContractId> {
-  return t.run(async (ctx) => {
-    const tenantId = await ctx.db.insert("tenants", {
-      entityType: "pf",
-      taxId: `2224447773${suffix}`.slice(-11),
-      fullName: `Second Tenant ${suffix}`,
-      birthDate: "1990-01-01",
-      email: `second-tenant-${suffix}@test.br`,
-      phone: "11888888888",
-    });
-    return ctx.db.insert("contracts", {
+): Promise<GuaranteeId> {
+  const { guaranteeId } = await seedGuaranteeWithLease(
+    t,
+    {
       agencyId,
-      publicId: `CT-second-${suffix}`,
-      tenantId,
-      tenantApproval: { status: "aprovado", termApprovedAt: "2024-06-01" },
-      status: "ativo",
-      activatedAt: "2024-06-01",
-      deactivatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: 3_600_000,
-      rental: {
-        propertyKind: "residencial",
-        plan: "basic",
-        rentCents: 300_000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 300_000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "12x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
-    });
-  });
+      status: "active",
+      activatedAt: "2024-06-01T00:00:00.000Z",
+      rentCents: 300_000,
+      tenantTaxId: `2224447773${suffix}`.slice(-11),
+    },
+    `CT-second-${suffix}`,
+  );
+  return guaranteeId;
 }
 
 // Mirrors the pattern the future mutation layer will use: check the machine
@@ -197,12 +127,12 @@ async function guardedPatch(
 describe("schema conformance — the notice row shape holds under real DB writes", () => {
   test("inserts a minimal open notice with only required fields (no resolution / cancellation)", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-min-1",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -229,12 +159,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
   test("inserts a resolved notice carrying the full resolution envelope (tenant_cured)", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-resolved-tc",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-04-05",
@@ -261,12 +191,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
   test("inserts a resolved notice with cover_committed + coverOperationPublicId set", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-resolved-cc",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-05-05",
@@ -293,12 +223,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
   test("inserts a canceled notice carrying the full cancellation envelope", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-canceled-aw",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "canceled",
         rentDueDate: "2026-06-05",
@@ -324,16 +254,16 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
   test("accepts every NOTICE_EVIDENCE_SOURCE value as evidenceSource", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const sources = Object.values(NOTICE_EVIDENCE_SOURCE);
     const ids = await t.run(async (ctx) => {
       const inserted: Array<{ source: string; id: DelinquencyNoticeId }> = [];
       let i = 0;
       for (const source of sources) {
-        const id = await ctx.db.insert("contractDelinquencyNotices", {
+        const id = await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-evsrc-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "open",
           rentDueDate: "2026-06-05",
@@ -358,16 +288,16 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
   test("accepts every NOTICE_RESOLUTION_KIND value in the resolution envelope", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const kinds = Object.values(NOTICE_RESOLUTION_KIND);
     const ids = await t.run(async (ctx) => {
       const inserted: Array<{ kind: string; id: DelinquencyNoticeId }> = [];
       let i = 0;
       for (const kind of kinds) {
-        const id = await ctx.db.insert("contractDelinquencyNotices", {
+        const id = await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-rkind-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "resolved",
           rentDueDate: "2026-04-05",
@@ -397,16 +327,16 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
   test("accepts every NOTICE_CANCELLATION_REASON value in the cancellation envelope", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const reasons = Object.values(NOTICE_CANCELLATION_REASON);
     const ids = await t.run(async (ctx) => {
       const inserted: Array<{ reason: string; id: DelinquencyNoticeId }> = [];
       let i = 0;
       for (const reason of reasons) {
-        const id = await ctx.db.insert("contractDelinquencyNotices", {
+        const id = await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-crsn-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "canceled",
           rentDueDate: "2026-06-05",
@@ -440,13 +370,13 @@ describe("schema conformance — the notice row shape holds under real DB writes
   // pairings into a Result<> guard; until then, this test documents intent.
   test("resolution.kind='cover_committed' round-trips WITH coverOperationPublicId; the other three kinds round-trip WITHOUT it", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     // cover_committed WITH the op ref.
     const ccId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-pair-cc",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-04-05",
@@ -475,9 +405,9 @@ describe("schema conformance — the notice row shape holds under real DB writes
     let i = 0;
     for (const kind of kindsWithoutOp) {
       const id = await t.run((ctx) =>
-        ctx.db.insert("contractDelinquencyNotices", {
+        ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-pair-nop-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "resolved",
           rentDueDate: "2026-04-05",
@@ -502,12 +432,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
   test("resolution and cancellation envelopes accept the note-absent shape", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const resolvedId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-nonote-res",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-04-05",
@@ -524,9 +454,9 @@ describe("schema conformance — the notice row shape holds under real DB writes
       }),
     );
     const canceledId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-nonote-can",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "canceled",
         rentDueDate: "2026-06-05",
@@ -563,7 +493,7 @@ describe("schema conformance — the notice row shape holds under real DB writes
   //   (2) The current schema-layer permissiveness — so a future flip of
   //       `schemaValidation: true` shows up as one of these tests failing
   //       and prompts a review.
-  test("delinquencyStatusValidator is a 3-literal union (open|resolved|canceled), not widened to v.string()", async () => {
+  test("delinquencyStatusValidator is a 4-literal union (open|verified|resolved|canceled), not widened to v.string()", async () => {
     const { delinquencyStatusValidator } = await import("./domain");
     // Convex validators expose a `kind` discriminator and a `.members` array
     // for unions. If someone widened the validator to v.string(), .kind would
@@ -571,7 +501,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
     expect(delinquencyStatusValidator.kind).toBe("union");
     const members = (delinquencyStatusValidator as unknown as { members: Array<{ value: string }> })
       .members;
-    expect(members.map((m) => m.value).sort()).toEqual(["canceled", "open", "resolved"]);
+    expect(members.map((m) => m.value).sort()).toEqual([
+      "canceled",
+      "open",
+      "resolved",
+      "verified",
+    ]);
   });
 
   test("noticeEvidenceSourceValidator is a 5-literal union matching NOTICE_EVIDENCE_SOURCE exactly", async () => {
@@ -612,12 +547,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
   // see this test fail and reconsider.
   test("schema-layer PERMITS unknown evidenceSource values today (schemaValidation:false) — this is intentional pre-production and will flip later", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const id = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-perm-evsrc",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -642,12 +577,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
   // future mutation layer must enforce the pairing before hitting db.insert.
   test("schema PERMITS status:'resolved' with no resolution envelope — documenting the mutation-layer responsibility", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const id = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-schema-gap-resolved",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-06-05",
@@ -670,12 +605,12 @@ describe("schema conformance — the notice row shape holds under real DB writes
   // must assert uniqueness explicitly before inserting.
   test("by_publicId does NOT enforce uniqueness at the schema layer — two rows can share a publicId", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-collision",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -687,9 +622,9 @@ describe("schema conformance — the notice row shape holds under real DB writes
       }),
     );
     await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-collision",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-07-05",
@@ -703,7 +638,7 @@ describe("schema conformance — the notice row shape holds under real DB writes
 
     const rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", "DN-collision"))
         .collect(),
     );
@@ -719,7 +654,7 @@ describe("schema conformance — the notice row shape holds under real DB writes
 describe("index coverage — each of the four indexes returns the rows a realistic query needs", () => {
   test("by_publicId resolves a single notice by its 'DN-…' public identifier", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const targetPublicId = "DN-lookup-target";
     const targetId = await t.run(async (ctx) => {
@@ -727,9 +662,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
       const publicIds = ["DN-lookup-other-1", targetPublicId, "DN-lookup-other-2"];
       let i = 0;
       for (const pid of publicIds) {
-        const id = await ctx.db.insert("contractDelinquencyNotices", {
+        const id = await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: pid,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "open",
           rentDueDate: "2026-06-05",
@@ -747,7 +682,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", targetPublicId))
         .collect(),
     );
@@ -757,12 +692,12 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
   test("by_publicId returns an empty result when the publicId does not exist", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-exists",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -776,7 +711,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", "DN-does-not-exist"))
         .collect(),
     );
@@ -794,9 +729,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
     const b = await makeFixture(t, "2");
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-x-agency",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -813,7 +748,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
     // agencyId; the index does not (and cannot) do that itself.
     const rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", "DN-x-agency"))
         .collect(),
     );
@@ -824,12 +759,12 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
   test("by_agency_status returns only open notices for the given agency", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-open-a",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -839,9 +774,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2026-06-10T09:00:00-03:00",
         openedByUserId: userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-open-b",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-06",
@@ -851,9 +786,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2026-06-11T09:00:00-03:00",
         openedByUserId: userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-res-a",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-05-05",
@@ -868,9 +803,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
           resolvedByUserId: userId,
         },
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-can-a",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "canceled",
         rentDueDate: "2026-04-05",
@@ -889,7 +824,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const openRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId).eq("status", "open"))
         .collect(),
     );
@@ -900,12 +835,12 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
   test("by_agency_status with status='canceled' returns only canceled notices for the agency", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-can-list-a",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "canceled",
         rentDueDate: "2026-04-05",
@@ -920,9 +855,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
           canceledByUserId: userId,
         },
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-can-list-b",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "canceled",
         rentDueDate: "2026-05-05",
@@ -938,9 +873,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         },
       });
       // Non-canceled negative control.
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-can-list-open",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -954,7 +889,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const canceledRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId).eq("status", "canceled"))
         .collect(),
     );
@@ -963,19 +898,19 @@ describe("index coverage — each of the four indexes returns the rows a realist
     expect(canceledRows.map((r) => r.publicId).sort()).toEqual(["DN-can-list-a", "DN-can-list-b"]);
   });
 
-  test("by_contract_dueDate returns a single contract's notices ordered by rentDueDate AND excludes notices on a second contract in the same agency", async () => {
+  test("by_guarantee_dueDate returns a single guarantee's notices ordered by rentDueDate AND excludes notices on a second guarantee in the same agency", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
-    const contractBId = await insertSecondContract(t, agencyId, "1");
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
+    const guaranteeBId = await insertSecondGuarantee(t, agencyId, "1");
 
     await t.run(async (ctx) => {
-      // Contract A — dates deliberately out of chronological order.
+      // Guarantee A — dates deliberately out of chronological order.
       const aDueDates = ["2026-05-05", "2026-03-05", "2026-06-05", "2026-04-05"];
       let i = 0;
       for (const rentDueDate of aDueDates) {
-        await ctx.db.insert("contractDelinquencyNotices", {
+        await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-orderA-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "open",
           rentDueDate,
@@ -987,13 +922,13 @@ describe("index coverage — each of the four indexes returns the rows a realist
         });
         i += 1;
       }
-      // Contract B — dates that would interleave with A if scoping breaks.
+      // Guarantee B — dates that would interleave with A if scoping breaks.
       const bDueDates = ["2026-02-05", "2026-05-15", "2026-07-05"];
       let j = 0;
       for (const rentDueDate of bDueDates) {
-        await ctx.db.insert("contractDelinquencyNotices", {
+        await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-orderB-${j}`,
-          contractId: contractBId,
+          guaranteeId: guaranteeBId,
           agencyId,
           status: "open",
           rentDueDate,
@@ -1009,8 +944,8 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const aRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
         .collect(),
     );
     expect(aRows.map((r) => r.rentDueDate)).toEqual([
@@ -1019,27 +954,27 @@ describe("index coverage — each of the four indexes returns the rows a realist
       "2026-05-05",
       "2026-06-05",
     ]);
-    expect(aRows.every((r) => r.contractId === contractId)).toBe(true);
+    expect(aRows.every((r) => r.guaranteeId === guaranteeId)).toBe(true);
 
     const bRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractBId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeBId))
         .collect(),
     );
     expect(bRows.map((r) => r.rentDueDate)).toEqual(["2026-02-05", "2026-05-15", "2026-07-05"]);
-    expect(bRows.every((r) => r.contractId === contractBId)).toBe(true);
+    expect(bRows.every((r) => r.guaranteeId === guaranteeBId)).toBe(true);
   });
 
-  test("by_contract_dueDate scoped to contract A excludes notices on contract B for the same agency (dedicated isolation control)", async () => {
+  test("by_guarantee_dueDate scoped to guarantee A excludes notices on guarantee B for the same agency (dedicated isolation control)", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
-    const contractBId = await insertSecondContract(t, agencyId, "iso");
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
+    const guaranteeBId = await insertSecondGuarantee(t, agencyId, "iso");
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-isoAB-A",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1049,9 +984,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2026-06-10T09:00:00-03:00",
         openedByUserId: userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-isoAB-B",
-        contractId: contractBId,
+        guaranteeId: guaranteeBId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1065,17 +1000,17 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const aRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
         .collect(),
     );
     expect(aRows.length).toBe(1);
     expect(aRows[0].publicId).toBe("DN-isoAB-A");
   });
 
-  test("by_contract_dueDate answers a rentDueDate range query (gte/lte) returning the in-range subset in order", async () => {
+  test("by_guarantee_dueDate answers a rentDueDate range query (gte/lte) returning the in-range subset in order", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     await t.run(async (ctx) => {
       const dueDates = [
@@ -1088,9 +1023,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
       ];
       let i = 0;
       for (const rentDueDate of dueDates) {
-        await ctx.db.insert("contractDelinquencyNotices", {
+        await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-range-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "open",
           rentDueDate,
@@ -1104,13 +1039,13 @@ describe("index coverage — each of the four indexes returns the rows a realist
       }
     });
 
-    // "Q2 notices for this contract" — 2026-03 through 2026-05.
+    // "Q2 notices for this guarantee" — 2026-03 through 2026-05.
     const q2Rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) =>
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) =>
           q
-            .eq("contractId", contractId)
+            .eq("guaranteeId", guaranteeId)
             .gte("rentDueDate", "2026-03-01")
             .lte("rentDueDate", "2026-05-31"),
         )
@@ -1131,9 +1066,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
     // - DN-triage-b  latest    (2026-08-15)
     // If the index returned publicId sort order, the sequence would be a,b,c,z.
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-triage-b",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "open",
         rentDueDate: "2026-08-05",
@@ -1143,9 +1078,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2026-08-15T09:00:00-03:00",
         openedByUserId: a.userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-triage-a",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1155,9 +1090,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2026-06-10T09:00:00-03:00",
         openedByUserId: a.userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-triage-z",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "open",
         rentDueDate: "2025-11-05",
@@ -1167,9 +1102,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2025-11-10T09:00:00-03:00",
         openedByUserId: b.userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-triage-c",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "open",
         rentDueDate: "2026-06-06",
@@ -1180,9 +1115,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedByUserId: b.userId,
       });
       // Negative control: resolved notice must be excluded from status='open'.
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-triage-resolved",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "resolved",
         rentDueDate: "2026-05-05",
@@ -1201,7 +1136,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const openRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_status_openedAt", (q) => q.eq("status", "open"))
         .collect(),
     );
@@ -1223,9 +1158,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
     const b = await makeFixture(t, "2");
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-inc-a",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1235,9 +1170,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2026-06-10T09:00:00-03:00",
         openedByUserId: a.userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-inc-b",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1251,7 +1186,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const openRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_status_openedAt", (q) => q.eq("status", "open"))
         .collect(),
     );
@@ -1267,9 +1202,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     await t.run(async (ctx) => {
       // Two resolved rows, misaligned publicId order.
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-res-y",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "resolved",
         rentDueDate: "2026-05-05",
@@ -1284,9 +1219,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
           resolvedByUserId: a.userId,
         },
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-res-a",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "resolved",
         rentDueDate: "2026-03-05",
@@ -1303,9 +1238,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         },
       });
       // Open and canceled negative controls — must be excluded.
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-neg-open",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1315,9 +1250,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         openedAt: "2026-06-10T09:00:00-03:00",
         openedByUserId: a.userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-neg-can",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "canceled",
         rentDueDate: "2026-04-05",
@@ -1336,7 +1271,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const resolvedRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_status_openedAt", (q) => q.eq("status", "resolved"))
         .collect(),
     );
@@ -1350,9 +1285,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
     const b = await makeFixture(t, "2");
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-can-y",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "canceled",
         rentDueDate: "2026-05-05",
@@ -1367,9 +1302,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
           canceledByUserId: a.userId,
         },
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-can-a",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "canceled",
         rentDueDate: "2026-03-05",
@@ -1385,9 +1320,9 @@ describe("index coverage — each of the four indexes returns the rows a realist
         },
       });
       // Open negative control.
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-can-neg-open",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1401,7 +1336,7 @@ describe("index coverage — each of the four indexes returns the rows a realist
 
     const canceledRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_status_openedAt", (q) => q.eq("status", "canceled"))
         .collect(),
     );
@@ -1421,9 +1356,9 @@ describe("cross-agency isolation — the by_agency_status index cannot leak acro
     const b = await makeFixture(t, "2");
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-iso-a",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1433,9 +1368,9 @@ describe("cross-agency isolation — the by_agency_status index cannot leak acro
         openedAt: "2026-06-10T09:00:00-03:00",
         openedByUserId: a.userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-iso-b",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1449,7 +1384,7 @@ describe("cross-agency isolation — the by_agency_status index cannot leak acro
 
     const rowsForA = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", a.agencyId).eq("status", "open"))
         .collect(),
     );
@@ -1459,20 +1394,20 @@ describe("cross-agency isolation — the by_agency_status index cannot leak acro
     expect(rowsForA[0].agencyId).toBe(a.agencyId);
   });
 
-  // by_contract_dueDate is keyed on contractId only. If the caller passes
-  // agency B's contractId to a handler acting as agency A, the index will
+  // by_guarantee_dueDate is keyed on guaranteeId only. If the caller passes
+  // agency B's guaranteeId to a handler acting as agency A, the index will
   // happily return B's rows. This test documents that the caller must gate
-  // the query on contract ownership (assertAgencyAccess on the contract row)
+  // the query on guarantee ownership (assertAgencyAccess on the guarantee row)
   // before ever hitting this index.
-  test("by_contract_dueDate lookup with agency B's contractId returns B's notices — callers must first verify the contract belongs to the acting agency", async () => {
+  test("by_guarantee_dueDate lookup with agency B's guaranteeId returns B's notices — callers must first verify the guarantee belongs to the acting agency", async () => {
     const t = setup();
     const a = await makeFixture(t, "1");
     const b = await makeFixture(t, "2");
 
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-xiso-a",
-        contractId: a.contractId,
+        guaranteeId: a.guaranteeId,
         agencyId: a.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1482,9 +1417,9 @@ describe("cross-agency isolation — the by_agency_status index cannot leak acro
         openedAt: "2026-06-10T09:00:00-03:00",
         openedByUserId: a.userId,
       });
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-xiso-b",
-        contractId: b.contractId,
+        guaranteeId: b.guaranteeId,
         agencyId: b.agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1496,17 +1431,17 @@ describe("cross-agency isolation — the by_agency_status index cannot leak acro
       });
     });
 
-    // Query targeting agency B's contract returns agency B's rows regardless
+    // Query targeting agency B's guarantee returns agency B's rows regardless
     // of who's asking — the index has no notion of an "acting agency".
-    const rowsForBContract = await t.run((ctx) =>
+    const rowsForBGuarantee = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", b.contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", b.guaranteeId))
         .collect(),
     );
-    expect(rowsForBContract.length).toBe(1);
-    expect(rowsForBContract[0].agencyId).toBe(b.agencyId);
-    expect(rowsForBContract[0].agencyId).not.toBe(a.agencyId);
+    expect(rowsForBGuarantee.length).toBe(1);
+    expect(rowsForBGuarantee[0].agencyId).toBe(b.agencyId);
+    expect(rowsForBGuarantee[0].agencyId).not.toBe(a.agencyId);
   });
 });
 
@@ -1517,12 +1452,12 @@ describe("cross-agency isolation — the by_agency_status index cannot leak acro
 describe("update-in-place — patching updatedAmountCents must not drift identity or audit fields", () => {
   test("updatedAmountCents patch preserves openedAt, openedByUserId, and originalAmountCents", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-audit",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1557,15 +1492,15 @@ describe("update-in-place — patching updatedAmountCents must not drift identit
 // multi-notice lifecycle (scenario matrix rows)
 // ---------------------------------------------------------------------------
 
-describe("multi-notice lifecycle — one contract accumulating notices across cycles (scenario matrix)", () => {
+describe("multi-notice lifecycle — one guarantee accumulating notices across cycles (scenario matrix)", () => {
   test("row 1 cure with bank evidence — an open notice resolves tenant_cured while carrying evidenceSource='bank_attested'", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row1-bank",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1596,12 +1531,12 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
   test("row 2 partial cure — updatedAmountCents can grow on an open notice via db.patch", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-partial",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1626,9 +1561,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     expect(afterSecond?.status).toBe("open");
   });
 
-  test("row 3 chronic late payment — one contract accumulates multiple tenant_cured notices over successive cycles", async () => {
+  test("row 3 chronic late payment — one guarantee accumulates multiple tenant_cured notices over successive cycles", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     // Three separate cycles: report → cure → next month → report → cure → …
     const cycles = [
@@ -1652,9 +1587,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     let i = 0;
     for (const c of cycles) {
       const id = await t.run((ctx) =>
-        ctx.db.insert("contractDelinquencyNotices", {
+        ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-row3-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "open",
           rentDueDate: c.due,
@@ -1679,8 +1614,8 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
     const rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
         .collect(),
     );
     expect(rows.length).toBe(3);
@@ -1693,12 +1628,12 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
   test("cover resolution — an open notice moves to resolved(cover_committed) carrying the cover op ref; the notice-layer cycle is then closed", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-cover-close",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1725,24 +1660,24 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     expect(row?.status).toBe("resolved");
     expect(row?.resolution?.coverOperationPublicId).toBe("CO-2026-06-0001");
 
-    // Cycle closed at the notice layer: no open notices remain on this contract.
+    // Cycle closed at the notice layer: no open notices remain on this guarantee.
     const stillOpen = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId).eq("status", "open"))
         .collect(),
     );
-    expect(stillOpen.filter((r) => r.contractId === contractId).length).toBe(0);
+    expect(stillOpen.filter((r) => r.guaranteeId === guaranteeId).length).toBe(0);
   });
 
-  test("row 6 re-default after cover — a new open notice can be added to the same contract after prior notice is resolved", async () => {
+  test("row 6 re-default after cover — a new open notice can be added to the same guarantee after prior notice is resolved", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeAId = await t.run(async (ctx) => {
-      const id = await ctx.db.insert("contractDelinquencyNotices", {
+      const id = await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row6-A",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-05-05",
@@ -1765,9 +1700,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     });
 
     const noticeBId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row6-B",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1781,8 +1716,8 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
     const rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
         .collect(),
     );
 
@@ -1795,16 +1730,16 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
   test("row 7 batched cover — multiple open notices resolve to the same coverOperationPublicId", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeIds = await t.run(async (ctx) => {
       const dueDates = ["2026-04-05", "2026-05-05", "2026-06-05"];
       const inserted: DelinquencyNoticeId[] = [];
       let i = 0;
       for (const rentDueDate of dueDates) {
-        const id = await ctx.db.insert("contractDelinquencyNotices", {
+        const id = await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-row7-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "open",
           rentDueDate,
@@ -1837,8 +1772,8 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
     const rows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
         .collect(),
     );
 
@@ -1853,7 +1788,7 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
   test("row 7 batched cover idempotency — the guard blocks a second patch on an already-resolved notice, so the audit trail (resolvedAt/resolvedByUserId) survives an operator retry", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
     const retryUserId = await t.run((ctx) =>
       ctx.db.insert("users", {
         publicId: "user-retry",
@@ -1864,9 +1799,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     );
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row7-idem",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -1918,7 +1853,7 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
   test("row 7 batched cover with mixed resolutions — two notices share a coverOperationPublicId, one resolves separately via tenant_cured", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     // Three open notices, then split resolutions.
     const [n1Id, n2Id, n3Id] = await t.run(async (ctx) => {
@@ -1926,9 +1861,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
       const inserted: DelinquencyNoticeId[] = [];
       let i = 0;
       for (const rentDueDate of dueDates) {
-        const id = await ctx.db.insert("contractDelinquencyNotices", {
+        const id = await ctx.db.insert("guaranteeDelinquencyNotices", {
           publicId: `DN-row7-mixed-${i}`,
-          contractId,
+          guaranteeId,
           agencyId,
           status: "open",
           rentDueDate,
@@ -1974,8 +1909,8 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     // dedicated index for the cover op, which is intentional).
     const all = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
         .collect(),
     );
     const batched = all.filter((r) => r.resolution?.coverOperationPublicId === batchOp);
@@ -1988,15 +1923,15 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     expect(cured[0].resolution?.coverOperationPublicId).toBeUndefined();
   });
 
-  test("row 8 multiple cover cycles — same contract carries alternating resolved and open notices over time", async () => {
+  test("row 8 multiple cover cycles — same guarantee carries alternating resolved and open notices over time", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     await t.run(async (ctx) => {
       // N1 — resolved(cover_committed, CO-1)
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row8-N1",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-03-05",
@@ -2013,9 +1948,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
         },
       });
       // N2 — resolved(tenant_cured)
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row8-N2",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-04-05",
@@ -2031,9 +1966,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
         },
       });
       // N3 — resolved(cover_committed, CO-2)
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row8-N3",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-05-05",
@@ -2050,9 +1985,9 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
         },
       });
       // N4 — open
-      await ctx.db.insert("contractDelinquencyNotices", {
+      await ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row8-N4",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2066,8 +2001,8 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
     const chronology = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) => q.eq("contractId", contractId))
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
         .collect(),
     );
     expect(chronology.map((r) => r.publicId)).toEqual([
@@ -2085,7 +2020,7 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 
     const openOnly = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId).eq("status", "open"))
         .collect(),
     );
@@ -2093,14 +2028,14 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
     expect(openOnly[0].publicId).toBe("DN-row8-N4");
   });
 
-  test("row 12 tenant abandonment — an open notice persists after we simulate the contract closing", async () => {
+  test("row 12 tenant abandonment — an open notice persists after we simulate the guarantee closing", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-row12",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2112,22 +2047,26 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
       }),
     );
 
-    // Close the contract. `encerrado` is the terminal status per contractStatus.
+    // Close the guarantee. `closed` is its terminal state; the notice is a
+    // separate record and stays open regardless.
     await t.run((ctx) =>
-      ctx.db.patch(contractId, { status: "encerrado", deactivatedAt: "2026-06-15" }),
+      ctx.db.patch(guaranteeId, {
+        status: "closed",
+        closure: { reason: "abandonment", closedAt: "2026-06-15T00:00:00.000Z" },
+      }),
     );
 
     const stillOpen = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId).eq("status", "open"))
         .collect(),
     );
     expect(stillOpen.length).toBe(1);
     expect(stillOpen[0]._id).toBe(noticeId);
 
-    const contract = await t.run((ctx) => ctx.db.get(contractId));
-    expect(contract?.status).toBe("encerrado");
+    const guarantee = await t.run((ctx) => ctx.db.get(guaranteeId));
+    expect(guarantee?.status).toBe("closed");
   });
 });
 
@@ -2138,7 +2077,7 @@ describe("multi-notice lifecycle — one contract accumulating notices across cy
 describe("resolution cause coverage — each NOTICE_RESOLUTION_KIND has a documented end-to-end flow", () => {
   test("staff_dispute — an open notice resolves via staff_dispute with a staff user as resolvedByUserId", async () => {
     const t = setup();
-    const { userId: agencyOwnerId, agencyId, contractId } = await makeFixture(t);
+    const { userId: agencyOwnerId, agencyId, guaranteeId } = await makeFixture(t);
     const staffUserId = await t.run((ctx) =>
       ctx.db.insert("users", {
         publicId: "user-staff-dispute",
@@ -2149,9 +2088,9 @@ describe("resolution cause coverage — each NOTICE_RESOLUTION_KIND has a docume
     );
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-staffdispute",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2184,12 +2123,12 @@ describe("resolution cause coverage — each NOTICE_RESOLUTION_KIND has a docume
 
   test("stale resolution — an aged open notice resolves via stale with no coverOperationPublicId", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-stale",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2024-01-05",
@@ -2207,7 +2146,7 @@ describe("resolution cause coverage — each NOTICE_RESOLUTION_KIND has a docume
         kind: "stale",
         resolvedAt: "2026-06-01T09:00:00-03:00",
         resolvedByUserId: userId,
-        note: "Contract closed 18 months ago; no follow-up possible.",
+        note: "Guarantee closed 18 months ago; no follow-up possible.",
       },
     });
     expect(guard.success).toBe(true);
@@ -2226,12 +2165,12 @@ describe("resolution cause coverage — each NOTICE_RESOLUTION_KIND has a docume
 describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a real end-to-end flow", () => {
   test("agency_withdrew — open notice cancels with agency_withdrew and preserves the withdrawer identity", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-cancel-aw",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2263,7 +2202,7 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
 
   test("staff_dismissed — a distinct canceledByUserId can be recorded, encoding the staff-vs-agency distinction", async () => {
     const t = setup();
-    const { userId: agencyOwnerId, agencyId, contractId } = await makeFixture(t);
+    const { userId: agencyOwnerId, agencyId, guaranteeId } = await makeFixture(t);
     const staffUserId = await t.run((ctx) =>
       ctx.db.insert("users", {
         publicId: "user-staff-1",
@@ -2274,9 +2213,9 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
     );
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-cancel-sd",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2309,13 +2248,13 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
 
   test("duplicate — a second notice for the same rentDueDate cancels with reason='duplicate' while the original stays open", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     // Original — filed first, stays open.
     const originalId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-dup-original",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2327,11 +2266,11 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
       }),
     );
 
-    // Duplicate — same contract, same rentDueDate, filed shortly after.
+    // Duplicate — same guarantee, same rentDueDate, filed shortly after.
     const duplicateId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-dup-second",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2349,7 +2288,7 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
         reason: "duplicate",
         canceledAt: "2026-06-10T12:00:00-03:00",
         canceledByUserId: userId,
-        note: "Duplicate of DN-dup-original — same contract, same rentDueDate.",
+        note: "Duplicate of DN-dup-original — same guarantee, same rentDueDate.",
       },
     });
     expect(guard.success).toBe(true);
@@ -2363,24 +2302,24 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
     // Both rows are queryable by the same rentDueDate on the composite index.
     const forDueDate = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) =>
-          q.eq("contractId", contractId).eq("rentDueDate", "2026-06-05"),
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) =>
+          q.eq("guaranteeId", guaranteeId).eq("rentDueDate", "2026-06-05"),
         )
         .collect(),
     );
     expect(forDueDate.length).toBe(2);
   });
 
-  test("data_error — a notice cancels with reason='data_error' and a replacement notice opens on the same contract", async () => {
+  test("data_error — a notice cancels with reason='data_error' and a replacement notice opens on the same guarantee", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     // Wrong-data notice: originalAmountCents was mis-entered (e.g. missing a zero).
     const badNoticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-de-bad",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2405,9 +2344,9 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
 
     // Replacement notice, correct amount, same rentDueDate.
     const goodNoticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-de-good",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2429,9 +2368,9 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
     // Audit trail: both rows survive so the correction is traceable.
     const trail = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
-        .withIndex("by_contract_dueDate", (q) =>
-          q.eq("contractId", contractId).eq("rentDueDate", "2026-06-05"),
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_guarantee_dueDate", (q) =>
+          q.eq("guaranteeId", guaranteeId).eq("rentDueDate", "2026-06-05"),
         )
         .collect(),
     );
@@ -2446,12 +2385,12 @@ describe("cancellation cause coverage — each NOTICE_CANCELLATION_REASON is a r
 describe("composition — assertTransition gates the write, so terminal / self-transition attempts do not touch the row", () => {
   test("an already-resolved notice cannot be transitioned again — guardedPatch skips the write and the row is preserved", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-terminal-res",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "resolved",
         rentDueDate: "2026-06-05",
@@ -2491,12 +2430,12 @@ describe("composition — assertTransition gates the write, so terminal / self-t
 
   test("an already-canceled notice cannot be transitioned again — TERMINAL_STATE protects the other terminal too", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-terminal-can",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "canceled",
         rentDueDate: "2026-06-05",
@@ -2535,12 +2474,12 @@ describe("composition — assertTransition gates the write, so terminal / self-t
 
   test("self-transition guard — assertTransition(open, open) rejects with SELF_TRANSITION and the row is not touched", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-self-open",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2570,12 +2509,12 @@ describe("composition — assertTransition gates the write, so terminal / self-t
 
   test("an open notice is patched WHEN AND ONLY WHEN assertTransition returns success — happy path via the same conditional", async () => {
     const t = setup();
-    const { userId, agencyId, contractId } = await makeFixture(t);
+    const { userId, agencyId, guaranteeId } = await makeFixture(t);
 
     const noticeId = await t.run((ctx) =>
-      ctx.db.insert("contractDelinquencyNotices", {
+      ctx.db.insert("guaranteeDelinquencyNotices", {
         publicId: "DN-happy",
-        contractId,
+        guaranteeId,
         agencyId,
         status: "open",
         rentDueDate: "2026-06-05",
@@ -2624,13 +2563,13 @@ describe("seed integration — the seeded delinquency book matches the scenario 
 
     const openRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovada._id).eq("status", "open"))
         .collect(),
     );
     const resolvedRows = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", aprovada._id).eq("status", "resolved"),
         )
