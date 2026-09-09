@@ -5,7 +5,6 @@ import { internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
 import { priceGuarantee, splitCommission } from "./pricing";
 import type {
-  ActivityBucket,
   ContractApplication,
   ContractApplicationId,
   Guarantee,
@@ -462,95 +461,12 @@ function buildWeekBoundaries(now: Date, count: number): PeriodBoundary[] {
   return boundaries;
 }
 
-type GuaranteeTimePoint = Pick<Guarantee, "activatedAt" | "closure">;
-
-/**
- * A guarantee leaves the in-force book at `closure.closedAt`. A draft
- * canceled before activation counts as `cancelled`; every other close
- * reason (end of lease, rescission, eviction, …) counts as `expired`.
- */
-function bucketsForGuarantees(
-  guarantees: readonly GuaranteeTimePoint[],
-  boundaries: readonly PeriodBoundary[],
-): ActivityBucket[] {
-  return boundaries.map(({ startISO, endISO, key }) => {
-    let activated = 0;
-    let cancelled = 0;
-    let expired = 0;
-    let netActive = 0;
-
-    for (const g of guarantees) {
-      const activatedAt = g.activatedAt;
-      const closedAt = g.closure?.closedAt ?? null;
-
-      if (activatedAt && activatedAt >= startISO && activatedAt < endISO) {
-        activated++;
-      }
-      if (closedAt && closedAt >= startISO && closedAt < endISO) {
-        if (g.closure?.reason === CLOSE_REASON.CANCELED_PRE_ACTIVATION) cancelled++;
-        else expired++;
-      }
-
-      if (!activatedAt) continue;
-      if (activatedAt >= endISO) continue;
-      if (closedAt && closedAt < endISO) continue;
-      netActive++;
-    }
-
-    return { period: key, activated, cancelled, expired, netActive };
-  });
-}
-
 const activityScopeValidator = v.union(
   v.object({ kind: v.literal("agency"), agencyId: v.id("agencies") }),
   v.object({ kind: v.literal("platform") }),
 );
 
 const activityGranularityValidator = v.union(v.literal("month"), v.literal("week"));
-
-/**
- * Guarantee-activity time series, scoped to either one agency or the platform.
- *
- * Auth: `queryWithAuth` + inline `assertAgencyAccess` for the agency arm —
- * since wrapper choice is static per handler, the scope discriminator is the
- * only way to serve both consumers from a single public function.
- *
- * Per-agency scope uses the `by_agency_status` index to bound the scan;
- * platform scope does a full `.collect()` by design. Time-series aggregates
- * are deliberately deferred until the guarantees table crosses ~5–10k rows.
- *
- * NO CLIENT. `getStateTimelineByPeriod` replaced it in both cards (the
- * dashboard and `/transparency`), and the event-bar panel beneath the
- * composition reads that query's `eventCount` rather than these coarser
- * series — one replay, one round trip. Delete this with its tests in the
- * cleanup PR.
- */
-export const getActivityByPeriod = queryWithAuth({
-  args: {
-    scope: activityScopeValidator,
-    granularity: activityGranularityValidator,
-  },
-  handler: async (ctx, { scope, granularity }): Promise<ActivityBucket[]> => {
-    let guarantees: readonly GuaranteeTimePoint[];
-    if (scope.kind === "agency") {
-      await assertAgencyAccess(ctx, scope.agencyId);
-      guarantees = await ctx.db
-        .query("guarantees")
-        .withIndex("by_agency_status", (q) => q.eq("agencyId", scope.agencyId))
-        .collect();
-    } else {
-      guarantees = await ctx.db.query("guarantees").collect();
-    }
-
-    const now = new Date();
-    const boundaries =
-      granularity === "month"
-        ? buildMonthBoundaries(now, ACTIVITY_MONTH_PERIODS)
-        : buildWeekBoundaries(now, ACTIVITY_WEEK_PERIODS);
-
-    return bucketsForGuarantees(guarantees, boundaries);
-  },
-});
 
 /**
  * A guarantee's position on the machine, replayed from its history rows.
@@ -705,24 +621,27 @@ function replayStateTimeline(
 
 /**
  * Guarantee **state timeline** — one count per lifecycle state per period,
- * for the same scopes, granularities and auth shape as `getActivityByPeriod`.
+ * scoped to either one agency or the platform.
  *
- * `getActivityByPeriod` derives its four coarse series from `activatedAt` and
- * `closure.closedAt`, the only two timestamps the guarantee row carries, so it
- * can never show `in_arrears`, `default_verified`, `cover_committed` or
- * `in_eviction`. This one replays `guaranteeHistory.transition` instead and
- * therefore sees every state the machine can reach.
+ * Auth: `queryWithAuth` + inline `assertAgencyAccess` for the agency arm —
+ * wrapper choice is static per handler, so the scope discriminator is the only
+ * way to serve both consumers from one public function.
+ *
+ * `activatedAt` and `closure.closedAt` are the only timestamps the guarantee
+ * row carries, so a series derived from them can never show `in_arrears`,
+ * `default_verified`, `cover_committed` or `in_eviction`. This one replays
+ * `guaranteeHistory.transition` instead and therefore sees every state the
+ * machine can reach.
  *
  * Per-agency scope bounds both scans on an index (`by_agency_status`,
- * `by_agency_guarantee`); platform scope collects both tables by design, the
- * same trade `getActivityByPeriod` already makes.
+ * `by_agency_guarantee`); platform scope collects both tables by design.
  *
  * The binding table here is `guaranteeHistory`, not `guarantees`: it takes a
  * row per creation, per guarded transition and per reprice, is never pruned,
  * and is read in full even though only the last 12 months matter. So the
  * platform arm reaches Convex's per-query document-read ceiling at roughly
  * `guarantees × average path length`, well before the ~5–10k guarantee rows
- * the activity series is deferred against. The fix when it binds is a
+ * a count-only series would be deferred against. The fix when it binds is a
  * `by_at` / `by_agency_at` index ranged from the window's first boundary, with
  * the opening state replayed backwards from `guarantees.status`.
  */

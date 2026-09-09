@@ -30,7 +30,7 @@ export function AgencyStateChart() {
         { value: "12m", periods: 12, labelKey: "last12Months" },
       ]}
       defaultRange="12m"
-      showEventPanel
+      showEvents
     />
   );
 }

@@ -1,67 +1,65 @@
 import type { GuaranteeEvent, GuaranteeState } from "@convex/guarantees/domain";
+import { GUARANTEE_STATE_TONE } from "@/components/guarantees/state-tag";
+
+type Tone = (typeof GUARANTEE_STATE_TONE)[GuaranteeState];
 
 /**
- * The composition stack is an ORDINAL ramp, not a set of categorical hues:
- * swapping two states would change the meaning, so the reader has to see the
- * order in the colour. One hue, lightness stepping monotonically with
- * severity, defined once in `globals.css` as `--chart-severity-1..5`.
+ * The swatch colour a tone gets, matched to the dot `@mutav/ui`'s status tag
+ * paints for the same tone. The count row under the chart and the status tags
+ * in the table further down the page therefore show one state in one colour —
+ * a state that changed colour between two places on the same screen would
+ * read as two different things.
  *
- * Deliberately NOT the tag tones. `--warning` and `--warning-strong` are tuned
- * for a labelled tag, where text carries the meaning; along the severity order
- * their lightness zigzags (0.569 → 0.473 → 0.705 → 0.523), which a stacked
- * area would read backwards.
+ * Two tones collapse here exactly as they do on the tags: `default_verified`
+ * and `cover_committed` share `warning-strong`, `drafted` and `closed` share
+ * the neutral. That is the shipped tag palette, and the label beside each
+ * swatch is what tells them apart.
  */
-export const GUARANTEE_SEVERITY_RAMP = [
-  "var(--color-chart-severity-1)",
-  "var(--color-chart-severity-2)",
-  "var(--color-chart-severity-3)",
-  "var(--color-chart-severity-4)",
-  "var(--color-chart-severity-5)",
-] as const;
+const TONE_SWATCH_COLOR: Record<Tone, string> = {
+  accent: "var(--color-text-3)",
+  success: "var(--color-success)",
+  error: "var(--color-error)",
+  neutral: "var(--color-text-3)",
+  muted: "var(--color-text-3)",
+  expiring: "var(--color-warning)",
+  caution: "var(--color-warning-strong)",
+};
 
-export const GUARANTEE_STATE_CHART_COLOR: Record<GuaranteeState, string> = {
-  drafted: "var(--color-text-3)",
-  active: GUARANTEE_SEVERITY_RAMP[0],
-  in_arrears: GUARANTEE_SEVERITY_RAMP[1],
-  default_verified: GUARANTEE_SEVERITY_RAMP[2],
-  cover_committed: GUARANTEE_SEVERITY_RAMP[3],
-  in_eviction: GUARANTEE_SEVERITY_RAMP[4],
-  closed: "var(--color-text-2)",
+export const GUARANTEE_STATE_SWATCH_COLOR: Record<GuaranteeState, string> = {
+  drafted: TONE_SWATCH_COLOR[GUARANTEE_STATE_TONE.drafted],
+  active: TONE_SWATCH_COLOR[GUARANTEE_STATE_TONE.active],
+  in_arrears: TONE_SWATCH_COLOR[GUARANTEE_STATE_TONE.in_arrears],
+  default_verified: TONE_SWATCH_COLOR[GUARANTEE_STATE_TONE.default_verified],
+  cover_committed: TONE_SWATCH_COLOR[GUARANTEE_STATE_TONE.cover_committed],
+  in_eviction: TONE_SWATCH_COLOR[GUARANTEE_STATE_TONE.in_eviction],
+  closed: TONE_SWATCH_COLOR[GUARANTEE_STATE_TONE.closed],
 };
 
 /**
- * An event bar wears the colour of the band it feeds, so the two panels read
- * as one picture: the bar is the inflow to the state above it. `created` and
- * `closed` move a guarantee into a state the stack does not draw, so they take
- * the neutral context tones — grey has no chroma, which is exactly why it
- * cannot impersonate a severity step.
+ * The book in force is one series in the brand accent — the total is the
+ * subject of the panel, and the brand colour is what says "this is the
+ * headline number", not a severity reading.
+ */
+export const IN_FORCE_AREA_COLOR = "var(--color-chart-1)";
+export const AREA_FILL_OPACITY = 0.15;
+export const AREA_STROKE_WIDTH = 2;
+
+/**
+ * Event colour is semantic, not ordinal: green means good, red means cost,
+ * grey means no valence. A guarantee opening is the business working; a cover
+ * payout is money leaving; a contract ending is neither.
+ *
+ * `created` and `closed` take the two neutral steps rather than a hue — a
+ * draft appearing and a lease ending are both events with no valence, and
+ * spending a hue on them would dilute the three that carry one.
  */
 export const GUARANTEE_EVENT_CHART_COLOR: Record<GuaranteeEvent, string> = {
   created: "var(--color-text-3)",
-  activated: GUARANTEE_STATE_CHART_COLOR.active,
-  default_verified: GUARANTEE_STATE_CHART_COLOR.default_verified,
-  cover_paid: GUARANTEE_STATE_CHART_COLOR.cover_committed,
+  activated: "var(--color-success)",
+  default_verified: "var(--color-warning)",
+  cover_paid: "var(--color-error)",
   closed: "var(--color-text-2)",
 };
 
-/**
- * Fill alpha for every plotted mark on this card.
- *
- * NOT shadcn's 0.4. On an ordinal ramp the gradient IS the encoding — the
- * reader is meant to see severity increase upward — and alpha compresses it:
- * composited over the card, 0.4 leaves adjacent bands ~0.032 L apart, half the
- * 0.06 floor, which is no perceptible ramp at all. shadcn's 0.4 is tuned for
- * two- and three-series demos, not a five-band single-hue stack.
- *
- * 0.85 is the lowest step where the COMPOSITED bands still pass the ordinal
- * checks in both modes: adjacent ΔL ≥ 0.067 light / 0.068 dark, and the palest
- * band still clears the surface at 2.03:1. Below it the ramp fails as drawn
- * even though the tokens pass on paper.
- *
- * The full-strength stroke on each band is what separates touching segments,
- * so there is no surface-coloured gap: a boundary drawn in the band's own
- * colour reads as the edge of that series, where a surface gap reads as empty
- * space between two things — and the white 2px stroke it replaced drew even
- * across zero-height bands, scratching a diagonal streak over the field.
- */
-export const CHART_FILL_OPACITY = 0.85;
+/** Rounded data-end, square at the baseline. */
+export const EVENT_BAR_RADIUS: [number, number, number, number] = [3, 3, 0, 0];

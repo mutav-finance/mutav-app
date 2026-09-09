@@ -3,35 +3,33 @@ import { describe, expect, it } from "vitest";
 import { GUARANTEE_EVENTS, GUARANTEE_STATES } from "@convex/guarantees/domain";
 import type { GuaranteeEvent, StateTimelineBucket } from "@convex/guarantees/domain";
 import {
-  CHART_FILL_OPACITY,
+  AREA_FILL_OPACITY,
   GUARANTEE_EVENT_CHART_COLOR,
-  GUARANTEE_SEVERITY_RAMP,
-  GUARANTEE_STATE_CHART_COLOR,
+  GUARANTEE_STATE_SWATCH_COLOR,
+  IN_FORCE_AREA_COLOR,
 } from "@/components/guarantees/state-chart-palette";
+import { GUARANTEE_STATE_TONE } from "@/components/guarantees/state-tag";
 import {
   GUARANTEE_CONTEXT_STATES,
-  GUARANTEE_STATE_STACK_ORDER,
+  GUARANTEE_IN_FORCE_STATES,
   SHARED_X_AXIS_SCALE,
   axisUpperBound,
   bandScalePositions,
   buildContextFigures,
   buildStateLegend,
-  hasAnyEvent,
-  maxEventCount,
-  maxStackedTotal,
+  maxInForce,
   pointScalePositions,
   sliceRecentPeriods,
-  toCompositionRows,
-  toEventRows,
+  toChartRows,
+  toInForceRows,
   type GuaranteeStateCounts,
 } from "./state-chart";
 
-// The card is two plots and a legend over the same buckets: a composition of
-// the in-force book on top, the lifecycle moves that produced it underneath.
-// Everything the card decides — which bands exist, in what order, which counts
-// are context rather than composition, how much of the series the range toggle
-// shows, which colour each series wears — lives in these pure modules so it
-// can be asserted without a renderer.
+// The card is one trend, one event panel and one count row over the same
+// buckets. Everything it decides — which states count as in force, which
+// counts are context, how much of the series the range toggle shows, which
+// colour each series wears, where a period lands on the shared x axis — lives
+// in these pure modules so it can be asserted without a renderer.
 
 function counts(overrides: Partial<GuaranteeStateCounts> = {}): GuaranteeStateCounts {
   return {
@@ -69,9 +67,9 @@ function bucket(
   };
 }
 
-describe("GUARANTEE_STATE_STACK_ORDER", () => {
-  it("stacks exactly the five in-force states, least severe at the base", () => {
-    expect(GUARANTEE_STATE_STACK_ORDER).toEqual([
+describe("GUARANTEE_IN_FORCE_STATES", () => {
+  it("is exactly the five states Mutav is on risk for, in severity order", () => {
+    expect(GUARANTEE_IN_FORCE_STATES).toEqual([
       "active",
       "in_arrears",
       "default_verified",
@@ -80,64 +78,67 @@ describe("GUARANTEE_STATE_STACK_ORDER", () => {
     ]);
   });
 
-  // `closed` only ever accumulates, so stacking it pins the total flat and the
+  // `closed` only ever accumulates, so counting it pins the total flat and the
   // card stops describing the book under management; a draft carries no
   // coverage and consumes no capacity, so it is not under management either.
-  it("keeps drafted and closed out of the stack and beside it as context", () => {
-    expect(GUARANTEE_STATE_STACK_ORDER).not.toContain("drafted");
-    expect(GUARANTEE_STATE_STACK_ORDER).not.toContain("closed");
+  it("keeps drafted and closed out of the book and beside it as context", () => {
+    expect(GUARANTEE_IN_FORCE_STATES).not.toContain("drafted");
+    expect(GUARANTEE_IN_FORCE_STATES).not.toContain("closed");
     expect(GUARANTEE_CONTEXT_STATES).toEqual(["drafted", "closed"]);
   });
 
-  it("accounts for every state exactly once across the stack and the context", () => {
-    expect([...GUARANTEE_STATE_STACK_ORDER, ...GUARANTEE_CONTEXT_STATES].sort()).toEqual(
+  it("accounts for every state exactly once across the book and the context", () => {
+    expect([...GUARANTEE_IN_FORCE_STATES, ...GUARANTEE_CONTEXT_STATES].sort()).toEqual(
       [...GUARANTEE_STATES].sort(),
     );
   });
 });
 
 describe("state chart palette", () => {
-  it("paints the stack with the ordered severity ramp, in ramp order", () => {
-    expect(GUARANTEE_STATE_STACK_ORDER.map((state) => GUARANTEE_STATE_CHART_COLOR[state])).toEqual([
-      ...GUARANTEE_SEVERITY_RAMP,
-    ]);
-  });
+  const TONE_DOT_COLOR: Record<string, string> = {
+    accent: "var(--color-text-3)",
+    success: "var(--color-success)",
+    error: "var(--color-error)",
+    neutral: "var(--color-text-3)",
+    muted: "var(--color-text-3)",
+    expiring: "var(--color-warning)",
+    caution: "var(--color-warning-strong)",
+  };
 
-  // A repeated step would put two bands at the same lightness, which is what
-  // made `drafted` and `closed` indistinguishable in the seven-band draft.
-  it("gives every band its own ramp step", () => {
-    const bandColors = GUARANTEE_STATE_STACK_ORDER.map(
-      (state) => GUARANTEE_STATE_CHART_COLOR[state],
-    );
-    expect(new Set(bandColors).size).toBe(bandColors.length);
-  });
-
-  it("keeps the context states off the ramp entirely", () => {
-    for (const state of GUARANTEE_CONTEXT_STATES) {
-      expect(GUARANTEE_SEVERITY_RAMP).not.toContain(GUARANTEE_STATE_CHART_COLOR[state]);
+  // One state, one colour, everywhere on the page: the count row under the
+  // chart and the status tags in the table below it read from the same tone
+  // map, so a state cannot look like two different things on one screen.
+  it("takes every state swatch from the status tag's tone", () => {
+    for (const state of GUARANTEE_STATES) {
+      expect(GUARANTEE_STATE_SWATCH_COLOR[state]).toBe(TONE_DOT_COLOR[GUARANTEE_STATE_TONE[state]]);
     }
   });
 
-  it("gives every event a colour and matches each one to the band it feeds", () => {
+  // The trend is the headline number, not a severity reading, so it wears the
+  // brand accent rather than anything from the status palette.
+  it("plots the book in force in the brand accent, as a wash under a full stroke", () => {
+    expect(IN_FORCE_AREA_COLOR).toBe("var(--color-chart-1)");
+    expect(AREA_FILL_OPACITY).toBeGreaterThan(0);
+    expect(AREA_FILL_OPACITY).toBeLessThanOrEqual(0.2);
+  });
+
+  // Green means the business worked, red means money left, grey means neither.
+  it("colours events by valence, not by lifecycle position", () => {
+    expect(GUARANTEE_EVENT_CHART_COLOR.activated).toBe("var(--color-success)");
+    expect(GUARANTEE_EVENT_CHART_COLOR.default_verified).toBe("var(--color-warning)");
+    expect(GUARANTEE_EVENT_CHART_COLOR.cover_paid).toBe("var(--color-error)");
+  });
+
+  it("gives the two valence-free events distinct neutrals", () => {
+    expect(GUARANTEE_EVENT_CHART_COLOR.created).toBe("var(--color-text-3)");
+    expect(GUARANTEE_EVENT_CHART_COLOR.closed).toBe("var(--color-text-2)");
+    expect(GUARANTEE_EVENT_CHART_COLOR.created).not.toBe(GUARANTEE_EVENT_CHART_COLOR.closed);
+  });
+
+  it("gives every event a colour", () => {
     for (const event of GUARANTEE_EVENTS) {
       expect(GUARANTEE_EVENT_CHART_COLOR[event]).toMatch(/^var\(--color-[a-z0-9-]+\)$/);
     }
-    expect(GUARANTEE_EVENT_CHART_COLOR.activated).toBe(GUARANTEE_STATE_CHART_COLOR.active);
-    expect(GUARANTEE_EVENT_CHART_COLOR.default_verified).toBe(
-      GUARANTEE_STATE_CHART_COLOR.default_verified,
-    );
-    expect(GUARANTEE_EVENT_CHART_COLOR.cover_paid).toBe(
-      GUARANTEE_STATE_CHART_COLOR.cover_committed,
-    );
-  });
-
-  // Composited over the card, alpha compresses the ramp: at shadcn's 0.4 the
-  // adjacent bands land ~0.032 L apart, half the 0.06 ordinal floor, and the
-  // gradient that IS the encoding stops being visible. 0.85 is the lowest step
-  // that keeps the drawn bands passing.
-  it("keeps the fill alpha high enough for the ramp to survive compositing", () => {
-    expect(CHART_FILL_OPACITY).toBeGreaterThanOrEqual(0.85);
-    expect(CHART_FILL_OPACITY).toBeLessThanOrEqual(1);
   });
 });
 
@@ -147,7 +148,7 @@ describe("buildStateLegend", () => {
     expect(buildStateLegend(undefined)).toBeNull();
   });
 
-  it("lists the five bands in stack order", () => {
+  it("lists the five in-force states in severity order", () => {
     const legend = buildStateLegend(counts({ active: 4, closed: 2 }));
     expect(legend?.map((entry) => entry.state)).toEqual([
       "active",
@@ -158,7 +159,7 @@ describe("buildStateLegend", () => {
     ]);
   });
 
-  it("keeps a band at zero rather than dropping it", () => {
+  it("keeps a state at zero rather than dropping it", () => {
     const legend = buildStateLegend(counts({ active: 6 }));
     expect(legend?.find((entry) => entry.state === "in_eviction")).toEqual({
       state: "in_eviction",
@@ -166,7 +167,7 @@ describe("buildStateLegend", () => {
     });
   });
 
-  it("carries the count of each band", () => {
+  it("carries the count of each state", () => {
     const legend = buildStateLegend(counts({ active: 5, in_arrears: 2 }));
     expect(legend?.find((entry) => entry.state === "in_arrears")?.count).toBe(2);
     expect(legend?.find((entry) => entry.state === "active")?.count).toBe(5);
@@ -220,32 +221,26 @@ describe("sliceRecentPeriods", () => {
   });
 });
 
-describe("toCompositionRows", () => {
-  it("writes every stacked band as a top-level key, zeros included", () => {
-    const [row] = toCompositionRows([bucket("2026-04", { active: 3, in_arrears: 1 })]);
-    for (const state of GUARANTEE_STATE_STACK_ORDER) {
-      expect(row?.[state]).toBeTypeOf("number");
-    }
-    expect(row?.active).toBe(3);
-    expect(row?.in_arrears).toBe(1);
-    expect(row?.in_eviction).toBe(0);
-    expect(row?.period).toBe("2026-04");
+describe("toInForceRows", () => {
+  it("sums the five in-force states into one series per period", () => {
+    const [row] = toInForceRows([
+      bucket("2026-04", { active: 3, in_arrears: 1, in_eviction: 1, drafted: 9, closed: 40 }),
+    ]);
+    expect(row).toEqual({ period: "2026-04", inForce: 5 });
   });
 
-  // The whole point of dropping `closed`: the silhouette has to be able to
-  // fall, which it cannot when a monotonically growing band is in the stack.
-  it("lets the stacked total fall when guarantees leave the book", () => {
-    const rows = toCompositionRows([
+  // The whole point of excluding `closed`: the line has to be able to fall,
+  // which it cannot while a monotonically growing state is in the total.
+  it("lets the total fall when guarantees leave the book", () => {
+    const rows = toInForceRows([
       bucket("2026-03", { active: 4, in_arrears: 1, closed: 1 }),
       bucket("2026-04", { active: 2, closed: 4 }),
     ]);
-    const inForceTotal = (row: (typeof rows)[number]) =>
-      GUARANTEE_STATE_STACK_ORDER.reduce((sum, state) => sum + row[state], 0);
-    expect(rows.map(inForceTotal)).toEqual([5, 2]);
+    expect(rows.map((row) => row.inForce)).toEqual([5, 2]);
   });
 
   it("preserves period order", () => {
-    const rows = toCompositionRows([
+    const rows = toInForceRows([
       bucket("2026-03", { active: 1 }),
       bucket("2026-04", { active: 2 }),
     ]);
@@ -253,67 +248,22 @@ describe("toCompositionRows", () => {
   });
 });
 
-describe("toEventRows", () => {
-  it("writes every event as a top-level key, zeros included", () => {
-    const [row] = toEventRows([bucket("2026-04", {}, { created: 2, cover_paid: 1 })]);
-    expect(row).toEqual({
-      period: "2026-04",
-      created: 2,
-      activated: 0,
-      default_verified: 0,
-      cover_paid: 1,
-      closed: 0,
-    });
-  });
-
-  // `default_verified` names both a band and an event. Two row shapes is what
-  // keeps one from overwriting the other in a single flat record.
-  it("keeps the event series separate from the composition series", () => {
-    const source = [bucket("2026-04", { default_verified: 7 }, { default_verified: 1 })];
-    expect(toCompositionRows(source)[0]?.default_verified).toBe(7);
-    expect(toEventRows(source)[0]?.default_verified).toBe(1);
-  });
-
-  it("shares the period order with the composition rows", () => {
-    const source = [bucket("2026-03", { active: 1 }), bucket("2026-04", { active: 2 })];
-    expect(toEventRows(source).map((row) => row.period)).toEqual(
-      toCompositionRows(source).map((row) => row.period),
-    );
-  });
-});
-
-describe("hasAnyEvent", () => {
-  it("is false for a range in which nothing moved", () => {
-    expect(hasAnyEvent(toEventRows([bucket("2026-03", { active: 2 })]))).toBe(false);
-    expect(hasAnyEvent([])).toBe(false);
-  });
-
-  it("is true as soon as one event lands anywhere in the range", () => {
-    const rows = toEventRows([
-      bucket("2026-03", { active: 2 }),
-      bucket("2026-04", { active: 2 }, { closed: 1 }),
-    ]);
-    expect(hasAnyEvent(rows)).toBe(true);
-  });
-});
-
 describe("shared x scale", () => {
-  // Recharts gives an area a POINT scale and bars a BAND scale unless told
-  // otherwise, so the same month landed half a band apart in the two panels —
-  // 44px on the frame this card renders at. Both panels now declare `band`.
+  // Recharts gives an area a POINT scale (first sample flush left, spacing
+  // width/(n-1)) and bars a BAND scale (centres, width/n). When the two lived
+  // in separate panels that put the same month 44px apart on the frame this
+  // card renders at. They share one plot now, and the axis declares `band`
+  // explicitly so the area sits on the bar centres rather than the reverse.
   const frame = { plotLeft: 380, plotWidth: 1052, periods: 12 };
 
-  it("is the band scale, so both panels place a period at the same x", () => {
+  it("declares the band scale, the one the bars force", () => {
     expect(SHARED_X_AXIS_SCALE).toBe("band");
-    const area = bandScalePositions(frame);
-    const bars = bandScalePositions(frame);
-    expect(area[0]).toBe(bars[0]);
-    expect(area[area.length - 1]).toBe(bars[bars.length - 1]);
-    expect(area[0]).toBeCloseTo(423.83, 2);
-    expect(area[area.length - 1]).toBeCloseTo(1388.17, 2);
+    const positions = bandScalePositions(frame);
+    expect(positions[0]).toBeCloseTo(423.83, 2);
+    expect(positions[positions.length - 1]).toBeCloseTo(1388.17, 2);
   });
 
-  it("measures the defect the band scale removes", () => {
+  it("measures the offset the band scale removes", () => {
     const band = bandScalePositions(frame);
     const point = pointScalePositions(frame);
     const halfBand = frame.plotWidth / (2 * frame.periods);
@@ -328,20 +278,21 @@ describe("shared x scale", () => {
 });
 
 describe("axis domains", () => {
-  it("takes the peak of the stacked in-force total, ignoring context states", () => {
-    const rows = toCompositionRows([
+  it("takes the peak of the in-force total, ignoring context states", () => {
+    const rows = toInForceRows([
       bucket("2026-03", { active: 4, in_arrears: 1, closed: 40 }),
       bucket("2026-04", { active: 2, closed: 90 }),
     ]);
-    expect(maxStackedTotal(rows)).toBe(5);
+    expect(maxInForce(rows)).toBe(5);
   });
 
-  it("takes the peak of a single event series, not their sum", () => {
-    const rows = toEventRows([
-      bucket("2026-03", {}, { created: 2, closed: 3 }),
-      bucket("2026-04", {}, { activated: 1 }),
-    ]);
-    expect(maxEventCount(rows)).toBe(3);
+  // Both the area and the bars hang off one y axis, so the domain is set by
+  // the book and never by an event count. A second, independently scaled bar
+  // axis would paint two events as tall as a quarter of a two-hundred-
+  // guarantee book, silently, as volume grew.
+  it("is set by the book even when the events dwarf it", () => {
+    const rows = toInForceRows([bucket("2026-03", { active: 2 }, { created: 40 })]);
+    expect(axisUpperBound(maxInForce(rows))).toBe(3);
   });
 
   // The top of the data must never be the top of the panel: with no headroom
@@ -358,5 +309,32 @@ describe("axis domains", () => {
     expect(axisUpperBound(6)).toBe(7);
     expect(axisUpperBound(10)).toBe(12);
     expect(axisUpperBound(120)).toBe(140);
+  });
+});
+
+describe("toChartRows", () => {
+  // One row, one plot, one y axis: the area and every bar read off the same
+  // scale, which is only possible while they travel together.
+  it("carries the book and that period's events in a single row", () => {
+    const [row] = toChartRows([
+      bucket("2026-04", { active: 3, in_arrears: 1, closed: 9 }, { created: 2, cover_paid: 1 }),
+    ]);
+    expect(row).toEqual({
+      period: "2026-04",
+      inForce: 4,
+      created: 2,
+      activated: 0,
+      default_verified: 0,
+      cover_paid: 1,
+      closed: 0,
+    });
+  });
+
+  // `closed` is a state AND an event. The row carries the event; the state's
+  // count belongs to the count row, so nothing is silently overwritten.
+  it("gives the shared name to the event, never to the state count", () => {
+    const [row] = toChartRows([bucket("2026-04", { active: 1, closed: 30 }, { closed: 2 })]);
+    expect(row?.closed).toBe(2);
+    expect(row?.inForce).toBe(1);
   });
 });

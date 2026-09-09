@@ -2,7 +2,7 @@
 
 import { TrendingUpIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts";
 import { GUARANTEE_EVENTS } from "@convex/guarantees/domain";
 import type {
   ActivityGranularity,
@@ -23,16 +23,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@mutav/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import {
-  CHART_FILL_OPACITY,
+  AREA_FILL_OPACITY,
+  AREA_STROKE_WIDTH,
+  EVENT_BAR_RADIUS,
   GUARANTEE_EVENT_CHART_COLOR,
-  GUARANTEE_STATE_CHART_COLOR,
+  GUARANTEE_STATE_SWATCH_COLOR,
 } from "@/components/guarantees/state-chart-palette";
 import {
   useGuaranteeStateChart,
   type GuaranteeStateChartRangeOption,
 } from "@/components/guarantees/use-guarantee-state-chart";
 import {
-  GUARANTEE_STATE_STACK_ORDER,
+  GUARANTEE_IN_FORCE_STATES,
   SHARED_X_AXIS_SCALE,
   type GuaranteeStateCounts,
   type GuaranteeStateLegendEntry,
@@ -48,34 +50,37 @@ type GuaranteeStateChartProps = {
   defaultRange: string;
   i18nNamespace: string;
   showTrendIcon?: boolean;
-  showEventPanel?: boolean;
+  showEvents?: boolean;
 };
 
-const CHART_STACK_ID = "book";
 const AXIS_WIDTH = 32;
 // Wide enough that a single event is a bar rather than a speck. At six months
 // each category is ~175px, so five series fit comfortably; at twelve the cap
 // stops binding and the category gap does the work.
 const EVENT_BAR_MAX_WIDTH_PX = 18;
-// Both plots must start their drawing area at the same x, or the shared time
-// axis lies. Identical y-axis width plus identical margins is what guarantees
-// it — Recharts has no cross-chart alignment primitive.
-const SHARED_MARGIN = { top: 4, right: 12, bottom: 0, left: 12 };
+const CHART_MARGIN = { top: 4, right: 12, bottom: 0, left: 12 };
 
 /**
- * The guarantee book in one card, split by the two questions it answers.
+ * The guarantee book in one card: one plot, one count row.
  *
- * **Top panel — composition (a stock).** The five in-force states stacked, so
- * the silhouette IS the book under management and its height rises and falls
- * with the carteira. Interpolation is `linear` rather than a spline so no band
- * is ever drawn above or below a count that was actually observed.
+ * The **area** is the book in force — how many guarantees Mutav was on risk
+ * for at the end of each period — in the brand accent, as a wash under a 2px
+ * stroke. One series, because that total is the line an agency tracks; five
+ * stacked bands of one hue turned it into a mass and cost the reader the
+ * shape. Drafts and closed guarantees stay out, so the line can fall as well
+ * as rise. `monotone`, never `natural`: a spline through integer counts
+ * overshoots between sharp steps and draws the book at values never observed.
  *
- * **Bottom panel — events (a flow).** How many guarantees were created,
- * activated, defaulted, paid out and closed in each period. It shares the top
- * panel's x-axis but never its plot: events and book size are different units,
- * and overlaying them is what forced the second y-axis this card used to
- * carry. A handful of events against hundreds in force either vanishes or
- * distorts the scale — beneath, on its own scale, it does neither.
+ * The **bars** are that period's lifecycle events, in semantic colour: green
+ * is the business working, red is money leaving, grey has no valence. They sit
+ * on the SAME y axis as the area — no `yAxisId`, one `<YAxis>`. Two
+ * independently scaled axes would let a single event paint as tall as a
+ * quarter of a two-hundred-guarantee book, silently, as volume grows. Short
+ * bars against a tall area are the honest picture; exact counts come from the
+ * tooltip.
+ *
+ * The **count row** carries the per-state granularity, with the same swatch
+ * the status tags in the table below use.
  */
 export function GuaranteeStateChart({
   timeline,
@@ -85,12 +90,13 @@ export function GuaranteeStateChart({
   defaultRange,
   i18nNamespace,
   showTrendIcon = false,
-  showEventPanel = false,
+  showEvents = false,
 }: GuaranteeStateChartProps) {
   const t = useTranslations(i18nNamespace);
   const chart = useGuaranteeStateChart({
     timeline,
     counts,
+    inForceLabel: t("inForceLabel"),
     granularity,
     rangeOptions,
     defaultRange,
@@ -147,16 +153,18 @@ export function GuaranteeStateChart({
       </CardHeader>
       <CardContent className="flex flex-col gap-4 px-2 pt-4 sm:px-6 sm:pt-6">
         {chart.isLoading ? (
-          <Skeleton className="h-[220px] w-full" />
+          <Skeleton className="h-[250px] w-full" />
         ) : (
-          <ChartContainer config={chart.compositionConfig} className="aspect-auto h-[220px] w-full">
-            <AreaChart data={[...chart.compositionRows]} margin={SHARED_MARGIN}>
+          <ChartContainer config={chart.chartConfig} className="aspect-auto h-[250px] w-full">
+            <ComposedChart
+              data={[...chart.chartRows]}
+              margin={CHART_MARGIN}
+              barGap={1}
+              barCategoryGap="12%"
+            >
               <CartesianGrid vertical={false} />
-              {/* One time axis for both panels: when the event panel is below,
-                  it owns the ticks and this one only supplies the scale. */}
               <XAxis
                 dataKey="period"
-                hide={showEventPanel}
                 scale={SHARED_X_AXIS_SCALE}
                 tickLine={false}
                 axisLine={false}
@@ -168,7 +176,7 @@ export function GuaranteeStateChart({
                 axisLine={false}
                 tickMargin={8}
                 allowDecimals={false}
-                domain={[0, chart.compositionAxisMax]}
+                domain={[0, chart.axisMax]}
                 width={AXIS_WIDTH}
               />
               <ChartTooltip
@@ -177,25 +185,31 @@ export function GuaranteeStateChart({
                   <ChartTooltipContent labelFormatter={chart.labelFormatter} indicator="dot" />
                 }
               />
-              {GUARANTEE_STATE_STACK_ORDER.map((state) => (
-                <Area
-                  key={state}
-                  dataKey={state}
-                  stackId={CHART_STACK_ID}
-                  type="natural"
-                  fill={`var(--color-${state})`}
-                  fillOpacity={CHART_FILL_OPACITY}
-                  stroke={`var(--color-${state})`}
-                  dot={false}
-                />
-              ))}
-            </AreaChart>
+              {showEvents
+                ? GUARANTEE_EVENTS.map((event) => (
+                    <Bar
+                      key={event}
+                      dataKey={event}
+                      fill={`var(--color-${event})`}
+                      radius={EVENT_BAR_RADIUS}
+                      maxBarSize={EVENT_BAR_MAX_WIDTH_PX}
+                    />
+                  ))
+                : null}
+              <Area
+                dataKey="inForce"
+                type="monotone"
+                fill="var(--color-inForce)"
+                fillOpacity={AREA_FILL_OPACITY}
+                stroke="var(--color-inForce)"
+                strokeWidth={AREA_STROKE_WIDTH}
+                dot={false}
+              />
+            </ComposedChart>
           </ChartContainer>
         )}
 
-        {showEventPanel ? (
-          <EventPanel title={t("eventsTitle")} emptyLabel={t("eventsEmpty")} chart={chart} />
-        ) : null}
+        {showEvents ? <EventLegend label={t("eventsTitle")} labelFor={chart.eventLabel} /> : null}
 
         <StateLegend
           entries={chart.legend}
@@ -208,74 +222,15 @@ export function GuaranteeStateChart({
   );
 }
 
-function EventPanel({
-  title,
-  emptyLabel,
-  chart,
+function EventLegend({
+  label,
+  labelFor,
 }: {
-  title: string;
-  emptyLabel: string;
-  chart: ReturnType<typeof useGuaranteeStateChart>;
+  label: string;
+  labelFor: (event: GuaranteeEvent) => string;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-muted-foreground px-2 text-xs sm:px-0">{title}</p>
-      {chart.isLoading ? (
-        <Skeleton className="h-[96px] w-full" />
-      ) : chart.hasEvents ? (
-        <ChartContainer config={chart.eventConfig} className="aspect-auto h-[96px] w-full">
-          <BarChart
-            data={[...chart.eventRows]}
-            margin={SHARED_MARGIN}
-            barGap={1}
-            barCategoryGap="12%"
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="period"
-              scale={SHARED_X_AXIS_SCALE}
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              tickFormatter={chart.tickFormatter}
-            />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              allowDecimals={false}
-              domain={[0, chart.eventAxisMax]}
-              tickCount={chart.eventTickCount}
-              width={AXIS_WIDTH}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent labelFormatter={chart.labelFormatter} indicator="dot" />
-              }
-            />
-            {GUARANTEE_EVENTS.map((event) => (
-              <Bar
-                key={event}
-                dataKey={event}
-                fill={`var(--color-${event})`}
-                fillOpacity={CHART_FILL_OPACITY}
-                maxBarSize={EVENT_BAR_MAX_WIDTH_PX}
-              />
-            ))}
-          </BarChart>
-        </ChartContainer>
-      ) : (
-        <p className="text-muted-foreground px-2 text-xs sm:px-0">{emptyLabel}</p>
-      )}
-      <EventLegend labelFor={chart.eventLabel} />
-    </div>
-  );
-}
-
-function EventLegend({ labelFor }: { labelFor: (event: GuaranteeEvent) => string }) {
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 px-2 sm:px-0">
+    <ul aria-label={label} className="flex flex-wrap gap-x-4 gap-y-1 px-2 sm:px-0">
       {GUARANTEE_EVENTS.map((event) => (
         <li key={event} className="text-muted-foreground flex h-5 items-center gap-1.5 text-xs">
           <Swatch color={GUARANTEE_EVENT_CHART_COLOR[event]} />
@@ -286,11 +241,7 @@ function EventLegend({ labelFor }: { labelFor: (event: GuaranteeEvent) => string
   );
 }
 
-/**
- * Full strength, always. The plotted fill is a 0.4 wash — atmospheric, not the
- * identity channel — so the swatch is where the validated ramp step is shown
- * at the value it was validated at.
- */
+/** The status tag's dot, at the size a legend wants. */
 function Swatch({ color }: { color: string }) {
   return (
     <span
@@ -302,10 +253,12 @@ function Swatch({ color }: { color: string }) {
 }
 
 /**
- * One row per band: swatch, label and count on a single baseline. The count is
- * a supporting figure, not a hero — a view gets exactly one hero figure, and
- * five competing 24px numbers on a ragged baseline is what the oversized draft
- * produced. Text stays in text tokens; the swatch carries the identity.
+ * One row per in-force state: swatch, label and count on a single baseline.
+ * This is where the card's granularity lives now that the plot carries one
+ * series. The count is a supporting figure, not a hero — a view gets exactly
+ * one hero figure, and five competing 24px numbers on a ragged baseline is
+ * what the oversized draft produced. Text stays in text tokens; the swatch
+ * carries the identity, and it is the same swatch the status tags use.
  */
 function StateLegend({
   entries,
@@ -324,11 +277,11 @@ function StateLegend({
           stretched each cell to a full column and flushed the count to the far
           edge, where it read as belonging to nothing. */}
       <dl aria-label={label} className="flex flex-wrap gap-x-6 gap-y-1">
-        {GUARANTEE_STATE_STACK_ORDER.map((state) => {
+        {GUARANTEE_IN_FORCE_STATES.map((state) => {
           const count = entries?.find((entry) => entry.state === state)?.count;
           return (
             <div key={state} className="flex h-6 items-center gap-1.5">
-              <Swatch color={GUARANTEE_STATE_CHART_COLOR[state]} />
+              <Swatch color={GUARANTEE_STATE_SWATCH_COLOR[state]} />
               <dt className="text-muted-foreground text-xs">{labelFor(state)}</dt>
               <dd className="text-foreground text-sm font-semibold tabular-nums">
                 {count === undefined ? <Skeleton className="h-4 w-6" /> : count}

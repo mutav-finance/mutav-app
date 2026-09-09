@@ -72,23 +72,6 @@ export function isInsured(guarantee: Pick<Guarantee, "status">): boolean {
   return INSURED_STATE_SET.has(guarantee.status);
 }
 
-/**
- * One bucket in the unified guarantee-activity time series. Shared between the
- * agency dashboard (`granularity: "month"`) and the platform health timeline
- * (`granularity: "week"`).
- *
- * `period` is the bucket start: `"YYYY-MM"` for month, `"YYYY-MM-DD"` (UTC
- * Monday) for week. `netActive` is the snapshot of guarantees in force at the
- * END of the period — the unified trend semantic on both charts.
- */
-export type ActivityBucket = {
-  period: string;
-  activated: number;
-  cancelled: number;
-  expired: number;
-  netActive: number;
-};
-
 export type ActivityGranularity = "month" | "week";
 
 /**
@@ -97,13 +80,11 @@ export type ActivityGranularity = "month" | "week";
  * happened DURING it (`eventCount`).
  *
  * Both come from one replay of the same history rows, so the card draws its
- * composition panel and its event panel from a single round trip. They are
- * different units — a stock and a flow — and belong in different plots.
+ * trend and its event panel from a single round trip. They are different
+ * units — a stock and a flow — and belong in different plots.
  *
- * Distinct from `ActivityBucket`, which counts *events* (activations,
- * closures) in the period and cannot express `in_arrears` at all — arrears is
- * a state, not an event, and nothing on the guarantee row dates it. The
- * timeline is reconstructed from `guaranteeHistory.transition`, so every
+ * Arrears is a state, not an event, and nothing on the guarantee row dates it;
+ * the timeline is reconstructed from `guaranteeHistory.transition`, so every
  * state the machine can reach is visible.
  *
  * The counts sum to the number of guarantees in scope in every bucket: a

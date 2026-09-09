@@ -12,19 +12,16 @@ import {
 import type { ChartConfig } from "@mutav/ui/chart";
 import {
   GUARANTEE_EVENT_CHART_COLOR,
-  GUARANTEE_STATE_CHART_COLOR,
+  IN_FORCE_AREA_COLOR,
 } from "@/components/guarantees/state-chart-palette";
 import {
-  GUARANTEE_STATE_STACK_ORDER,
   axisUpperBound,
   buildContextFigures,
   buildStateLegend,
-  hasAnyEvent,
-  maxEventCount,
-  maxStackedTotal,
+  maxInForce,
   sliceRecentPeriods,
-  toCompositionRows,
-  toEventRows,
+  toChartRows,
+  toInForceRows,
   type GuaranteeStateCounts,
 } from "@/lib/guarantees/state-chart";
 
@@ -37,6 +34,8 @@ export type GuaranteeStateChartRangeOption = {
 type UseGuaranteeStateChartArgs = {
   timeline: StateTimelineBucket[] | null | undefined;
   counts: GuaranteeStateCounts | null | undefined;
+  /** Tooltip name for the single plotted series; the caller owns the namespace. */
+  inForceLabel: string;
   granularity: ActivityGranularity;
   rangeOptions: readonly GuaranteeStateChartRangeOption[];
   defaultRange: string;
@@ -54,6 +53,7 @@ function parsePeriodToDate(period: string, granularity: ActivityGranularity): Da
 export function useGuaranteeStateChart({
   timeline,
   counts,
+  inForceLabel,
   granularity,
   rangeOptions,
   defaultRange,
@@ -71,14 +71,12 @@ export function useGuaranteeStateChart({
     [timeline, activeOption?.periods],
   );
 
-  const compositionRows = React.useMemo(() => toCompositionRows(visibleBuckets), [visibleBuckets]);
-  const eventRows = React.useMemo(() => toEventRows(visibleBuckets), [visibleBuckets]);
+  const chartRows = React.useMemo(() => toChartRows(visibleBuckets), [visibleBuckets]);
 
-  const compositionAxisMax = axisUpperBound(maxStackedTotal(compositionRows));
-  // The event panel scales to its own data. Borrowing the area's domain is
-  // what left every bar at 1 inside a 0-4 axis: three quarters dead space.
-  const eventPeak = maxEventCount(eventRows);
-  const eventAxisMax = Math.max(1, eventPeak);
+  // One domain for the whole plot, set by the book. Bars are read against the
+  // same scale as the area on purpose: a month with two events out of a book
+  // of two hundred IS small, and a second axis would hide that.
+  const axisMax = axisUpperBound(maxInForce(toInForceRows(visibleBuckets)));
 
   const formatter = React.useMemo(() => {
     if (granularity === "month") {
@@ -97,34 +95,25 @@ export function useGuaranteeStateChart({
     [formatter, granularity],
   );
 
-  const compositionConfig: ChartConfig = Object.fromEntries(
-    GUARANTEE_STATE_STACK_ORDER.map((state) => [
-      state,
-      { label: tState(state), color: GUARANTEE_STATE_CHART_COLOR[state] },
-    ]),
-  );
-
-  const eventConfig: ChartConfig = Object.fromEntries(
-    GUARANTEE_EVENTS.map((event) => [
-      event,
-      { label: tEvent(event), color: GUARANTEE_EVENT_CHART_COLOR[event] },
-    ]),
-  );
+  const chartConfig: ChartConfig = {
+    inForce: { label: inForceLabel, color: IN_FORCE_AREA_COLOR },
+    ...Object.fromEntries(
+      GUARANTEE_EVENTS.map((event) => [
+        event,
+        { label: tEvent(event), color: GUARANTEE_EVENT_CHART_COLOR[event] },
+      ]),
+    ),
+  };
 
   return {
     range,
     setRange,
     activeOption,
-    compositionRows,
-    eventRows,
-    hasEvents: hasAnyEvent(eventRows),
-    compositionAxisMax,
-    eventAxisMax,
-    eventTickCount: Math.min(eventAxisMax + 1, 5),
+    chartRows,
+    axisMax,
     legend: buildStateLegend(counts),
     contextFigures: buildContextFigures(counts),
-    compositionConfig,
-    eventConfig,
+    chartConfig,
     tickFormatter,
     labelFormatter,
     stateLabel: (state: GuaranteeState) => tState(state),

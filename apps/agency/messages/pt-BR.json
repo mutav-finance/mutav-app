@@ -231,7 +231,7 @@
     "selectRangeAriaLabel": "Selecione um período",
     "legendLabel": "Garantias vigentes por situação, contagem atual",
     "eventsTitle": "Movimentações por mês",
-    "eventsEmpty": "Nenhuma movimentação registrada neste período."
+    "inForceLabel": "Vigentes"
   },
   "metrics": {
     "inForce": {
@@ -1286,7 +1286,7 @@
       "selectRangeAriaLabel": "Selecione um período",
       "legendLabel": "Garantias vigentes por situação, contagem atual",
       "eventsTitle": "Movimentações por semana",
-      "eventsEmpty": "Nenhuma movimentação registrada neste período."
+      "inForceLabel": "Vigentes"
     }
   },
   "guaranteeEvents": {
