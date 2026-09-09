@@ -23,10 +23,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@mutav/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import {
+  AREA_FILL_OPACITY,
   EVENT_BAR_FILL_OPACITY,
   GUARANTEE_EVENT_CHART_COLOR,
   GUARANTEE_STATE_CHART_COLOR,
-  STACK_SURFACE_GAP_PX,
 } from "@/components/guarantees/state-chart-palette";
 import {
   useGuaranteeStateChart,
@@ -56,8 +56,7 @@ const AXIS_WIDTH = 32;
 // Both plots must start their drawing area at the same x, or the shared time
 // axis lies. Identical y-axis width plus identical margins is what guarantees
 // it — Recharts has no cross-chart alignment primitive.
-const SHARED_MARGIN = { top: 4, right: 8, bottom: 0, left: 0 };
-const CROSSHAIR = { stroke: "var(--color-border)", strokeWidth: 1 };
+const SHARED_MARGIN = { top: 4, right: 12, bottom: 0, left: 12 };
 
 /**
  * The guarantee book in one card, split by the two questions it answers.
@@ -167,8 +166,7 @@ export function GuaranteeStateChart({
                 width={AXIS_WIDTH}
               />
               <ChartTooltip
-                cursor={CROSSHAIR}
-                offset={16}
+                cursor={false}
                 content={
                   <ChartTooltipContent labelFormatter={chart.labelFormatter} indicator="dot" />
                 }
@@ -178,13 +176,10 @@ export function GuaranteeStateChart({
                   key={state}
                   dataKey={state}
                   stackId={CHART_STACK_ID}
-                  type="linear"
+                  type="natural"
                   fill={`var(--color-${state})`}
-                  fillOpacity={1}
-                  // The stroke is the card's own surface showing through: a 2px
-                  // gap, not a border. Ink that isn't data would be a border.
-                  stroke="var(--color-card)"
-                  strokeWidth={STACK_SURFACE_GAP_PX}
+                  fillOpacity={AREA_FILL_OPACITY}
+                  stroke={`var(--color-${state})`}
                   dot={false}
                 />
               ))}
@@ -240,8 +235,7 @@ function EventPanel({
               width={AXIS_WIDTH}
             />
             <ChartTooltip
-              cursor={CROSSHAIR}
-              offset={16}
+              cursor={false}
               content={
                 <ChartTooltipContent labelFormatter={chart.labelFormatter} indicator="dot" />
               }
@@ -270,7 +264,7 @@ function EventLegend({ labelFor }: { labelFor: (event: GuaranteeEvent) => string
     <ul className="flex flex-wrap gap-x-4 gap-y-1 px-2 sm:px-0">
       {GUARANTEE_EVENTS.map((event) => (
         <li key={event} className="text-muted-foreground flex h-5 items-center gap-1.5 text-xs">
-          <Swatch color={GUARANTEE_EVENT_CHART_COLOR[event]} opacity={EVENT_BAR_FILL_OPACITY} />
+          <Swatch color={GUARANTEE_EVENT_CHART_COLOR[event]} />
           {labelFor(event)}
         </li>
       ))}
@@ -278,12 +272,17 @@ function EventLegend({ labelFor }: { labelFor: (event: GuaranteeEvent) => string
   );
 }
 
-function Swatch({ color, opacity = 1 }: { color: string; opacity?: number }) {
+/**
+ * Full strength, always. The plotted fill is a 0.4 wash — atmospheric, not the
+ * identity channel — so the swatch is where the validated ramp step is shown
+ * at the value it was validated at.
+ */
+function Swatch({ color }: { color: string }) {
   return (
     <span
       aria-hidden
       className="size-2.5 shrink-0 rounded-[2px]"
-      style={{ backgroundColor: color, opacity }}
+      style={{ backgroundColor: color }}
     />
   );
 }

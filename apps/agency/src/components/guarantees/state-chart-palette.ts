@@ -45,15 +45,18 @@ export const GUARANTEE_EVENT_CHART_COLOR: Record<GuaranteeEvent, string> = {
 };
 
 /**
- * The event panel is a supporting read, so its bars sit below the area in
- * weight: same hues, one wash lighter. Full-strength bars against a
- * full-strength area make two charts compete for the same glance.
+ * Fills are a wash, never a saturated block. Identity lives in the
+ * full-strength stroke that caps each band and in the legend swatch — which is
+ * where the ramp is shown at the value it was validated at. The 0.4 fill is
+ * atmospheric: it gives the band its area without turning five stacked
+ * segments into five loud blocks.
+ *
+ * The stroke is also what separates touching bands, so there is no
+ * surface-coloured gap: a band boundary drawn in the band's own colour reads
+ * as the edge of that series, where a surface gap reads as empty space
+ * between two things.
  */
-export const EVENT_BAR_FILL_OPACITY = 0.6;
+export const AREA_FILL_OPACITY = 0.4;
 
-/**
- * Width of the surface-coloured separator drawn between touching bands. It is
- * a gap, not a border: the stroke is painted in the card's own surface colour,
- * so what the reader sees is the card showing through.
- */
-export const STACK_SURFACE_GAP_PX = 2;
+/** Same wash on the event bars, so the two panels read as one card. */
+export const EVENT_BAR_FILL_OPACITY = 0.4;
