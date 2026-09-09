@@ -123,23 +123,6 @@ export const getByPublicId = query({
 });
 
 /**
- * Internal companion to `getByPublicId` for actions that authorize by a
- * non-user model (e.g. tenant checkout flows triggered by publicId-bearer).
- * Returns the raw contract doc — no history, no shaping. The calling
- * internal flow is responsible for whatever authorization is appropriate
- * at its entry point.
- */
-export const getByPublicIdInternal = internalQuery({
-  args: { publicId: v.string() },
-  handler: async (ctx, { publicId }) => {
-    return ctx.db
-      .query("contracts")
-      .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
-      .unique();
-  },
-});
-
-/**
  * Tenant identity for a contract as the *owning* agency submitted it, for
  * actions that have no `ctx.db` (anchor SEP-9 prefill). This is the one read
  * path that hands tenant PII to a third party, so it is scoped and fail-closed
