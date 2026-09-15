@@ -9,7 +9,7 @@ import type {
   GuaranteeDocumentKey,
   DocumentStatus,
 } from "@/lib/guarantees/types";
-import { StatusTag } from "./state-tag";
+import { StatusTag } from "@mutav/ui/guarantee-state-tag";
 
 const docKeys: GuaranteeDocumentKey[] = ["rentalContract", "inspection", "policy"];
 const keysWithTemplate = new Set<GuaranteeDocumentKey>(["rentalContract", "inspection"]);

@@ -89,7 +89,7 @@ async function insertNotice(
   fx: Fixture,
   overrides: {
     publicId: string;
-    status?: "open" | "resolved" | "canceled";
+    status?: "open" | "verified" | "resolved" | "canceled";
     rentDueDate?: string;
     openedAt?: string;
     updatedAmountCents?: number;
@@ -624,6 +624,86 @@ describe("listOpenAdminQueue", () => {
         paginationOpts: { numItems: 10, cursor: null },
       }),
     ).rejects.toThrow(/compliance/);
+  });
+
+  // The queue spans agencies, so every join it carries is one the admin
+  // console cannot make for itself: every guarantee, lease and tenant read is
+  // agency-scoped or membership-gated.
+  test("row carries the agency, tenant, guarantee and its remaining capacity", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await grantStaffRole(t, fx.userId, "compliance");
+    await insertNotice(t, fx, { publicId: "DN-enriched", updatedAmountCents: 412_300 });
+
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+    const result = await asCompliance.query(api.delinquencies.useCases.listOpenAdminQueue, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+
+    const [row] = result.page;
+    expect(row.publicId).toBe("DN-enriched");
+    expect(row.status).toBe("open");
+    expect(row.agencyName).toBe("Fixture Agency 1");
+    expect(row.tenantName).toBe("Test Tenant");
+    expect(row.guaranteePublicId).toBe("CT-1");
+    expect(row.guaranteeState).toBe("active");
+    expect(row.updatedAmountCents).toBe(412_300);
+    // The clamp the cover dialog previews reads this leg; the invariant the
+    // reserve helper enforces has to hold on the way out of the read too.
+    expect(row.guaranteeCapacity.availableCents + row.guaranteeCapacity.reservedCents).toBe(
+      row.guaranteeCapacity.ceilingCents,
+    );
+  });
+
+  test("verified notices ride along with open ones, merged FIFO", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await grantStaffRole(t, fx.userId, "compliance");
+    await insertNotice(t, fx, { publicId: "DN-open-late", openedAt: "2026-08-10T09:00:00-03:00" });
+    await insertNotice(t, fx, {
+      publicId: "DN-verified-early",
+      status: "verified",
+      openedAt: "2026-05-10T09:00:00-03:00",
+    });
+    await insertNotice(t, fx, { publicId: "DN-open-mid", openedAt: "2026-06-10T09:00:00-03:00" });
+
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+    const result = await asCompliance.query(api.delinquencies.useCases.listOpenAdminQueue, {
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+
+    expect(result.page.map((row) => row.publicId)).toEqual([
+      "DN-verified-early",
+      "DN-open-mid",
+      "DN-open-late",
+    ]);
+    // Cover is only legal on a verified notice, so the UI needs the status to
+    // decide which action a row may offer.
+    expect(result.page.map((row) => row.status)).toEqual(["verified", "open", "open"]);
+  });
+
+  test("a cursored page does not repeat the verified rows", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await grantStaffRole(t, fx.userId, "compliance");
+    await insertNotice(t, fx, {
+      publicId: "DN-verified-rider",
+      status: "verified",
+      openedAt: "2026-05-10T09:00:00-03:00",
+    });
+    await insertNotice(t, fx, { publicId: "DN-open-a", openedAt: "2026-06-01T09:00:00-03:00" });
+    await insertNotice(t, fx, { publicId: "DN-open-b", openedAt: "2026-06-02T09:00:00-03:00" });
+
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+    const first = await asCompliance.query(api.delinquencies.useCases.listOpenAdminQueue, {
+      paginationOpts: { numItems: 1, cursor: null },
+    });
+    expect(first.page.map((row) => row.publicId)).toEqual(["DN-verified-rider", "DN-open-a"]);
+
+    const second = await asCompliance.query(api.delinquencies.useCases.listOpenAdminQueue, {
+      paginationOpts: { numItems: 1, cursor: first.continueCursor },
+    });
+    expect(second.page.map((row) => row.publicId)).toEqual(["DN-open-b"]);
   });
 });
 

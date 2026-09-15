@@ -7,7 +7,7 @@ import { maskCNPJ, maskCPF } from "@mutav/i18n/brazil";
 import { formatDateBR, formatDateTimeBR } from "@mutav/i18n/brazil";
 import type { GuaranteeTenant } from "@/lib/guarantees/types";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";
-import { StatusTag } from "./state-tag";
+import { StatusTag } from "@mutav/ui/guarantee-state-tag";
 
 const approvalTone: Record<GuaranteeTenant["approvalStatus"], "accent" | "success" | "error"> = {
   aprovado: "success",

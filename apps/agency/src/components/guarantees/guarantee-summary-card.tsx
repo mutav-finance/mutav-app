@@ -31,7 +31,7 @@ import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { GUARANTEE_STATE } from "@convex/guarantees/domain";
 import type { Guarantee } from "@/lib/guarantees/types";
 import { api } from "@convex/_generated/api";
-import { GuaranteeStateTag } from "./state-tag";
+import { GuaranteeStateTag } from "@mutav/ui/guarantee-state-tag";
 
 export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
   const t = useTranslations("guaranteeDetails.summary");

@@ -1,5 +1,5 @@
 import type { GuaranteeEvent, GuaranteeState } from "@convex/guarantees/domain";
-import { GUARANTEE_STATE_TONE } from "@/components/guarantees/state-tag";
+import { GUARANTEE_STATE_TONE } from "@mutav/ui/guarantee-state-tag";
 
 type Tone = (typeof GUARANTEE_STATE_TONE)[GuaranteeState];
 

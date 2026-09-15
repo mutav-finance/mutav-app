@@ -4,14 +4,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { StatusTagTone } from "@mutav/ui/status-tag";
+import { GUARANTEE_STATE_NAMES, GUARANTEE_STATE_TONE, TONE } from "@mutav/ui/guarantee-state-tag";
 import { GUARANTEE_STATES } from "@convex/guarantees/machine";
 import {
   COLOR_SCHEMES,
-  GUARANTEE_STATE_TONE,
   STATE_TONE_HEX,
   STATE_TONE_SEVERITY_ORDER,
   STATE_TONE_TOKEN,
-  TONE,
   type ColorScheme,
 } from "./state-tag";
 
@@ -143,6 +142,16 @@ describe("guarantee state tones", () => {
     const closed = TONE[GUARANTEE_STATE_TONE.closed];
     expect(drafted).toBe(closed);
     expect(drafted).toBe("neutral");
+  });
+
+  /**
+   * `@mutav/ui` carries no Convex dependency, so its state list is a literal.
+   * apps/admin paints its defaults queue from that literal — a state added to
+   * the machine and not to the package would reach the staff console untoned,
+   * and nothing else in either app can see the two lists disagree.
+   */
+  it("covers exactly the states the guarantee machine declares", () => {
+    expect([...GUARANTEE_STATE_NAMES].sort()).toEqual([...GUARANTEE_STATES].sort());
   });
 });
 
