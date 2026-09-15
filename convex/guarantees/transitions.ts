@@ -327,7 +327,7 @@ export async function releaseCoverCapacity(
 }
 
 /**
- * `ativoInsuredCentsPlatform` sums `capacity.availableCents`, so a capacity
+ * `insuredCentsPlatform` sums `capacity.availableCents`, so a capacity
  * patch is an aggregate write too — the two must not be separable.
  */
 async function writeCapacity(

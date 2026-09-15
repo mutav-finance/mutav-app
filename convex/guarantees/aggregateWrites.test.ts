@@ -3,9 +3,9 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import type { AgencyId } from "../agencies/domain";
 import {
-  ativoInsuredCentsPlatform,
-  contractsByStatus,
-  contractsByStatusPlatform,
+  insuredCentsPlatform,
+  guaranteesByState,
+  guaranteesByStatePlatform,
   sumInsuredExposure,
 } from "./aggregate";
 import {
@@ -13,7 +13,7 @@ import {
   insertGuaranteeAggregates,
   replaceGuaranteeAggregates,
 } from "./aggregateWrites";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import { GUARANTEE_STATE, type GuaranteeState } from "./domain";
 import schema from "../schema";
 
@@ -38,7 +38,7 @@ function singleKey(state: GuaranteeState) {
 
 async function activeCountFor(t: ReturnType<typeof convexTest>, agencyId: AgencyId) {
   return t.run((ctx) =>
-    contractsByStatus.count(ctx, {
+    guaranteesByState.count(ctx, {
       namespace: agencyId,
       bounds: singleKey(GUARANTEE_STATE.ACTIVE),
     }),
@@ -47,13 +47,13 @@ async function activeCountFor(t: ReturnType<typeof convexTest>, agencyId: Agency
 
 async function platformActiveCount(t: ReturnType<typeof convexTest>) {
   return t.run((ctx) =>
-    contractsByStatusPlatform.count(ctx, { bounds: singleKey(GUARANTEE_STATE.ACTIVE) }),
+    guaranteesByStatePlatform.count(ctx, { bounds: singleKey(GUARANTEE_STATE.ACTIVE) }),
   );
 }
 
 async function platformActiveSum(t: ReturnType<typeof convexTest>) {
   return t.run((ctx) =>
-    ativoInsuredCentsPlatform.sum(ctx, { bounds: singleKey(GUARANTEE_STATE.ACTIVE) }),
+    insuredCentsPlatform.sum(ctx, { bounds: singleKey(GUARANTEE_STATE.ACTIVE) }),
   );
 }
 
@@ -64,7 +64,7 @@ const EXIT_CAP = 600_000;
 describe("insertGuaranteeAggregates", () => {
   test("keeps per-agency, platform, and sum-insured aggregates in lockstep", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const agencyA = await seedAgency(t, "00000000000111");
     const agencyB = await seedAgency(t, "00000000000222");
 
@@ -103,7 +103,7 @@ describe("insertGuaranteeAggregates", () => {
 describe("replaceGuaranteeAggregates", () => {
   test("flips counts and sum when drafted becomes active", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const agency = await seedAgency(t, "00000000000333");
     const { guaranteeId } = await seedGuaranteeWithLease(
       t,
@@ -130,7 +130,7 @@ describe("replaceGuaranteeAggregates", () => {
 
   test("sumInsuredExposure follows a guarantee across the non-contiguous insured states", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const agency = await seedAgency(t, "00000000000334");
     const { guaranteeId } = await seedGuaranteeWithLease(
       t,
@@ -168,7 +168,7 @@ describe("replaceGuaranteeAggregates", () => {
 describe("deleteGuaranteeAggregates", () => {
   test("removes the guarantee from every aggregate", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const agency = await seedAgency(t, "00000000000444");
     const { guaranteeId } = await seedGuaranteeWithLease(
       t,

@@ -77,7 +77,7 @@ Three things that look like leftovers and are not:
 
 - **`contractApplications`** is the Lei 12.414 bureau-consult relationship record. `creditAnalysisSignals.applicationId` FK-references it, and **neither table is in `DEMO_TABLES`** — both hold retained, real data. A Convex rename is a new table plus a copy; it would orphan every retained signal for a cosmetic gain.
 - **`contract.created` / `contract.canceled` / `contract.status_updated`** are frozen wire values in the hash-chained audit log. Renaming a wire value breaks the chain. `guarantee.*` and `lease.*` keys were added beside them, the old ones frozen under the existing pattern.
-- **Aggregate component names** (`contractsByStatus`, `contractsByStatusPlatform`, `ativoInsuredCentsPlatform`) are re-bound to `guarantees` / `GuaranteeState` but keep their names — a component rename is a data migration in the component's own tables, and it buys nothing this refactor needs. Tracked as a follow-up.
+- **Aggregate component names** were re-bound to `guarantees` / `GuaranteeState` in this refactor but kept their `contractsByStatus` / `contractsByStatusPlatform` / `ativoInsuredCentsPlatform` names, because a component rename is a fresh instance with empty tables. The follow-up renamed them to `guaranteesByState`, `guaranteesByStatePlatform`, `insuredCentsPlatform`; the old instances unmount on deploy and the new ones are rebuilt with `guarantees/backfill:backfillPlatformAggregates` (or a reseed).
 - **Insured exposure is summed by iterating `INSURED_STATES`, never by a single `bounds`.** The aggregate sorts on the status string, and the five in-force states are not lexically contiguous (`active < closed < cover_committed < default_verified < drafted < in_arrears < in_eviction`) — a range sum would silently include `closed` and `drafted`.
 
 ### 9. The receivable ledger and carência are **out of scope for v1**
@@ -126,6 +126,6 @@ Orphaned `contracts` / `contractHistory` / `contractDelinquencyNotices` / `delin
 
 - **The guarantee domain owns the product, not the property.** Anything about where the tenant lives or what they pay the landlord belongs on `leases` — reviewers should push back on new lease-shaped columns creeping onto `guarantees`. The one deliberate duplication is `terms.rentCents`, which is rent _at pricing time_ and must not track `leases.rent`.
 - **`applyGuaranteeTransition` is a chokepoint by design.** It patches, rewrites the aggregate, writes history, appends the audit entry and maintains the lease pointer, in that fixed order. A caller that patches `status` directly skips all five.
-- **A capacity write is an aggregate write.** `ativoInsuredCentsPlatform` sums `capacity.availableCents`, so the two are not separable — `writeCapacity` does both or neither.
+- **A capacity write is an aggregate write.** `insuredCentsPlatform` sums `capacity.availableCents`, so the two are not separable — `writeCapacity` does both or neither.
 - **Reversal-shaped bug reports are a known gap**, not a defect, until the revisit trigger in decision 9 fires.
 - **Admin product CRUD does not exist.** The catalog is seeded; `isValidProductTerms` is written and unused, waiting for the write path. Until it lands, changing a price means a code change.

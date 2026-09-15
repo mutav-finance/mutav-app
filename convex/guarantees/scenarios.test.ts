@@ -8,7 +8,7 @@ import type { AgencyId } from "../agencies/domain";
 import type { CreditAnalysisAssessmentId } from "../creditAnalysis/domain";
 import { assertLeaseAcceptsGuarantee, type Lease, type LeaseId } from "../leases/domain";
 import {
-  registerContractAggregateComponents,
+  registerGuaranteeAggregateComponents,
   seedAgencyWithMembership,
   seedDefaultProduct,
   seedFreshCreditAssessment,
@@ -46,13 +46,13 @@ type Harness = TestConvex<typeof schema>;
 
 function setup(): Harness {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 
 function setupStrict(): Harness {
   const t = convexTest(strictSchema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 

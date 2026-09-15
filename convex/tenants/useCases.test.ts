@@ -5,7 +5,7 @@ import { api, internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
 import type { AuditActor } from "../audit/domain";
 import {
-  registerContractAggregateComponents,
+  registerGuaranteeAggregateComponents,
   seedAgencyWithMembership,
   seedDefaultProduct,
   setupAuthenticatedUser,
@@ -416,7 +416,7 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
 
   test("related agency gets prefill; unrelated agency and unknown tax id both get null (no existence leak)", async () => {
     const t = setup();
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     await seedDefaultProduct(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyA = await seedAgencyWithMembership(t, userId);
@@ -450,7 +450,7 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
 
   test("a pj tenant's contact CPF is not an identity key — looking it up never leaks company data", async () => {
     const t = setup();
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     await seedDefaultProduct(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
@@ -564,7 +564,7 @@ describe("cross-agency tenant identity", () => {
   }
 
   async function bothAgenciesRegisterTheSameCpf(t: ReturnType<typeof setup>) {
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     await seedDefaultProduct(t);
 
     const a = await setupAuthenticatedUser(t, {

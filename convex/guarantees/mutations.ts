@@ -370,7 +370,7 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
     });
     const after = await ctx.db.get(guarantee._id);
     if (!after) throw new Error("Guarantee row vanished mid-transaction");
-    // `ativoInsuredCentsPlatform` sums `availableCents + terms.exitCostCapCents`;
+    // `insuredCentsPlatform` sums `availableCents + terms.exitCostCapCents`;
     // the exit cost cap just moved, so the aggregate is part of this write.
     await replaceGuaranteeAggregates(ctx, guarantee, after);
 

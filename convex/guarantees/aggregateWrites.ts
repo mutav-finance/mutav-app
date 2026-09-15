@@ -1,18 +1,14 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Guarantee } from "./domain";
-import {
-  ativoInsuredCentsPlatform,
-  contractsByStatus,
-  contractsByStatusPlatform,
-} from "./aggregate";
+import { insuredCentsPlatform, guaranteesByState, guaranteesByStatePlatform } from "./aggregate";
 
 /**
  * Central dual-write helpers for every guarantee aggregate.
  *
  * Three aggregates must stay in lockstep on every guarantee write:
- *   - `contractsByStatus` (per-agency state counts)
- *   - `contractsByStatusPlatform` (platform-wide state counts)
- *   - `ativoInsuredCentsPlatform` (platform-wide worst-case exposure)
+ *   - `guaranteesByState` (per-agency state counts)
+ *   - `guaranteesByStatePlatform` (platform-wide state counts)
+ *   - `insuredCentsPlatform` (platform-wide worst-case exposure)
  *
  * Every mutation that inserts/replaces/deletes a guarantee MUST go through one
  * of the helpers below — never call `.insert` / `.replace` / `.delete` directly
@@ -20,9 +16,9 @@ import {
  */
 
 export async function insertGuaranteeAggregates(ctx: MutationCtx, doc: Guarantee): Promise<void> {
-  await contractsByStatus.insert(ctx, doc);
-  await contractsByStatusPlatform.insert(ctx, doc);
-  await ativoInsuredCentsPlatform.insert(ctx, doc);
+  await guaranteesByState.insert(ctx, doc);
+  await guaranteesByStatePlatform.insert(ctx, doc);
+  await insuredCentsPlatform.insert(ctx, doc);
 }
 
 export async function replaceGuaranteeAggregates(
@@ -30,15 +26,15 @@ export async function replaceGuaranteeAggregates(
   before: Guarantee,
   after: Guarantee,
 ): Promise<void> {
-  await contractsByStatus.replace(ctx, before, after);
-  await contractsByStatusPlatform.replace(ctx, before, after);
-  await ativoInsuredCentsPlatform.replace(ctx, before, after);
+  await guaranteesByState.replace(ctx, before, after);
+  await guaranteesByStatePlatform.replace(ctx, before, after);
+  await insuredCentsPlatform.replace(ctx, before, after);
 }
 
 export async function deleteGuaranteeAggregates(ctx: MutationCtx, doc: Guarantee): Promise<void> {
-  await contractsByStatus.delete(ctx, doc);
-  await contractsByStatusPlatform.delete(ctx, doc);
-  await ativoInsuredCentsPlatform.delete(ctx, doc);
+  await guaranteesByState.delete(ctx, doc);
+  await guaranteesByStatePlatform.delete(ctx, doc);
+  await insuredCentsPlatform.delete(ctx, doc);
 }
 
 /**
@@ -49,7 +45,7 @@ export async function insertGuaranteeAggregatesIfMissing(
   ctx: MutationCtx,
   doc: Guarantee,
 ): Promise<void> {
-  await contractsByStatus.insertIfDoesNotExist(ctx, doc);
-  await contractsByStatusPlatform.insertIfDoesNotExist(ctx, doc);
-  await ativoInsuredCentsPlatform.insertIfDoesNotExist(ctx, doc);
+  await guaranteesByState.insertIfDoesNotExist(ctx, doc);
+  await guaranteesByStatePlatform.insertIfDoesNotExist(ctx, doc);
+  await insuredCentsPlatform.insertIfDoesNotExist(ctx, doc);
 }

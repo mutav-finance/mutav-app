@@ -6,7 +6,7 @@ import type { AgencyId } from "./agencies/domain";
 import { NOTICE_RESOLUTION_KIND } from "./delinquencies/domain";
 import { CLOSE_REASON, GUARANTEE_STATE } from "./guarantees/domain";
 import { DEFAULT_PRICING_TABLE } from "./guarantees/pricing";
-import { registerContractAggregateComponents } from "./lib/testFixtures";
+import { registerGuaranteeAggregateComponents } from "./lib/testFixtures";
 import { isEffective } from "./products/domain";
 import schema from "./schema";
 
@@ -26,7 +26,7 @@ function setup() {
   const t = convexTest(schema);
   // seedReset writes guarantee aggregates; the components must be registered
   // or the aggregate writes throw.
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 

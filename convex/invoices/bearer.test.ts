@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
 import {
-  registerContractAggregateComponents,
+  registerGuaranteeAggregateComponents,
   seedAgencyWithMembership,
   setupAuthenticatedUser,
 } from "../lib/testFixtures";
@@ -82,7 +82,7 @@ async function seedBankAccount(t: ReturnType<typeof convexTest>, agencyId: Agenc
 
 async function setup() {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   const { userId } = await setupAuthenticatedUser(t);
   const agencyId = await seedAgencyWithMembership(t, userId);
   return { t, agencyId };
@@ -199,7 +199,7 @@ describe("bearer lifecycle — a revoked token is rejected", () => {
 
   test("revokeAccessToken takes effect on the next request", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     const invoiceId = await seedInvoice(t, agencyId);
@@ -217,7 +217,7 @@ describe("bearer lifecycle — a revoked token is rejected", () => {
 
   test("revoking and rotating both leave an audit entry, and neither logs the token", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     const invoiceId = await seedInvoice(t, agencyId);
@@ -245,7 +245,7 @@ describe("bearer lifecycle — a revoked token is rejected", () => {
 
   test("rotateAccessToken retires the leaked token and issues a working one", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     const invoiceId = await seedInvoice(t, agencyId, { accessTokenRevokedAt: Date.now() - 1000 });

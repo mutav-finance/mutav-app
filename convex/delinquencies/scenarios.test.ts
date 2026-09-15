@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { internal } from "../_generated/api";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import schema from "../schema";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
@@ -30,7 +30,7 @@ beforeAll(() => {
 
 function setup() {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 

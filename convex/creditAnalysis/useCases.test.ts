@@ -5,7 +5,7 @@ import { api, internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
 import type { ContractApplicationId } from "../guarantees/domain";
 import {
-  registerContractAggregateComponents,
+  registerGuaranteeAggregateComponents,
   seedAgencyWithMembership,
   setupAuthenticatedUser,
   type SeededUserId,
@@ -149,7 +149,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
 
   test("dispatch is refused when no application binds the agency to the tax ID", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -166,7 +166,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
 
   test("dispatch is permitted once an application binds the agency to the tax ID", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -189,7 +189,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
 
   test("another agency's application does not authorise this agency's pull", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     const foreignAgencyId = await seedAgency(t);
@@ -209,7 +209,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
 
   test("an application older than the validity window no longer authorises a pull", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedApplication(t, {
@@ -228,7 +228,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
 
   test("the resulting signal carries the application ref and the legal basis", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     const applicationId = await seedApplication(t, {
@@ -252,7 +252,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
 
   test("openContractApplication rejects a tax ID that is neither CPF nor CNPJ length", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -274,7 +274,7 @@ describe("Lei 12.414 art. 15 relationship precondition", () => {
 
   test("openContractApplication attributes the record to the declaring member", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
