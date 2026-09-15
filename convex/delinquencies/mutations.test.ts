@@ -2,16 +2,17 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { registerContractAggregateComponents } from "../lib/testFixtures";
+import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { replaceGuaranteeAggregates } from "../guarantees/aggregateWrites";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractId } from "../contracts/domain";
+import type { GuaranteeId, GuaranteeState } from "../guarantees/domain";
 import type { DelinquencyNoticeId } from "./domain";
 import schema from "../schema";
 
 // A convexTest instance factory. Aggregate components must be registered per
-// instance — the contracts domain's shared schema wires them in, and
+// instance — the guarantees domain's shared schema wires them in, and
 // unregistered lookups throw on first query.
 function setup() {
   const t = convexTest(schema);
@@ -31,20 +32,24 @@ function orThrow<TValue>(value: TValue | null | undefined, label: string): TValu
   return value;
 }
 
-// One-user, one-agency, one-active-contract fixture. Mirrors the shape used
+// One-user, one-agency, one-active-guarantee fixture. Mirrors the shape used
 // in useCases.test.ts so mutation calls resolve identity end-to-end.
 type Fixture = {
   subject: string;
   userId: UserId;
   agencyId: AgencyId;
-  contractId: ContractId;
-  contractPublicId: string;
+  guaranteeId: GuaranteeId;
+  guaranteePublicId: string;
 };
 
-async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
+async function makeFixture(
+  t: T,
+  suffix = "1",
+  guarantee: { status?: GuaranteeState; availableCents?: number } = {},
+): Promise<Fixture> {
   const subject = `auth0|user-${suffix}`;
-  const contractPublicId = `CT-${suffix}`;
-  const fx = await t.run(async (ctx) => {
+  const guaranteePublicId = `CT-${suffix}`;
+  const { userId, agencyId } = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", {
       publicId: `user-${suffix}`,
       subject,
@@ -65,55 +70,23 @@ async function makeFixture(t: T, suffix = "1"): Promise<Fixture> {
       role: "owner",
       joinedAt: "2024-01-01T00:00:00-03:00",
     });
-    const tenantId = await ctx.db.insert("tenants", {
-      entityType: "pf",
-      taxId: `1114447773${suffix}`.slice(-11),
-      fullName: `Tenant ${suffix}`,
-      birthDate: "1990-01-01",
-      email: `tenant-${suffix}@test.br`,
-      phone: "11999999999",
-    });
-    const contractId = await ctx.db.insert("contracts", {
-      agencyId,
-      publicId: contractPublicId,
-      tenantId,
-      tenantApproval: { status: "aprovado", termApprovedAt: "2024-06-01" },
-      status: "ativo",
-      activatedAt: "2024-06-01",
-      deactivatedAt: null,
-      nextRenewalDate: "2026-12-31",
-      availableGuaranteeCents: 3_600_000,
-      rental: {
-        propertyKind: "residencial",
-        plan: "basic",
-        rentCents: 300_000,
-        condoCents: 0,
-        otherFeesCents: 0,
-        totalRentCents: 300_000,
-        feeCents: 1500,
-        oneTimeActivationFeeCents: 0,
-        setupInstallments: 1,
-        exitCostMultiplier: "5x",
-        rentMultiplier: "12x",
-        payer: "inquilino",
-        pviMigrationSchedule: null,
-      },
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo/SP",
-      },
-      optional: { complement: "", tag: "", description: "" },
-      documents: [
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "aprovado" },
-        { key: "policy", status: "aprovado" },
-      ],
-    });
-    return { userId, agencyId, contractId };
+    return { userId, agencyId };
   });
-  return { subject, contractPublicId, ...fx };
+  const { guaranteeId } = await seedGuaranteeWithLease(
+    t,
+    {
+      agencyId,
+      status: guarantee.status ?? "active",
+      activatedAt: "2024-06-01T00:00:00.000Z",
+      rentCents: 300_000,
+      tenantTaxId: `1114447773${suffix}`.slice(-11),
+      ...(guarantee.availableCents === undefined
+        ? {}
+        : { availableCents: guarantee.availableCents }),
+    },
+    guaranteePublicId,
+  );
+  return { subject, guaranteePublicId, userId, agencyId, guaranteeId };
 }
 
 async function grantStaffRole(t: T, userId: UserId, role: MutavStaffRole): Promise<void> {
@@ -126,13 +99,22 @@ async function grantStaffRole(t: T, userId: UserId, role: MutavStaffRole): Promi
   });
 }
 
-async function setContractStatus(
+// Direct status patch. The aggregates are rewritten with it: a mutation under
+// test may now transition the guarantee, and `replace` deletes by the key the
+// aggregate holds — a stale key makes the aggregate, not the mutation, the
+// thing that fails.
+async function setGuaranteeStatus(
   t: T,
-  contractId: ContractId,
-  status: "ativo" | "pendente" | "encerrado" | "cancelado",
+  guaranteeId: GuaranteeId,
+  status: GuaranteeState,
 ): Promise<void> {
   await t.run(async (ctx) => {
-    await ctx.db.patch(contractId, { status });
+    const before = await ctx.db.get(guaranteeId);
+    if (!before) throw new Error(`No guarantee ${guaranteeId} to patch.`);
+    await ctx.db.patch(guaranteeId, { status });
+    const after = await ctx.db.get(guaranteeId);
+    if (!after) throw new Error(`Guarantee ${guaranteeId} vanished mid-patch.`);
+    await replaceGuaranteeAggregates(ctx, before, after);
   });
 }
 
@@ -141,7 +123,7 @@ async function insertNotice(
   fx: Fixture,
   overrides: {
     publicId: string;
-    status?: "open" | "resolved" | "canceled";
+    status?: "open" | "verified" | "resolved" | "canceled";
     rentDueDate?: string;
     originalAmountCents?: number;
     updatedAmountCents?: number;
@@ -152,9 +134,9 @@ async function insertNotice(
 ): Promise<DelinquencyNoticeId> {
   return t.run(async (ctx) => {
     const status = overrides.status ?? "open";
-    return ctx.db.insert("contractDelinquencyNotices", {
+    return ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: overrides.publicId,
-      contractId: fx.contractId,
+      guaranteeId: fx.guaranteeId,
       agencyId: fx.agencyId,
       status,
       rentDueDate: overrides.rentDueDate ?? "2026-06-05",
@@ -163,6 +145,14 @@ async function insertNotice(
       evidenceSource: "agency_reported",
       openedAt: overrides.openedAt ?? "2026-06-10T09:00:00-03:00",
       openedByUserId: fx.userId,
+      ...(status === "verified"
+        ? {
+            verification: {
+              verifiedAt: "2026-06-12T09:00:00-03:00",
+              verifiedByUserId: fx.userId,
+            },
+          }
+        : {}),
       ...(status === "resolved"
         ? {
             resolution: {
@@ -196,7 +186,7 @@ describe("openNotice", () => {
     await expect(
       t.mutation(api.delinquencies.mutations.openNotice, {
         agencyId: fx.agencyId,
-        contractPublicId: fx.contractPublicId,
+        guaranteePublicId: fx.guaranteePublicId,
         rentDueDate: "2026-06-05",
         originalAmountCents: 300_000,
       }),
@@ -211,7 +201,7 @@ describe("openNotice", () => {
     await expect(
       asA.mutation(api.delinquencies.mutations.openNotice, {
         agencyId: b.agencyId,
-        contractPublicId: b.contractPublicId,
+        guaranteePublicId: b.guaranteePublicId,
         rentDueDate: "2026-06-05",
         originalAmountCents: 300_000,
       }),
@@ -226,7 +216,7 @@ describe("openNotice", () => {
     const before = Date.now();
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -238,13 +228,13 @@ describe("openNotice", () => {
 
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
     expect(row).not.toBeNull();
     expect(row?.status).toBe("open");
-    expect(row?.contractId).toBe(fx.contractId);
+    expect(row?.guaranteeId).toBe(fx.guaranteeId);
     expect(row?.agencyId).toBe(fx.agencyId);
     expect(row?.openedByUserId).toBe(fx.userId);
     expect(row?.updatedAmountCents).toBe(300_000);
@@ -261,7 +251,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-07-05",
       originalAmountCents: 250_000,
     });
@@ -269,7 +259,7 @@ describe("openNotice", () => {
     if (!result.success) return;
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
@@ -282,7 +272,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
       evidenceSource: "bank_attested",
@@ -298,7 +288,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
       evidenceSource: "onchain_observed",
@@ -314,7 +304,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05T00:00:00Z",
       originalAmountCents: 300_000,
     });
@@ -329,7 +319,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 0,
     });
@@ -344,7 +334,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: -1,
     });
@@ -359,7 +349,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300.5,
     });
@@ -368,61 +358,61 @@ describe("openNotice", () => {
     expect(result.error.code).toBe("INVALID_AMOUNT");
   });
 
-  test("unknown contract publicId → CONTRACT_NOT_FOUND", async () => {
+  test("unknown guarantee publicId → GUARANTEE_NOT_FOUND", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: "CT-does-not-exist",
+      guaranteePublicId: "CT-does-not-exist",
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.code).toBe("CONTRACT_NOT_FOUND");
+    expect(result.error.code).toBe("GUARANTEE_NOT_FOUND");
   });
 
-  test("contract exists but in a different agency → CONTRACT_NOT_FOUND (existence not leaked)", async () => {
+  test("guarantee exists but in a different agency → GUARANTEE_NOT_FOUND (existence not leaked)", async () => {
     const t = setup();
     const a = await makeFixture(t, "1");
     const b = await makeFixture(t, "2");
     const asA = t.withIdentity({ subject: a.subject });
     const result = await asA.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: a.agencyId,
-      contractPublicId: b.contractPublicId,
+      guaranteePublicId: b.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.code).toBe("CONTRACT_NOT_FOUND");
+    expect(result.error.code).toBe("GUARANTEE_NOT_FOUND");
   });
 
-  test("contract exists but status='pendente' → CONTRACT_NOT_ACTIVE", async () => {
+  test("guarantee exists but status='drafted' → GUARANTEE_NOT_INSURED", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    await setContractStatus(t, fx.contractId, "pendente");
+    await setGuaranteeStatus(t, fx.guaranteeId, "drafted");
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.code).toBe("CONTRACT_NOT_ACTIVE");
+    expect(result.error.code).toBe("GUARANTEE_NOT_INSURED");
   });
 
-  test("second open notice for same (contract, rentDueDate) → DUPLICATE_NOTICE", async () => {
+  test("second open notice for same (guarantee, rentDueDate) → DUPLICATE_NOTICE", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     const asUser = t.withIdentity({ subject: fx.subject });
 
     const first = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -430,7 +420,7 @@ describe("openNotice", () => {
 
     const second = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -439,7 +429,7 @@ describe("openNotice", () => {
     expect(second.error.code).toBe("DUPLICATE_NOTICE");
   });
 
-  test("prior canceled notice for same (contract, dueDate) does NOT block a re-file; suffixed publicId", async () => {
+  test("prior canceled notice for same (guarantee, dueDate) does NOT block a re-file; suffixed publicId", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     // Seed a prior canceled notice on the exact same rentDueDate — the
@@ -454,7 +444,7 @@ describe("openNotice", () => {
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-06-05",
       originalAmountCents: 300_000,
     });
@@ -463,11 +453,11 @@ describe("openNotice", () => {
     expect(result.data.publicId).toBe("DN-CT-1-2026-06-05-2");
   });
 
-  test("two notices on same contract in same month, different due dates → distinct publicIds retrievable via getByPublicId", async () => {
+  test("two notices on same guarantee in same month, different due dates → distinct publicIds retrievable via getByPublicId", async () => {
     // Regression for the month-granularity collision: previously both notices
     // would base on `DN-CT-1-2026-04` and rely on the suffix loop. That loop
-    // only saw prior rows on the SAME (contract, rentDueDate) tuple via
-    // `by_contract_dueDate`, so the second notice would get the same base
+    // only saw prior rows on the SAME (guarantee, rentDueDate) tuple via
+    // `by_guarantee_dueDate`, so the second notice would get the same base
     // publicId as the first and permanently break getByPublicId's `.unique()`.
     const t = setup();
     const fx = await makeFixture(t);
@@ -475,7 +465,7 @@ describe("openNotice", () => {
 
     const first = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-04-05",
       originalAmountCents: 300_000,
     });
@@ -494,7 +484,7 @@ describe("openNotice", () => {
 
     const second = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
-      contractPublicId: fx.contractPublicId,
+      guaranteePublicId: fx.guaranteePublicId,
       rentDueDate: "2026-04-20",
       originalAmountCents: 300_000,
     });
@@ -590,6 +580,26 @@ describe("markResolved", () => {
     expect(resolvedAtMs).toBeLessThanOrEqual(after);
   });
 
+  test("staff-verified notice → NOTICE_VERIFIED; agency cannot make a confirmed default disappear", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-verified-r", status: "verified" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-verified-r",
+      resolution: { kind: "tenant_cured" },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOTICE_VERIFIED");
+
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("verified");
+    expect(row?.resolution).toBeUndefined();
+  });
+
   test("resolution kind='stale' is accepted (agency-side terminal resolution)", async () => {
     const t = setup();
     const fx = await makeFixture(t);
@@ -603,7 +613,7 @@ describe("markResolved", () => {
     if (!result.success) return;
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
@@ -623,7 +633,7 @@ describe("markResolved", () => {
     expect(first.success).toBe(true);
     const rowAfterFirstRaw = await t.run(async (ctx) => {
       const notice = await ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", "DN-double-r"))
         .unique();
       return notice;
@@ -733,6 +743,26 @@ describe("markCanceled", () => {
     expect(canceledAtMs).toBeLessThanOrEqual(after);
   });
 
+  test("staff-verified notice → NOTICE_VERIFIED and row preserved", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-verified-c", status: "verified" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-verified-c",
+      cancellation: { reason: "agency_withdrew" },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOTICE_VERIFIED");
+
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("verified");
+    expect(row?.cancellation).toBeUndefined();
+  });
+
   test("reason='duplicate' accepted", async () => {
     const t = setup();
     const fx = await makeFixture(t);
@@ -746,7 +776,7 @@ describe("markCanceled", () => {
     if (!result.success) return;
     const row = await t.run((ctx) =>
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
@@ -767,7 +797,7 @@ describe("markCanceled", () => {
 
     const rowAfterFirstRaw = await t.run(async (ctx) => {
       return ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_publicId", (q) => q.eq("publicId", "DN-double-c"))
         .unique();
     });
@@ -878,7 +908,11 @@ describe("staffMarkResolvedByCover", () => {
   test("happy path (compliance): patches row + emits audit entry with staff actor", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    const noticeId = await insertNotice(t, fx, { publicId: "DN-cover-happy" });
+    const noticeId = await insertNotice(t, fx, {
+      publicId: "DN-cover-happy",
+      status: "verified",
+    });
+    await setGuaranteeStatus(t, fx.guaranteeId, "default_verified");
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
@@ -910,7 +944,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cover-happy"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cover-happy"),
         )
         .collect(),
     );
@@ -919,10 +953,34 @@ describe("staffMarkResolvedByCover", () => {
     expect(entries[0].actor).toEqual({ kind: "user", userId: fx.userId });
   });
 
+  test("verified → resolved by cover is the staff path the agency guard reserves", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, {
+      publicId: "DN-cover-verified",
+      status: "verified",
+    });
+    await setGuaranteeStatus(t, fx.guaranteeId, "default_verified");
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-cover-verified", coverOperationPublicId: "COVER-V1" },
+    );
+    expect(result.success).toBe(true);
+
+    const row = await t.run((ctx) => ctx.db.get(noticeId));
+    expect(row?.status).toBe("resolved");
+    expect(row?.resolution?.kind).toBe("cover_committed");
+    expect(row?.verification?.verifiedByUserId).toBe(fx.userId);
+  });
+
   test("staff role='admin' also allowed (admin ≥ compliance)", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    await insertNotice(t, fx, { publicId: "DN-cover-admin" });
+    await insertNotice(t, fx, { publicId: "DN-cover-admin", status: "verified" });
+    await setGuaranteeStatus(t, fx.guaranteeId, "default_verified");
     await grantStaffRole(t, fx.userId, "admin");
     const asAdmin = t.withIdentity({ subject: fx.subject });
     const result = await asAdmin.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
@@ -936,7 +994,11 @@ describe("staffMarkResolvedByCover", () => {
     const t = setup();
     const a = await makeFixture(t, "1");
     const b = await makeFixture(t, "2");
-    const noticeId = await insertNotice(t, b, { publicId: "DN-cross-agency" });
+    const noticeId = await insertNotice(t, b, {
+      publicId: "DN-cross-agency",
+      status: "verified",
+    });
+    await setGuaranteeStatus(t, b.guaranteeId, "default_verified");
     // Staff row lives on user A, but the notice is agency B's.
     await grantStaffRole(t, a.userId, "compliance");
     const asStaff = t.withIdentity({ subject: a.subject });
@@ -961,7 +1023,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cross-agency"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cross-agency"),
         )
         .collect(),
     );
@@ -991,7 +1053,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cover-terminal"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cover-terminal"),
         )
         .collect(),
     );
@@ -1016,7 +1078,7 @@ describe("staffMarkResolvedByCover", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cover-self"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cover-self"),
         )
         .collect(),
     );
@@ -1116,7 +1178,7 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-dismiss-happy"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-dismiss-happy"),
         )
         .collect(),
     );
@@ -1155,7 +1217,7 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-dispute-happy"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-dispute-happy"),
         )
         .collect(),
     );
@@ -1188,7 +1250,7 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-cross-dismiss"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-cross-dismiss"),
         )
         .collect(),
     );
@@ -1219,7 +1281,7 @@ describe("staffMarkCanceledByDismissal", () => {
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
           q
-            .eq("resourceType", "contractDelinquencyNotices")
+            .eq("resourceType", "guaranteeDelinquencyNotices")
             .eq("resourceId", "DN-dismiss-terminal"),
         )
         .collect(),
@@ -1245,10 +1307,949 @@ describe("staffMarkCanceledByDismissal", () => {
       ctx.db
         .query("mutavAuditLog")
         .withIndex("by_resource", (q) =>
-          q.eq("resourceType", "contractDelinquencyNotices").eq("resourceId", "DN-dismiss-self"),
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-dismiss-self"),
         )
         .collect(),
     );
     expect(entries.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Composition: notices drive the guarantee machine
+//
+// Every case below asserts BOTH rows the transaction touches — the notice and
+// the guarantee it belongs to — plus what the guarantee timeline and the audit
+// log recorded. The fixture's 300_000-cent rent under the seeded default
+// product (30x ceiling multiplier) gives a 9_000_000-cent ceiling; the
+// capacity literals are written out from that, never read back from pricing.
+// ---------------------------------------------------------------------------
+
+const CEILING_CENTS = 9_000_000;
+
+async function readGuarantee(t: T, guaranteeId: GuaranteeId) {
+  return orThrow(await t.run((ctx) => ctx.db.get(guaranteeId)), "guarantee row");
+}
+
+async function readGuaranteeHistory(t: T, guaranteePublicId: string) {
+  return t.run((ctx) =>
+    ctx.db
+      .query("guaranteeHistory")
+      .withIndex("by_guarantee", (q) => q.eq("guaranteePublicId", guaranteePublicId))
+      .collect(),
+  );
+}
+
+async function readGuaranteeAudit(t: T, guaranteePublicId: string) {
+  return t.run((ctx) =>
+    ctx.db
+      .query("mutavAuditLog")
+      .withIndex("by_resource", (q) =>
+        q.eq("resourceType", "guarantees").eq("resourceId", guaranteePublicId),
+      )
+      .collect(),
+  );
+}
+
+describe("openNotice — composed guarantee transition", () => {
+  test("active guarantee moves to in_arrears, with history and audit, in the same call", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(true);
+
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("in_arrears");
+
+    const history = await readGuaranteeHistory(t, fx.guaranteePublicId);
+    expect(history.length).toBe(1);
+    expect(history[0].transition).toEqual({ from: "active", to: "in_arrears" });
+
+    const audit = await readGuaranteeAudit(t, fx.guaranteePublicId);
+    expect(audit.length).toBe(1);
+    expect(audit[0].action).toBe("guarantee.transitioned");
+    expect(audit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("guarantee already in_arrears keeps its state and still records the notice", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-07-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("in_arrears");
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+
+    const notice = await t.run((ctx) =>
+      ctx.db
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
+        .unique(),
+    );
+    expect(notice?.status).toBe("open");
+  });
+
+  test("guarantee under cover keeps cover_committed and still records the notice", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "cover_committed" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-08-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(true);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("cover_committed");
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+
+  test("drafted guarantee is refused and writes nothing at all", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "drafted" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("GUARANTEE_NOT_INSURED");
+
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("drafted");
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+    const notices = await t.run((ctx) => ctx.db.query("guaranteeDelinquencyNotices").collect());
+    expect(notices.length).toBe(0);
+  });
+});
+
+describe("staffVerifyDefault", () => {
+  test("unauthenticated → throws", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-verify-noauth" });
+    await expect(
+      t.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+        noticePublicId: "DN-verify-noauth",
+      }),
+    ).rejects.toThrow(/Authentication required/);
+  });
+
+  test("authenticated non-staff → throws ForbiddenError", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-verify-nostaff" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+    await expect(
+      asUser.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+        noticePublicId: "DN-verify-nostaff",
+      }),
+    ).rejects.toThrow(/Not a Mutav staff member/);
+  });
+
+  test("staff role='support' → throws (below compliance)", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-verify-support" });
+    await grantStaffRole(t, fx.userId, "support");
+    const asSupport = t.withIdentity({ subject: fx.subject });
+    await expect(
+      asSupport.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+        noticePublicId: "DN-verify-support",
+      }),
+    ).rejects.toThrow(/compliance/);
+  });
+
+  test("unknown notice → NOTICE_NOT_FOUND", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+    const result = await asCompliance.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: "DN-nope",
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOTICE_NOT_FOUND");
+  });
+
+  test("happy path: notice open → verified and guarantee in_arrears → default_verified", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-verify-happy" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const before = Date.now();
+    const result = await asCompliance.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: "DN-verify-happy",
+      note: "Comprovante conferido.",
+    });
+    const after = Date.now();
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeStatus).toBe("default_verified");
+
+    const row = orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row");
+    expect(row.status).toBe("verified");
+    const verification = orThrow(row.verification, "verification envelope");
+    expect(verification.verifiedByUserId).toBe(fx.userId);
+    expect(verification.note).toBe("Comprovante conferido.");
+    const verifiedAtMs = Date.parse(verification.verifiedAt);
+    expect(verifiedAtMs).toBeGreaterThanOrEqual(before);
+    expect(verifiedAtMs).toBeLessThanOrEqual(after);
+
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
+
+    const history = await readGuaranteeHistory(t, fx.guaranteePublicId);
+    expect(history.length).toBe(1);
+    expect(history[0].transition).toEqual({ from: "in_arrears", to: "default_verified" });
+
+    const noticeAudit = await t.run((ctx) =>
+      ctx.db
+        .query("mutavAuditLog")
+        .withIndex("by_resource", (q) =>
+          q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", "DN-verify-happy"),
+        )
+        .collect(),
+    );
+    expect(noticeAudit.length).toBe(1);
+    expect(noticeAudit[0].action).toBe("delinquency.verified");
+    expect(noticeAudit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("guarantee still active → GUARANTEE_TRANSITION_REFUSED and neither row moves", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-verify-active" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: "DN-verify-active",
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("GUARANTEE_TRANSITION_REFUSED");
+
+    const row = orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row");
+    expect(row.status).toBe("open");
+    expect(row.verification).toBeUndefined();
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("active");
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+    expect((await readGuaranteeAudit(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+
+  test("already-verified notice → SELF_TRANSITION, guarantee untouched", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, { publicId: "DN-verify-twice", status: "verified" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: "DN-verify-twice",
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("SELF_TRANSITION");
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+
+  test("a second notice on an already-verified default is verified without moving the guarantee", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    const noticeId = await insertNotice(t, fx, {
+      publicId: "DN-verify-second",
+      rentDueDate: "2026-07-05",
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: "DN-verify-second",
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeStatus).toBe("default_verified");
+
+    expect(orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row").status).toBe(
+      "verified",
+    );
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
+    // No hop, so no history row and no guarantee-level audit entry.
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+    expect((await readGuaranteeAudit(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+
+  test("a notice filed under committed cover is verified without moving the guarantee", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "cover_committed" });
+    await insertNotice(t, fx, { publicId: "DN-verify-covered", rentDueDate: "2026-08-05" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: "DN-verify-covered",
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeStatus).toBe("cover_committed");
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("cover_committed");
+  });
+
+  test("cross-agency: compliance staff verifies a notice owned by another agency", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1");
+    const b = await makeFixture(t, "2", { status: "in_arrears" });
+    const noticeId = await insertNotice(t, b, { publicId: "DN-verify-cross" });
+    await grantStaffRole(t, a.userId, "compliance");
+    const asStaff = t.withIdentity({ subject: a.subject });
+
+    const result = await asStaff.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: "DN-verify-cross",
+    });
+    expect(result.success).toBe(true);
+
+    const row = orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row");
+    expect(row.agencyId).toBe(b.agencyId);
+    expect(row.verification?.verifiedByUserId).toBe(a.userId);
+    expect((await readGuarantee(t, b.guaranteeId)).status).toBe("default_verified");
+    // Agency A's own guarantee is untouched by staff acting on agency B's row.
+    expect((await readGuarantee(t, a.guaranteeId)).status).toBe("active");
+  });
+});
+
+describe("staffMarkResolvedByCover — capacity draw", () => {
+  test("reserves the notice's updated amount and moves the guarantee to cover_committed", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    const noticeId = await insertNotice(t, fx, {
+      publicId: "DN-draw-happy",
+      status: "verified",
+      originalAmountCents: 250_000,
+      updatedAmountCents: 250_000,
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-happy", coverOperationPublicId: "COVER-D1" },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.appliedCoverCents).toBe(250_000);
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.status).toBe("cover_committed");
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: 8_750_000,
+      reservedCents: 250_000,
+    });
+
+    const row = orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row");
+    expect(row.resolution?.appliedCoverCents).toBe(250_000);
+    expect(row.resolution?.kind).toBe("cover_committed");
+
+    const audit = await readGuaranteeAudit(t, fx.guaranteePublicId);
+    expect(audit.map((entry) => entry.action)).toEqual([
+      "guarantee.capacity_reserved",
+      "guarantee.transitioned",
+    ]);
+  });
+
+  test("draws the UPDATED amount, not the original one", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, {
+      publicId: "DN-draw-updated",
+      status: "verified",
+      originalAmountCents: 200_000,
+      updatedAmountCents: 260_000,
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-updated", coverOperationPublicId: "COVER-D2" },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.appliedCoverCents).toBe(260_000);
+    expect((await readGuarantee(t, fx.guaranteeId)).capacity.reservedCents).toBe(260_000);
+  });
+
+  test("a notice worth more than the remaining ceiling is clamped to what is available", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", {
+      status: "default_verified",
+      availableCents: 100_000,
+    });
+    const noticeId = await insertNotice(t, fx, {
+      publicId: "DN-draw-clamp",
+      status: "verified",
+      originalAmountCents: 300_000,
+      updatedAmountCents: 300_000,
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-clamp", coverOperationPublicId: "COVER-D3" },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.appliedCoverCents).toBe(100_000);
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: 0,
+      reservedCents: CEILING_CENTS,
+    });
+
+    const row = orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row");
+    // The APPLIED figure, not the 300_000 face amount — a reversal gives back
+    // exactly what was taken.
+    expect(row.resolution?.appliedCoverCents).toBe(100_000);
+  });
+
+  test("an exhausted guarantee applies zero and still records the cover", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified", availableCents: 0 });
+    await insertNotice(t, fx, {
+      publicId: "DN-draw-exhausted",
+      status: "verified",
+      originalAmountCents: 300_000,
+      updatedAmountCents: 300_000,
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-exhausted", coverOperationPublicId: "COVER-D4" },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.appliedCoverCents).toBe(0);
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.status).toBe("cover_committed");
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: 0,
+      reservedCents: CEILING_CENTS,
+    });
+  });
+
+  test("an unverified notice cannot draw cover even when a sibling verified the default", async () => {
+    // The guarantee is `default_verified` because ANOTHER notice was verified.
+    // Without a notice-level gate the machine check alone would let this one
+    // through and draw against a default nobody confirmed for it.
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, {
+      publicId: "DN-draw-sibling-verified",
+      status: "verified",
+      rentDueDate: "2026-05-05",
+    });
+    const unverifiedId = await insertNotice(t, fx, {
+      publicId: "DN-draw-unverified",
+      rentDueDate: "2026-06-05",
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-unverified", coverOperationPublicId: "COVER-D6" },
+    );
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOTICE_NOT_VERIFIED");
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.status).toBe("default_verified");
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: CEILING_CENTS,
+      reservedCents: 0,
+    });
+    expect(orThrow(await t.run((ctx) => ctx.db.get(unverifiedId)), "notice row").status).toBe(
+      "open",
+    );
+    expect((await readGuaranteeAudit(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+
+  test("a second verified notice draws again against the same ceiling without a second hop", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, {
+      publicId: "DN-draw-month-1",
+      status: "verified",
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 250_000,
+      updatedAmountCents: 250_000,
+    });
+    const secondId = await insertNotice(t, fx, {
+      publicId: "DN-draw-month-2",
+      status: "verified",
+      rentDueDate: "2026-07-05",
+      originalAmountCents: 100_000,
+      updatedAmountCents: 100_000,
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const first = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-month-1", coverOperationPublicId: "COVER-M1" },
+    );
+    expect(first.success).toBe(true);
+
+    const second = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-month-2", coverOperationPublicId: "COVER-M2" },
+    );
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+    expect(second.data.appliedCoverCents).toBe(100_000);
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.status).toBe("cover_committed");
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: 8_650_000,
+      reservedCents: 350_000,
+    });
+    // Each notice records its own applied figure so a reversal gives back
+    // exactly what that notice took.
+    expect(
+      orThrow(await t.run((ctx) => ctx.db.get(secondId)), "notice row").resolution
+        ?.appliedCoverCents,
+    ).toBe(100_000);
+    // One state hop for the episode, two reservations.
+    expect((await readGuaranteeAudit(t, fx.guaranteePublicId)).map((e) => e.action)).toEqual([
+      "guarantee.capacity_reserved",
+      "guarantee.transitioned",
+      "guarantee.capacity_reserved",
+    ]);
+  });
+
+  test("guarantee still active → refused, and no capacity moves", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-draw-active", status: "verified" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkResolvedByCover,
+      { noticePublicId: "DN-draw-active", coverOperationPublicId: "COVER-D5" },
+    );
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("GUARANTEE_TRANSITION_REFUSED");
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.status).toBe("active");
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: CEILING_CENTS,
+      reservedCents: 0,
+    });
+    expect(orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row").status).toBe(
+      "verified",
+    );
+    expect((await readGuaranteeAudit(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+});
+
+describe("markResolved — return to active", () => {
+  test("curing the last outstanding notice returns the guarantee to active", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-cure-only" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-cure-only",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(true);
+
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("active");
+    const history = await readGuaranteeHistory(t, fx.guaranteePublicId);
+    expect(history.length).toBe(1);
+    expect(history[0].transition).toEqual({ from: "in_arrears", to: "active" });
+  });
+
+  test("another open notice on the same guarantee keeps it in arrears", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-cure-one", rentDueDate: "2026-06-05" });
+    await insertNotice(t, fx, { publicId: "DN-cure-two", rentDueDate: "2026-07-05" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-cure-one",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("in_arrears");
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+
+  test("a staff-verified notice still outstanding keeps the guarantee where it is", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, { publicId: "DN-cure-open", rentDueDate: "2026-06-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-cure-verified",
+      rentDueDate: "2026-07-05",
+      status: "verified",
+    });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-cure-open",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
+  });
+
+  test("a resolved or canceled sibling does not block the return to active", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-cure-live", rentDueDate: "2026-06-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-cure-done",
+      rentDueDate: "2026-05-05",
+      status: "resolved",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-cure-dropped",
+      rentDueDate: "2026-04-05",
+      status: "canceled",
+    });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-cure-live",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(true);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("active");
+  });
+
+  test("a 'stale' resolution never hands the guarantee back its performing state", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-cure-stale" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-cure-stale",
+      resolution: { kind: "stale" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("in_arrears");
+  });
+
+  test("a guarantee in eviction is not pulled back by a cure", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_eviction" });
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-cure-eviction" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-cure-eviction",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("in_eviction");
+    // The notice itself still resolves — the cure is a fact worth recording.
+    expect(orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row").status).toBe(
+      "resolved",
+    );
+  });
+
+  test("a member of another agency cannot cure this agency's notice", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1", { status: "in_arrears" });
+    const b = await makeFixture(t, "2");
+    await insertNotice(t, a, { publicId: "DN-cure-cross" });
+    const asB = t.withIdentity({ subject: b.subject });
+
+    await expect(
+      asB.mutation(api.delinquencies.mutations.markResolved, {
+        noticePublicId: "DN-cure-cross",
+        resolution: { kind: "tenant_cured" },
+      }),
+    ).rejects.toThrow(/not a member/);
+    expect((await readGuarantee(t, a.guaranteeId)).status).toBe("in_arrears");
+  });
+
+  test("a staff-verified notice is refused for the agency and moves no guarantee", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, { publicId: "DN-cure-locked", status: "verified" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-cure-locked",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOTICE_VERIFIED");
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
+  });
+});
+
+describe("markCanceled — return to active", () => {
+  test("canceling the last outstanding notice returns the guarantee to active", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-cancel-only" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-cancel-only",
+      cancellation: { reason: "data_error" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(true);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("active");
+  });
+
+  test("another open notice keeps the guarantee in arrears", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    await insertNotice(t, fx, { publicId: "DN-cancel-one", rentDueDate: "2026-06-05" });
+    await insertNotice(t, fx, { publicId: "DN-cancel-two", rentDueDate: "2026-07-05" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-cancel-one",
+      cancellation: { reason: "duplicate" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("in_arrears");
+  });
+
+  test("a cancellation never touches capacity", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", {
+      status: "in_arrears",
+      availableCents: 8_700_000,
+    });
+    await insertNotice(t, fx, { publicId: "DN-cancel-capacity" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-cancel-capacity",
+      cancellation: { reason: "agency_withdrew" },
+    });
+    expect(result.success).toBe(true);
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.status).toBe("active");
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: 8_700_000,
+      reservedCents: 300_000,
+    });
+  });
+
+  test("a member of another agency cannot cancel this agency's notice", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1", { status: "in_arrears" });
+    const b = await makeFixture(t, "2");
+    await insertNotice(t, a, { publicId: "DN-cancel-cross" });
+    const asB = t.withIdentity({ subject: b.subject });
+
+    await expect(
+      asB.mutation(api.delinquencies.mutations.markCanceled, {
+        noticePublicId: "DN-cancel-cross",
+        cancellation: { reason: "data_error" },
+      }),
+    ).rejects.toThrow(/not a member/);
+    expect((await readGuarantee(t, a.guaranteeId)).status).toBe("in_arrears");
+  });
+});
+
+describe("return to active — who may leave which state", () => {
+  // The machine allows `default_verified → active` and `cover_committed →
+  // active`; the mutations do not hand that authority to an agency. Without
+  // the state-specific gate an agency could open a fresh notice on a covered
+  // guarantee, cancel it, and walk a paid-out default back to performing.
+  test.each([
+    { label: "a verified default", status: "default_verified" as GuaranteeState },
+    { label: "a committed cover", status: "cover_committed" as GuaranteeState },
+  ])("an agency cancellation does not pull $label back to active", async ({ status }) => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status });
+    await insertNotice(t, fx, { publicId: `DN-walkback-${status}`, rentDueDate: "2026-09-05" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: `DN-walkback-${status}`,
+      cancellation: { reason: "data_error" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe(status);
+    expect((await readGuaranteeHistory(t, fx.guaranteePublicId)).length).toBe(0);
+  });
+
+  test("an agency cure does not pull a committed cover back to active", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "cover_committed" });
+    await insertNotice(t, fx, { publicId: "DN-walkback-cure", rentDueDate: "2026-09-05" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-walkback-cure",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("cover_committed");
+  });
+
+  test("a compliance dismissal undoes its own verification and returns the guarantee", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    const noticeId = await insertNotice(t, fx, {
+      publicId: "DN-dismiss-restores",
+      status: "verified",
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkCanceledByDismissal,
+      { noticePublicId: "DN-dismiss-restores", disposition: { kind: "staff_dismissed" } },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(true);
+
+    expect(orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row").status).toBe(
+      "canceled",
+    );
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("active");
+    const history = await readGuaranteeHistory(t, fx.guaranteePublicId);
+    expect(history.length).toBe(1);
+    expect(history[0].transition).toEqual({ from: "default_verified", to: "active" });
+  });
+
+  test("a dismissal leaves the guarantee alone while another notice is outstanding", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, {
+      publicId: "DN-dismiss-one",
+      status: "verified",
+      rentDueDate: "2026-06-05",
+    });
+    await insertNotice(t, fx, { publicId: "DN-dismiss-two", rentDueDate: "2026-07-05" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkCanceledByDismissal,
+      { noticePublicId: "DN-dismiss-one", disposition: { kind: "staff_dismissed" } },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
+  });
+
+  test("a dismissal never gives back cents a cover already reserved", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", {
+      status: "cover_committed",
+      availableCents: 8_700_000,
+    });
+    await insertNotice(t, fx, { publicId: "DN-dismiss-covered", status: "verified" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkCanceledByDismissal,
+      { noticePublicId: "DN-dismiss-covered", disposition: { kind: "staff_dismissed" } },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+
+    const guarantee = await readGuarantee(t, fx.guaranteeId);
+    expect(guarantee.status).toBe("cover_committed");
+    expect(guarantee.capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: 8_700_000,
+      reservedCents: 300_000,
+    });
+  });
+
+  test("a staff dispute leaves the default standing for the reversal to close", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, { publicId: "DN-dispute-holds", status: "verified" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(
+      api.delinquencies.mutations.staffMarkCanceledByDismissal,
+      { noticePublicId: "DN-dispute-holds", disposition: { kind: "staff_dispute" } },
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.guaranteeReturnedToActive).toBe(false);
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
   });
 });

@@ -246,9 +246,11 @@ describe("schema walk", () => {
   });
 
   it("marks nested object and array paths with dots and []", () => {
-    const contracts = schemaFieldsForTable(schema, "contracts").map((field) => field.fieldPath);
-    expect(contracts).toContain("property.cep");
-    expect(contracts).toContain("documents[].key");
+    const leases = schemaFieldsForTable(schema, "leases").map((field) => field.fieldPath);
+    expect(leases).toContain("property.cep");
+    const guarantees = schemaFieldsForTable(schema, "guarantees").map((field) => field.fieldPath);
+    expect(guarantees).toContain("documents[].key");
+    expect(guarantees).toContain("underwriting.score");
 
     const assessments = schemaFieldsForTable(schema, "creditAnalysisAssessments").map(
       (field) => field.fieldPath,
@@ -285,17 +287,19 @@ describe("tier assignments agree with POL-SEC-004 §4.2", () => {
     "anchorAccounts.data.encryptedSecret.iv",
     "anchorWebhookEvents.payload",
     "bearerAccessAttempts.key",
-    "contractDelinquencyNotices.originalAmountCents",
-    "contractDelinquencyNotices.rentDueDate",
-    "contractDelinquencyNotices.resolution.kind",
-    "contractDelinquencyNotices.status",
-    "contractDelinquencyNotices.updatedAmountCents",
-    "contractHistory.tenantSnapshot.contactCpf",
-    "contractHistory.tenantSnapshot.taxId",
-    "contracts.score",
     "creditAnalysisAssessments.score",
     "creditAnalysisAssessments.tier",
     "creditAnalysisSignals.normalized.score",
+    "guaranteeDelinquencyNotices.originalAmountCents",
+    "guaranteeDelinquencyNotices.rentDueDate",
+    "guaranteeDelinquencyNotices.resolution.appliedCoverCents",
+    "guaranteeDelinquencyNotices.resolution.kind",
+    "guaranteeDelinquencyNotices.status",
+    "guaranteeDelinquencyNotices.updatedAmountCents",
+    "guaranteeHistory.tenantSnapshot.contactCpf",
+    "guaranteeHistory.tenantSnapshot.taxId",
+    "guarantees.underwriting.score",
+    "guarantees.underwriting.tier",
     "invoices.accessToken",
     "mutavAuditLog.payloadHash",
     "payments.method.pixKey",
@@ -324,17 +328,25 @@ describe("tier assignments agree with POL-SEC-004 §4.2", () => {
     ["agencies", "consentMarketing", PII_TIER.T3],
     ["users", "email", PII_TIER.T2],
     ["users", "subject", PII_TIER.T3],
-    ["contracts", "score", PII_TIER.T1],
-    ["contracts", "tenantApproval.status", PII_TIER.T2],
-    ["contracts", "property.cep", PII_TIER.T2],
-    ["contracts", "property.neighborhood", PII_TIER.T2],
-    ["contracts", "property.cityUF", PII_TIER.T3],
-    ["contracts", "publicId", PII_TIER.T3],
-    ["contractHistory", "tenantSnapshot.taxId", PII_TIER.T1],
-    ["contractHistory", "username", PII_TIER.T2],
-    ["contractDelinquencyNotices", "status", PII_TIER.T1],
-    ["contractDelinquencyNotices", "resolution.note", PII_TIER.T2],
-    ["contractDelinquencyNotices", "openedByUserId", PII_TIER.T3],
+    ["guarantees", "underwriting.score", PII_TIER.T1],
+    ["guarantees", "tenantApproval.status", PII_TIER.T2],
+    ["guarantees", "closure.reason", PII_TIER.T2],
+    ["guarantees", "closure.note", PII_TIER.T2],
+    ["guarantees", "terms.feeCents", PII_TIER.T2],
+    ["guarantees", "capacity.availableCents", PII_TIER.T2],
+    ["guarantees", "terms.coverageCeilingMultiplier", PII_TIER.T3],
+    ["guarantees", "publicId", PII_TIER.T3],
+    ["leases", "property.cep", PII_TIER.T2],
+    ["leases", "property.neighborhood", PII_TIER.T2],
+    ["leases", "property.cityUF", PII_TIER.T3],
+    ["leases", "rent.rentCents", PII_TIER.T2],
+    ["leases", "openGuaranteeId", PII_TIER.T3],
+    ["guaranteeHistory", "tenantSnapshot.taxId", PII_TIER.T1],
+    ["guaranteeHistory", "username", PII_TIER.T2],
+    ["guaranteeDelinquencyNotices", "status", PII_TIER.T1],
+    ["guaranteeDelinquencyNotices", "resolution.note", PII_TIER.T2],
+    ["guaranteeDelinquencyNotices", "verification.note", PII_TIER.T2],
+    ["guaranteeDelinquencyNotices", "openedByUserId", PII_TIER.T3],
     ["invoices", "publicId", PII_TIER.T2],
     ["invoices", "muxedId", PII_TIER.T3],
     ["invoices", "lineItems[].description", PII_TIER.T3],
@@ -392,8 +404,8 @@ describe("§4.3 — T0 is empty", () => {
 
   it("keeps CPF and credit history at T1, not T0 — they are ordinary personal data of elevated risk", () => {
     expect(classificationFor("tenants", "taxId")?.tier).toBe(PII_TIER.T1);
-    expect(classificationFor("contracts", "score")?.tier).toBe(PII_TIER.T1);
-    expect(classificationFor("contractDelinquencyNotices", "status")?.tier).toBe(PII_TIER.T1);
+    expect(classificationFor("guarantees", "underwriting.score")?.tier).toBe(PII_TIER.T1);
+    expect(classificationFor("guaranteeDelinquencyNotices", "status")?.tier).toBe(PII_TIER.T1);
   });
 });
 

@@ -6,8 +6,9 @@ import { AlertTriangleIcon, CalendarIcon, FileTextIcon, ShieldAlertIcon } from "
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { api } from "@convex/_generated/api";
+import { INSURED_STATES } from "@convex/guarantees/domain";
 import { useWorkspace } from "@/providers/workspace";
-import { formatBRLCents, formatDateBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 
 export function SectionCards() {
   const t = useTranslations("metrics");
@@ -15,7 +16,7 @@ export function SectionCards() {
   const agencyId = selectedAgency?._id;
 
   const summary = useQuery(
-    api.contracts.useCases.getStatusCounts,
+    api.guarantees.useCases.getStatusCounts,
     agencyId ? { agencyId } : "skip",
   );
 
@@ -29,37 +30,41 @@ export function SectionCards() {
     agencyId ? { agencyId } : "skip",
   );
 
+  const inForceCount = summary
+    ? INSURED_STATES.reduce((total, state) => total + summary[state], 0)
+    : null;
+
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @md/main:grid-cols-2 @4xl/main:grid-cols-4">
-      {/* Ativos */}
+      {/* In force — every insured state, not just `active` */}
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <FileTextIcon className="size-3.5" />
-            {t("ativo.label")}
+            {t("inForce.label")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {summary ? summary.ativo : "—"}
+            {inForceCount ?? "—"}
           </CardTitle>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">{t("ativo.footer")}</div>
+          <div className="text-muted-foreground">{t("inForce.footer")}</div>
         </CardFooter>
       </Card>
 
-      {/* Pendentes */}
+      {/* Drafts */}
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <AlertTriangleIcon className="size-3.5" />
-            {t("pendente.label")}
+            {t("drafted.label")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {summary ? summary.pendente : "—"}
+            {summary ? summary.drafted : "—"}
           </CardTitle>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">{t("pendente.footer")}</div>
+          <div className="text-muted-foreground">{t("drafted.footer")}</div>
         </CardFooter>
       </Card>
 

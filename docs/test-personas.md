@@ -43,17 +43,17 @@ The seed exposes exactly **two** runnable entrypoints — pick by what you need:
 
 `seedTestPersonas` skips personas whose state already matches, so it's safe to re-run. It does **not** wipe or seed the fictional/Aprovada data — use it to repair persona bindings (e.g. after rotating the dev tenant's subjects), not for a first populate. The Auth0 side (account + password) doesn't need recreating — it's tenant-scoped, not deployment-scoped.
 
-### Trap: `agencyowner`'s contracts come from the Aprovada book, not the fictional dataset
+### Trap: `agencyowner`'s guarantees come from the Aprovada book, not the fictional dataset
 
 The personas own different slices of the seed data:
 
-| Persona                                        | Agency                           | Contracts come from                             |
-| ---------------------------------------------- | -------------------------------- | ----------------------------------------------- |
-| `agencyowner@mutav.finance`                    | **Imobiliária Aprovada**         | the Aprovada book step of `seedReset`           |
-| _(demo dataset, not a login persona's agency)_ | Paulista / Atlântica / Horizonte | the fictional-dataset step of `seedReset`       |
-| `pendinguser` / `newuser`                      | under_review / none              | `seedTestPersonas` (agency state, no contracts) |
+| Persona                                        | Agency                           | Guarantees come from                             |
+| ---------------------------------------------- | -------------------------------- | ------------------------------------------------ |
+| `agencyowner@mutav.finance`                    | **Imobiliária Aprovada**         | the Aprovada book step of `seedReset`            |
+| _(demo dataset, not a login persona's agency)_ | Paulista / Atlântica / Horizonte | the fictional-dataset step of `seedReset`        |
+| `pendinguser` / `newuser`                      | under_review / none              | `seedTestPersonas` (agency state, no guarantees) |
 
-The fictional dataset seeds the **demo agencies** (Paulista/Atlântica/Horizonte) — **none of which is a login persona's workspace**. That is why the seed no longer exposes the fictional/Aprovada steps as separate entrypoints: only `seedReset` runs all of them, so logging in as `agencyowner` always lands on a populated **Aprovada** dashboard. `convex/seed.test.ts` is the regression guard — it fails if any change lets `agencyowner`'s agency come up with zero contracts.
+The fictional dataset seeds the **demo agencies** (Paulista/Atlântica/Horizonte) — **none of which is a login persona's workspace**. That is why the seed no longer exposes the fictional/Aprovada steps as separate entrypoints: only `seedReset` runs all of them, so logging in as `agencyowner` always lands on a populated **Aprovada** dashboard. `convex/seed.test.ts` is the regression guard — it fails if any change lets `agencyowner`'s agency come up with zero guarantees.
 
 ## Recreating the personas on a fresh Auth0 tenant
 

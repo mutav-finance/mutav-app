@@ -19,7 +19,7 @@ import type { DataModel } from "./_generated/dataModel";
  * already runs `migrations:runAll` after every `convex deploy`, so real
  * migrations take effect automatically from that point on.
  *
- * NOTE: the operational backfills (`contracts/backfill.ts` aggregate rebuild,
+ * NOTE: the operational backfills (`guarantees/backfill.ts` aggregate rebuild,
  * `waitlist` Resend audience sync, `reserve` snapshot clear) are NOT migrations —
  * they're on-demand tools and deliberately stay out of this runner.
  */

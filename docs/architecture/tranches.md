@@ -25,7 +25,7 @@ The waterfall protects MTVL holders from the first chunk of defaults at the cost
 ## Default waterfall
 
 ```
-Default detected on a contract → Mutav-BR notifies Mutav-Mgmt
+Default detected on a guarantee → Mutav-BR notifies Mutav-Mgmt
                                             │
                                             ▼
                           Mutav-Mgmt instructs Mutav-Fund to liquidate

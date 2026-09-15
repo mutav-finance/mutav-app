@@ -6,7 +6,7 @@ import { CheckCircle2, AlertCircle } from "lucide-react";
 import { Link, redirect } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 import { Mono } from "@mutav/ui/mono";
-import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@/lib/contracts/format";
+import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@mutav/i18n/brazil";
 import { fetchInvoiceDocumentNumber } from "@/lib/invoices/document-number";
 import { api } from "@convex/_generated/api";
 

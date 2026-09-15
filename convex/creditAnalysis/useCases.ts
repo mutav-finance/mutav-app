@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { AgencyId } from "../agencies/domain";
-import { scoreTierValidator } from "../contracts/domain";
+import { scoreTierValidator } from "../guarantees/domain";
 import type {
   CreditAnalysisAssessment,
   CreditAnalysisAssessmentId,

@@ -11,7 +11,7 @@ import {
   type AssetOption,
 } from "@/components/payments/flow/payment-address-panel";
 import { brlCentsToAsset } from "@/lib/stellar/asset-format";
-import { formatBRLCents } from "@/lib/contracts/format";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import { buildSep7PayUri } from "@/lib/stellar/sep7";
 import { getActiveAssets, type ResolvedAsset } from "@/lib/stellar/assets";
 import { getStellarNetwork } from "@/lib/stellar/network";

@@ -89,8 +89,8 @@ describe("appendAuditEntry — chain construction", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "user", userId },
-        action: AUDIT_ACTION.CONTRACT_CREATED,
-        resourceType: "contracts",
+        action: AUDIT_ACTION.GUARANTEE_CREATED,
+        resourceType: "guarantees",
         resourceId: "C-1",
         payload: { rentCents: 100000 },
       }),
@@ -217,8 +217,8 @@ describe("auditLogByResource — forensic lookup", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
-        action: AUDIT_ACTION.CONTRACT_CREATED,
-        resourceType: "contracts",
+        action: AUDIT_ACTION.GUARANTEE_CREATED,
+        resourceType: "guarantees",
         resourceId: "C-1",
         payload: { step: 1 },
       }),
@@ -227,8 +227,8 @@ describe("auditLogByResource — forensic lookup", () => {
     await t.run((ctx) =>
       appendAuditEntry(ctx, {
         actor: { kind: "system", source: "test" },
-        action: AUDIT_ACTION.CONTRACT_STATUS_UPDATED,
-        resourceType: "contracts",
+        action: AUDIT_ACTION.GUARANTEE_TRANSITIONED,
+        resourceType: "guarantees",
         resourceId: "C-1",
         payload: { step: 2 },
       }),
@@ -245,19 +245,19 @@ describe("auditLogByResource — forensic lookup", () => {
     );
 
     const trail = await t.query(internal.audit.useCases.auditLogByResource, {
-      resourceType: "contracts",
+      resourceType: "guarantees",
       resourceId: "C-1",
     });
     expect(trail).toHaveLength(2);
-    expect(trail[0].action).toBe(AUDIT_ACTION.CONTRACT_CREATED);
-    expect(trail[1].action).toBe(AUDIT_ACTION.CONTRACT_STATUS_UPDATED);
+    expect(trail[0].action).toBe(AUDIT_ACTION.GUARANTEE_CREATED);
+    expect(trail[1].action).toBe(AUDIT_ACTION.GUARANTEE_TRANSITIONED);
     expect(trail[0].timestamp).toBeLessThanOrEqual(trail[1].timestamp);
   });
 
   test("returns empty when no entries match", async () => {
     const t = convexTest(schema);
     const trail = await t.query(internal.audit.useCases.auditLogByResource, {
-      resourceType: "contracts",
+      resourceType: "guarantees",
       resourceId: "missing",
     });
     expect(trail).toEqual([]);

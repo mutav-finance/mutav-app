@@ -86,13 +86,23 @@ const nextConfig: NextConfig = {
   // `app/global-not-found.tsx` is silently ignored without this — next-app-loader
   // deletes the convention when the flag is off.
   experimental: { globalNotFound: true },
+  // Worktrees live under .claude/worktrees/ inside the main checkout, so Next
+  // sees two bun.lock files and picks the outer one — every route then 404s.
+  turbopack: { root: resolve(__dirname, "../..") },
   // Workspace packages ship TypeScript / TSX source; Next.js must transpile
   // them through SWC on the way into the build.
   transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui"],
+  // next-intl's `as-needed` prefix means the default locale (pt-BR) is served
+  // unprefixed while English carries `/en`, and redirects run before the
+  // middleware rewrites — so each source needs both spellings. `:path*` matches
+  // zero or more segments, so one rule covers `/contracts`, `/contracts/new`
+  // and `/contracts/<publicId>`.
   async redirects() {
     return [
       { source: "/health", destination: "/transparency", permanent: true },
       { source: "/en/health", destination: "/en/transparency", permanent: true },
+      { source: "/contracts/:path*", destination: "/guarantees/:path*", permanent: true },
+      { source: "/en/contracts/:path*", destination: "/en/guarantees/:path*", permanent: true },
     ];
   },
   async headers() {

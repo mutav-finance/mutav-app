@@ -15,9 +15,9 @@ Reconciles against [§ Shell catalog](README.md#shell-catalog), which describes 
 | Route                  | Group          | Chrome                                         | Auth                      |
 | ---------------------- | -------------- | ---------------------------------------------- | ------------------------- |
 | `/`                    | `(app)`        | `AppSidebar` + `SiteHeader`                    | Auth0 + agency membership |
-| `/contracts`           | `(app)`        | same                                           | same                      |
-| `/contracts/new`       | `(app)`        | same                                           | same                      |
-| `/contracts/[id]`      | `(app)`        | same                                           | same                      |
+| `/guarantees`          | `(app)`        | same                                           | same                      |
+| `/guarantees/new`      | `(app)`        | same                                           | same                      |
+| `/guarantees/[id]`     | `(app)`        | same                                           | same                      |
 | `/invoices`            | `(app)`        | same                                           | same                      |
 | `/invoices/[id]`       | `(app)`        | same                                           | same                      |
 | `/commission`          | `(app)`        | same                                           | same                      |
@@ -175,7 +175,7 @@ Verified after the change, in `next dev` and against a production `next build` +
 
 | Segment has a `loading.tsx` (⇒ a Suspense boundary) | Status | SSR HTML                                  |
 | --------------------------------------------------- | ------ | ----------------------------------------- |
-| yes — e.g. `agency/contracts/[id]`                  | `200`  | the loading skeleton, inside the shell    |
+| yes — e.g. `agency/guarantees/[id]`                 | `200`  | the loading skeleton, inside the shell    |
 | no — e.g. every `pay/[publicId]` step               | `404`  | Next's `__next_error__` document, no body |
 
 Both repair on hydration; both are blank-ish for a no-JS client or a crawler. Adding a `loading.tsx` to `pay` was trialled and **rejected**: it does not server-render the 404 (verified — the skeleton is what lands in the HTML), and it trades the correct `404` status on the product's highest-traffic 404 for a `200`. Do not "fix" one of these rows into the other believing it renders the 404 server-side. The only path that truly server-renders a branded 404 is `global-not-found.tsx`, which is why unmatched URLs are the case the gates are strict about.

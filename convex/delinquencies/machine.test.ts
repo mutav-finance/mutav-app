@@ -12,25 +12,33 @@ import {
 const ALL_STATUSES = DELINQUENCY_STATUSES;
 
 describe("DELINQUENCY_STATUS constants", () => {
-  test("exposes the three notice states", () => {
-    expect(DELINQUENCY_STATUSES).toEqual(["open", "resolved", "canceled"]);
+  test("exposes the four notice states", () => {
+    expect(DELINQUENCY_STATUSES).toEqual(["open", "verified", "resolved", "canceled"]);
   });
 
   test("DELINQUENCY_STATUS keys mirror the values (upper snake)", () => {
     expect(DELINQUENCY_STATUS.OPEN).toBe("open");
+    expect(DELINQUENCY_STATUS.VERIFIED).toBe("verified");
     expect(DELINQUENCY_STATUS.RESOLVED).toBe("resolved");
     expect(DELINQUENCY_STATUS.CANCELED).toBe("canceled");
   });
 
-  test("resolved and canceled are terminal; open is not", () => {
+  test("resolved and canceled are terminal; open and verified are not", () => {
     expect([...TERMINAL_STATUSES].sort()).toEqual(["canceled", "resolved"]);
     expect(isTerminal("resolved")).toBe(true);
     expect(isTerminal("canceled")).toBe(true);
     expect(isTerminal("open")).toBe(false);
+    expect(isTerminal("verified")).toBe(false);
   });
 });
 
-describe("ALLOWED_TRANSITIONS — the two legal edges", () => {
+describe("ALLOWED_TRANSITIONS — the five legal edges", () => {
+  test("open -> verified is allowed (staff confirmed the default)", () => {
+    const result = assertTransition("open", "verified");
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toEqual({ from: "open", to: "verified" });
+  });
+
   test("open -> resolved is allowed (tenant cured or cover committed)", () => {
     const result = assertTransition("open", "resolved");
     expect(result.success).toBe(true);
@@ -43,7 +51,15 @@ describe("ALLOWED_TRANSITIONS — the two legal edges", () => {
     if (result.success) expect(result.data).toEqual({ from: "open", to: "canceled" });
   });
 
-  test("ALLOWED_TRANSITIONS map covers exactly the two edges above", () => {
+  test("verified -> resolved and verified -> canceled are allowed; verified -> open is not", () => {
+    expect(assertTransition("verified", "resolved").success).toBe(true);
+    expect(assertTransition("verified", "canceled").success).toBe(true);
+    const back = assertTransition("verified", "open");
+    expect(back.success).toBe(false);
+    if (!back.success) expect(back.error.code).toBe("ILLEGAL_TRANSITION");
+  });
+
+  test("ALLOWED_TRANSITIONS map covers exactly the five edges above", () => {
     const flattened: Array<[string, string]> = [];
     for (const [from, tos] of Object.entries(ALLOWED_TRANSITIONS)) {
       for (const to of tos) flattened.push([from, to]);
@@ -52,6 +68,9 @@ describe("ALLOWED_TRANSITIONS — the two legal edges", () => {
       [
         ["open", "canceled"],
         ["open", "resolved"],
+        ["open", "verified"],
+        ["verified", "canceled"],
+        ["verified", "resolved"],
       ].sort(),
     );
   });

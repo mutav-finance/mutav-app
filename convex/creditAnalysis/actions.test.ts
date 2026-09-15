@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeAll, expect, test } from "vitest";
 import { internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractApplicationId } from "../contracts/domain";
+import type { ContractApplicationId } from "../guarantees/domain";
 import schema from "../schema";
 
 beforeAll(() => {
@@ -42,7 +42,7 @@ async function seedApplication(
       agencyId,
       subjectHash: "hash-application",
       entityType: "pf",
-      propertyKind: "residencial",
+      propertyKind: "residential",
       cep: "01310100",
       rentCents: 250_000,
       openedBy,

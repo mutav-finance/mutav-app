@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { logError } from "../lib/logger";
 import { paginationOptsValidator } from "convex/server";
-import { internalQuery, query } from "../_generated/server";
+import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { assertAgencyAccess, queryWithAgencyScope, queryWithMutavRole } from "../lib/auth";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
-import type { ContractId } from "../contracts/domain";
+import type { GuaranteeCapacity, GuaranteeId, GuaranteeState } from "../guarantees/domain";
 import {
   DELINQUENCY_STATUS,
   delinquencyStatusValidator,
@@ -21,9 +21,29 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 // branch without hard-coding the number in two places.
 export const STATS_TAKE_LIMIT = 1000;
 
+// Temporary: the agency app's status tag knows `open | resolved | canceled`
+// only. A staff-verified notice is still outstanding from the agency's side,
+// so agency reads surface it as `open` (and count it with the open ones)
+// until the agency UI grows a `verified` state. Deleted with the contracts
+// facade.
+export type AgencyNoticeStatus = Exclude<DelinquencyStatus, typeof DELINQUENCY_STATUS.VERIFIED>;
+
+function toAgencyNoticeStatus(status: DelinquencyStatus): AgencyNoticeStatus {
+  return status === DELINQUENCY_STATUS.VERIFIED ? DELINQUENCY_STATUS.OPEN : status;
+}
+
+/**
+ * The two non-terminal statuses — what the staff queue holds. Narrower than
+ * `DelinquencyStatus` so a caller switching on a queue row does not have to
+ * write unreachable `resolved` / `canceled` arms.
+ */
+export type OutstandingNoticeStatus =
+  | typeof DELINQUENCY_STATUS.OPEN
+  | typeof DELINQUENCY_STATUS.VERIFIED;
+
 // ---- projection shapes -----------------------------------------------------
 // Server-owned response types. Callers (UI, tests, internal wrappers) couple
-// to THESE, not to `Doc<'contractDelinquencyNotices'>` — so future schema
+// to THESE, not to `Doc<'guaranteeDelinquencyNotices'>` — so future schema
 // tweaks (new envelope fields, renamed system columns) do not ripple out.
 
 /**
@@ -33,8 +53,8 @@ export const STATS_TAKE_LIMIT = 1000;
  */
 export type DelinquencyNoticeRow = {
   publicId: string;
-  contractId: ContractId;
-  status: DelinquencyStatus;
+  guaranteeId: GuaranteeId;
+  status: AgencyNoticeStatus;
   rentDueDate: string;
   originalAmountCents: number;
   updatedAmountCents: number;
@@ -68,13 +88,34 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
 
 /**
  * Staff-queue row. Includes `agencyId` so the queue UI can group across
- * agencies; drops `status` (always `open` by index) and `openedByUserId`
- * (queue does not surface the agency-side author).
+ * agencies; drops `openedByUserId` (the queue does not surface the
+ * agency-side author).
+ *
+ * The joined fields are what a triage decision needs and cannot be fetched
+ * per row from the client: the staff queue spans agencies, and every
+ * guarantee, lease and tenant read the admin console could reach is either
+ * agency-scoped or membership-gated. `guaranteeCapacity` in particular is not
+ * decoration — `staffMarkResolvedByCover` CLAMPS its draw to
+ * `capacity.availableCents`, so an operator who cannot see the remaining
+ * ceiling before submitting cannot tell whether the landlord is made whole.
  */
 export type DelinquencyAdminQueueRow = {
   publicId: string;
+  /**
+   * `open` or `verified` — the two outstanding statuses. The queue carries it
+   * because the staff dispositions are status-gated: `staffVerifyDefault`
+   * takes an `open` notice, `staffMarkResolvedByCover` refuses anything but a
+   * `verified` one.
+   */
+  status: OutstandingNoticeStatus;
   agencyId: AgencyId;
-  contractId: ContractId;
+  agencyName: string;
+  guaranteeId: GuaranteeId;
+  guaranteePublicId: string;
+  guaranteeState: GuaranteeState;
+  guaranteeCapacity: GuaranteeCapacity;
+  /** Null only when the lease's registry row is gone — rendered as a dash. */
+  tenantName: string | null;
   rentDueDate: string;
   originalAmountCents: number;
   updatedAmountCents: number;
@@ -85,8 +126,8 @@ export type DelinquencyAdminQueueRow = {
 function shapeDelinquencyNoticeRow(notice: DelinquencyNotice): DelinquencyNoticeRow {
   return {
     publicId: notice.publicId,
-    contractId: notice.contractId,
-    status: notice.status,
+    guaranteeId: notice.guaranteeId,
+    status: toAgencyNoticeStatus(notice.status),
     rentDueDate: notice.rentDueDate,
     originalAmountCents: notice.originalAmountCents,
     updatedAmountCents: notice.updatedAmountCents,
@@ -122,11 +163,55 @@ function shapeDelinquencyNoticeDetail(notice: DelinquencyNotice): DelinquencyNot
   };
 }
 
-function shapeDelinquencyAdminQueueRow(notice: DelinquencyNotice): DelinquencyAdminQueueRow {
+function outstandingStatusOf(notice: DelinquencyNotice): OutstandingNoticeStatus {
+  if (notice.status === DELINQUENCY_STATUS.OPEN || notice.status === DELINQUENCY_STATUS.VERIFIED) {
+    return notice.status;
+  }
+  throw new Error(
+    `Delinquency notice ${notice.publicId} is '${notice.status}'; the staff queue holds outstanding notices only.`,
+  );
+}
+
+/**
+ * Async because the queue row is a join. `agencyId`, `guaranteeId` and
+ * `leaseId` are required columns and none of those rows are ever deleted, so
+ * a miss is corrupted data rather than an access case — it throws, exactly as
+ * `guarantees.getByPublicId` does for a missing lease.
+ *
+ * The tenant name comes from the shared registry row rather than the owning
+ * agency's own submission. The agency-facing reads refuse that fallback
+ * because it would show agency A whatever agency B wrote for the same person
+ * (LGPD-26); this caller is platform-scoped compliance staff, who already
+ * read every agency, so the disclosure that rule prevents cannot happen here.
+ */
+async function shapeDelinquencyAdminQueueRow(
+  ctx: QueryCtx,
+  notice: DelinquencyNotice,
+): Promise<DelinquencyAdminQueueRow> {
+  const agency = await ctx.db.get(notice.agencyId);
+  if (!agency) {
+    throw new Error(`Delinquency notice ${notice.publicId} references a missing agencies row`);
+  }
+  const guarantee = await ctx.db.get(notice.guaranteeId);
+  if (!guarantee) {
+    throw new Error(`Delinquency notice ${notice.publicId} references a missing guarantees row`);
+  }
+  const lease = await ctx.db.get(guarantee.leaseId);
+  if (!lease) {
+    throw new Error(`Guarantee ${guarantee.publicId} references a missing leases row`);
+  }
+  const tenant = await ctx.db.get(lease.tenantId);
+
   return {
     publicId: notice.publicId,
+    status: outstandingStatusOf(notice),
     agencyId: notice.agencyId,
-    contractId: notice.contractId,
+    agencyName: agency.name,
+    guaranteeId: notice.guaranteeId,
+    guaranteePublicId: guarantee.publicId,
+    guaranteeState: guarantee.status,
+    guaranteeCapacity: guarantee.capacity,
+    tenantName: tenant?.fullName ?? null,
     rentDueDate: notice.rentDueDate,
     originalAmountCents: notice.originalAmountCents,
     updatedAmountCents: notice.updatedAmountCents,
@@ -157,7 +242,7 @@ function shapeDelinquencyAdminQueueRow(notice: DelinquencyNotice): DelinquencyAd
  * `DelinquencyRow` shape with `propertyId` + formatted `noticeAt`. That
  * adapter (property join + `Intl` date formatting per active locale) lives
  * client-side in `apps/agency/src/components/delinquencies/` — the property
- * join needs a `contracts.get` per row and the date format is locale-aware,
+ * join needs a guarantee → lease read per row and the date format is locale-aware,
  * neither of which belongs in this projection.
  */
 export const listByAgency = queryWithAgencyScope({
@@ -182,12 +267,25 @@ export const listByAgency = queryWithAgencyScope({
     const dueDateFrom = args.dueDateFrom?.slice(0, 10);
     const dueDateTo = args.dueDateTo?.slice(0, 10);
     const result = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", status))
       .order("desc")
       .paginate(args.paginationOpts);
+    // Verified notices ride along with the open page (see `AgencyNoticeStatus`);
+    // the agency list reads a single page, so a bounded take is enough.
+    const verifiedRows =
+      status === DELINQUENCY_STATUS.OPEN
+        ? await ctx.db
+            .query("guaranteeDelinquencyNotices")
+            .withIndex("by_agency_status", (q) =>
+              q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.VERIFIED),
+            )
+            .order("desc")
+            .take(args.paginationOpts.numItems)
+        : [];
 
-    const page = result.page
+    const page = [...verifiedRows, ...result.page]
+      .sort((a, b) => b._creationTime - a._creationTime)
       .filter(
         (notice) =>
           (dueDateFrom == null || notice.rentDueDate.slice(0, 10) >= dueDateFrom) &&
@@ -204,13 +302,13 @@ export const listByAgency = queryWithAgencyScope({
 /**
  * Resource-by-id read. Returns null on both not-found and cross-agency
  * access-denied to avoid leaking existence — same shape as
- * `invoices.getByPublicId` and `contracts.getByPublicId`.
+ * `invoices.getByPublicId` and `guarantees.getByPublicId`.
  */
 export const getByPublicId = query({
   args: { publicId: v.string() },
   handler: async (ctx, args): Promise<DelinquencyNoticeDetail | null> => {
     const notice = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
     if (!notice) return null;
@@ -270,23 +368,30 @@ export const openStats = queryWithAgencyScope({
     // would get resolvedCountLast30d/canceledCountLast30d = 0 (the 1000
     // oldest rows are all outside the window). `.order('desc')` + take
     // gives us the most-recent 1000 — the window we actually want.
-    const [openRows, resolvedRows, canceledRows] = await Promise.all([
+    const [openRows, verifiedRows, resolvedRows, canceledRows] = await Promise.all([
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.OPEN),
         )
         .order("desc")
         .take(STATS_TAKE_LIMIT),
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_agency_status", (q) =>
+          q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.VERIFIED),
+        )
+        .order("desc")
+        .take(STATS_TAKE_LIMIT),
+      ctx.db
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.RESOLVED),
         )
         .order("desc")
         .take(STATS_TAKE_LIMIT),
       ctx.db
-        .query("contractDelinquencyNotices")
+        .query("guaranteeDelinquencyNotices")
         .withIndex("by_agency_status", (q) =>
           q.eq("agencyId", ctx.agencyId).eq("status", DELINQUENCY_STATUS.CANCELED),
         )
@@ -317,10 +422,10 @@ export const openStats = queryWithAgencyScope({
     }).length;
 
     return {
-      openCount: openRows.length,
+      openCount: openRows.length + verifiedRows.length,
       resolvedCountLast30d,
       canceledCountLast30d,
-      approxOpen: openRows.length === STATS_TAKE_LIMIT,
+      approxOpen: openRows.length === STATS_TAKE_LIMIT || verifiedRows.length === STATS_TAKE_LIMIT,
       approxResolved: resolvedRows.length === STATS_TAKE_LIMIT,
       approxCanceled: canceledRows.length === STATS_TAKE_LIMIT,
     };
@@ -328,10 +433,22 @@ export const openStats = queryWithAgencyScope({
 });
 
 /**
- * Cross-agency staff queue of open notices, FIFO by `openedAt`.
+ * Cross-agency staff queue of outstanding notices, FIFO by `openedAt`.
  * `compliance` is the correct rung — support is KYC-only per the mutavStaff
- * ladder; admin over-privileges a read. Index-native ordering, no
- * post-filtering.
+ * ladder; admin over-privileges a read.
+ *
+ * `verified` rides along with `open` for the same reason it does in
+ * `listByAgency`: verification is a step INSIDE the queue, not an exit from
+ * it. `staffMarkResolvedByCover` refuses anything but a `verified` notice, so
+ * a queue that dropped a notice the moment compliance verified it would make
+ * the cover step unreachable from the only screen that offers it.
+ *
+ * The merge is first-page-only. `.paginate()` cursors belong to the `open`
+ * index scan alone, so taking the verified rows on every page would repeat
+ * each of them once per page rather than paging them. Verified notices are
+ * the short leg of the queue by construction (they are the ones staff have
+ * already picked up), so a bounded take on the first page shows the work
+ * without inventing a second cursor.
  */
 export const listOpenAdminQueue = queryWithMutavRole({ minRole: "compliance" })({
   args: { paginationOpts: paginationOptsValidator },
@@ -344,13 +461,29 @@ export const listOpenAdminQueue = queryWithMutavRole({ minRole: "compliance" })(
     continueCursor: string;
   }> => {
     const result = await ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_status_openedAt", (q) => q.eq("status", DELINQUENCY_STATUS.OPEN))
       .order("asc")
       .paginate(args.paginationOpts);
 
+    const verifiedRows =
+      args.paginationOpts.cursor === null
+        ? await ctx.db
+            .query("guaranteeDelinquencyNotices")
+            .withIndex("by_status_openedAt", (q) => q.eq("status", DELINQUENCY_STATUS.VERIFIED))
+            .order("asc")
+            .take(args.paginationOpts.numItems)
+        : [];
+
+    // Plain lex compare, not `localeCompare`: `by_status_openedAt` orders the
+    // rows lexicographically, so the merge has to use the same comparison the
+    // index used or the two legs interleave in an order neither scan produced.
+    const notices = [...verifiedRows, ...result.page].sort((a, b) =>
+      a.openedAt < b.openedAt ? -1 : a.openedAt > b.openedAt ? 1 : 0,
+    );
+
     return {
-      page: result.page.map(shapeDelinquencyAdminQueueRow),
+      page: await Promise.all(notices.map((notice) => shapeDelinquencyAdminQueueRow(ctx, notice))),
       isDone: result.isDone,
       continueCursor: result.continueCursor,
     };
@@ -371,7 +504,7 @@ export const getByPublicIdInternal = internalQuery({
   args: { publicId: v.string() },
   handler: async (ctx, { publicId }): Promise<DelinquencyNotice | null> => {
     return ctx.db
-      .query("contractDelinquencyNotices")
+      .query("guaranteeDelinquencyNotices")
       .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
       .unique();
   },

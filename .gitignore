@@ -83,3 +83,6 @@ docs/superpowers/
 
 # Changelog sync-notice cursor (tracks last-seen entry per developer)
 .claude/notes/.changelog-seen
+
+# Session handoff docs — local boot prompts for a fresh session, never tracked
+.claude/notes/*-handoff.md

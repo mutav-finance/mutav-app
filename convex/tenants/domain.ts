@@ -79,8 +79,8 @@ export function validateTaxId(args: {
 const CPF_LENGTH = 11;
 
 /**
- * What one agency submitted for a tenant, frozen on its contract creation
- * event. Structurally the `contractHistory.tenantSnapshot` shape, declared
+ * What one agency submitted for a tenant, frozen on its guarantee creation
+ * event. Structurally the `guaranteeHistory.tenantSnapshot` shape, declared
  * here because the value it maps to (`TenantInput`) is this domain's.
  */
 export type TenantSubmission = {

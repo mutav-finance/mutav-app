@@ -17,6 +17,7 @@ export default async function TransparencyLoading() {
             <Skeleton className="h-36 rounded-xl" />
             <Skeleton className="h-36 rounded-xl" />
           </div>
+          <Skeleton className="h-32 w-full rounded-xl" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Skeleton className="h-48 rounded-xl" />
             <Skeleton className="h-48 rounded-xl" />

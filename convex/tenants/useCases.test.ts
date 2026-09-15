@@ -7,6 +7,7 @@ import type { AuditActor } from "../audit/domain";
 import {
   registerContractAggregateComponents,
   seedAgencyWithMembership,
+  seedDefaultProduct,
   setupAuthenticatedUser,
   type SeededUserId,
   seedFreshCreditAssessment,
@@ -384,21 +385,23 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
     });
   }
 
-  function pfContractArgs(agencyId: AgencyId) {
+  function pfGuaranteeArgs(agencyId: AgencyId) {
     return {
       agencyId,
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo / SP",
+      lease: {
+        propertyKind: "residential" as const,
+        property: {
+          cep: "01000000",
+          streetAndNumber: "Rua Teste, 1",
+          neighborhood: "Centro",
+          cityUF: "São Paulo / SP",
+          complement: "",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0 },
       },
-      optional: { complement: "", tag: "", description: "" },
-      propertyKind: "residencial" as const,
       plan: "basic" as const,
-      rentCents: 300000,
-      condoCents: 0,
-      otherFeesCents: 0,
       tenant: {
         entityType: "pf" as const,
         fullName: "Maria Silva Santos",
@@ -414,13 +417,14 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
   test("related agency gets prefill; unrelated agency and unknown tax id both get null (no existence leak)", async () => {
     const t = setup();
     registerContractAggregateComponents(t);
+    await seedDefaultProduct(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyA = await seedAgencyWithMembership(t, userId);
     await seedFreshCreditAssessment(t, { agencyId: agencyA, document: VALID_CPF, score: 750 });
     await seedFreshCreditAssessment(t, { agencyId: agencyA, document: VALID_CNPJ, score: 650 });
     const agencyB = await seedSecondAgencyForUser(t, userId, "00000000000200");
 
-    const created = await asUser.mutation(api.contracts.useCases.create, pfContractArgs(agencyA));
+    const created = await asUser.mutation(api.guarantees.useCases.create, pfGuaranteeArgs(agencyA));
     expect(created.success).toBe(true);
 
     const fromRelated = await asUser.query(api.tenants.useCases.lookupTenantByTaxId, {
@@ -447,13 +451,14 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
   test("a pj tenant's contact CPF is not an identity key — looking it up never leaks company data", async () => {
     const t = setup();
     registerContractAggregateComponents(t);
+    await seedDefaultProduct(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CPF, score: 750 });
     await seedFreshCreditAssessment(t, { agencyId: agencyId, document: VALID_CNPJ, score: 650 });
 
     const pjArgs = {
-      ...pfContractArgs(agencyId),
+      ...pfGuaranteeArgs(agencyId),
       tenant: {
         entityType: "pj" as const,
         fullName: "Tech Solutions Ltda",
@@ -464,7 +469,7 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
         phone: "11900000003",
       },
     };
-    const created = await asUser.mutation(api.contracts.useCases.create, pjArgs);
+    const created = await asUser.mutation(api.guarantees.useCases.create, pjArgs);
     expect(created.success).toBe(true);
 
     // The registry row keys on the CNPJ; the contact CPF is stored but is not
@@ -506,21 +511,23 @@ describe("cross-agency tenant identity", () => {
 
   type SubmittedTenant = typeof AGENCY_A_TENANT;
 
-  function contractArgs(agencyId: AgencyId, tenant: SubmittedTenant) {
+  function guaranteeArgs(agencyId: AgencyId, tenant: SubmittedTenant) {
     return {
       agencyId,
-      property: {
-        cep: "01000000",
-        streetAndNumber: "Rua Teste, 1",
-        neighborhood: "Centro",
-        cityUF: "São Paulo / SP",
+      lease: {
+        propertyKind: "residential" as const,
+        property: {
+          cep: "01000000",
+          streetAndNumber: "Rua Teste, 1",
+          neighborhood: "Centro",
+          cityUF: "São Paulo / SP",
+          complement: "",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0 },
       },
-      optional: { complement: "", tag: "", description: "" },
-      propertyKind: "residencial" as const,
       plan: "basic" as const,
-      rentCents: 300000,
-      condoCents: 0,
-      otherFeesCents: 0,
       tenant: {
         entityType: "pf" as const,
         fullName: tenant.fullName,
@@ -558,6 +565,7 @@ describe("cross-agency tenant identity", () => {
 
   async function bothAgenciesRegisterTheSameCpf(t: ReturnType<typeof setup>) {
     registerContractAggregateComponents(t);
+    await seedDefaultProduct(t);
 
     const a = await setupAuthenticatedUser(t, {
       subject: "auth0|agency-a-owner",
@@ -578,16 +586,16 @@ describe("cross-agency tenant identity", () => {
     await seedFreshCreditAssessment(t, { agencyId: agencyB, document: VALID_CPF, score: 750 });
 
     const createdA = await a.asUser.mutation(
-      api.contracts.useCases.create,
-      contractArgs(agencyA, AGENCY_A_TENANT),
+      api.guarantees.useCases.create,
+      guaranteeArgs(agencyA, AGENCY_A_TENANT),
     );
     const createdB = await b.asUser.mutation(
-      api.contracts.useCases.create,
-      contractArgs(agencyB, AGENCY_B_TENANT),
+      api.guarantees.useCases.create,
+      guaranteeArgs(agencyB, AGENCY_B_TENANT),
     );
     expect(createdA.success).toBe(true);
     expect(createdB.success).toBe(true);
-    if (!createdA.success || !createdB.success) throw new Error("Contract creation failed");
+    if (!createdA.success || !createdB.success) throw new Error("Guarantee creation failed");
 
     return { a, b, agencyA, agencyB, createdA, createdB };
   }
@@ -596,19 +604,19 @@ describe("cross-agency tenant identity", () => {
     const t = setup();
     const { b, createdB } = await bothAgenciesRegisterTheSameCpf(t);
 
-    const contract = await b.asUser.query(api.contracts.useCases.getByPublicId, {
+    const guarantee = await b.asUser.query(api.guarantees.useCases.getByPublicId, {
       publicId: createdB.data.publicId,
     });
 
-    expect(contract?.tenant).toMatchObject({
+    expect(guarantee?.tenant).toMatchObject({
       entityType: "pf",
       taxId: VALID_CPF,
       fullName: "Maria S. Nascimento",
       email: "maria@agencia-b.example.com",
       phone: "11922222222",
     });
-    if (contract?.tenant.entityType === "pf") {
-      expect(contract.tenant.birthDate).toBe("1991-01-02");
+    if (guarantee?.tenant.entityType === "pf") {
+      expect(guarantee.tenant.birthDate).toBe("1991-01-02");
     }
   });
 
@@ -616,29 +624,29 @@ describe("cross-agency tenant identity", () => {
     const t = setup();
     const { a, createdA } = await bothAgenciesRegisterTheSameCpf(t);
 
-    const contract = await a.asUser.query(api.contracts.useCases.getByPublicId, {
+    const guarantee = await a.asUser.query(api.guarantees.useCases.getByPublicId, {
       publicId: createdA.data.publicId,
     });
 
-    expect(contract?.tenant).toMatchObject({
+    expect(guarantee?.tenant).toMatchObject({
       fullName: "Maria Silva Santos",
       email: "maria@agencia-a.example.com",
       phone: "11900000001",
     });
-    if (contract?.tenant.entityType === "pf") {
-      expect(contract.tenant.birthDate).toBe("1990-05-12");
+    if (guarantee?.tenant.entityType === "pf") {
+      expect(guarantee.tenant.birthDate).toBe("1990-05-12");
     }
   });
 
-  test("the contract list shows each agency the name it submitted", async () => {
+  test("the guarantee list shows each agency the name it submitted", async () => {
     const t = setup();
     const { a, b, agencyA, agencyB } = await bothAgenciesRegisterTheSameCpf(t);
 
-    const pageA = await a.asUser.query(api.contracts.useCases.listByAgency, {
+    const pageA = await a.asUser.query(api.guarantees.useCases.listByAgency, {
       agencyId: agencyA,
       paginationOpts: { numItems: 10, cursor: null },
     });
-    const pageB = await b.asUser.query(api.contracts.useCases.listByAgency, {
+    const pageB = await b.asUser.query(api.guarantees.useCases.listByAgency, {
       agencyId: agencyB,
       paginationOpts: { numItems: 10, cursor: null },
     });
@@ -687,28 +695,30 @@ describe("cross-agency tenant identity", () => {
     });
   });
 
-  test("the contract detail history excludes another agency's rows under the same publicId", async () => {
+  test("the guarantee detail history excludes another agency's rows under the same publicId", async () => {
     const t = setup();
     const { b, agencyA, createdB } = await bothAgenciesRegisterTheSameCpf(t);
 
     // publicId carries no DB-level uniqueness constraint, so a collision across
     // agencies is a real state — seed re-runs already produce them.
     await t.run(async (ctx) => {
-      await ctx.db.insert("contractHistory", {
+      await ctx.db.insert("guaranteeHistory", {
         agencyId: agencyA,
-        contractPublicId: createdB.data.publicId,
+        guaranteePublicId: createdB.data.publicId,
         at: "2025-01-01T00:00:00-03:00",
         username: "Owner A",
         message: "Agency A internal note",
       });
     });
 
-    const contract = await b.asUser.query(api.contracts.useCases.getByPublicId, {
+    const guarantee = await b.asUser.query(api.guarantees.useCases.getByPublicId, {
       publicId: createdB.data.publicId,
     });
 
-    expect(contract?.history.map((entry) => entry.username)).toEqual(["Owner B"]);
-    expect(contract?.history.map((entry) => entry.message)).not.toContain("Agency A internal note");
+    expect(guarantee?.history.map((entry) => entry.username)).toEqual(["Owner B"]);
+    expect(guarantee?.history.map((entry) => entry.message)).not.toContain(
+      "Agency A internal note",
+    );
   });
 
   test("the anchor SEP-9 prefill carries agency B's own submitted contact data", async () => {
@@ -716,7 +726,7 @@ describe("cross-agency tenant identity", () => {
     const { agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
 
     // The two steps `resolveTenantPrefill` composes inside the anchor action.
-    const identity = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+    const identity = await t.query(internal.guarantees.useCases.getTenantIdentityInternal, {
       agencyId: agencyB,
       publicId: createdB.data.publicId,
     });
@@ -745,7 +755,7 @@ describe("cross-agency tenant identity", () => {
   });
 
   // The snapshot must be selected by CARRYING a tenantSnapshot, never by
-  // sorting first. `contractHistory.at` is indexed as a plain string, and an
+  // sorting first. `guaranteeHistory.at` is indexed as a plain string, and an
   // offset-form timestamp sorts BEFORE the Z form on identical clock digits
   // ("-" < "Z") while denoting a LATER instant — the shape convex/seed.ts
   // already writes. One such row leading the index makes an earliest-row
@@ -755,20 +765,20 @@ describe("cross-agency tenant identity", () => {
     async function plantHistoryRowSortingFirst(
       t: ReturnType<typeof setup>,
       agencyId: AgencyId,
-      contractPublicId: string,
+      guaranteePublicId: string,
     ) {
       await t.run(async (ctx) => {
         const rows = await ctx.db
-          .query("contractHistory")
-          .withIndex("by_agency_contract", (q) =>
-            q.eq("agencyId", agencyId).eq("contractPublicId", contractPublicId),
+          .query("guaranteeHistory")
+          .withIndex("by_agency_guarantee", (q) =>
+            q.eq("agencyId", agencyId).eq("guaranteePublicId", guaranteePublicId),
           )
           .collect();
         const creation = rows.find((row) => row.tenantSnapshot !== undefined);
         if (!creation) throw new Error("Creation event carries no tenantSnapshot");
-        await ctx.db.insert("contractHistory", {
+        await ctx.db.insert("guaranteeHistory", {
           agencyId,
-          contractPublicId,
+          guaranteePublicId,
           at: creation.at.replace("Z", "-03:00"),
           username: "Owner B",
           message: "Vistoria agendada",
@@ -776,31 +786,31 @@ describe("cross-agency tenant identity", () => {
       });
     }
 
-    test("the contract detail still reads agency B's own submitted identity", async () => {
+    test("the guarantee detail still reads agency B's own submitted identity", async () => {
       const t = setup();
       const { b, agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
       await plantHistoryRowSortingFirst(t, agencyB, createdB.data.publicId);
 
-      const contract = await b.asUser.query(api.contracts.useCases.getByPublicId, {
+      const guarantee = await b.asUser.query(api.guarantees.useCases.getByPublicId, {
         publicId: createdB.data.publicId,
       });
 
-      expect(contract?.tenant).toMatchObject({
+      expect(guarantee?.tenant).toMatchObject({
         fullName: "Maria S. Nascimento",
         email: "maria@agencia-b.example.com",
         phone: "11922222222",
       });
-      if (contract?.tenant.entityType === "pf") {
-        expect(contract.tenant.birthDate).toBe("1991-01-02");
+      if (guarantee?.tenant.entityType === "pf") {
+        expect(guarantee.tenant.birthDate).toBe("1991-01-02");
       }
     });
 
-    test("the contract list still shows agency B the name it submitted", async () => {
+    test("the guarantee list still shows agency B the name it submitted", async () => {
       const t = setup();
       const { b, agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
       await plantHistoryRowSortingFirst(t, agencyB, createdB.data.publicId);
 
-      const page = await b.asUser.query(api.contracts.useCases.listByAgency, {
+      const page = await b.asUser.query(api.guarantees.useCases.listByAgency, {
         agencyId: agencyB,
         paginationOpts: { numItems: 10, cursor: null },
       });
@@ -829,7 +839,7 @@ describe("cross-agency tenant identity", () => {
       const { agencyB, createdB } = await bothAgenciesRegisterTheSameCpf(t);
       await plantHistoryRowSortingFirst(t, agencyB, createdB.data.publicId);
 
-      const identity = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+      const identity = await t.query(internal.guarantees.useCases.getTenantIdentityInternal, {
         agencyId: agencyB,
         publicId: createdB.data.publicId,
       });
@@ -846,24 +856,24 @@ describe("cross-agency tenant identity", () => {
   // two agencies is a real state. Resolving it by publicId alone either throws
   // on `.unique()` or ships one agency's tenant PII under the other's session.
   describe("with the same publicId under both agencies", () => {
-    async function renameContract(
+    async function renameGuarantee(
       t: ReturnType<typeof setup>,
       fromPublicId: string,
       toPublicId: string,
     ) {
       await t.run(async (ctx) => {
-        const contracts = await ctx.db
-          .query("contracts")
+        const guarantees = await ctx.db
+          .query("guarantees")
           .withIndex("by_publicId", (q) => q.eq("publicId", fromPublicId))
           .collect();
-        for (const contract of contracts)
-          await ctx.db.patch(contract._id, { publicId: toPublicId });
+        for (const guarantee of guarantees)
+          await ctx.db.patch(guarantee._id, { publicId: toPublicId });
 
         const history = await ctx.db
-          .query("contractHistory")
-          .withIndex("by_contract", (q) => q.eq("contractPublicId", fromPublicId))
+          .query("guaranteeHistory")
+          .withIndex("by_guarantee", (q) => q.eq("guaranteePublicId", fromPublicId))
           .collect();
-        for (const row of history) await ctx.db.patch(row._id, { contractPublicId: toPublicId });
+        for (const row of history) await ctx.db.patch(row._id, { guaranteePublicId: toPublicId });
       });
     }
 
@@ -871,13 +881,13 @@ describe("cross-agency tenant identity", () => {
       const t = setup();
       const { agencyA, agencyB, createdA, createdB } = await bothAgenciesRegisterTheSameCpf(t);
       const sharedPublicId = createdB.data.publicId;
-      await renameContract(t, createdA.data.publicId, sharedPublicId);
+      await renameGuarantee(t, createdA.data.publicId, sharedPublicId);
 
-      const forB = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+      const forB = await t.query(internal.guarantees.useCases.getTenantIdentityInternal, {
         agencyId: agencyB,
         publicId: sharedPublicId,
       });
-      const forA = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+      const forA = await t.query(internal.guarantees.useCases.getTenantIdentityInternal, {
         agencyId: agencyA,
         publicId: sharedPublicId,
       });
@@ -892,11 +902,11 @@ describe("cross-agency tenant identity", () => {
       });
     });
 
-    test("an agency that owns no contract under that publicId resolves nothing", async () => {
+    test("an agency that owns no guarantee under that publicId resolves nothing", async () => {
       const t = setup();
       const { agencyA, createdB } = await bothAgenciesRegisterTheSameCpf(t);
 
-      const forA = await t.query(internal.contracts.useCases.getTenantIdentityInternal, {
+      const forA = await t.query(internal.guarantees.useCases.getTenantIdentityInternal, {
         agencyId: agencyA,
         publicId: createdB.data.publicId,
       });

@@ -95,6 +95,9 @@ const nextConfig: NextConfig = {
   // `app/global-not-found.tsx` is silently ignored without this — next-app-loader
   // deletes the convention when the flag is off.
   experimental: { globalNotFound: true },
+  // Worktrees live under .claude/worktrees/ inside the main checkout, so Next
+  // sees two bun.lock files and picks the outer one — every route then 404s.
+  turbopack: { root: resolve(__dirname, "../..") },
   // Workspace packages ship TypeScript / TSX source; Next.js must transpile
   // them through SWC on the way into the build.
   transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui", "@mutav/wallet"],

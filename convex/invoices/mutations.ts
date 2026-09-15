@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation } from "../_generated/server";
+import { internalMutation, mutation, type MutationCtx } from "../_generated/server";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import { mutationWithAgencyScope } from "../lib/auth";
@@ -8,6 +8,7 @@ import { SettlementMethods } from "../payments/domain";
 import { recordSettlement } from "../payments/settlement";
 import { generateInvoiceAccessToken } from "../lib/randomId";
 import type { AgencyId } from "../agencies/domain";
+import { INSURED_STATES, type Guarantee, type GuaranteeId } from "../guarantees/domain";
 import {
   accessTokenExpiryFrom,
   INVOICE_LINE_ITEM_KIND,
@@ -26,7 +27,7 @@ type BearerGrant = {
   agencyId: AgencyId;
   totalCents: number;
   state: InvoiceState;
-  firstContractPublicId: string | null;
+  firstGuaranteePublicId: string | null;
 };
 
 type BearerAccessErrorResult = { code: BearerDenialReason };
@@ -86,7 +87,7 @@ export const consumeBearerAccess = internalMutation({
         agencyId: invoice.agencyId,
         totalCents: invoice.totalCents,
         state: invoice.state,
-        firstContractPublicId: invoice.lineItems[0]?.contractPublicId ?? null,
+        firstGuaranteePublicId: invoice.lineItems[0]?.guaranteePublicId ?? null,
       },
       message: "Bearer access granted",
     };
@@ -149,14 +150,53 @@ export const rotateAccessToken = mutationWithAgencyScope({
   },
 });
 
+type BillingLineItem = {
+  guaranteeId: GuaranteeId;
+  guaranteePublicId: string;
+  kind: "recurring" | "activation";
+  amountCents: number;
+  description: string;
+};
+
+/**
+ * Every guarantee the agency is billed for this period: one read per insured
+ * state through `by_agency_status`. The insured states are not lexically
+ * contiguous (`active < closed < cover_committed < …`), so a single index
+ * range would fold drafts and closed guarantees into the bill.
+ */
+async function collectInsuredGuarantees(
+  ctx: { db: Pick<MutationCtx["db"], "query"> },
+  agencyId: AgencyId,
+): Promise<Guarantee[]> {
+  const perState = await Promise.all(
+    INSURED_STATES.map((status) =>
+      ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", agencyId).eq("status", status))
+        .collect(),
+    ),
+  );
+  return perState.flat();
+}
+
+function activatedWithin(
+  guarantee: Guarantee,
+  period: { startMs: number; endMs: number },
+): boolean {
+  if (guarantee.activatedAt === null) return false;
+  const activatedMs = Date.parse(guarantee.activatedAt);
+  return activatedMs >= period.startMs && activatedMs < period.endMs;
+}
+
 /**
  * Generate one `invoices` record per agency for the given billing period.
  *
  * Rules:
- * - Only `ativo` contracts contribute line items.
- * - Every active contract generates a `recurring` line item (feeCents).
- * - Contracts whose `_creationTime` falls within the period also get an
- *   `activation` line item (oneTimeActivationFeeCents).
+ * - Every in-force guarantee (any `INSURED_STATES` member) contributes a
+ *   `recurring` line item (`terms.feeCents`) — a guarantee in arrears or under
+ *   cover is still insured and still billed.
+ * - Guarantees whose `activatedAt` falls within the period also get an
+ *   `activation` line item (`terms.oneTimeActivationFeeCents`).
  * - Idempotent: skips agencies that already have a record for the period.
  * - `state` starts as `open`; the payment method is derived from the
  *   settlement row once the invoice is paid.
@@ -168,15 +208,14 @@ export const rotateAccessToken = mutationWithAgencyScope({
 export const generateMonthlyInvoices = internalMutation({
   args: { periodMonth: v.string() },
   handler: async (ctx, { periodMonth }) => {
-    // Period boundaries (UTC ms) — used to detect newly activated contracts.
+    // Period boundaries (UTC ms) — used to detect newly activated guarantees.
     const [yearStr, monthStr] = periodMonth.split("-");
     const year = Number(yearStr);
     const month = Number(monthStr);
-    const periodStart = Date.UTC(year, month - 1, 1);
-    const periodEnd = Date.UTC(year, month, 1); // exclusive
+    const period = { startMs: Date.UTC(year, month - 1, 1), endMs: Date.UTC(year, month, 1) };
 
     const dueDate = `${periodMonth}-10`;
-    const issuedAt = new Date().toISOString().split("T")[0]!;
+    const issuedAt = new Date().toISOString().slice(0, 10);
 
     const agencies = await ctx.db.query("agencies").collect();
 
@@ -200,41 +239,29 @@ export const generateMonthlyInvoices = internalMutation({
         continue;
       }
 
-      // ── Collect active contracts ───────────────────────────────────────────
-      const activeContracts = await ctx.db
-        .query("contracts")
-        .withIndex("by_agency_status", (q) => q.eq("agencyId", agency._id).eq("status", "ativo"))
-        .collect();
+      // ── Collect in-force guarantees ────────────────────────────────────────
+      const insuredGuarantees = await collectInsuredGuarantees(ctx, agency._id);
 
-      const lineItems: Array<{
-        contractId: (typeof activeContracts)[number]["_id"];
-        contractPublicId: string;
-        kind: "recurring" | "activation";
-        amountCents: number;
-        description: string;
-      }> = [];
+      const lineItems: BillingLineItem[] = [];
 
-      for (const contract of activeContracts) {
-        // Recurring fee — every active contract.
+      for (const guarantee of insuredGuarantees) {
+        // Recurring fee — every in-force guarantee, priced by its own terms snapshot.
         lineItems.push({
-          contractId: contract._id,
-          contractPublicId: contract.publicId,
+          guaranteeId: guarantee._id,
+          guaranteePublicId: guarantee.publicId,
           kind: INVOICE_LINE_ITEM_KIND.RECURRING,
-          amountCents: contract.rental.feeCents,
-          description: `Mensalidade — contrato ${contract.publicId}`,
+          amountCents: guarantee.terms.feeCents,
+          description: `Mensalidade — garantia ${guarantee.publicId}`,
         });
 
-        // Activation fee — contracts first activated within this billing period.
-        const activatedThisPeriod =
-          contract._creationTime >= periodStart && contract._creationTime < periodEnd;
-
-        if (activatedThisPeriod && contract.rental.oneTimeActivationFeeCents > 0) {
+        // Activation fee — guarantees first activated within this billing period.
+        if (activatedWithin(guarantee, period) && guarantee.terms.oneTimeActivationFeeCents > 0) {
           lineItems.push({
-            contractId: contract._id,
-            contractPublicId: contract.publicId,
+            guaranteeId: guarantee._id,
+            guaranteePublicId: guarantee.publicId,
             kind: INVOICE_LINE_ITEM_KIND.ACTIVATION,
-            amountCents: contract.rental.oneTimeActivationFeeCents,
-            description: `Taxa de ativação — contrato ${contract.publicId}`,
+            amountCents: guarantee.terms.oneTimeActivationFeeCents,
+            description: `Taxa de ativação — garantia ${guarantee.publicId}`,
           });
         }
       }

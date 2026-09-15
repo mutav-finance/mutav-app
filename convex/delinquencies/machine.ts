@@ -3,17 +3,21 @@ import type { Result } from "../lib/result";
 /**
  * Delinquency notice lifecycle.
  *
- * A DIFFERENT object from the guarantee state ({@link ../guarantees/machine.ts}).
- * A notice is a per-event record ("agency reports tenant missed rent on this
- * date for this amount"); the guarantee state is contract-level.
+ * A DIFFERENT object from the guarantee state ({@link ../guarantees/machine.ts}),
+ * which lives on the guarantee row. A notice is one per-event record ("agency
+ * reports tenant missed rent on this date for this amount") that may drive a
+ * guarantee transition, but never carries the guarantee state itself.
  *
- * One contract can accumulate many notices over its life. Each notice moves
- * independently through this 3-status machine. Identifiers are English per
- * repo convention (CLAUDE.md § Code style); PT copy for these values lives
- * in `messages/pt-BR.json` values only.
+ * One guarantee can accumulate many notices over its life. Each notice moves
+ * independently through this 4-status machine: `open` is the agency's claim,
+ * `verified` is staff's confirmation of the default, and the two terminal
+ * statuses close it. Identifiers are English per repo convention (CLAUDE.md
+ * § Code style); PT copy for these values lives in `messages/pt-BR.json`
+ * values only.
  */
 export const DELINQUENCY_STATUS = {
   OPEN: "open",
+  VERIFIED: "verified",
   RESOLVED: "resolved",
   CANCELED: "canceled",
 } as const;
@@ -22,6 +26,7 @@ export type DelinquencyStatus = (typeof DELINQUENCY_STATUS)[keyof typeof DELINQU
 
 export const DELINQUENCY_STATUSES: readonly DelinquencyStatus[] = [
   DELINQUENCY_STATUS.OPEN,
+  DELINQUENCY_STATUS.VERIFIED,
   DELINQUENCY_STATUS.RESOLVED,
   DELINQUENCY_STATUS.CANCELED,
 ] as const;
@@ -39,14 +44,17 @@ export const TERMINAL_STATUSES: ReadonlySet<DelinquencyStatus> = new Set([
 export const isTerminal = (status: DelinquencyStatus): boolean => TERMINAL_STATUSES.has(status);
 
 /**
- * The only two legal exits from `open`. Resolution semantics (WHY it moved to
- * `resolved` — tenant cured vs cover committed vs staff dispute) live on the
- * row's `resolution` field, not in this machine.
+ * `open` may be verified by staff or exit straight to a terminal status (the
+ * tenant cured before anyone looked, or the agency withdrew); `verified` can
+ * only close. Resolution semantics (WHY it moved to `resolved` — tenant cured
+ * vs cover committed vs staff dispute) live on the row's `resolution` field,
+ * not in this machine.
  */
 export const ALLOWED_TRANSITIONS: Readonly<
   Record<DelinquencyStatus, readonly DelinquencyStatus[]>
 > = {
-  open: [DELINQUENCY_STATUS.RESOLVED, DELINQUENCY_STATUS.CANCELED],
+  open: [DELINQUENCY_STATUS.VERIFIED, DELINQUENCY_STATUS.RESOLVED, DELINQUENCY_STATUS.CANCELED],
+  verified: [DELINQUENCY_STATUS.RESOLVED, DELINQUENCY_STATUS.CANCELED],
   resolved: [],
   canceled: [],
 } as const;

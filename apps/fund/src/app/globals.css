@@ -149,9 +149,16 @@
   --error: #b83232;
   /* Warning palette — distinct from accent (which is brand/selection).
      warning = amber "watch" (expiring, soft warning).
-     warning-strong = orange "act now" (caution, overdue). */
-  --warning: #d97706;
-  --warning-strong: #ea580c;
+     warning-strong = orange "act now" (caution, overdue).
+     The two steps separate by lightness, not hue. The previous amber-600 /
+     orange-600 pair measured OKLab ΔE 1.6 under simulated deuteranopia and 6.7
+     under normal color vision, against floors of 6 and 15 — a colorblind
+     reader could not tell "in arrears" from "default verified", and a
+     full-color reader barely could. Re-stepped to amber-800 / orange-500,
+     which is the widest gap these ramps allow while --error keeps the red end.
+     Re-measured by apps/agency/src/components/guarantees/state-tag.test.ts. */
+  --warning: #92400e;
+  --warning-strong: #f97316;
   --warning-dim: #fff4e0;
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1a1a1a;
@@ -177,8 +184,10 @@
   --accent-dim: #9e6a10;
   --success: #3dab72;
   --error: #c94040;
-  --warning: #f59e0b;
-  --warning-strong: #fb923c;
+  /* Measured against the dark surface in its own right, not flipped from the
+     light steps: amber-400 / orange-500. */
+  --warning: #fbbf24;
+  --warning-strong: #f97316;
   --warning-dim: #4a2c0a;
   /* Restore canvas-on-accent for dark mode */
   --color-accent-foreground: var(--canvas);

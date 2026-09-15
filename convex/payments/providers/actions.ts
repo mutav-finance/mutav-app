@@ -251,19 +251,19 @@ function brlCentsToAssetAmount(brlCents: number, assetSymbol: string): string {
  * — that row keeps its first writer's values and is never patched, so reading
  * it here would ship another agency's contact data to a third-party anchor and
  * pin it there permanently (LGPD-26). Returns an empty object when no
- * contract/tenant is reachable — the deposit still works without prefill.
+ * guarantee/tenant is reachable — the deposit still works without prefill.
  *
- * `agencyId` comes from the invoice being paid, so a `contractPublicId` that
+ * `agencyId` comes from the invoice being paid, so a `guaranteePublicId` that
  * also exists under another agency cannot pull that agency's tenant in.
  */
 async function resolveTenantPrefill(
   ctx: ActionCtx,
-  args: { agencyId: AgencyId; contractPublicId: string | undefined },
+  args: { agencyId: AgencyId; guaranteePublicId: string | undefined },
 ): Promise<TenantPrefill> {
-  if (!args.contractPublicId) return {};
-  const identity = await ctx.runQuery(internal.contracts.useCases.getTenantIdentityInternal, {
+  if (!args.guaranteePublicId) return {};
+  const identity = await ctx.runQuery(internal.guarantees.useCases.getTenantIdentityInternal, {
     agencyId: args.agencyId,
-    publicId: args.contractPublicId,
+    publicId: args.guaranteePublicId,
   });
   if (!identity) return {};
   return tenantToSep9Prefill(identity);
@@ -456,7 +456,7 @@ export const startPixOnramp = action({
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
     const tenant = await resolveTenantPrefill(ctx, {
       agencyId: invoice.agencyId,
-      contractPublicId: invoice.firstContractPublicId ?? undefined,
+      guaranteePublicId: invoice.firstGuaranteePublicId ?? undefined,
     });
 
     try {
@@ -648,7 +648,7 @@ export const startAnchorTestOnramp = action({
     const amount = brlCentsToAssetAmount(invoice.totalCents, "USDC");
     const tenant = await resolveTenantPrefill(ctx, {
       agencyId: invoice.agencyId,
-      contractPublicId: invoice.firstContractPublicId ?? undefined,
+      guaranteePublicId: invoice.firstGuaranteePublicId ?? undefined,
     });
 
     try {

@@ -17,20 +17,20 @@ All live in [`convex/lib/auth.ts`](../convex/lib/auth.ts). Import from `../lib/a
 The wrapper consumes its declared args; the handler does not redeclare them. Callers still pass `{ agencyId, ...handlerArgs }`.
 
 ```ts
-// convex/contracts/useCases.ts
+// convex/guarantees/useCases.ts
 import { mutationWithAgencyScope } from "../lib/auth";
 
-export const cancelProposal = mutationWithAgencyScope({
+export const cancelDraft = mutationWithAgencyScope({
   args: { publicId: v.string() }, // agencyId is supplied by the wrapper
   handler: async (ctx, args) => {
     // ctx.user, ctx.membership, ctx.agencyId are guaranteed
-    const contract = await ctx.db
-      .query("contracts")
+    const guarantee = await ctx.db
+      .query("guarantees")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
 
     // NOT_FOUND covers both "no such id" and "exists in another agency"
-    if (!contract || contract.agencyId !== ctx.agencyId) {
+    if (!guarantee || guarantee.agencyId !== ctx.agencyId) {
       return { success: false, error: { code: "NOT_FOUND" } } as const;
     }
     // ...
@@ -40,12 +40,12 @@ export const cancelProposal = mutationWithAgencyScope({
 
 ```ts
 // Client call — still passes agencyId, no change
-await cancelProposal({ agencyId: contract.agencyId, publicId: contract.id });
+await cancelDraft({ agencyId: guarantee.agencyId, publicId: guarantee.publicId });
 ```
 
 ## The resource-by-id pattern (`assertAgencyAccess`)
 
-Some routes only know a resource's public id, not its agency — e.g. `/contracts/[publicId]` is deep-linkable and renders server-side via `preloadQuery`. The client has no way to pass `agencyId` along with `publicId` from the URL, so the wrapper can't pre-scope by args.
+Some routes only know a resource's public id, not its agency — e.g. `/guarantees/[publicId]` is deep-linkable and renders server-side via `preloadQuery`. The client has no way to pass `agencyId` along with `publicId` from the URL, so the wrapper can't pre-scope by args.
 
 For these, use a bare `query` + inline `assertAgencyAccess` against the resource's own `agencyId`:
 
@@ -53,16 +53,16 @@ For these, use a bare `query` + inline `assertAgencyAccess` against the resource
 export const getByPublicId = query({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
-    const contract = await ctx.db
-      .query("contracts")
+    const guarantee = await ctx.db
+      .query("guarantees")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
-    if (!contract) return null;
+    if (!guarantee) return null;
 
     // Returns null on both "no such id" and "not a member of that agency"
     // — never leak cross-agency existence.
     try {
-      await assertAgencyAccess(ctx, contract.agencyId);
+      await assertAgencyAccess(ctx, guarantee.agencyId);
     } catch {
       return null;
     }
@@ -185,7 +185,7 @@ Each **imobiliária maps to one Auth0 Organization**, mirrored 1:1 to one Convex
 **Every public `query` or `mutation` that touches agency-scoped data MUST use a wrapper.** No bare `query({ args, handler })` for new handlers. The two allowed exceptions:
 
 1. **Resource-by-id reads/writes** (the `getByPublicId` pattern) — bare `query`/`mutation` + inline `assertAgencyAccess`. The wrapper can't help because `agencyId` comes from the resource, not args.
-2. **`internalMutation` / `internalQuery`** (the `convex/contracts/mutations.ts` pattern) — internal-only writers called via `ctx.runMutation(internal.…)`. Auth was already enforced by the public caller; internals don't re-check.
+2. **`internalMutation` / `internalQuery`** (the `convex/guarantees/mutations.ts` pattern) — internal-only writers called via `ctx.runMutation(internal.…)`. Auth was already enforced by the public caller; internals don't re-check.
 
 Everything else: wrapper. PRs that add a bare public `query`/`mutation` for an agency-scoped handler should be rejected at review.
 
@@ -220,6 +220,8 @@ grep -rn 'ctx\.runQuery(api\.<domain>\.' convex/
 For every hit, walk back to the entry-point action and decide tenant vs staff. Tenant-facing × wrapped requires routing through the internal companion.
 
 ## Migration status (2026-05-18)
+
+> Dated snapshot, kept as the record of when each handler was wrapped. The paths are the ones that existed then — `convex/contracts/` is now `convex/guarantees/` and `convex/payments/` / `convex/anchors/` became `convex/invoices/` and `convex/payments/providers/`.
 
 Wrapped:
 
@@ -261,5 +263,5 @@ Admin authority is split cleanly between identity and authorization:
 
 - [convex-helpers customFunctions](https://stack.convex.dev/custom-functions) — upstream pattern
 - [`convex/lib/auth.ts`](../convex/lib/auth.ts) — implementation
-- [`convex/contracts/useCases.ts`](../convex/contracts/useCases.ts) — reference consumers
+- [`convex/guarantees/useCases.ts`](../convex/guarantees/useCases.ts) — reference consumers
 - Issue [#58](https://github.com/mutav-finance/mutav-app/issues/58) — original spec

@@ -1,7 +1,7 @@
 import { useTranslations } from "next-intl";
 import { Check, ExternalLink } from "lucide-react";
 import { Mono } from "@mutav/ui/mono";
-import { formatPaidAtBR } from "@/lib/contracts/format";
+import { formatPaidAtBR } from "@mutav/i18n/brazil";
 import { getStellarNetwork } from "@/lib/stellar/network";
 import type { SettlementMethod } from "@convex/payments/domain";
 

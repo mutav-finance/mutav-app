@@ -143,6 +143,90 @@
       "unexpected": "Algo deu errado. Tente novamente."
     }
   },
+  "defaults": {
+    "title": "Acionamentos de inadimplência",
+    "subtitle": "Acionamentos aguardando decisão de compliance, dos mais antigos aos mais recentes.",
+    "empty": "Nenhum acionamento em aberto.",
+    "moreAvailable": "Há mais acionamentos na fila — apenas a página mais antiga é exibida.",
+    "notAvailable": "—",
+    "dueOn": "Aluguel vencido em {date}",
+    "daysOpen": "{days, plural, =0 {hoje} one {# dia} other {# dias}}",
+    "columns": {
+      "notice": "Acionamento",
+      "agency": "Imobiliária",
+      "tenant": "Inquilino",
+      "guarantee": "Garantia",
+      "outstanding": "Em aberto",
+      "openFor": "Aberto há",
+      "actions": "Ações"
+    },
+    "noticeStatus": {
+      "open": "Informado",
+      "verified": "Inadimplência confirmada"
+    },
+    "guaranteeState": {
+      "drafted": "Rascunho",
+      "active": "Ativa",
+      "in_arrears": "Em atraso",
+      "default_verified": "Inadimplência confirmada",
+      "cover_committed": "Cobertura acionada",
+      "in_eviction": "Em despejo",
+      "closed": "Encerrada"
+    },
+    "actions": {
+      "verify": "Confirmar",
+      "cover": "Registrar cobertura",
+      "dismiss": "Descartar",
+      "cancel": "Cancelar"
+    },
+    "cover": {
+      "title": "Registrar pagamento de cobertura",
+      "description": "A Mutav pagou o locador e nasce um recebível regressivo. Isto reserva capacidade na garantia.",
+      "claimed": "Valor acionado",
+      "remainingCapacity": "Cobertura restante",
+      "applied": "Valor que será debitado",
+      "clampWarning": "O valor acionado excede a cobertura restante. Somente o valor acima é debitado — {shortfall} ficam descobertos.",
+      "operationLabel": "Referência da operação de cobertura",
+      "operationPlaceholder": "COV-2026-000123",
+      "noteLabel": "Observação (opcional)",
+      "notePlaceholder": "O que a trilha de auditoria deve registrar",
+      "confirm": "Registrar cobertura"
+    },
+    "dismiss": {
+      "title": "Descartar acionamento",
+      "description": "Encerra o acionamento sem pagamento de cobertura. Escolha a disposição que corresponde à apuração.",
+      "reasonLabel": "Disposição",
+      "reason": {
+        "staff_dismissed": "Descartado — a inadimplência nunca existiu",
+        "staff_dispute": "Contestado — o acionamento é inválido, a garantia segue inadimplente"
+      },
+      "noteLabel": "Observação (opcional)",
+      "notePlaceholder": "Por que o acionamento está sendo encerrado",
+      "confirm": "Descartar acionamento"
+    },
+    "toast": {
+      "verified": "Inadimplência confirmada.",
+      "covered": "Cobertura registrada.",
+      "dismissed": "Acionamento encerrado."
+    },
+    "errors": {
+      "NOTICE_NOT_FOUND": "Este acionamento não existe mais.",
+      "NOTICE_NOT_VERIFIED": "Somente uma inadimplência confirmada pode acionar a cobertura. Confirme o acionamento antes.",
+      "SELF_TRANSITION": "O acionamento já está nesta situação.",
+      "TERMINAL_STATE": "O acionamento já está encerrado e não pode mudar novamente.",
+      "ILLEGAL_TRANSITION": "Esta mudança não é permitida a partir da situação atual do acionamento.",
+      "GUARANTEE_TRANSITION_REFUSED": "O ciclo de vida da garantia recusa esta mudança. Recarregue a fila e verifique a situação atual.",
+      "INVALID_AMOUNT": "O valor de cobertura não é um número válido em centavos.",
+      "CAPACITY_INVARIANT_BROKEN": "Os valores de cobertura da garantia não fecham. Escale antes de acionar a cobertura.",
+      "RELEASE_EXCEEDS_RESERVED": "A liberação é maior do que o valor atualmente reservado na garantia.",
+      "CLOSURE_REQUIRED": "Encerrar uma garantia exige um motivo de encerramento.",
+      "CLOSURE_NOT_ALLOWED": "Foi informado um motivo de encerramento para uma mudança que não encerra a garantia.",
+      "GUARANTEE_CLOSED": "A garantia está encerrada e não aceita mais mudanças.",
+      "INVALID_RENEWAL_DATE": "A data de renovação não é uma data válida.",
+      "FORBIDDEN": "Seu papel interno não permite executar esta ação.",
+      "unexpected": "Algo deu errado. Tente novamente."
+    }
+  },
   "shellSwitcher": {
     "backToAgency": "Voltar para Imobiliárias"
   },

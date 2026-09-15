@@ -1,9 +1,9 @@
 /**
- * Brazil document + phone formatting and validation. Shared across persona
- * apps. Values are stored digits-only per repo conventions (CPF = 11, CNPJ =
- * 14); the `mask*` helpers format at render time only — never persisted
- * formatted. The `isValid*` helpers run the official checksum algorithms
- * (never regex alone).
+ * Brazil document, phone, money and date formatting and validation. Shared
+ * across persona apps. Values are stored digits-only per repo conventions
+ * (CPF = 11, CNPJ = 14) and money as integer cents; the `mask*` / `format*`
+ * helpers format at render time only — never persisted formatted. The
+ * `isValid*` helpers run the official checksum algorithms (never regex alone).
  */
 
 export function isValidCPF(cpf: string): boolean {
@@ -62,4 +62,59 @@ export function maskPhone(raw: string): string {
   if (d.length > 6) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   if (d.length > 2) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
   return d;
+}
+
+/** Format an integer-cents BRL value as a localized currency string. */
+export function formatBRLCents(cents: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(cents / 100);
+}
+
+/**
+ * Format integer cents as a plain pt-BR amount (`1.234,56`) with no currency
+ * symbol — for inputs that render their own "R$" prefix.
+ */
+export function formatCentsPlain(cents: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
+export function formatDateBR(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+export function formatDateTimeBR(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/** Like {@link formatDateTimeBR} but pinned to São Paulo time — for paid-at timestamps. */
+export function formatPaidAtBR(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(date);
 }
