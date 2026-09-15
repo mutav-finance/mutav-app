@@ -52,11 +52,11 @@ ${SCENARIOS_DOC ? `Scenarios doc: ${SCENARIOS_DOC}` : 'No external scenarios doc
 - Setup pattern (copy verbatim from convex/seed.test.ts):
     import { convexTest } from 'convex-test'
     import schema from '../schema'
-    import { registerContractAggregateComponents } from '../lib/testFixtures'
+    import { registerGuaranteeAggregateComponents } from '../lib/testFixtures'
 
     function setup() {
       const t = convexTest(schema)
-      registerContractAggregateComponents(t) // required — aggregate writes throw otherwise
+      registerGuaranteeAggregateComponents(t) // required — aggregate writes throw otherwise
       return t
     }
 - Use \`await t.run(async (ctx) => { ... })\` for db operations.
@@ -177,7 +177,7 @@ Read these before designing:
 - convex/${DOMAIN}/domain.ts (value objects + validators + Doc<>/Id<> aliases)
 - convex/${DOMAIN}/machine.test.ts (existing test shape to match)
 - convex/${DOMAIN}/domain.test.ts
-- convex/seed.test.ts (canonical convex-test example in this repo — copy the setup() pattern including registerContractAggregateComponents)
+- convex/seed.test.ts (canonical convex-test example in this repo — copy the setup() pattern including registerGuaranteeAggregateComponents)
 - convex/lib/testFixtures.ts (available helpers)
 - convex/schema.ts (search for the domain's table def, understand every field + index)
 - convex/seed.ts (how the domain's rows are seeded — copy the insert shape)
@@ -224,7 +224,7 @@ Write the file at ${design.file_path} following the plan EXACTLY:
 Additional constraints (already in the design agent's context — repeated here so you don't need to hunt):
 
 - Top of file: \`// @vitest-environment edge-runtime\`
-- Setup: convexTest(schema) + registerContractAggregateComponents(t) — see convex/seed.test.ts
+- Setup: convexTest(schema) + registerGuaranteeAggregateComponents(t) — see convex/seed.test.ts
 - Fixtures created INLINE inside t.run — no seedReset dependency
 - Integer cents, ISO strings, no Date objects
 - Read-what-you-wrote assertions with \`.toEqual([literal])\`

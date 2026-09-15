@@ -7,15 +7,15 @@ const app = defineApp();
 app.use(migrations);
 
 /**
- * One named aggregate instance: counts contracts grouped by
- * (agencyId namespace, status key).
+ * Per-agency aggregate: counts guarantees grouped by
+ * (agencyId namespace, state key).
  *
  * Using a namespace per agency maximises write throughput — each agency's
  * B-tree is isolated, so concurrent mutations from different agencies never
  * contend on the same internal nodes.
  */
-app.use(aggregate, { name: "contractsByStatus" });
-app.use(aggregate, { name: "contractsByStatusPlatform" });
-app.use(aggregate, { name: "ativoInsuredCentsPlatform" });
+app.use(aggregate, { name: "guaranteesByState" });
+app.use(aggregate, { name: "guaranteesByStatePlatform" });
+app.use(aggregate, { name: "insuredCentsPlatform" });
 
 export default app;

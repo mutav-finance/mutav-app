@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
@@ -16,7 +16,7 @@ import { STATS_TAKE_LIMIT } from "./useCases";
 // throw on first query. Cheap to register, expensive to forget.
 function setup() {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 

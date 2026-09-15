@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vi
 import { api } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
 import {
-  registerContractAggregateComponents,
+  registerGuaranteeAggregateComponents,
   seedAgencyWithMembership,
   seedDefaultProduct,
   seedGuaranteeWithLease,
@@ -60,7 +60,7 @@ const EXIT_CAP = 600_000;
 describe("getStatusCounts", () => {
   test("returns one key per guarantee state, scoped to the agency", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -77,7 +77,7 @@ describe("getStatusCounts", () => {
 describe("getStatusCountsGlobal", () => {
   test("returns platform totals that match the sum of per-agency counts", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyA = await seedAgencyWithMembership(t, userId);
     const agencyB = await seedSecondAgency(t, userId, "00000000000777");
@@ -111,7 +111,7 @@ describe("getStatusCountsGlobal", () => {
 describe("getInsuredCapacityGlobal", () => {
   test("sums exposure (available capacity + exit cap) over every insured state, not drafts or closed", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -167,7 +167,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
 
   test("scheduling a CPF makes the score readable via getCachedCreditScore after actions run", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, agencyId } = await seedBoundSubject(t, "12345678901");
 
     const req = await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
@@ -188,7 +188,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
 
   test("returns cached status when a fresh assessment already exists", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, agencyId } = await seedBoundSubject(t, "12345678901");
 
     const first = await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
@@ -207,7 +207,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
 
   test("returns invalid for a malformed document string", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -220,7 +220,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
 
   test("getCachedCreditScore refuses the cache once no application binds the agency to the subject", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, agencyId } = await seedBoundSubject(t, "12345678901");
 
     await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
@@ -251,7 +251,7 @@ describe("requestCreditScore / getCachedCreditScore", () => {
 
   test("CNPJ (14-digit) also routes through creditAnalysis and yields a cached score", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, agencyId } = await seedBoundSubject(t, "12345678000190");
 
     const req = await asUser.mutation(api.guarantees.useCases.requestCreditScore, {
@@ -306,7 +306,7 @@ describe("getStateTimelineByPeriod", () => {
 
   test("replays history into one count per state at each period end", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -350,7 +350,7 @@ describe("getStateTimelineByPeriod", () => {
 
   test("a guarantee is absent from every bucket that closed before it existed", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -394,7 +394,7 @@ describe("getStateTimelineByPeriod", () => {
 
   test("a guarantee with no transition history counts in its current status from the moment it exists", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -432,7 +432,7 @@ describe("getStateTimelineByPeriod", () => {
 
   test("agency scope excludes another agency's guarantee even when both share a publicId", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyA = await seedAgencyWithMembership(t, userId);
     const agencyB = await seedSecondAgency(t, userId, "00000000000999");
@@ -491,7 +491,7 @@ describe("getStateTimelineByPeriod", () => {
 
   test("counts the lifecycle moves of each period beside the composition", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -542,7 +542,7 @@ describe("getStateTimelineByPeriod", () => {
 
   test("weekly granularity returns 52 buckets with ISO Monday period keys", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 
@@ -560,7 +560,7 @@ describe("getStateTimelineByPeriod", () => {
 
   test("refuses an agency the caller is not a member of", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     await seedAgencyWithMembership(t, userId);
     const foreignAgencyId = await t.run(async (ctx) =>
@@ -615,7 +615,7 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
 
   test("tab 'expiring' returns only the active rows inside [today, today+60], each carrying urgency", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedUrgencyBook(t, agencyId);
@@ -636,7 +636,7 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
 
   test("a state tab returns only rows in that state", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedUrgencyBook(t, agencyId);
@@ -664,7 +664,7 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
 
   test("tab undefined returns every guarantee", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedUrgencyBook(t, agencyId);
@@ -682,7 +682,7 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
 
   test("a closed row projects availableCapacityCents = 0 while its capacity invariant stays intact", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedUrgencyBook(t, agencyId);
@@ -714,7 +714,7 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
 
   test("getGuaranteeTabCounts: expiring === 2 with one bucket per state", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedUrgencyBook(t, agencyId);
@@ -780,7 +780,7 @@ describe("create (lease + drafted guarantee)", () => {
   };
 
   async function setup(t: ReturnType<typeof convexTest>) {
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     await seedDefaultProduct(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
@@ -934,7 +934,7 @@ describe("create (lease + drafted guarantee)", () => {
 
   test("refuses when no enabled default product exists", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     await seedFreshCreditAssessment(t, { agencyId, document: VALID_CPF, score: 750 });
@@ -1089,7 +1089,7 @@ describe("create (lease + drafted guarantee)", () => {
 describe("cancelDraft", () => {
   test("closes a draft with canceled_pre_activation and releases the lease pointer", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     const { guaranteeId, leaseId } = await seedGuaranteeWithLease(
@@ -1121,7 +1121,7 @@ describe("cancelDraft", () => {
 
   test("refuses to cancel a guarantee that is no longer a draft", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     const { guaranteeId, leaseId } = await seedGuaranteeWithLease(
@@ -1144,7 +1144,7 @@ describe("cancelDraft", () => {
 
   test("returns NOT_FOUND for another agency's draft without revealing it", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const mine = await seedAgencyWithMembership(t, userId);
     const theirs = await seedSecondAgency(t, userId, "00000000000999");
@@ -1168,7 +1168,7 @@ describe("cancelDraft", () => {
 describe("listForCommissionByMonth", () => {
   test("returns commissionCents from the stored terms split at the product's rates for each in-force guarantee", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
 

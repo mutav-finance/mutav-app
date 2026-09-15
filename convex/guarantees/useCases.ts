@@ -18,7 +18,7 @@ import type { AgencyId } from "../agencies/domain";
 import type { Tenant, TenantInput } from "../tenants/domain";
 import type { Lease } from "../leases/domain";
 import { PRODUCT_ERROR_CODE } from "../products/domain";
-import { contractsByStatus, countByStatePlatform, sumInsuredExposure } from "./aggregate";
+import { guaranteesByState, countByStatePlatform, sumInsuredExposure } from "./aggregate";
 import { insertGuaranteeAggregates } from "./aggregateWrites";
 import { applyGuaranteeTransition } from "./transitions";
 import {
@@ -319,7 +319,7 @@ function shapeStateCounts(counts: readonly number[]): StateCounts {
 }
 
 async function stateCountsForAgency(ctx: QueryCtx, agencyId: AgencyId): Promise<StateCounts> {
-  const counts = await contractsByStatus.countBatch(
+  const counts = await guaranteesByState.countBatch(
     ctx,
     GUARANTEE_STATES.map((state) => ({ namespace: agencyId, bounds: singleKeyBounds(state) })),
   );
@@ -328,7 +328,7 @@ async function stateCountsForAgency(ctx: QueryCtx, agencyId: AgencyId): Promise<
 
 /**
  * Per-agency state counts, one key per guarantee state. O(log n) via the
- * namespaced `contractsByStatus` aggregate. Used by the dashboard KPI tiles.
+ * namespaced `guaranteesByState` aggregate. Used by the dashboard KPI tiles.
  */
 export const getStatusCounts = queryWithAgencyScope({
   args: {},
@@ -337,7 +337,7 @@ export const getStatusCounts = queryWithAgencyScope({
 
 /**
  * Per-tab badge counts for the guarantees list. State buckets reuse the
- * O(log n) `contractsByStatus` aggregate; the `expiring` badge counts the
+ * O(log n) `guaranteesByState` aggregate; the `expiring` badge counts the
  * indexed `active` renewal range (same window `listByAgency` paginates).
  */
 export const getGuaranteeTabCounts = queryWithAgencyScope({
@@ -370,7 +370,7 @@ export const getGuaranteeTabCounts = queryWithAgencyScope({
 
 /**
  * Platform-wide state counts, one key per guarantee state. O(log n) via the
- * un-namespaced `contractsByStatusPlatform` aggregate. Used by the
+ * un-namespaced `guaranteesByStatePlatform` aggregate. Used by the
  * health/transparency page.
  */
 export const getStatusCountsGlobal = queryWithAuth({
@@ -382,7 +382,7 @@ export const getStatusCountsGlobal = queryWithAuth({
  * Platform-wide insured capacity. Sum of worst-case exposure (remaining
  * rent-coverage capacity + exit-cost sublimit) across every in-force
  * guarantee, plus the configured global capacity cap. O(log n) per insured
- * state via the `ativoInsuredCentsPlatform` aggregate.
+ * state via the `insuredCentsPlatform` aggregate.
  */
 export const getInsuredCapacityGlobal = queryWithAuth({
   args: {},

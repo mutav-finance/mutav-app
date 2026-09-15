@@ -38,9 +38,9 @@ import {
 import type { UserId } from "./users/domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee } from "./guarantees/pricing";
 import {
-  ativoInsuredCentsPlatform,
-  contractsByStatus,
-  contractsByStatusPlatform,
+  insuredCentsPlatform,
+  guaranteesByState,
+  guaranteesByStatePlatform,
 } from "./guarantees/aggregate";
 import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
 import {
@@ -1719,10 +1719,10 @@ async function seedFictional(
     // may have stale entries from a prior run. Clear all three then re-insert
     // through the central helper so they stay in lockstep.
     for (const agencyId of [paulistaId, atlanticaId, horizonteId]) {
-      await contractsByStatus.clear(ctx, { namespace: agencyId });
+      await guaranteesByState.clear(ctx, { namespace: agencyId });
     }
-    await contractsByStatusPlatform.clear(ctx);
-    await ativoInsuredCentsPlatform.clear(ctx);
+    await guaranteesByStatePlatform.clear(ctx);
+    await insuredCentsPlatform.clear(ctx);
     {
       const allGuarantees = await ctx.db.query("guarantees").collect();
       for (const doc of allGuarantees) {

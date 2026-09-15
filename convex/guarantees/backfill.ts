@@ -1,11 +1,11 @@
 import { internalMutation } from "../_generated/server";
 import { insertGuaranteeAggregatesIfMissing } from "./aggregateWrites";
-import { contractsByStatus } from "./aggregate";
+import { guaranteesByState } from "./aggregate";
 
 const PAGE_SIZE = 200;
 
 /**
- * Seed the `contractsByStatus` aggregate from the current state of the
+ * Seed the `guaranteesByState` aggregate from the current state of the
  * `guarantees` table.
  *
  * Safe to run multiple times — uses `insertIfDoesNotExist` which is idempotent.
@@ -21,7 +21,7 @@ export const backfillGuaranteeAggregate = internalMutation({
     const guarantees = await ctx.db.query("guarantees").take(PAGE_SIZE);
 
     for (const doc of guarantees) {
-      await contractsByStatus.insertIfDoesNotExist(ctx, doc);
+      await guaranteesByState.insertIfDoesNotExist(ctx, doc);
     }
 
     return { processed: guarantees.length, done: guarantees.length < PAGE_SIZE };

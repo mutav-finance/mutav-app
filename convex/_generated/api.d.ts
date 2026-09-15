@@ -224,7 +224,7 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
-  contractsByStatus: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatus">;
-  contractsByStatusPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"contractsByStatusPlatform">;
-  ativoInsuredCentsPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"ativoInsuredCentsPlatform">;
+  guaranteesByState: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"guaranteesByState">;
+  guaranteesByStatePlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"guaranteesByStatePlatform">;
+  insuredCentsPlatform: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"insuredCentsPlatform">;
 };

@@ -39,15 +39,11 @@ export const TEST_USER_SUBJECT = "auth0|test-user";
  * `convex.config.ts`. Tests that exercise mutations writing to aggregates
  * MUST call this on their `convexTest` instance before invoking the code.
  */
-export function registerContractAggregateComponents(t: ReturnType<typeof convexTest>): void {
+export function registerGuaranteeAggregateComponents(t: ReturnType<typeof convexTest>): void {
   const componentGlob = import.meta.glob(
     "../../node_modules/@convex-dev/aggregate/src/component/**/*.ts",
   );
-  for (const name of [
-    "contractsByStatus",
-    "contractsByStatusPlatform",
-    "ativoInsuredCentsPlatform",
-  ]) {
+  for (const name of ["guaranteesByState", "guaranteesByStatePlatform", "insuredCentsPlatform"]) {
     t.registerComponent(name, aggregateComponentSchema, componentGlob);
   }
 }

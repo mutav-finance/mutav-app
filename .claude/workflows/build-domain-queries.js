@@ -296,11 +296,11 @@ Body:
 
     import { convexTest } from 'convex-test'
     import schema from '../schema'
-    import { registerContractAggregateComponents } from '../lib/testFixtures'
+    import { registerGuaranteeAggregateComponents } from '../lib/testFixtures'
 
     function setup() {
       const t = convexTest(schema)
-      registerContractAggregateComponents(t)
+      registerGuaranteeAggregateComponents(t)
       return t
     }
 

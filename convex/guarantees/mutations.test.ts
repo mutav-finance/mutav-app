@@ -5,7 +5,7 @@ import { api } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
 import type { UserId } from "../users/domain";
 import type { MutavStaffRole } from "../mutavStaff/domain";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import {
   CLOSE_REASON,
   GUARANTEE_STATE,
@@ -23,7 +23,7 @@ const CEILING_CENTS = 3_000_000;
 
 function setup(): T {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 

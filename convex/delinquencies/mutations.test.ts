@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import { replaceGuaranteeAggregates } from "../guarantees/aggregateWrites";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
@@ -16,7 +16,7 @@ import schema from "../schema";
 // unregistered lookups throw on first query.
 function setup() {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 

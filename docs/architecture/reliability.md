@@ -163,7 +163,7 @@ For multi-step flows where partial failure must be recoverable: investor deposit
 | Bounded parallelism (one settlement at a time per agency) | Workpool       | `@convex-dev/workpool`                                         |
 | Retry one idempotent action with backoff                  | Action retrier | `@convex-dev/action-retrier`                                   |
 | Fire-and-forget single execution                          | Scheduler      | `ctx.scheduler.runAfter` (built-in)                            |
-| O(log n) sums/counts on indexed data                      | Aggregate      | `@convex-dev/aggregate` (already used for `contractsByStatus`) |
+| O(log n) sums/counts on indexed data                      | Aggregate      | `@convex-dev/aggregate` (already used for `guaranteesByState`) |
 
 ### Workflow guarantees
 

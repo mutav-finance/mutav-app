@@ -18,35 +18,31 @@ export type GuaranteeStateCounts = Record<GuaranteeState, number>;
  * Must be updated in every mutation that inserts, patches status, or deletes a
  * guarantee. Use the helpers exported from `aggregateWrites.ts` (insert /
  * replace / delete) to keep the aggregate in sync.
- *
- * Component names still say `contracts…` / `ativo…`: they are bound in
- * `convex.config.ts` and renaming them is a separate migration of the
- * component tables. Only the binding changed here.
  */
-export const contractsByStatus = new TableAggregate<{
+export const guaranteesByState = new TableAggregate<{
   Namespace: AgencyId;
   Key: GuaranteeState;
   DataModel: DataModel;
   TableName: "guarantees";
-}>(components.contractsByStatus, {
+}>(components.guaranteesByState, {
   namespace: (doc) => doc.agencyId,
   sortKey: (doc) => doc.status,
 });
 
 /**
- * Un-namespaced sibling of `contractsByStatus` for platform-wide reads.
+ * Un-namespaced sibling of `guaranteesByState` for platform-wide reads.
  *
  * `@convex-dev/aggregate`'s `Namespace` type is invariant, so we cannot widen
  * the per-agency aggregate to also serve platform queries — two separate
  * aggregates is the only way. Every mutation must keep both in lockstep via
  * the helpers in `aggregateWrites.ts`.
  */
-export const contractsByStatusPlatform = new TableAggregate<{
+export const guaranteesByStatePlatform = new TableAggregate<{
   Namespace: undefined;
   Key: GuaranteeState;
   DataModel: DataModel;
   TableName: "guarantees";
-}>(components.contractsByStatusPlatform, {
+}>(components.guaranteesByStatePlatform, {
   sortKey: (doc) => doc.status,
 });
 
@@ -60,12 +56,12 @@ export const contractsByStatusPlatform = new TableAggregate<{
  * ceiling PLUS the exit-cost sublimit, both taken from the guarantee's own
  * `terms`/`capacity` snapshot (no product lookup).
  */
-export const ativoInsuredCentsPlatform = new TableAggregate<{
+export const insuredCentsPlatform = new TableAggregate<{
   Namespace: undefined;
   Key: GuaranteeState;
   DataModel: DataModel;
   TableName: "guarantees";
-}>(components.ativoInsuredCentsPlatform, {
+}>(components.insuredCentsPlatform, {
   sortKey: (doc) => doc.status,
   sumValue: (doc) => doc.capacity.availableCents + doc.terms.exitCostCapCents,
 });
@@ -95,7 +91,7 @@ function shapeStateCounts(counts: readonly number[]): GuaranteeStateCounts {
 
 /** Platform-wide guarantee count per lifecycle state, one O(log n) read each. */
 export async function countByStatePlatform(ctx: QueryCtx): Promise<GuaranteeStateCounts> {
-  const counts = await contractsByStatusPlatform.countBatch(
+  const counts = await guaranteesByStatePlatform.countBatch(
     ctx,
     GUARANTEE_STATES.map((state) => ({ bounds: singleKeyBounds(state) })),
   );
@@ -106,14 +102,14 @@ export async function countByStatePlatform(ctx: QueryCtx): Promise<GuaranteeStat
 export async function sumInsuredExposure(ctx: QueryCtx): Promise<number> {
   let total = 0;
   for (const state of INSURED_STATES) {
-    total += await ativoInsuredCentsPlatform.sum(ctx, { bounds: singleKeyBounds(state) });
+    total += await insuredCentsPlatform.sum(ctx, { bounds: singleKeyBounds(state) });
   }
   return total;
 }
 
 /** Platform-wide number of in-force guarantees. */
 export async function countInsured(ctx: QueryCtx): Promise<number> {
-  const counts = await contractsByStatusPlatform.countBatch(
+  const counts = await guaranteesByStatePlatform.countBatch(
     ctx,
     INSURED_STATES.map((state) => ({ bounds: singleKeyBounds(state) })),
   );
@@ -122,7 +118,7 @@ export async function countInsured(ctx: QueryCtx): Promise<number> {
 
 /** Per-agency number of in-force guarantees. */
 export async function countInsuredForAgency(ctx: QueryCtx, agencyId: AgencyId): Promise<number> {
-  const counts = await contractsByStatus.countBatch(
+  const counts = await guaranteesByState.countBatch(
     ctx,
     INSURED_STATES.map((state) => ({ namespace: agencyId, bounds: singleKeyBounds(state) })),
   );

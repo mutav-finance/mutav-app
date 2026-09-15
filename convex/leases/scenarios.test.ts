@@ -13,7 +13,7 @@ import {
   type GuaranteeState,
 } from "../guarantees/domain";
 import type { Result } from "../lib/result";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import { isEligible, type ProductEligibility } from "../products/domain";
 import schema from "../schema";
 import type { TenantId } from "../tenants/domain";
@@ -38,13 +38,13 @@ type Harness = TestConvex<typeof schema>;
 
 function setup(): Harness {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 
 function setupStrict(): Harness {
   const t = convexTest(strictSchema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 

@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
 import { GUARANTEE_STATE, type GuaranteeState } from "../guarantees/domain";
 import {
-  registerContractAggregateComponents,
+  registerGuaranteeAggregateComponents,
   seedAgencyWithMembership,
   seedGuaranteeWithLease,
   setupAuthenticatedUser,
@@ -36,7 +36,7 @@ async function authedReader() {
 describe("getGuaranteeAggregates — defaultRate", () => {
   async function bookWith(states: readonly GuaranteeState[]) {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const { asUser, userId } = await setupAuthenticatedUser(t);
     const agencyId = await seedAgencyWithMembership(t, userId);
     let index = 0;

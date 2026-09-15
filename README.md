@@ -181,7 +181,7 @@ bun run test:file <path>  # one file, e.g. bun run test:file convex/delinquencie
 
 - Pure logic → `machine.test.ts`, `domain.test.ts` — plain vitest, no `convexTest(...)`. See `convex/delinquencies/machine.test.ts` for the canonical shape (state-machine exhaustive coverage, self-transition + terminal-state rejection).
 - Scenario → `scenarios.test.ts` — schema conformance, index coverage, and cross-agency isolation; produced by the [`build-scenario-tests`](.claude/workflows/build-scenario-tests.js) workflow. Same edge-runtime + `convexTest` harness as db-backed tests. See `convex/delinquencies/scenarios.test.ts` for the canonical shape.
-- Db-backed scenarios → `useCases.test.ts`, `seed.test.ts` — starts with `// @vitest-environment edge-runtime`, calls `convexTest(schema)` and `registerContractAggregateComponents(t)` (from `convex/lib/testFixtures.ts`) so aggregate writes don't throw. See `convex/seed.test.ts` for the pattern.
+- Db-backed scenarios → `useCases.test.ts`, `seed.test.ts` — starts with `// @vitest-environment edge-runtime`, calls `convexTest(schema)` and `registerGuaranteeAggregateComponents(t)` (from `convex/lib/testFixtures.ts`) so aggregate writes don't throw. See `convex/seed.test.ts` for the pattern.
 
 ## Git hooks
 

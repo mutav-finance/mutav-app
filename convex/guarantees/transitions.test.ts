@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, test } from "vitest";
 import type { AgencyId } from "../agencies/domain";
 import type { UserId } from "../users/domain";
 import { AUDIT_ACTION } from "../audit/domain";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
-import { contractsByStatus } from "./aggregate";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { guaranteesByState } from "./aggregate";
 import {
   CLOSE_REASON,
   GUARANTEE_STATE,
@@ -32,7 +32,7 @@ const CEILING_CENTS = 3_000_000;
 
 function setup(): T {
   const t = convexTest(schema);
-  registerContractAggregateComponents(t);
+  registerGuaranteeAggregateComponents(t);
   return t;
 }
 
@@ -83,7 +83,7 @@ async function auditActions(t: T): Promise<string[]> {
 
 async function countInState(t: T, agencyId: AgencyId, state: GuaranteeState): Promise<number> {
   return t.run((ctx) =>
-    contractsByStatus.count(ctx, {
+    guaranteesByState.count(ctx, {
       namespace: agencyId,
       bounds: { lower: { key: state, inclusive: true }, upper: { key: state, inclusive: true } },
     }),

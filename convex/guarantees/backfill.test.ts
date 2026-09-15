@@ -3,8 +3,8 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
-import { ativoInsuredCentsPlatform, contractsByStatusPlatform } from "./aggregate";
-import { registerContractAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import { insuredCentsPlatform, guaranteesByStatePlatform } from "./aggregate";
+import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
 import { GUARANTEE_STATE } from "./domain";
 import schema from "../schema";
 
@@ -26,11 +26,11 @@ const ACTIVE_BOUNDS = {
 };
 
 async function platformActiveCount(t: ReturnType<typeof convexTest>) {
-  return t.run((ctx) => contractsByStatusPlatform.count(ctx, { bounds: ACTIVE_BOUNDS }));
+  return t.run((ctx) => guaranteesByStatePlatform.count(ctx, { bounds: ACTIVE_BOUNDS }));
 }
 
 async function platformActiveSum(t: ReturnType<typeof convexTest>) {
-  return t.run((ctx) => ativoInsuredCentsPlatform.sum(ctx, { bounds: ACTIVE_BOUNDS }));
+  return t.run((ctx) => insuredCentsPlatform.sum(ctx, { bounds: ACTIVE_BOUNDS }));
 }
 
 // rentCents 100_000 through the default product → 6x exit cap.
@@ -39,7 +39,7 @@ const EXIT_CAP = 600_000;
 describe("backfillPlatformAggregates", () => {
   test("populates platform count and sum aggregates from raw guarantees", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const agency = await seedAgency(t, "00000000000999");
 
     await seedGuaranteeWithLease(
@@ -87,7 +87,7 @@ describe("backfillPlatformAggregates", () => {
 
   test("idempotent — re-running after first pass is a no-op", async () => {
     const t = convexTest(schema);
-    registerContractAggregateComponents(t);
+    registerGuaranteeAggregateComponents(t);
     const agency = await seedAgency(t, "00000000001001");
     await seedGuaranteeWithLease(
       t,
