@@ -21,7 +21,7 @@
 
 **Diagrams:**
 
-- [`system-architecture.html`](system-architecture.html) — the whole system on one page: actors → persona apps → the single Convex deployment → external services, with what is live on `main` drawn solid and what is stage 2 or unbuilt drawn dashed. Then per-surface identity + wrapper, who signs what, crons + webhook, the 29 tables grouped, and the deploy path. Self-contained HTML like the lifecycle drawing. Read it before this catalog when you need the shape; read the catalog when you need the rule.
+- [`system-architecture.html`](system-architecture.html) — the whole system on one page: actors → persona apps → the single Convex deployment → external services, with what is live on `main` drawn solid and what is stage 2 or unbuilt drawn dashed. Then per-surface identity + wrapper, who signs what, crons + webhook, the 28 tables grouped, and the deploy path. Self-contained HTML like the lifecycle drawing. Read it before this catalog when you need the shape; read the catalog when you need the rule.
 - [`guarantee-lifecycle.html`](guarantee-lifecycle.html) — the seven guarantee states, every legal edge, and which actor drives it. HTML rather than Markdown because it is a drawing, not prose: the repo has no Mermaid render step, and the file is self-contained (inline CSS, theme-aware against the brand tokens) so it opens correctly from anywhere. The live per-state counts are the agency dashboard's lifecycle card; this is the reference read once.
 
 **Cross-cutting:**
@@ -154,7 +154,7 @@ The protocol crosses several trust boundaries. Each is a place where wrong assum
               │ JWT                   │ JWT                │ token                   │ none
               ▼                       ▼                    ▼                         ▼
    ┌──────────────────────────────────────────────────────────────────────────────────────────┐
-   │                        Convex — Mutav API (one deployment, 29 tables)                    │
+   │                        Convex — Mutav API (one deployment, 28 tables)                    │
    │   • auth wrappers (convex/lib/auth.ts): agency scope · staff role ladder                 │
    │   • assertTransition / assertClose before every guarantee patch                          │
    │   • mutavAuditLog hash chain, Merkle-anchored to Stellar daily                            │
