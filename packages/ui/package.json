@@ -55,6 +55,7 @@
     "./toggle-group": "./src/toggle-group.tsx",
     "./tooltip": "./src/tooltip.tsx",
     "./transparency/capacity-panel": "./src/transparency/capacity-panel.tsx",
+    "./transparency/format": "./src/transparency/format.ts",
     "./transparency/reserve-breakdown": "./src/transparency/reserve-breakdown.tsx",
     "./transparency/reserve-panel": "./src/transparency/reserve-panel.tsx",
     "./transparency/types": "./src/transparency/types.ts",

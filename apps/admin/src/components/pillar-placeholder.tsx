@@ -5,7 +5,7 @@ import { getTranslations } from "next-intl/server";
  * in the sidebar but not yet built — so a nav click renders this instead of a
  * 404. Each pillar's page is a one-liner that passes its `nav.main` title key.
  */
-type PillarKey = "agencies" | "compliance" | "defaults" | "treasury" | "observability" | "nav";
+type PillarKey = "agencies" | "compliance" | "defaults" | "observability" | "nav";
 
 export async function PillarPlaceholder({ titleKey }: { titleKey: PillarKey }) {
   const tNav = await getTranslations("nav.main");
