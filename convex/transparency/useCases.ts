@@ -1,13 +1,27 @@
 import { queryWithAuth } from "../lib/auth";
-import { countByStatePlatform, countInsured, sumInsuredExposure } from "../guarantees/aggregate";
-import { getMaxGuaranteeCapacityCents, getReserveContractId, getStellarNetwork } from "../lib/env";
-import { GUARANTEE_STATE, type GuaranteeState } from "../guarantees/domain";
-import type { GuaranteeAggregates, ReserveCoverage } from "./domain";
+import {
+  countByStatePlatform,
+  countInsured,
+  sumInsuredExposure,
+  sumVerifiedDefaultExposure,
+} from "../guarantees/aggregate";
+import { getReserveContractId, getStellarNetwork } from "../lib/env";
+import { VERIFIED_DEFAULT_STATES, type GuaranteeState } from "../guarantees/domain";
+import { deriveSolvencyFigures, type ReserveSolvencySnapshot } from "../reserve/domain";
+import type {
+  GuaranteeAggregates,
+  ReserveCoverage,
+  ReserveSolvency,
+  StellarNetworkName,
+} from "./domain";
 
 // Aggregates in this module are platform-wide BY DESIGN — every viewer sees the
 // same numbers (transparency dashboard). Do NOT add per-agency filtering here;
 // if a scoped variant is needed, add a separate `queryWithAgencyScope` handler
 // in a sibling file.
+//
+// Every figure below is defined — formula, source, refresh cadence — in
+// docs/transparency-metrics.md. Change the two together.
 
 /**
  * Metric definition, quoted verbatim in the SOW evidence pack:
@@ -28,16 +42,13 @@ import type { GuaranteeAggregates, ReserveCoverage } from "./domain";
  * counted while it passed through `cover_committed`, and the eviction is a
  * recovery step, not a second default.
  */
-function computeDefaultRate(
-  countByState: Record<GuaranteeState, number>,
-  insuredCount: number,
-): number | null {
+function computeDefaultRate(verifiedDefaultCount: number, insuredCount: number): number | null {
   if (insuredCount === 0) return null;
-  return (
-    (countByState[GUARANTEE_STATE.DEFAULT_VERIFIED] +
-      countByState[GUARANTEE_STATE.COVER_COMMITTED]) /
-    insuredCount
-  );
+  return verifiedDefaultCount / insuredCount;
+}
+
+function countVerifiedDefault(countByState: Record<GuaranteeState, number>): number {
+  return VERIFIED_DEFAULT_STATES.reduce((sum, state) => sum + countByState[state], 0);
 }
 
 export const getGuaranteeAggregates = queryWithAuth({
@@ -45,23 +56,55 @@ export const getGuaranteeAggregates = queryWithAuth({
   handler: async (ctx): Promise<GuaranteeAggregates> => {
     const countByState = await countByStatePlatform(ctx);
     const insuredCount = await countInsured(ctx);
+    const verifiedDefaultCount = countVerifiedDefault(countByState);
     return {
       countByState,
       countInsured: insuredCount,
       sumInsuredCents: await sumInsuredExposure(ctx),
-      defaultRate: computeDefaultRate(countByState, insuredCount),
-      maxCapacityCents: getMaxGuaranteeCapacityCents(),
+      countVerifiedDefault: verifiedDefaultCount,
+      // Same aggregate and exposure formula as `sumInsuredCents`, narrowed to
+      // the verified-default states — a subset of it, in the same BRL centavos.
+      verifiedDefaultExposureCents: await sumVerifiedDefaultExposure(ctx),
+      defaultRate: computeDefaultRate(verifiedDefaultCount, insuredCount),
     };
   },
 });
 
+function explorerRoot(network: StellarNetworkName): string {
+  return `https://stellar.expert/explorer/${network}`;
+}
+
+function contractExplorerUrl(network: StellarNetworkName, id: string): string {
+  return `${explorerRoot(network)}/contract/${id}`;
+}
+
 function reserveExplorerUrl(): string {
   const id = getReserveContractId();
-  const network = getStellarNetwork() === "public" ? "public" : "testnet";
+  const network = getStellarNetwork();
   // When unconfigured (mainnet, no id) link to the network's contract index root.
-  return id
-    ? `https://stellar.expert/explorer/${network}/contract/${id}`
-    : `https://stellar.expert/explorer/${network}`;
+  return id ? contractExplorerUrl(network, id) : explorerRoot(network);
+}
+
+// Contract ids come from the snapshot, not env: the page must name the
+// contracts the figures were actually read from, even if env moved since.
+function shapeReserveSolvency(snapshot: ReserveSolvencySnapshot): ReserveSolvency {
+  const network = getStellarNetwork();
+  const figures = deriveSolvencyFigures(snapshot);
+  const reference = (id: string) => ({ id, explorerUrl: contractExplorerUrl(network, id) });
+  return {
+    ...figures,
+    network,
+    assetSymbol: snapshot.assetSymbol,
+    contracts: {
+      vault: reference(snapshot.vaultId),
+      policy: reference(snapshot.policyId),
+      registry: reference(snapshot.registryId),
+    },
+    positions: figures.positions.map((position) => ({
+      ...position,
+      explorerUrl: contractExplorerUrl(network, position.address),
+    })),
+  };
 }
 
 // Platform-wide BY DESIGN — every viewer sees the same onchain coverage figure.
@@ -88,6 +131,7 @@ export const getReserveCoverage = queryWithAuth({
       fxQuotedAt: snap.fxQuotedAt,
       capturedAt: snap.capturedAt,
       assetCount: snap.assets.length,
+      solvency: snap.solvency ? shapeReserveSolvency(snap.solvency) : null,
     };
   },
 });
