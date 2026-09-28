@@ -71,7 +71,7 @@ export type GuaranteeTransitionError = {
  * a drifted row is refused rather than repaired, because repairing it would
  * silently invent or destroy coverage.
  */
-function isValidCapacity(capacity: GuaranteeCapacity): boolean {
+export function isValidCapacity(capacity: GuaranteeCapacity): boolean {
   if (capacity.availableCents < 0 || capacity.reservedCents < 0) return false;
   return capacity.availableCents + capacity.reservedCents === capacity.ceilingCents;
 }

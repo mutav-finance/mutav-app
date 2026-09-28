@@ -43,6 +43,21 @@ export function generateLeasePublicId(): string {
 }
 
 /**
+ * Staff-facing cover-operation reference (`COV-XXXXXXXX`). It names a payout
+ * owed to a landlord, so it is quoted in bank-transfer memos and support
+ * threads; random rather than derived from the guarantee so the reference
+ * alone reveals nothing about whose default it settles.
+ */
+export function generateCoverOperationPublicId(): string {
+  return `COV-${randomChars(PUBLIC_REFERENCE_CHARS)}`;
+}
+
+/** Shared reference for cover operations recorded together (`CVB-XXXXXXXX`). */
+export function generateCoverBatchId(): string {
+  return `CVB-${randomChars(PUBLIC_REFERENCE_CHARS)}`;
+}
+
+/**
  * Bearer token for the unauthenticated tenant checkout (`apps/pay`). Holding it
  * IS the authorization — there is no session behind it — so it carries 160 bits
  * and must never be derived from anything observable.

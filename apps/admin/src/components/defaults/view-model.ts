@@ -1,15 +1,17 @@
 import type { GuaranteeCapacity } from "@convex/guarantees/domain";
 
 /**
- * The three staff dispositions this screen offers, each bound to one Convex
- * mutation. Batch cover is deliberately absent: `staffMarkResolvedByCover`
- * takes a single notice, and a UI loop over it would report a partial failure
- * as a success.
+ * The staff actions this screen offers. `cover` is one action whether it
+ * records one notice or a selection: a selection goes to
+ * `staffRecordCoverBatch` as ONE all-or-nothing call, never a UI loop over the
+ * single mutation, which would report a partial failure as a success.
+ * `execute` confirms a recorded cover's off-chain payout.
  */
 export const DEFAULT_ACTION = {
   VERIFY: "verify",
   COVER: "cover",
   DISMISS: "dismiss",
+  EXECUTE: "execute",
 } as const satisfies Record<string, string>;
 
 export type DefaultAction = (typeof DEFAULT_ACTION)[keyof typeof DEFAULT_ACTION];
@@ -48,6 +50,13 @@ export const DEFAULTS_ERROR_CODES = [
   "CLOSURE_NOT_ALLOWED",
   "GUARANTEE_CLOSED",
   "INVALID_RENEWAL_DATE",
+  "EMPTY_BATCH",
+  "BATCH_TOO_LARGE",
+  "DUPLICATE_NOTICE_IN_BATCH",
+  "COVER_ALREADY_RECORDED",
+  "COVER_OPERATION_NOT_FOUND",
+  "COVER_ALREADY_EXECUTED",
+  "PAYMENT_REFERENCE_REQUIRED",
 ] as const;
 
 export type DefaultsErrorCode = (typeof DEFAULTS_ERROR_CODES)[number];
@@ -66,17 +75,26 @@ export function errorMessageKey(code: string): string {
  * return would drag `_generated/api` into the pure module and make it
  * untestable without a deployment.
  */
-export type DispositionResult = { success: true } | { success: false; error: { code: string } };
+export type DispositionResult =
+  | { success: true }
+  | { success: false; error: { code: string; noticePublicId?: string } };
 
+/**
+ * `noticePublicId` rides along on a refused batch: the whole selection was
+ * turned down because of ONE row, and the operator needs to know which.
+ */
 export type ActionOutcome =
   | { kind: "success"; messageKey: string }
-  | { kind: "error"; messageKey: string };
+  | { kind: "error"; messageKey: string; noticePublicId?: string };
 
 const SUCCESS_MESSAGE_KEY: Record<DefaultAction, string> = {
   verify: "toast.verified",
   cover: "toast.covered",
   dismiss: "toast.dismissed",
+  execute: "toast.executed",
 };
+
+export const REFUSING_NOTICE_MESSAGE_KEY = "errors.inNotice";
 
 export function outcomeForResult({
   action,
@@ -86,7 +104,10 @@ export function outcomeForResult({
   result: DispositionResult;
 }): ActionOutcome {
   if (!result.success) {
-    return { kind: "error", messageKey: errorMessageKey(result.error.code) };
+    const messageKey = errorMessageKey(result.error.code);
+    return result.error.noticePublicId
+      ? { kind: "error", messageKey, noticePublicId: result.error.noticePublicId }
+      : { kind: "error", messageKey };
   }
   return { kind: "success", messageKey: SUCCESS_MESSAGE_KEY[action] };
 }
@@ -144,6 +165,46 @@ export function coverPreview({
   return {
     requestedCents,
     availableCents,
+    appliedCents,
+    clamped: appliedCents < requestedCents,
+    shortfallCents: requestedCents - appliedCents,
+  };
+}
+
+export type BatchCoverItem = {
+  guaranteeId: string;
+  requestedCents: number;
+  capacity: GuaranteeCapacity;
+};
+
+export type BatchCoverPreview = {
+  count: number;
+  requestedCents: number;
+  appliedCents: number;
+  clamped: boolean;
+  shortfallCents: number;
+};
+
+/**
+ * Totals for a selection, applying the same clamp per notice in the order the
+ * server will. Two notices of one guarantee draw against ONE remaining
+ * ceiling — summing each row's own `coverPreview` would count that ceiling
+ * twice and promise the landlord money the guarantee no longer has.
+ */
+export function batchCoverPreview(items: readonly BatchCoverItem[]): BatchCoverPreview {
+  const remaining = new Map<string, number>();
+  let requestedCents = 0;
+  let appliedCents = 0;
+  for (const item of items) {
+    const available = remaining.get(item.guaranteeId) ?? item.capacity.availableCents;
+    const applied = Math.min(available, item.requestedCents);
+    remaining.set(item.guaranteeId, available - applied);
+    requestedCents += item.requestedCents;
+    appliedCents += applied;
+  }
+  return {
+    count: items.length,
+    requestedCents,
     appliedCents,
     clamped: appliedCents < requestedCents,
     shortfallCents: requestedCents - appliedCents,

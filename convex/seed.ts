@@ -15,7 +15,9 @@ import {
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
   type DelinquencyNotice,
+  type DelinquencyNoticeId,
 } from "./delinquencies/domain";
+import { COVER_OPERATION_STATUS, coveragePeriodOf } from "./coverOperations/domain";
 import {
   assertClose,
   assertTransition,
@@ -77,6 +79,47 @@ const leasePid = (guaranteePublicId: string) => `LSE-${guaranteePublicId}`;
 const d = (s: string) => new Date(s).toISOString();
 
 /**
+ * Give a seeded cover-resolved notice the ledger row `staffRecordCover` and
+ * `staffMarkCoverExecuted` would have left behind, and link the notice to it.
+ * Everything but the payout facts is read off the notice, so the two cannot
+ * disagree about amount, period or who recorded it.
+ */
+async function seedExecutedCover(
+  ctx: MutationCtx,
+  {
+    noticeId,
+    executedAt,
+    paymentReference,
+  }: { noticeId: DelinquencyNoticeId; executedAt: string; paymentReference: string },
+): Promise<void> {
+  const notice = await ctx.db.get(noticeId);
+  const resolution = notice?.resolution;
+  const publicId = resolution?.coverOperationPublicId;
+  const coveragePeriod = notice ? coveragePeriodOf(notice.rentDueDate) : null;
+  if (!notice || !resolution || !publicId || coveragePeriod === null) {
+    throw new Error(`Seed notice ${noticeId} is not a cover-resolved notice.`);
+  }
+  const operationId = await ctx.db.insert("coverOperations", {
+    publicId,
+    status: COVER_OPERATION_STATUS.EXECUTED,
+    noticeId,
+    guaranteeId: notice.guaranteeId,
+    agencyId: notice.agencyId,
+    coveragePeriod,
+    requestedCents: notice.updatedAmountCents,
+    appliedCents: resolution.appliedCoverCents ?? notice.updatedAmountCents,
+    recordedAt: resolution.resolvedAt,
+    recordedByUserId: resolution.resolvedByUserId,
+    execution: {
+      executedAt,
+      executedByUserId: resolution.resolvedByUserId,
+      paymentReference,
+    },
+  });
+  await ctx.db.patch(noticeId, { resolution: { ...resolution, coverOperationId: operationId } });
+}
+
+/**
  * Demo tables wiped by `seedReset`. Order matters —
  * tables with foreign-key-like references come first so we don't leave
  * dangling pointers mid-wipe.
@@ -109,6 +152,9 @@ const DEMO_TABLES = [
   // pointers mid-wipe.
   "payments",
   "invoices",
+  // Cover operations and notices point at each other; the ledger rows go
+  // first so no `resolution.coverOperationId` outlives its row for long.
+  "coverOperations",
   // Notices FK-reference guarantees + users. Wipe before guarantees so we
   // don't leave dangling guaranteeId pointers mid-wipe.
   "guaranteeDelinquencyNotices",
@@ -1689,7 +1735,7 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
+    const horizonteCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${h2.publicId}-2026-04-15`,
       guaranteeId: h2.guaranteeId,
       agencyId: horizonteId,
@@ -1712,6 +1758,11 @@ async function seedFictional(
         appliedCoverCents: HORIZONTE_COVER_APPLIED_CENTS,
         note: "Cobertura paga; ação de despejo ajuizada em 2026-05-20.",
       },
+    });
+    await seedExecutedCover(ctx, {
+      noticeId: horizonteCoveredNoticeId,
+      executedAt: d("2026-05-06T11:00:00-03:00"),
+      paymentReference: "E2E-DEMO-20260506-0001",
     });
 
     // ── Sync aggregates ───────────────────────────────────────────────────────
@@ -2773,7 +2824,7 @@ async function populateAprovadaBook(
         note: "Inadimplência confirmada junto ao proprietário; sem acordo de quitação.",
       },
     });
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
+    const coveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${covered.publicId}-2026-03-10`,
       guaranteeId: covered.guaranteeId,
       agencyId,
@@ -2796,6 +2847,11 @@ async function populateAprovadaBook(
         appliedCoverCents: APROVADA_COVER_APPLIED_CENTS,
         note: "Cobertura paga ao proprietário; regresso contra o inquilino em andamento.",
       },
+    });
+    await seedExecutedCover(ctx, {
+      noticeId: coveredNoticeId,
+      executedAt: d("2026-04-03T09:30:00-03:00"),
+      paymentReference: "E2E-DEMO-20260403-0001",
     });
     noticesInserted = 4;
   }

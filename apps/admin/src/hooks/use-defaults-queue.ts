@@ -8,9 +8,13 @@ import { api } from "@convex/_generated/api";
 import type { DelinquencyAdminQueueRow } from "@convex/delinquencies/useCases";
 import {
   DEFAULT_ACTION,
+  REFUSING_NOTICE_MESSAGE_KEY,
+  batchCoverPreview,
   coverPreview,
   outcomeForResult,
   outcomeForThrown,
+  type ActionOutcome,
+  type BatchCoverPreview,
   type CoverPreview,
 } from "@/components/defaults/view-model";
 
@@ -28,87 +32,138 @@ type UseDefaultsQueueArgs = {
 };
 
 /**
- * View-model hook for the defaults queue. Owns dialog state, the in-flight
- * flag and the toast/translation wiring; every decision it makes (which
- * message key an outcome earns, what the cover clamp will do) is delegated to
- * the pure module beside it, which is where the tests live.
+ * Only a staff-verified notice may draw cover, so only those rows can join a
+ * selection — offering the checkbox on an `open` row would build a batch the
+ * server is certain to refuse whole.
+ */
+export function isCoverable(row: DelinquencyAdminQueueRow): boolean {
+  return row.status === "verified";
+}
+
+/**
+ * Toast wiring for an outcome. Shared by the queue and the payouts panel so a
+ * batch refusal names its notice the same way everywhere.
+ */
+export function useOutcomeReporter() {
+  const t = useTranslations("defaults");
+  return (outcome: ActionOutcome) => {
+    if (outcome.kind === "success") {
+      toast.success(t(outcome.messageKey));
+      return;
+    }
+    toast.error(t(outcome.messageKey), {
+      description: outcome.noticePublicId
+        ? t(REFUSING_NOTICE_MESSAGE_KEY, { notice: outcome.noticePublicId })
+        : undefined,
+    });
+  };
+}
+
+/**
+ * View-model hook for the defaults queue. Owns selection, dialog state, the
+ * in-flight flag and the toast/translation wiring; every decision it makes
+ * (which message key an outcome earns, what the cover clamp will do) is
+ * delegated to the pure module beside it, which is where the tests live.
  */
 export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
   const result = usePreloadedQuery(preloaded);
-  const t = useTranslations("defaults");
+  const report = useOutcomeReporter();
 
   const verifyDefault = useMutation(api.delinquencies.mutations.staffVerifyDefault);
-  const markResolvedByCover = useMutation(api.delinquencies.mutations.staffMarkResolvedByCover);
+  const recordCover = useMutation(api.coverOperations.mutations.staffRecordCover);
+  const recordCoverBatch = useMutation(api.coverOperations.mutations.staffRecordCoverBatch);
   const markCanceledByDismissal = useMutation(
     api.delinquencies.mutations.staffMarkCanceledByDismissal,
   );
 
-  const [busyNoticeId, setBusyNoticeId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   // Stamped once per mount, in a lazy initializer rather than in render: the
   // "open for N days" column must not re-derive from a moving clock on every
   // re-render, and reading the clock during render is impure.
   const [now] = useState(() => Date.now());
 
-  const [coverTarget, setCoverTarget] = useState<DelinquencyAdminQueueRow | null>(null);
-  const [coverOperationPublicId, setCoverOperationPublicId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  const [coverTargets, setCoverTargets] = useState<readonly DelinquencyAdminQueueRow[]>([]);
   const [coverNote, setCoverNote] = useState("");
 
   const [dismissTarget, setDismissTarget] = useState<DelinquencyAdminQueueRow | null>(null);
   const [dismissKind, setDismissKind] = useState<DismissalKind>("staff_dismissed");
   const [dismissNote, setDismissNote] = useState("");
 
-  function report(outcome: { kind: "success" | "error"; messageKey: string }) {
-    if (outcome.kind === "success") {
-      toast.success(t(outcome.messageKey));
-      return;
-    }
-    toast.error(t(outcome.messageKey));
+  const rows = result.page;
+  // A row that left the queue (covered, dismissed, or resolved elsewhere)
+  // drops out of the selection on the next render rather than lingering in it.
+  const selectedRows = rows.filter((row) => selectedIds.has(row.publicId) && isCoverable(row));
+  const coverableRows = rows.filter(isCoverable);
+
+  function toggleSelected(row: DelinquencyAdminQueueRow) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(row.publicId)) next.delete(row.publicId);
+      else next.add(row.publicId);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelectedIds(
+      selectedRows.length === coverableRows.length
+        ? new Set()
+        : new Set(coverableRows.map((row) => row.publicId)),
+    );
   }
 
   async function verify(row: DelinquencyAdminQueueRow) {
-    setBusyNoticeId(row.publicId);
+    setBusy(true);
     try {
-      const outcome = outcomeForResult({
-        action: DEFAULT_ACTION.VERIFY,
-        result: await verifyDefault({ noticePublicId: row.publicId }),
-      });
-      report(outcome);
+      report(
+        outcomeForResult({
+          action: DEFAULT_ACTION.VERIFY,
+          result: await verifyDefault({ noticePublicId: row.publicId }),
+        }),
+      );
     } catch (error) {
       report(outcomeForThrown(error));
     } finally {
-      setBusyNoticeId(null);
+      setBusy(false);
     }
   }
 
-  function openCover(row: DelinquencyAdminQueueRow) {
-    setCoverTarget(row);
-    setCoverOperationPublicId("");
+  function openCover(targets: readonly DelinquencyAdminQueueRow[]) {
+    if (targets.length === 0) return;
+    setCoverTargets(targets);
     setCoverNote("");
   }
 
   async function confirmCover() {
-    const row = coverTarget;
-    if (!row) return;
-    const reference = coverOperationPublicId.trim();
-    if (!reference) return;
+    const targets = coverTargets;
+    const [first] = targets;
+    if (!first) return;
+    const note = coverNote.trim() || undefined;
 
-    setBusyNoticeId(row.publicId);
+    setBusy(true);
     try {
       const outcome = outcomeForResult({
         action: DEFAULT_ACTION.COVER,
-        result: await markResolvedByCover({
-          noticePublicId: row.publicId,
-          coverOperationPublicId: reference,
-          note: coverNote.trim() || undefined,
-        }),
+        result:
+          targets.length === 1
+            ? await recordCover({ noticePublicId: first.publicId, note })
+            : await recordCoverBatch({
+                noticePublicIds: targets.map((row) => row.publicId),
+                note,
+              }),
       });
       report(outcome);
-      if (outcome.kind === "success") setCoverTarget(null);
+      if (outcome.kind === "success") {
+        setCoverTargets([]);
+        setSelectedIds(new Set());
+      }
     } catch (error) {
       report(outcomeForThrown(error));
     } finally {
-      setBusyNoticeId(null);
+      setBusy(false);
     }
   }
 
@@ -122,7 +177,7 @@ export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
     const row = dismissTarget;
     if (!row) return;
 
-    setBusyNoticeId(row.publicId);
+    setBusy(true);
     try {
       const outcome = outcomeForResult({
         action: DEFAULT_ACTION.DISMISS,
@@ -136,32 +191,51 @@ export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
     } catch (error) {
       report(outcomeForThrown(error));
     } finally {
-      setBusyNoticeId(null);
+      setBusy(false);
     }
   }
 
-  const preview: CoverPreview | null = coverTarget
-    ? coverPreview({
-        requestedCents: coverTarget.updatedAmountCents,
-        capacity: coverTarget.guaranteeCapacity,
-      })
-    : null;
+  const [singleTarget] = coverTargets;
+  const singlePreview: CoverPreview | null =
+    coverTargets.length === 1 && singleTarget
+      ? coverPreview({
+          requestedCents: singleTarget.updatedAmountCents,
+          capacity: singleTarget.guaranteeCapacity,
+        })
+      : null;
+  const totals: BatchCoverPreview = batchCoverPreview(
+    coverTargets.map((row) => ({
+      guaranteeId: row.guaranteeId,
+      requestedCents: row.updatedAmountCents,
+      capacity: row.guaranteeCapacity,
+    })),
+  );
 
   return {
-    rows: result.page,
+    rows,
     isDone: result.isDone,
     now,
-    busyNoticeId,
+    busy,
     verify,
+    selection: {
+      isSelected: (row: DelinquencyAdminQueueRow) => selectedIds.has(row.publicId),
+      toggle: toggleSelected,
+      toggleAll,
+      clear: () => setSelectedIds(new Set()),
+      rows: selectedRows,
+      hasCoverable: coverableRows.length > 0,
+      allSelected: coverableRows.length > 0 && selectedRows.length === coverableRows.length,
+    },
     cover: {
-      target: coverTarget,
-      close: () => setCoverTarget(null),
-      open: openCover,
-      operationPublicId: coverOperationPublicId,
-      setOperationPublicId: setCoverOperationPublicId,
+      targets: coverTargets,
+      isOpen: coverTargets.length > 0,
+      close: () => setCoverTargets([]),
+      openOne: (row: DelinquencyAdminQueueRow) => openCover([row]),
+      openSelected: () => openCover(selectedRows),
       note: coverNote,
       setNote: setCoverNote,
-      preview,
+      singlePreview,
+      totals,
       confirm: confirmCover,
     },
     dismiss: {

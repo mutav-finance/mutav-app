@@ -241,6 +241,8 @@ const noticeEvidenceSource = v.union(
   v.literal("system_scheduled"),
 );
 
+const coverOperationStatus = v.union(v.literal("recorded"), v.literal("executed"));
+
 export default defineSchema(
   {
     agencies: defineTable({
@@ -596,9 +598,11 @@ export default defineSchema(
         }),
       ),
 
-      // Populated on transition to `resolved`. `coverOperationPublicId` is
-      // a string (not an id ref) because coverOperations lands in a later
-      // slice; migrate to `v.id("coverOperations")` when it exists.
+      // Populated on transition to `resolved`. A cover resolution carries
+      // both the `coverOperations` row id (the link) and its publicId (the
+      // reference staff read off a screen). `coverOperationId` is optional
+      // only because it is absent on every other resolution kind; every
+      // cover recorded through the ledger writes it.
       // `appliedCoverCents` is the amount actually reserved against the
       // guarantee's capacity (clamped to what was available), so the
       // reversal on dispute is exact.
@@ -607,6 +611,7 @@ export default defineSchema(
           kind: noticeResolutionKind,
           resolvedAt: v.string(),
           resolvedByUserId: v.id("users"),
+          coverOperationId: v.optional(v.id("coverOperations")),
           coverOperationPublicId: v.optional(v.string()),
           appliedCoverCents: v.optional(v.number()),
           note: v.optional(v.string()),
@@ -627,6 +632,45 @@ export default defineSchema(
       .index("by_agency_status", ["agencyId", "status"])
       .index("by_guarantee_dueDate", ["guaranteeId", "rentDueDate"])
       .index("by_status_openedAt", ["status", "openedAt"]),
+
+    // The cover-payout ledger: one row per guarantee per coverage period,
+    // born `recorded` when compliance commits cover against a verified
+    // notice and moved to `executed` once the off-chain payment to the
+    // landlord has actually left. The phases stay apart because "Mutav owes
+    // this" and "Mutav paid this" are different facts with different
+    // evidence. A batch is a shared `batchId` over rows written in one
+    // transaction; the row, not the batch, is the idempotency unit.
+    coverOperations: defineTable({
+      publicId: v.string(),
+      status: coverOperationStatus,
+      noticeId: v.id("guaranteeDelinquencyNotices"),
+      guaranteeId: v.id("guarantees"),
+      agencyId: v.id("agencies"),
+      // UTC billing month (`YYYY-MM`) of the missed rent — with
+      // `guaranteeId`, the per-guarantee-per-period key ADR 0004 fixes.
+      coveragePeriod: v.string(),
+      batchId: v.optional(v.string()),
+      // What the notice claimed at cover time vs what the guarantee's
+      // remaining capacity actually let Mutav reserve.
+      requestedCents: v.number(),
+      appliedCents: v.number(),
+      recordedAt: v.string(),
+      recordedByUserId: v.id("users"),
+      note: v.optional(v.string()),
+      // Populated on transition to `executed`.
+      execution: v.optional(
+        v.object({
+          executedAt: v.string(),
+          executedByUserId: v.id("users"),
+          // The off-chain payment id (bank transfer / Pix end-to-end id).
+          paymentReference: v.string(),
+          note: v.optional(v.string()),
+        }),
+      ),
+    })
+      .index("by_publicId", ["publicId"])
+      .index("by_guarantee_period", ["guaranteeId", "coveragePeriod"])
+      .index("by_status_recordedAt", ["status", "recordedAt"]),
 
     invoices: defineTable({
       agencyId: v.id("agencies"),

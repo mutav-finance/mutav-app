@@ -424,6 +424,46 @@ describe("seedReset", () => {
     }
   });
 
+  test("every cover-resolved notice links to an executed ledger row carrying its amount and period", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const links = await t.run(async (ctx) => {
+      const operations = await ctx.db.query("coverOperations").collect();
+      const notices = await ctx.db.query("guaranteeDelinquencyNotices").collect();
+      const covered = notices.filter(
+        (notice) => notice.resolution?.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+      );
+      return {
+        operationCount: operations.length,
+        covered: covered.map((notice) => {
+          const operation = operations.find((op) => op._id === notice.resolution?.coverOperationId);
+          return {
+            linked: operation?.noticeId === notice._id,
+            publicIdMatches: operation?.publicId === notice.resolution?.coverOperationPublicId,
+            status: operation?.status,
+            appliedCents: operation?.appliedCents,
+            appliedCoverCents: notice.resolution?.appliedCoverCents,
+            coveragePeriod: operation?.coveragePeriod,
+            rentDueMonth: notice.rentDueDate.slice(0, 7),
+            hasPaymentReference: Boolean(operation?.execution?.paymentReference),
+          };
+        }),
+      };
+    });
+
+    expect(links.operationCount).toBe(2);
+    expect(links.covered.length).toBe(2);
+    for (const row of links.covered) {
+      expect(row.linked).toBe(true);
+      expect(row.publicIdMatches).toBe(true);
+      expect(row.status).toBe("executed");
+      expect(row.appliedCents).toBe(row.appliedCoverCents);
+      expect(row.coveragePeriod).toBe(row.rentDueMonth);
+      expect(row.hasPaymentReference).toBe(true);
+    }
+  });
+
   test("no lease carries more than one non-closed guarantee, and openGuaranteeId points at it", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});

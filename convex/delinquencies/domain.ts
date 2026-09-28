@@ -22,6 +22,25 @@ export type { DelinquencyStatus, TransitionError, TransitionSuccess } from "./ma
 import { DELINQUENCY_STATUS, type DelinquencyStatus } from "./machine";
 
 /**
+ * A cover draw is only legal against a default compliance has actually
+ * confirmed. Without this the notice machine alone would let
+ * `open → resolved(cover_committed)` through, and a sibling notice's
+ * verification would supply the guarantee state the draw checks.
+ */
+export const NOTICE_NOT_VERIFIED_ERROR_CODE = "NOTICE_NOT_VERIFIED";
+export type NoticeNotVerifiedErrorCode = typeof NOTICE_NOT_VERIFIED_ERROR_CODE;
+
+/**
+ * One wire code for "the guarantee machine refused the state change this
+ * notice disposition implies". `applyGuaranteeTransition` reports seven
+ * distinct guard codes; surfacing them raw would ask every caller to carry a
+ * message key per guarantee state, and the caller's remedy is the same in all
+ * seven cases. The refusal's own sentence travels in `message`.
+ */
+export const GUARANTEE_REFUSED_ERROR_CODE = "GUARANTEE_TRANSITION_REFUSED";
+export type GuaranteeRefusedErrorCode = typeof GUARANTEE_REFUSED_ERROR_CODE;
+
+/**
  * How an `open` notice reached `resolved`. Stored on the row so the resolved
  * terminal state carries its cause. `tenant_cured` = tenant paid the landlord
  * and the agency confirmed. `cover_committed` = Mutav drew reserve to pay the

@@ -81,6 +81,10 @@ export const AUDIT_ACTION = {
   DELINQUENCY_RESOLVED_BY_COVER: "delinquency.resolved_by_cover",
   DELINQUENCY_DISMISSED: "delinquency.dismissed",
   DELINQUENCY_DISPUTED: "delinquency.disputed",
+  // coverOperations/ (the cover-payout ledger — emitted by
+  // convex/coverOperations/mutations.ts).
+  COVER_OPERATION_RECORDED: "cover_operation.recorded",
+  COVER_OPERATION_EXECUTED: "cover_operation.executed",
 } as const satisfies Record<string, string>;
 
 export type AuditActionKey = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -118,6 +122,8 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISMISSED),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISPUTED),
+  v.literal(AUDIT_ACTION.COVER_OPERATION_RECORDED),
+  v.literal(AUDIT_ACTION.COVER_OPERATION_EXECUTED),
 );
 
 /**
