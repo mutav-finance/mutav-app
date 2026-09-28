@@ -2253,3 +2253,117 @@ describe("return to active — who may leave which state", () => {
     expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Agency-side notice writes are audited like the staff ones
+// ---------------------------------------------------------------------------
+
+async function readNoticeAudit(t: T, noticePublicId: string) {
+  return t.run((ctx) =>
+    ctx.db
+      .query("mutavAuditLog")
+      .withIndex("by_resource", (q) =>
+        q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", noticePublicId),
+      )
+      .collect(),
+  );
+}
+
+describe("agency-side notice writes — audit", () => {
+  test("openNotice appends delinquency.opened with the agency user as actor", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const audit = await readNoticeAudit(t, result.data.publicId);
+    expect(audit.map((entry) => entry.action)).toEqual(["delinquency.opened"]);
+    expect(audit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("a refused openNotice appends no audit entry at all", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-CT-1-2026-06-05", rentDueDate: "2026-06-05" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(false);
+    expect(await t.run((ctx) => ctx.db.query("mutavAuditLog").collect())).toEqual([]);
+  });
+
+  test("markResolved appends delinquency.resolved", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-r" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-audit-r",
+      resolution: { kind: "stale" },
+    });
+    expect(result.success).toBe(true);
+
+    const audit = await readNoticeAudit(t, "DN-audit-r");
+    expect(audit.map((entry) => entry.action)).toEqual(["delinquency.resolved"]);
+    expect(audit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("a markResolved refused on a verified notice appends nothing", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-rv", status: "verified" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-audit-rv",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(false);
+    expect(await readNoticeAudit(t, "DN-audit-rv")).toEqual([]);
+  });
+
+  test("markCanceled appends delinquency.canceled", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-c" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-audit-c",
+      cancellation: { reason: "duplicate" },
+    });
+    expect(result.success).toBe(true);
+
+    const audit = await readNoticeAudit(t, "DN-audit-c");
+    expect(audit.map((entry) => entry.action)).toEqual(["delinquency.canceled"]);
+    expect(audit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("a markCanceled refused on a canceled notice appends nothing", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-cc", status: "canceled" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-audit-cc",
+      cancellation: { reason: "duplicate" },
+    });
+    expect(result.success).toBe(false);
+    expect(await readNoticeAudit(t, "DN-audit-cc")).toEqual([]);
+  });
+});

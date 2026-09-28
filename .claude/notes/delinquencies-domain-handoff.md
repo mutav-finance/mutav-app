@@ -38,9 +38,9 @@ Shipped: notice state machine → schema → 5 queries → 5 mutations → seed 
 
 Every one of these was flagged by a review lens and considered — deferring is a documented choice, not an oversight.
 
-- **Agency-side audit** — three `TODO(audit)` markers on `openNotice`/`markResolved`/`markCanceled` in `mutations.ts`. Design decision needed:
-  - Option A: extend `mutationWithAgencyScope` with an `appendAgencyAudit` helper (mirroring `appendStaffAudit`).
-  - Option B: ADR that agency writes rely on `openedByUserId` + `openedAt` columns only; no audit chain.
+- ~~**Agency-side audit**~~ — resolved (#330): `openNotice` / `markResolved` / `markCanceled` now
+  call `appendAuditEntry` directly with a `user` actor, emitting `delinquency.opened` /
+  `delinquency.resolved` / `delinquency.canceled` on the same chain as the staff dispositions.
 - **`openStats` aggregate migration** — carries `TODO(agg)` marker. Migrate to `@convex-dev/aggregate` before any agency crosses ~1000 open+recent notices. Not blocking today.
 - **`SELF_TRANSITION` vs `TERMINAL_STATE` on idempotent retry** — machine returns `SELF_TRANSITION` when target===current for ANY state (including terminal). Caller-side fix (map both to "already at target") is cleaner than reordering the machine's error precedence.
 - **`staffMarkCanceledByDismissal` name/behavior mismatch** on `staff_dispute` — the mutation returns `terminalStatus: 'resolved'` when kind is `staff_dispute`. Rename or split would ripple; documented in the return type.

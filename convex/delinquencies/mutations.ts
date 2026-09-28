@@ -18,6 +18,7 @@ import {
 } from "../guarantees/transitions";
 import type { UserId } from "../users/domain";
 import { AUDIT_ACTION } from "../audit/domain";
+import { appendAuditEntry } from "../audit/useCases";
 import {
   DELINQUENCY_STATUS,
   assertTransition,
@@ -117,8 +118,9 @@ const AGENCY_RETURN_TO_ACTIVE_FROM: readonly GuaranteeState[] = [GUARANTEE_STATE
  * also undo the verification this same office made — otherwise dismissing the
  * only notice of an episode strands the guarantee in `default_verified` with
  * nothing outstanding and no way back. `cover_committed` is deliberately
- * absent: cover has already moved cents, and handing them back needs
- * `releaseCoverCapacity`, deferred with the receivable ledger.
+ * absent: cover has already moved cents, and handing them back is the
+ * guarantee-level `close(dispute_reversal)`, which releases them in the same
+ * transaction as it closes.
  */
 const STAFF_DISMISSAL_RETURN_TO_ACTIVE_FROM: readonly GuaranteeState[] = [
   GUARANTEE_STATE.IN_ARREARS,
@@ -316,10 +318,7 @@ export const openNotice = mutationWithAgencyScope({
     }
 
     const openedAt = new Date().toISOString();
-    // TODO(audit): emit appendAuditEntry once agency-side audit lands. Pilot
-    // relies on the openedByUserId column plus staff-side entries; see
-    // docs/architecture/admin.md.
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
+    const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId,
       guaranteeId: guarantee._id,
       agencyId: ctx.agencyId,
@@ -330,6 +329,24 @@ export const openNotice = mutationWithAgencyScope({
       evidenceSource,
       openedAt,
       openedByUserId: ctx.user._id,
+    });
+
+    // The agency's claim is what starts the whole default path, so it joins
+    // the same hash chain as the staff dispositions that answer it.
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.DELINQUENCY_OPENED,
+      resourceType: "guaranteeDelinquencyNotices",
+      resourceId: publicId,
+      payload: {
+        noticeId,
+        guaranteeId: guarantee._id,
+        agencyId: ctx.agencyId,
+        rentDueDate: args.rentDueDate,
+        originalAmountCents: args.originalAmountCents,
+        evidenceSource,
+        openedAt,
+      },
     });
 
     return {
@@ -408,15 +425,30 @@ export const markResolved = mutation({
         ? await planReturnToActive(ctx, { notice, from: AGENCY_RETURN_TO_ACTIVE_FROM })
         : null;
 
-    // TODO(audit): emit appendAuditEntry once agency-side audit lands; see
-    // docs/architecture/admin.md.
+    const resolvedAt = new Date().toISOString();
     await ctx.db.patch(notice._id, {
       status: DELINQUENCY_STATUS.RESOLVED,
       resolution: {
         kind: args.resolution.kind,
-        resolvedAt: new Date().toISOString(),
+        resolvedAt,
         resolvedByUserId: membership.userId,
         note: args.resolution.note,
+      },
+    });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: membership.userId },
+      action: AUDIT_ACTION.DELINQUENCY_RESOLVED,
+      resourceType: "guaranteeDelinquencyNotices",
+      resourceId: notice.publicId,
+      payload: {
+        noticeId: notice._id,
+        guaranteeId: notice.guaranteeId,
+        agencyId: notice.agencyId,
+        kind: args.resolution.kind,
+        guaranteeReturnedToActive: cured !== null,
+        at: resolvedAt,
+        note: args.resolution.note ?? null,
       },
     });
 
@@ -502,15 +534,30 @@ export const markCanceled = mutation({
       from: AGENCY_RETURN_TO_ACTIVE_FROM,
     });
 
-    // TODO(audit): emit appendAuditEntry once agency-side audit lands; see
-    // docs/architecture/admin.md.
+    const canceledAt = new Date().toISOString();
     await ctx.db.patch(notice._id, {
       status: DELINQUENCY_STATUS.CANCELED,
       cancellation: {
         reason: args.cancellation.reason,
-        canceledAt: new Date().toISOString(),
+        canceledAt,
         canceledByUserId: membership.userId,
         note: args.cancellation.note,
+      },
+    });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: membership.userId },
+      action: AUDIT_ACTION.DELINQUENCY_CANCELED,
+      resourceType: "guaranteeDelinquencyNotices",
+      resourceId: notice.publicId,
+      payload: {
+        noticeId: notice._id,
+        guaranteeId: notice.guaranteeId,
+        agencyId: notice.agencyId,
+        reason: args.cancellation.reason,
+        guaranteeReturnedToActive: withdrawn !== null,
+        at: canceledAt,
+        note: args.cancellation.note ?? null,
       },
     });
 
