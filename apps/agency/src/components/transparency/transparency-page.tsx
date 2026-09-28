@@ -6,9 +6,10 @@ import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { StateTimelineBucket } from "@convex/guarantees/domain";
 import type { GuaranteeAggregates, ReserveCoverage } from "@convex/transparency/domain";
-import { GuaranteesPanel } from "./guarantees-panel";
-import { CapacityPanel } from "./capacity-panel";
-import { ReservePanel } from "./reserve-panel";
+import { CapacityPanel } from "@mutav/ui/transparency/capacity-panel";
+import { ReserveBreakdown } from "@mutav/ui/transparency/reserve-breakdown";
+import { ReservePanel } from "@mutav/ui/transparency/reserve-panel";
+import { GuaranteeExposurePanel, GuaranteesPanel } from "./guarantees-panel";
 import { PlatformStateChart } from "./platform-state-chart";
 
 type Props = {
@@ -45,9 +46,15 @@ function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps)
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <CapacityPanel aggregates={agg} />
-        <ReservePanel coverage={coverage} />
+        <GuaranteeExposurePanel aggregates={agg} />
       </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <ReservePanel coverage={coverage} />
+        <CapacityPanel coverage={coverage} />
+      </div>
+
+      <ReserveBreakdown coverage={coverage} />
 
       <PlatformStateChart timeline={tl} counts={agg?.countByState} />
 

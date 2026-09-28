@@ -1265,25 +1265,62 @@
     },
     "heading": "Transparency",
     "subheading": "Risk position transparency and onchain treasury.",
-    "footer": "Guarantee data in real time. Coverage reserve read onchain and refreshed periodically.",
+    "footer": "Guarantee data in real time. Reserve and capacity read onchain from the mutav-pulse contracts and refreshed every 15 minutes.",
     "guarantees": {
       "insured": "Guarantees in force",
       "drafted": "Drafts",
       "defaultRate": "Default rate",
-      "defaultRateHint": "Verified defaults and committed covers as a share of guarantees in force, right now."
+      "defaultRateHint": "Verified defaults and committed covers as a share of guarantees in force, right now.",
+      "totalGuaranteed": "Total guaranteed",
+      "totalGuaranteedHint": "Worst-case exposure across guarantees in force: remaining rent coverage plus the exit-cost sublimit.",
+      "verifiedDefaultExposure": "Exposure in verified default",
+      "verifiedDefaultExposureHint": "{count, plural, =0 {No guarantee in verified default or committed cover.} one {# guarantee in verified default or committed cover.} other {# guarantees in verified default or committed cover.}}"
     },
     "capacity": {
-      "label": "Contracted capacity utilization",
-      "used": "{pct}% utilized",
-      "of": "of {total}"
+      "label": "Remaining guarantee capacity",
+      "unavailable": "Unavailable",
+      "utilization": "Utilization",
+      "ceiling": "Capacity ceiling",
+      "ceilingUnbounded": "Unbounded (c = 0)",
+      "requiredRatio": "Required coverage ratio (c)",
+      "rule": "Capacity is solvency: remaining capacity is the reserve's free capital, and the ceiling is stable assets divided by c. No configured cap."
     },
     "reserve": {
       "label": "Coverage reserve",
       "unavailable": "Unavailable",
+      "testnet": "Testnet",
       "asOf": "As of {datetime}",
-      "fx": "BCB PTAX (ask): {rate}",
-      "fxQuotedAt": "Quoted {datetime} (BRT)",
+      "brlIndicative": "≈ {amount} at BCB PTAX (ask) {rate} — indicative only; {symbol} is a testnet mock asset",
+      "fxQuotedAt": "PTAX quoted {datetime} (BRT)",
+      "coverageRatio": "Coverage ratio",
+      "coverageRatioNone": "No coverage reserved",
+      "coverageRequired": "Coverage required",
+      "coverageRatioHint": "Stable assets divided by the coverage the contracts reserve behind the onchain book.",
+      "contracts": {
+        "vault": "Vault",
+        "policy": "Policy",
+        "registry": "Registry"
+      },
       "viewExplorer": "Verify on the Stellar network"
+    },
+    "breakdown": {
+      "title": "Reserve breakdown",
+      "description": "Where the reserve's capital sits, read onchain. Only stable positions count toward solvency.",
+      "testnet": "Testnet",
+      "unavailable": "The reserve breakdown is unavailable right now.",
+      "columns": {
+        "position": "Position",
+        "contract": "Contract",
+        "solvency": "Solvency",
+        "balance": "Balance",
+        "share": "Share"
+      },
+      "kind": {
+        "idle": "{symbol} held in the vault",
+        "strategy": "Yield strategy"
+      },
+      "stable": "Stable",
+      "volatile": "Volatile"
     },
     "timeline": {
       "title": "Platform book in force",

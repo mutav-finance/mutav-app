@@ -54,6 +54,10 @@
     "./toggle": "./src/toggle.tsx",
     "./toggle-group": "./src/toggle-group.tsx",
     "./tooltip": "./src/tooltip.tsx",
+    "./transparency/capacity-panel": "./src/transparency/capacity-panel.tsx",
+    "./transparency/reserve-breakdown": "./src/transparency/reserve-breakdown.tsx",
+    "./transparency/reserve-panel": "./src/transparency/reserve-panel.tsx",
+    "./transparency/types": "./src/transparency/types.ts",
     "./use-mobile": "./src/use-mobile.ts",
     "./wordmark": "./src/wordmark.tsx"
   },
