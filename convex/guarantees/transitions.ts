@@ -3,16 +3,19 @@ import type { Result } from "../lib/result";
 import type { UserId } from "../users/domain";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
+import { NOTICE_RESOLUTION_KIND } from "../delinquencies/domain";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import {
   assertClose,
   assertTransition,
+  CLOSE_REASON,
   GUARANTEE_ERROR_CODE,
   GUARANTEE_STATE,
   type CloseError,
   type CloseReason,
   type Guarantee,
   type GuaranteeCapacity,
+  type GuaranteeId,
   type GuaranteeState,
   type TransitionError,
 } from "./domain";
@@ -262,11 +265,9 @@ export async function reserveCoverCapacity(
  * currently reserved is refused rather than floored, because the excess would
  * have to come from somewhere and there is nowhere honest for it to come from.
  *
- * STAGED, NOT FORGOTTEN: nothing calls this yet. Policy C's release/burn half
- * lands with the receivable ledger, so today a `close(dispute_reversal)` from
- * `cover_committed` leaves the reserved cents held — see `guarantees.close`.
- * The reserve side is what PR5 ships; this is its other half, written now so
- * the two stay symmetric.
+ * Called by `closeAsDisputeReversal`, the one path that unwinds a committed
+ * cover. The burn half of policy C — cents actually paid out and recovered
+ * through the receivable — still lands with the receivable ledger.
  */
 export async function releaseCoverCapacity(
   ctx: MutationCtx,
@@ -323,6 +324,111 @@ export async function releaseCoverCapacity(
     success: true,
     data: { appliedCents, capacity: after.capacity },
     message: `Released ${appliedCents} cents on ${guarantee.publicId}.`,
+  };
+}
+
+export type DisputeReversalSuccess = GuaranteeTransitionSuccess & { releasedCents: number };
+
+export type DisputeReversalError = {
+  code: GuaranteeTransitionError["code"] | CoverCapacityError["code"];
+};
+
+/**
+ * Every cent a committed cover reserved on this guarantee, read back from the
+ * notices that drew it. Nothing moves a guarantee out of `cover_committed`
+ * except a close or eviction, and `activate` starts every life at zero, so on
+ * a sound row this sum IS `reservedCents` — the caller refuses when it is not.
+ */
+async function sumAppliedCover(ctx: MutationCtx, guaranteeId: GuaranteeId): Promise<number> {
+  const notices = await ctx.db
+    .query("guaranteeDelinquencyNotices")
+    .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
+    .collect();
+  return notices.reduce(
+    (total, notice) =>
+      notice.resolution?.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED
+        ? total + (notice.resolution.appliedCoverCents ?? 0)
+        : total,
+    0,
+  );
+}
+
+/**
+ * `close(dispute_reversal)`: the default was not real, so a cover already
+ * committed against it is unwound in the same transaction as the close. The
+ * release runs first and the transition after, so the `guarantee.transitioned`
+ * audit row stamps the restored capacity.
+ *
+ * The figure released is what the covered notices recorded as applied, and it
+ * must account for every reserved cent. A mismatch is drift, refused before
+ * the first write rather than repaired: releasing only the notices' sum would
+ * strand the rest as phantom exposure, and releasing `reservedCents` would
+ * give back cents no notice can explain.
+ */
+export async function closeAsDisputeReversal(
+  ctx: MutationCtx,
+  {
+    guarantee,
+    note,
+    actor,
+    message,
+  }: { guarantee: Guarantee; note?: string; actor: GuaranteeActor; message: string },
+): Promise<Result<DisputeReversalSuccess, DisputeReversalError>> {
+  const closure: GuaranteeClosureInput = {
+    reason: CLOSE_REASON.DISPUTE_REVERSAL,
+    ...(note === undefined ? {} : { note }),
+  };
+
+  if (guarantee.status !== GUARANTEE_STATE.COVER_COMMITTED) {
+    const applied = await applyGuaranteeTransition(ctx, {
+      guarantee,
+      to: GUARANTEE_STATE.CLOSED,
+      closure,
+      actor,
+      message,
+    });
+    if (!applied.success) {
+      return { success: false, error: { code: applied.error.code }, message: applied.message };
+    }
+    return { success: true, data: { ...applied.data, releasedCents: 0 }, message: applied.message };
+  }
+
+  const releasedCents = await sumAppliedCover(ctx, guarantee._id);
+  if (releasedCents !== guarantee.capacity.reservedCents) {
+    return {
+      success: false,
+      error: { code: GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN },
+      message: `Guarantee ${guarantee.publicId} holds ${guarantee.capacity.reservedCents} reserved cents but its covered notices applied ${releasedCents}.`,
+    };
+  }
+
+  const released = await releaseCoverCapacity(ctx, {
+    guarantee,
+    appliedCents: releasedCents,
+    actor,
+  });
+  if (!released.success) {
+    return { success: false, error: { code: released.error.code }, message: released.message };
+  }
+
+  const reloaded = await ctx.db.get(guarantee._id);
+  if (!reloaded) throw new Error("Guarantee row vanished mid-transaction");
+  const applied = await applyGuaranteeTransition(ctx, {
+    guarantee: reloaded,
+    to: GUARANTEE_STATE.CLOSED,
+    closure,
+    actor,
+    message,
+  });
+  // `cover_committed` → closed(dispute_reversal) is legal by construction and
+  // the release is already written, so a refusal is an invariant break —
+  // throwing takes the release back with the rest of the transaction.
+  if (!applied.success) throw new Error(applied.message);
+
+  return {
+    success: true,
+    data: { ...applied.data, releasedCents },
+    message: `${applied.message} Released ${releasedCents} reserved cents.`,
   };
 }
 
