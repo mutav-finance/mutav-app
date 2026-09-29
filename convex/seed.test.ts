@@ -1,10 +1,21 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "./_generated/api";
 import type { AgencyId } from "./agencies/domain";
-import { NOTICE_RESOLUTION_KIND } from "./delinquencies/domain";
-import { CLOSE_REASON, GUARANTEE_STATE } from "./guarantees/domain";
+import {
+  DELINQUENCY_STATUS,
+  NOTICE_CANCELLATION_REASON,
+  NOTICE_RESOLUTION_KIND,
+} from "./delinquencies/domain";
+import {
+  countByStatePlatform,
+  countInsured,
+  sumInsuredExposure,
+  sumVerifiedDefaultExposure,
+} from "./guarantees/aggregate";
+import { CLOSE_REASON, GUARANTEE_STATE, GUARANTEE_STATES } from "./guarantees/domain";
+import { isValidCapacity } from "./guarantees/transitions";
 import { DEFAULT_PRICING_TABLE } from "./guarantees/pricing";
 import { registerGuaranteeAggregateComponents } from "./lib/testFixtures";
 import { isEffective } from "./products/domain";
@@ -20,6 +31,25 @@ const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 beforeAll(() => {
   process.env.PII_ENCRYPTION_KEY = Buffer.from(new Uint8Array(32).fill(0xaa)).toString("base64"); // hook-ok: test-only env fixture
   process.env.PII_HMAC_KEY = Buffer.from(new Uint8Array(32).fill(0xbb)).toString("base64"); // hook-ok: test-only env fixture
+});
+
+// The live half of the dataset is dated back from the reseed, so every test
+// runs on one pinned clock and date expectations stay literal. Only `Date` is
+// faked; convex-test's own timers keep running.
+const SEED_NOW = "2026-09-28T15:00:00.000Z";
+
+// Worst-case exposure over the in-force book and its verified-default slice,
+// in BRL centavos: available rent-coverage + exit-cost cap per guarantee.
+const SUM_INSURED_CENTS = 689_806_900;
+const VERIFIED_DEFAULT_EXPOSURE_CENTS = 72_078_600;
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(SEED_NOW));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 function setup() {
@@ -81,12 +111,17 @@ describe("seedReset", () => {
       expect(count, `${name} should have guarantees`).toBeGreaterThan(0);
     }
 
-    // Sanity: the fictional dataset is 30 guarantees (15 + 12 + 3) across the
-    // three demo agencies. Guards against the demo book silently shrinking.
+    // Sanity: the fictional dataset is 58 guarantees — 15 + 12 + 3 original
+    // lives, one default each for Paulista and Atlântica, and 13 + 13
+    // performing filler leases. Guards against the demo book silently shrinking.
     const [paulista, atlantica, horizonte] = await Promise.all(
       demoAgencies.map(async (name) => guaranteeCountFor(t, await agencyIdByName(t, name))),
     );
-    expect(paulista + atlantica + horizonte).toBe(30);
+    expect({ paulista, atlantica, horizonte }).toEqual({
+      paulista: 29,
+      atlantica: 26,
+      horizonte: 3,
+    });
   });
 
   test("maps the legacy PT statuses onto the 7-state machine with reasoned closures", async () => {
@@ -108,21 +143,24 @@ describe("seedReset", () => {
       };
     });
 
-    // 21 fictional + 1 Aprovada → active; Horizonte pid(29) → in_eviction;
-    // Aprovada rows 1–3 → in_arrears / default_verified / cover_committed;
-    // 5 pendente + 1 Aprovada → drafted; 2 encerrado + 1 Aprovada →
-    // closed(end_of_lease); 1 cancelado → closed(canceled_pre_activation).
+    // active: 21 fictional + 26 filler + Aprovada's performing and renewed
+    // lives. default_verified: Aprovada ×2 + Paulista. cover_committed:
+    // Aprovada ×2 + Atlântica. in_eviction: Horizonte + Aprovada. drafted:
+    // 5 pendente + 1 Aprovada. closed: 2 encerrado + Aprovada's first term →
+    // end_of_lease, 1 cancelado → canceled_pre_activation, and Aprovada's
+    // reversed cover → dispute_reversal.
     expect(byState.counts).toEqual({
-      active: 22,
+      active: 49,
       in_arrears: 1,
-      default_verified: 1,
-      cover_committed: 1,
-      in_eviction: 1,
+      default_verified: 3,
+      cover_committed: 3,
+      in_eviction: 2,
       drafted: 6,
-      closed: 4,
+      closed: 5,
     });
     expect(byState.closedReasons).toEqual([
       "canceled_pre_activation",
+      "dispute_reversal",
       "end_of_lease",
       "end_of_lease",
       "end_of_lease",
@@ -207,10 +245,13 @@ describe("seedReset", () => {
     await t.mutation(internal.seed.seedReset, {});
 
     const path = await t.run(async (ctx) => {
-      const guarantee = (await ctx.db.query("guarantees").collect()).find(
-        (row) => row.status === GUARANTEE_STATE.IN_EVICTION,
-      );
-      if (!guarantee) throw new Error("no guarantee seeded in eviction");
+      const guarantee = await ctx.db
+        .query("guarantees")
+        .withIndex("by_publicId", (q) => q.eq("publicId", "1000029"))
+        .unique();
+      if (guarantee?.status !== GUARANTEE_STATE.IN_EVICTION) {
+        throw new Error("Horizonte's 1000029 is not seeded in eviction");
+      }
       const history = await ctx.db
         .query("guaranteeHistory")
         .withIndex("by_agency_guarantee", (q) =>
@@ -228,13 +269,14 @@ describe("seedReset", () => {
 
     // The eviction filing has no timestamp anywhere in the schema; the seed
     // derives it 15 days after the cover, the interval the notice's own
-    // resolution note describes.
+    // resolution note describes. The notice book is dated back from the pinned
+    // reseed clock (2026-09-28): opened 47 days ago, verified 36, covered 28.
     expect(path).toEqual([
       "2026-02-05 drafted->active",
-      "2026-04-20 active->in_arrears",
-      "2026-04-30 in_arrears->default_verified",
-      "2026-05-05 default_verified->cover_committed",
-      "2026-05-20 cover_committed->in_eviction",
+      "2026-08-12 active->in_arrears",
+      "2026-08-23 in_arrears->default_verified",
+      "2026-08-31 default_verified->cover_committed",
+      "2026-09-15 cover_committed->in_eviction",
     ]);
   });
 
@@ -344,8 +386,9 @@ describe("seedReset", () => {
 
     expect(probe.effectiveFrom).toBe("2022-01-01T00:00:00.000Z");
     expect(probe.pricedBeforeEffect).toEqual([]);
-    // Aprovada's closed guarantee is the oldest life in the dataset.
-    expect(probe.earliestAppliedAt).toBe("2024-04-15T13:00:00.000Z");
+    // Aprovada's first-term guarantee on the renewed lease is the oldest life
+    // in the dataset: activated 900 days before the pinned reseed clock.
+    expect(probe.earliestAppliedAt).toBe("2024-04-11T13:00:00.000Z");
   });
 
   test("every guarantee that has been in force carries a full ISO activatedAt; drafts and pre-activation cancellations carry none", async () => {
@@ -369,7 +412,7 @@ describe("seedReset", () => {
       };
     });
 
-    expect(audit.total).toBe(36);
+    expect(audit.total).toBe(69);
     expect(audit.activatedWithoutTimestamp).toEqual([]);
     expect(audit.neverActivatedWithTimestamp).toEqual([]);
     // 6 drafts + the one canceled_pre_activation.
@@ -385,46 +428,80 @@ describe("seedReset", () => {
       const brokenInvariant = rows
         .filter(
           (row) =>
-            row.capacity.availableCents + row.capacity.reservedCents !==
-              row.capacity.ceilingCents ||
+            !isValidCapacity(row.capacity) ||
             row.capacity.availableCents < 0 ||
             row.capacity.reservedCents < 0,
         )
         .map((row) => row.publicId);
-      const reserved = rows.filter((row) => row.capacity.reservedCents > 0);
-      const reservedDetails = await Promise.all(
-        reserved.map(async (row) => {
-          const notices = await ctx.db
-            .query("guaranteeDelinquencyNotices")
-            .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", row._id))
-            .collect();
-          const cover = notices.find(
-            (notice) => notice.resolution?.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
-          );
-          return {
-            status: row.status,
-            reservedCents: row.capacity.reservedCents,
-            appliedCoverCents: cover?.resolution?.appliedCoverCents ?? null,
-          };
-        }),
+      // `closeAsDisputeReversal` refuses unless the cover its notices applied
+      // sums to exactly `reservedCents`, so every committed row must satisfy
+      // it for the reversal the demo walks through to be possible at all.
+      const appliedCoverSum = async (guaranteeId: (typeof rows)[number]["_id"]) => {
+        const notices = await ctx.db
+          .query("guaranteeDelinquencyNotices")
+          .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guaranteeId))
+          .collect();
+        return notices.reduce(
+          (sum, notice) =>
+            notice.resolution?.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED
+              ? sum + (notice.resolution.appliedCoverCents ?? 0)
+              : sum,
+          0,
+        );
+      };
+      const committed = rows.filter(
+        (row) =>
+          row.status === GUARANTEE_STATE.COVER_COMMITTED ||
+          row.status === GUARANTEE_STATE.IN_EVICTION,
       );
-      return { brokenInvariant, reservedDetails };
+      const committedDetails = await Promise.all(
+        committed.map(async (row) => ({
+          status: row.status,
+          reservedCents: row.capacity.reservedCents,
+          appliedCoverCents: await appliedCoverSum(row._id),
+        })),
+      );
+      const reversed = rows.filter((row) => row.closure?.reason === CLOSE_REASON.DISPUTE_REVERSAL);
+      const reversedDetails = await Promise.all(
+        reversed.map(async (row) => ({
+          reservedCents: row.capacity.reservedCents,
+          availableIsCeiling: row.capacity.availableCents === row.capacity.ceilingCents,
+          appliedCoverCents: await appliedCoverSum(row._id),
+        })),
+      );
+      return {
+        brokenInvariant,
+        reservedElsewhere: rows
+          .filter((row) => row.capacity.reservedCents > 0 && !committed.includes(row))
+          .map((row) => row.publicId),
+        committedDetails,
+        reversedDetails,
+      };
     });
 
     expect(audit.brokenInvariant).toEqual([]);
-    expect(audit.reservedDetails.map((row) => row.status).sort()).toEqual([
+    expect(audit.reservedElsewhere).toEqual([]);
+    expect(audit.committedDetails.map((row) => row.status).sort()).toEqual([
+      "cover_committed",
+      "cover_committed",
       "cover_committed",
       "in_eviction",
+      "in_eviction",
     ]);
-    expect(audit.reservedDetails.map((row) => row.reservedCents).sort((a, b) => a - b)).toEqual([
-      525_000, 682_500,
+    expect(audit.committedDetails.map((row) => row.reservedCents).sort((a, b) => a - b)).toEqual([
+      298_700, 355_300, 431_600, 525_000, 682_500,
     ]);
-    for (const row of audit.reservedDetails) {
+    for (const row of audit.committedDetails) {
       expect(row.appliedCoverCents).toBe(row.reservedCents);
     }
+    // The reversed cover is released: nothing reserved, the notice still
+    // records what it had applied.
+    expect(audit.reversedDetails).toEqual([
+      { reservedCents: 0, availableIsCeiling: true, appliedCoverCents: 231_400 },
+    ]);
   });
 
-  test("every cover-resolved notice links to an executed ledger row carrying its amount and period", async () => {
+  test("every cover-resolved notice links to a ledger row carrying its amount and period", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
 
@@ -447,20 +524,87 @@ describe("seedReset", () => {
             coveragePeriod: operation?.coveragePeriod,
             rentDueMonth: notice.rentDueDate.slice(0, 7),
             hasPaymentReference: Boolean(operation?.execution?.paymentReference),
+            recordedAtMatchesResolution: operation?.recordedAt === notice.resolution?.resolvedAt,
           };
         }),
       };
     });
 
-    expect(links.operationCount).toBe(2);
-    expect(links.covered.length).toBe(2);
+    expect(links.operationCount).toBe(6);
+    expect(links.covered.length).toBe(6);
     for (const row of links.covered) {
       expect(row.linked).toBe(true);
       expect(row.publicIdMatches).toBe(true);
-      expect(row.status).toBe("executed");
       expect(row.appliedCents).toBe(row.appliedCoverCents);
       expect(row.coveragePeriod).toBe(row.rentDueMonth);
-      expect(row.hasPaymentReference).toBe(true);
+      expect(row.recordedAtMatchesResolution).toBe(true);
+      // Only an executed payout carries its off-chain reference.
+      expect(row.hasPaymentReference).toBe(row.status === "executed");
+    }
+    expect(links.covered.map((row) => row.status).sort()).toEqual([
+      "executed",
+      "executed",
+      "executed",
+      "executed",
+      "recorded",
+      "recorded",
+    ]);
+  });
+
+  test("cover batches: two recorded ops awaiting payout share a batch, as do two executed ones", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const operations = await t.run(async (ctx) => {
+      const rows = await ctx.db.query("coverOperations").collect();
+      return Promise.all(
+        rows.map(async (row) => ({
+          publicId: row.publicId,
+          status: row.status,
+          batchId: row.batchId ?? null,
+          recordedAt: row.recordedAt,
+          executedAt: row.execution?.executedAt ?? null,
+          agencyName: (await ctx.db.get(row.agencyId))?.name ?? null,
+          guaranteeStatus: (await ctx.db.get(row.guaranteeId))?.status ?? null,
+        })),
+      );
+    });
+
+    // Live id formats (`generateCoverOperationPublicId` / `generateCoverBatchId`).
+    for (const operation of operations) {
+      expect(operation.publicId).toMatch(/^COV-[0-9A-HJKMNP-TV-Z]{8}$/);
+      if (operation.batchId !== null)
+        expect(operation.batchId).toMatch(/^CVB-[0-9A-HJKMNP-TV-Z]{8}$/);
+    }
+
+    const recorded = operations.filter((operation) => operation.status === "recorded");
+    expect(recorded).toHaveLength(2);
+    expect(new Set(recorded.map((operation) => operation.batchId)).size).toBe(1);
+    expect(recorded[0]?.batchId).not.toBeNull();
+    // One transaction → one recordedAt; recorded this week, on guarantees still
+    // in cover_committed, across two agencies.
+    expect(new Set(recorded.map((operation) => operation.recordedAt))).toEqual(
+      new Set(["2026-09-26T18:10:00.000Z"]),
+    );
+    expect(recorded.map((operation) => operation.guaranteeStatus)).toEqual([
+      GUARANTEE_STATE.COVER_COMMITTED,
+      GUARANTEE_STATE.COVER_COMMITTED,
+    ]);
+    expect(new Set(recorded.map((operation) => operation.agencyName)).size).toBe(2);
+
+    const executedBatches = new Map<string, number>();
+    for (const operation of operations) {
+      if (operation.status !== "executed" || operation.batchId === null) continue;
+      executedBatches.set(operation.batchId, (executedBatches.get(operation.batchId) ?? 0) + 1);
+    }
+    expect([...executedBatches.values()]).toEqual([2]);
+    expect([...executedBatches.keys()][0]).not.toBe(recorded[0]?.batchId);
+
+    // Executed payouts land within the last few weeks to months, never in the future.
+    for (const operation of operations.filter((o) => o.status === "executed")) {
+      expect(operation.executedAt).not.toBeNull();
+      expect((operation.executedAt ?? "") > (operation.recordedAt ?? "")).toBe(true);
+      expect((operation.executedAt ?? "") < SEED_NOW).toBe(true);
     }
   });
 
@@ -494,11 +638,53 @@ describe("seedReset", () => {
       return { total: leases.length, leasesWithOpen, violations };
     });
 
-    // One lease per seeded guarantee (30 fictional + 6 Aprovada); the four
-    // closed guarantees leave their lease with a null pointer.
-    expect(audit.total).toBe(36);
-    expect(audit.leasesWithOpen).toBe(32);
+    // One lease per seeded guarantee (58 fictional + 11 Aprovada) except the
+    // renewed Aprovada lease, which carries two. Four closed guarantees leave
+    // their lease with a null pointer; the fifth's lease points at its
+    // successor.
+    expect(audit.total).toBe(68);
+    expect(audit.leasesWithOpen).toBe(64);
     expect(audit.violations).toEqual([]);
+  });
+
+  test("one Aprovada lease carries two guarantees: a closed first term and the open renewal", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
+    const renewed = await t.run(async (ctx) => {
+      const leases = await ctx.db
+        .query("leases")
+        .withIndex("by_agency", (q) => q.eq("agencyId", aprovadaId))
+        .collect();
+      const multi = [];
+      for (const lease of leases) {
+        const guarantees = await ctx.db
+          .query("guarantees")
+          .withIndex("by_lease", (q) => q.eq("leaseId", lease._id))
+          .collect();
+        if (guarantees.length < 2) continue;
+        const open = guarantees.filter((g) => g.status !== GUARANTEE_STATE.CLOSED);
+        multi.push({
+          guarantees: guarantees
+            .map((g) => `${g.publicId}:${g.status}:${g.closure?.reason ?? "-"}`)
+            .sort(),
+          pointsAtOpen: open.length === 1 && lease.openGuaranteeId === open[0]?._id,
+          renewalAfterClose:
+            (open[0]?.activatedAt ?? "") >
+            (guarantees.find((g) => g.status === GUARANTEE_STATE.CLOSED)?.closure?.closedAt ?? ""),
+        });
+      }
+      return multi;
+    });
+
+    expect(renewed).toEqual([
+      {
+        guarantees: ["1000036:closed:end_of_lease", "1000041:active:-"],
+        pointsAtOpen: true,
+        renewalAfterClose: true,
+      },
+    ]);
   });
 
   test("registers tenants and links every seeded lease by tenantId", async () => {
@@ -747,7 +933,204 @@ describe("seedReset", () => {
       guarantees: (await ctx.db.query("guarantees").collect()).length,
     }));
     expect(counts.products).toBe(1);
-    expect(counts.leases).toBe(36);
-    expect(counts.guarantees).toBe(36);
+    expect(counts.leases).toBe(68);
+    expect(counts.guarantees).toBe(69);
+  });
+
+  test("agencyowner's agency walks every one of the seven guarantee states", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
+    const states = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovadaId))
+        .collect();
+      return [...new Set(rows.map((row) => row.status))].sort();
+    });
+
+    expect(states).toEqual([...GUARANTEE_STATES].sort());
+  });
+
+  test("the defaults queue holds at least three verified defaults across at least two agencies", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const verified = await t.run(async (ctx) => {
+      const notices = await ctx.db.query("guaranteeDelinquencyNotices").collect();
+      const rows = [];
+      for (const notice of notices.filter((n) => n.status === DELINQUENCY_STATUS.VERIFIED)) {
+        const guarantee = await ctx.db.get(notice.guaranteeId);
+        const agency = await ctx.db.get(notice.agencyId);
+        rows.push({
+          agency: agency?.name ?? null,
+          guaranteeStatus: guarantee?.status ?? null,
+          verifiedAt: notice.verification?.verifiedAt ?? "",
+        });
+      }
+      return rows;
+    });
+
+    expect(verified.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(verified.map((row) => row.agency)).size).toBeGreaterThanOrEqual(2);
+    for (const row of verified) {
+      expect(row.guaranteeStatus).toBe(GUARANTEE_STATE.DEFAULT_VERIFIED);
+      // Waiting days, not months: verified within the last two weeks.
+      expect(row.verifiedAt >= "2026-09-14").toBe(true);
+      expect(row.verifiedAt < SEED_NOW).toBe(true);
+    }
+  });
+
+  test("the notice book carries a staff dismissal and a staff dispute with their guarantee outcomes", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const book = await t.run(async (ctx) => {
+      const notices = await ctx.db.query("guaranteeDelinquencyNotices").collect();
+      const withGuarantee = async (notice: (typeof notices)[number]) => ({
+        publicId: notice.publicId,
+        status: notice.status,
+        openedAt: notice.openedAt,
+        guarantee: await ctx.db.get(notice.guaranteeId),
+      });
+      const dismissed = notices.filter(
+        (n) => n.cancellation?.reason === NOTICE_CANCELLATION_REASON.STAFF_DISMISSED,
+      );
+      const disputed = notices.filter(
+        (n) => n.resolution?.kind === NOTICE_RESOLUTION_KIND.STAFF_DISPUTE,
+      );
+      const open = notices.filter((n) => n.status === DELINQUENCY_STATUS.OPEN);
+      return {
+        dismissed: await Promise.all(dismissed.map(withGuarantee)),
+        disputed: await Promise.all(disputed.map(withGuarantee)),
+        open: await Promise.all(open.map(withGuarantee)),
+      };
+    });
+
+    // Dismissal hands the guarantee back its performing state.
+    expect(book.dismissed.map((n) => [n.status, n.guarantee?.status])).toEqual([
+      ["canceled", GUARANTEE_STATE.ACTIVE],
+    ]);
+    // Dispute leaves the guarantee in default: 1000032 stays in arrears, and
+    // the fresh notice filed this week sits open on the same guarantee.
+    expect(
+      book.disputed.map((n) => [n.status, n.guarantee?.publicId, n.guarantee?.status]),
+    ).toEqual([["resolved", "1000032", GUARANTEE_STATE.IN_ARREARS]]);
+    expect(book.open.map((n) => [n.guarantee?.publicId, n.openedAt])).toEqual([
+      ["1000032", "2026-09-24T12:19:00.000Z"],
+    ]);
+  });
+
+  test("the transparency figures read like a real book: ~10% default rate, aggregates match the table", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const figures = await t.run(async (ctx) => {
+      const rows = await ctx.db.query("guarantees").collect();
+      const tableCounts: Record<string, number> = {};
+      for (const row of rows) tableCounts[row.status] = (tableCounts[row.status] ?? 0) + 1;
+      const countByState = await countByStatePlatform(ctx);
+      const insured = await countInsured(ctx);
+      return {
+        tableCounts,
+        countByState,
+        insured,
+        verifiedDefault: countByState.default_verified + countByState.cover_committed,
+        sumInsuredCents: await sumInsuredExposure(ctx),
+        verifiedDefaultExposureCents: await sumVerifiedDefaultExposure(ctx),
+      };
+    });
+
+    // Aggregate ↔ table consistency: the B-trees the transparency page reads
+    // agree with the rows the seed wrote.
+    for (const state of GUARANTEE_STATES) {
+      expect(figures.countByState[state], state).toBe(figures.tableCounts[state] ?? 0);
+    }
+    // Same formula as `getGuaranteeAggregates`: (default_verified +
+    // cover_committed) / in-force.
+    expect(figures.verifiedDefault).toBe(6);
+    expect(figures.insured).toBe(58);
+    expect(figures.verifiedDefault / figures.insured).toBeCloseTo(0.1034, 3);
+    expect(figures.sumInsuredCents).toBe(SUM_INSURED_CENTS);
+    expect(figures.verifiedDefaultExposureCents).toBe(VERIFIED_DEFAULT_EXPOSURE_CENTS);
+  });
+
+  test("the newest invoice of every agency is the current month, and no invoice bills a guarantee before its activation", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const audit = await t.run(async (ctx) => {
+      const agencies = await ctx.db.query("agencies").collect();
+      const invoices = await ctx.db.query("invoices").collect();
+      const newestByAgency: Record<string, string> = {};
+      const billedBeforeActivation: string[] = [];
+      for (const invoice of invoices) {
+        if (invoice.publicId.startsWith("INV-TEST-")) continue;
+        const name = agencies.find((a) => a._id === invoice.agencyId)?.name ?? "?";
+        if ((newestByAgency[name] ?? "") < invoice.periodMonth) {
+          newestByAgency[name] = invoice.periodMonth;
+        }
+        for (const item of invoice.lineItems) {
+          const guarantee = await ctx.db.get(item.guaranteeId);
+          const activatedMonth = guarantee?.activatedAt?.slice(0, 7) ?? "9999-99";
+          if (activatedMonth > invoice.periodMonth) {
+            billedBeforeActivation.push(`${invoice.publicId}:${item.guaranteePublicId}`);
+          }
+        }
+      }
+      // Convex field names are ASCII-only, so the map leaves as entries.
+      return { newestByAgency: Object.entries(newestByAgency).sort(), billedBeforeActivation };
+    });
+
+    expect(audit.newestByAgency).toEqual([
+      ["Horizonte Imóveis", "2026-09"],
+      ["Imobiliária Aprovada", "2026-09"],
+      ["Imobiliária Atlântica", "2026-09"],
+      ["Imobiliária Paulista", "2026-09"],
+    ]);
+    expect(audit.billedBeforeActivation).toEqual([]);
+  });
+
+  test("seeded payment instruments are unmistakably fake", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const methods = await t.run(async (ctx) =>
+      (await ctx.db.query("payments").collect()).map((payment) => payment.method),
+    );
+
+    expect(methods.length).toBeGreaterThan(0);
+    for (const method of methods) {
+      if (method.kind === "pix") {
+        expect(method.pixKey).toContain("00000000-0000-0000-0000-000000000000");
+        expect(method.txId).toMatch(/^E00000000\d{12}DEMO\d{7}$/);
+      }
+      if (method.kind === "boleto") {
+        expect(method.barcode).toMatch(/^[0 .]+$/);
+      }
+    }
+  });
+
+  test("transition history speaks pt-BR labels, never raw enum values", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const messages = await t.run(async (ctx) =>
+      (await ctx.db.query("guaranteeHistory").collect()).map((row) => row.message),
+    );
+
+    expect(messages.filter((message) => /\([a-z]+_[a-z_]+\)/.test(message))).toEqual([]);
+    expect(messages).toContain("Garantia 1000040 encerrada: contestação revertida.");
+  });
+
+  test("the seed writes no audit rows — the prod chain is never wiped, so seeded entries would dangle", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const auditRows = await t.run(
+      async (ctx) => (await ctx.db.query("mutavAuditLog").collect()).length,
+    );
+    expect(auditRows).toBe(0);
   });
 });
