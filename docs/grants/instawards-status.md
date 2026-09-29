@@ -175,6 +175,6 @@ Nothing outstanding.
 4. **`apps/fund` is fully mocked** (`apps/fund/src/components/investor/transparency-page.tsx` literals) and unauthenticated. Keep it out of every evidence artifact.
 5. **SOW internal inconsistency.** The out-of-scope section states twice that the CNPJ is a deliverable of this sprint; section 4.1 lists only the three technical deliverables. Decision requested in #334.
 6. **SOW wording drift.** Horizon + `G...` address in the SOW vs Soroban RPC + the pulse vault contract `CA26WJGO…` in the build. Amend the SOW (#334), not the code.
-7. **Open Dependabot alerts on a public repo.** PR #339 bumps Next.js to 16.3.6 and closes 11 alerts; until it merges, a reviewer browsing the repo sees them. Low effort, worth merging before submission.
+7. **Dependabot alerts on a public repo — resolved.** #339 bumped Next.js to 16.3.6 (merged `6dcb5d0`), which closes all 11 open alerts on `next` once Dependabot rescans `main`. Confirm the alert count is zero before submission.
 
 Resolved since the previous audit: capacity release is no longer one-sided (#335); the coverage ratio promised by `mutav#196` is now computed and published (#336).
