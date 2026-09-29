@@ -108,6 +108,19 @@ function dateDaysAgo(days: number): string {
   return new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
 }
 
+/**
+ * Due date for a seeded billing month: the 10th, except the current month is
+ * never due sooner than a week from the reseed — an invoice issued this month
+ * must not be born overdue (`isOverdue` compares `dueDate < today`), whatever
+ * day of the month the reseed runs on. Mirrors the testnet invoices below.
+ */
+function seedDueDate(month: string): string {
+  const tenth = `${month}-10`;
+  if (month !== monthsAgo(0)) return tenth;
+  const nextWeek = dateDaysAgo(-7);
+  return nextWeek > tenth ? nextWeek : tenth;
+}
+
 /** Billing month (`YYYY-MM`) `months` before the current UTC month. */
 function monthsAgo(months: number): string {
   const now = new Date(Date.now());
@@ -673,6 +686,12 @@ const APPROVED_DOCUMENTS: Guarantee["documents"] = [
  * A checksum-valid CPF from nine base digits — `getOrCreateTenant` rejects any
  * tax id that fails the mod-11 check, so generated tenants need real check
  * digits even though the people are fictional.
+ *
+ * Callers pass a small base (`1NN`, NN tracking the guarantee's public id), so
+ * every generated CPF reads `000.000.1NN-XX`: obviously synthetic when the
+ * agency screens show it in full, and clear of `00000000191` (p9) and the
+ * repeated-digit literals. A real-looking CPF in a screen recording reads as
+ * someone's actual tax id (LGPD).
  */
 function seedCpf(base: number): string {
   const digits = String(base).padStart(9, "0").slice(-9).split("").map(Number);
@@ -994,7 +1013,7 @@ function performingFillerSpec({
     tenant: {
       approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
       fullName: filler.fullName,
-      cpf: seedCpf(402_000_000 + index * 1_234_567),
+      cpf: seedCpf(PERFORMING_FIRST_PID + 100 + index),
       birthDate: `${1978 + (index % 20)}-${String((index % 12) + 1).padStart(2, "0")}-15`,
       email: `${emailLocal}@example.com`,
       phone: `${isPaulista ? "11" : "21"}9000001${String(index).padStart(2, "0")}`,
@@ -1030,7 +1049,10 @@ type SeedFictionalResult = {
  * `staffUserId` signs the staff-only notice dispositions (verification,
  * cover) in the dataset, the way `mutationWithMutavRole` would in production.
  *
- * Dev-only. Do NOT call from production.
+ * For dev/preview deployments, and for the production demo environment
+ * only before any real agency data exists, via `seedReset` — which wipes the
+ * demo tables first and keeps `waitlist`, `contractApplications`, the audit
+ * chain and the staff tables (see `DEMO_TABLES`).
  */
 async function seedFictional(
   ctx: MutationCtx,
@@ -1390,7 +1412,7 @@ async function seedFictional(
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-12-28T10:00:00-03:00"),
-        nextRenewalDate: "2026-09-01",
+        nextRenewalDate: dateDaysAgo(-30),
         documents: [
           { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
           { key: "inspection", status: DOCUMENT_STATUS.ENVIADO },
@@ -1428,7 +1450,7 @@ async function seedFictional(
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-05T10:00:00-03:00"),
-        nextRenewalDate: "2026-08-20",
+        nextRenewalDate: dateDaysAgo(-45),
         documents: [
           { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
           { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
@@ -2328,7 +2350,7 @@ async function seedFictional(
         resolvedAt: executedBatchRecordedAt(),
         resolvedByUserId: args.staffUserId,
         appliedCoverCents: HORIZONTE_COVER_APPLIED_CENTS,
-        note: "Cobertura paga; ação de despejo ajuizada 15 dias depois.",
+        note: "Lote semanal de coberturas.",
       },
     });
     await seedExecutedCover(ctx, {
@@ -2367,7 +2389,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Otávio Resende Prado",
-        cpf: seedCpf(401_500_120),
+        cpf: seedCpf(150),
         birthDate: "1987-06-11",
         email: "otavio.prado@example.com",
         phone: "11900000050",
@@ -2422,7 +2444,7 @@ async function seedFictional(
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
         fullName: "Helena Duarte Quintela",
-        cpf: seedCpf(401_500_131),
+        cpf: seedCpf(151),
         birthDate: "1990-02-03",
         email: "helena.quintela@example.com",
         phone: "21900000051",
@@ -2626,7 +2648,7 @@ async function seedFictional(
           publicId: `INV-${month}-${book.suffix}`,
           periodMonth: month,
           issuedAt: `${month}-01`,
-          dueDate: `${month}-10`,
+          dueDate: seedDueDate(month),
           lineItems,
         };
         if (offset < book.unpaidMonths) {
@@ -3115,7 +3137,7 @@ async function populateAprovadaBook(
         },
         tenant: {
           fullName: "Thiago Mendes Sarmento",
-          cpf: seedCpf(403_310_037),
+          cpf: seedCpf(137),
           birthDate: "1991-01-22",
           phoneSuffix: "37",
           emailLocal: "thiago.sarmento",
@@ -3141,7 +3163,7 @@ async function populateAprovadaBook(
         },
         tenant: {
           fullName: "Camila Rezende Borges",
-          cpf: seedCpf(403_310_038),
+          cpf: seedCpf(138),
           birthDate: "1988-05-09",
           phoneSuffix: "38",
           emailLocal: "camila.borges",
@@ -3167,7 +3189,7 @@ async function populateAprovadaBook(
         },
         tenant: {
           fullName: "Leandro Viana Coelho",
-          cpf: seedCpf(403_310_039),
+          cpf: seedCpf(139),
           birthDate: "1983-12-01",
           phoneSuffix: "39",
           emailLocal: "leandro.coelho",
@@ -3197,7 +3219,7 @@ async function populateAprovadaBook(
         },
         tenant: {
           fullName: "Mônica Freire Salgado",
-          cpf: seedCpf(403_310_040),
+          cpf: seedCpf(140),
           birthDate: "1979-10-14",
           phoneSuffix: "40",
           emailLocal: "monica.salgado",
@@ -3301,7 +3323,7 @@ async function populateAprovadaBook(
       publicId: `INV-${month}-0500`,
       periodMonth: month,
       issuedAt: `${month}-01`,
-      dueDate: `${month}-10`,
+      dueDate: seedDueDate(month),
       lineItems,
     };
     if (offset === 0) {
@@ -3432,7 +3454,7 @@ async function populateAprovadaBook(
         kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
         at: executedBatchRecordedAt(),
         appliedCents: COVER_EXECUTED_CENTS,
-        note: "Cobertura paga ao proprietário; regresso contra o inquilino em andamento.",
+        note: "Lote semanal de coberturas.",
         cover: {
           kind: "executed",
           batchId: coverBatches.executed,
@@ -3934,7 +3956,10 @@ async function attachGuaranteeTransitionHistory(ctx: MutationCtx): Promise<numbe
  * partial-seed footgun of exposing the intermediate steps as their own
  * runnable entrypoints.
  *
- * Dev-only. Do NOT call from production.
+ * For dev/preview deployments, and for the production demo environment
+ * only before any real agency data exists. It wipes the demo tables and keeps
+ * `waitlist`, `contractApplications`, the audit chain and the staff tables
+ * (see `DEMO_TABLES`).
  */
 export const seedReset = internalMutation({
   args: { adminEmail: v.optional(v.string()) },

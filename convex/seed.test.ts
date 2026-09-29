@@ -17,6 +17,7 @@ import {
 import { CLOSE_REASON, GUARANTEE_STATE, GUARANTEE_STATES } from "./guarantees/domain";
 import { isValidCapacity } from "./guarantees/transitions";
 import { DEFAULT_PRICING_TABLE } from "./guarantees/pricing";
+import { isOverdue } from "./invoices/domain";
 import { registerGuaranteeAggregateComponents } from "./lib/testFixtures";
 import { isEffective } from "./products/domain";
 import schema from "./schema";
@@ -1090,6 +1091,57 @@ describe("seedReset", () => {
       ["Imobiliária Paulista", "2026-09"],
     ]);
     expect(audit.billedBeforeActivation).toEqual([]);
+  });
+
+  test("no current-month invoice is born overdue, whatever day of the month the reseed runs", async () => {
+    // The 1st, mid-month, the 28th and the 31st: the current month's due date
+    // must never sit before the reseed day.
+    const clocks = [
+      "2026-10-01T15:00:00.000Z",
+      "2026-10-15T15:00:00.000Z",
+      "2026-10-28T15:00:00.000Z",
+      "2026-10-31T15:00:00.000Z",
+    ];
+    const agencies = ["Imobiliária Paulista", "Imobiliária Atlântica", "Imobiliária Aprovada"];
+    for (const clock of clocks) {
+      vi.setSystemTime(new Date(clock));
+      const today = clock.slice(0, 10);
+      const t = setup();
+      await t.mutation(internal.seed.seedReset, {});
+
+      const current = await t.run(async (ctx) => {
+        const agencyRows = await ctx.db.query("agencies").collect();
+        const ids = new Set(agencyRows.filter((a) => agencies.includes(a.name)).map((a) => a._id));
+        return (await ctx.db.query("invoices").collect()).filter(
+          (invoice) => ids.has(invoice.agencyId) && invoice.periodMonth === today.slice(0, 7),
+        );
+      });
+
+      // One recurring invoice per agency plus the testnet ones for Paulista
+      // and Atlântica.
+      expect(current.length, clock).toBeGreaterThanOrEqual(agencies.length);
+      expect(
+        current.filter((invoice) => isOverdue(invoice, today)).map((invoice) => invoice.publicId),
+        clock,
+      ).toEqual([]);
+    }
+  }, 60_000);
+
+  test("seeded tax ids are obviously synthetic and unique (LGPD: the agency screens show them in full)", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const taxIds = await t.run(async (ctx) =>
+      (await ctx.db.query("tenants").collect()).map((tenant) => tenant.taxId),
+    );
+
+    expect(taxIds.length).toBeGreaterThan(0);
+    // Either the `000.000.1NN-XX` range `seedCpf` generates, or a literal whose
+    // body repeats one digit or one digit pair (`77777777…`, `72727272…`).
+    const synthetic = (taxId: string) =>
+      taxId.startsWith("000000") || /^(\d)\1{7}/.test(taxId) || /^(\d\d)\1{3}/.test(taxId);
+    expect(taxIds.filter((taxId) => !synthetic(taxId))).toEqual([]);
+    expect(new Set(taxIds).size).toBe(taxIds.length);
   });
 
   test("seeded payment instruments are unmistakably fake", async () => {
