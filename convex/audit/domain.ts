@@ -72,9 +72,11 @@ export const AUDIT_ACTION = {
   // emitted by convex/tenants/useCases.ts for staff review; the registry
   // value is NOT overwritten).
   TENANT_DATA_CONFLICT: "tenant.data_conflict",
-  // delinquencies/ (staff-only terminal dispositions — emitted by
-  // convex/delinquencies/mutations.ts). Agency-side transitions are NOT
-  // audited for the pilot; see the mutations file for the TODO.
+  // delinquencies/ (emitted by convex/delinquencies/mutations.ts — the agency
+  // files, cures and withdraws; staff verify, cover, dismiss and dispute).
+  DELINQUENCY_OPENED: "delinquency.opened",
+  DELINQUENCY_RESOLVED: "delinquency.resolved",
+  DELINQUENCY_CANCELED: "delinquency.canceled",
   DELINQUENCY_VERIFIED: "delinquency.verified",
   DELINQUENCY_RESOLVED_BY_COVER: "delinquency.resolved_by_cover",
   DELINQUENCY_DISMISSED: "delinquency.dismissed",
@@ -109,6 +111,9 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.STAFF_DELETED),
   v.literal(AUDIT_ACTION.STAFF_BOOTSTRAP),
   v.literal(AUDIT_ACTION.TENANT_DATA_CONFLICT),
+  v.literal(AUDIT_ACTION.DELINQUENCY_OPENED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_CANCELED),
   v.literal(AUDIT_ACTION.DELINQUENCY_VERIFIED),
   v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISMISSED),
