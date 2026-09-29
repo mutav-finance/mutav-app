@@ -313,6 +313,66 @@ describe("listByAgency", () => {
     expect(result.page.map((r) => r.publicId)).toEqual(["DN-mine"]);
   });
 
+  test("guaranteePublicId without status returns the guarantee's whole history, newest first", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-h-open", status: "open", rentDueDate: "2026-01-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-h-verified",
+      status: "verified",
+      rentDueDate: "2026-02-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-h-resolved",
+      status: "resolved",
+      rentDueDate: "2026-03-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-h-canceled",
+      status: "canceled",
+      rentDueDate: "2026-04-05",
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.query(api.delinquencies.useCases.listByAgency, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: "CT-1",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((r) => r.publicId)).toEqual([
+      "DN-h-canceled",
+      "DN-h-resolved",
+      "DN-h-verified",
+      "DN-h-open",
+    ]);
+    expect(result.isDone).toBe(true);
+  });
+
+  test("guaranteePublicId + status='open' keeps verified notices alongside open ones", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-o-open", status: "open", rentDueDate: "2026-01-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-o-verified",
+      status: "verified",
+      rentDueDate: "2026-02-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-o-resolved",
+      status: "resolved",
+      rentDueDate: "2026-03-05",
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.query(api.delinquencies.useCases.listByAgency, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: "CT-1",
+      status: "open",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((r) => r.publicId)).toEqual(["DN-o-verified", "DN-o-open"]);
+  });
+
   test("guaranteePublicId of another agency's guarantee → empty page, no leak", async () => {
     const t = setup();
     const a = await makeFixture(t, "1");

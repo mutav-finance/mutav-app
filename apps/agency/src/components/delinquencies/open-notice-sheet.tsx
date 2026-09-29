@@ -54,11 +54,15 @@ export function OpenNoticeSheet({
   const [errors, setErrors] = React.useState<FieldErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
 
-  function handleClose() {
+  function resetForm() {
     setGuaranteePublicId(initialGuaranteePublicId);
     setRentDueDate("");
     setAmountInput("");
     setErrors({});
+  }
+
+  function handleClose() {
+    resetForm();
     onClose();
   }
 
@@ -82,6 +86,7 @@ export function OpenNoticeSheet({
       });
       if (result.success) {
         toast.success(t("success", { publicId: result.data.publicId }));
+        resetForm();
         onSuccess(result.data.publicId);
       } else {
         toast.error(t(`errors.${result.error.code}`));

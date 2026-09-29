@@ -245,6 +245,10 @@ async function shapeDelinquencyAdminQueueRow(
  * join needs a guarantee → lease read per row and the date format is locale-aware,
  * neither of which belongs in this projection.
  */
+// A guarantee files at most one notice per rent due date, so this bounds
+// decades of monthly history while keeping the read finite.
+const GUARANTEE_NOTICE_HISTORY_LIMIT = 500;
+
 export const listByAgency = queryWithAgencyScope({
   args: {
     paginationOpts: paginationOptsValidator,
@@ -253,26 +257,16 @@ export const listByAgency = queryWithAgencyScope({
     dueDateTo: v.optional(v.string()),
     amountFromCents: v.optional(v.number()),
     amountToCents: v.optional(v.number()),
+    // Scopes the list to one guarantee's notice history. Here an omitted
+    // `status` means every status, not `open`: the guarantee page links in to
+    // show the whole history, and one guarantee's notices are a handful, so the
+    // list is read whole instead of paged.
     guaranteePublicId: v.optional(v.string()),
   },
   handler: async (
     ctx,
     args,
   ): Promise<{ page: DelinquencyNoticeRow[]; isDone: boolean; continueCursor: string }> => {
-    const status = args.status ?? DELINQUENCY_STATUS.OPEN;
-    // `publicId` is unique only per agency, so the caller's agency picks the
-    // row — and a publicId from another agency resolves to nothing, which
-    // filters every notice out rather than leaking that agency's rows.
-    const { guaranteePublicId } = args;
-    const scopedGuaranteeId =
-      guaranteePublicId === undefined
-        ? undefined
-        : (
-            await ctx.db
-              .query("guarantees")
-              .withIndex("by_publicId", (q) => q.eq("publicId", guaranteePublicId))
-              .collect()
-          ).find((candidate) => candidate.agencyId === ctx.agencyId)?._id;
     // Normalize both sides of the compare to YYYY-MM-DD so a caller passing
     // an ISO datetime (e.g. "2026-06-05T00:00:00Z") is compared against the
     // stored day, not lex-compared with a longer string that diverges at
@@ -280,6 +274,42 @@ export const listByAgency = queryWithAgencyScope({
     // openNotice's validator; the .slice keeps this query defensive.
     const dueDateFrom = args.dueDateFrom?.slice(0, 10);
     const dueDateTo = args.dueDateTo?.slice(0, 10);
+    const matchesFilters = (notice: DelinquencyNotice) =>
+      (dueDateFrom == null || notice.rentDueDate.slice(0, 10) >= dueDateFrom) &&
+      (dueDateTo == null || notice.rentDueDate.slice(0, 10) <= dueDateTo) &&
+      (args.amountFromCents == null || notice.updatedAmountCents >= args.amountFromCents) &&
+      (args.amountToCents == null || notice.updatedAmountCents <= args.amountToCents);
+
+    const { guaranteePublicId } = args;
+    if (guaranteePublicId !== undefined) {
+      // `publicId` is unique only per agency, so the caller's agency picks the
+      // row — a publicId from another agency resolves to nothing and yields an
+      // empty page rather than that agency's notices.
+      const guarantee = (
+        await ctx.db
+          .query("guarantees")
+          .withIndex("by_publicId", (q) => q.eq("publicId", guaranteePublicId))
+          .collect()
+      ).find((candidate) => candidate.agencyId === ctx.agencyId);
+      const notices = guarantee
+        ? await ctx.db
+            .query("guaranteeDelinquencyNotices")
+            .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guarantee._id))
+            .take(GUARANTEE_NOTICE_HISTORY_LIMIT)
+        : [];
+      const page = notices
+        .filter(
+          (notice) =>
+            (args.status === undefined ||
+              toAgencyNoticeStatus(notice.status) === toAgencyNoticeStatus(args.status)) &&
+            matchesFilters(notice),
+        )
+        .sort((a, b) => b._creationTime - a._creationTime)
+        .map(shapeDelinquencyNoticeRow);
+      return { page, isDone: true, continueCursor: "" };
+    }
+
+    const status = args.status ?? DELINQUENCY_STATUS.OPEN;
     const result = await ctx.db
       .query("guaranteeDelinquencyNotices")
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", status))
@@ -300,14 +330,7 @@ export const listByAgency = queryWithAgencyScope({
 
     const page = [...verifiedRows, ...result.page]
       .sort((a, b) => b._creationTime - a._creationTime)
-      .filter(
-        (notice) =>
-          (guaranteePublicId === undefined || notice.guaranteeId === scopedGuaranteeId) &&
-          (dueDateFrom == null || notice.rentDueDate.slice(0, 10) >= dueDateFrom) &&
-          (dueDateTo == null || notice.rentDueDate.slice(0, 10) <= dueDateTo) &&
-          (args.amountFromCents == null || notice.updatedAmountCents >= args.amountFromCents) &&
-          (args.amountToCents == null || notice.updatedAmountCents <= args.amountToCents),
-      )
+      .filter(matchesFilters)
       .map(shapeDelinquencyNoticeRow);
 
     return { page, isDone: result.isDone, continueCursor: result.continueCursor };

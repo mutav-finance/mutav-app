@@ -58,7 +58,10 @@ export function DelinquencyPage() {
   const noticeParam = searchParams.get(OPEN_QUERY_KEY);
   const guaranteeFilter = searchParams.get(DELINQUENCIES_GUARANTEE_PARAM);
 
-  const [status, setStatus] = React.useState<StatusTab>("open");
+  // Arriving from a guarantee means "show me its history", resolved and
+  // canceled notices included — an `open` default would hide a closed
+  // guarantee's entire record.
+  const [status, setStatus] = React.useState<StatusTab>(guaranteeFilter ? "all" : "open");
   const [order, setOrder] = React.useState<SortKey>("date");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
