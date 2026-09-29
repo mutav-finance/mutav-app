@@ -83,6 +83,14 @@ export function formatCentsPlain(cents: number): string {
   }).format(cents / 100);
 }
 
+/** A BRL exchange rate (reais per unit of another asset), 2–4 decimals, no symbol. */
+export function formatBRLRate(rate: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(rate);
+}
+
 export function formatDateBR(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;

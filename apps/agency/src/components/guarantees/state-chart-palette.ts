@@ -47,7 +47,10 @@ export const AREA_STROKE_WIDTH = 2;
 /**
  * Event colour is semantic, not ordinal: green means good, red means cost,
  * grey means no valence. A guarantee opening is the business working; a cover
- * payout is money leaving; a contract ending is neither.
+ * commitment is reserve capital earmarked to leave; a contract ending is neither.
+ *
+ * `cover_paid` is the event emitted on the move into `cover_committed` — a
+ * commitment, not a settled payout — so its label reads "Cover committed".
  *
  * `created` and `closed` take the two neutral steps rather than a hue — a
  * draft appearing and a lease ending are both events with no valence, and

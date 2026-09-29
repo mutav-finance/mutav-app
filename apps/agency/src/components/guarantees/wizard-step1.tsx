@@ -199,7 +199,6 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
               value={rentInput}
               onChange={setRentInput}
               onBlur={(v) => handleCurrencyBlur(v, "rentCents")}
-              placeholder={t("rent.placeholder")}
             />
           </Field>
 
@@ -208,7 +207,6 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
               value={condoInput}
               onChange={setCondoInput}
               onBlur={(v) => handleCurrencyBlur(v, "condoCents")}
-              placeholder={t("rent.placeholder")}
             />
           </Field>
 
@@ -217,7 +215,6 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
               value={otherInput}
               onChange={setOtherInput}
               onBlur={(v) => handleCurrencyBlur(v, "otherFeesCents")}
-              placeholder={t("rent.placeholder")}
             />
           </Field>
         </div>

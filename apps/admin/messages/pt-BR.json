@@ -348,10 +348,10 @@
     },
     "exposure": {
       "title": "Exposição das garantias",
-      "description": "A carteira de garantias do Convex, em BRL. Não é convertida para o ativo da reserva: compare as duas só com uma taxa de câmbio.",
+      "description": "A carteira de garantias, em BRL. Não é convertida para o ativo da reserva: compare as duas só com uma taxa de câmbio.",
       "insured": "Garantias vigentes",
       "totalGuaranteed": "Total garantido",
-      "verifiedDefault": "Em inadimplência verificada",
+      "verifiedDefault": "Inadimplência verificada ou cobertura comprometida",
       "verifiedDefaultExposure": "Exposição em inadimplência verificada",
       "coverCommitted": "Cobertura comprometida",
       "defaultRate": "Taxa de inadimplência"
