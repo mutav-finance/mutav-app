@@ -143,7 +143,7 @@ export function OpenNoticeSheet({
           </div>
 
           <Field label={t("fields.originalAmount")} error={errors.amount}>
-            <CurrencyInput value={amountInput} onChange={setAmountInput} placeholder="R$ 0,00" />
+            <CurrencyInput value={amountInput} onChange={setAmountInput} />
           </Field>
         </form>
 

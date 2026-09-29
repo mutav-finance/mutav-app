@@ -284,7 +284,7 @@
       "label": "Coverage reserve",
       "unavailable": "Unavailable",
       "testnet": "Testnet",
-      "asOf": "As of {datetime}",
+      "asOf": "As of {datetime} (BRT)",
       "brlIndicative": "≈ {amount} at BCB PTAX (ask) {rate} — indicative only; {symbol} is a testnet mock asset",
       "fxQuotedAt": "PTAX quoted {datetime} (BRT)",
       "coverageRatio": "Coverage ratio",
@@ -335,7 +335,7 @@
       "undercovered": "Undercovered",
       "noBook": "No coverage reserved",
       "unavailable": "Reserve read unavailable",
-      "stale": "Last snapshot {datetime} is older than 45 minutes — the reserve read may be failing."
+      "stale": "Last snapshot {datetime} (BRT) is older than 45 minutes — the reserve read may be failing."
     },
     "book": {
       "title": "Capacity in book terms",
@@ -348,11 +348,11 @@
     },
     "exposure": {
       "title": "Guarantee exposure",
-      "description": "The Convex guarantee book in BRL. Not converted to the reserve asset: compare the two only at an FX rate.",
+      "description": "The guarantee book in BRL. Not converted to the reserve asset: compare the two only at an FX rate.",
       "insured": "In-force guarantees",
       "totalGuaranteed": "Total guaranteed",
-      "verifiedDefault": "In verified default",
-      "verifiedDefaultExposure": "Verified-default exposure",
+      "verifiedDefault": "Verified default or cover committed",
+      "verifiedDefaultExposure": "Exposure in verified default or committed cover",
       "coverCommitted": "Cover committed",
       "defaultRate": "Default rate"
     },

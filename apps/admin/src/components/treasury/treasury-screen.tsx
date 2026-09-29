@@ -16,7 +16,8 @@ import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
 import { CapacityPanel } from "@mutav/ui/transparency/capacity-panel";
-import { formatAssetAmount, formatBrlCents, formatPercent } from "@mutav/ui/transparency/format";
+import { formatBRLCents, formatDateTimeBRT } from "@mutav/i18n/brazil";
+import { formatAssetAmount, formatPercent } from "@mutav/ui/transparency/format";
 import { ReserveBreakdown } from "@mutav/ui/transparency/reserve-breakdown";
 import { ReservePanel } from "@mutav/ui/transparency/reserve-panel";
 import {
@@ -98,7 +99,6 @@ function noServerClock(): null {
 
 function ReserveStatus({ coverage }: { coverage: ReserveCoverage }) {
   const t = useTranslations("treasury.status");
-  const locale = useLocale();
   const now = useSyncExternalStore(subscribeToMinutes, currentMinute, noServerClock);
   const status = solvencyStatus(coverage);
   const stale =
@@ -110,10 +110,7 @@ function ReserveStatus({ coverage }: { coverage: ReserveCoverage }) {
       {stale && coverage.available ? (
         <p role="status" className="text-warning text-xs">
           {t("stale", {
-            datetime: new Intl.DateTimeFormat(locale, {
-              dateStyle: "short",
-              timeStyle: "short",
-            }).format(new Date(coverage.capturedAt)),
+            datetime: formatDateTimeBRT(new Date(coverage.capturedAt).toISOString()),
           })}
         </p>
       ) : null}
@@ -176,12 +173,12 @@ function ExposureCard({ aggregates }: { aggregates: GuaranteeAggregates }) {
           <FigureRow label={t("insured")} value={count(aggregates.countInsured)} />
           <FigureRow
             label={t("totalGuaranteed")}
-            value={formatBrlCents(locale, aggregates.sumInsuredCents)}
+            value={formatBRLCents(aggregates.sumInsuredCents)}
           />
           <FigureRow label={t("verifiedDefault")} value={count(aggregates.countVerifiedDefault)} />
           <FigureRow
             label={t("verifiedDefaultExposure")}
-            value={formatBrlCents(locale, aggregates.verifiedDefaultExposureCents)}
+            value={formatBRLCents(aggregates.verifiedDefaultExposureCents)}
           />
           <FigureRow
             label={t("coverCommitted")}

@@ -73,7 +73,7 @@
       "description": "Acompanhe e gerencie os acionamentos de inadimplência das garantias da sua imobiliária."
     },
     "heading": "Acionamentos de Inadimplência",
-    "subheading": "Acompanhe e gerencie as inadimplências abertas das suas garantias",
+    "subheading": "Acompanhe e gerencie as inadimplências das suas garantias",
     "actions": {
       "report": "Gerar relatório",
       "statement": "Extrato de pagamento",
@@ -87,7 +87,7 @@
     "evidenceSource": {
       "agency_reported": "Reportado pela imobiliária",
       "bank_attested": "Atestado pelo banco",
-      "onchain_observed": "Observado on-chain",
+      "onchain_observed": "Observado onchain",
       "system_scheduled": "Agendado pelo sistema"
     },
     "filter": {
@@ -222,6 +222,14 @@
       "members": "Membros",
       "commission": "Comissão",
       "agencySettings": "Configurações da Agência"
+    },
+    "agencySwitcher": {
+      "workspacesLabel": "Espaços de trabalho",
+      "roles": {
+        "owner": "Proprietário",
+        "admin": "Administrador",
+        "member": "Membro"
+      }
     }
   },
   "chart": {
@@ -258,10 +266,10 @@
       "noneLabel": "Nenhuma",
       "dueOn": "Vence em {date}"
     },
-    "delinquencies": {
-      "label": "Inadimplências",
-      "footerNone": "Nenhuma fatura em atraso",
-      "footerSome": "{count, plural, one {# fatura em atraso} other {# faturas em atraso}}"
+    "overdueInvoices": {
+      "label": "Faturas em atraso",
+      "footerNone": "Todas as faturas Mutav estão em dia",
+      "footerSome": "{count, plural, one {# fatura Mutav em atraso} other {# faturas Mutav em atraso}}"
     }
   },
   "dataTable": {
@@ -389,7 +397,7 @@
     "state": {
       "drafted": "Rascunho",
       "active": "Ativa",
-      "in_arrears": "Em inadimplência",
+      "in_arrears": "Em atraso",
       "default_verified": "Inadimplência verificada",
       "cover_committed": "Cobertura registrada",
       "in_eviction": "Em despejo",
@@ -529,7 +537,7 @@
       "all": "Todas",
       "expiring": "A vencer",
       "active": "Ativas",
-      "in_arrears": "Em inadimplência",
+      "in_arrears": "Em atraso",
       "default_verified": "Inadimplência verificada",
       "cover_committed": "Cobertura registrada",
       "in_eviction": "Em despejo",
@@ -819,7 +827,7 @@
       "txIdEmpty": "Aguardando pagamento",
       "address": "Endereço de destino",
       "txHash": "Hash da transação",
-      "txHashEmpty": "Aguardando confirmação on-chain",
+      "txHashEmpty": "Aguardando confirmação onchain",
       "generateStellar": "Pagar com Stellar",
       "openPayPage": "Abrir página de pagamento",
       "copyShareLink": "Link de pagamento",
@@ -885,8 +893,7 @@
       "rent": "Aluguel mensal",
       "condo": "Condomínio",
       "otherFees": "Outras taxas",
-      "total": "Total",
-      "placeholder": "0,00"
+      "total": "Total"
     },
     "tenant": {
       "fullName": "Nome completo",
@@ -1293,7 +1300,7 @@
       "label": "Reserva de cobertura",
       "unavailable": "Indisponível",
       "testnet": "Testnet",
-      "asOf": "Atualizado em {datetime}",
+      "asOf": "Atualizado em {datetime} (BRT)",
       "brlIndicative": "≈ {amount} pela PTAX BCB (venda) {rate} — apenas indicativo; {symbol} é um ativo simulado da testnet",
       "fxQuotedAt": "PTAX cotada em {datetime} (BRT)",
       "coverageRatio": "Índice de cobertura",
@@ -1342,7 +1349,7 @@
     "created": "Criadas",
     "activated": "Ativadas",
     "default_verified": "Inadimplência verificada",
-    "cover_paid": "Cobertura paga",
+    "cover_paid": "Cobertura registrada",
     "closed": "Encerradas"
   }
 }

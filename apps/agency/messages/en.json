@@ -4,7 +4,7 @@
   },
   "meta": {
     "title": "Mutav — Registered Guarantee System",
-    "description": "Dashboard for managing rental guarantees registered on-chain."
+    "description": "Dashboard for managing rental guarantees registered onchain."
   },
   "paymentStatus": {
     "pending": "Pending",
@@ -73,7 +73,7 @@
       "description": "Track and manage delinquency actions for your agency's guarantees."
     },
     "heading": "Delinquency Actions",
-    "subheading": "Track and manage open delinquencies for your guarantees",
+    "subheading": "Track and manage delinquencies for your guarantees",
     "actions": {
       "report": "Generate report",
       "statement": "Payment statement",
@@ -87,7 +87,7 @@
     "evidenceSource": {
       "agency_reported": "Agency-reported",
       "bank_attested": "Bank-attested",
-      "onchain_observed": "On-chain observed",
+      "onchain_observed": "Onchain observed",
       "system_scheduled": "System-scheduled"
     },
     "filter": {
@@ -222,6 +222,14 @@
       "members": "Members",
       "commission": "Commission",
       "agencySettings": "Agency Settings"
+    },
+    "agencySwitcher": {
+      "workspacesLabel": "Workspaces",
+      "roles": {
+        "owner": "Owner",
+        "admin": "Admin",
+        "member": "Member"
+      }
     }
   },
   "chart": {
@@ -258,10 +266,10 @@
       "noneLabel": "None",
       "dueOn": "Due on {date}"
     },
-    "delinquencies": {
-      "label": "Delinquencies",
-      "footerNone": "No overdue invoices",
-      "footerSome": "{count, plural, one {# overdue invoice} other {# overdue invoices}}"
+    "overdueInvoices": {
+      "label": "Overdue invoices",
+      "footerNone": "All Mutav invoices are up to date",
+      "footerSome": "{count, plural, one {# Mutav invoice past its due date} other {# Mutav invoices past their due date}}"
     }
   },
   "dataTable": {
@@ -819,7 +827,7 @@
       "txIdEmpty": "Awaiting payment",
       "address": "Destination address",
       "txHash": "Transaction hash",
-      "txHashEmpty": "Awaiting on-chain confirmation",
+      "txHashEmpty": "Awaiting onchain confirmation",
       "generateStellar": "Pay with Stellar",
       "openPayPage": "Open payment page",
       "copyShareLink": "Payment Link",
@@ -885,8 +893,7 @@
       "rent": "Monthly rent",
       "condo": "Condo fee",
       "otherFees": "Other fees",
-      "total": "Total rent",
-      "placeholder": "0.00"
+      "total": "Total rent"
     },
     "tenant": {
       "fullName": "Full name",
@@ -1293,7 +1300,7 @@
       "label": "Coverage reserve",
       "unavailable": "Unavailable",
       "testnet": "Testnet",
-      "asOf": "As of {datetime}",
+      "asOf": "As of {datetime} (BRT)",
       "brlIndicative": "≈ {amount} at BCB PTAX (ask) {rate} — indicative only; {symbol} is a testnet mock asset",
       "fxQuotedAt": "PTAX quoted {datetime} (BRT)",
       "coverageRatio": "Coverage ratio",
@@ -1342,7 +1349,7 @@
     "created": "Created",
     "activated": "Activated",
     "default_verified": "Default verified",
-    "cover_paid": "Cover paid",
+    "cover_paid": "Cover committed",
     "closed": "Closed"
   }
 }

@@ -83,6 +83,14 @@ export function formatCentsPlain(cents: number): string {
   }).format(cents / 100);
 }
 
+/** A BRL exchange rate (reais per unit of another asset), 2–4 decimals, no symbol. */
+export function formatBRLRate(rate: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(rate);
+}
+
 export function formatDateBR(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
@@ -105,8 +113,11 @@ export function formatDateTimeBR(iso: string): string {
   }).format(date);
 }
 
-/** Like {@link formatDateTimeBR} but pinned to São Paulo time — for paid-at timestamps. */
-export function formatPaidAtBR(iso: string): string {
+/**
+ * Like {@link formatDateTimeBR} but pinned to São Paulo time (BRT), so the
+ * server render (UTC) and the browser render agree. Label the result "(BRT)".
+ */
+export function formatDateTimeBRT(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return new Intl.DateTimeFormat("pt-BR", {
@@ -116,5 +127,28 @@ export function formatPaidAtBR(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "America/Sao_Paulo",
+  }).format(date);
+}
+
+/** Paid-at timestamps, in São Paulo time — see {@link formatDateTimeBRT}. */
+export function formatPaidAtBR(iso: string): string {
+  return formatDateTimeBRT(iso);
+}
+
+/**
+ * Format a zoneless wall-clock timestamp (e.g. a BCB PTAX quote time,
+ * `"2026-09-29 13:08:26"`) day-first, without any timezone shift — the value
+ * is already local to its source. Returns the input untouched if unparseable.
+ */
+export function formatWallClockDateTimeBR(value: string): string {
+  const date = new Date(`${value.trim().replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
   }).format(date);
 }

@@ -6,7 +6,13 @@ import { Badge } from "../badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../card";
 import { Mono } from "../mono";
 import { Skeleton } from "../skeleton";
-import { formatAssetAmount, formatBrlCents, formatMultiple } from "./format";
+import {
+  formatBRLCents,
+  formatBRLRate,
+  formatDateTimeBRT,
+  formatWallClockDateTimeBR,
+} from "@mutav/i18n/brazil";
+import { formatAssetAmount, formatMultiple } from "./format";
 import type { ContractReferenceView, ReserveCoverageInput, ReserveSolvencyView } from "./types";
 
 /**
@@ -41,7 +47,7 @@ export function ReservePanel({ coverage }: { coverage: ReserveCoverageInput }) {
           ) : solvency ? (
             formatAssetAmount(locale, solvency.totalAssets, solvency.assetSymbol)
           ) : (
-            formatBrlCents(locale, coverage.storedValueCents)
+            formatBRLCents(coverage.storedValueCents)
           )}
         </CardTitle>
       </CardHeader>
@@ -55,26 +61,24 @@ export function ReservePanel({ coverage }: { coverage: ReserveCoverageInput }) {
               <div className="text-muted-foreground flex flex-col gap-1 text-xs">
                 <span>
                   {t("asOf", {
-                    datetime: new Intl.DateTimeFormat(locale, {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    }).format(new Date(coverage.capturedAt)),
+                    datetime: formatDateTimeBRT(new Date(coverage.capturedAt).toISOString()),
                   })}
                 </span>
                 {solvency ? (
                   <span>
                     {t("brlIndicative", {
-                      amount: formatBrlCents(locale, coverage.storedValueCents),
-                      rate: new Intl.NumberFormat(locale, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 4,
-                      }).format(coverage.fxUsdBrl),
+                      amount: formatBRLCents(coverage.storedValueCents),
+                      rate: formatBRLRate(coverage.fxUsdBrl),
                       symbol: solvency.assetSymbol,
                     })}
                   </span>
                 ) : null}
                 {coverage.fxQuotedAt ? (
-                  <span>{t("fxQuotedAt", { datetime: coverage.fxQuotedAt })}</span>
+                  <span>
+                    {t("fxQuotedAt", {
+                      datetime: formatWallClockDateTimeBR(coverage.fxQuotedAt),
+                    })}
+                  </span>
                 ) : null}
               </div>
             ) : null}

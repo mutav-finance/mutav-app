@@ -219,7 +219,7 @@
       "txIdEmpty": "Aguardando pagamento",
       "address": "Endereço de destino",
       "txHash": "Hash da transação",
-      "txHashEmpty": "Aguardando confirmação on-chain",
+      "txHashEmpty": "Aguardando confirmação onchain",
       "generateStellar": "Pagar com Stellar",
       "openPayPage": "Abrir página de pagamento",
       "copyShareLink": "Copiar link",

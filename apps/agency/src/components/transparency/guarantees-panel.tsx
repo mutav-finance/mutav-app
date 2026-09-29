@@ -11,6 +11,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { GuaranteeAggregates } from "@convex/transparency/domain";
+import { formatBRLCents } from "@mutav/i18n/brazil";
+import { formatPercent } from "@mutav/ui/transparency/format";
 
 type Props = { aggregates: GuaranteeAggregates | null };
 
@@ -47,17 +49,14 @@ function MetricCard({
   );
 }
 
-function formatBrl(locale: string, cents: number): string {
-  return new Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(cents / 100);
-}
-
 export function GuaranteesPanel({ aggregates }: Props) {
   const t = useTranslations("transparency.guarantees");
+  const locale = useLocale();
   const loading = aggregates === null;
 
   const defaultRatePct =
     aggregates && aggregates.defaultRate !== null
-      ? `${(aggregates.defaultRate * 100).toFixed(1)}%`
+      ? formatPercent(locale, aggregates.defaultRate)
       : "—";
 
   return (
@@ -88,7 +87,6 @@ export function GuaranteesPanel({ aggregates }: Props) {
 /** The BRL side of the book: total guaranteed and the slice in verified default. */
 export function GuaranteeExposurePanel({ aggregates }: Props) {
   const t = useTranslations("transparency.guarantees");
-  const locale = useLocale();
   const loading = aggregates === null;
 
   return (
@@ -96,14 +94,14 @@ export function GuaranteeExposurePanel({ aggregates }: Props) {
       <MetricCard
         icon={<BanknoteIcon className="size-3.5" />}
         label={t("totalGuaranteed")}
-        value={aggregates ? formatBrl(locale, aggregates.sumInsuredCents) : "—"}
+        value={aggregates ? formatBRLCents(aggregates.sumInsuredCents) : "—"}
         loading={loading}
         hint={t("totalGuaranteedHint")}
       />
       <MetricCard
         icon={<ShieldAlertIcon className="size-3.5" />}
         label={t("verifiedDefaultExposure")}
-        value={aggregates ? formatBrl(locale, aggregates.verifiedDefaultExposureCents) : "—"}
+        value={aggregates ? formatBRLCents(aggregates.verifiedDefaultExposureCents) : "—"}
         loading={loading}
         hint={t("verifiedDefaultExposureHint", { count: aggregates?.countVerifiedDefault ?? 0 })}
       />
