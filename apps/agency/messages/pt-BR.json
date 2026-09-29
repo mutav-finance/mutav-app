@@ -1265,25 +1265,62 @@
     },
     "heading": "Transparência",
     "subheading": "Transparência da posição de risco e treasury onchain.",
-    "footer": "Dados de garantias em tempo real. Reserva de cobertura lida onchain e atualizada periodicamente.",
+    "footer": "Dados de garantias em tempo real. Reserva e capacidade lidas onchain dos contratos mutav-pulse e atualizadas a cada 15 minutos.",
     "guarantees": {
       "insured": "Garantias em vigor",
       "drafted": "Rascunhos",
       "defaultRate": "Taxa de inadimplência",
-      "defaultRateHint": "Inadimplências verificadas e coberturas registradas sobre as garantias em vigor, no momento."
+      "defaultRateHint": "Inadimplências verificadas e coberturas registradas sobre as garantias em vigor, no momento.",
+      "totalGuaranteed": "Total garantido",
+      "totalGuaranteedHint": "Exposição máxima das garantias em vigor: cobertura de aluguel restante mais o sublimite de custos de saída.",
+      "verifiedDefaultExposure": "Exposição em inadimplência verificada",
+      "verifiedDefaultExposureHint": "{count, plural, =0 {Nenhuma garantia em inadimplência verificada ou cobertura registrada.} one {# garantia em inadimplência verificada ou cobertura registrada.} other {# garantias em inadimplência verificada ou cobertura registrada.}}"
     },
     "capacity": {
-      "label": "Utilização da capacidade contratada",
-      "used": "{pct}% utilizado",
-      "of": "de {total}"
+      "label": "Capacidade de garantia restante",
+      "unavailable": "Indisponível",
+      "utilization": "Utilização",
+      "ceiling": "Teto de capacidade",
+      "ceilingUnbounded": "Sem teto (c = 0)",
+      "requiredRatio": "Índice de cobertura exigido (c)",
+      "rule": "Capacidade é solvência: a capacidade restante é o capital livre da reserva, e o teto é o ativo estável dividido por c. Sem limite configurado."
     },
     "reserve": {
       "label": "Reserva de cobertura",
       "unavailable": "Indisponível",
+      "testnet": "Testnet",
       "asOf": "Atualizado em {datetime}",
-      "fx": "PTAX BCB (venda): {rate}",
-      "fxQuotedAt": "Cotada em {datetime} (BRT)",
+      "brlIndicative": "≈ {amount} pela PTAX BCB (venda) {rate} — apenas indicativo; {symbol} é um ativo simulado da testnet",
+      "fxQuotedAt": "PTAX cotada em {datetime} (BRT)",
+      "coverageRatio": "Índice de cobertura",
+      "coverageRatioNone": "Nenhuma cobertura reservada",
+      "coverageRequired": "Cobertura exigida",
+      "coverageRatioHint": "Ativos estáveis divididos pela cobertura que os contratos reservam para a carteira onchain.",
+      "contracts": {
+        "vault": "Vault",
+        "policy": "Política",
+        "registry": "Registro"
+      },
       "viewExplorer": "Verificar na rede Stellar"
+    },
+    "breakdown": {
+      "title": "Composição da reserva",
+      "description": "Onde está o capital da reserva, lido onchain. Só posições estáveis contam para a solvência.",
+      "testnet": "Testnet",
+      "unavailable": "A composição da reserva está indisponível no momento.",
+      "columns": {
+        "position": "Posição",
+        "contract": "Contrato",
+        "solvency": "Solvência",
+        "balance": "Saldo",
+        "share": "Participação"
+      },
+      "kind": {
+        "idle": "{symbol} mantido no vault",
+        "strategy": "Estratégia de rendimento"
+      },
+      "stable": "Estável",
+      "volatile": "Volátil"
     },
     "timeline": {
       "title": "Carteira vigente da plataforma",

@@ -1,7 +1,13 @@
 "use client";
 
-import { useTranslations } from "next-intl";
-import { FileTextIcon, ClockIcon, AlertTriangleIcon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import {
+  AlertTriangleIcon,
+  BanknoteIcon,
+  ClockIcon,
+  FileTextIcon,
+  ShieldAlertIcon,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { GuaranteeAggregates } from "@convex/transparency/domain";
@@ -41,6 +47,10 @@ function MetricCard({
   );
 }
 
+function formatBrl(locale: string, cents: number): string {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(cents / 100);
+}
+
 export function GuaranteesPanel({ aggregates }: Props) {
   const t = useTranslations("transparency.guarantees");
   const loading = aggregates === null;
@@ -70,6 +80,32 @@ export function GuaranteesPanel({ aggregates }: Props) {
         value={defaultRatePct}
         loading={loading}
         hint={t("defaultRateHint")}
+      />
+    </>
+  );
+}
+
+/** The BRL side of the book: total guaranteed and the slice in verified default. */
+export function GuaranteeExposurePanel({ aggregates }: Props) {
+  const t = useTranslations("transparency.guarantees");
+  const locale = useLocale();
+  const loading = aggregates === null;
+
+  return (
+    <>
+      <MetricCard
+        icon={<BanknoteIcon className="size-3.5" />}
+        label={t("totalGuaranteed")}
+        value={aggregates ? formatBrl(locale, aggregates.sumInsuredCents) : "—"}
+        loading={loading}
+        hint={t("totalGuaranteedHint")}
+      />
+      <MetricCard
+        icon={<ShieldAlertIcon className="size-3.5" />}
+        label={t("verifiedDefaultExposure")}
+        value={aggregates ? formatBrl(locale, aggregates.verifiedDefaultExposureCents) : "—"}
+        loading={loading}
+        hint={t("verifiedDefaultExposureHint", { count: aggregates?.countVerifiedDefault ?? 0 })}
       />
     </>
   );

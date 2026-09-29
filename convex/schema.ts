@@ -943,6 +943,32 @@ export default defineSchema(
         }),
       ),
       capturedAt: v.number(),
+      // Mirrors reserveSolvencyValidator in convex/reserve/domain.ts. Optional:
+      // snapshots written before the mutav-pulse read carry no solvency block.
+      solvency: v.optional(
+        v.object({
+          vaultId: v.string(),
+          policyId: v.string(),
+          registryId: v.string(),
+          assetContractId: v.string(),
+          assetSymbol: v.string(),
+          assetDecimals: v.number(),
+          totalAssetsRaw: v.string(),
+          stableAssetsRaw: v.string(),
+          freeCapitalRaw: v.string(),
+          coverageRequiredRaw: v.string(),
+          rawCoverageRaw: v.string(),
+          coverageRatioBps: v.number(),
+          positions: v.array(
+            v.object({
+              kind: v.union(v.literal("idle"), v.literal("strategy")),
+              address: v.string(),
+              volatile: v.boolean(),
+              rawBalance: v.string(),
+            }),
+          ),
+        }),
+      ),
     }).index("by_capturedAt", ["capturedAt"]),
 
     // Anonymous public waitlist for the marketing site (mutav-website).

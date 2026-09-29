@@ -1,4 +1,3 @@
-import { logWarn } from "./logger";
 /**
  * Which score bureau provider to use for tenant score lookups.
  * Defaults to "mock" so deployments without credentials still work.
@@ -88,24 +87,6 @@ export function getWaitlistAudienceId(audience: "investidor" | "imobiliaria"): s
   return process.env[key] ?? null;
 }
 
-/**
- * Maximum aggregate guarantee the Mutav treasury can underwrite (in centavos).
- * Defaults to R$ 5.000.000 for dev/preview. Production should set this via
- * `bunx convex env set MAX_GUARANTEE_CAPACITY_CENTS <value>`.
- */
-export function getMaxGuaranteeCapacityCents(): number {
-  const raw = process.env.MAX_GUARANTEE_CAPACITY_CENTS; // hook-ok: env module boundary
-  if (!raw) return 500_000_000;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    logWarn(
-      `[env] MAX_GUARANTEE_CAPACITY_CENTS=${JSON.stringify(raw)} is not a positive integer; falling back to default`,
-    );
-    return 500_000_000;
-  }
-  return parsed;
-}
-
 export function getAppUrl(): string {
   const url = process.env.APP_URL;
   if (!url) throw new Error("APP_URL is not set");
@@ -144,20 +125,43 @@ export function getStellarHorizonUrl(): string {
   return getStellarNetwork() === "public" ? DEFAULT_HORIZON_PUBLIC : DEFAULT_HORIZON_TESTNET;
 }
 
-const DEFAULT_RESERVE_VAULT_TESTNET = "CBDGKVRP5MYER3I2WZ7F2FJULFFXY3NHB5MU75VSEZHDXYJNAB3YC7Y2";
+// The mutav-pulse MUSD reserve on testnet (mutav-pulse/docs/reference/deployments.md).
+// A pulse redeploy issues new ids — override via env rather than editing these.
+const DEFAULT_RESERVE_VAULT_TESTNET = "CA26WJGO5MINAT47DCGMU54HYW5A3RQ7VSE4ANPCYYA4TGXTJZQJ5EZQ";
+const DEFAULT_RESERVE_POLICY_TESTNET = "CBC2IJHH3FQMIQETFYDIEQG7OFJXTRKKLJDDONQ6N47AB3HLWWEIZQVO";
+const DEFAULT_RESERVE_REGISTRY_TESTNET = "CDJYJLUJL55SFD5YPSEKH6IZN3XRPLOCSFG33LDXOHEI2JY2ILITUSZ4";
 const DEFAULT_SOROBAN_RPC_TESTNET = "https://soroban-testnet.stellar.org";
 const DEFAULT_SOROBAN_RPC_PUBLIC = "https://mainnet.sorobanrpc.com";
 
-/**
- * Reserve-vault contract id. On testnet, defaults to the deployed
- * `reserve-vault-postpivot` instance so dev/preview reads work out of the box.
- * On `public` there is no default — returns `null` until explicitly configured,
- * and the reserve read reports `available: false` rather than guessing.
- */
-export function getReserveContractId(): string | null {
-  const explicit = process.env.STELLAR_RESERVE_CONTRACT_ID; // hook-ok: env module boundary
+// On `public` there is no default: the getters return null until explicitly
+// configured, and the reserve read reports `available: false` rather than guessing.
+function reserveContractIdOr(explicit: string | undefined, testnetDefault: string): string | null {
   if (explicit) return explicit;
-  return getStellarNetwork() === "public" ? null : DEFAULT_RESERVE_VAULT_TESTNET;
+  return getStellarNetwork() === "public" ? null : testnetDefault;
+}
+
+/** Reserve vault contract id (mutav-pulse vault: total_assets, free_capital, strategies). */
+export function getReserveContractId(): string | null {
+  return reserveContractIdOr(
+    process.env.STELLAR_RESERVE_CONTRACT_ID, // hook-ok: env module boundary
+    DEFAULT_RESERVE_VAULT_TESTNET,
+  );
+}
+
+/** Reserve policy contract id (mutav-pulse policy: coverage_required, ratio `c`). */
+export function getReservePolicyContractId(): string | null {
+  return reserveContractIdOr(
+    process.env.STELLAR_RESERVE_POLICY_CONTRACT_ID, // hook-ok: env module boundary
+    DEFAULT_RESERVE_POLICY_TESTNET,
+  );
+}
+
+/** Reserve registry contract id (mutav-pulse registry: raw_coverage of the book). */
+export function getReserveRegistryContractId(): string | null {
+  return reserveContractIdOr(
+    process.env.STELLAR_RESERVE_REGISTRY_CONTRACT_ID, // hook-ok: env module boundary
+    DEFAULT_RESERVE_REGISTRY_TESTNET,
+  );
 }
 
 /** Soroban RPC endpoint (distinct from Horizon). */
@@ -189,7 +193,8 @@ export function getReserveBrlPeggedSymbols(): readonly string[] {
 /**
  * SEP-41 symbols treated as USD-pegged. Their on-chain balance is valued in
  * BRL at the live USD→BRL rate (see `getBcbPtaxBaseUrl`). Defaults cover the
- * testnet mock (`USDCMOCK`) plus canonical `USDC`.
+ * testnet mocks (`USDCMOCK`, and `cUSD` — the mutav-pulse MUSD vault's deposit
+ * token) plus canonical `USDC`.
  */
 export function getReserveUsdSymbols(): readonly string[] {
   const raw = process.env.STELLAR_RESERVE_USD_SYMBOLS; // hook-ok: env module boundary
@@ -200,7 +205,7 @@ export function getReserveUsdSymbols(): readonly string[] {
       .filter(Boolean);
     if (parsed.length > 0) return parsed;
   }
-  return ["USDC", "USDCMOCK"];
+  return ["USDC", "USDCMOCK", "cUSD"];
 }
 
 /**

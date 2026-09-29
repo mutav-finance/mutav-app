@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { reserveAssetValidator, type ReserveSnapshot } from "./domain";
+import { reserveAssetValidator, reserveSolvencyValidator, type ReserveSnapshot } from "./domain";
 
 export const writeSnapshot = internalMutation({
   args: {
@@ -10,6 +10,7 @@ export const writeSnapshot = internalMutation({
     fxQuotedAt: v.string(),
     assets: v.array(reserveAssetValidator),
     capturedAt: v.number(),
+    solvency: v.optional(reserveSolvencyValidator),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("reserveSnapshots", args);

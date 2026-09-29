@@ -3,8 +3,9 @@ import { describe, expect, test, beforeEach, afterEach } from "vitest";
 import {
   getAuth0MgmtClientId,
   getAuth0MgmtClientSecret,
-  getMaxGuaranteeCapacityCents,
   getReserveContractId,
+  getReservePolicyContractId,
+  getReserveRegistryContractId,
   getStellarRpcUrl,
   getReserveBrlPeggedSymbols,
   getReserveUsdSymbols,
@@ -53,52 +54,6 @@ describe("getAuth0MgmtClientSecret", () => {
   });
 });
 
-describe("getMaxGuaranteeCapacityCents", () => {
-  let original: string | undefined;
-  beforeEach(() => {
-    original = process.env.MAX_GUARANTEE_CAPACITY_CENTS;
-  });
-  afterEach(() => {
-    if (original === undefined) delete process.env.MAX_GUARANTEE_CAPACITY_CENTS;
-    else process.env.MAX_GUARANTEE_CAPACITY_CENTS = original;
-  });
-
-  test("returns the parsed value when set to a positive integer", () => {
-    process.env.MAX_GUARANTEE_CAPACITY_CENTS = "1000000";
-    expect(getMaxGuaranteeCapacityCents()).toBe(1_000_000);
-  });
-
-  test("returns the default when unset", () => {
-    delete process.env.MAX_GUARANTEE_CAPACITY_CENTS;
-    expect(getMaxGuaranteeCapacityCents()).toBe(500_000_000);
-  });
-
-  test("returns the default when value is not numeric", () => {
-    process.env.MAX_GUARANTEE_CAPACITY_CENTS = "abc";
-    expect(getMaxGuaranteeCapacityCents()).toBe(500_000_000);
-  });
-
-  test("returns the default when value is empty string", () => {
-    process.env.MAX_GUARANTEE_CAPACITY_CENTS = "";
-    expect(getMaxGuaranteeCapacityCents()).toBe(500_000_000);
-  });
-
-  test("returns the default when value is zero", () => {
-    process.env.MAX_GUARANTEE_CAPACITY_CENTS = "0";
-    expect(getMaxGuaranteeCapacityCents()).toBe(500_000_000);
-  });
-
-  test("returns the default when value is negative", () => {
-    process.env.MAX_GUARANTEE_CAPACITY_CENTS = "-5";
-    expect(getMaxGuaranteeCapacityCents()).toBe(500_000_000);
-  });
-
-  test("returns the default when value is a non-integer number", () => {
-    process.env.MAX_GUARANTEE_CAPACITY_CENTS = "1.5";
-    expect(getMaxGuaranteeCapacityCents()).toBe(500_000_000);
-  });
-});
-
 describe("getReserveContractId", () => {
   const KEY = "STELLAR_RESERVE_CONTRACT_ID";
   const NET = "STELLAR_NETWORK";
@@ -120,16 +75,62 @@ describe("getReserveContractId", () => {
     expect(getReserveContractId()).toBe("CXYZ");
   });
 
-  test("falls back to the testnet reserve vault when unset on testnet", () => {
+  test("falls back to the mutav-pulse testnet vault when unset on testnet", () => {
     delete process.env[KEY];
     delete process.env[NET];
-    expect(getReserveContractId()).toBe("CBDGKVRP5MYER3I2WZ7F2FJULFFXY3NHB5MU75VSEZHDXYJNAB3YC7Y2");
+    expect(getReserveContractId()).toBe("CA26WJGO5MINAT47DCGMU54HYW5A3RQ7VSE4ANPCYYA4TGXTJZQJ5EZQ");
   });
 
   test("returns null on public network when unset (no mainnet default)", () => {
     delete process.env[KEY];
     process.env[NET] = "public";
     expect(getReserveContractId()).toBeNull();
+  });
+});
+
+describe.each([
+  {
+    name: "getReservePolicyContractId",
+    read: getReservePolicyContractId,
+    key: "STELLAR_RESERVE_POLICY_CONTRACT_ID",
+    testnetDefault: "CBC2IJHH3FQMIQETFYDIEQG7OFJXTRKKLJDDONQ6N47AB3HLWWEIZQVO",
+  },
+  {
+    name: "getReserveRegistryContractId",
+    read: getReserveRegistryContractId,
+    key: "STELLAR_RESERVE_REGISTRY_CONTRACT_ID",
+    testnetDefault: "CDJYJLUJL55SFD5YPSEKH6IZN3XRPLOCSFG33LDXOHEI2JY2ILITUSZ4",
+  },
+])("$name", ({ read, key, testnetDefault }) => {
+  const NET = "STELLAR_NETWORK";
+  let origId: string | undefined;
+  let origNet: string | undefined;
+  beforeEach(() => {
+    origId = process.env[key];
+    origNet = process.env[NET];
+  });
+  afterEach(() => {
+    if (origId === undefined) delete process.env[key];
+    else process.env[key] = origId;
+    if (origNet === undefined) delete process.env[NET];
+    else process.env[NET] = origNet;
+  });
+
+  test("returns the explicit value when set", () => {
+    process.env[key] = "CXYZ";
+    expect(read()).toBe("CXYZ");
+  });
+
+  test("falls back to the mutav-pulse testnet contract when unset on testnet", () => {
+    delete process.env[key];
+    delete process.env[NET];
+    expect(read()).toBe(testnetDefault);
+  });
+
+  test("returns null on public network when unset (no mainnet default)", () => {
+    delete process.env[key];
+    process.env[NET] = "public";
+    expect(read()).toBeNull();
   });
 });
 
@@ -168,7 +169,7 @@ describe("getReserveUsdSymbols", () => {
 
   test("defaults to the USD-pegged symbol set", () => {
     delete process.env[KEY];
-    expect(getReserveUsdSymbols()).toEqual(["USDC", "USDCMOCK"]);
+    expect(getReserveUsdSymbols()).toEqual(["USDC", "USDCMOCK", "cUSD"]);
   });
 
   test("parses a comma-separated override", () => {
@@ -178,7 +179,7 @@ describe("getReserveUsdSymbols", () => {
 
   test("falls back to the default when the override parses empty", () => {
     process.env[KEY] = " , ,";
-    expect(getReserveUsdSymbols()).toEqual(["USDC", "USDCMOCK"]);
+    expect(getReserveUsdSymbols()).toEqual(["USDC", "USDCMOCK", "cUSD"]);
   });
 });
 
