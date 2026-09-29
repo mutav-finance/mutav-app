@@ -268,8 +268,8 @@
     },
     "overdueInvoices": {
       "label": "Faturas em atraso",
-      "footerNone": "Todas as faturas Mutav em dia",
-      "footerSome": "{count, plural, one {# fatura Mutav vencida} other {# faturas Mutav vencidas}}"
+      "footerNone": "Todas as faturas Mutav estão em dia",
+      "footerSome": "{count, plural, one {# fatura Mutav em atraso} other {# faturas Mutav em atraso}}"
     }
   },
   "dataTable": {
@@ -397,7 +397,7 @@
     "state": {
       "drafted": "Rascunho",
       "active": "Ativa",
-      "in_arrears": "Em inadimplência",
+      "in_arrears": "Em atraso",
       "default_verified": "Inadimplência verificada",
       "cover_committed": "Cobertura registrada",
       "in_eviction": "Em despejo",
@@ -537,7 +537,7 @@
       "all": "Todas",
       "expiring": "A vencer",
       "active": "Ativas",
-      "in_arrears": "Em inadimplência",
+      "in_arrears": "Em atraso",
       "default_verified": "Inadimplência verificada",
       "cover_committed": "Cobertura registrada",
       "in_eviction": "Em despejo",
@@ -1300,7 +1300,7 @@
       "label": "Reserva de cobertura",
       "unavailable": "Indisponível",
       "testnet": "Testnet",
-      "asOf": "Atualizado em {datetime}",
+      "asOf": "Atualizado em {datetime} (BRT)",
       "brlIndicative": "≈ {amount} pela PTAX BCB (venda) {rate} — apenas indicativo; {symbol} é um ativo simulado da testnet",
       "fxQuotedAt": "PTAX cotada em {datetime} (BRT)",
       "coverageRatio": "Índice de cobertura",

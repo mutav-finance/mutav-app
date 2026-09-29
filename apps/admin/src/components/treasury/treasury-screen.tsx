@@ -16,7 +16,7 @@ import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
 import { CapacityPanel } from "@mutav/ui/transparency/capacity-panel";
-import { formatBRLCents, formatDateTimeBR } from "@mutav/i18n/brazil";
+import { formatBRLCents, formatDateTimeBRT } from "@mutav/i18n/brazil";
 import { formatAssetAmount, formatPercent } from "@mutav/ui/transparency/format";
 import { ReserveBreakdown } from "@mutav/ui/transparency/reserve-breakdown";
 import { ReservePanel } from "@mutav/ui/transparency/reserve-panel";
@@ -110,7 +110,7 @@ function ReserveStatus({ coverage }: { coverage: ReserveCoverage }) {
       {stale && coverage.available ? (
         <p role="status" className="text-warning text-xs">
           {t("stale", {
-            datetime: formatDateTimeBR(new Date(coverage.capturedAt).toISOString()),
+            datetime: formatDateTimeBRT(new Date(coverage.capturedAt).toISOString()),
           })}
         </p>
       ) : null}

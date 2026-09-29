@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatBRLCents, formatBRLRate, formatDateTimeBR } from "./brazil";
+import {
+  formatBRLCents,
+  formatBRLRate,
+  formatDateTimeBR,
+  formatDateTimeBRT,
+  formatWallClockDateTimeBR,
+} from "./brazil";
 
 // Intl emits a non-breaking space between "R$" and the figure.
 const NBSP = " ";
@@ -20,5 +26,19 @@ describe("Brazil money and date formatters", () => {
 
   it("returns an unparseable timestamp untouched", () => {
     expect(formatDateTimeBR("not-a-date")).toBe("not-a-date");
+  });
+
+  it("pins a timestamp to São Paulo time regardless of the host timezone", () => {
+    expect(formatDateTimeBRT("2026-09-29T16:08:00Z")).toBe("29/09/2026, 13:08");
+    expect(formatDateTimeBRT(new Date(Date.UTC(2026, 0, 1, 2, 30)).toISOString())).toBe(
+      "31/12/2025, 23:30",
+    );
+    expect(formatDateTimeBRT("not-a-date")).toBe("not-a-date");
+  });
+
+  it("formats a zoneless wall-clock timestamp without shifting it", () => {
+    expect(formatWallClockDateTimeBR("2026-09-29 13:08:26")).toBe("29/09/2026, 13:08");
+    expect(formatWallClockDateTimeBR("2026-09-28 13:00")).toBe("28/09/2026, 13:00");
+    expect(formatWallClockDateTimeBR("garbage")).toBe("garbage");
   });
 });

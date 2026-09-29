@@ -1300,7 +1300,7 @@
       "label": "Coverage reserve",
       "unavailable": "Unavailable",
       "testnet": "Testnet",
-      "asOf": "As of {datetime}",
+      "asOf": "As of {datetime} (BRT)",
       "brlIndicative": "≈ {amount} at BCB PTAX (ask) {rate} — indicative only; {symbol} is a testnet mock asset",
       "fxQuotedAt": "PTAX quoted {datetime} (BRT)",
       "coverageRatio": "Coverage ratio",
