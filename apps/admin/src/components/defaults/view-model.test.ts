@@ -8,6 +8,7 @@ import {
   DEFAULT_ACTION,
   FORBIDDEN_MESSAGE_KEY,
   UNEXPECTED_MESSAGE_KEY,
+  batchCoverPreview,
   coverPreview,
   daysOpen,
   errorMessageKey,
@@ -52,6 +53,7 @@ describe("outcomeForResult — happy paths", () => {
     [DEFAULT_ACTION.VERIFY, "toast.verified"],
     [DEFAULT_ACTION.COVER, "toast.covered"],
     [DEFAULT_ACTION.DISMISS, "toast.dismissed"],
+    [DEFAULT_ACTION.EXECUTE, "toast.executed"],
   ])("%s success reports %s", (action, messageKey) => {
     expect(outcomeForResult({ action, result: { success: true } })).toEqual({
       kind: "success",
@@ -62,7 +64,7 @@ describe("outcomeForResult — happy paths", () => {
   it("every success key exists in both catalogs", () => {
     for (const locale of LOCALES) {
       const catalog = defaultsCatalog(locale);
-      for (const key of ["toast.verified", "toast.covered", "toast.dismissed"]) {
+      for (const key of ["toast.verified", "toast.covered", "toast.dismissed", "toast.executed"]) {
         expect(typeof lookup(catalog, key), `${locale} ${key}`).toBe("string");
       }
     }
@@ -119,6 +121,42 @@ describe("error code to message key", () => {
     ).toEqual({ kind: "error", messageKey: "errors.NOTICE_NOT_VERIFIED" });
   });
 
+  it("names the notice that refused a batch", () => {
+    expect(
+      outcomeForResult({
+        action: DEFAULT_ACTION.COVER,
+        result: {
+          success: false,
+          error: { code: "COVER_ALREADY_RECORDED", noticePublicId: "DN-CTR-1-2026-06-05" },
+        },
+      }),
+    ).toEqual({
+      kind: "error",
+      messageKey: "errors.COVER_ALREADY_RECORDED",
+      noticePublicId: "DN-CTR-1-2026-06-05",
+    });
+  });
+
+  it("the ledger's own codes are all translated", () => {
+    for (const code of [
+      "EMPTY_BATCH",
+      "BATCH_TOO_LARGE",
+      "DUPLICATE_NOTICE_IN_BATCH",
+      "COVER_ALREADY_RECORDED",
+      "COVER_OPERATION_NOT_FOUND",
+      "COVER_ALREADY_EXECUTED",
+      "PAYMENT_REFERENCE_REQUIRED",
+    ]) {
+      expect(errorMessageKey(code)).toBe(`errors.${code}`);
+    }
+  });
+
+  it("the batch-refusal hint exists in both catalogs", () => {
+    for (const locale of LOCALES) {
+      expect(typeof lookup(defaultsCatalog(locale), "errors.inNotice"), locale).toBe("string");
+    }
+  });
+
   it("every mapped code has a string in both catalogs", () => {
     for (const locale of LOCALES) {
       const catalog = defaultsCatalog(locale);
@@ -168,6 +206,51 @@ describe("coverPreview — the clamp an operator must see before submitting", ()
     expect(preview.appliedCents).toBe(0);
     expect(preview.clamped).toBe(true);
     expect(preview.shortfallCents).toBe(250_000);
+  });
+});
+
+describe("batchCoverPreview — the totals a batch will actually draw", () => {
+  const roomy = { ceilingCents: 9_000_000, availableCents: 9_000_000, reservedCents: 0 };
+
+  it("sums independent guarantees", () => {
+    expect(
+      batchCoverPreview([
+        { guaranteeId: "g1", requestedCents: 200_000, capacity: roomy },
+        { guaranteeId: "g2", requestedCents: 150_000, capacity: roomy },
+      ]),
+    ).toEqual({
+      count: 2,
+      requestedCents: 350_000,
+      appliedCents: 350_000,
+      clamped: false,
+      shortfallCents: 0,
+    });
+  });
+
+  it("two notices of one guarantee share its remaining ceiling instead of each seeing all of it", () => {
+    const tight = { ceilingCents: 1_000_000, availableCents: 300_000, reservedCents: 700_000 };
+    expect(
+      batchCoverPreview([
+        { guaranteeId: "g1", requestedCents: 200_000, capacity: tight },
+        { guaranteeId: "g1", requestedCents: 200_000, capacity: tight },
+      ]),
+    ).toEqual({
+      count: 2,
+      requestedCents: 400_000,
+      appliedCents: 300_000,
+      clamped: true,
+      shortfallCents: 100_000,
+    });
+  });
+
+  it("an empty selection draws nothing", () => {
+    expect(batchCoverPreview([])).toEqual({
+      count: 0,
+      requestedCents: 0,
+      appliedCents: 0,
+      clamped: false,
+      shortfallCents: 0,
+    });
   });
 });
 

@@ -95,7 +95,7 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
  * per row from the client: the staff queue spans agencies, and every
  * guarantee, lease and tenant read the admin console could reach is either
  * agency-scoped or membership-gated. `guaranteeCapacity` in particular is not
- * decoration — `staffMarkResolvedByCover` CLAMPS its draw to
+ * decoration — `coverOperations.staffRecordCover` CLAMPS its draw to
  * `capacity.availableCents`, so an operator who cannot see the remaining
  * ceiling before submitting cannot tell whether the landlord is made whole.
  */
@@ -104,7 +104,7 @@ export type DelinquencyAdminQueueRow = {
   /**
    * `open` or `verified` — the two outstanding statuses. The queue carries it
    * because the staff dispositions are status-gated: `staffVerifyDefault`
-   * takes an `open` notice, `staffMarkResolvedByCover` refuses anything but a
+   * takes an `open` notice, `coverOperations.staffRecordCover` refuses anything but a
    * `verified` one.
    */
   status: OutstandingNoticeStatus;
@@ -439,7 +439,7 @@ export const openStats = queryWithAgencyScope({
  *
  * `verified` rides along with `open` for the same reason it does in
  * `listByAgency`: verification is a step INSIDE the queue, not an exit from
- * it. `staffMarkResolvedByCover` refuses anything but a `verified` notice, so
+ * it. `coverOperations.staffRecordCover` refuses anything but a `verified` notice, so
  * a queue that dropped a notice the moment compliance verified it would make
  * the cover step unreachable from the only screen that offers it.
  *

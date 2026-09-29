@@ -158,7 +158,8 @@
       "guarantee": "Garantia",
       "outstanding": "Em aberto",
       "openFor": "Aberto há",
-      "actions": "Ações"
+      "actions": "Ações",
+      "select": "Selecionar"
     },
     "noticeStatus": {
       "open": "Informado",
@@ -177,20 +178,22 @@
       "verify": "Confirmar",
       "cover": "Registrar cobertura",
       "dismiss": "Descartar",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "coverSelected": "Registrar cobertura ({count})",
+      "clearSelection": "Limpar seleção"
     },
     "cover": {
-      "title": "Registrar pagamento de cobertura",
-      "description": "A Mutav pagou o locador e nasce um recebível regressivo. Isto reserva capacidade na garantia.",
+      "title": "Registrar cobertura",
+      "description": "Aciona a cobertura para cada inadimplência confirmada: a capacidade é reservada na garantia e o pagamento fica registrado como aguardando execução. O pagamento em si é feito fora da cadeia.",
       "claimed": "Valor acionado",
       "remainingCapacity": "Cobertura restante",
       "applied": "Valor que será debitado",
       "clampWarning": "O valor acionado excede a cobertura restante. Somente o valor acima é debitado — {shortfall} ficam descobertos.",
-      "operationLabel": "Referência da operação de cobertura",
-      "operationPlaceholder": "COV-2026-000123",
       "noteLabel": "Observação (opcional)",
       "notePlaceholder": "O que a trilha de auditoria deve registrar",
-      "confirm": "Registrar cobertura"
+      "confirm": "Registrar cobertura",
+      "selectedCount": "{count, plural, one {# acionamento} other {# acionamentos}}",
+      "batchNotice": "Todos os acionamentos selecionados são registrados juntos, ou nenhum é."
     },
     "dismiss": {
       "title": "Descartar acionamento",
@@ -207,7 +210,8 @@
     "toast": {
       "verified": "Inadimplência confirmada.",
       "covered": "Cobertura registrada.",
-      "dismissed": "Acionamento encerrado."
+      "dismissed": "Acionamento encerrado.",
+      "executed": "Pagamento marcado como executado."
     },
     "errors": {
       "NOTICE_NOT_FOUND": "Este acionamento não existe mais.",
@@ -224,7 +228,46 @@
       "GUARANTEE_CLOSED": "A garantia está encerrada e não aceita mais mudanças.",
       "INVALID_RENEWAL_DATE": "A data de renovação não é uma data válida.",
       "FORBIDDEN": "Seu papel interno não permite executar esta ação.",
-      "unexpected": "Algo deu errado. Tente novamente."
+      "unexpected": "Algo deu errado. Tente novamente.",
+      "EMPTY_BATCH": "Selecione ao menos um acionamento confirmado.",
+      "BATCH_TOO_LARGE": "Acionamentos demais em um só lote. Registre-os em grupos menores.",
+      "DUPLICATE_NOTICE_IN_BATCH": "O mesmo acionamento foi selecionado duas vezes.",
+      "COVER_ALREADY_RECORDED": "A cobertura desta garantia neste mês de referência já foi registrada.",
+      "COVER_OPERATION_NOT_FOUND": "Esta operação de cobertura não existe mais.",
+      "COVER_ALREADY_EXECUTED": "Este pagamento já está marcado como executado.",
+      "PAYMENT_REFERENCE_REQUIRED": "Informe a referência de pagamento da transferência.",
+      "inNotice": "Nada foi registrado. Recusado no acionamento {notice}."
+    },
+    "payouts": {
+      "title": "Pagamentos aguardando execução",
+      "subtitle": "Coberturas registradas pelo compliance cujo pagamento ao locador ainda não foi confirmado, dos mais antigos aos mais recentes.",
+      "empty": "Nenhum pagamento aguardando execução.",
+      "moreAvailable": "Há mais pagamentos aguardando — apenas a página mais antiga é exibida.",
+      "noBatch": "—",
+      "columns": {
+        "operation": "Operação",
+        "batch": "Lote",
+        "notice": "Acionamento",
+        "agency": "Imobiliária",
+        "guarantee": "Garantia",
+        "period": "Referência",
+        "amount": "Valor",
+        "recordedAt": "Registrado em",
+        "actions": "Ações"
+      },
+      "actions": {
+        "markExecuted": "Marcar pagamento executado"
+      },
+      "execute": {
+        "title": "Marcar pagamento executado",
+        "description": "Confirma que o pagamento ao locador foi feito. Registre a referência devolvida pelo banco ou Pix para permitir a conciliação.",
+        "amount": "Valor pago",
+        "referenceLabel": "Referência do pagamento",
+        "referencePlaceholder": "ID E2E ou número da transferência",
+        "noteLabel": "Observação (opcional)",
+        "notePlaceholder": "O que a trilha de auditoria deve registrar",
+        "confirm": "Marcar executado"
+      }
     }
   },
   "shellSwitcher": {

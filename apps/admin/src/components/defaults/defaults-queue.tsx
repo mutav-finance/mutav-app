@@ -8,6 +8,7 @@ import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { Button } from "@mutav/ui/button";
+import { Checkbox } from "@mutav/ui/checkbox";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
@@ -26,20 +27,25 @@ import {
 } from "@mutav/ui/alert-dialog";
 import {
   DISMISSAL_KINDS,
+  isCoverable,
   useDefaultsQueue,
   type DefaultsQueueRow,
   type DefaultsQueueViewModel,
   type DismissalKind,
 } from "@/hooks/use-defaults-queue";
 import { daysOpen } from "@/components/defaults/view-model";
+import { CoverPayouts } from "@/components/defaults/cover-payouts";
 
 export function DefaultsQueue({
   preloaded,
+  payoutsPreloaded,
 }: {
   preloaded: Preloaded<typeof api.delinquencies.useCases.listOpenAdminQueue>;
+  payoutsPreloaded: Preloaded<typeof api.coverOperations.useCases.listAwaitingPayout>;
 }) {
   const t = useTranslations("defaults");
   const view = useDefaultsQueue({ preloaded });
+  const selectedCount = view.selection.rows.length;
 
   return (
     <PageShell>
@@ -49,32 +55,59 @@ export function DefaultsQueue({
           {view.rows.length === 0 ? (
             <p className="text-muted-foreground text-base-sm">{t("empty")}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("columns.notice")}</TableHead>
-                    <TableHead>{t("columns.agency")}</TableHead>
-                    <TableHead>{t("columns.tenant")}</TableHead>
-                    <TableHead>{t("columns.guarantee")}</TableHead>
-                    <TableHead className="text-right">{t("columns.outstanding")}</TableHead>
-                    <TableHead className="text-right">{t("columns.openFor")}</TableHead>
-                    <TableHead className="text-right">{t("columns.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {view.rows.map((row) => (
-                    <QueueRow key={row.publicId} row={row} view={view} />
-                  ))}
-                </TableBody>
-              </Table>
-              {!view.isDone && (
-                <p className="text-muted-foreground text-base-sm mt-4">{t("moreAvailable")}</p>
+            <div className="flex flex-col gap-4">
+              {selectedCount > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" disabled={view.busy} onClick={view.cover.openSelected}>
+                    {t("actions.coverSelected", { count: selectedCount })}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={view.busy}
+                    onClick={view.selection.clear}
+                  >
+                    {t("actions.clearSelection")}
+                  </Button>
+                </div>
               )}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8">
+                        <Checkbox
+                          aria-label={t("columns.select")}
+                          checked={view.selection.allSelected}
+                          disabled={!view.selection.hasCoverable || view.busy}
+                          onCheckedChange={view.selection.toggleAll}
+                        />
+                      </TableHead>
+                      <TableHead>{t("columns.notice")}</TableHead>
+                      <TableHead>{t("columns.agency")}</TableHead>
+                      <TableHead>{t("columns.tenant")}</TableHead>
+                      <TableHead>{t("columns.guarantee")}</TableHead>
+                      <TableHead className="text-right">{t("columns.outstanding")}</TableHead>
+                      <TableHead className="text-right">{t("columns.openFor")}</TableHead>
+                      <TableHead className="text-right">{t("columns.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {view.rows.map((row) => (
+                      <QueueRow key={row.publicId} row={row} view={view} />
+                    ))}
+                  </TableBody>
+                </Table>
+                {!view.isDone && (
+                  <p className="text-muted-foreground text-base-sm mt-4">{t("moreAvailable")}</p>
+                )}
+              </div>
             </div>
           )}
         </div>
       </PageContent>
+
+      <CoverPayouts preloaded={payoutsPreloaded} />
 
       <CoverDialog view={view} />
       <DismissDialog view={view} />
@@ -84,11 +117,18 @@ export function DefaultsQueue({
 
 function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueViewModel }) {
   const t = useTranslations("defaults");
-  const busy = view.busyNoticeId !== null;
-  const isVerified = row.status === "verified";
+  const isVerified = isCoverable(row);
 
   return (
     <TableRow>
+      <TableCell>
+        <Checkbox
+          aria-label={t("columns.select")}
+          checked={view.selection.isSelected(row)}
+          disabled={!isVerified || view.busy}
+          onCheckedChange={() => view.selection.toggle(row)}
+        />
+      </TableCell>
       <TableCell>
         <div className="flex flex-col gap-1">
           <Mono>{row.publicId}</Mono>
@@ -120,21 +160,21 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
       </TableCell>
       <TableCell className="text-right">
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" disabled={busy || isVerified} onClick={() => view.verify(row)}>
+          <Button size="sm" disabled={view.busy || isVerified} onClick={() => view.verify(row)}>
             {t("actions.verify")}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            disabled={busy || !isVerified}
-            onClick={() => view.cover.open(row)}
+            disabled={view.busy || !isVerified}
+            onClick={() => view.cover.openOne(row)}
           >
             {t("actions.cover")}
           </Button>
           <Button
             size="sm"
             variant="destructive"
-            disabled={busy}
+            disabled={view.busy}
             onClick={() => view.dismiss.open(row)}
           >
             {t("actions.dismiss")}
@@ -147,67 +187,67 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
 
 function CoverDialog({ view }: { view: DefaultsQueueViewModel }) {
   const t = useTranslations("defaults");
-  const { target, preview } = view.cover;
+  const { targets, singlePreview, totals } = view.cover;
 
   return (
-    <AlertDialog open={target !== null} onOpenChange={(open) => !open && view.cover.close()}>
+    <AlertDialog open={view.cover.isOpen} onOpenChange={(open) => !open && view.cover.close()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t("cover.title")}</AlertDialogTitle>
           <AlertDialogDescription>{t("cover.description")}</AlertDialogDescription>
         </AlertDialogHeader>
 
-        {preview && (
-          <div className="text-base-sm flex flex-col gap-2">
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t("cover.claimed")}</span>
-              <span>{formatBRLCents(preview.requestedCents)}</span>
-            </div>
+        <div className="text-base-sm flex flex-col gap-2">
+          {targets.length > 1 && (
+            <>
+              <div className="flex justify-between gap-4 font-medium">
+                <span>{t("cover.selectedCount", { count: totals.count })}</span>
+              </div>
+              <ul className="text-muted-foreground flex flex-col gap-1">
+                {targets.map((row) => (
+                  <li key={row.publicId} className="flex justify-between gap-4">
+                    <Mono>{row.publicId}</Mono>
+                    <span>{formatBRLCents(row.updatedAmountCents)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">{t("cover.claimed")}</span>
+            <span>{formatBRLCents(totals.requestedCents)}</span>
+          </div>
+          {singlePreview && (
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">{t("cover.remainingCapacity")}</span>
-              <span>{formatBRLCents(preview.availableCents)}</span>
+              <span>{formatBRLCents(singlePreview.availableCents)}</span>
             </div>
-            <div className="flex justify-between gap-4 font-medium">
-              <span>{t("cover.applied")}</span>
-              <span>{formatBRLCents(preview.appliedCents)}</span>
-            </div>
-            {preview.clamped && (
-              <p className="text-warning-strong">
-                {t("cover.clampWarning", {
-                  shortfall: formatBRLCents(preview.shortfallCents),
-                })}
-              </p>
-            )}
+          )}
+          <div className="flex justify-between gap-4 font-medium">
+            <span>{t("cover.applied")}</span>
+            <span>{formatBRLCents(totals.appliedCents)}</span>
           </div>
-        )}
+          {totals.clamped && (
+            <p className="text-warning-strong">
+              {t("cover.clampWarning", { shortfall: formatBRLCents(totals.shortfallCents) })}
+            </p>
+          )}
+          {targets.length > 1 && <p className="text-muted-foreground">{t("cover.batchNotice")}</p>}
+        </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="cover-operation">{t("cover.operationLabel")}</Label>
-            <Input
-              id="cover-operation"
-              value={view.cover.operationPublicId}
-              onChange={(event) => view.cover.setOperationPublicId(event.target.value)}
-              placeholder={t("cover.operationPlaceholder")}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="cover-note">{t("cover.noteLabel")}</Label>
-            <Input
-              id="cover-note"
-              value={view.cover.note}
-              onChange={(event) => view.cover.setNote(event.target.value)}
-              placeholder={t("cover.notePlaceholder")}
-            />
-          </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="cover-note">{t("cover.noteLabel")}</Label>
+          <Input
+            id="cover-note"
+            value={view.cover.note}
+            onChange={(event) => view.cover.setNote(event.target.value)}
+            placeholder={t("cover.notePlaceholder")}
+          />
         </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={view.cover.operationPublicId.trim().length === 0}
-            onClick={view.cover.confirm}
-          >
+          <AlertDialogAction disabled={view.busy} onClick={view.cover.confirm}>
             {t("cover.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>

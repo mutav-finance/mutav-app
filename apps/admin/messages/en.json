@@ -158,7 +158,8 @@
       "guarantee": "Guarantee",
       "outstanding": "Outstanding",
       "openFor": "Open for",
-      "actions": "Actions"
+      "actions": "Actions",
+      "select": "Select"
     },
     "noticeStatus": {
       "open": "Reported",
@@ -177,20 +178,22 @@
       "verify": "Verify",
       "cover": "Record cover",
       "dismiss": "Dismiss",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "coverSelected": "Record cover ({count})",
+      "clearSelection": "Clear selection"
     },
     "cover": {
-      "title": "Record cover payment",
-      "description": "Mutav has paid the landlord and a regressive receivable is born. This reserves capacity on the guarantee.",
+      "title": "Record cover",
+      "description": "Commits cover against each verified default: capacity is reserved on the guarantee and the payout is logged as awaiting execution. The payment itself is made off-chain.",
       "claimed": "Amount claimed",
       "remainingCapacity": "Remaining coverage",
       "applied": "Amount that will be drawn",
       "clampWarning": "The claim exceeds the remaining coverage. Only the figure above is drawn — {shortfall} is left uncovered.",
-      "operationLabel": "Cover operation reference",
-      "operationPlaceholder": "COV-2026-000123",
       "noteLabel": "Note (optional)",
       "notePlaceholder": "Anything the audit trail should carry",
-      "confirm": "Record cover"
+      "confirm": "Record cover",
+      "selectedCount": "{count, plural, one {# notice} other {# notices}}",
+      "batchNotice": "All selected notices are recorded together, or none are."
     },
     "dismiss": {
       "title": "Dismiss notice",
@@ -207,7 +210,8 @@
     "toast": {
       "verified": "Default verified.",
       "covered": "Cover recorded.",
-      "dismissed": "Notice closed."
+      "dismissed": "Notice closed.",
+      "executed": "Payout marked as executed."
     },
     "errors": {
       "NOTICE_NOT_FOUND": "That notice no longer exists.",
@@ -224,7 +228,46 @@
       "GUARANTEE_CLOSED": "The guarantee is closed and no longer accepts changes.",
       "INVALID_RENEWAL_DATE": "The renewal date is not a valid date.",
       "FORBIDDEN": "Your staff role cannot perform this action.",
-      "unexpected": "Something went wrong. Please try again."
+      "unexpected": "Something went wrong. Please try again.",
+      "EMPTY_BATCH": "Select at least one verified notice.",
+      "BATCH_TOO_LARGE": "Too many notices in one batch. Record them in smaller groups.",
+      "DUPLICATE_NOTICE_IN_BATCH": "The same notice was selected twice.",
+      "COVER_ALREADY_RECORDED": "Cover for this guarantee and billing month is already recorded.",
+      "COVER_OPERATION_NOT_FOUND": "That cover operation no longer exists.",
+      "COVER_ALREADY_EXECUTED": "This payout is already marked as executed.",
+      "PAYMENT_REFERENCE_REQUIRED": "Enter the payment reference of the transfer.",
+      "inNotice": "Nothing was recorded. Refused at notice {notice}."
+    },
+    "payouts": {
+      "title": "Payouts awaiting execution",
+      "subtitle": "Cover recorded by compliance whose off-chain payment to the landlord has not been confirmed yet, oldest first.",
+      "empty": "No payouts awaiting execution.",
+      "moreAvailable": "More payouts are waiting — only the oldest page is shown.",
+      "noBatch": "—",
+      "columns": {
+        "operation": "Operation",
+        "batch": "Batch",
+        "notice": "Notice",
+        "agency": "Agency",
+        "guarantee": "Guarantee",
+        "period": "Period",
+        "amount": "Amount",
+        "recordedAt": "Recorded",
+        "actions": "Actions"
+      },
+      "actions": {
+        "markExecuted": "Mark payout executed"
+      },
+      "execute": {
+        "title": "Mark payout executed",
+        "description": "Confirms the payment to the landlord has left. Record the reference the bank or Pix returned so the ledger can be reconciled.",
+        "amount": "Amount paid",
+        "referenceLabel": "Payment reference",
+        "referencePlaceholder": "E2E id or transfer number",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "Anything the audit trail should carry",
+        "confirm": "Mark executed"
+      }
     }
   },
   "shellSwitcher": {

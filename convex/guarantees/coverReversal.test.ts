@@ -11,10 +11,10 @@ import schema from "../schema";
 
 /**
  * Cover → reversal, end to end through the public mutations: the agency files
- * the notice, compliance verifies it and commits cover, and a later
- * `close(dispute_reversal)` must hand back exactly the cents cover reserved —
- * with a release audit row, a transition audit row and a history row, all in
- * the closing transaction.
+ * the notice, compliance verifies it and records cover (singly or in a batch),
+ * and a later `close(dispute_reversal)` must hand back exactly the cents cover
+ * reserved — with a release audit row, a transition audit row and a history
+ * row, all in the closing transaction.
  */
 
 function setup() {
@@ -124,12 +124,12 @@ async function releaseEntries(t: T, guaranteePublicId: string) {
   return rows.filter((row) => row.action === "guarantee.capacity_released");
 }
 
-/** File → verify → cover one missed rent, through the real mutations. */
-async function coverOneRent(
+/** File → verify one missed rent, through the real mutations. Returns the notice publicId. */
+async function fileAndVerify(
   t: T,
   fx: Fixture,
   { rentDueDate, amountCents }: { rentDueDate: string; amountCents: number },
-): Promise<number> {
+): Promise<string> {
   const asUser = t.withIdentity({ subject: fx.subject });
   const opened = await asUser.mutation(api.delinquencies.mutations.openNotice, {
     agencyId: fx.agencyId,
@@ -142,10 +142,19 @@ async function coverOneRent(
     noticePublicId: opened.data.publicId,
   });
   if (!verified.success) throw new Error(verified.message);
-  const covered = await asUser.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
-    noticePublicId: opened.data.publicId,
-    coverOperationPublicId: `COVER-${rentDueDate}`,
-  });
+  return opened.data.publicId;
+}
+
+/** File → verify → cover one missed rent, through the real mutations. */
+async function coverOneRent(
+  t: T,
+  fx: Fixture,
+  rent: { rentDueDate: string; amountCents: number },
+): Promise<number> {
+  const noticePublicId = await fileAndVerify(t, fx, rent);
+  const covered = await t
+    .withIdentity({ subject: fx.subject })
+    .mutation(api.coverOperations.mutations.staffRecordCover, { noticePublicId });
   if (!covered.success) throw new Error(covered.message);
   return covered.data.appliedCoverCents;
 }
@@ -240,6 +249,36 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
     });
     const released = await releaseEntries(t, fx.guaranteePublicId);
     expect(released.length).toBe(1);
+  });
+
+  test("rents covered together in one batch are all released by the reversal", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "7");
+    const first = await fileAndVerify(t, fx, { rentDueDate: "2026-06-05", amountCents: 250_000 });
+    const second = await fileAndVerify(t, fx, { rentDueDate: "2026-07-05", amountCents: 310_000 });
+
+    const asStaff = t.withIdentity({ subject: fx.subject });
+    const batch = await asStaff.mutation(api.coverOperations.mutations.staffRecordCoverBatch, {
+      noticePublicIds: [first, second],
+    });
+    if (!batch.success) throw new Error(batch.message);
+    expect(batch.data.operations.map((op) => op.appliedCoverCents)).toEqual([250_000, 310_000]);
+
+    const covered = await readGuarantee(t, fx.guaranteeId);
+    expect(covered.status).toBe("cover_committed");
+    expect(covered.capacity.reservedCents).toBe(560_000);
+
+    const result = await asStaff.mutation(api.guarantees.mutations.close, {
+      publicId: fx.guaranteePublicId,
+      reason: "dispute_reversal",
+    });
+    expect(result.success).toBe(true);
+    expect((await readGuarantee(t, fx.guaranteeId)).capacity).toEqual({
+      ceilingCents: CEILING_CENTS,
+      availableCents: CEILING_CENTS,
+      reservedCents: 0,
+    });
+    expect((await releaseEntries(t, fx.guaranteePublicId)).length).toBe(1);
   });
 
   test("a clamped draw releases the applied figure, never the notice's face amount", async () => {
