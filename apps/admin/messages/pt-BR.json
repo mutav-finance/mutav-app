@@ -278,5 +278,90 @@
     "connecting": "Conectando…",
     "disconnect": "Desconectar",
     "verified": "Titularidade verificada"
+  },
+  "transparency": {
+    "reserve": {
+      "label": "Reserva de cobertura",
+      "unavailable": "Indisponível",
+      "testnet": "Testnet",
+      "asOf": "Atualizado em {datetime}",
+      "brlIndicative": "≈ {amount} pela PTAX BCB (venda) {rate} — apenas indicativo; {symbol} é um ativo simulado da testnet",
+      "fxQuotedAt": "PTAX cotada em {datetime} (BRT)",
+      "coverageRatio": "Índice de cobertura",
+      "coverageRatioNone": "Nenhuma cobertura reservada",
+      "coverageRequired": "Cobertura exigida",
+      "coverageRatioHint": "Ativos estáveis divididos pela cobertura que os contratos reservam para a carteira onchain.",
+      "contracts": {
+        "vault": "Vault",
+        "policy": "Política",
+        "registry": "Registro"
+      },
+      "viewExplorer": "Verificar na rede Stellar"
+    },
+    "capacity": {
+      "label": "Capacidade de garantia restante",
+      "unavailable": "Indisponível",
+      "utilization": "Utilização",
+      "ceiling": "Teto de capacidade",
+      "ceilingUnbounded": "Sem teto (c = 0)",
+      "requiredRatio": "Índice de cobertura exigido (c)",
+      "rule": "Capacidade é solvência: a capacidade restante é o capital livre da reserva, e o teto é o ativo estável dividido por c. Sem limite configurado."
+    },
+    "breakdown": {
+      "title": "Composição da reserva",
+      "description": "Onde está o capital da reserva, lido onchain. Só posições estáveis contam para a solvência.",
+      "testnet": "Testnet",
+      "unavailable": "A composição da reserva está indisponível no momento.",
+      "columns": {
+        "position": "Posição",
+        "contract": "Contrato",
+        "solvency": "Solvência",
+        "balance": "Saldo",
+        "share": "Participação"
+      },
+      "kind": {
+        "idle": "{symbol} mantido no vault",
+        "strategy": "Estratégia de rendimento"
+      },
+      "stable": "Estável",
+      "volatile": "Volátil"
+    }
+  },
+  "treasury": {
+    "title": "Tesouraria",
+    "subtitle": "A reserva de cobertura mutav-pulse, a capacidade que ela sustenta e a carteira de garantias que ela lastreia.",
+    "status": {
+      "solvent": "Solvente",
+      "undercovered": "Cobertura insuficiente",
+      "noBook": "Nenhuma cobertura reservada",
+      "unavailable": "Leitura da reserva indisponível",
+      "stale": "O último snapshot, de {datetime}, tem mais de 45 minutos — a leitura da reserva pode estar falhando."
+    },
+    "book": {
+      "title": "Capacidade em termos de carteira",
+      "description": "Carteira bruta de garantias que o vault consegue lastrear, numa só escala: teto − usado = restante.",
+      "ceiling": "Teto (ativos estáveis ÷ c)",
+      "used": "Usado (cobertura bruta no registro)",
+      "remaining": "Restante (capital livre ÷ c)",
+      "unbounded": "Sem teto (c = 0)",
+      "unavailable": "Indisponível até o próximo snapshot da reserva."
+    },
+    "exposure": {
+      "title": "Exposição das garantias",
+      "description": "A carteira de garantias do Convex, em BRL. Não é convertida para o ativo da reserva: compare as duas só com uma taxa de câmbio.",
+      "insured": "Garantias vigentes",
+      "totalGuaranteed": "Total garantido",
+      "verifiedDefault": "Em inadimplência verificada",
+      "verifiedDefaultExposure": "Exposição em inadimplência verificada",
+      "coverCommitted": "Cobertura comprometida",
+      "defaultRate": "Taxa de inadimplência"
+    },
+    "footer": "Os números de reserva e capacidade estão no ativo do vault, lidos onchain a cada 15 minutos; a exposição está em BRL, a partir da carteira de garantias.",
+    "errors": {
+      "unexpected": "Algo deu errado. Tente novamente."
+    },
+    "actions": {
+      "retry": "Tentar novamente"
+    }
   }
 }

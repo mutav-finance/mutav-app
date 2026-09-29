@@ -107,3 +107,18 @@ snapshot exists yet, or the latest snapshot has no priced value. A failed read
 (RPC error, unexpected contract shape, missing `CoverageRatioBps`, PTAX outage)
 writes nothing, so the page keeps the last good snapshot and its timestamp —
 never a mock or a zero.
+
+## Admin `/treasury` — staff-only figures
+
+The admin treasury screen renders the same reserve, capacity and breakdown
+panels from the same queries (`getReserveCoverage`, `getGuaranteeAggregates`),
+plus these derived figures. Code: `apps/admin/src/components/treasury/view-model.ts`.
+
+| Figure                    | Formula                                                                                                  | Notes                                                                                                                                                |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Solvency status           | `solvent` if coverage ratio ≥ 1, `undercovered` if < 1, `noBook` if nothing reserved, else `unavailable` | The contracts enforce the floor only when money moves; a strategy loss or depeg can breach it between moves, which is what `undercovered` surfaces.  |
+| Stale snapshot            | now − `capturedAt` > 45 min                                                                              | Three missed 15-minute cron ticks. A failed read writes nothing, so age is how a broken read shows. Computed client-side only (no SSR clock).        |
+| Book capacity — ceiling   | `stable_assets` ÷ c                                                                                      | Same as the capacity ceiling above.                                                                                                                  |
+| Book capacity — used      | registry `raw_coverage`                                                                                  | The raw book the vault backs today, in the same units as the ceiling.                                                                                |
+| Book capacity — remaining | max(0, ceiling − used)                                                                                   | = `free_capital` ÷ c up to the policy's ceil rounding. Staff see ceiling − used = remaining on one scale, unlike the collateral-unit headline above. |
+| Cover committed           | count of guarantees in `cover_committed`                                                                 | From the guarantee state aggregate; the cover-operations ledger (recorded vs executed) is not shown yet.                                             |

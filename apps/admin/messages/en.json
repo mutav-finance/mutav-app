@@ -278,5 +278,90 @@
     "connecting": "Connecting…",
     "disconnect": "Disconnect",
     "verified": "Ownership verified"
+  },
+  "transparency": {
+    "reserve": {
+      "label": "Coverage reserve",
+      "unavailable": "Unavailable",
+      "testnet": "Testnet",
+      "asOf": "As of {datetime}",
+      "brlIndicative": "≈ {amount} at BCB PTAX (ask) {rate} — indicative only; {symbol} is a testnet mock asset",
+      "fxQuotedAt": "PTAX quoted {datetime} (BRT)",
+      "coverageRatio": "Coverage ratio",
+      "coverageRatioNone": "No coverage reserved",
+      "coverageRequired": "Coverage required",
+      "coverageRatioHint": "Stable assets divided by the coverage the contracts reserve behind the onchain book.",
+      "contracts": {
+        "vault": "Vault",
+        "policy": "Policy",
+        "registry": "Registry"
+      },
+      "viewExplorer": "Verify on the Stellar network"
+    },
+    "capacity": {
+      "label": "Remaining guarantee capacity",
+      "unavailable": "Unavailable",
+      "utilization": "Utilization",
+      "ceiling": "Capacity ceiling",
+      "ceilingUnbounded": "Unbounded (c = 0)",
+      "requiredRatio": "Required coverage ratio (c)",
+      "rule": "Capacity is solvency: remaining capacity is the reserve's free capital, and the ceiling is stable assets divided by c. No configured cap."
+    },
+    "breakdown": {
+      "title": "Reserve breakdown",
+      "description": "Where the reserve's capital sits, read onchain. Only stable positions count toward solvency.",
+      "testnet": "Testnet",
+      "unavailable": "The reserve breakdown is unavailable right now.",
+      "columns": {
+        "position": "Position",
+        "contract": "Contract",
+        "solvency": "Solvency",
+        "balance": "Balance",
+        "share": "Share"
+      },
+      "kind": {
+        "idle": "{symbol} held in the vault",
+        "strategy": "Yield strategy"
+      },
+      "stable": "Stable",
+      "volatile": "Volatile"
+    }
+  },
+  "treasury": {
+    "title": "Treasury",
+    "subtitle": "The mutav-pulse coverage reserve, the capacity it backs and the guarantee book it stands behind.",
+    "status": {
+      "solvent": "Solvent",
+      "undercovered": "Undercovered",
+      "noBook": "No coverage reserved",
+      "unavailable": "Reserve read unavailable",
+      "stale": "Last snapshot {datetime} is older than 45 minutes — the reserve read may be failing."
+    },
+    "book": {
+      "title": "Capacity in book terms",
+      "description": "Raw guarantee book the vault can back, on one scale: ceiling − used = remaining.",
+      "ceiling": "Ceiling (stable assets ÷ c)",
+      "used": "Used (raw coverage in the registry)",
+      "remaining": "Remaining (free capital ÷ c)",
+      "unbounded": "Unbounded (c = 0)",
+      "unavailable": "Unavailable until the next reserve snapshot."
+    },
+    "exposure": {
+      "title": "Guarantee exposure",
+      "description": "The Convex guarantee book in BRL. Not converted to the reserve asset: compare the two only at an FX rate.",
+      "insured": "In-force guarantees",
+      "totalGuaranteed": "Total guaranteed",
+      "verifiedDefault": "In verified default",
+      "verifiedDefaultExposure": "Verified-default exposure",
+      "coverCommitted": "Cover committed",
+      "defaultRate": "Default rate"
+    },
+    "footer": "Reserve and capacity figures are in the vault's asset, read onchain every 15 minutes; exposure is in BRL from the guarantee book.",
+    "errors": {
+      "unexpected": "Something went wrong. Please try again."
+    },
+    "actions": {
+      "retry": "Try again"
+    }
   }
 }
