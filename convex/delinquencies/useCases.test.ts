@@ -287,6 +287,108 @@ describe("listByAgency", () => {
     expect(result.page.map((r) => r.publicId)).toEqual(["DN-mid"]);
   });
 
+  test("guaranteePublicId narrows to that guarantee's notices", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const { guaranteeId: otherGuaranteeId } = await seedGuaranteeWithLease(
+      t,
+      {
+        agencyId: fx.agencyId,
+        status: "active",
+        activatedAt: "2024-06-01T00:00:00.000Z",
+        rentCents: 300_000,
+        tenantTaxId: "22233344405",
+      },
+      "CT-other",
+    );
+    await insertNotice(t, fx, { publicId: "DN-mine" });
+    await insertNotice(t, { ...fx, guaranteeId: otherGuaranteeId }, { publicId: "DN-other" });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.query(api.delinquencies.useCases.listByAgency, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: "CT-1",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((r) => r.publicId)).toEqual(["DN-mine"]);
+  });
+
+  test("guaranteePublicId without status returns the guarantee's whole history, newest first", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-h-open", status: "open", rentDueDate: "2026-01-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-h-verified",
+      status: "verified",
+      rentDueDate: "2026-02-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-h-resolved",
+      status: "resolved",
+      rentDueDate: "2026-03-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-h-canceled",
+      status: "canceled",
+      rentDueDate: "2026-04-05",
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.query(api.delinquencies.useCases.listByAgency, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: "CT-1",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((r) => r.publicId)).toEqual([
+      "DN-h-canceled",
+      "DN-h-resolved",
+      "DN-h-verified",
+      "DN-h-open",
+    ]);
+    expect(result.isDone).toBe(true);
+  });
+
+  test("guaranteePublicId + status='open' keeps verified notices alongside open ones", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-o-open", status: "open", rentDueDate: "2026-01-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-o-verified",
+      status: "verified",
+      rentDueDate: "2026-02-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-o-resolved",
+      status: "resolved",
+      rentDueDate: "2026-03-05",
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const result = await asUser.query(api.delinquencies.useCases.listByAgency, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: "CT-1",
+      status: "open",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((r) => r.publicId)).toEqual(["DN-o-verified", "DN-o-open"]);
+  });
+
+  test("guaranteePublicId of another agency's guarantee → empty page, no leak", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1");
+    const b = await makeFixture(t, "2");
+    await insertNotice(t, a, { publicId: "DN-agencyA" });
+    await insertNotice(t, b, { publicId: "DN-agencyB" });
+
+    const asA = t.withIdentity({ subject: a.subject });
+    const result = await asA.query(api.delinquencies.useCases.listByAgency, {
+      agencyId: a.agencyId,
+      guaranteePublicId: "CT-2",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page).toEqual([]);
+  });
+
   test("pagination: numItems=2 with 3 rows returns 2 rows + isDone=false + cursor advances the page", async () => {
     const t = setup();
     const fx = await makeFixture(t);

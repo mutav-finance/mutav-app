@@ -102,7 +102,9 @@
       "amountFrom": "Amount — from",
       "amountTo": "Amount — to",
       "search": "Search",
-      "clear": "Clear"
+      "clear": "Clear",
+      "guarantee": "Guarantee {id}",
+      "clearGuarantee": "Remove the guarantee {id} filter"
     },
     "table": {
       "heading": "Results",
@@ -379,6 +381,8 @@
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this guarantee",
+      "openDelinquencyDisabledHint": "Available only for guarantees in force",
+      "trackDelinquenciesDisabledHint": "This guarantee was never in force, so it has no delinquencies",
       "actionsMenu": "Guarantee actions",
       "ofCeiling": "of {ceiling}"
     },

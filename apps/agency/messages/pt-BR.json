@@ -102,7 +102,9 @@
       "amountFrom": "Valor inadimplência — de",
       "amountTo": "Valor inadimplência — até",
       "search": "Pesquisar",
-      "clear": "Limpar"
+      "clear": "Limpar",
+      "guarantee": "Garantia {id}",
+      "clearGuarantee": "Remover o filtro da garantia {id}"
     },
     "table": {
       "heading": "Resultados",
@@ -379,6 +381,8 @@
       },
       "openDelinquencyHint": "Registrar nova inadimplência",
       "trackDelinquenciesHint": "Ver inadimplências desta garantia",
+      "openDelinquencyDisabledHint": "Disponível apenas para garantias em vigor",
+      "trackDelinquenciesDisabledHint": "Esta garantia nunca esteve em vigor, portanto não tem inadimplências",
       "actionsMenu": "Ações da garantia",
       "ofCeiling": "de {ceiling}"
     },
