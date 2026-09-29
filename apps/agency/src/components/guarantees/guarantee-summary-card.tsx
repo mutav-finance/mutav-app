@@ -87,10 +87,15 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
           <CardAction className="flex items-center gap-2">
             {/* Desktop: show all buttons inline */}
             <div className="hidden items-center gap-2 sm:flex">
-              {/* A disabled button swallows pointer events, so a span carries the tooltip. */}
+              {/* A disabled button swallows pointer events and focus, so a span carries the
+                  tooltip — focusable while the button is disabled, so keyboard users reach it too.
+                  Radix wires the trigger's aria-describedby to the tooltip content. */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className={cn(!delinquencyActions.open.enabled && "cursor-not-allowed")}>
+                  <span
+                    className={cn(!delinquencyActions.open.enabled && "cursor-not-allowed")}
+                    tabIndex={delinquencyActions.open.enabled ? undefined : 0}
+                  >
                     <Button
                       variant="outline-primary"
                       size="sm"
@@ -110,7 +115,7 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
                       <Link href={delinquencyActions.track.href}>{t("trackDelinquencies")}</Link>
                     </Button>
                   ) : (
-                    <span className="cursor-not-allowed">
+                    <span className="cursor-not-allowed" tabIndex={0}>
                       <Button variant="outline-primary" size="sm" disabled>
                         {t("trackDelinquencies")}
                       </Button>
@@ -121,7 +126,10 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className={cn(!isDrafted && "cursor-not-allowed")}>
+                  <span
+                    className={cn(!isDrafted && "cursor-not-allowed")}
+                    tabIndex={isDrafted ? undefined : 0}
+                  >
                     <Button
                       variant="outline-primary"
                       size="sm"

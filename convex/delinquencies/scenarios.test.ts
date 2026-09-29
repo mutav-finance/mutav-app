@@ -2550,7 +2550,7 @@ describe("composition — assertTransition gates the write, so terminal / self-t
 // ---------------------------------------------------------------------------
 
 describe("seed integration — the seeded delinquency book matches the scenario doc's realistic shape", () => {
-  test("seedReset populates the agencyowner's agency with one notice per status (open, verified, resolved-tenant_cured, resolved-cover_committed), each on the guarantee state it implies, with every user reference live", async () => {
+  test("seedReset populates the agencyowner's agency with a notice book that covers every status and resolution kind, each notice on the guarantee state it implies, with every user reference live", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
 
@@ -2576,36 +2576,57 @@ describe("seed integration — the seeded delinquency book matches the scenario 
     ]);
 
     expect(openRows.length).toBe(1);
-    expect(verifiedRows.length).toBe(1);
-    expect(resolvedRows.length).toBe(2);
-    expect(canceledRows.length).toBe(0);
+    expect(verifiedRows.length).toBe(2);
+    expect(resolvedRows.length).toBe(6);
+    expect(canceledRows.length).toBe(1);
     expect(resolvedRows.map((r) => r.resolution?.kind).sort()).toEqual([
       "cover_committed",
+      "cover_committed",
+      "cover_committed",
+      "cover_committed",
+      "staff_dispute",
       "tenant_cured",
     ]);
-    const all = [...openRows, ...verifiedRows, ...resolvedRows];
+    const all = [...openRows, ...verifiedRows, ...resolvedRows, ...canceledRows];
     for (const r of all) {
       expect(r.publicId.startsWith("DN-")).toBe(true);
     }
 
     // The notice book and the guarantee states tell one story: an open notice
-    // sits on `in_arrears`, a verified one on `default_verified`, cover
-    // committed on `cover_committed`, and a cured tenant leaves `active`.
+    // sits on `in_arrears`, a verified one on `default_verified`, a cured
+    // tenant leaves `active`, a staff dispute puts the guarantee back in
+    // arrears, and committed cover moves it along the cover path
+    // (`cover_committed` → `in_eviction` → `closed`). A canceled notice leaves
+    // the guarantee `active`.
     const guaranteeStatusOf = async (guaranteeId: (typeof all)[number]["guaranteeId"]) =>
       (await t.run((ctx) => ctx.db.get(guaranteeId)))?.status ?? null;
     expect(await guaranteeStatusOf(openRows[0].guaranteeId)).toBe("in_arrears");
-    expect(await guaranteeStatusOf(verifiedRows[0].guaranteeId)).toBe("default_verified");
-    for (const r of resolvedRows) {
-      expect(await guaranteeStatusOf(r.guaranteeId)).toBe(
-        r.resolution?.kind === "cover_committed" ? "cover_committed" : "active",
-      );
+    for (const r of verifiedRows) {
+      expect(await guaranteeStatusOf(r.guaranteeId)).toBe("default_verified");
     }
+    for (const r of resolvedRows) {
+      const status = await guaranteeStatusOf(r.guaranteeId);
+      switch (r.resolution?.kind) {
+        case "tenant_cured":
+          expect(status).toBe("active");
+          break;
+        case "staff_dispute":
+          expect(status).toBe("in_arrears");
+          break;
+        case "cover_committed":
+          expect(["cover_committed", "in_eviction", "closed"]).toContain(status);
+          break;
+        default:
+          throw new Error(`unexpected resolution kind ${String(r.resolution?.kind)}`);
+      }
+    }
+    expect(await guaranteeStatusOf(canceledRows[0].guaranteeId)).toBe("active");
 
-    // No dangling FKs — every opener, verifier and resolver must be a live
-    // seeded user. A regression that left a stale id (or forgot to reseed the
-    // user) would fail this.
+    // No dangling FKs — every opener, verifier, resolver and canceler must be
+    // a live seeded user. A regression that left a stale id (or forgot to
+    // reseed the user) would fail this.
     for (const r of all) {
-      const { verification, resolution } = r;
+      const { verification, resolution, cancellation } = r;
       expect(await t.run((ctx) => ctx.db.get(r.openedByUserId))).not.toBeNull();
       if (verification) {
         expect(await t.run((ctx) => ctx.db.get(verification.verifiedByUserId))).not.toBeNull();
@@ -2613,6 +2634,10 @@ describe("seed integration — the seeded delinquency book matches the scenario 
       if (resolution) {
         expect(await t.run((ctx) => ctx.db.get(resolution.resolvedByUserId))).not.toBeNull();
       }
+      if (cancellation) {
+        expect(await t.run((ctx) => ctx.db.get(cancellation.canceledByUserId))).not.toBeNull();
+      }
     }
+    expect(canceledRows[0].cancellation).toBeDefined();
   });
 });

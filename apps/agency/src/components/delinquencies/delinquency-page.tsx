@@ -85,7 +85,6 @@ export function DelinquencyPage() {
 
   function handleClear() {
     clearGuaranteeFilter();
-    setStatus("open");
     setOrder("date");
     setDateFrom("");
     setDateTo("");
@@ -150,8 +149,12 @@ export function DelinquencyPage() {
     replaceWithout(OPEN_QUERY_KEY);
   }
 
+  // Dropping the guarantee scope drops its "all" default too — the status
+  // select falls back to the unscoped default so it never says "all" over a
+  // list that isn't.
   function clearGuaranteeFilter() {
     if (guaranteeFilter) replaceWithout(DELINQUENCIES_GUARANTEE_PARAM);
+    setStatus("open");
   }
 
   function openNoticeDetail(publicId: string) {
