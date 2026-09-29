@@ -26,6 +26,9 @@ type Props = {
   agencyId: AgencyId;
   onClose: () => void;
   onSuccess: (publicId: string) => void;
+  // Set when the sheet is opened from a guarantee's own page: the notice can
+  // only be about that guarantee, so the field is locked rather than editable.
+  fixedGuaranteePublicId?: string;
 };
 
 type FieldErrors = {
@@ -34,18 +37,25 @@ type FieldErrors = {
   amount?: string;
 };
 
-export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
+export function OpenNoticeSheet({
+  open,
+  agencyId,
+  onClose,
+  onSuccess,
+  fixedGuaranteePublicId,
+}: Props) {
   const t = useTranslations("delinquencies.openNoticeSheet");
   const openNotice = useMutation(api.delinquencies.mutations.openNotice);
 
-  const [guaranteePublicId, setGuaranteePublicId] = React.useState("");
+  const initialGuaranteePublicId = fixedGuaranteePublicId ?? "";
+  const [guaranteePublicId, setGuaranteePublicId] = React.useState(initialGuaranteePublicId);
   const [rentDueDate, setRentDueDate] = React.useState("");
   const [amountInput, setAmountInput] = React.useState("");
   const [errors, setErrors] = React.useState<FieldErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
 
   function handleClose() {
-    setGuaranteePublicId("");
+    setGuaranteePublicId(initialGuaranteePublicId);
     setRentDueDate("");
     setAmountInput("");
     setErrors({});
@@ -109,7 +119,8 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
               value={guaranteePublicId}
               onChange={(e) => setGuaranteePublicId(e.target.value)}
               placeholder={t("fields.guaranteePublicIdPlaceholder")}
-              autoFocus
+              readOnly={fixedGuaranteePublicId !== undefined}
+              autoFocus={fixedGuaranteePublicId === undefined}
             />
           </Field>
 
@@ -117,6 +128,7 @@ export function OpenNoticeSheet({ open, agencyId, onClose, onSuccess }: Props) {
             <Label className="text-xs">{t("fields.rentDueDate")}</Label>
             <Input
               type="date"
+              autoFocus={fixedGuaranteePublicId !== undefined}
               value={rentDueDate}
               onChange={(e) => setRentDueDate(e.target.value)}
             />

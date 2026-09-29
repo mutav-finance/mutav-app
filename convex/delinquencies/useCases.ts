@@ -253,12 +253,26 @@ export const listByAgency = queryWithAgencyScope({
     dueDateTo: v.optional(v.string()),
     amountFromCents: v.optional(v.number()),
     amountToCents: v.optional(v.number()),
+    guaranteePublicId: v.optional(v.string()),
   },
   handler: async (
     ctx,
     args,
   ): Promise<{ page: DelinquencyNoticeRow[]; isDone: boolean; continueCursor: string }> => {
     const status = args.status ?? DELINQUENCY_STATUS.OPEN;
+    // `publicId` is unique only per agency, so the caller's agency picks the
+    // row — and a publicId from another agency resolves to nothing, which
+    // filters every notice out rather than leaking that agency's rows.
+    const { guaranteePublicId } = args;
+    const scopedGuaranteeId =
+      guaranteePublicId === undefined
+        ? undefined
+        : (
+            await ctx.db
+              .query("guarantees")
+              .withIndex("by_publicId", (q) => q.eq("publicId", guaranteePublicId))
+              .collect()
+          ).find((candidate) => candidate.agencyId === ctx.agencyId)?._id;
     // Normalize both sides of the compare to YYYY-MM-DD so a caller passing
     // an ISO datetime (e.g. "2026-06-05T00:00:00Z") is compared against the
     // stored day, not lex-compared with a longer string that diverges at
@@ -288,6 +302,7 @@ export const listByAgency = queryWithAgencyScope({
       .sort((a, b) => b._creationTime - a._creationTime)
       .filter(
         (notice) =>
+          (guaranteePublicId === undefined || notice.guaranteeId === scopedGuaranteeId) &&
           (dueDateFrom == null || notice.rentDueDate.slice(0, 10) >= dueDateFrom) &&
           (dueDateTo == null || notice.rentDueDate.slice(0, 10) <= dueDateTo) &&
           (args.amountFromCents == null || notice.updatedAmountCents >= args.amountFromCents) &&

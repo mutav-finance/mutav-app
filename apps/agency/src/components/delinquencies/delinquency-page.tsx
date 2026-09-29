@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
-import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon, PlusIcon } from "lucide-react";
+import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon, PlusIcon, XIcon } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import { Button } from "@mutav/ui/button";
@@ -21,6 +21,7 @@ import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-sta
 import { OpenNoticeSheet } from "@/components/delinquencies/open-notice-sheet";
 import { NoticeDetailSheet } from "@/components/delinquencies/notice-detail-sheet";
 import { formatBRLCents, formatDateTimeBR } from "@mutav/i18n/brazil";
+import { DELINQUENCIES_GUARANTEE_PARAM } from "@/lib/guarantees/delinquency-actions";
 
 const OPEN_QUERY_KEY = "notice";
 const OPEN_NEW = "new";
@@ -47,6 +48,16 @@ export function DelinquencyPage() {
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
+  // URL-driven drawer state — sharable + survives navigations, and lets
+  // DelinquencyPageActions (rendered up in PageHeader) trigger the open-notice
+  // sheet without prop drilling. The guarantee filter rides the URL for the same
+  // reason: the guarantee detail page deep-links into this list.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const noticeParam = searchParams.get(OPEN_QUERY_KEY);
+  const guaranteeFilter = searchParams.get(DELINQUENCIES_GUARANTEE_PARAM);
+
   const [status, setStatus] = React.useState<StatusTab>("open");
   const [order, setOrder] = React.useState<SortKey>("date");
   const [dateFrom, setDateFrom] = React.useState("");
@@ -70,6 +81,7 @@ export function DelinquencyPage() {
   }
 
   function handleClear() {
+    clearGuaranteeFilter();
     setStatus("open");
     setOrder("date");
     setDateFrom("");
@@ -99,6 +111,7 @@ export function DelinquencyPage() {
     ? {
         agencyId,
         paginationOpts: { numItems: 200, cursor: null },
+        ...(guaranteeFilter ? { guaranteePublicId: guaranteeFilter } : {}),
         ...(status !== "all" ? { status } : {}),
         ...(activeFilters.dateFrom ? { dueDateFrom: activeFilters.dateFrom } : {}),
         ...(activeFilters.dateTo ? { dueDateTo: activeFilters.dateTo } : {}),
@@ -123,19 +136,19 @@ export function DelinquencyPage() {
     return copy;
   }, [result?.page, order]);
 
-  // URL-driven drawer state — sharable + survives navigations, and lets
-  // DelinquencyPageActions (rendered up in PageHeader) trigger the open-notice
-  // sheet without prop drilling.
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const noticeParam = searchParams.get(OPEN_QUERY_KEY);
-
-  function closeSheet() {
+  function replaceWithout(key: string) {
     const next = new URLSearchParams(searchParams.toString());
-    next.delete(OPEN_QUERY_KEY);
+    next.delete(key);
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }
+
+  function closeSheet() {
+    replaceWithout(OPEN_QUERY_KEY);
+  }
+
+  function clearGuaranteeFilter() {
+    if (guaranteeFilter) replaceWithout(DELINQUENCIES_GUARANTEE_PARAM);
   }
 
   function openNoticeDetail(publicId: string) {
@@ -221,7 +234,19 @@ export function DelinquencyPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {guaranteeFilter ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mr-auto"
+                  onClick={clearGuaranteeFilter}
+                  aria-label={t("filter.clearGuarantee", { id: guaranteeFilter })}
+                >
+                  {t("filter.guarantee", { id: guaranteeFilter })}
+                  <XIcon className="size-3.5" strokeWidth={1.5} />
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={handleClear}>
                 {t("filter.clear")}
               </Button>

@@ -32,6 +32,9 @@ import { GUARANTEE_STATE } from "@convex/guarantees/domain";
 import type { Guarantee } from "@/lib/guarantees/types";
 import { api } from "@convex/_generated/api";
 import { GuaranteeStateTag } from "@mutav/ui/guarantee-state-tag";
+import { Link } from "@mutav/i18n/navigation";
+import { OpenNoticeSheet } from "@/components/delinquencies/open-notice-sheet";
+import { guaranteeDelinquencyActions } from "@/lib/guarantees/delinquency-actions";
 
 export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
   const t = useTranslations("guaranteeDetails.summary");
@@ -41,6 +44,14 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
   const cancelDraft = useMutation(api.guarantees.useCases.cancelDraft);
   const [cancelOpen, setCancelOpen] = React.useState(false);
   const [isCanceling, setIsCanceling] = React.useState(false);
+  const [openNoticeOpen, setOpenNoticeOpen] = React.useState(false);
+  const delinquencyActions = guaranteeDelinquencyActions(guarantee);
+  const openDelinquencyHint = delinquencyActions.open.enabled
+    ? t("openDelinquencyHint")
+    : t("openDelinquencyDisabledHint");
+  const trackDelinquenciesHint = delinquencyActions.track.enabled
+    ? t("trackDelinquenciesHint")
+    : t("trackDelinquenciesDisabledHint");
 
   // The row keeps `available + reserved = ceiling` for its whole life, so a
   // closed guarantee still carries capacity it no longer covers anything with.
@@ -76,21 +87,37 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
           <CardAction className="flex items-center gap-2">
             {/* Desktop: show all buttons inline */}
             <div className="hidden items-center gap-2 sm:flex">
+              {/* A disabled button swallows pointer events, so a span carries the tooltip. */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline-primary" size="sm">
-                    {t("openDelinquency")}
-                  </Button>
+                  <span className={cn(!delinquencyActions.open.enabled && "cursor-not-allowed")}>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      disabled={!delinquencyActions.open.enabled}
+                      onClick={() => setOpenNoticeOpen(true)}
+                    >
+                      {t("openDelinquency")}
+                    </Button>
+                  </span>
                 </TooltipTrigger>
-                <TooltipContent>{t("openDelinquencyHint")}</TooltipContent>
+                <TooltipContent>{openDelinquencyHint}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline-primary" size="sm">
-                    {t("trackDelinquencies")}
-                  </Button>
+                  {delinquencyActions.track.enabled ? (
+                    <Button variant="outline-primary" size="sm" asChild>
+                      <Link href={delinquencyActions.track.href}>{t("trackDelinquencies")}</Link>
+                    </Button>
+                  ) : (
+                    <span className="cursor-not-allowed">
+                      <Button variant="outline-primary" size="sm" disabled>
+                        {t("trackDelinquencies")}
+                      </Button>
+                    </span>
+                  )}
                 </TooltipTrigger>
-                <TooltipContent>{t("trackDelinquenciesHint")}</TooltipContent>
+                <TooltipContent>{trackDelinquenciesHint}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -121,8 +148,27 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>{t("openDelinquency")}</DropdownMenuItem>
-                <DropdownMenuItem>{t("trackDelinquencies")}</DropdownMenuItem>
+                {/* No hover on touch, so the reason a row is disabled is printed inline. */}
+                <DropdownMenuItem
+                  disabled={!delinquencyActions.open.enabled}
+                  onClick={() => setOpenNoticeOpen(true)}
+                  className="flex-col items-start gap-0.5"
+                >
+                  {t("openDelinquency")}
+                  {delinquencyActions.open.enabled ? null : (
+                    <span className="text-muted-foreground text-xs">{openDelinquencyHint}</span>
+                  )}
+                </DropdownMenuItem>
+                {delinquencyActions.track.enabled ? (
+                  <DropdownMenuItem asChild>
+                    <Link href={delinquencyActions.track.href}>{t("trackDelinquencies")}</Link>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem disabled className="flex-col items-start gap-0.5">
+                    {t("trackDelinquencies")}
+                    <span className="text-muted-foreground text-xs">{trackDelinquenciesHint}</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem disabled={!isDrafted} onClick={() => setCancelOpen(true)}>
                   {t("cancelProposal")}
                 </DropdownMenuItem>
@@ -187,6 +233,16 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
           </dl>
         </CardContent>
       </Card>
+
+      {delinquencyActions.open.enabled ? (
+        <OpenNoticeSheet
+          open={openNoticeOpen}
+          agencyId={guarantee.agencyId}
+          fixedGuaranteePublicId={guarantee.id}
+          onClose={() => setOpenNoticeOpen(false)}
+          onSuccess={() => setOpenNoticeOpen(false)}
+        />
+      ) : null}
 
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>
