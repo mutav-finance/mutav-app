@@ -6,7 +6,7 @@
 
 **Product (what exists today):**
 
-- [`product-architecture.md`](product-architecture.md) — the feature view: every capability by product area (onboarding, origination, underwriting, lifecycle, delinquency, billing, payment, notifications, admin, on-chain, platform) with its user, surface, state (`Live` / `Partial` / `Backend only` / `UI only` / `Placeholder` / `Planned` / `Stage 2`), the code that proves it, and the issue that tracks it; then the ranked pilot gaps and the Story 1.1–1.9 progress snapshot. Read this before scoping a feature, so you build against what is inert rather than what looks built.
+- [`product-architecture.md`](product-architecture.md) — the feature view: every capability by product area (onboarding, origination, underwriting, lifecycle, delinquency, billing, payment, notifications, admin, on-chain, platform) with its user, surface, state (`Live` / `Partial` / `Backend only` / `UI only` / `Placeholder` / `Planned` / `Stage 2`), the code that proves it, and the issue that tracks it; then the ranked pilot gaps. Read this before scoping a feature, so you build against what is inert rather than what looks built.
 
 **Foundations (read first):**
 
