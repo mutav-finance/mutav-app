@@ -68,7 +68,7 @@ export function SectionCards() {
         </CardFooter>
       </Card>
 
-      {/* Próxima Fatura */}
+      {/* Next invoice */}
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
@@ -92,13 +92,13 @@ export function SectionCards() {
         </CardFooter>
       </Card>
 
-      {/* Inadimplências — overdue payment count, an approximation of the
-          delinquency concept until issue #52 ships a dedicated domain. */}
+      {/* Counts overdue Mutav invoices (the agency's bill), not delinquency
+          notices on tenants — those live on the Delinquencies page. */}
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <ShieldAlertIcon className="size-3.5" />
-            {t("delinquencies.label")}
+            {t("overdueInvoices.label")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {overdueCount === undefined ? <Skeleton className="h-8 w-10" /> : overdueCount}
@@ -109,9 +109,9 @@ export function SectionCards() {
             {overdueCount === undefined ? (
               <Skeleton className="h-4 w-32" />
             ) : overdueCount === 0 ? (
-              t("delinquencies.footerNone")
+              t("overdueInvoices.footerNone")
             ) : (
-              t("delinquencies.footerSome", { count: overdueCount })
+              t("overdueInvoices.footerSome", { count: overdueCount })
             )}
           </div>
         </CardFooter>

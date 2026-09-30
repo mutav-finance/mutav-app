@@ -138,8 +138,7 @@ describe("getInsuredCapacityGlobal", () => {
 
     const result = await asUser.query(api.guarantees.useCases.getInsuredCapacityGlobal, {});
     // Two insured: (10_000 + 25_000) + 2 x 600_000; draft and closed excluded.
-    expect(result.sumInsuredCents).toBe(35_000 + 2 * EXIT_CAP);
-    expect(result.maxCapacityCents).toBeGreaterThan(0);
+    expect(result).toEqual({ sumInsuredCents: 35_000 + 2 * EXIT_CAP });
   });
 });
 

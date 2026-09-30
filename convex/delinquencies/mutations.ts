@@ -10,16 +10,13 @@ import {
   type GuaranteeId,
   type GuaranteeState,
 } from "../guarantees/domain";
-import {
-  applyGuaranteeTransition,
-  reserveCoverCapacity,
-  type CoverCapacityError,
-  type GuaranteeActor,
-} from "../guarantees/transitions";
+import { applyGuaranteeTransition, type GuaranteeActor } from "../guarantees/transitions";
 import type { UserId } from "../users/domain";
 import { AUDIT_ACTION } from "../audit/domain";
+import { appendAuditEntry } from "../audit/useCases";
 import {
   DELINQUENCY_STATUS,
+  GUARANTEE_REFUSED_ERROR_CODE,
   assertTransition,
   NOTICE_RESOLUTION_KIND,
   NOTICE_CANCELLATION_REASON,
@@ -27,6 +24,7 @@ import {
   noticeEvidenceSourceValidator,
   type DelinquencyNotice,
   type DelinquencyNoticeId,
+  type GuaranteeRefusedErrorCode,
 } from "./domain";
 import type { TransitionError } from "./machine";
 
@@ -42,27 +40,6 @@ type TransitionErrorCode = TransitionError["code"];
  */
 const NOTICE_VERIFIED_ERROR_CODE = "NOTICE_VERIFIED";
 type NoticeVerifiedErrorCode = typeof NOTICE_VERIFIED_ERROR_CODE;
-
-/**
- * The mirror image on the staff side: a cover draw is only legal against a
- * default compliance has actually confirmed. Without this the notice machine
- * alone would let `open → resolved(cover_committed)` through, and a sibling
- * notice's verification would supply the guarantee state the draw checks.
- */
-const NOTICE_NOT_VERIFIED_ERROR_CODE = "NOTICE_NOT_VERIFIED";
-type NoticeNotVerifiedErrorCode = typeof NOTICE_NOT_VERIFIED_ERROR_CODE;
-
-/**
- * One wire code for "the guarantee machine refused the state change this
- * notice disposition implies". `applyGuaranteeTransition` reports seven
- * distinct guard codes; surfacing them raw would ask every caller to carry a
- * message key per guarantee state, and the caller's remedy is the same in all
- * seven cases. The refusal's own sentence travels in `message`.
- */
-const GUARANTEE_REFUSED_ERROR_CODE = "GUARANTEE_TRANSITION_REFUSED";
-type GuaranteeRefusedErrorCode = typeof GUARANTEE_REFUSED_ERROR_CODE;
-
-type CoverCapacityErrorCode = CoverCapacityError["code"];
 
 async function guaranteeActorFor(ctx: MutationCtx, userId: UserId): Promise<GuaranteeActor> {
   const user = await ctx.db.get(userId);
@@ -117,8 +94,9 @@ const AGENCY_RETURN_TO_ACTIVE_FROM: readonly GuaranteeState[] = [GUARANTEE_STATE
  * also undo the verification this same office made — otherwise dismissing the
  * only notice of an episode strands the guarantee in `default_verified` with
  * nothing outstanding and no way back. `cover_committed` is deliberately
- * absent: cover has already moved cents, and handing them back needs
- * `releaseCoverCapacity`, deferred with the receivable ledger.
+ * absent: cover has already moved cents, and handing them back is the
+ * guarantee-level `close(dispute_reversal)`, which releases them in the same
+ * transaction as it closes.
  */
 const STAFF_DISMISSAL_RETURN_TO_ACTIVE_FROM: readonly GuaranteeState[] = [
   GUARANTEE_STATE.IN_ARREARS,
@@ -316,10 +294,7 @@ export const openNotice = mutationWithAgencyScope({
     }
 
     const openedAt = new Date().toISOString();
-    // TODO(audit): emit appendAuditEntry once agency-side audit lands. Pilot
-    // relies on the openedByUserId column plus staff-side entries; see
-    // docs/architecture/admin.md.
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
+    const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId,
       guaranteeId: guarantee._id,
       agencyId: ctx.agencyId,
@@ -330,6 +305,24 @@ export const openNotice = mutationWithAgencyScope({
       evidenceSource,
       openedAt,
       openedByUserId: ctx.user._id,
+    });
+
+    // The agency's claim is what starts the whole default path, so it joins
+    // the same hash chain as the staff dispositions that answer it.
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.DELINQUENCY_OPENED,
+      resourceType: "guaranteeDelinquencyNotices",
+      resourceId: publicId,
+      payload: {
+        noticeId,
+        guaranteeId: guarantee._id,
+        agencyId: ctx.agencyId,
+        rentDueDate: args.rentDueDate,
+        originalAmountCents: args.originalAmountCents,
+        evidenceSource,
+        openedAt,
+      },
     });
 
     return {
@@ -408,15 +401,30 @@ export const markResolved = mutation({
         ? await planReturnToActive(ctx, { notice, from: AGENCY_RETURN_TO_ACTIVE_FROM })
         : null;
 
-    // TODO(audit): emit appendAuditEntry once agency-side audit lands; see
-    // docs/architecture/admin.md.
+    const resolvedAt = new Date().toISOString();
     await ctx.db.patch(notice._id, {
       status: DELINQUENCY_STATUS.RESOLVED,
       resolution: {
         kind: args.resolution.kind,
-        resolvedAt: new Date().toISOString(),
+        resolvedAt,
         resolvedByUserId: membership.userId,
         note: args.resolution.note,
+      },
+    });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: membership.userId },
+      action: AUDIT_ACTION.DELINQUENCY_RESOLVED,
+      resourceType: "guaranteeDelinquencyNotices",
+      resourceId: notice.publicId,
+      payload: {
+        noticeId: notice._id,
+        guaranteeId: notice.guaranteeId,
+        agencyId: notice.agencyId,
+        kind: args.resolution.kind,
+        guaranteeReturnedToActive: cured !== null,
+        at: resolvedAt,
+        note: args.resolution.note ?? null,
       },
     });
 
@@ -502,15 +510,30 @@ export const markCanceled = mutation({
       from: AGENCY_RETURN_TO_ACTIVE_FROM,
     });
 
-    // TODO(audit): emit appendAuditEntry once agency-side audit lands; see
-    // docs/architecture/admin.md.
+    const canceledAt = new Date().toISOString();
     await ctx.db.patch(notice._id, {
       status: DELINQUENCY_STATUS.CANCELED,
       cancellation: {
         reason: args.cancellation.reason,
-        canceledAt: new Date().toISOString(),
+        canceledAt,
         canceledByUserId: membership.userId,
         note: args.cancellation.note,
+      },
+    });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: membership.userId },
+      action: AUDIT_ACTION.DELINQUENCY_CANCELED,
+      resourceType: "guaranteeDelinquencyNotices",
+      resourceId: notice.publicId,
+      payload: {
+        noticeId: notice._id,
+        guaranteeId: notice.guaranteeId,
+        agencyId: notice.agencyId,
+        reason: args.cancellation.reason,
+        guaranteeReturnedToActive: withdrawn !== null,
+        at: canceledAt,
+        note: args.cancellation.note ?? null,
       },
     });
 
@@ -645,157 +668,6 @@ export const staffVerifyDefault = mutationWithMutavRole({ minRole: "compliance" 
       success: true,
       data: { publicId: notice.publicId, guaranteeStatus },
       message: `Delinquency notice '${notice.publicId}' verified.`,
-    };
-  },
-});
-
-// ---------------------------------------------------------------------------
-// staffMarkResolvedByCover — cover_committed resolution, compliance+ only
-// ---------------------------------------------------------------------------
-
-type StaffResolveByCoverSuccess = { publicId: string; appliedCoverCents: number };
-type StaffResolveByCoverError = {
-  code:
-    | "NOTICE_NOT_FOUND"
-    | NoticeNotVerifiedErrorCode
-    | TransitionErrorCode
-    | GuaranteeRefusedErrorCode
-    | CoverCapacityErrorCode;
-};
-
-/**
- * cover_committed is the money-committing resolution: Mutav has drawn from
- * the reserve to pay the landlord and a Regressive Receivable is born.
- * Compliance+ gate + hash-chained audit entry — coverOperationPublicId is
- * a free-form string until the coverOperations table lands (later slice).
- */
-export const staffMarkResolvedByCover = mutationWithMutavRole({ minRole: "compliance" })({
-  args: {
-    noticePublicId: v.string(),
-    // TODO(link): migrate to v.id("coverOperations") when the cover-integration
-    // branch lands — currently coupled via publicId as a natural key.
-    coverOperationPublicId: v.string(),
-    note: v.optional(v.string()),
-  },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<Result<StaffResolveByCoverSuccess, StaffResolveByCoverError>> => {
-    const notice = await ctx.db
-      .query("guaranteeDelinquencyNotices")
-      .withIndex("by_publicId", (q) => q.eq("publicId", args.noticePublicId))
-      .unique();
-    if (!notice) {
-      return {
-        success: false,
-        error: { code: "NOTICE_NOT_FOUND" },
-        message: `No delinquency notice '${args.noticePublicId}'.`,
-      };
-    }
-
-    const guard = assertTransition(notice.status, DELINQUENCY_STATUS.RESOLVED);
-    if (!guard.success) {
-      return { success: false, error: { code: guard.error.code }, message: guard.message };
-    }
-
-    // The compliance gate on the money: cover draws against THIS notice, so
-    // THIS notice must be the one compliance verified. The guarantee-state
-    // check below cannot stand in for it — a sibling notice's verification is
-    // what put the guarantee in `default_verified`.
-    if (notice.status !== DELINQUENCY_STATUS.VERIFIED) {
-      return {
-        success: false,
-        error: { code: NOTICE_NOT_VERIFIED_ERROR_CODE },
-        message: `Delinquency notice '${notice.publicId}' is '${notice.status}'; only a staff-verified default may draw cover.`,
-      };
-    }
-
-    const guarantee = await loadGuarantee(ctx, notice.guaranteeId);
-    // Pre-check by state, not by the machine, so the draw below is the FIRST
-    // write of the transaction: reserving cents and only then discovering the
-    // guarantee cannot be covered would either commit an orphan reservation or
-    // force a throw where a typed refusal belongs. The hop happens once per
-    // episode — the first cover moves the guarantee to `cover_committed`, and
-    // each further verified notice of the same episode draws more cents against
-    // the same ceiling without moving the state again.
-    const isFirstDraw = guarantee.status === GUARANTEE_STATE.DEFAULT_VERIFIED;
-    if (!isFirstDraw && guarantee.status !== GUARANTEE_STATE.COVER_COMMITTED) {
-      return {
-        success: false,
-        error: { code: GUARANTEE_REFUSED_ERROR_CODE },
-        message: `Guarantee '${guarantee.publicId}' is '${guarantee.status}'; cover may only be committed against a verified default.`,
-      };
-    }
-
-    // Draw the UPDATED amount, not the original: `updatedAmountCents` is what
-    // the tenant owes the landlord at cover time — the original plus whatever
-    // juros and multa have accrued since — and that is the figure Mutav pays
-    // out. The schema keeps the field required and seeds it equal to the
-    // original at open, so there is no "if present" branch to write.
-    const actor: GuaranteeActor = { userId: ctx.user._id, username: ctx.user.name };
-    const reserved = await reserveCoverCapacity(ctx, {
-      guarantee,
-      amountCents: notice.updatedAmountCents,
-      actor,
-    });
-    if (!reserved.success) {
-      return { success: false, error: { code: reserved.error.code }, message: reserved.message };
-    }
-
-    if (isFirstDraw) {
-      const drawn = await loadGuarantee(ctx, notice.guaranteeId);
-      const applied = await applyGuaranteeTransition(ctx, {
-        guarantee: drawn,
-        to: GUARANTEE_STATE.COVER_COMMITTED,
-        actor,
-        message: "Cobertura acionada pela Mutav",
-      });
-      // The from-state was checked above and capacity is already committed — a
-      // refusal here is an invariant break, so throw and let the transaction
-      // take the reservation back with it.
-      if (!applied.success) throw new Error(applied.message);
-    }
-
-    const resolvedAt = new Date().toISOString();
-    await ctx.db.patch(notice._id, {
-      status: DELINQUENCY_STATUS.RESOLVED,
-      resolution: {
-        kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
-        resolvedAt,
-        resolvedByUserId: ctx.user._id,
-        coverOperationPublicId: args.coverOperationPublicId,
-        // The clamped figure, never the face amount: a later dispute reversal
-        // releases exactly this many cents.
-        appliedCoverCents: reserved.data.appliedCents,
-        note: args.note,
-      },
-    });
-
-    // Audit AFTER the patch: hash-chained entries should reflect committed
-    // state only. If the patch throws, the audit row rolls back with the
-    // rest of the transaction — no orphan entries in either direction.
-    await ctx.appendStaffAudit({
-      action: AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER,
-      resourceType: "guaranteeDelinquencyNotices",
-      resourceId: notice.publicId,
-      payload: {
-        noticeId: notice._id,
-        guaranteeId: notice.guaranteeId,
-        agencyId: notice.agencyId,
-        coverOperationPublicId: args.coverOperationPublicId,
-        originalAmountCents: notice.originalAmountCents,
-        updatedAmountCents: notice.updatedAmountCents,
-        appliedCoverCents: reserved.data.appliedCents,
-        capacity: reserved.data.capacity,
-        resolvedAt,
-        note: args.note ?? null,
-      },
-    });
-
-    return {
-      success: true,
-      data: { publicId: notice.publicId, appliedCoverCents: reserved.data.appliedCents },
-      message: `Delinquency notice '${notice.publicId}' resolved by cover for ${reserved.data.appliedCents} cents.`,
     };
   },
 });

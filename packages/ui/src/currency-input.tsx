@@ -1,15 +1,19 @@
 import { Input } from "./input";
 
+// The input owns its placeholder: the "R$" adornment is already rendered, so a
+// caller-supplied "R$ 0,00" doubles the symbol. The sample is pt-BR in every
+// locale because callers parse the value as pt-BR (dot = thousands, comma =
+// decimal) — an en-style "0.00" hint would invite input that parses 100× off.
+const AMOUNT_PLACEHOLDER = "0,00";
+
 export function CurrencyInput({
   value,
   onChange,
   onBlur,
-  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
   onBlur?: (v: string) => void;
-  placeholder?: string;
 }) {
   return (
     <div className="relative">
@@ -19,7 +23,7 @@ export function CurrencyInput({
       <Input
         className="pl-8"
         value={value}
-        placeholder={placeholder}
+        placeholder={AMOUNT_PLACEHOLDER}
         inputMode="decimal"
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}

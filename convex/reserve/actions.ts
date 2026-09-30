@@ -2,7 +2,6 @@
 
 import {
   Account,
-  Address,
   BASE_FEE,
   Contract,
   Networks,
@@ -10,7 +9,7 @@ import {
   TransactionBuilder,
   rpc,
   scValToNative,
-  type xdr,
+  xdr,
 } from "@stellar/stellar-sdk";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -18,16 +17,22 @@ import {
   getBcbPtaxBaseUrl,
   getReserveBrlPeggedSymbols,
   getReserveContractId,
+  getReservePolicyContractId,
+  getReserveRegistryContractId,
   getReserveUsdSymbols,
   getStellarNetwork,
   getStellarRpcUrl,
 } from "../lib/env";
 import { logError } from "../lib/logger";
 import {
+  RESERVE_POSITION_KIND,
+  findCoverageRatioBps,
+  parseStrategyAllocations,
   storedValueCentsFromValuedAssets,
   valueAssets,
   type ReserveAsset,
   type ReserveReadResult,
+  type ReserveSolvencySnapshot,
 } from "./domain";
 
 type PtaxQuote = { cotacaoCompra?: number; cotacaoVenda?: number; dataHoraCotacao?: string };
@@ -79,9 +84,103 @@ async function simulateRead(
   return scValToNative(sim.result.retval);
 }
 
+// An i128/u32 read comes back from `scValToNative` as bigint or number; anything
+// else means the contract answered with a shape we don't understand.
+function integerString(value: unknown, method: string): string {
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "number" && Number.isInteger(value)) return String(value);
+  throw new Error(`${method}: expected an integer, got ${typeof value}`);
+}
+
+type PulseReserveIds = { vaultId: string; policyId: string; registryId: string };
+
+/**
+ * One solvency read of the mutav-pulse reserve, entirely by simulation (read
+ * only — nothing is ever signed or submitted). The policy has no getter for
+ * its coverage ratio `c`, so that one value comes from its instance storage.
+ */
+async function readPulseSolvency(
+  server: rpc.Server,
+  networkPassphrase: string,
+  ids: PulseReserveIds,
+): Promise<ReserveSolvencySnapshot> {
+  const vault = new Contract(ids.vaultId);
+  const policy = new Contract(ids.policyId);
+  const registry = new Contract(ids.registryId);
+  const read = (contract: Contract, method: string) =>
+    simulateRead(server, contract, method, [], networkPassphrase);
+
+  const [totalAssets, stableAssets, freeCapital, idle, rawStrategies, assetId] = await Promise.all([
+    read(vault, "total_assets"),
+    read(vault, "stable_assets"),
+    read(vault, "free_capital"),
+    read(vault, "available_held"),
+    read(vault, "strategies"),
+    read(vault, "query_asset"),
+  ]);
+  const [coverageRequired, rawCoverage, policyInstance] = await Promise.all([
+    read(policy, "coverage_required"),
+    read(registry, "raw_coverage"),
+    server.getContractData(ids.policyId, xdr.ScVal.scvLedgerKeyContractInstance()),
+  ]);
+
+  const strategies = parseStrategyAllocations(rawStrategies);
+  if (!strategies) throw new Error("strategies: unexpected shape");
+  const storage = policyInstance.val.contractData().val().instance().storage() ?? [];
+  const coverageRatioBps = findCoverageRatioBps(
+    storage.map((entry) => ({
+      key: scValToNative(entry.key()),
+      val: scValToNative(entry.val()),
+    })),
+  );
+  if (coverageRatioBps === null) throw new Error("policy: CoverageRatioBps not found");
+
+  const asset = new Contract(String(assetId));
+  const [symbol, decimals, ...strategyBalances] = await Promise.all([
+    read(asset, "symbol"),
+    read(asset, "decimals"),
+    ...strategies.map((s) => read(new Contract(s.address), "balance")),
+  ]);
+
+  return {
+    ...ids,
+    assetContractId: String(assetId),
+    assetSymbol: String(symbol),
+    assetDecimals: Number(integerString(decimals, "decimals")),
+    totalAssetsRaw: integerString(totalAssets, "total_assets"),
+    stableAssetsRaw: integerString(stableAssets, "stable_assets"),
+    freeCapitalRaw: integerString(freeCapital, "free_capital"),
+    coverageRequiredRaw: integerString(coverageRequired, "coverage_required"),
+    rawCoverageRaw: integerString(rawCoverage, "raw_coverage"),
+    coverageRatioBps,
+    positions: [
+      {
+        kind: RESERVE_POSITION_KIND.IDLE,
+        address: ids.vaultId,
+        volatile: false,
+        rawBalance: integerString(idle, "available_held"),
+      },
+      ...strategies.map((s, i) => ({
+        kind: RESERVE_POSITION_KIND.STRATEGY,
+        address: s.address,
+        volatile: s.volatile,
+        rawBalance: integerString(strategyBalances[i], "balance"),
+      })),
+    ],
+  };
+}
+
+function pulseReserveIds(): PulseReserveIds | null {
+  const vaultId = getReserveContractId();
+  const policyId = getReservePolicyContractId();
+  const registryId = getReserveRegistryContractId();
+  if (!vaultId || !policyId || !registryId) return null;
+  return { vaultId, policyId, registryId };
+}
+
 async function readReserve(): Promise<ReserveReadResult> {
-  const contractId = getReserveContractId();
-  if (!contractId) return { available: false };
+  const ids = pulseReserveIds();
+  if (!ids) return { available: false };
 
   try {
     // Fetch FX first: a failure here must yield `{ available: false }` (caught
@@ -90,39 +189,18 @@ async function readReserve(): Promise<ReserveReadResult> {
 
     const server = new rpc.Server(getStellarRpcUrl(), { timeout: 10_000 });
     const networkPassphrase = getStellarNetwork() === "public" ? Networks.PUBLIC : Networks.TESTNET;
-    const vault = new Contract(contractId);
+    const solvency = await readPulseSolvency(server, networkPassphrase, ids);
 
-    const rawAddresses = await simulateRead(
-      server,
-      vault,
-      "approved_assets",
-      [],
-      networkPassphrase,
-    );
-    const addresses = Array.isArray(rawAddresses) ? rawAddresses.map(String) : [];
-
-    const assets: ReserveAsset[] = [];
-    for (const addr of addresses) {
-      const token = new Contract(addr);
-      const [rawBalance, symbol, decimals] = await Promise.all([
-        simulateRead(
-          server,
-          vault,
-          "balance",
-          [Address.fromString(addr).toScVal()],
-          networkPassphrase,
-        ),
-        simulateRead(server, token, "symbol", [], networkPassphrase),
-        simulateRead(server, token, "decimals", [], networkPassphrase),
-      ]);
-      assets.push({
-        contractAddress: addr,
-        symbol: String(symbol),
-        decimals: Number(decimals),
-        rawBalance: String(rawBalance),
-      });
-    }
-
+    // The vault holds a single underlying; its total_assets (idle + every
+    // strategy) is the one asset row the BRL-indicative headline is priced from.
+    const assets: ReserveAsset[] = [
+      {
+        contractAddress: solvency.assetContractId,
+        symbol: solvency.assetSymbol,
+        decimals: solvency.assetDecimals,
+        rawBalance: solvency.totalAssetsRaw,
+      },
+    ];
     const pricing = {
       brlSymbols: getReserveBrlPeggedSymbols(),
       usdSymbols: getReserveUsdSymbols(),
@@ -137,6 +215,7 @@ async function readReserve(): Promise<ReserveReadResult> {
       fxSource,
       fxQuotedAt,
       assets: valued,
+      solvency,
     };
   } catch (err) {
     // Non-fatal: keep the last good snapshot, report unavailable, never a mock.
@@ -157,6 +236,7 @@ export const refreshReserveSnapshot = internalAction({
       fxSource: result.fxSource,
       fxQuotedAt: result.fxQuotedAt,
       assets: result.assets,
+      solvency: result.solvency,
       capturedAt: Date.now(),
     });
   },

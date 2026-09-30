@@ -66,6 +66,17 @@ export const INSURED_STATES: readonly GuaranteeState[] = [
   GUARANTEE_STATE.IN_EVICTION,
 ] as const;
 
+/**
+ * The in-force states whose default Mutav has confirmed (`default_verified`) or
+ * already paid for (`cover_committed`) — the numerator of the published default
+ * rate. `in_arrears` is the agency's unverified claim and stays out; see the
+ * metric definition in `convex/transparency/useCases.ts`.
+ */
+export const VERIFIED_DEFAULT_STATES: readonly GuaranteeState[] = [
+  GUARANTEE_STATE.DEFAULT_VERIFIED,
+  GUARANTEE_STATE.COVER_COMMITTED,
+] as const;
+
 const INSURED_STATE_SET: ReadonlySet<GuaranteeState> = new Set(INSURED_STATES);
 
 export function isInsured(guarantee: Pick<Guarantee, "status">): boolean {

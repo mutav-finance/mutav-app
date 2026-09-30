@@ -834,18 +834,17 @@ describe("markCanceled", () => {
 });
 
 // ---------------------------------------------------------------------------
-// staffMarkResolvedByCover
+// staffRecordCover — the notice-resolution side of recording cover
 // ---------------------------------------------------------------------------
 
-describe("staffMarkResolvedByCover", () => {
+describe("staffRecordCover", () => {
   test("unauthenticated → throws", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     await insertNotice(t, fx, { publicId: "DN-cover-noauth" });
     await expect(
-      t.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
+      t.mutation(api.coverOperations.mutations.staffRecordCover, {
         noticePublicId: "DN-cover-noauth",
-        coverOperationPublicId: "COVER-1",
       }),
     ).rejects.toThrow(/Authentication required/);
   });
@@ -856,9 +855,8 @@ describe("staffMarkResolvedByCover", () => {
     await insertNotice(t, fx, { publicId: "DN-cover-nostaff" });
     const asUser = t.withIdentity({ subject: fx.subject });
     await expect(
-      asUser.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
+      asUser.mutation(api.coverOperations.mutations.staffRecordCover, {
         noticePublicId: "DN-cover-nostaff",
-        coverOperationPublicId: "COVER-1",
       }),
     ).rejects.toThrow(/Not a Mutav staff member/);
   });
@@ -870,9 +868,8 @@ describe("staffMarkResolvedByCover", () => {
     await grantStaffRole(t, fx.userId, "support");
     const asSupport = t.withIdentity({ subject: fx.subject });
     await expect(
-      asSupport.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
+      asSupport.mutation(api.coverOperations.mutations.staffRecordCover, {
         noticePublicId: "DN-cover-support",
-        coverOperationPublicId: "COVER-1",
       }),
     ).rejects.toThrow(/compliance/);
   });
@@ -884,9 +881,8 @@ describe("staffMarkResolvedByCover", () => {
     await grantStaffRole(t, fx.userId, "treasury");
     const asTreasury = t.withIdentity({ subject: fx.subject });
     await expect(
-      asTreasury.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
+      asTreasury.mutation(api.coverOperations.mutations.staffRecordCover, {
         noticePublicId: "DN-cover-treasury",
-        coverOperationPublicId: "COVER-1",
       }),
     ).rejects.toThrow(/compliance/);
   });
@@ -896,10 +892,9 @@ describe("staffMarkResolvedByCover", () => {
     const fx = await makeFixture(t);
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-nope", coverOperationPublicId: "COVER-1" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-nope",
+    });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("NOTICE_NOT_FOUND");
@@ -917,21 +912,17 @@ describe("staffMarkResolvedByCover", () => {
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
     const before = Date.now();
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      {
-        noticePublicId: "DN-cover-happy",
-        coverOperationPublicId: "COVER-ABC",
-        note: "Reserve drawn per case #42.",
-      },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-cover-happy",
+      note: "Reserve drawn per case #42.",
+    });
     const after = Date.now();
     expect(result.success).toBe(true);
 
     const row = await t.run((ctx) => ctx.db.get(noticeId));
     expect(row?.status).toBe("resolved");
     expect(row?.resolution?.kind).toBe("cover_committed");
-    expect(row?.resolution?.coverOperationPublicId).toBe("COVER-ABC");
+    expect(row?.resolution?.coverOperationPublicId).toMatch(/^COV-/);
     expect(row?.resolution?.resolvedByUserId).toBe(fx.userId);
     expect(row?.resolution?.note).toBe("Reserve drawn per case #42.");
     const resolution = orThrow(orThrow(row, "notice row").resolution, "resolution envelope");
@@ -964,10 +955,9 @@ describe("staffMarkResolvedByCover", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-cover-verified", coverOperationPublicId: "COVER-V1" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-cover-verified",
+    });
     expect(result.success).toBe(true);
 
     const row = await t.run((ctx) => ctx.db.get(noticeId));
@@ -983,9 +973,8 @@ describe("staffMarkResolvedByCover", () => {
     await setGuaranteeStatus(t, fx.guaranteeId, "default_verified");
     await grantStaffRole(t, fx.userId, "admin");
     const asAdmin = t.withIdentity({ subject: fx.subject });
-    const result = await asAdmin.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
+    const result = await asAdmin.mutation(api.coverOperations.mutations.staffRecordCover, {
       noticePublicId: "DN-cover-admin",
-      coverOperationPublicId: "COVER-XYZ",
     });
     expect(result.success).toBe(true);
   });
@@ -1002,9 +991,8 @@ describe("staffMarkResolvedByCover", () => {
     // Staff row lives on user A, but the notice is agency B's.
     await grantStaffRole(t, a.userId, "compliance");
     const asStaff = t.withIdentity({ subject: a.subject });
-    const result = await asStaff.mutation(api.delinquencies.mutations.staffMarkResolvedByCover, {
+    const result = await asStaff.mutation(api.coverOperations.mutations.staffRecordCover, {
       noticePublicId: "DN-cross-agency",
-      coverOperationPublicId: "COVER-CROSS",
     });
     expect(result.success).toBe(true);
 
@@ -1015,7 +1003,7 @@ describe("staffMarkResolvedByCover", () => {
     expect(row?.status).toBe("resolved");
     expect(row?.agencyId).toBe(b.agencyId);
     expect(row?.resolution?.kind).toBe("cover_committed");
-    expect(row?.resolution?.coverOperationPublicId).toBe("COVER-CROSS");
+    expect(row?.resolution?.coverOperationPublicId).toMatch(/^COV-/);
     expect(row?.resolution?.resolvedByUserId).toBe(a.userId);
 
     // Exactly one audit entry, actor = staff A (not the agency owner).
@@ -1041,10 +1029,9 @@ describe("staffMarkResolvedByCover", () => {
     await insertNotice(t, fx, { publicId: "DN-cover-terminal", status: "canceled" });
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-cover-terminal", coverOperationPublicId: "COVER-Z" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-cover-terminal",
+    });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("TERMINAL_STATE");
@@ -1066,10 +1053,9 @@ describe("staffMarkResolvedByCover", () => {
     await insertNotice(t, fx, { publicId: "DN-cover-self", status: "resolved" });
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-cover-self", coverOperationPublicId: "COVER-DUP" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-cover-self",
+    });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("SELF_TRANSITION");
@@ -1639,7 +1625,7 @@ describe("staffVerifyDefault", () => {
   });
 });
 
-describe("staffMarkResolvedByCover — capacity draw", () => {
+describe("staffRecordCover — capacity draw", () => {
   test("reserves the notice's updated amount and moves the guarantee to cover_committed", async () => {
     const t = setup();
     const fx = await makeFixture(t, "1", { status: "default_verified" });
@@ -1652,10 +1638,9 @@ describe("staffMarkResolvedByCover — capacity draw", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-happy", coverOperationPublicId: "COVER-D1" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-happy",
+    });
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.appliedCoverCents).toBe(250_000);
@@ -1691,10 +1676,9 @@ describe("staffMarkResolvedByCover — capacity draw", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-updated", coverOperationPublicId: "COVER-D2" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-updated",
+    });
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.appliedCoverCents).toBe(260_000);
@@ -1716,10 +1700,9 @@ describe("staffMarkResolvedByCover — capacity draw", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-clamp", coverOperationPublicId: "COVER-D3" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-clamp",
+    });
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.appliedCoverCents).toBe(100_000);
@@ -1749,10 +1732,9 @@ describe("staffMarkResolvedByCover — capacity draw", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-exhausted", coverOperationPublicId: "COVER-D4" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-exhausted",
+    });
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.appliedCoverCents).toBe(0);
@@ -1784,10 +1766,9 @@ describe("staffMarkResolvedByCover — capacity draw", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-unverified", coverOperationPublicId: "COVER-D6" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-unverified",
+    });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("NOTICE_NOT_VERIFIED");
@@ -1825,16 +1806,14 @@ describe("staffMarkResolvedByCover — capacity draw", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const first = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-month-1", coverOperationPublicId: "COVER-M1" },
-    );
+    const first = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-month-1",
+    });
     expect(first.success).toBe(true);
 
-    const second = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-month-2", coverOperationPublicId: "COVER-M2" },
-    );
+    const second = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-month-2",
+    });
     expect(second.success).toBe(true);
     if (!second.success) return;
     expect(second.data.appliedCoverCents).toBe(100_000);
@@ -1867,10 +1846,9 @@ describe("staffMarkResolvedByCover — capacity draw", () => {
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
-    const result = await asCompliance.mutation(
-      api.delinquencies.mutations.staffMarkResolvedByCover,
-      { noticePublicId: "DN-draw-active", coverOperationPublicId: "COVER-D5" },
-    );
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-active",
+    });
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.code).toBe("GUARANTEE_TRANSITION_REFUSED");
@@ -2251,5 +2229,119 @@ describe("return to active — who may leave which state", () => {
     if (!result.success) return;
     expect(result.data.guaranteeReturnedToActive).toBe(false);
     expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("default_verified");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Agency-side notice writes are audited like the staff ones
+// ---------------------------------------------------------------------------
+
+async function readNoticeAudit(t: T, noticePublicId: string) {
+  return t.run((ctx) =>
+    ctx.db
+      .query("mutavAuditLog")
+      .withIndex("by_resource", (q) =>
+        q.eq("resourceType", "guaranteeDelinquencyNotices").eq("resourceId", noticePublicId),
+      )
+      .collect(),
+  );
+}
+
+describe("agency-side notice writes — audit", () => {
+  test("openNotice appends delinquency.opened with the agency user as actor", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const audit = await readNoticeAudit(t, result.data.publicId);
+    expect(audit.map((entry) => entry.action)).toEqual(["delinquency.opened"]);
+    expect(audit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("a refused openNotice appends no audit entry at all", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-CT-1-2026-06-05", rentDueDate: "2026-06-05" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      rentDueDate: "2026-06-05",
+      originalAmountCents: 300_000,
+    });
+    expect(result.success).toBe(false);
+    expect(await t.run((ctx) => ctx.db.query("mutavAuditLog").collect())).toEqual([]);
+  });
+
+  test("markResolved appends delinquency.resolved", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-r" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-audit-r",
+      resolution: { kind: "stale" },
+    });
+    expect(result.success).toBe(true);
+
+    const audit = await readNoticeAudit(t, "DN-audit-r");
+    expect(audit.map((entry) => entry.action)).toEqual(["delinquency.resolved"]);
+    expect(audit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("a markResolved refused on a verified notice appends nothing", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-rv", status: "verified" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markResolved, {
+      noticePublicId: "DN-audit-rv",
+      resolution: { kind: "tenant_cured" },
+    });
+    expect(result.success).toBe(false);
+    expect(await readNoticeAudit(t, "DN-audit-rv")).toEqual([]);
+  });
+
+  test("markCanceled appends delinquency.canceled", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-c" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-audit-c",
+      cancellation: { reason: "duplicate" },
+    });
+    expect(result.success).toBe(true);
+
+    const audit = await readNoticeAudit(t, "DN-audit-c");
+    expect(audit.map((entry) => entry.action)).toEqual(["delinquency.canceled"]);
+    expect(audit[0].actor).toEqual({ kind: "user", userId: fx.userId });
+  });
+
+  test("a markCanceled refused on a canceled notice appends nothing", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-audit-cc", status: "canceled" });
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.delinquencies.mutations.markCanceled, {
+      noticePublicId: "DN-audit-cc",
+      cancellation: { reason: "duplicate" },
+    });
+    expect(result.success).toBe(false);
+    expect(await readNoticeAudit(t, "DN-audit-cc")).toEqual([]);
   });
 });

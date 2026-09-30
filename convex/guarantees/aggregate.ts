@@ -3,7 +3,12 @@ import { components } from "../_generated/api";
 import type { DataModel } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import type { AgencyId } from "../agencies/domain";
-import { GUARANTEE_STATES, INSURED_STATES, type GuaranteeState } from "./domain";
+import {
+  GUARANTEE_STATES,
+  INSURED_STATES,
+  VERIFIED_DEFAULT_STATES,
+  type GuaranteeState,
+} from "./domain";
 
 export type GuaranteeStateCounts = Record<GuaranteeState, number>;
 
@@ -98,13 +103,25 @@ export async function countByStatePlatform(ctx: QueryCtx): Promise<GuaranteeStat
   return shapeStateCounts(counts);
 }
 
-/** Platform-wide worst-case exposure over every in-force guarantee. */
-export async function sumInsuredExposure(ctx: QueryCtx): Promise<number> {
+async function sumExposureOverStates(
+  ctx: QueryCtx,
+  states: readonly GuaranteeState[],
+): Promise<number> {
   let total = 0;
-  for (const state of INSURED_STATES) {
+  for (const state of states) {
     total += await insuredCentsPlatform.sum(ctx, { bounds: singleKeyBounds(state) });
   }
   return total;
+}
+
+/** Platform-wide worst-case exposure over every in-force guarantee. */
+export async function sumInsuredExposure(ctx: QueryCtx): Promise<number> {
+  return sumExposureOverStates(ctx, INSURED_STATES);
+}
+
+/** Platform-wide worst-case exposure over the guarantees in verified default. */
+export async function sumVerifiedDefaultExposure(ctx: QueryCtx): Promise<number> {
+  return sumExposureOverStates(ctx, VERIFIED_DEFAULT_STATES);
 }
 
 /** Platform-wide number of in-force guarantees. */

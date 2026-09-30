@@ -51,6 +51,7 @@ gh api repos/mutav-finance/mutav/contents/docs/whitepaper.md --jq '.content' | b
 
 **Surfaces:**
 
+- [`docs/architecture/guarantee-lifecycle.md`](docs/architecture/guarantee-lifecycle.md) — Guarantee lifecycle spec (7 states, transition matrix, close reasons, notice ↔ guarantee coupling, capacity policy C, single write path, audit) — every rule cited to code + test. Read before touching `convex/guarantees/` or `convex/delinquencies/`.
 - [`docs/architecture/admin.md`](docs/architecture/admin.md) — Mutav Admin (`mutavStaff` actor, `(admin)` shell, A1–A6 pillars, default-approval workflow, NAV updates, hash-chained audit log)
 - [`docs/architecture/investor.md`](docs/architecture/investor.md) — Investor portal (per-chain wallet-as-identity, level-gated KYC, wallet kit architecture, workflow-based deposit/redeem)
 

@@ -7,15 +7,24 @@ import {
   settledAccessTokenExpiry,
 } from "./invoices/domain";
 import { generateInvoiceMuxedId } from "./invoices/lib/muxedId";
-import { generateInvoiceAccessToken } from "./lib/randomId";
+import {
+  generateCoverBatchId,
+  generateCoverOperationPublicId,
+  generateInvoiceAccessToken,
+} from "./lib/randomId";
 import { SettlementMethods, type SettlementMethod } from "./payments/domain";
 import type { AgencyId } from "./agencies/domain";
 import {
   DELINQUENCY_STATUS,
+  NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
   type DelinquencyNotice,
+  type DelinquencyNoticeId,
+  type NoticeCancellationReason,
+  type NoticeResolutionKind,
 } from "./delinquencies/domain";
+import { COVER_OPERATION_STATUS, coveragePeriodOf } from "./coverOperations/domain";
 import {
   assertClose,
   assertTransition,
@@ -76,6 +85,160 @@ const leasePid = (guaranteePublicId: string) => `LSE-${guaranteePublicId}`;
  */
 const d = (s: string) => new Date(s).toISOString();
 
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * The live half of the dataset — the delinquency and cover book, the Aprovada
+ * lives and the latest invoice months — is dated back from the moment of the
+ * reseed rather than pinned to a calendar, so a reseed on any day shows an
+ * overdue notice from this week instead of one from months ago. `Date.now()`
+ * is the clock every mutation stamps with (`new Date().toISOString()`), and
+ * Convex fixes it for the whole transaction, so one reseed has one "now".
+ *
+ * Returns the timestamp `days` whole days before now at the given UTC wall
+ * clock. Callers pass `days >= 1`, so the result is always in the past.
+ */
+function daysAgo(days: number, utcTime = "13:00"): string {
+  const day = new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
+  return new Date(`${day}T${utcTime}:00.000Z`).toISOString();
+}
+
+/** Calendar date (`YYYY-MM-DD`) `days` before now; negative days look ahead. */
+function dateDaysAgo(days: number): string {
+  return new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
+}
+
+/**
+ * Due date for a seeded billing month: the 10th, except the current month is
+ * never due sooner than a week from the reseed — an invoice issued this month
+ * must not be born overdue (`isOverdue` compares `dueDate < today`), whatever
+ * day of the month the reseed runs on. Mirrors the testnet invoices below.
+ */
+function seedDueDate(month: string): string {
+  const tenth = `${month}-10`;
+  if (month !== monthsAgo(0)) return tenth;
+  const nextWeek = dateDaysAgo(-7);
+  return nextWeek > tenth ? nextWeek : tenth;
+}
+
+/** Billing month (`YYYY-MM`) `months` before the current UTC month. */
+function monthsAgo(months: number): string {
+  const now = new Date(Date.now());
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, 1))
+    .toISOString()
+    .slice(0, 7);
+}
+
+// Payment instruments that are unmistakably demo data: a nil-UUID Pix key and
+// an all-zero boleto line, shaped like the real thing so the invoice screens
+// render them the same way. A real bank's line or a live-looking Pix key in a
+// screen recording reads as someone's actual account.
+const DEMO_PIX_BR_CODE = "00020126580014br.gov.bcb.pix013600000000-0000-0000-0000-000000000000";
+const DEMO_BOLETO_LINE = "00000.00000 00000.000000 00000.000000 0 00000000000000";
+
+/** 32-char Pix end-to-end id with the all-zero ISPB, e.g. `E00000000202609091000DEMO0200001`. */
+function demoPixEndToEndId(month: string, suffix: string): string {
+  return `E00000000${month.replace("-", "")}091000DEMO${suffix}001`;
+}
+
+/**
+ * Insert the ledger row `staffRecordCover` / `staffRecordCoverBatch` would
+ * write for a cover-resolved notice and link the notice to it — the same two
+ * fields the mutation stamps on the resolution (`coverOperationId` and its
+ * public reference). Amount, period and author are read off the notice, so
+ * the two rows cannot disagree; the id comes from the live generator.
+ */
+async function insertSeedCoverOperation(
+  ctx: MutationCtx,
+  {
+    noticeId,
+    batchId,
+    execution,
+  }: {
+    noticeId: DelinquencyNoticeId;
+    batchId: string | undefined;
+    execution: { executedAt: string; paymentReference: string } | null;
+  },
+): Promise<void> {
+  const notice = await ctx.db.get(noticeId);
+  const resolution = notice?.resolution;
+  const coveragePeriod = notice ? coveragePeriodOf(notice.rentDueDate) : null;
+  if (
+    !notice ||
+    !resolution ||
+    resolution.kind !== NOTICE_RESOLUTION_KIND.COVER_COMMITTED ||
+    resolution.appliedCoverCents === undefined ||
+    coveragePeriod === null
+  ) {
+    throw new Error(`Seed notice ${noticeId} is not a cover-resolved notice.`);
+  }
+  const publicId = generateCoverOperationPublicId();
+  const operationId = await ctx.db.insert("coverOperations", {
+    publicId,
+    status: execution ? COVER_OPERATION_STATUS.EXECUTED : COVER_OPERATION_STATUS.RECORDED,
+    noticeId,
+    guaranteeId: notice.guaranteeId,
+    agencyId: notice.agencyId,
+    coveragePeriod,
+    ...(batchId === undefined ? {} : { batchId }),
+    requestedCents: notice.updatedAmountCents,
+    appliedCents: resolution.appliedCoverCents,
+    recordedAt: resolution.resolvedAt,
+    recordedByUserId: resolution.resolvedByUserId,
+    ...(resolution.note === undefined ? {} : { note: resolution.note }),
+    ...(execution
+      ? {
+          execution: {
+            executedAt: execution.executedAt,
+            executedByUserId: resolution.resolvedByUserId,
+            paymentReference: execution.paymentReference,
+          },
+        }
+      : {}),
+  });
+  await ctx.db.patch(noticeId, {
+    resolution: { ...resolution, coverOperationId: operationId, coverOperationPublicId: publicId },
+  });
+}
+
+/** A cover `staffMarkCoverExecuted` has confirmed: the payout has left. */
+async function seedExecutedCover(
+  ctx: MutationCtx,
+  {
+    noticeId,
+    batchId,
+    executedAt,
+  }: { noticeId: DelinquencyNoticeId; batchId?: string; executedAt: string },
+): Promise<void> {
+  // Pix end-to-end-shaped, but plainly a demo reference.
+  const paymentReference = `E2E-DEMO-${executedAt.slice(0, 10).replaceAll("-", "")}`;
+  await insertSeedCoverOperation(ctx, {
+    noticeId,
+    batchId,
+    execution: { executedAt, paymentReference },
+  });
+}
+
+/** A cover recorded and still awaiting its payout — the admin's payout queue. */
+async function seedRecordedCover(
+  ctx: MutationCtx,
+  { noticeId, batchId }: { noticeId: DelinquencyNoticeId; batchId: string },
+): Promise<void> {
+  await insertSeedCoverOperation(ctx, { noticeId, batchId, execution: null });
+}
+
+/**
+ * Shared batch references for the seeded cover book. A batch is one
+ * transaction, so every row under one id carries the same `recordedAt`.
+ */
+type SeedCoverBatches = { executed: string; recorded: string };
+
+/** When the executed batch was recorded — shared by every row in it. */
+const executedBatchRecordedAt = () => daysAgo(28, "17:30");
+const executedBatchExecutedAt = () => daysAgo(27, "14:00");
+/** When the pending batch was recorded — this week, still unpaid. */
+const recordedBatchRecordedAt = () => daysAgo(2, "18:10");
+
 /**
  * Demo tables wiped by `seedReset`. Order matters —
  * tables with foreign-key-like references come first so we don't leave
@@ -109,6 +272,9 @@ const DEMO_TABLES = [
   // pointers mid-wipe.
   "payments",
   "invoices",
+  // Cover operations and notices point at each other; the ledger rows go
+  // first so no `resolution.coverOperationId` outlives its row for long.
+  "coverOperations",
   // Notices FK-reference guarantees + users. Wipe before guarantees so we
   // don't leave dangling guaranteeId pointers mid-wipe.
   "guaranteeDelinquencyNotices",
@@ -213,6 +379,7 @@ type SeededLeaseAndGuarantee = {
   guaranteeId: GuaranteeId;
   leaseId: LeaseId;
   publicId: string;
+  activatedAt: string | null;
   terms: GuaranteeTerms;
 };
 
@@ -248,11 +415,6 @@ async function insertSeedLeaseAndGuarantee(
     throw new Error(`Seed tenant for guarantee ${spec.publicId}: ${result.message}`);
   }
 
-  const tier = tierForScore(tenant.score);
-  if (tier === SCORE_TIER.NEGADO) {
-    throw new Error(`Seed tenant for guarantee ${spec.publicId} has a denied score`);
-  }
-
   const leaseId = await ctx.db.insert("leases", {
     agencyId: spec.agencyId,
     publicId: leasePid(spec.publicId),
@@ -266,9 +428,84 @@ async function insertSeedLeaseAndGuarantee(
     openGuaranteeId: null,
   });
 
+  return insertSeedGuarantee(ctx, {
+    product,
+    agencyId: spec.agencyId,
+    leaseId,
+    publicId: spec.publicId,
+    rentCents: lease.rent.rentCents,
+    guarantee,
+    tenant,
+  });
+}
+
+/**
+ * A further guarantee written on a lease that already carries one — the renewal
+ * shape, where a lease outlives the guarantee it was first written with. Priced
+ * off the lease's own rent; the tenant block supplies only the underwriting of
+ * this new life. The lease's `openGuaranteeId` moves only if this one is open,
+ * so a caller must close the predecessor first, as production does.
+ */
+async function insertSeedGuaranteeOnLease(
+  ctx: MutationCtx,
+  {
+    product,
+    leaseId,
+    publicId,
+    guarantee,
+    tenant,
+  }: {
+    product: Product;
+    leaseId: LeaseId;
+    publicId: string;
+    guarantee: SeedLeaseSpec["guarantee"];
+    tenant: Pick<SeedTenantBlock, "approvalStatus" | "termApprovedAt" | "score">;
+  },
+): Promise<SeededLeaseAndGuarantee> {
+  const lease = await ctx.db.get(leaseId);
+  if (!lease) throw new Error(`Seed guarantee ${publicId} targets a missing lease`);
+  if (lease.openGuaranteeId !== null) {
+    throw new Error(`Seed guarantee ${publicId}: lease ${lease.publicId} already has one open`);
+  }
+  return insertSeedGuarantee(ctx, {
+    product,
+    agencyId: lease.agencyId,
+    leaseId,
+    publicId,
+    rentCents: lease.rent.rentCents,
+    guarantee,
+    tenant,
+  });
+}
+
+async function insertSeedGuarantee(
+  ctx: MutationCtx,
+  {
+    product,
+    agencyId,
+    leaseId,
+    publicId,
+    rentCents,
+    guarantee,
+    tenant,
+  }: {
+    product: Product;
+    agencyId: AgencyId;
+    leaseId: LeaseId;
+    publicId: string;
+    rentCents: number;
+    guarantee: SeedLeaseSpec["guarantee"];
+    tenant: Pick<SeedTenantBlock, "approvalStatus" | "termApprovedAt" | "score">;
+  },
+): Promise<SeededLeaseAndGuarantee> {
+  const tier = tierForScore(tenant.score);
+  if (tier === SCORE_TIER.NEGADO) {
+    throw new Error(`Seed tenant for guarantee ${publicId} has a denied score`);
+  }
+
   const priced = priceGuarantee(
     {
-      rentCents: lease.rent.rentCents,
+      rentCents,
       tier,
       plan: guarantee.plan ?? DEFAULT_GUARANTEE_PLAN,
       productSlug: product.slug,
@@ -279,13 +516,13 @@ async function insertSeedLeaseAndGuarantee(
   );
   const reservedCents = guarantee.reservedCents ?? 0;
   if (reservedCents > priced.capacity.ceilingCents) {
-    throw new Error(`Seed guarantee ${spec.publicId} reserves more than its coverage ceiling`);
+    throw new Error(`Seed guarantee ${publicId} reserves more than its coverage ceiling`);
   }
 
   const guaranteeId = await ctx.db.insert("guarantees", {
-    agencyId: spec.agencyId,
+    agencyId,
     leaseId,
-    publicId: spec.publicId,
+    publicId,
     productId: product._id,
     status: guarantee.state,
     ...(guarantee.closure ? { closure: guarantee.closure } : {}),
@@ -310,11 +547,18 @@ async function insertSeedLeaseAndGuarantee(
   }
 
   const doc = await ctx.db.get(guaranteeId);
-  if (!doc) throw new Error(`Seed guarantee ${spec.publicId} insert failed`);
+  if (!doc) throw new Error(`Seed guarantee ${publicId} insert failed`);
   await insertGuaranteeAggregates(ctx, doc);
 
-  return { guaranteeId, leaseId, publicId: spec.publicId, terms: priced.terms };
+  return {
+    guaranteeId,
+    leaseId,
+    publicId,
+    activatedAt: guarantee.activatedAt,
+    terms: priced.terms,
+  };
 }
+
 /**
  * Insert a paid invoice plus its mirroring `payments` settlement row in
  * one call. The settlement reuses the invoice's own `paidAt`, total, and
@@ -332,13 +576,7 @@ async function seedPaidInvoice(
     totalCents: number;
     paidAt: string;
     method: SettlementMethod;
-    lineItems: Array<{
-      guaranteeId: GuaranteeId;
-      guaranteePublicId: string;
-      kind: "recurring" | "activation";
-      amountCents: number;
-      description: string;
-    }>;
+    lineItems: SeedInvoiceLineItem[];
   },
 ) {
   const invoiceId = await ctx.db.insert("invoices", {
@@ -371,6 +609,57 @@ async function seedPaidInvoice(
   return invoiceId;
 }
 
+type SeedInvoiceLineItem = {
+  guaranteeId: GuaranteeId;
+  guaranteePublicId: string;
+  kind: "recurring" | "activation";
+  amountCents: number;
+  description: string;
+};
+
+/** An issued invoice nobody has paid yet — overdue once its `dueDate` passes. */
+async function seedOpenInvoice(
+  ctx: MutationCtx,
+  invoice: {
+    agencyId: AgencyId;
+    publicId: string;
+    periodMonth: string;
+    issuedAt: string;
+    dueDate: string;
+    lineItems: SeedInvoiceLineItem[];
+  },
+) {
+  return ctx.db.insert("invoices", {
+    ...invoice,
+    totalCents: invoice.lineItems.reduce((sum, item) => sum + item.amountCents, 0),
+    state: InvoiceStates.open(),
+    accessToken: generateInvoiceAccessToken(),
+    accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
+    muxedId: generateInvoiceMuxedId(),
+  });
+}
+
+/**
+ * The recurring line items a month's invoice bills: each guarantee's own
+ * priced fee (`terms.feeCents`, the figure `generateMonthlyInvoices` uses),
+ * for every guarantee already in force by that month — a guarantee is never
+ * billed for a month before its activation.
+ */
+function recurringLineItems(
+  rows: readonly SeededLeaseAndGuarantee[],
+  month: string,
+): SeedInvoiceLineItem[] {
+  return rows
+    .filter((row) => row.activatedAt !== null && row.activatedAt.slice(0, 7) <= month)
+    .map((row) => ({
+      guaranteeId: row.guaranteeId,
+      guaranteePublicId: row.publicId,
+      kind: INVOICE_LINE_ITEM_KIND.RECURRING,
+      amountCents: row.terms.feeCents,
+      description: `Mensalidade contrato ${row.publicId} — ${month}`,
+    }));
+}
+
 /**
  * Pick the on-chain/anchor reference that the dual-write path records as
  * `externalRef` (tx hash for Stellar, anchor txId for Pix; boleto has
@@ -387,15 +676,363 @@ function externalRefForSettlement(method: SettlementMethod): string | undefined 
   }
 }
 
+const APPROVED_DOCUMENTS: Guarantee["documents"] = [
+  { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
+  { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
+  { key: "policy", status: DOCUMENT_STATUS.APROVADO },
+];
+
+/**
+ * A checksum-valid CPF from nine base digits — `getOrCreateTenant` rejects any
+ * tax id that fails the mod-11 check, so generated tenants need real check
+ * digits even though the people are fictional.
+ *
+ * Callers pass a small base (`1NN`, NN tracking the guarantee's public id), so
+ * every generated CPF reads `000.000.1NN-XX`: obviously synthetic when the
+ * agency screens show it in full, and clear of `00000000191` (p9) and the
+ * repeated-digit literals. A real-looking CPF in a screen recording reads as
+ * someone's actual tax id (LGPD).
+ */
+function seedCpf(base: number): string {
+  const digits = String(base).padStart(9, "0").slice(-9).split("").map(Number);
+  const checkDigit = (body: number[]) => {
+    const weighted = body.reduce((sum, digit, i) => sum + digit * (body.length + 1 - i), 0);
+    const remainder = (weighted * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  const first = checkDigit(digits);
+  const second = checkDigit([...digits, first]);
+  return [...digits, first, second].join("");
+}
+
+// Public ids 1000060+ — clear of the fictional (1–30, 50–51) and Aprovada
+// (31–41) ranges.
+const PERFORMING_FIRST_PID = 60;
+
+type PerformingFiller = {
+  city: "sp" | "rj";
+  fullName: string;
+  cep: string;
+  streetAndNumber: string;
+  neighborhood: string;
+  rentCents: number;
+  /** Activation month, `YYYY-MM`; all in the past so every one is billed. */
+  activatedMonth: string;
+};
+
+/**
+ * Plain performing leases for Paulista and Atlântica. They exist so the
+ * default rate the transparency page publishes — verified defaults over the
+ * in-force book — reads like a real portfolio's instead of a demo that is
+ * mostly defaults.
+ */
+const PERFORMING_FILLER: readonly PerformingFiller[] = [
+  {
+    city: "sp",
+    fullName: "Aline Barbosa Teixeira",
+    cep: "05415-020",
+    streetAndNumber: "Rua Teodoro Sampaio, 1420",
+    neighborhood: "Pinheiros",
+    rentCents: 245_000,
+    activatedMonth: "2024-11",
+  },
+  {
+    city: "sp",
+    fullName: "Caio Nogueira Brandão",
+    cep: "04534-011",
+    streetAndNumber: "Rua Tabapuã, 640",
+    neighborhood: "Itaim Bibi",
+    rentCents: 390_000,
+    activatedMonth: "2025-01",
+  },
+  {
+    city: "sp",
+    fullName: "Daniela Moraes Fonseca",
+    cep: "01426-001",
+    streetAndNumber: "Alameda Lorena, 1300",
+    neighborhood: "Jardim Paulista",
+    rentCents: 330_000,
+    activatedMonth: "2025-02",
+  },
+  {
+    city: "sp",
+    fullName: "Eduardo Siqueira Lopes",
+    cep: "04038-001",
+    streetAndNumber: "Rua Domingos de Morais, 870",
+    neighborhood: "Vila Mariana",
+    rentCents: 210_000,
+    activatedMonth: "2025-03",
+  },
+  {
+    city: "sp",
+    fullName: "Fabiana Rocha Guimarães",
+    cep: "03310-000",
+    streetAndNumber: "Rua Tuiuti, 1500",
+    neighborhood: "Tatuapé",
+    rentCents: 185_000,
+    activatedMonth: "2025-04",
+  },
+  {
+    city: "sp",
+    fullName: "Gabriel Antunes Paiva",
+    cep: "05011-000",
+    streetAndNumber: "Rua Cardoso de Almeida, 820",
+    neighborhood: "Perdizes",
+    rentCents: 275_000,
+    activatedMonth: "2025-05",
+  },
+  {
+    city: "sp",
+    fullName: "Isadora Pacheco Leme",
+    cep: "04563-001",
+    streetAndNumber: "Rua Pensilvânia, 380",
+    neighborhood: "Brooklin",
+    rentCents: 298_000,
+    activatedMonth: "2025-06",
+  },
+  {
+    city: "sp",
+    fullName: "João Vitor Cardoso Reis",
+    cep: "02012-010",
+    streetAndNumber: "Rua Alfredo Pujol, 950",
+    neighborhood: "Santana",
+    rentCents: 172_000,
+    activatedMonth: "2025-08",
+  },
+  {
+    city: "sp",
+    fullName: "Larissa Figueira Campos",
+    cep: "04005-001",
+    streetAndNumber: "Rua Tutóia, 410",
+    neighborhood: "Paraíso",
+    rentCents: 265_000,
+    activatedMonth: "2025-09",
+  },
+  {
+    city: "sp",
+    fullName: "Marcelo Diniz Amaral",
+    cep: "05303-000",
+    streetAndNumber: "Rua Guaicurus, 1200",
+    neighborhood: "Lapa",
+    rentCents: 198_000,
+    activatedMonth: "2025-11",
+  },
+  {
+    city: "sp",
+    fullName: "Natália Corrêa Bittencourt",
+    cep: "01238-010",
+    streetAndNumber: "Rua Itacolomi, 520",
+    neighborhood: "Higienópolis",
+    rentCents: 410_000,
+    activatedMonth: "2026-01",
+  },
+  {
+    city: "sp",
+    fullName: "Paulo Henrique Vasconcelos",
+    cep: "04116-020",
+    streetAndNumber: "Rua Loefgren, 1600",
+    neighborhood: "Vila Clementino",
+    rentCents: 226_000,
+    activatedMonth: "2026-03",
+  },
+  {
+    city: "sp",
+    fullName: "Renata Sampaio Toledo",
+    cep: "05586-000",
+    streetAndNumber: "Av. Corifeu de Azevedo Marques, 900",
+    neighborhood: "Butantã",
+    rentCents: 205_000,
+    activatedMonth: "2026-05",
+  },
+  {
+    city: "rj",
+    fullName: "Sérgio Albuquerque Mota",
+    cep: "22031-000",
+    streetAndNumber: "Rua Barata Ribeiro, 520",
+    neighborhood: "Copacabana",
+    rentCents: 310_000,
+    activatedMonth: "2024-12",
+  },
+  {
+    city: "rj",
+    fullName: "Tânia Coutinho Valadares",
+    cep: "22460-030",
+    streetAndNumber: "Rua Jardim Botânico, 700",
+    neighborhood: "Jardim Botânico",
+    rentCents: 360_000,
+    activatedMonth: "2025-01",
+  },
+  {
+    city: "rj",
+    fullName: "Ubirajara Fontes Leal",
+    cep: "20550-013",
+    streetAndNumber: "Rua Barão de Mesquita, 450",
+    neighborhood: "Tijuca",
+    rentCents: 205_000,
+    activatedMonth: "2025-03",
+  },
+  {
+    city: "rj",
+    fullName: "Vanessa Pimentel Araújo",
+    cep: "22250-040",
+    streetAndNumber: "Rua Voluntários da Pátria, 190",
+    neighborhood: "Botafogo",
+    rentCents: 285_000,
+    activatedMonth: "2025-04",
+  },
+  {
+    city: "rj",
+    fullName: "Wagner Lacerda Bastos",
+    cep: "22631-000",
+    streetAndNumber: "Av. Lúcio Costa, 3150",
+    neighborhood: "Barra da Tijuca",
+    rentCents: 420_000,
+    activatedMonth: "2025-05",
+  },
+  {
+    city: "rj",
+    fullName: "Yasmin Carvalhal Neves",
+    cep: "22230-060",
+    streetAndNumber: "Rua do Catete, 228",
+    neighborhood: "Catete",
+    rentCents: 178_000,
+    activatedMonth: "2025-06",
+  },
+  {
+    city: "rj",
+    fullName: "André Luiz Magalhães",
+    cep: "20211-340",
+    streetAndNumber: "Rua Haddock Lobo, 360",
+    neighborhood: "Tijuca",
+    rentCents: 192_000,
+    activatedMonth: "2025-07",
+  },
+  {
+    city: "rj",
+    fullName: "Bianca Serrano Veloso",
+    cep: "22270-010",
+    streetAndNumber: "Rua São Clemente, 250",
+    neighborhood: "Botafogo",
+    rentCents: 305_000,
+    activatedMonth: "2025-09",
+  },
+  {
+    city: "rj",
+    fullName: "Cláudio Rangel Peixoto",
+    cep: "22410-003",
+    streetAndNumber: "Rua Visconde de Pirajá, 980",
+    neighborhood: "Ipanema",
+    rentCents: 470_000,
+    activatedMonth: "2025-10",
+  },
+  {
+    city: "rj",
+    fullName: "Débora Falcão Miranda",
+    cep: "20260-080",
+    streetAndNumber: "Rua Conde de Bonfim, 820",
+    neighborhood: "Tijuca",
+    rentCents: 215_000,
+    activatedMonth: "2025-12",
+  },
+  {
+    city: "rj",
+    fullName: "Emanuel Tavares Queiroz",
+    cep: "22775-040",
+    streetAndNumber: "Estrada dos Bandeirantes, 7000",
+    neighborhood: "Jacarepaguá",
+    rentCents: 168_000,
+    activatedMonth: "2026-02",
+  },
+  {
+    city: "rj",
+    fullName: "Flávia Monteiro Castilho",
+    cep: "22021-001",
+    streetAndNumber: "Av. Nossa Senhora de Copacabana, 1100",
+    neighborhood: "Copacabana",
+    rentCents: 295_000,
+    activatedMonth: "2026-04",
+  },
+  {
+    city: "rj",
+    fullName: "Guilherme Prates Rezende",
+    cep: "24220-001",
+    streetAndNumber: "Rua Moreira César, 300",
+    neighborhood: "Icaraí",
+    rentCents: 188_000,
+    activatedMonth: "2026-06",
+  },
+];
+
+function performingFillerSpec({
+  agencyId,
+  publicId,
+  index,
+  filler,
+}: {
+  agencyId: AgencyId;
+  publicId: string;
+  index: number;
+  filler: PerformingFiller;
+}): SeedLeaseSpec {
+  const isPaulista = filler.city === "sp";
+  const emailLocal = filler.fullName
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(" ")
+    .filter((_, i, parts) => i === 0 || i === parts.length - 1)
+    .join(".");
+  const activatedAt = d(`${filler.activatedMonth}-12T10:00:00-03:00`);
+  const renewalYear = Number(filler.activatedMonth.slice(0, 4)) + 2;
+  return {
+    agencyId,
+    publicId,
+    lease: {
+      propertyKind: PROPERTY_KIND.RESIDENTIAL,
+      property: {
+        cep: filler.cep,
+        streetAndNumber: filler.streetAndNumber,
+        neighborhood: filler.neighborhood,
+        cityUF: isPaulista ? "São Paulo/SP" : "Rio de Janeiro/RJ",
+        complement: `Apto ${101 + index * 7}`,
+      },
+      tag: "",
+      description: "",
+      rent: {
+        rentCents: filler.rentCents,
+        condoCents: Math.round(filler.rentCents * 0.14),
+        otherFeesCents: 0,
+      },
+    },
+    guarantee: {
+      state: GUARANTEE_STATE.ACTIVE,
+      activatedAt,
+      nextRenewalDate: `${renewalYear}${filler.activatedMonth.slice(4)}-12`,
+      documents: APPROVED_DOCUMENTS,
+    },
+    tenant: {
+      approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
+      fullName: filler.fullName,
+      cpf: seedCpf(PERFORMING_FIRST_PID + 100 + index),
+      birthDate: `${1978 + (index % 20)}-${String((index % 12) + 1).padStart(2, "0")}-15`,
+      email: `${emailLocal}@example.com`,
+      phone: `${isPaulista ? "11" : "21"}9000001${String(index).padStart(2, "0")}`,
+      termApprovedAt: d(`${filler.activatedMonth}-05T10:00:00-03:00`),
+      score: 660 + ((index * 37) % 180),
+    },
+  };
+}
+
 type SeedFictionalResult = {
   agencies: { paulistaId: AgencyId; atlanticaId: AgencyId; horizonteId: AgencyId };
   guaranteeCounts: { paulista: number; atlantica: number; horizonte: number };
 };
 
 /**
- * Additive dev seed — inserts 3 agencies, 30 leases each carrying one
- * guarantee priced through the default product, guarantee history, and
- * historical payments covering the last two months. Does NOT wipe
+ * Additive dev seed — inserts 3 agencies, their leases each carrying one
+ * guarantee priced through the default product, the platform's share of the
+ * default and cover book, guarantee history, and seven months of invoices
+ * ending in the current one. Does NOT wipe
  * existing rows and does NOT seed the `agencyowner` persona's own agency
  * ("Imobiliária Aprovada"). It is deliberately a private helper, not a
  * runnable entrypoint: running it by hand leaves `agencyowner` staring at
@@ -412,11 +1049,14 @@ type SeedFictionalResult = {
  * `staffUserId` signs the staff-only notice dispositions (verification,
  * cover) in the dataset, the way `mutationWithMutavRole` would in production.
  *
- * Dev-only. Do NOT call from production.
+ * For dev/preview deployments, and for the production demo environment
+ * only before any real agency data exists, via `seedReset` — which wipes the
+ * demo tables first and keeps `waitlist`, `contractApplications`, the audit
+ * chain and the staff tables (see `DEMO_TABLES`).
  */
 async function seedFictional(
   ctx: MutationCtx,
-  args: { adminEmail?: string; staffUserId: UserId },
+  args: { adminEmail?: string; staffUserId: UserId; coverBatches: SeedCoverBatches },
 ): Promise<SeedFictionalResult> {
   {
     const product = await requireDefaultProduct(ctx);
@@ -772,7 +1412,7 @@ async function seedFictional(
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-12-28T10:00:00-03:00"),
-        nextRenewalDate: "2026-09-01",
+        nextRenewalDate: dateDaysAgo(-30),
         documents: [
           { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
           { key: "inspection", status: DOCUMENT_STATUS.ENVIADO },
@@ -810,7 +1450,7 @@ async function seedFictional(
       guarantee: {
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-05T10:00:00-03:00"),
-        nextRenewalDate: "2026-08-20",
+        nextRenewalDate: dateDaysAgo(-45),
         documents: [
           { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
           { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
@@ -1689,30 +2329,174 @@ async function seedFictional(
       },
     });
 
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${h2.publicId}-2026-04-15`,
+    const horizonteCoverRentDue = dateDaysAgo(52);
+    const horizonteCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${h2.publicId}-${horizonteCoverRentDue}`,
       guaranteeId: h2.guaranteeId,
       agencyId: horizonteId,
       status: DELINQUENCY_STATUS.RESOLVED,
-      rentDueDate: "2026-04-15",
+      rentDueDate: horizonteCoverRentDue,
       originalAmountCents: 500_000,
       updatedAmountCents: HORIZONTE_COVER_APPLIED_CENTS,
       evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
-      openedAt: d("2026-04-20T09:00:00-03:00"),
+      openedAt: daysAgo(47, "12:00"),
       openedByUserId: horizonteOwnerId,
       verification: {
-        verifiedAt: d("2026-04-30T14:00:00-03:00"),
+        verifiedAt: daysAgo(36, "17:00"),
         verifiedByUserId: args.staffUserId,
       },
       resolution: {
         kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
-        resolvedAt: d("2026-05-05T15:00:00-03:00"),
+        resolvedAt: executedBatchRecordedAt(),
         resolvedByUserId: args.staffUserId,
-        coverOperationPublicId: "COV-2026-05-0001",
         appliedCoverCents: HORIZONTE_COVER_APPLIED_CENTS,
-        note: "Cobertura paga; ação de despejo ajuizada em 2026-05-20.",
+        note: "Lote semanal de coberturas.",
       },
     });
+    await seedExecutedCover(ctx, {
+      noticeId: horizonteCoveredNoticeId,
+      batchId: args.coverBatches.executed,
+      executedAt: executedBatchExecutedAt(),
+    });
+
+    // ── The rest of the platform's default book ───────────────────────────────
+    // A verified default outside the persona's agency, so the admin defaults
+    // queue spans agencies, and a cover recorded this week in the same pending
+    // batch as one of Aprovada's, so the payout panel shows a cross-agency batch.
+
+    const paulistaDefault = await insertLeaseAndGuarantee({
+      agencyId: paulistaId,
+      publicId: pid(50),
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "04101-000",
+          streetAndNumber: "Rua Vergueiro, 2250",
+          neighborhood: "Vila Mariana",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 114",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 260_000, condoCents: 38_000, otherFeesCents: 0 },
+      },
+      guarantee: {
+        state: GUARANTEE_STATE.DEFAULT_VERIFIED,
+        activatedAt: d("2025-10-20T10:00:00-03:00"),
+        nextRenewalDate: "2027-10-20",
+        documents: APPROVED_DOCUMENTS,
+      },
+      tenant: {
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
+        fullName: "Otávio Resende Prado",
+        cpf: seedCpf(150),
+        birthDate: "1987-06-11",
+        email: "otavio.prado@example.com",
+        phone: "11900000050",
+        termApprovedAt: d("2025-10-15T10:00:00-03:00"),
+        score: 690,
+      },
+    });
+    const paulistaDefaultRentDue = dateDaysAgo(22);
+    await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${paulistaDefault.publicId}-${paulistaDefaultRentDue}`,
+      guaranteeId: paulistaDefault.guaranteeId,
+      agencyId: paulistaId,
+      status: DELINQUENCY_STATUS.VERIFIED,
+      rentDueDate: paulistaDefaultRentDue,
+      originalAmountCents: 260_000,
+      updatedAmountCents: 268_450,
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
+      openedAt: daysAgo(17, "14:25"),
+      openedByUserId: paulistaOwnerId,
+      verification: {
+        verifiedAt: daysAgo(5, "16:40"),
+        verifiedByUserId: args.staffUserId,
+        note: "Proprietário confirmou o não pagamento; inquilino sem resposta.",
+      },
+    });
+
+    // Rent + condo of the missed month plus accrued juros and multa.
+    const ATLANTICA_COVER_APPLIED_CENTS = 431_600;
+    const atlanticaCovered = await insertLeaseAndGuarantee({
+      agencyId: atlanticaId,
+      publicId: pid(51),
+      lease: {
+        propertyKind: PROPERTY_KIND.RESIDENTIAL,
+        property: {
+          cep: "22290-030",
+          streetAndNumber: "Av. Pasteur, 110",
+          neighborhood: "Botafogo",
+          cityUF: "Rio de Janeiro/RJ",
+          complement: "Apto 903",
+        },
+        tag: "",
+        description: "",
+        rent: { rentCents: 380_000, condoCents: 36_000, otherFeesCents: 0 },
+      },
+      guarantee: {
+        state: GUARANTEE_STATE.COVER_COMMITTED,
+        activatedAt: d("2025-11-18T10:00:00-03:00"),
+        reservedCents: ATLANTICA_COVER_APPLIED_CENTS,
+        nextRenewalDate: "2027-11-18",
+        documents: APPROVED_DOCUMENTS,
+      },
+      tenant: {
+        approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
+        fullName: "Helena Duarte Quintela",
+        cpf: seedCpf(151),
+        birthDate: "1990-02-03",
+        email: "helena.quintela@example.com",
+        phone: "21900000051",
+        termApprovedAt: d("2025-11-10T10:00:00-03:00"),
+        score: 710,
+      },
+    });
+    const atlanticaCoverRentDue = dateDaysAgo(33);
+    const atlanticaCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${atlanticaCovered.publicId}-${atlanticaCoverRentDue}`,
+      guaranteeId: atlanticaCovered.guaranteeId,
+      agencyId: atlanticaId,
+      status: DELINQUENCY_STATUS.RESOLVED,
+      rentDueDate: atlanticaCoverRentDue,
+      originalAmountCents: 416_000,
+      updatedAmountCents: ATLANTICA_COVER_APPLIED_CENTS,
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
+      openedAt: daysAgo(28, "11:15"),
+      openedByUserId: atlanticaOwnerId,
+      verification: {
+        verifiedAt: daysAgo(11, "15:05"),
+        verifiedByUserId: args.staffUserId,
+      },
+      resolution: {
+        kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+        resolvedAt: recordedBatchRecordedAt(),
+        resolvedByUserId: args.staffUserId,
+        appliedCoverCents: ATLANTICA_COVER_APPLIED_CENTS,
+        note: "Lote semanal de coberturas.",
+      },
+    });
+    await seedRecordedCover(ctx, {
+      noticeId: atlanticaCoveredNoticeId,
+      batchId: args.coverBatches.recorded,
+    });
+
+    // Performing leases that keep the published default rate at a believable
+    // share of the book (see `getGuaranteeAggregates`).
+    const paulistaPerforming: SeededLeaseAndGuarantee[] = [];
+    const atlanticaPerforming: SeededLeaseAndGuarantee[] = [];
+    for (const [index, filler] of PERFORMING_FILLER.entries()) {
+      const isPaulista = filler.city === "sp";
+      const row = await insertLeaseAndGuarantee(
+        performingFillerSpec({
+          agencyId: isPaulista ? paulistaId : atlanticaId,
+          publicId: pid(PERFORMING_FIRST_PID + index),
+          index,
+          filler,
+        }),
+      );
+      (isPaulista ? paulistaPerforming : atlanticaPerforming).push(row);
+    }
 
     // ── Sync aggregates ───────────────────────────────────────────────────────
     // Wipe above deleted all rows, but the aggregate B-trees are separate and
@@ -1812,351 +2596,81 @@ async function seedFictional(
       message: "Contrato 1000028 aprovado e ativado.",
     });
 
-    // ── Historical payments (6 months: Nov 2025 – Apr 2026) ──────────────────
-    // Paulista & Atlântica: all paid. Horizonte: paid Nov–Jan, overdue Feb–Apr.
+    // ── Monthly invoices: the last seven billing months, ending this one ──────
+    // Paulista & Atlântica paid every month but the current one; Horizonte
+    // paid the first three and owes the last four (the eviction book).
 
-    // Recurring line items bill each active guarantee's own priced fee
-    // (`terms.feeCents`), the figure `generateMonthlyInvoices` uses, so seeded
-    // history reconciles with what production billing would produce.
-    const recurringLineItems = (rows: SeededLeaseAndGuarantee[], month: string) =>
-      rows.map((row) => ({
-        guaranteeId: row.guaranteeId,
-        guaranteePublicId: row.publicId,
-        kind: "recurring" as const,
-        amountCents: row.terms.feeCents,
-        description: `Mensalidade contrato ${row.publicId} — ${month}`,
-      }));
+    const FICTIONAL_BILLING_MONTHS = 7;
+    const billingBooks: ReadonlyArray<{
+      agencyId: AgencyId;
+      suffix: string;
+      rows: SeededLeaseAndGuarantee[];
+      unpaidMonths: number;
+      paidDay: string;
+      method: (month: string) => SettlementMethod;
+    }> = [
+      {
+        agencyId: paulistaId,
+        suffix: "0100",
+        rows: [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, paulistaDefault].concat(
+          paulistaPerforming,
+        ),
+        unpaidMonths: 1,
+        paidDay: "07",
+        method: () => SettlementMethods.boleto(DEMO_BOLETO_LINE),
+      },
+      {
+        agencyId: atlanticaId,
+        suffix: "0200",
+        rows: [a1, a2, a3, a4, a5, a6, a7, a8, atlanticaCovered].concat(atlanticaPerforming),
+        unpaidMonths: 1,
+        paidDay: "09",
+        method: (month) =>
+          SettlementMethods.pix(DEMO_PIX_BR_CODE, demoPixEndToEndId(month, "0200")),
+      },
+      {
+        agencyId: horizonteId,
+        suffix: "0300",
+        rows: [h1, h2],
+        unpaidMonths: 4,
+        paidDay: "09",
+        method: () => SettlementMethods.boleto(DEMO_BOLETO_LINE),
+      },
+    ];
 
-    const paulistaLineItems = (month: string) =>
-      recurringLineItems([p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12], month);
-    const atlanticaLineItems = (month: string) =>
-      recurringLineItems([a1, a2, a3, a4, a5, a6, a7, a8], month);
-    const horizonteLineItems = (month: string) => recurringLineItems([h1, h2], month);
-
-    // ── Nov 2025 ──────────────────────────────────────────────────────────────
-
-    const p2025Nov = paulistaLineItems("2025-11");
-    await seedPaidInvoice(ctx, {
-      agencyId: paulistaId,
-      publicId: "INV-2025-11-0100",
-      periodMonth: "2025-11",
-      issuedAt: "2025-11-01",
-      dueDate: "2025-11-10",
-      totalCents: p2025Nov.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2025-11-07T10:00:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: p2025Nov,
-    });
-
-    const a2025Nov = atlanticaLineItems("2025-11");
-    await seedPaidInvoice(ctx, {
-      agencyId: atlanticaId,
-      publicId: "INV-2025-11-0200",
-      periodMonth: "2025-11",
-      issuedAt: "2025-11-01",
-      dueDate: "2025-11-10",
-      totalCents: a2025Nov.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2025-11-08T11:00:00-03:00"),
-      method: SettlementMethods.pix(
-        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
-        "E00038166202511081100abc001",
-      ),
-      lineItems: a2025Nov,
-    });
-
-    const h2025Nov = horizonteLineItems("2025-11");
-    await seedPaidInvoice(ctx, {
-      agencyId: horizonteId,
-      publicId: "INV-2025-11-0300",
-      periodMonth: "2025-11",
-      issuedAt: "2025-11-01",
-      dueDate: "2025-11-10",
-      totalCents: h2025Nov.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2025-11-09T09:30:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: h2025Nov,
-    });
-
-    // ── Dec 2025 ──────────────────────────────────────────────────────────────
-
-    const p2025Dec = paulistaLineItems("2025-12");
-    await seedPaidInvoice(ctx, {
-      agencyId: paulistaId,
-      publicId: "INV-2025-12-0100",
-      periodMonth: "2025-12",
-      issuedAt: "2025-12-01",
-      dueDate: "2025-12-10",
-      totalCents: p2025Dec.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2025-12-05T14:00:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: p2025Dec,
-    });
-
-    const a2025Dec = atlanticaLineItems("2025-12");
-    await seedPaidInvoice(ctx, {
-      agencyId: atlanticaId,
-      publicId: "INV-2025-12-0200",
-      periodMonth: "2025-12",
-      issuedAt: "2025-12-01",
-      dueDate: "2025-12-10",
-      totalCents: a2025Dec.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2025-12-08T10:00:00-03:00"),
-      method: SettlementMethods.pix(
-        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
-        "E00038166202512081000abc002",
-      ),
-      lineItems: a2025Dec,
-    });
-
-    const h2025Dec = horizonteLineItems("2025-12");
-    await seedPaidInvoice(ctx, {
-      agencyId: horizonteId,
-      publicId: "INV-2025-12-0300",
-      periodMonth: "2025-12",
-      issuedAt: "2025-12-01",
-      dueDate: "2025-12-10",
-      totalCents: h2025Dec.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2025-12-09T09:00:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: h2025Dec,
-    });
-
-    // ── Jan 2026 ──────────────────────────────────────────────────────────────
-
-    const p2026Jan = paulistaLineItems("2026-01");
-    await seedPaidInvoice(ctx, {
-      agencyId: paulistaId,
-      publicId: "INV-2026-01-0100",
-      periodMonth: "2026-01",
-      issuedAt: "2026-01-02",
-      dueDate: "2026-01-12",
-      totalCents: p2026Jan.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-01-10T11:00:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: p2026Jan,
-    });
-
-    const a2026Jan = atlanticaLineItems("2026-01");
-    await seedPaidInvoice(ctx, {
-      agencyId: atlanticaId,
-      publicId: "INV-2026-01-0200",
-      periodMonth: "2026-01",
-      issuedAt: "2026-01-02",
-      dueDate: "2026-01-12",
-      totalCents: a2026Jan.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-01-09T15:00:00-03:00"),
-      method: SettlementMethods.pix(
-        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
-        "E00038166202601091500abc003",
-      ),
-      lineItems: a2026Jan,
-    });
-
-    const h2026Jan = horizonteLineItems("2026-01");
-    await seedPaidInvoice(ctx, {
-      agencyId: horizonteId,
-      publicId: "INV-2026-01-0300",
-      periodMonth: "2026-01",
-      issuedAt: "2026-01-02",
-      dueDate: "2026-01-12",
-      totalCents: h2026Jan.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-01-11T10:00:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: h2026Jan,
-    });
-
-    // ── Feb 2026 ──────────────────────────────────────────────────────────────
-
-    const p2026Feb = paulistaLineItems("2026-02");
-    await seedPaidInvoice(ctx, {
-      agencyId: paulistaId,
-      publicId: "INV-2026-02-0100",
-      periodMonth: "2026-02",
-      issuedAt: "2026-02-02",
-      dueDate: "2026-02-10",
-      totalCents: p2026Feb.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-02-07T09:00:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: p2026Feb,
-    });
-
-    const a2026Feb = atlanticaLineItems("2026-02");
-    await seedPaidInvoice(ctx, {
-      agencyId: atlanticaId,
-      publicId: "INV-2026-02-0200",
-      periodMonth: "2026-02",
-      issuedAt: "2026-02-02",
-      dueDate: "2026-02-10",
-      totalCents: a2026Feb.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-02-09T14:00:00-03:00"),
-      method: SettlementMethods.pix(
-        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
-        "E00038166202602091400abc004",
-      ),
-      lineItems: a2026Feb,
-    });
-
-    const h2026Feb = horizonteLineItems("2026-02");
-    await ctx.db.insert("invoices", {
-      agencyId: horizonteId,
-      publicId: "INV-2026-02-0300",
-      periodMonth: "2026-02",
-      issuedAt: "2026-02-02",
-      dueDate: "2026-02-10",
-      totalCents: h2026Feb.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.open(),
-      accessToken: generateInvoiceAccessToken(),
-      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-      muxedId: generateInvoiceMuxedId(),
-      lineItems: h2026Feb,
-    });
-
-    // ── Mar 2026 ──────────────────────────────────────────────────────────────
-
-    const p2026Mar = paulistaLineItems("2026-03");
-    await seedPaidInvoice(ctx, {
-      agencyId: paulistaId,
-      publicId: "INV-2026-03-0100",
-      periodMonth: "2026-03",
-      issuedAt: "2026-03-02",
-      dueDate: "2026-03-10",
-      totalCents: p2026Mar.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-03-08T10:30:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: p2026Mar,
-    });
-
-    const a2026Mar = atlanticaLineItems("2026-03");
-    await seedPaidInvoice(ctx, {
-      agencyId: atlanticaId,
-      publicId: "INV-2026-03-0200",
-      periodMonth: "2026-03",
-      issuedAt: "2026-03-02",
-      dueDate: "2026-03-10",
-      totalCents: a2026Mar.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-03-09T11:00:00-03:00"),
-      method: SettlementMethods.pix(
-        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
-        "E00038166202603091100abc005",
-      ),
-      lineItems: a2026Mar,
-    });
-
-    const h2026Mar = horizonteLineItems("2026-03");
-    await ctx.db.insert("invoices", {
-      agencyId: horizonteId,
-      publicId: "INV-2026-03-0300",
-      periodMonth: "2026-03",
-      issuedAt: "2026-03-02",
-      dueDate: "2026-03-10",
-      totalCents: h2026Mar.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.open(),
-      accessToken: generateInvoiceAccessToken(),
-      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-      muxedId: generateInvoiceMuxedId(),
-      lineItems: h2026Mar,
-    });
-
-    // ── Apr 2026 ──────────────────────────────────────────────────────────────
-    // ── Apr 2026 ──────────────────────────────────────────────────────────────
-
-    const paulistaAprLineItems = paulistaLineItems("2026-04");
-    await seedPaidInvoice(ctx, {
-      agencyId: paulistaId,
-      publicId: "INV-2026-04-0100",
-      periodMonth: "2026-04",
-      issuedAt: "2026-04-01",
-      dueDate: "2026-04-10",
-      totalCents: paulistaAprLineItems.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-04-08T14:21:00-03:00"),
-      method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000592000"),
-      lineItems: paulistaAprLineItems,
-    });
-
-    const atlanticaAprLineItems = atlanticaLineItems("2026-04");
-    await seedPaidInvoice(ctx, {
-      agencyId: atlanticaId,
-      publicId: "INV-2026-04-0200",
-      periodMonth: "2026-04",
-      issuedAt: "2026-04-01",
-      dueDate: "2026-04-10",
-      totalCents: atlanticaAprLineItems.reduce((s, x) => s + x.amountCents, 0),
-      paidAt: d("2026-04-09T10:00:00-03:00"),
-      method: SettlementMethods.pix(
-        "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b5a8",
-        "E00038166202404091000abc123",
-      ),
-      lineItems: atlanticaAprLineItems,
-    });
-
-    const horizonteAprLineItems = horizonteLineItems("2026-04");
-    await ctx.db.insert("invoices", {
-      agencyId: horizonteId,
-      publicId: "INV-2026-04-0300",
-      periodMonth: "2026-04",
-      issuedAt: "2026-04-01",
-      dueDate: "2026-04-10",
-      totalCents: horizonteAprLineItems.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.open(),
-      accessToken: generateInvoiceAccessToken(),
-      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-      muxedId: generateInvoiceMuxedId(),
-      lineItems: horizonteAprLineItems,
-    });
-
-    const paulistaMayLineItems = paulistaLineItems("2026-05");
-    await ctx.db.insert("invoices", {
-      agencyId: paulistaId,
-      publicId: "INV-2026-05-0100",
-      periodMonth: "2026-05",
-      issuedAt: "2026-05-01",
-      dueDate: "2026-05-10",
-      totalCents: paulistaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.open(),
-      accessToken: generateInvoiceAccessToken(),
-      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-      muxedId: generateInvoiceMuxedId(),
-      lineItems: paulistaMayLineItems,
-    });
-
-    const atlanticaMayLineItems = atlanticaLineItems("2026-05");
-    await ctx.db.insert("invoices", {
-      agencyId: atlanticaId,
-      publicId: "INV-2026-05-0200",
-      periodMonth: "2026-05",
-      issuedAt: "2026-05-01",
-      dueDate: "2026-05-10",
-      totalCents: atlanticaMayLineItems.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.open(),
-      accessToken: generateInvoiceAccessToken(),
-      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-      muxedId: generateInvoiceMuxedId(),
-      lineItems: atlanticaMayLineItems,
-    });
-
-    const horizonteMayLineItems = horizonteLineItems("2026-05");
-    await ctx.db.insert("invoices", {
-      agencyId: horizonteId,
-      publicId: "INV-2026-05-0300",
-      periodMonth: "2026-05",
-      issuedAt: "2026-05-01",
-      dueDate: "2026-05-10",
-      totalCents: horizonteMayLineItems.reduce((s, x) => s + x.amountCents, 0),
-      state: InvoiceStates.open(),
-      accessToken: generateInvoiceAccessToken(),
-      accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-      muxedId: generateInvoiceMuxedId(),
-      lineItems: horizonteMayLineItems,
-    });
+    for (const book of billingBooks) {
+      for (let offset = FICTIONAL_BILLING_MONTHS - 1; offset >= 0; offset--) {
+        const month = monthsAgo(offset);
+        const lineItems = recurringLineItems(book.rows, month);
+        if (lineItems.length === 0) continue;
+        const invoice = {
+          agencyId: book.agencyId,
+          publicId: `INV-${month}-${book.suffix}`,
+          periodMonth: month,
+          issuedAt: `${month}-01`,
+          dueDate: seedDueDate(month),
+          lineItems,
+        };
+        if (offset < book.unpaidMonths) {
+          await seedOpenInvoice(ctx, invoice);
+          continue;
+        }
+        await seedPaidInvoice(ctx, {
+          ...invoice,
+          totalCents: lineItems.reduce((sum, item) => sum + item.amountCents, 0),
+          paidAt: d(`${month}-${book.paidDay}T10:00:00-03:00`),
+          method: book.method(month),
+        });
+      }
+    }
 
     // ── Testnet-sized invoices ────────────────────────────────────────────────
-    // Tiny amounts so a friendbot-funded sender (10k XLM) can complete a
-    // real on-chain test against the Mutav treasury. One per agency.
-
-    // Testnet-sized invoices in the testanchor USDC deposit range
-    // (1 ≤ USDC ≤ 10 at 5.0 BRL/USDC ⇒ R$5 to R$50). All three agencies
-    // get a spread of amounts so any agency can be selected and any
-    // anchor method (Pix sep-6 / AnchorTest sep-24) will pass validation.
+    // Tiny amounts in the testanchor USDC deposit range (1 ≤ USDC ≤ 10 at
+    // 5.0 BRL/USDC ⇒ R$5 to R$50), so a friendbot-funded sender can complete a
+    // real on-chain test against the Mutav treasury. All three agencies get a
+    // spread of amounts so any agency can be selected and any anchor method
+    // (Pix sep-6 / AnchorTest sep-24) passes validation. Issued this month and
+    // due next week, so none of them is born overdue.
     const testAgencies: ReadonlyArray<{
       agencyId: AgencyId;
       guaranteeId: GuaranteeId;
@@ -2169,38 +2683,24 @@ async function seedFictional(
 
     // 12 amounts in the safe band (R$5–R$50), four per agency.
     const testAmountsCents = [500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 4750, 5000];
+    const testMonth = monthsAgo(0);
 
-    const testInvoices = testAmountsCents.map((amountCents, idx) => {
+    for (const [idx, amountCents] of testAmountsCents.entries()) {
       const agency = testAgencies[idx % testAgencies.length];
-      const n = String(idx + 1).padStart(3, "0");
-      return {
-        publicId: `INV-TEST-${n}`,
+      const publicId = `INV-TEST-${String(idx + 1).padStart(3, "0")}`;
+      await seedOpenInvoice(ctx, {
         agencyId: agency.agencyId,
-        guaranteeId: agency.guaranteeId,
-        guaranteePublicId: agency.guaranteePublicId,
-        amountCents,
-      };
-    });
-
-    for (const t of testInvoices) {
-      await ctx.db.insert("invoices", {
-        agencyId: t.agencyId,
-        publicId: t.publicId,
-        periodMonth: "2026-05",
-        issuedAt: "2026-05-13",
-        dueDate: "2026-05-20",
-        totalCents: t.amountCents,
-        state: InvoiceStates.open(),
-        accessToken: generateInvoiceAccessToken(),
-        accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-        muxedId: generateInvoiceMuxedId(),
+        publicId,
+        periodMonth: testMonth,
+        issuedAt: `${testMonth}-01`,
+        dueDate: dateDaysAgo(-7),
         lineItems: [
           {
-            guaranteeId: t.guaranteeId,
-            guaranteePublicId: t.guaranteePublicId,
+            guaranteeId: agency.guaranteeId,
+            guaranteePublicId: agency.guaranteePublicId,
             kind: INVOICE_LINE_ITEM_KIND.RECURRING,
-            amountCents: t.amountCents,
-            description: `Testnet invoice — ${t.publicId}`,
+            amountCents,
+            description: `Testnet invoice — ${publicId}`,
           },
         ],
       });
@@ -2208,7 +2708,11 @@ async function seedFictional(
 
     return {
       agencies: { paulistaId, atlanticaId, horizonteId },
-      guaranteeCounts: { paulista: 15, atlantica: 12, horizonte: 3 },
+      guaranteeCounts: {
+        paulista: 16 + paulistaPerforming.length,
+        atlantica: 13 + atlanticaPerforming.length,
+        horizonte: 3,
+      },
     };
   }
 }
@@ -2375,13 +2879,17 @@ type SeedPersonasResult = Array<{
 }>;
 
 /**
- * Populate the `agencyowner` persona's agency ("Imobiliária Aprovada")
- * with a believable dashboard: one guarantee in each of `active`,
- * `in_arrears`, `default_verified` and `cover_committed` (each with the
- * notice that put it there), plus 1 drafted + 1 closed, every one on its
- * own lease; two months of paid history, one month due. Distinct
- * `publicId` range (1000031–1000036) so it doesn't collide with the
- * fictional Paulista/Atlântica/Horizonte ids.
+ * Populate the `agencyowner` persona's agency ("Imobiliária Aprovada") with a
+ * book that walks every guarantee state and every notice disposition: two
+ * performing guarantees (one with a cured and a dismissed notice behind it,
+ * one renewed on a lease whose previous guarantee ended), one in arrears
+ * behind a disputed and a fresh notice, two verified defaults awaiting a
+ * decision, one cover-committed with its payout executed and one still
+ * awaiting it, one in eviction, one draft, and two closed lives — end of lease
+ * and a dispute reversal that released its cover. Every notice, cover and
+ * activation is dated back from the reseed, so the book always reads as
+ * current. Distinct `publicId` range (1000031–1000041) so it doesn't collide
+ * with the fictional Paulista/Atlântica/Horizonte ids.
  *
  * Idempotent — if a guarantee in the seeded range already exists, the
  * function is a no-op. Called only by `seedReset` (post-wipe) as the step
@@ -2389,12 +2897,16 @@ type SeedPersonasResult = Array<{
  */
 async function populateAprovadaBook(
   ctx: MutationCtx,
-  { agencyId, staffUserId }: { agencyId: AgencyId; staffUserId: UserId },
+  {
+    agencyId,
+    staffUserId,
+    coverBatches,
+  }: { agencyId: AgencyId; staffUserId: UserId; coverBatches: SeedCoverBatches },
 ) {
   const FIRST_PID = 31;
 
   // Idempotency must be GLOBAL, not per-agency. publicId carries no
-  // DB-level uniqueness constraint; this range (1000031–1000036) is the
+  // DB-level uniqueness constraint; this range (1000031–1000041) is the
   // single canonical Aprovada starter book — if any guarantee already
   // claims it, abort regardless of which agency owns it. Earlier the
   // check filtered by agencyId, which let `seedAprovadaContracts`
@@ -2410,184 +2922,367 @@ async function populateAprovadaBook(
 
   const product = await requireDefaultProduct(ctx);
 
-  // Cover Mutav committed on the `cover_committed` row: reserved on the
-  // guarantee's capacity and recorded on its resolved notice.
-  const APROVADA_COVER_APPLIED_CENTS = 682_500;
+  // Cover amounts: the missed month's rent + condo plus accrued juros and
+  // multa — what the notice claimed and the capacity reserved in full.
+  const COVER_EXECUTED_CENTS = 682_500;
+  const COVER_RECORDED_CENTS = 355_300;
+  const COVER_EVICTION_CENTS = 298_700;
+  const COVER_REVERSED_CENTS = 231_400;
 
-  type AprovadaSpec = {
-    n: number;
-    state: Exclude<GuaranteeState, typeof GUARANTEE_STATE.CLOSED>;
-    activatedAt: string | null;
-    reservedCents?: number;
-    nextRenewalDate: string;
+  type AprovadaTenant = {
+    fullName: string;
+    cpf: string;
+    birthDate: string;
+    phoneSuffix: string;
+    emailLocal: string;
+    score: number;
+  };
+
+  type AprovadaLease = {
     rentCents: number;
     condoCents: number;
     property: LeaseProperty;
+    tenant: AprovadaTenant;
+  };
+
+  type AprovadaSpec = {
+    n: number;
+    state: GuaranteeState;
+    activatedAt: string | null;
+    closure?: { reason: CloseReason; closedAt: string; note?: string };
+    reservedCents?: number;
+    nextRenewalDate: string;
+    /** A lease of its own, or the `n` of an earlier spec whose lease it renews. */
+    lease: AprovadaLease | { renews: number };
+    /** Underwriting of this life; defaults to the lease tenant's score. */
+    score?: number;
+  };
+
+  // The lease that outlives its first guarantee: the tenant renewed, the old
+  // guarantee ended with the old term and a new one was written on the lease.
+  const SANTANA_LEASE: AprovadaLease = {
+    rentCents: 225_000,
+    condoCents: 38_000,
+    property: {
+      cep: "02011-000",
+      streetAndNumber: "Rua Voluntários da Pátria, 990",
+      neighborhood: "Santana",
+      cityUF: "São Paulo/SP",
+      complement: "Apto 22",
+    },
     tenant: {
-      fullName: string;
-      cpf: string;
-      birthDate: string;
-      phoneSuffix: string;
-      emailLocal: string;
-      score: number;
-    };
+      fullName: "Bruno Tavares Macedo",
+      cpf: "72727272766",
+      birthDate: "1986-09-19",
+      phoneSuffix: "36",
+      emailLocal: "bruno.tavares",
+      score: 705,
+    },
   };
+  const SANTANA_FIRST_TERM_ENDED_DAYS_AGO = 182;
 
-  type AprovadaClosedSpec = Omit<AprovadaSpec, "state" | "activatedAt"> & {
-    state: typeof GUARANTEE_STATE.CLOSED;
-    activatedAt: string;
-    closedAt: string;
-  };
-
-  const specs: Array<AprovadaSpec | AprovadaClosedSpec> = [
+  const specs: AprovadaSpec[] = [
     {
       n: 0,
       state: GUARANTEE_STATE.ACTIVE,
-      activatedAt: d("2025-09-15T10:00:00-03:00"),
-      nextRenewalDate: "2027-09-15",
-      rentCents: 285_000,
-      condoCents: 42_000,
-      property: {
-        cep: "04543-011",
-        streetAndNumber: "Rua Joaquim Floriano, 533",
-        neighborhood: "Itaim Bibi",
-        cityUF: "São Paulo/SP",
-        complement: "Apto 82",
-      },
-      tenant: {
-        fullName: "Beatriz Almeida Carvalho",
-        cpf: "23232323200",
-        birthDate: "1992-08-23",
-        phoneSuffix: "31",
-        emailLocal: "beatriz.almeida",
-        score: 780,
+      activatedAt: daysAgo(380, "13:00"),
+      nextRenewalDate: dateDaysAgo(-350),
+      lease: {
+        rentCents: 285_000,
+        condoCents: 42_000,
+        property: {
+          cep: "04543-011",
+          streetAndNumber: "Rua Joaquim Floriano, 533",
+          neighborhood: "Itaim Bibi",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 82",
+        },
+        tenant: {
+          fullName: "Beatriz Almeida Carvalho",
+          cpf: "23232323200",
+          birthDate: "1992-08-23",
+          phoneSuffix: "31",
+          emailLocal: "beatriz.almeida",
+          score: 780,
+        },
       },
     },
     {
       n: 1,
       state: GUARANTEE_STATE.IN_ARREARS,
-      activatedAt: d("2025-11-01T10:00:00-03:00"),
-      nextRenewalDate: "2027-11-01",
-      rentCents: 420_000,
-      condoCents: 65_000,
-      property: {
-        cep: "01451-000",
-        streetAndNumber: "Rua Oscar Freire, 1200",
-        neighborhood: "Jardins",
-        cityUF: "São Paulo/SP",
-        complement: "Apto 1502",
-      },
-      tenant: {
-        fullName: "Rafael Monteiro Lima",
-        cpf: "32323232355",
-        birthDate: "1985-04-17",
-        phoneSuffix: "32",
-        emailLocal: "rafael.monteiro",
-        score: 820,
+      activatedAt: daysAgo(330, "13:00"),
+      nextRenewalDate: dateDaysAgo(-400),
+      lease: {
+        rentCents: 420_000,
+        condoCents: 65_000,
+        property: {
+          cep: "01451-000",
+          streetAndNumber: "Rua Oscar Freire, 1200",
+          neighborhood: "Jardins",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 1502",
+        },
+        tenant: {
+          fullName: "Rafael Monteiro Lima",
+          cpf: "32323232355",
+          birthDate: "1985-04-17",
+          phoneSuffix: "32",
+          emailLocal: "rafael.monteiro",
+          score: 820,
+        },
       },
     },
     {
       n: 2,
       state: GUARANTEE_STATE.DEFAULT_VERIFIED,
-      activatedAt: d("2026-01-20T10:00:00-03:00"),
-      nextRenewalDate: "2028-01-20",
-      rentCents: 195_000,
-      condoCents: 28_000,
-      property: {
-        cep: "05402-000",
-        streetAndNumber: "Rua Cardeal Arcoverde, 1820",
-        neighborhood: "Pinheiros",
-        cityUF: "São Paulo/SP",
-        complement: "Apto 41",
-      },
-      tenant: {
-        fullName: "Letícia Andrade Pires",
-        cpf: "42424242488",
-        birthDate: "1994-11-30",
-        phoneSuffix: "33",
-        emailLocal: "leticia.andrade",
-        score: 695,
+      activatedAt: daysAgo(250, "13:00"),
+      nextRenewalDate: dateDaysAgo(-480),
+      lease: {
+        rentCents: 195_000,
+        condoCents: 28_000,
+        property: {
+          cep: "05402-000",
+          streetAndNumber: "Rua Cardeal Arcoverde, 1820",
+          neighborhood: "Pinheiros",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 41",
+        },
+        tenant: {
+          fullName: "Letícia Andrade Pires",
+          cpf: "42424242488",
+          birthDate: "1994-11-30",
+          phoneSuffix: "33",
+          emailLocal: "leticia.andrade",
+          score: 695,
+        },
       },
     },
     {
       n: 3,
       state: GUARANTEE_STATE.COVER_COMMITTED,
-      reservedCents: APROVADA_COVER_APPLIED_CENTS,
-      activatedAt: d("2026-03-10T10:00:00-03:00"),
-      nextRenewalDate: "2028-03-10",
-      rentCents: 650_000,
-      condoCents: 98_000,
-      property: {
-        cep: "01310-100",
-        streetAndNumber: "Av. Paulista, 2100",
-        neighborhood: "Bela Vista",
-        cityUF: "São Paulo/SP",
-        complement: "Cobertura 18",
-      },
-      tenant: {
-        fullName: "Fernanda Lopes Cavalcanti",
-        cpf: "52525252500",
-        birthDate: "1980-07-08",
-        phoneSuffix: "34",
-        emailLocal: "fernanda.lopes",
-        score: 855,
+      reservedCents: COVER_EXECUTED_CENTS,
+      activatedAt: daysAgo(200, "13:00"),
+      nextRenewalDate: dateDaysAgo(-530),
+      lease: {
+        rentCents: 650_000,
+        condoCents: 98_000,
+        property: {
+          cep: "01310-100",
+          streetAndNumber: "Av. Paulista, 2100",
+          neighborhood: "Bela Vista",
+          cityUF: "São Paulo/SP",
+          complement: "Cobertura 18",
+        },
+        tenant: {
+          fullName: "Fernanda Lopes Cavalcanti",
+          cpf: "52525252500",
+          birthDate: "1980-07-08",
+          phoneSuffix: "34",
+          emailLocal: "fernanda.lopes",
+          score: 855,
+        },
       },
     },
     {
       n: 4,
       state: GUARANTEE_STATE.DRAFTED,
       activatedAt: null,
-      nextRenewalDate: "2028-06-01",
-      rentCents: 340_000,
-      condoCents: 52_000,
-      property: {
-        cep: "04094-050",
-        streetAndNumber: "Rua Vergueiro, 3800",
-        neighborhood: "Vila Mariana",
-        cityUF: "São Paulo/SP",
-        complement: "Apto 73",
-      },
-      tenant: {
-        fullName: "Gustavo Ribeiro Tavares",
-        cpf: "62626262633",
-        birthDate: "1989-02-14",
-        phoneSuffix: "35",
-        emailLocal: "gustavo.ribeiro",
-        score: 610,
+      nextRenewalDate: dateDaysAgo(-730),
+      lease: {
+        rentCents: 340_000,
+        condoCents: 52_000,
+        property: {
+          cep: "04094-050",
+          streetAndNumber: "Rua Vergueiro, 3800",
+          neighborhood: "Vila Mariana",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 73",
+        },
+        tenant: {
+          fullName: "Gustavo Ribeiro Tavares",
+          cpf: "62626262633",
+          birthDate: "1989-02-14",
+          phoneSuffix: "35",
+          emailLocal: "gustavo.ribeiro",
+          score: 610,
+        },
       },
     },
     {
       n: 5,
       state: GUARANTEE_STATE.CLOSED,
-      activatedAt: d("2024-04-15T10:00:00-03:00"),
-      closedAt: d("2026-03-31T18:00:00-03:00"),
-      nextRenewalDate: "2026-04-15",
-      rentCents: 225_000,
-      condoCents: 38_000,
-      property: {
-        cep: "02011-000",
-        streetAndNumber: "Rua Voluntários da Pátria, 990",
-        neighborhood: "Santana",
-        cityUF: "São Paulo/SP",
-        complement: "Apto 22",
+      activatedAt: daysAgo(900, "13:00"),
+      closure: {
+        reason: CLOSE_REASON.END_OF_LEASE,
+        closedAt: daysAgo(SANTANA_FIRST_TERM_ENDED_DAYS_AGO, "21:00"),
+        note: "Fim do primeiro prazo; locação renovada com nova garantia.",
       },
-      tenant: {
-        fullName: "Bruno Tavares Macedo",
-        cpf: "72727272766",
-        birthDate: "1986-09-19",
-        phoneSuffix: "36",
-        emailLocal: "bruno.tavares",
-        score: 705,
+      nextRenewalDate: dateDaysAgo(SANTANA_FIRST_TERM_ENDED_DAYS_AGO),
+      lease: SANTANA_LEASE,
+    },
+    {
+      n: 6,
+      state: GUARANTEE_STATE.DEFAULT_VERIFIED,
+      activatedAt: daysAgo(160, "13:00"),
+      nextRenewalDate: dateDaysAgo(-570),
+      lease: {
+        rentCents: 248_000,
+        condoCents: 31_000,
+        property: {
+          cep: "05014-000",
+          streetAndNumber: "Rua Monte Alegre, 640",
+          neighborhood: "Perdizes",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 57",
+        },
+        tenant: {
+          fullName: "Thiago Mendes Sarmento",
+          cpf: seedCpf(137),
+          birthDate: "1991-01-22",
+          phoneSuffix: "37",
+          emailLocal: "thiago.sarmento",
+          score: 670,
+        },
       },
+    },
+    {
+      n: 7,
+      state: GUARANTEE_STATE.COVER_COMMITTED,
+      reservedCents: COVER_RECORDED_CENTS,
+      activatedAt: daysAgo(140, "13:00"),
+      nextRenewalDate: dateDaysAgo(-590),
+      lease: {
+        rentCents: 310_000,
+        condoCents: 36_000,
+        property: {
+          cep: "04515-030",
+          streetAndNumber: "Rua Gaivota, 480",
+          neighborhood: "Moema",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 131",
+        },
+        tenant: {
+          fullName: "Camila Rezende Borges",
+          cpf: seedCpf(138),
+          birthDate: "1988-05-09",
+          phoneSuffix: "38",
+          emailLocal: "camila.borges",
+          score: 700,
+        },
+      },
+    },
+    {
+      n: 8,
+      state: GUARANTEE_STATE.IN_EVICTION,
+      reservedCents: COVER_EVICTION_CENTS,
+      activatedAt: daysAgo(420, "13:00"),
+      nextRenewalDate: dateDaysAgo(-310),
+      lease: {
+        rentCents: 262_000,
+        condoCents: 30_000,
+        property: {
+          cep: "03066-000",
+          streetAndNumber: "Rua Serra de Bragança, 1100",
+          neighborhood: "Tatuapé",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 64",
+        },
+        tenant: {
+          fullName: "Leandro Viana Coelho",
+          cpf: seedCpf(139),
+          birthDate: "1983-12-01",
+          phoneSuffix: "39",
+          emailLocal: "leandro.coelho",
+          score: 640,
+        },
+      },
+    },
+    {
+      n: 9,
+      state: GUARANTEE_STATE.CLOSED,
+      activatedAt: daysAgo(300, "13:00"),
+      closure: {
+        reason: CLOSE_REASON.DISPUTE_REVERSAL,
+        closedAt: daysAgo(40, "15:30"),
+        note: "Comprovantes de pagamento apresentados; inadimplência revertida.",
+      },
+      nextRenewalDate: dateDaysAgo(-430),
+      lease: {
+        rentCents: 204_000,
+        condoCents: 22_000,
+        property: {
+          cep: "04602-001",
+          streetAndNumber: "Av. Santo Amaro, 5300",
+          neighborhood: "Campo Belo",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 25",
+        },
+        tenant: {
+          fullName: "Mônica Freire Salgado",
+          cpf: seedCpf(140),
+          birthDate: "1979-10-14",
+          phoneSuffix: "40",
+          emailLocal: "monica.salgado",
+          score: 735,
+        },
+      },
+    },
+    {
+      n: 10,
+      state: GUARANTEE_STATE.ACTIVE,
+      activatedAt: daysAgo(SANTANA_FIRST_TERM_ENDED_DAYS_AGO - 1, "13:00"),
+      nextRenewalDate: dateDaysAgo(-548),
+      lease: { renews: 5 },
+      score: 740,
     },
   ];
 
-  const inserted: Array<{ spec: AprovadaSpec | AprovadaClosedSpec } & SeededLeaseAndGuarantee> = [];
+  const inserted: Array<{ spec: AprovadaSpec; lease: AprovadaLease } & SeededLeaseAndGuarantee> =
+    [];
+  const insertedAt = (n: number) => {
+    const row = inserted.find((candidate) => candidate.spec.n === n);
+    if (!row) throw new Error(`Aprovada spec ${n} is not seeded yet`);
+    return row;
+  };
 
   for (const spec of specs) {
     const publicId = pid(FIRST_PID + spec.n);
     const isApproved = spec.state !== GUARANTEE_STATE.DRAFTED;
+    const guarantee: SeedLeaseSpec["guarantee"] = {
+      state: spec.state,
+      ...(spec.closure ? { closure: spec.closure } : {}),
+      activatedAt: spec.activatedAt,
+      nextRenewalDate: spec.nextRenewalDate,
+      ...(spec.reservedCents === undefined ? {} : { reservedCents: spec.reservedCents }),
+      documents: isApproved
+        ? APPROVED_DOCUMENTS
+        : [
+            { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
+            { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
+            { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
+          ],
+    };
+    const approval = {
+      approvalStatus: isApproved
+        ? TENANT_APPROVAL_STATUS.APROVADO
+        : TENANT_APPROVAL_STATUS.PENDENTE,
+      termApprovedAt: isApproved ? spec.activatedAt : null,
+    };
 
+    if ("renews" in spec.lease) {
+      const predecessor = insertedAt(spec.lease.renews);
+      const row = await insertSeedGuaranteeOnLease(ctx, {
+        product,
+        leaseId: predecessor.leaseId,
+        publicId,
+        guarantee,
+        tenant: { ...approval, score: spec.score ?? predecessor.lease.tenant.score },
+      });
+      inserted.push({ spec, lease: predecessor.lease, ...row });
+      continue;
+    }
+
+    const lease = spec.lease;
     const row = await insertSeedLeaseAndGuarantee(ctx, {
       product,
       spec: {
@@ -2595,215 +3290,306 @@ async function populateAprovadaBook(
         publicId,
         lease: {
           propertyKind: PROPERTY_KIND.RESIDENTIAL,
-          property: spec.property,
+          property: lease.property,
           tag: "",
           description: "",
-          rent: {
-            rentCents: spec.rentCents,
-            condoCents: spec.condoCents,
-            otherFeesCents: 0,
-          },
+          rent: { rentCents: lease.rentCents, condoCents: lease.condoCents, otherFeesCents: 0 },
         },
-        guarantee: {
-          state: spec.state,
-          ...(spec.state === GUARANTEE_STATE.CLOSED
-            ? {
-                closure: {
-                  reason: CLOSE_REASON.END_OF_LEASE,
-                  closedAt: spec.closedAt,
-                },
-              }
-            : {}),
-          activatedAt: spec.activatedAt,
-          nextRenewalDate: spec.nextRenewalDate,
-          ...(spec.reservedCents === undefined ? {} : { reservedCents: spec.reservedCents }),
-          documents: isApproved
-            ? [
-                { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-                { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-                { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-              ]
-            : [
-                { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-                { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-                { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-              ],
-        },
+        guarantee,
         tenant: {
-          approvalStatus: isApproved
-            ? TENANT_APPROVAL_STATUS.APROVADO
-            : TENANT_APPROVAL_STATUS.PENDENTE,
-          fullName: spec.tenant.fullName,
-          cpf: spec.tenant.cpf,
-          birthDate: spec.tenant.birthDate,
-          email: `${spec.tenant.emailLocal}@example.com`,
-          phone: `119000000${spec.tenant.phoneSuffix}`,
-          termApprovedAt: isApproved ? (spec.activatedAt ?? d("2025-09-15T09:00:00-03:00")) : null,
-          score: spec.tenant.score,
+          ...approval,
+          fullName: lease.tenant.fullName,
+          cpf: lease.tenant.cpf,
+          birthDate: lease.tenant.birthDate,
+          email: `${lease.tenant.emailLocal}@example.com`,
+          phone: `119000000${lease.tenant.phoneSuffix}`,
+          score: spec.score ?? lease.tenant.score,
         },
       },
     });
-    inserted.push({ spec, ...row });
+    inserted.push({ spec, lease, ...row });
   }
 
   // Every in-force guarantee bills its fee, arrears or not.
   const insuredRows = inserted.filter((r) => isInsured({ status: r.spec.state }));
 
-  const monthlyLineItems = (month: string) =>
-    insuredRows.map((r) => ({
-      guaranteeId: r.guaranteeId,
-      guaranteePublicId: r.publicId,
-      kind: INVOICE_LINE_ITEM_KIND.RECURRING,
-      amountCents: r.terms.feeCents,
-      description: `Mensalidade contrato ${r.publicId} — ${month}`,
-    }));
-
-  const march = monthlyLineItems("2026-03");
-  await seedPaidInvoice(ctx, {
-    agencyId,
-    publicId: "INV-2026-03-0500",
-    periodMonth: "2026-03",
-    issuedAt: "2026-03-01",
-    dueDate: "2026-03-10",
-    totalCents: march.reduce((s, x) => s + x.amountCents, 0),
-    paidAt: d("2026-03-08T10:00:00-03:00"),
-    method: SettlementMethods.pix(
-      "00020126580014br.gov.bcb.pix0136a629532e-7693-4846-852d-1bbff817b500",
-      "E00038166202603081000aprov01",
-    ),
-    lineItems: march,
-  });
-
-  const april = monthlyLineItems("2026-04");
-  await seedPaidInvoice(ctx, {
-    agencyId,
-    publicId: "INV-2026-04-0500",
-    periodMonth: "2026-04",
-    issuedAt: "2026-04-01",
-    dueDate: "2026-04-10",
-    totalCents: april.reduce((s, x) => s + x.amountCents, 0),
-    paidAt: d("2026-04-07T11:30:00-03:00"),
-    method: SettlementMethods.boleto("34191.09008 63521.570001 61038.150000 8 97370000005920"),
-    lineItems: april,
-  });
-
-  const may = monthlyLineItems("2026-05");
-  await ctx.db.insert("invoices", {
-    agencyId,
-    publicId: "INV-2026-05-0500",
-    periodMonth: "2026-05",
-    issuedAt: "2026-05-01",
-    dueDate: "2026-05-10",
-    totalCents: may.reduce((s, x) => s + x.amountCents, 0),
-    state: InvoiceStates.open(),
-    accessToken: generateInvoiceAccessToken(),
-    accessTokenExpiresAt: accessTokenExpiryFrom(Date.now()),
-    muxedId: generateInvoiceMuxedId(),
-    lineItems: may,
-  });
-
-  for (const r of insuredRows) {
-    await ctx.db.insert("guaranteeHistory", {
+  // Two paid months and the current one due.
+  const APROVADA_BILLING_MONTHS = 3;
+  for (let offset = APROVADA_BILLING_MONTHS - 1; offset >= 0; offset--) {
+    const month = monthsAgo(offset);
+    const lineItems = recurringLineItems(insuredRows, month);
+    const invoice = {
       agencyId,
-      guaranteePublicId: r.publicId,
-      at: r.spec.activatedAt ?? d("2025-09-15T09:00:00-03:00"),
-      username: "agency.owner",
-      message: `Criada Solicitação #${r.publicId} — ${r.spec.tenant.fullName}, aluguel R$ ${(r.spec.rentCents / 100).toLocaleString("pt-BR")}.`,
+      publicId: `INV-${month}-0500`,
+      periodMonth: month,
+      issuedAt: `${month}-01`,
+      dueDate: seedDueDate(month),
+      lineItems,
+    };
+    if (offset === 0) {
+      await seedOpenInvoice(ctx, invoice);
+      continue;
+    }
+    await seedPaidInvoice(ctx, {
+      ...invoice,
+      totalCents: lineItems.reduce((sum, item) => sum + item.amountCents, 0),
+      paidAt: d(`${month}-08T10:00:00-03:00`),
+      method:
+        offset % 2 === 0
+          ? SettlementMethods.pix(DEMO_PIX_BR_CODE, demoPixEndToEndId(month, "0500"))
+          : SettlementMethods.boleto(DEMO_BOLETO_LINE),
     });
   }
 
-  // The notice book behind the Aprovada agency's in-force states — each
-  // guarantee carries the notice that put it where it is, so the
-  // delinquencies page renders every notice status out of the box.
+  for (const r of inserted) {
+    if (r.spec.activatedAt === null) continue;
+    await ctx.db.insert("guaranteeHistory", {
+      agencyId,
+      guaranteePublicId: r.publicId,
+      at: r.spec.activatedAt,
+      username: "agency.owner",
+      message: `Criada Solicitação #${r.publicId} — ${r.lease.tenant.fullName}, aluguel R$ ${(r.lease.rentCents / 100).toLocaleString("pt-BR")}.`,
+    });
+  }
+
+  // The notice book behind the Aprovada agency's states — each guarantee
+  // carries the notices that put it where it is, so the delinquencies page
+  // renders every notice status and disposition out of the box.
   const ownerMembership = await ctx.db
     .query("memberships")
     .withIndex("by_agency", (q) => q.eq("agencyId", agencyId))
     .filter((q) => q.eq(q.field("role"), "owner"))
     .first();
   const openedByUserId = ownerMembership?.userId;
-  let noticesInserted = 0;
-  if (openedByUserId && insuredRows.length >= 4) {
-    const [cured, inArrears, defaultVerified, covered] = insuredRows;
-    // publicIds mirror the openNotice mutation shape: DN-<guarantee>-<yyyy-mm-dd>
-    // (day granularity, matching the by_guarantee_dueDate collision domain).
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${cured.publicId}-2026-04-05`,
-      guaranteeId: cured.guaranteeId,
-      agencyId,
-      status: DELINQUENCY_STATUS.RESOLVED,
-      rentDueDate: "2026-04-05",
-      originalAmountCents: cured.spec.rentCents,
-      updatedAmountCents: Math.round(cured.spec.rentCents * 1.05),
-      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
-      openedAt: d("2026-04-08T10:00:00-03:00"),
-      openedByUserId,
+  if (!openedByUserId) throw new Error("Aprovada book requires the agency owner membership");
+
+  type AprovadaNotice = {
+    n: number;
+    rentDueDaysAgo: number;
+    lateFeeRate: number;
+    openedAt: string;
+    verification?: { at: string; note?: string };
+    resolution?:
+      | { kind: typeof NOTICE_RESOLUTION_KIND.TENANT_CURED; at: string; note: string }
+      | { kind: typeof NOTICE_RESOLUTION_KIND.STAFF_DISPUTE; at: string; note: string }
+      | {
+          kind: typeof NOTICE_RESOLUTION_KIND.COVER_COMMITTED;
+          at: string;
+          appliedCents: number;
+          note: string;
+          cover:
+            | { kind: "executed"; batchId?: string; executedAt: string }
+            | { kind: "recorded"; batchId: string };
+        };
+    cancellation?: { at: string; note: string };
+  };
+
+  // publicIds mirror the openNotice mutation shape: DN-<guarantee>-<yyyy-mm-dd>
+  // (day granularity, matching the by_guarantee_dueDate collision domain).
+  const notices: AprovadaNotice[] = [
+    // Performing guarantee: an old arrears the tenant cured, and a recent
+    // notice staff dismissed — the payment had been made all along.
+    {
+      n: 0,
+      rentDueDaysAgo: 95,
+      lateFeeRate: 1.05,
+      openedAt: daysAgo(92, "13:00"),
       resolution: {
         kind: NOTICE_RESOLUTION_KIND.TENANT_CURED,
-        resolvedAt: d("2026-04-15T14:30:00-03:00"),
-        resolvedByUserId: openedByUserId,
+        at: daysAgo(85, "17:30"),
         note: "Inquilino quitou aluguel + encargos diretamente com o proprietário.",
       },
-    });
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${inArrears.publicId}-2026-06-05`,
-      guaranteeId: inArrears.guaranteeId,
-      agencyId,
-      status: DELINQUENCY_STATUS.OPEN,
-      rentDueDate: "2026-06-05",
-      originalAmountCents: inArrears.spec.rentCents,
-      updatedAmountCents: Math.round(inArrears.spec.rentCents * 1.02),
-      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
-      openedAt: d("2026-06-10T09:19:00-03:00"),
-      openedByUserId,
-    });
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${defaultVerified.publicId}-2026-05-05`,
-      guaranteeId: defaultVerified.guaranteeId,
-      agencyId,
-      status: DELINQUENCY_STATUS.VERIFIED,
-      rentDueDate: "2026-05-05",
-      originalAmountCents: defaultVerified.spec.rentCents,
-      updatedAmountCents: Math.round(defaultVerified.spec.rentCents * 1.035),
-      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
-      openedAt: d("2026-05-14T18:14:00-03:00"),
-      openedByUserId,
+    },
+    {
+      n: 0,
+      rentDueDaysAgo: 40,
+      lateFeeRate: 1.02,
+      openedAt: daysAgo(36, "12:40"),
+      cancellation: {
+        at: daysAgo(31, "16:10"),
+        note: "Pagamento localizado no extrato do proprietário; aviso aberto por engano.",
+      },
+    },
+    // In arrears: a first claim staff disputed (it stays in default), then a
+    // fresh notice filed this week that nobody has looked at yet.
+    {
+      n: 1,
+      rentDueDaysAgo: 70,
+      lateFeeRate: 1.04,
+      openedAt: daysAgo(66, "12:05"),
+      resolution: {
+        kind: NOTICE_RESOLUTION_KIND.STAFF_DISPUTE,
+        at: daysAgo(58, "18:20"),
+        note: "Valor cobrado diverge do contrato; imobiliária deve reapresentar o aviso.",
+      },
+    },
+    { n: 1, rentDueDaysAgo: 9, lateFeeRate: 1.02, openedAt: daysAgo(4, "12:19") },
+    // Verified defaults waiting for a cover decision.
+    {
+      n: 2,
+      rentDueDaysAgo: 25,
+      lateFeeRate: 1.035,
+      openedAt: daysAgo(20, "21:14"),
       verification: {
-        verifiedAt: d("2026-05-28T11:05:00-03:00"),
-        verifiedByUserId: staffUserId,
+        at: daysAgo(6, "14:05"),
         note: "Inadimplência confirmada junto ao proprietário; sem acordo de quitação.",
       },
-    });
-    await ctx.db.insert("guaranteeDelinquencyNotices", {
-      publicId: `DN-${covered.publicId}-2026-03-10`,
-      guaranteeId: covered.guaranteeId,
-      agencyId,
-      status: DELINQUENCY_STATUS.RESOLVED,
-      rentDueDate: "2026-03-10",
-      originalAmountCents: covered.spec.rentCents,
-      updatedAmountCents: APROVADA_COVER_APPLIED_CENTS,
-      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
-      openedAt: d("2026-03-16T09:40:00-03:00"),
-      openedByUserId,
-      verification: {
-        verifiedAt: d("2026-03-27T16:20:00-03:00"),
-        verifiedByUserId: staffUserId,
-      },
+    },
+    {
+      n: 6,
+      rentDueDaysAgo: 18,
+      lateFeeRate: 1.03,
+      openedAt: daysAgo(14, "13:50"),
+      verification: { at: daysAgo(3, "19:30") },
+    },
+    // Cover committed, payout executed a few weeks ago in the batch Horizonte's
+    // cover shares.
+    {
+      n: 3,
+      rentDueDaysAgo: 50,
+      lateFeeRate: 1,
+      openedAt: daysAgo(45, "12:40"),
+      verification: { at: daysAgo(34, "19:20") },
       resolution: {
         kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
-        resolvedAt: d("2026-04-02T10:15:00-03:00"),
-        resolvedByUserId: staffUserId,
-        coverOperationPublicId: "COV-2026-04-0001",
-        appliedCoverCents: APROVADA_COVER_APPLIED_CENTS,
-        note: "Cobertura paga ao proprietário; regresso contra o inquilino em andamento.",
+        at: executedBatchRecordedAt(),
+        appliedCents: COVER_EXECUTED_CENTS,
+        note: "Lote semanal de coberturas.",
+        cover: {
+          kind: "executed",
+          batchId: coverBatches.executed,
+          executedAt: executedBatchExecutedAt(),
+        },
       },
+    },
+    // Cover committed this week, still awaiting its payout — the batch
+    // Atlântica's cover shares.
+    {
+      n: 7,
+      rentDueDaysAgo: 30,
+      lateFeeRate: 1,
+      openedAt: daysAgo(26, "14:00"),
+      verification: { at: daysAgo(12, "17:45") },
+      resolution: {
+        kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+        at: recordedBatchRecordedAt(),
+        appliedCents: COVER_RECORDED_CENTS,
+        note: "Lote semanal de coberturas.",
+        cover: { kind: "recorded", batchId: coverBatches.recorded },
+      },
+    },
+    // Covered months ago; the eviction followed the cover.
+    {
+      n: 8,
+      rentDueDaysAgo: 110,
+      lateFeeRate: 1,
+      openedAt: daysAgo(105, "12:30"),
+      verification: { at: daysAgo(95, "18:00") },
+      resolution: {
+        kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+        at: daysAgo(88, "16:00"),
+        appliedCents: COVER_EVICTION_CENTS,
+        note: "Cobertura paga; imobiliária ajuizou a ação de despejo.",
+        cover: { kind: "executed", executedAt: daysAgo(86, "13:30") },
+      },
+    },
+    // Covered, then the default turned out not to be real: closed by
+    // dispute reversal, which released the reserved cover.
+    {
+      n: 9,
+      rentDueDaysAgo: 80,
+      lateFeeRate: 1,
+      openedAt: daysAgo(76, "13:10"),
+      verification: { at: daysAgo(68, "17:00") },
+      resolution: {
+        kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED,
+        at: daysAgo(62, "15:00"),
+        appliedCents: COVER_REVERSED_CENTS,
+        note: "Cobertura paga ao proprietário.",
+        cover: { kind: "executed", executedAt: daysAgo(60, "12:00") },
+      },
+    },
+  ];
+
+  for (const notice of notices) {
+    const row = insertedAt(notice.n);
+    const rentDueDate = dateDaysAgo(notice.rentDueDaysAgo);
+    const originalAmountCents = row.lease.rentCents;
+    const resolution = notice.resolution;
+    const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId: `DN-${row.publicId}-${rentDueDate}`,
+      guaranteeId: row.guaranteeId,
+      agencyId,
+      status: resolution
+        ? DELINQUENCY_STATUS.RESOLVED
+        : notice.cancellation
+          ? DELINQUENCY_STATUS.CANCELED
+          : notice.verification
+            ? DELINQUENCY_STATUS.VERIFIED
+            : DELINQUENCY_STATUS.OPEN,
+      rentDueDate,
+      originalAmountCents,
+      updatedAmountCents:
+        resolution?.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED
+          ? resolution.appliedCents
+          : Math.round(originalAmountCents * notice.lateFeeRate),
+      evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
+      openedAt: notice.openedAt,
+      openedByUserId,
+      ...(notice.verification
+        ? {
+            verification: {
+              verifiedAt: notice.verification.at,
+              verifiedByUserId: staffUserId,
+              ...(notice.verification.note === undefined ? {} : { note: notice.verification.note }),
+            },
+          }
+        : {}),
+      ...(resolution
+        ? {
+            resolution: {
+              kind: resolution.kind,
+              resolvedAt: resolution.at,
+              // The agency confirms a cure; every other disposition is staff's.
+              resolvedByUserId:
+                resolution.kind === NOTICE_RESOLUTION_KIND.TENANT_CURED
+                  ? openedByUserId
+                  : staffUserId,
+              ...(resolution.kind === NOTICE_RESOLUTION_KIND.COVER_COMMITTED
+                ? { appliedCoverCents: resolution.appliedCents }
+                : {}),
+              note: resolution.note,
+            },
+          }
+        : {}),
+      ...(notice.cancellation
+        ? {
+            cancellation: {
+              reason: NOTICE_CANCELLATION_REASON.STAFF_DISMISSED,
+              canceledAt: notice.cancellation.at,
+              canceledByUserId: staffUserId,
+              note: notice.cancellation.note,
+            },
+          }
+        : {}),
     });
-    noticesInserted = 4;
+
+    if (resolution?.kind !== NOTICE_RESOLUTION_KIND.COVER_COMMITTED) continue;
+    if (resolution.cover.kind === "recorded") {
+      await seedRecordedCover(ctx, { noticeId, batchId: resolution.cover.batchId });
+      continue;
+    }
+    await seedExecutedCover(ctx, {
+      noticeId,
+      batchId: resolution.cover.batchId,
+      executedAt: resolution.cover.executedAt,
+    });
   }
 
   return {
     guaranteesInserted: inserted.length,
     insuredCount: insuredRows.length,
-    noticesInserted,
+    noticesInserted: notices.length,
   };
 }
 
@@ -2898,6 +3684,32 @@ function seedDaysAfter(at: string, days: number): string {
 
 type SeedNotice = DelinquencyNotice;
 
+// `guaranteeHistory.message` is stored pt-BR free text, so the enum values it
+// names are spelled the way the agency app labels them
+// (apps/agency/messages/pt-BR.json — `resolution.kind`, `cancellation.reason`,
+// `closeReason`), not as raw wire values inside Portuguese prose.
+const RESOLUTION_KIND_LABEL: Record<NoticeResolutionKind, string> = {
+  tenant_cured: "inquilino quitou a dívida",
+  cover_committed: "coberto pela reserva",
+  stale: "encerrado por prescrição",
+  staff_dispute: "contestação Mutav",
+};
+const CANCELLATION_REASON_LABEL: Record<NoticeCancellationReason, string> = {
+  agency_withdrew: "retirado pela imobiliária",
+  duplicate: "registro duplicado",
+  data_error: "erro de dados",
+  staff_dismissed: "rejeitado pela Mutav",
+};
+const CLOSE_REASON_LABEL: Record<CloseReason, string> = {
+  end_of_lease: "fim da locação",
+  rescission: "rescisão",
+  abandonment: "abandono do imóvel",
+  eviction: "despejo",
+  dispute_reversal: "contestação revertida",
+  canceled_pre_activation: "cancelada antes da ativação",
+  death: "falecimento",
+};
+
 type NoticeEvent = {
   at: string;
   /** `settled` is either disposition that ends a notice: resolution or cancellation. */
@@ -2948,7 +3760,7 @@ function noticeEventsFor(notice: SeedNotice): NoticeEvent[] {
       to: isCover ? GUARANTEE_STATE.COVER_COMMITTED : isCured ? GUARANTEE_STATE.ACTIVE : null,
       message: isCover
         ? `Cobertura comprometida para o aviso ${notice.publicId}.`
-        : `Aviso ${notice.publicId} resolvido (${notice.resolution.kind}).`,
+        : `Aviso ${notice.publicId} resolvido: ${RESOLUTION_KIND_LABEL[notice.resolution.kind]}.`,
     });
   }
   if (notice.cancellation) {
@@ -2957,7 +3769,7 @@ function noticeEventsFor(notice: SeedNotice): NoticeEvent[] {
       kind: "settled",
       noticePublicId: notice.publicId,
       to: GUARANTEE_STATE.ACTIVE,
-      message: `Aviso ${notice.publicId} cancelado (${notice.cancellation.reason}).`,
+      message: `Aviso ${notice.publicId} cancelado: ${CANCELLATION_REASON_LABEL[notice.cancellation.reason]}.`,
     });
   }
   return events;
@@ -3069,7 +3881,7 @@ function planGuaranteeTransitions(
     pushStructural(
       guarantee.closure.closedAt,
       GUARANTEE_STATE.CLOSED,
-      `Garantia ${guarantee.publicId} encerrada (${guarantee.closure.reason}).`,
+      `Garantia ${guarantee.publicId} encerrada: ${CLOSE_REASON_LABEL[guarantee.closure.reason]}.`,
       guarantee.closure.reason,
     );
   }
@@ -3144,7 +3956,10 @@ async function attachGuaranteeTransitionHistory(ctx: MutationCtx): Promise<numbe
  * partial-seed footgun of exposing the intermediate steps as their own
  * runnable entrypoints.
  *
- * Dev-only. Do NOT call from production.
+ * For dev/preview deployments, and for the production demo environment
+ * only before any real agency data exists. It wipes the demo tables and keeps
+ * `waitlist`, `contractApplications`, the audit chain and the staff tables
+ * (see `DEMO_TABLES`).
  */
 export const seedReset = internalMutation({
   args: { adminEmail: v.optional(v.string()) },
@@ -3154,11 +3969,15 @@ export const seedReset = internalMutation({
     const personas = await seedAllPersonas(ctx);
     const staffUserId = personas.find((p) => p.persona === "systemadmin")?.userId;
     if (!staffUserId) throw new Error("seedReset requires the systemadmin persona");
-    const fictional = await seedFictional(ctx, { ...args, staffUserId });
+    const coverBatches: SeedCoverBatches = {
+      executed: generateCoverBatchId(),
+      recorded: generateCoverBatchId(),
+    };
+    const fictional = await seedFictional(ctx, { ...args, staffUserId, coverBatches });
 
     const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
     const aprovada = aprovadaAgencyId
-      ? await populateAprovadaBook(ctx, { agencyId: aprovadaAgencyId, staffUserId })
+      ? await populateAprovadaBook(ctx, { agencyId: aprovadaAgencyId, staffUserId, coverBatches })
       : null;
 
     await attachTenantSnapshots(ctx);

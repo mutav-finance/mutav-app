@@ -158,7 +158,8 @@
       "guarantee": "Garantia",
       "outstanding": "Em aberto",
       "openFor": "Aberto há",
-      "actions": "Ações"
+      "actions": "Ações",
+      "select": "Selecionar"
     },
     "noticeStatus": {
       "open": "Informado",
@@ -168,8 +169,8 @@
       "drafted": "Rascunho",
       "active": "Ativa",
       "in_arrears": "Em atraso",
-      "default_verified": "Inadimplência confirmada",
-      "cover_committed": "Cobertura acionada",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura registrada",
       "in_eviction": "Em despejo",
       "closed": "Encerrada"
     },
@@ -177,20 +178,22 @@
       "verify": "Confirmar",
       "cover": "Registrar cobertura",
       "dismiss": "Descartar",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "coverSelected": "Registrar cobertura ({count})",
+      "clearSelection": "Limpar seleção"
     },
     "cover": {
-      "title": "Registrar pagamento de cobertura",
-      "description": "A Mutav pagou o locador e nasce um recebível regressivo. Isto reserva capacidade na garantia.",
+      "title": "Registrar cobertura",
+      "description": "Aciona a cobertura para cada inadimplência confirmada: a capacidade é reservada na garantia e o pagamento fica registrado como aguardando execução. O pagamento em si é feito fora da cadeia.",
       "claimed": "Valor acionado",
       "remainingCapacity": "Cobertura restante",
       "applied": "Valor que será debitado",
       "clampWarning": "O valor acionado excede a cobertura restante. Somente o valor acima é debitado — {shortfall} ficam descobertos.",
-      "operationLabel": "Referência da operação de cobertura",
-      "operationPlaceholder": "COV-2026-000123",
       "noteLabel": "Observação (opcional)",
       "notePlaceholder": "O que a trilha de auditoria deve registrar",
-      "confirm": "Registrar cobertura"
+      "confirm": "Registrar cobertura",
+      "selectedCount": "{count, plural, one {# acionamento} other {# acionamentos}}",
+      "batchNotice": "Todos os acionamentos selecionados são registrados juntos, ou nenhum é."
     },
     "dismiss": {
       "title": "Descartar acionamento",
@@ -207,7 +210,8 @@
     "toast": {
       "verified": "Inadimplência confirmada.",
       "covered": "Cobertura registrada.",
-      "dismissed": "Acionamento encerrado."
+      "dismissed": "Acionamento encerrado.",
+      "executed": "Pagamento marcado como executado."
     },
     "errors": {
       "NOTICE_NOT_FOUND": "Este acionamento não existe mais.",
@@ -224,7 +228,46 @@
       "GUARANTEE_CLOSED": "A garantia está encerrada e não aceita mais mudanças.",
       "INVALID_RENEWAL_DATE": "A data de renovação não é uma data válida.",
       "FORBIDDEN": "Seu papel interno não permite executar esta ação.",
-      "unexpected": "Algo deu errado. Tente novamente."
+      "unexpected": "Algo deu errado. Tente novamente.",
+      "EMPTY_BATCH": "Selecione ao menos um acionamento confirmado.",
+      "BATCH_TOO_LARGE": "Acionamentos demais em um só lote. Registre-os em grupos menores.",
+      "DUPLICATE_NOTICE_IN_BATCH": "O mesmo acionamento foi selecionado duas vezes.",
+      "COVER_ALREADY_RECORDED": "A cobertura desta garantia neste mês de referência já foi registrada.",
+      "COVER_OPERATION_NOT_FOUND": "Esta operação de cobertura não existe mais.",
+      "COVER_ALREADY_EXECUTED": "Este pagamento já está marcado como executado.",
+      "PAYMENT_REFERENCE_REQUIRED": "Informe a referência de pagamento da transferência.",
+      "inNotice": "Nada foi registrado. Recusado no acionamento {notice}."
+    },
+    "payouts": {
+      "title": "Pagamentos aguardando execução",
+      "subtitle": "Coberturas registradas pelo compliance cujo pagamento ao locador ainda não foi confirmado, dos mais antigos aos mais recentes.",
+      "empty": "Nenhum pagamento aguardando execução.",
+      "moreAvailable": "Há mais pagamentos aguardando — apenas a página mais antiga é exibida.",
+      "noBatch": "—",
+      "columns": {
+        "operation": "Operação",
+        "batch": "Lote",
+        "notice": "Acionamento",
+        "agency": "Imobiliária",
+        "guarantee": "Garantia",
+        "period": "Referência",
+        "amount": "Valor",
+        "recordedAt": "Registrado em",
+        "actions": "Ações"
+      },
+      "actions": {
+        "markExecuted": "Marcar pagamento executado"
+      },
+      "execute": {
+        "title": "Marcar pagamento executado",
+        "description": "Confirma que o pagamento ao locador foi feito. Registre a referência devolvida pelo banco ou Pix para permitir a conciliação.",
+        "amount": "Valor pago",
+        "referenceLabel": "Referência do pagamento",
+        "referencePlaceholder": "ID E2E ou número da transferência",
+        "noteLabel": "Observação (opcional)",
+        "notePlaceholder": "O que a trilha de auditoria deve registrar",
+        "confirm": "Marcar executado"
+      }
     }
   },
   "shellSwitcher": {
@@ -235,5 +278,90 @@
     "connecting": "Conectando…",
     "disconnect": "Desconectar",
     "verified": "Titularidade verificada"
+  },
+  "transparency": {
+    "reserve": {
+      "label": "Reserva de cobertura",
+      "unavailable": "Indisponível",
+      "testnet": "Testnet",
+      "asOf": "Atualizado em {datetime} (BRT)",
+      "brlIndicative": "≈ {amount} pela PTAX BCB (venda) {rate} — apenas indicativo; {symbol} é um ativo simulado da testnet",
+      "fxQuotedAt": "PTAX cotada em {datetime} (BRT)",
+      "coverageRatio": "Índice de cobertura",
+      "coverageRatioNone": "Nenhuma cobertura reservada",
+      "coverageRequired": "Cobertura exigida",
+      "coverageRatioHint": "Ativos estáveis divididos pela cobertura que os contratos reservam para a carteira onchain.",
+      "contracts": {
+        "vault": "Vault",
+        "policy": "Política",
+        "registry": "Registro"
+      },
+      "viewExplorer": "Verificar na rede Stellar"
+    },
+    "capacity": {
+      "label": "Capacidade de garantia restante",
+      "unavailable": "Indisponível",
+      "utilization": "Utilização",
+      "ceiling": "Teto de capacidade",
+      "ceilingUnbounded": "Sem teto (c = 0)",
+      "requiredRatio": "Índice de cobertura exigido (c)",
+      "rule": "Capacidade é solvência: a capacidade restante é o capital livre da reserva, e o teto é o ativo estável dividido por c. Sem limite configurado."
+    },
+    "breakdown": {
+      "title": "Composição da reserva",
+      "description": "Onde está o capital da reserva, lido onchain. Só posições estáveis contam para a solvência.",
+      "testnet": "Testnet",
+      "unavailable": "A composição da reserva está indisponível no momento.",
+      "columns": {
+        "position": "Posição",
+        "contract": "Contrato",
+        "solvency": "Solvência",
+        "balance": "Saldo",
+        "share": "Participação"
+      },
+      "kind": {
+        "idle": "{symbol} mantido no vault",
+        "strategy": "Estratégia de rendimento"
+      },
+      "stable": "Estável",
+      "volatile": "Volátil"
+    }
+  },
+  "treasury": {
+    "title": "Tesouraria",
+    "subtitle": "A reserva de cobertura mutav-pulse, a capacidade que ela sustenta e a carteira de garantias que ela lastreia.",
+    "status": {
+      "solvent": "Solvente",
+      "undercovered": "Cobertura insuficiente",
+      "noBook": "Nenhuma cobertura reservada",
+      "unavailable": "Leitura da reserva indisponível",
+      "stale": "O último snapshot, de {datetime} (BRT), tem mais de 45 minutos — a leitura da reserva pode estar falhando."
+    },
+    "book": {
+      "title": "Capacidade em termos de carteira",
+      "description": "Carteira bruta de garantias que o vault consegue lastrear, numa só escala: teto − usado = restante.",
+      "ceiling": "Teto (ativos estáveis ÷ c)",
+      "used": "Usado (cobertura bruta no registro)",
+      "remaining": "Restante (capital livre ÷ c)",
+      "unbounded": "Sem teto (c = 0)",
+      "unavailable": "Indisponível até o próximo snapshot da reserva."
+    },
+    "exposure": {
+      "title": "Exposição das garantias",
+      "description": "A carteira de garantias, em BRL. Não é convertida para o ativo da reserva: compare as duas só com uma taxa de câmbio.",
+      "insured": "Garantias vigentes",
+      "totalGuaranteed": "Total garantido",
+      "verifiedDefault": "Inadimplência verificada ou cobertura registrada",
+      "verifiedDefaultExposure": "Exposição em inadimplência verificada ou cobertura registrada",
+      "coverCommitted": "Cobertura registrada",
+      "defaultRate": "Taxa de inadimplência"
+    },
+    "footer": "Os números de reserva e capacidade estão no ativo do vault, lidos onchain a cada 15 minutos; a exposição está em BRL, a partir da carteira de garantias.",
+    "errors": {
+      "unexpected": "Algo deu errado. Tente novamente."
+    },
+    "actions": {
+      "retry": "Tentar novamente"
+    }
   }
 }

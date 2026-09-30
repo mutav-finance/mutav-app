@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { ChevronsUpDownIcon, BuildingIcon, CheckIcon } from "lucide-react";
 import {
   DropdownMenu,
@@ -14,13 +15,8 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@mu
 import { useWorkspace } from "@/providers/workspace";
 import { cn } from "@mutav/ui/cn";
 
-const ROLE_LABEL: Record<string, string> = {
-  owner: "Proprietário",
-  admin: "Admin",
-  member: "Membro",
-};
-
 export function AgencySwitcher() {
+  const t = useTranslations("nav.agencySwitcher");
   const { isMobile } = useSidebar();
   const { agencies, selectedAgency, setSelectedAgency, isLoading } = useWorkspace();
 
@@ -57,7 +53,7 @@ export function AgencySwitcher() {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{selectedAgency.name}</span>
                 <span className="text-muted-foreground truncate text-xs">
-                  {ROLE_LABEL[selectedAgency.role] ?? selectedAgency.role}
+                  {t(`roles.${selectedAgency.role}`)}
                 </span>
               </div>
               <ChevronsUpDownIcon className="ml-auto size-4" />
@@ -70,7 +66,7 @@ export function AgencySwitcher() {
             sideOffset={4}
           >
             <DropdownMenuLabel className="text-muted-foreground text-xs">
-              Workspaces
+              {t("workspacesLabel")}
             </DropdownMenuLabel>
             {agencies.map((agency) => (
               <DropdownMenuItem
@@ -84,7 +80,7 @@ export function AgencySwitcher() {
                 <div className="grid flex-1 text-sm leading-tight">
                   <span className="truncate font-medium">{agency.name}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    {ROLE_LABEL[agency.role] ?? agency.role}
+                    {t(`roles.${agency.role}`)}
                   </span>
                 </div>
                 <CheckIcon

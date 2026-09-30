@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Mutav — Registered Guarantee System",
-    "description": "Dashboard for managing rental guarantees registered on-chain."
+    "description": "Dashboard for managing rental guarantees registered onchain."
   },
   "common": {
     "a11y": {
@@ -219,7 +219,7 @@
       "txIdEmpty": "Awaiting payment",
       "address": "Destination address",
       "txHash": "Transaction hash",
-      "txHashEmpty": "Awaiting on-chain confirmation",
+      "txHashEmpty": "Awaiting onchain confirmation",
       "generateStellar": "Pay with Stellar",
       "openPayPage": "Open payment page",
       "copyShareLink": "Copy link",

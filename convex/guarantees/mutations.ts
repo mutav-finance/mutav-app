@@ -21,6 +21,8 @@ import {
 } from "./domain";
 import {
   applyGuaranteeTransition,
+  closeAsDisputeReversal,
+  type DisputeReversalError,
   type GuaranteeActor,
   type GuaranteeTransitionError,
 } from "./transitions";
@@ -142,6 +144,9 @@ type CloseSuccessResult = { publicId: string };
 type CloseErrorResult = {
   code: typeof GUARANTEE_ERROR_CODE.NOT_FOUND | TransitionErrorCode;
 };
+type StaffCloseErrorResult = {
+  code: CloseErrorResult["code"] | DisputeReversalError["code"];
+};
 
 /**
  * The one close an agency may file itself: the lease ran its course. Every
@@ -183,15 +188,34 @@ export const closeEndOfLease = mutationWithAgencyScope({
  * `in_eviction`, `dispute_reversal` only from a verified default or a
  * committed cover, `canceled_pre_activation` only from a draft.
  *
- * Closing never touches `capacity`: cents reserved by a committed cover survive
- * a `dispute_reversal` here, because giving them back is `releaseCoverCapacity`
- * and the release/burn half of policy C lands with the receivable ledger.
+ * Only `dispute_reversal` moves `capacity`: it says the default was never
+ * real, so the cover committed against it is released in the same
+ * transaction. Every other reason from `cover_committed` leaves the reserved
+ * cents held — that cover was paid out, and burning it is the receivable
+ * ledger's job, not a close's.
  */
 export const close = mutationWithMutavRole({ minRole: "compliance" })({
   args: { publicId: v.string(), reason: closeReasonValidator, note: v.optional(v.string()) },
-  handler: async (ctx, args): Promise<Result<CloseSuccessResult, CloseErrorResult>> => {
+  handler: async (ctx, args): Promise<Result<CloseSuccessResult, StaffCloseErrorResult>> => {
     const guarantee = await findGuaranteeByPublicId(ctx, args.publicId);
     if (!guarantee) return notFound(args.publicId);
+
+    if (args.reason === CLOSE_REASON.DISPUTE_REVERSAL) {
+      const reversed = await closeAsDisputeReversal(ctx, {
+        guarantee,
+        ...(args.note ? { note: args.note } : {}),
+        actor: actorFrom(ctx.user),
+        message: "Garantia encerrada",
+      });
+      if (!reversed.success) {
+        return { success: false, error: { code: reversed.error.code }, message: reversed.message };
+      }
+      return {
+        success: true,
+        data: { publicId: guarantee.publicId },
+        message: `Guarantee ${guarantee.publicId} closed as ${args.reason}; released ${reversed.data.releasedCents} cents`,
+      };
+    }
 
     const applied = await applyGuaranteeTransition(ctx, {
       guarantee,

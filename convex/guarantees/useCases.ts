@@ -59,7 +59,6 @@ import { getOrCreateTenant } from "../tenants/useCases";
 import type { Result } from "../lib/result";
 import { findFreshAssessment } from "../creditAnalysis/useCases";
 import { CAPABILITY, SUBJECT_TYPE } from "../creditAnalysis/domain";
-import { getMaxGuaranteeCapacityCents } from "../lib/env";
 import { generateGuaranteePublicId, generateLeasePublicId } from "../lib/randomId";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
@@ -379,21 +378,15 @@ export const getStatusCountsGlobal = queryWithAuth({
 });
 
 /**
- * Platform-wide insured capacity. Sum of worst-case exposure (remaining
+ * Platform-wide insured exposure. Sum of worst-case exposure (remaining
  * rent-coverage capacity + exit-cost sublimit) across every in-force
- * guarantee, plus the configured global capacity cap. O(log n) per insured
- * state via the `insuredCentsPlatform` aggregate.
+ * guarantee. O(log n) per insured state via the `insuredCentsPlatform`
+ * aggregate. The capacity ceiling is no longer a configured constant — it is
+ * derived from the on-chain reserve (see `transparency/useCases.ts`).
  */
 export const getInsuredCapacityGlobal = queryWithAuth({
   args: {},
-  handler: async (ctx) => {
-    const sumInsuredCents = await sumInsuredExposure(ctx);
-
-    return {
-      sumInsuredCents,
-      maxCapacityCents: getMaxGuaranteeCapacityCents(),
-    };
-  },
+  handler: async (ctx) => ({ sumInsuredCents: await sumInsuredExposure(ctx) }),
 });
 
 const ACTIVITY_MONTH_PERIODS = 12;

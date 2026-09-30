@@ -209,7 +209,7 @@ export const getStellarIndexState = internalQuery({
  * Count of overdue invoices for the current agency — open invoices whose
  * `dueDate` is strictly before today (UTC). Overdue is derived now (no
  * stored state), so the reducer compares against today's date computed
- * once at handler start. Used by the Inadimplências KPI tile on the
+ * once at handler start. Used by the Overdue invoices KPI tile on the
  * dashboard until a dedicated delinquency domain ships (see issue #52).
  *
  * Scans the agency-scoped invoices index — bounded by agency size, no

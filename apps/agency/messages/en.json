@@ -4,7 +4,7 @@
   },
   "meta": {
     "title": "Mutav — Registered Guarantee System",
-    "description": "Dashboard for managing rental guarantees registered on-chain."
+    "description": "Dashboard for managing rental guarantees registered onchain."
   },
   "paymentStatus": {
     "pending": "Pending",
@@ -73,7 +73,7 @@
       "description": "Track and manage delinquency actions for your agency's guarantees."
     },
     "heading": "Delinquency Actions",
-    "subheading": "Track and manage open delinquencies for your guarantees",
+    "subheading": "Track and manage delinquencies for your guarantees",
     "actions": {
       "report": "Generate report",
       "statement": "Payment statement",
@@ -87,7 +87,7 @@
     "evidenceSource": {
       "agency_reported": "Agency-reported",
       "bank_attested": "Bank-attested",
-      "onchain_observed": "On-chain observed",
+      "onchain_observed": "Onchain observed",
       "system_scheduled": "System-scheduled"
     },
     "filter": {
@@ -102,7 +102,9 @@
       "amountFrom": "Amount — from",
       "amountTo": "Amount — to",
       "search": "Search",
-      "clear": "Clear"
+      "clear": "Clear",
+      "guarantee": "Guarantee {id}",
+      "clearGuarantee": "Remove the guarantee {id} filter"
     },
     "table": {
       "heading": "Results",
@@ -220,6 +222,14 @@
       "members": "Members",
       "commission": "Commission",
       "agencySettings": "Agency Settings"
+    },
+    "agencySwitcher": {
+      "workspacesLabel": "Workspaces",
+      "roles": {
+        "owner": "Owner",
+        "admin": "Admin",
+        "member": "Member"
+      }
     }
   },
   "chart": {
@@ -256,10 +266,10 @@
       "noneLabel": "None",
       "dueOn": "Due on {date}"
     },
-    "delinquencies": {
-      "label": "Delinquencies",
-      "footerNone": "No overdue invoices",
-      "footerSome": "{count, plural, one {# overdue invoice} other {# overdue invoices}}"
+    "overdueInvoices": {
+      "label": "Overdue invoices",
+      "footerNone": "All Mutav invoices are up to date",
+      "footerSome": "{count, plural, one {# Mutav invoice past its due date} other {# Mutav invoices past their due date}}"
     }
   },
   "dataTable": {
@@ -379,6 +389,8 @@
       },
       "openDelinquencyHint": "Register a new delinquency",
       "trackDelinquenciesHint": "View delinquencies for this guarantee",
+      "openDelinquencyDisabledHint": "Available only for guarantees in force",
+      "trackDelinquenciesDisabledHint": "This guarantee was never in force, so it has no delinquencies",
       "actionsMenu": "Guarantee actions",
       "ofCeiling": "of {ceiling}"
     },
@@ -815,7 +827,7 @@
       "txIdEmpty": "Awaiting payment",
       "address": "Destination address",
       "txHash": "Transaction hash",
-      "txHashEmpty": "Awaiting on-chain confirmation",
+      "txHashEmpty": "Awaiting onchain confirmation",
       "generateStellar": "Pay with Stellar",
       "openPayPage": "Open payment page",
       "copyShareLink": "Payment Link",
@@ -881,8 +893,7 @@
       "rent": "Monthly rent",
       "condo": "Condo fee",
       "otherFees": "Other fees",
-      "total": "Total rent",
-      "placeholder": "0.00"
+      "total": "Total rent"
     },
     "tenant": {
       "fullName": "Full name",
@@ -1265,25 +1276,62 @@
     },
     "heading": "Transparency",
     "subheading": "Risk position transparency and onchain treasury.",
-    "footer": "Guarantee data in real time. Coverage reserve read onchain and refreshed periodically.",
+    "footer": "Guarantee data in real time. Reserve and capacity read onchain from the mutav-pulse contracts and refreshed every 15 minutes.",
     "guarantees": {
       "insured": "Guarantees in force",
       "drafted": "Drafts",
       "defaultRate": "Default rate",
-      "defaultRateHint": "Verified defaults and committed covers as a share of guarantees in force, right now."
+      "defaultRateHint": "Verified defaults and committed covers as a share of guarantees in force, right now.",
+      "totalGuaranteed": "Total guaranteed",
+      "totalGuaranteedHint": "Worst-case exposure across guarantees in force: remaining rent coverage plus the exit-cost sublimit.",
+      "verifiedDefaultExposure": "Exposure in verified default",
+      "verifiedDefaultExposureHint": "{count, plural, =0 {No guarantee in verified default or committed cover.} one {# guarantee in verified default or committed cover.} other {# guarantees in verified default or committed cover.}}"
     },
     "capacity": {
-      "label": "Contracted capacity utilization",
-      "used": "{pct}% utilized",
-      "of": "of {total}"
+      "label": "Remaining guarantee capacity",
+      "unavailable": "Unavailable",
+      "utilization": "Utilization",
+      "ceiling": "Capacity ceiling",
+      "ceilingUnbounded": "Unbounded (c = 0)",
+      "requiredRatio": "Required coverage ratio (c)",
+      "rule": "Capacity is solvency: remaining capacity is the reserve's free capital, and the ceiling is stable assets divided by c. No configured cap."
     },
     "reserve": {
       "label": "Coverage reserve",
       "unavailable": "Unavailable",
-      "asOf": "As of {datetime}",
-      "fx": "BCB PTAX (ask): {rate}",
-      "fxQuotedAt": "Quoted {datetime} (BRT)",
+      "testnet": "Testnet",
+      "asOf": "As of {datetime} (BRT)",
+      "brlIndicative": "≈ {amount} at BCB PTAX (ask) {rate} — indicative only; {symbol} is a testnet mock asset",
+      "fxQuotedAt": "PTAX quoted {datetime} (BRT)",
+      "coverageRatio": "Coverage ratio",
+      "coverageRatioNone": "No coverage reserved",
+      "coverageRequired": "Coverage required",
+      "coverageRatioHint": "Stable assets divided by the coverage the contracts reserve behind the onchain book.",
+      "contracts": {
+        "vault": "Vault",
+        "policy": "Policy",
+        "registry": "Registry"
+      },
       "viewExplorer": "Verify on the Stellar network"
+    },
+    "breakdown": {
+      "title": "Reserve breakdown",
+      "description": "Where the reserve's capital sits, read onchain. Only stable positions count toward solvency.",
+      "testnet": "Testnet",
+      "unavailable": "The reserve breakdown is unavailable right now.",
+      "columns": {
+        "position": "Position",
+        "contract": "Contract",
+        "solvency": "Solvency",
+        "balance": "Balance",
+        "share": "Share"
+      },
+      "kind": {
+        "idle": "{symbol} held in the vault",
+        "strategy": "Yield strategy"
+      },
+      "stable": "Stable",
+      "volatile": "Volatile"
     },
     "timeline": {
       "title": "Platform book in force",
@@ -1301,7 +1349,7 @@
     "created": "Created",
     "activated": "Activated",
     "default_verified": "Default verified",
-    "cover_paid": "Cover paid",
+    "cover_paid": "Cover committed",
     "closed": "Closed"
   }
 }

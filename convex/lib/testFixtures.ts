@@ -299,3 +299,102 @@ export async function seedGuaranteeWithLease(
     return { guaranteeId, leaseId, tenantId, productId };
   });
 }
+
+export type CoverCandidate = {
+  subject: string;
+  userId: SeededUserId;
+  agencyId: AgencyId;
+  guaranteeId: GuaranteeId;
+  guaranteePublicId: string;
+};
+
+/**
+ * One user who owns one agency with one guarantee already in default — the
+ * starting point of every cover-ledger test. The rent is 300_000 cents, so
+ * the priced ceiling is 9_000_000 (30x).
+ */
+export async function seedCoverCandidate(
+  t: TestConvex<typeof schema>,
+  {
+    suffix,
+    status = GUARANTEE_STATE.DEFAULT_VERIFIED,
+    availableCents,
+  }: { suffix: string; status?: GuaranteeState; availableCents?: number },
+): Promise<CoverCandidate> {
+  const subject = `auth0|cover-${suffix}`;
+  const userId = await seedAuthenticatedUser(t, {
+    subject,
+    name: `Cover User ${suffix}`,
+    email: `cover-${suffix}@test.br`,
+  });
+  const agencyId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("agencies", {
+      name: `Cover Agency ${suffix}`,
+      cnpj: `0000000000000${suffix}`.slice(-14),
+      agencyType: "empresa",
+      onboardingState: "active",
+      createdAt: "2024-01-01T00:00:00-03:00",
+    });
+    await ctx.db.insert("memberships", {
+      userId,
+      agencyId: id,
+      role: "owner",
+      joinedAt: "2024-01-01T00:00:00-03:00",
+    });
+    return id;
+  });
+  const guaranteePublicId = `CTR-COVER${suffix}`;
+  const { guaranteeId } = await seedGuaranteeWithLease(
+    t,
+    {
+      agencyId,
+      status,
+      activatedAt: "2024-06-01T00:00:00.000Z",
+      rentCents: 300_000,
+      tenantTaxId: `1114447773${suffix}`.slice(-11),
+      ...(availableCents === undefined ? {} : { availableCents }),
+    },
+    guaranteePublicId,
+  );
+  return { subject, userId, agencyId, guaranteeId, guaranteePublicId };
+}
+
+/** A delinquency notice (staff-verified unless told otherwise) on a cover candidate's guarantee. */
+export async function seedCoverNotice(
+  t: TestConvex<typeof schema>,
+  candidate: CoverCandidate,
+  {
+    publicId,
+    rentDueDate = "2026-06-05",
+    updatedAmountCents = 300_000,
+    status = "verified",
+  }: {
+    publicId: string;
+    rentDueDate?: string;
+    updatedAmountCents?: number;
+    status?: "open" | "verified";
+  },
+) {
+  return t.run((ctx) =>
+    ctx.db.insert("guaranteeDelinquencyNotices", {
+      publicId,
+      guaranteeId: candidate.guaranteeId,
+      agencyId: candidate.agencyId,
+      status,
+      rentDueDate,
+      originalAmountCents: updatedAmountCents,
+      updatedAmountCents,
+      evidenceSource: "agency_reported",
+      openedAt: "2026-06-10T09:00:00-03:00",
+      openedByUserId: candidate.userId,
+      ...(status === "verified"
+        ? {
+            verification: {
+              verifiedAt: "2026-06-12T09:00:00-03:00",
+              verifiedByUserId: candidate.userId,
+            },
+          }
+        : {}),
+    }),
+  );
+}

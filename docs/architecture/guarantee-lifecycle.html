@@ -289,7 +289,9 @@
           />
           <text class="e-label" x="392" y="112">regulariza</text>
           <text class="e-label" x="486" y="76">regulariza antes do pagamento</text>
-          <text class="e-label" x="596" y="40">volta a pagar · recebível segue aberto</text>
+          <text class="e-label" x="560" y="40">
+            volta a pagar · recebível segue aberto (pendente — ledger de recebíveis)
+          </text>
 
           <!-- spine -->
           <g>
@@ -457,7 +459,10 @@
             <tr>
               <td><code>dispute_reversal</code></td>
               <td><code>default_verified</code>, <code>cover_committed</code></td>
-              <td>Inadimplência revertida. Único motivo que devolve capital reservado.</td>
+              <td>
+                Inadimplência revertida. Deve devolver o capital reservado (pendente — #330); hoje o
+                encerramento mantém os centavos reservados.
+              </td>
             </tr>
             <tr>
               <td><code>end_of_lease</code></td>
@@ -538,7 +543,9 @@
           <li>
             <strong>Cobertura registrada não é terminal.</strong> Tem saída para
             <code>active</code> e para <code>in_arrears</code>, então uma locação sobrevive a várias
-            coberturas. O recebível contra o inquilino segue aberto e independente.
+            coberturas. O recebível contra o inquilino segue aberto e independente. As duas saídas
+            são legais na máquina, mas nenhuma mutação as executa ainda (pendente — ledger de
+            recebíveis).
           </li>
           <li>
             <strong>Verificar e pagar são passos distintos.</strong>
