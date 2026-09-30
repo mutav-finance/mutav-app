@@ -334,7 +334,7 @@
               stroke-width="1.5"
             />
             <rect x="480" y="196" width="4" height="62" rx="2" fill="#92400e" />
-            <text class="n-label" x="500" y="222">Em inadimplência</text>
+            <text class="n-label" x="500" y="222">Em atraso</text>
             <text class="n-code" x="500" y="240">in_arrears</text>
 
             <rect
@@ -348,7 +348,8 @@
               stroke-width="1.5"
             />
             <rect x="700" y="196" width="4" height="62" rx="2" fill="#f97316" />
-            <text class="n-label" x="720" y="222">Inadimpl. verificada</text>
+            <!-- prettier-ignore -->
+            <text class="n-label" x="720" y="222" textLength="150" lengthAdjust="spacingAndGlyphs">Inadimplência verificada</text>
             <text class="n-code" x="720" y="240">default_verified</text>
 
             <rect
@@ -385,7 +386,9 @@
 
           <!-- re-default arc (below spine) -->
           <path class="edge" d="M 1000 258 C 1000 320, 570 320, 570 264" marker-end="url(#ar)" />
-          <text class="e-label" x="716" y="316">novo ciclo de inadimplência</text>
+          <text class="e-label" x="640" y="316">
+            novo ciclo de inadimplência (pendente — ledger de recebíveis)
+          </text>
 
           <!-- eviction row -->
           <rect
@@ -460,8 +463,9 @@
               <td><code>dispute_reversal</code></td>
               <td><code>default_verified</code>, <code>cover_committed</code></td>
               <td>
-                Inadimplência revertida. Deve devolver o capital reservado (pendente — #330); hoje o
-                encerramento mantém os centavos reservados.
+                Inadimplência revertida. Devolve ao disponível exatamente os centavos que a
+                cobertura reservou (a soma do valor aplicado de cada acionamento coberto), na mesma
+                transação do encerramento. Os demais motivos mantêm os centavos reservados.
               </td>
             </tr>
             <tr>
@@ -507,12 +511,12 @@
               <td>teto integral disponível</td>
             </tr>
             <tr>
-              <td><span class="sw" style="background: #92400e"></span>Em inadimplência</td>
+              <td><span class="sw" style="background: #92400e"></span>Em atraso</td>
               <td>sim</td>
               <td>nenhum — ainda não houve pagamento</td>
             </tr>
             <tr>
-              <td><span class="sw" style="background: #f97316"></span>Inadimpl. verificada</td>
+              <td><span class="sw" style="background: #f97316"></span>Inadimplência verificada</td>
               <td>sim</td>
               <td>nenhum — elegível, ainda não pago</td>
             </tr>
@@ -553,11 +557,11 @@
             pagou". Só o segundo mexe em capital.
           </li>
           <li>
-            <strong>A capacidade só se move na cobertura.</strong> Política C, lado da reserva:
-            cobrir reserva, liquidar libera, baixa queima. Liquidação e baixa chegam com o ledger de
-            recebíveis, ainda não implementado. O valor gravado no acionamento é o valor
-            <em>aplicado</em> depois do teto, nunca o valor de face, para que uma reversão devolva
-            exatamente o que tirou.
+            <strong>A capacidade só se move na cobertura e na reversão.</strong> Política C, lado da
+            reserva: cobrir reserva, <code>dispute_reversal</code> devolve o reservado, liquidar
+            libera, baixa queima. Liquidação e baixa chegam com o ledger de recebíveis, ainda não
+            implementado. O valor gravado no acionamento é o valor <em>aplicado</em> depois do teto,
+            nunca o valor de face, para que uma reversão devolva exatamente o que tirou.
           </li>
         </ul>
       </div>
