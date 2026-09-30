@@ -546,7 +546,7 @@ export default defineSchema(
       // As-signed mitigation for the fully-normalized tenant link: the
       // creation event captures the resolved registry fields as an
       // append-only payload, since the living `tenants` row can change after
-      // signature (see docs/superpowers/specs/2026-07-17-tenant-registry-design.md).
+      // signature (see docs/architecture/decisions/0008-tenant-registry.md).
       tenantSnapshot: v.optional(
         v.object({
           entityType: v.union(v.literal("pf"), v.literal("pj")),
