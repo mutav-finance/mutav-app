@@ -102,7 +102,7 @@ Six distinct chrome configurations. None is shared between apps.
 
 ## 4. Decisions
 
-Settled 2026-08-01. D7 remains open and is out of scope for the shell work.
+Settled 2026-08-01. D7 (Auth0 Universal Login branding) was out of scope for the shell work and now lives in [#360](https://github.com/mutav-finance/mutav-app/issues/360).
 
 ### D1 — Three shell variants ✅
 
@@ -142,22 +142,15 @@ Follows from D1. Every app gains **two** BareShell 404s: `[locale]/not-found.tsx
 
 `InvestorNav` is rewritten for the shell migration anyway; doing F6 separately means touching one file twice.
 
-### D7 — Auth0 Universal Login branding — OPEN
-
-Out of scope for the shell work, but it is the first screen an unauthenticated user sees. While it stays default-Auth0, the unauthenticated experience is inconsistent regardless of what ships here. Track separately.
+### D7 — Auth0 Universal Login branding → [#360](https://github.com/mutav-finance/mutav-app/issues/360)
 
 ## 5. Scope that follows — shipped
 
-1. ✅ `<AppShell>` / `<FlowShell>` / `<BareShell>` + a `Wordmark` component in `@mutav/ui`.
-2. ✅ Migrate the chrome configurations onto them; delete the agency/admin duplicates.
-3. ✅ `[locale]/not-found.tsx` + `app/global-not-found.tsx` in all four apps (Bare).
-4. ✅ Replace the inline auth-aware header in `agency/(onboarding)` with a Flow identity slot.
-5. ✅ i18n `InvestorNav`; wire its wallet button as `fund`'s identity slot.
-6. ✅ Enforcement — see § 8.
+Shipped: the three shells + `Wordmark` in `@mutav/ui`, chrome migrated onto them, both BareShell 404s in all four apps, the Flow identity slot in `agency/(onboarding)`, i18n `InvestorNav` with its wallet slot, and enforcement (§ 8).
 
 Two rulings taken during implementation, recorded so they are not re-opened by omission:
 
-- **`fund/(investor)` did not adopt `<AppShell>`.** D1 lists it under the App variant, but its arrangement is a top bar and serving both from one component would need either a boolean flag (forbidden by CLAUDE.md) or a `navPlacement` enum that drags `SidebarProvider`'s cookie/keyboard/CSS-var machinery into a sidebar-less app. § 6's unresolved contradictions sit under fund and none is test-covered. Deferred to § 7; `fund` still got D5, D6, and a real identity slot.
+- **`fund/(investor)` did not adopt `<AppShell>`.** D1 lists it under the App variant, but its arrangement is a top bar and serving both from one component would need either a boolean flag (forbidden by CLAUDE.md) or a `navPlacement` enum that drags `SidebarProvider`'s cookie/keyboard/CSS-var machinery into a sidebar-less app. § 6's unresolved contradictions sit under fund and none is test-covered. Deferred to [#359](https://github.com/mutav-finance/mutav-app/issues/359); `fund` still got D5, D6, and a real identity slot.
 - **`pay`'s skip link now targets `#main-content`, not `#primary-action`.** The deleted `pay/[publicId]/layout.tsx` pointed a link labelled "skip to main content" at the payment CTA. `FlowShell` owns `<main id="main-content">`, so the label and the target now agree; the two orphaned `id="primary-action"` anchors were removed with it. A screen-reader user lands on the step's content rather than mid-panel.
 - **`<BareShell>` mounts no `ThemeProvider`.** `admin/access-denied` renders outside any `ThemeProvider` today (only the `(admin)` group layout mounts one), so next-themes never stamps `<html>` for that route. Adding one would change the rendered output for system-dark viewers; the shell ships the existing inconsistency deliberately so the migration had zero rendered diff.
 
@@ -182,23 +175,13 @@ Both repair on hydration; both are blank-ish for a no-JS client or a crawler. Ad
 
 ## 6. Not investigated
 
-- Mobile / responsive behavior of any nav — reviewed as source, not rendered at breakpoints.
-- `apps/agency`'s `SidebarRoadmapItem` and `NavCadastros`, whose purpose was not established.
-- Whether `fund`'s "scroll-with-document" root layout comment matches its `h-svh overflow-hidden` markup — they appear to contradict. `(investor)/layout.tsx` re-introduces `overflow-y-auto` on an inner div.
+Mobile nav at breakpoints, the purpose of agency's `SidebarRoadmapItem` / `NavCadastros`, and `fund`'s scroll ownership (root layout says scroll-with-document, markup is `h-svh overflow-hidden`, `(investor)/layout.tsx` re-adds `overflow-y-auto`) — the last is tracked in [#359](https://github.com/mutav-finance/mutav-app/issues/359).
 
 ## 7. Follow-ups
 
-**`fund/(investor)` adopts the App shell.** Gated on § 6's scroll-ownership question being resolved first, plus two things that make a shared shell unsafe today: the investor palette comes from a literal `dark` class on the `(investor)` div rather than next-themes (a shell owning that element would flip the portal to light in a way invisible in code review), and `fund` mounts no `ThemeProvider`, `Toaster`, or `TooltipProvider`.
-
-Until then the layout is an explicit exemption in **`tests/shell-exempt-layouts.json`**, keyed by the repo-relative layout path and carrying its own `reason` and `tracking` — the rationale travels with the data rather than sitting in a comment next to it. Three assertions keep it from being a soft spot: the schema rejects an entry with no substantive justification, test E asserts the exempt path still exists, and test E also asserts the layout really does arrange its own chrome (the thing the exemption buys relief from), so a shell-less route group cannot be waved through by appending a line. Deleting the entry is the last step of the follow-up.
-
-**`admin` and `fund` have no `notFound()` call site** other than their `[locale]/layout.tsx` locale guard, whose throw originates at the same segment as the boundary and so escapes it. Their `[locale]/not-found.tsx` is therefore unreachable today. Kept, not deleted: it is the boundary the moment either app gains a dynamic detail route.
-
-**`fund`'s investor pages ship English strings under the default `pt-BR` locale.** D6 scoped i18n to `InvestorNav`, so the nav is translated and roughly forty page-body strings beneath it are not — a mixed-language surface at `fund.mutav.finance`. No gate sees it: `scripts/regression-greps.sh` § 8 checks key **parity** between an app's two locale files, not **coverage**, so `fund` passes with 14 chrome-only keys while the other apps carry 105–886. Closing it means extracting the investor page copy into `messages/*.json`; a coverage floor (keys-per-app, or a scan for bare Latin text in JSX) is the gate that would keep it closed.
-
-**A scoped 404 inside the pay flow** is specified in `.design/projects/payment-flow/design/shared/component-plan.md` (`PaymentExpiredCard`, agency-branded, inside the flow chrome). Test B2 forbids a nested `not-found.tsx`, so that design needs D5 revisited — not a silent exception.
-
-D7 (Auth0 Universal Login branding) also remains open — see § 4.
+- `fund/(investor)` adopting `<AppShell>` (palette, providers, scroll ownership; its `tests/shell-exempt-layouts.json` entry goes last), `fund`'s untranslated pt-BR investor pages, and the pay-scoped 404 design that needs D5 revisited → [#359](https://github.com/mutav-finance/mutav-app/issues/359).
+- Auth0 Universal Login branding (D7) → [#360](https://github.com/mutav-finance/mutav-app/issues/360).
+- `admin` and `fund` have no `notFound()` call site beyond the locale guard, so their `[locale]/not-found.tsx` is unreachable today — kept as the boundary for their first dynamic detail route.
 
 ## 8. Enforcement
 

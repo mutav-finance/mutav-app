@@ -7,7 +7,7 @@ import { InvestorNav } from "@/components/investor/investor-nav";
  * is the sidebar arrangement. The `dark` class here (not next-themes) is what
  * forces the investor palette; moving this element into a shared shell would
  * flip the portal to light. Tracked as a follow-up alongside the unresolved
- * root-layout scroll contradiction in docs/architecture/nav-shell-audit.md § 6.
+ * root-layout scroll contradiction (nav-shell-audit.md § 6) in mutav-app#359.
  */
 export default async function InvestorLayout({ children }: { children: React.ReactNode }) {
   const tA11y = await getTranslations("common.a11y");
