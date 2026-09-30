@@ -118,7 +118,7 @@ export const listContractsWithHistory = query({
 });
 ```
 
-> **Note:** When `convex-helpers` is installed, use `asyncMap` from `convex-helpers` instead of `Promise.all(items.map(...))` for sequential async iteration. See deferred-conventions note.
+> **Note:** When `convex-helpers` is installed, use `asyncMap` from `convex-helpers` instead of `Promise.all(items.map(...))` for sequential async iteration. See `docs/conventions/deferred.md`.
 
 ### Immutable Update Builders
 

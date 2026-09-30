@@ -14,7 +14,7 @@ import type { DataModel } from "./_generated/dataModel";
  *
  * **When the first real (non-seed) data lands**, flip the model: start writing
  * in-place migrations here (widen → migrate → narrow, two PRs — see
- * `.claude/notes/deferred-conventions.md`), append each `internal.migrations.<name>`
+ * `docs/conventions/deferred.md`), append each `internal.migrations.<name>`
  * to `runAll` below, and re-enable strict `schemaValidation`. `run-migrations.sh`
  * already runs `migrations:runAll` after every `convex deploy`, so real
  * migrations take effect automatically from that point on.

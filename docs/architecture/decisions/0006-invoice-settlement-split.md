@@ -66,7 +66,7 @@ payments: { agencyId, invoiceId, status, amountCents, paidAt?, externalRef?, pro
 
 The schema PRs shipped as **wipe + reseed** rather than the documented widen → migrate → narrow two-PR pattern. Prod was empty pre-launch and dev data is disposable, so the new schema applies cleanly with no backfill.
 
-This was a **context-specific override**, and it has since become the general rule: see CLAUDE.md § "Schema changes & migrations — reseed-first (pre-production)" and `.claude/notes/deferred-conventions.md` § "Convex data migrations". The migrate-in-place pattern is the plan for **after** the first real (non-seed) data lands.
+This was a **context-specific override**, and it has since become the general rule: see CLAUDE.md § "Schema changes & migrations — reseed-first (pre-production)" and [`docs/conventions/deferred.md`](../../conventions/deferred.md) § "Convex data migrations". The migrate-in-place pattern is the plan for **after** the first real (non-seed) data lands.
 
 ## Consequences
 
