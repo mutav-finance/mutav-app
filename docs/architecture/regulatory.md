@@ -1,20 +1,12 @@
 # Regulatory Architecture — Brazil + Offshore
 
+> **Stage-2 / offshore model under review** — authoritative business docs are in the private protocol repo.
+
 > Mutav operates as a composite of three legal entities across two jurisdictions (see [`entities.md`](entities.md)): `Mutav-BR` (Brazilian operator, fiança under Lei do Inquilinato), `Mutav-Fund` (offshore, holds TESOURO and issues the three tranches), and `Mutav-Mgmt` (offshore, administrator). Each carries a distinct regulatory posture. This document defines the regulatory floor the architecture must support across all three — Brazilian law for `Mutav-BR` plus the cross-jurisdictional surface where the entities interact — and the architectural choices that follow from each. It is not a legal compliance plan; it is the set of architecture constraints that fall out of the regulatory reality. Operational compliance (filings, vendor contracts, opinions) is out of scope.
 
 The regulatory landscape as of 2026 is the most concrete it has been: BCB Resolução 519/2025 is in force, CVM Resolução 175 governs Brazilian tokenized fund structures, BCB Resolução 521/2025 monthly stablecoin reporting started May 4, 2026, and CVM's 2026 agenda explicitly includes tokenization rules. Architecture decisions made now should anticipate scrutiny within 12–24 months.
 
-## Per-entity license posture (working hypothesis)
-
-The full per-entity questions are tracked in the private protocol repo's open-questions registry (L1a/b/c, L4a/b/c/d, L5, L6, L7, L8) — all pending external counsel. This table captures the _working hypothesis_ that drives the architecture; nothing here is a legal opinion.
-
-| Entity       | Likely posture                                                                                                                                                                                                                         | Open question   |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `Mutav-BR`   | Outside SUSEP (not seguradora) and CVM (not fundo) because the fiança model under Lei do Inquilinato Art. 37 is not insurance and not fund administration. Subject to LGPD, ISS municipal, BCB câmbio reporting on offshore transfers. | L1a, L7, L8     |
-| `Mutav-Fund` | Not CVM-regulated as a fund (CVM 175 is a BR construct; offshore funds are regulated by their domicile authority — Cayman CIMA / BVI FSC / Bermuda BMA / etc.). Offering to BR investors does trigger CVM rules (see § Marketing).     | L1b, L3, L5, L6 |
-| `Mutav-Mgmt` | Same offshore jurisdiction as `Mutav-Fund`. Likely needs fund-admin registration in that jurisdiction.                                                                                                                                 | L1c, L5         |
-
-The three-entity split was chosen partly to keep `Mutav-BR` outside the fund regulatory perimeter (mirroring Credpago precedent for the fiança operator) and partly to put the investor-facing fund in a jurisdiction more accommodating to tokenized tranches than CVM 175 currently is in Brazil. The cost is the cross-jurisdictional reporting and substance scrutiny addressed in §§ BACEN câmbio reporting and Cessão de recebíveis below.
+**Per-entity license posture** is a legal question for external counsel, tracked in the private protocol repo — not restated here.
 
 ## LGPD — data protection
 
@@ -181,9 +173,7 @@ Mutav-BR pays imobiliária (default coverage) or investor (resgate)
 
 **Architectural commitment.** Same câmbio reporting surface in reverse. The deposit on the BR side has documented origin (specific Mutav-Fund liquidation event with correlation id).
 
-### Open per L7
-
-Whether câmbio reporting can be batched (e.g., monthly summary per cessão) or must be per-event, and which specific BACEN classification applies, is open per L7 in the private protocol repo's open-questions registry. The architecture preserves enough granularity (correlation ids, timestamps, amounts both currencies) to support either answer.
+The architecture keeps enough granularity (correlation ids, timestamps, amounts in both currencies) to support either batched or per-event reporting; the open legal questions live in the private protocol repo.
 
 ## Cessão de recebíveis — economic substance risk
 

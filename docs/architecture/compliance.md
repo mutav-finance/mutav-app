@@ -1,5 +1,7 @@
 # Compliance Architecture
 
+> **Mostly stage-2 design — not in the pilot.** Investor verification levels, tranche limits, and the capability matrix beyond agency KYB review are stage-2. See [#208](https://github.com/mutav-finance/mutav-app/issues/208) for pilot scope.
+
 > The compliance domain is the **operational layer** that translates regulatory requirements (see [`regulatory.md`](regulatory.md)) into per-account state: who they are, what they have verified, what risk they carry, what they can do today, and how much. Every actor on the platform has a compliance posture; every state-changing operation is gated by it. This document defines the taxonomy, the state machine, and the capability matrix. It does not set specific limit amounts or pick vendors — those are operational decisions made by the compliance team within this framework.
 
 ## Why a separate compliance domain

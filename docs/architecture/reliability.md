@@ -1,5 +1,7 @@
 # Reliability Primitives — Architecture
 
+> **Mostly stage-2 design — not in the pilot.** The hash-chained audit log (§ Audit log integrity) is live; cross-entity flows, quarantine windows, and per-tranche NAV safety are stage-2. See [#208](https://github.com/mutav-finance/mutav-app/issues/208) for pilot scope.
+
 > Cross-cutting primitives that every Mutav surface depends on: reconciliation (three-axis, cross-entity), idempotency, durable orchestration, bounded parallelism, audit-log integrity (entity-tagged), and per-tranche NAV safety. These are not features of any one pillar — they are the substrate. [`admin.md`](admin.md), [`investor.md`](investor.md), and [`onchain-integration.md`](onchain-integration.md) reference this document rather than re-explaining each primitive. The three-entity model from [`entities.md`](entities.md) shows up here as cross-entity reconciliation axes and entity-tagged audit entries.
 
 Every primitive here has a documented industry analog or a Convex-native component. None are speculative. None require custom infrastructure beyond what the Convex ecosystem already provides.

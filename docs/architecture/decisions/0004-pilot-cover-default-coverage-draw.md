@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-06-19) · **Phase:** Pilot ([#208](https://github.com/mutav-finance/mutav-app/issues/208)) · **Anchor:** [#201](https://github.com/mutav-finance/mutav-app/issues/201) (reserve-vault coverage draw) · **Builds on:** [ADR 0003](0003-persona-app-origin-isolation-single-convex.md), staff-access cascade (#202–#205)
 
-> **Evolved-in-part by [ADR 0005](0005-wallet-signing-architecture.md) (2026-06-22):** the cold-authority **account model** below specifies an OZ Smart Account with M-of-N passkeys. ADR 0005 supersedes that point — the pilot uses **classic native Stellar multisig** (signed by each admin's personal connected wallet), with the **OZ smart account as a later drop-in upgrade**. The rest of this ADR (the two-tier authorization split, the compose→sign→submit→reconcile flow, the `coverageDraw` lifecycle) stands.
+> **Superseded in part by [ADR 0005](0005-wallet-signing-architecture.md) (2026-06-22):** the admin-signing model below — an OZ Smart Account with M-of-N passkeys at the vault admin address, signed through `smart-account-kit` in `apps/admin` (and the single-hardware-wallet alternative it weighs) — is replaced. The pilot uses **classic native Stellar multisig**, each admin signing with their **own personal connected wallet** via `@mutav/wallet` (Stellar Wallets Kit; hardware via Freighter+Ledger), with the **OZ smart account as a later drop-in upgrade** (`set_admin`). The rest of this ADR (the two-tier authorization split, the compose→sign→submit→reconcile flow, the `coverageDraw` lifecycle) stands.
 
 ## Context
 

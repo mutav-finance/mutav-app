@@ -1,5 +1,7 @@
 # Entities
 
+> **Stage-2 / offshore model under review** — authoritative business docs are in the private protocol repo.
+
 > Mutav is not one legal entity. The consumer brand "Mutav" is the public face of a composite of three legal entities across two jurisdictions, each with its own regulator, books, and capability set. Every architecture doc that names "Mutav" in a financial / regulatory / operational sense must resolve to one of the three entity codes defined here. This file is the canonical registry — every other doc references it.
 
 ## Naming convention — the rule

@@ -1,5 +1,7 @@
 # Tranches — MTVH / MTVM / MTVL
 
+> **Stage-2 / offshore model under review** — authoritative business docs are in the private protocol repo.
+
 > `Mutav-Fund` issues three token tranches with a first-loss default waterfall. The tranche an investor holds determines their risk position, yield ceiling, eligibility floor, and redemption priority. This doc is the per-tranche specification; eligibility integrates with the verification-level ladder in [`compliance.md`](compliance.md), and the issuance/holding architecture lives in [`entities.md`](entities.md) and [`onchain-integration.md`](onchain-integration.md).
 
 ## Why three tranches
