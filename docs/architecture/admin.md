@@ -1,5 +1,7 @@
 # Mutav Admin — Architecture
 
+> **Mostly stage-2 design — not in the pilot.** The pilot admin surface is staff access, the KYC/KYB review queue, and the stage-1 reserve vault (`cover_default`); the three-entity, fund-payments, and NAV pillars are stage-2. See [#208](https://github.com/mutav-finance/mutav-app/issues/208) for pilot scope.
+
 > Mutav Admin is the surface where Mutav-internal staff operate the platform across the three entities (see [`entities.md`](entities.md)): review agency onboarding (`Mutav-BR`), screen investor compliance (`Mutav-Fund`), audit liquidation requests (cross-entity), observe fund state (`Mutav-Fund`), and (later) manage NAV updates and treasury operations (`Mutav-Mgmt`). It is a distinct shell with cross-tenant access — every other surface is agency-scoped or wallet-scoped. This document covers the architectural shape of the **admin foundations bundle** (shell, role, onboarding review, default-request approval) and sketches the future pillars (fund payments, onchain observability). Sub-role scoping per entity lives in [`compliance.md`](compliance.md) § Mutav-internal capabilities by sub-role.
 
 ## Scope

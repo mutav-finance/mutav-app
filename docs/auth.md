@@ -219,31 +219,9 @@ grep -rn 'ctx\.runQuery(api\.<domain>\.' convex/
 
 For every hit, walk back to the entry-point action and decide tenant vs staff. Tenant-facing × wrapped requires routing through the internal companion.
 
-## Migration status (2026-05-18)
+## Adoption rule
 
-> Dated snapshot, kept as the record of when each handler was wrapped. The paths are the ones that existed then — `convex/contracts/` is now `convex/guarantees/` and `convex/payments/` / `convex/anchors/` became `convex/invoices/` and `convex/payments/providers/`.
-
-Wrapped:
-
-- `convex/contracts/useCases.ts` — `getByPublicId`, `listByAgency`, `getPipelineSummary`, `countByMonth`, `lookupTenantByCpf`, `create`, `cancelProposal` (+ `getTenantIdentityInternal` companion for tenant prefill, scoped by `agencyId`)
-- `convex/payments/useCases.ts` — `listByAgency`, `getById`, `getByPublicId`, `getNextPendingPayment` (+ `getByIdInternal` companion for tenant onramp actions)
-- `convex/agencies/useCases.ts` — `getById`, `listAgenciesForUser` (+ `getByIdInternal` companion for internal actions)
-- `convex/anchors/orderUseCases.ts` — `getOrderById` (resource-by-id pattern; + `getOrderByIdInternal` companion for webhook + scheduler pollers)
-- `convex/anchors/bankAccountUseCases.ts` — `listByAgency` (+ `listByAgencyInternal` companion for tenant-context onramp actions)
-
-Removed:
-
-- `convex/contracts/useCases.ts` — `list` (unscoped, leaked all agencies, no client callers)
-- `convex/payments/useCases.ts` — `list`, `listByStateKind` (same)
-- `convex/anchors/orderUseCases.ts` — `listOrdersByPayment` (no client callers; resurrect via git history if a UI consumer lands)
-- `convex/anchors/accountUseCases.ts` — `listByAgency` (no client callers; admin cross-agency access lands via #87 staff wrappers, not by reintroducing this query)
-
-Not yet wrapped (same playbook applies — and remember the internal-companion audit when you do):
-
-- `convex/users/useCases.ts` — `getByPublicId` retained for legacy callers; new code should call `getMe`. Removable when no callers reference it.
-- `convex/contracts/actions.ts`, `convex/contracts/mutations.ts` — internal-only, lower priority
-
-New work in those domains should adopt the wrapper as part of the change; don't add new bare handlers next to existing bare handlers.
+The dated per-handler migration log was retired (it lives in git history); the legacy `users.getByPublicId` has been removed — use `users.getMe`. New work adopts the wrapper as part of the change; don't add new bare handlers next to existing ones, and remember the internal-companion audit above when you wrap one.
 
 ## Admin authorization model
 

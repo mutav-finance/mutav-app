@@ -306,7 +306,8 @@ export function getEtherfuseWebhookSecret(): string {
  *   openssl rand -base64 32
  *
  * Production should rotate to a managed secret (KMS/HSM/Vault) — this
- * env-derived path is the dev/preview default per `.claude/notes/deferred-conventions.md`.
+ * env-derived path is the dev/preview default per `docs/architecture/security.md`
+ * § Key management lifecycle.
  */
 export function getStellarSecretEncryptionKey(): Buffer {
   const raw = process.env.MUTAV_STELLAR_SECRET_ENCRYPTION_KEY;
@@ -335,7 +336,7 @@ export function getStellarSecretEncryptionKey(): Buffer {
  *
  * Generate dev/preview keys with `openssl rand -base64 32` and set via
  * `bunx convex env set PII_ENCRYPTION_KEY <base64>`. Production rotates
- * to a managed secret per `.claude/notes/deferred-conventions.md`.
+ * to a managed secret per `docs/architecture/security.md` § Key management lifecycle.
  */
 /**
  * Decode standard base64 to raw bytes WITHOUT Node's `Buffer`. The PII keys

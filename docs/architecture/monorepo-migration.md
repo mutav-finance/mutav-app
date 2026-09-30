@@ -1,6 +1,6 @@
 # Monorepo Migration — Turborepo + persona apps + shared Mutav API
 
-**Status:** Approved design, ready for implementation plan
+**Status:** Implemented (#139 closed)
 **Owners:** Workspace migration (#139); reconciliation reference (`mutav-stellar#57`); KMS-Action runbook (`mutav-stellar#41`)
 **Last decision date:** 2026-05-31
 
@@ -286,7 +286,7 @@ Vercel's built-in Turborepo cache (free with Vercel deploy). No additional infra
 /docs/                @<api-team>
 ```
 
-Team handles are placeholders; the structure is what's committed. Picking actual GitHub team handles is tracked in Section 10.
+Team handles are placeholders; the structure is what's committed.
 
 ## Section 7 — Auth0 posture (staff vs customer identity)
 
@@ -339,22 +339,9 @@ Key decisions, with the rationale anchored to existing docs:
 9. **Vercel Team Env Variables for v1**, with a documented trigger for migration to an external secrets manager (Section 5).
 10. **Per-app CI test + deploy gating** via `turbo-ignore` and `turbo --filter`. Per-app CODEOWNERS landing in PR 1.
 
-## Section 10 — Open follow-ups
+## Section 10 — Follow-ups
 
-Each of these is a downstream spec or issue, tracked here so the migration plan reader has a single index:
-
-| Item                                      | Owner                      | Status                                                                     |
-| ----------------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
-| Wallet-kit selection                      | TBD                        | Blocked on this spec; needs CVE audit, smart-account-vs-hot-wallet posture |
-| `apps/marketing/` scoping                 | TBD                        | Net-new app; CMS choice + content sourcing                                 |
-| `apps/docs/` scoping                      | TBD                        | Net-new app; Nextra vs Mintlify decision                                   |
-| `apps/admin/` A1–A6 build-out             | Per [`admin.md`](admin.md) | Blocked on PR 7 of this spec                                               |
-| HW-wallet flow in `apps/admin/`           | TBD                        | Blocked on PR 7 of this spec                                               |
-| Convex Action implementations (#141–#146) | API team                   | Blocked on this spec + `mutav-stellar#41`                                  |
-| KMS-Action runbook                        | mutav-stellar#41           | In flight                                                                  |
-| External secrets manager migration        | TBD                        | Trigger: BACEN/CVM diligence OR KMS work landing                           |
-| Branch-protection bypass cleanup          | TBD                        | Operational hygiene, separate from migration                               |
-| GitHub team handles for CODEOWNERS        | TBD                        | Cosmetic; resolves before PR 1 merges                                      |
+Follow-ups now tracked in: wallet kit and admin signing → [ADR 0005](decisions/0005-wallet-signing-architecture.md) (`@mutav/wallet`, #218); operator Convex Actions → #141–#146; KMS-Action runbook → `mutav-stellar#41`; secrets rotation / prod tenant and pre-launch hardening → #119 and #230. The `apps/marketing/` / `apps/docs/` scoping and branch-protection hygiene rows were dropped from this spec (no longer migration work).
 
 ## References
 

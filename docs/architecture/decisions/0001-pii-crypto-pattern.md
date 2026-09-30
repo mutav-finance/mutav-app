@@ -77,7 +77,7 @@ The lifecycle is intentionally minimal: insert on submit, delete on `reviewOnboa
 
 `PII_HMAC_KEY` rotation is destructive — it invalidates every existing `fieldHash` and so every index built on one. A rotation requires a re-hash migration plus index rebuilds. Treat the HMAC key as long-lived; rotate only on confirmed compromise.
 
-Both keys are env-derived for the dev/preview path. Production rotates to a managed secret (KMS/HSM/Vault) — same migration story as Stellar key per `.claude/notes/deferred-conventions.md`.
+Both keys are env-derived for the dev/preview path. Production rotates to a managed secret (KMS/HSM/Vault) — same migration story as the Stellar key per [`security.md` § Key management lifecycle](../security.md#key-management-lifecycle).
 
 ## Consequences
 

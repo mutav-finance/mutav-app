@@ -137,4 +137,5 @@ Full entries: changelog/pending/*.md
 - **Body sections** — `## What changed` / `## Notes for future agents` for durable "why" context beyond git log. Add back if the runbook feature works and there's appetite for narrative capture.
 - **PR-blocking sensor** — a PreToolUse hook that refuses `gh pr create` without a matching entry. Add if entries start getting skipped.
 - **Release aggregation** — a `changelog:release` script that groups pending entries into a SemVer-tagged GitHub Release. Add if the team adopts a release cadence.
+- **Periodic archive (open)** — `changelog/pending/` only grows (it is "cleared manually if desired"). Proposal: once a quarter, move entries whose sync actions everyone has run into `changelog/archive/YYYY-Qn/`. `sync-notice.mjs` and `validate.ts` already read only `changelog/pending/`, so an archive directory needs no tooling change.
 - **Skip marker as schema field** — today there's no escape hatch (there's no PR block either); if we re-add enforcement, a `skip: true` field with a required `reason` is cleaner than a filename-encoded side-channel.

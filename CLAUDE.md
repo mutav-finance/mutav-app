@@ -23,7 +23,7 @@ The web3 portal currently in [`mutav-finance/mutav-fund`](https://github.com/mut
 | **Admin** (cold)   | **M-of-N multisig** at the vault/policy admin address, each admin signing with their **own personal connected wallet** from `apps/admin/` (Stellar Wallets Kit; hardware via Freighter+Ledger). **Classic native Stellar multisig for the pilot → OZ smart account later** (drop-in `set_admin` upgrade). See [ADR 0005](docs/architecture/decisions/0005-wallet-signing-architecture.md). | Parameter changes, `cover_default`, partner whitelist, pause, admin handover              |
 | **Investor**       | User wallet inside `apps/fund/` (client-side)                                                                                                                                                                                                                                                                                                                                              | Deposit, request/cancel redemption, SEP-41 token ops                                      |
 
-**Status: monorepo is live.** The Turborepo split has landed — the persona apps are scaffolded under `apps/` and shared code is extracted into `packages/` (see [§ Monorepo layout](#monorepo-layout) below). The on-chain pieces (KMS-backed operator Convex Action, the `apps/admin/` M-of-N multisig signing path per [ADR 0005](docs/architecture/decisions/0005-wallet-signing-architecture.md)) are still being implemented; the Convex backend stays at the **repo root** in `convex/`, shared by every app. Migration history and the staged-PR sequence live in [`docs/architecture/monorepo-migration.md`](docs/architecture/monorepo-migration.md); the reconciliation against [`#57`](https://github.com/mutav-finance/mutav-stellar/issues/57)'s app/module sketch is in [`docs/architecture/README.md`](docs/architecture/README.md) (§ Shell catalog, § App catalog, § Domain catalog).
+Monorepo migration history and the staged-PR sequence live in [`docs/architecture/monorepo-migration.md`](docs/architecture/monorepo-migration.md); the reconciliation against [`#57`](https://github.com/mutav-finance/mutav-stellar/issues/57)'s app/module sketch is in [`docs/architecture/README.md`](docs/architecture/README.md) (§ Shell catalog, § App catalog, § Domain catalog).
 
 ## Shared docs
 
@@ -132,9 +132,9 @@ When the in-repo docs and skills aren't enough, consult:
 - Convex — backend (functions in `convex/`, root-level, shared by every app)
 - Railway / Vercel — deployment (one project per app)
 
-> Stellar wallet connection: removed pending a vetted, low-CVE replacement.
-> Earlier `@creit.tech/stellar-wallets-kit` pulled in 9 critical vulns via
-> Trezor/Hot/NEAR adapters we never invoked.
+> Stellar wallet connection: `@mutav/wallet` (Stellar Wallets Kit v2, explicit
+> Freighter + xBull modules only — never `allowAllModules()`, which pulls in the
+> CVE-flagged Trezor/HOT/NEAR adapters). Consumed by `apps/admin` today.
 
 ## Architecture
 
@@ -153,7 +153,7 @@ mutav-app/
 │   ├── ui/          # @mutav/ui     — shadcn primitives, page primitives, cn, theme provider
 │   ├── i18n/        # @mutav/i18n   — next-intl routing/navigation, cross-app URLs, Brazil formatters
 │   ├── app-shell/   # @mutav/app-shell — shared Convex providers (Auth0-backed + public)
-│   ├── wallet/      # @mutav/wallet — wallet-kit integration (in progress)
+│   ├── wallet/      # @mutav/wallet — Stellar Wallets Kit v2 connect/sign/ownership proof
 │   └── tsconfig/    # @mutav/tsconfig — shared TS base configs
 └── convex/          # Mutav API — shared backend (functions, schema, generated types)
 ```
@@ -198,7 +198,7 @@ Rules the gates enforce:
 - **Two 404 files per app, both BareShell.** `app/global-not-found.tsx` (app-dir root, behind `experimental.globalNotFound`) catches URLs that match no route, owns its own `<html>`/`<body>`/font/`NextIntlClientProvider`, and is the **only** 404 that server-renders. `[locale]/not-found.tsx` is the `notFound()` boundary — real, but its UI arrives in the RSC payload and paints on hydration, and `admin`/`fund` have no `notFound()` call site to reach it yet. `not-found.tsx` belongs at `[locale]/` and nowhere else: nested it renders inside its group's sidebar, and at the app-dir root Next has no root layout to wrap it in (these apps' root layout is `[locale]/layout.tsx`) so it gets a builtin bare document. Measurements + why a `loading.tsx` does not change this: nav-shell-audit § 5.
 - **Never import `@mutav/ui/sidebar`, `@mutav/ui/public/public-shell`, or `@mutav/ui/sonner` from `src/app/**`** — the shells compose those. Nav definitions stay app-local and arrive as props (`nav`, `identity`, `sidebarHeader`, `headerEnd`, `footer`, `context`). App-local nav components under `src/components/\*\*` import the sidebar primitives freely.
 - **`apps/pay` carries no Auth0 SDK** — its identity slot is empty for every viewer.
-- `fund/(investor)` is a tracked exemption (top-bar arrangement, unresolved palette/scroll ownership) — see nav-shell-audit § 7.
+- `fund/(investor)` is a tracked exemption (top-bar arrangement, unresolved palette/scroll ownership) — tracked in [#359](https://github.com/mutav-finance/mutav-app/issues/359).
 
 Gates: `bun run test:structure` (`tests/shell-contract.test.ts` — the only check that detects a _missing_ shell) and the `no-restricted-imports` / `no-restricted-syntax` blocks in `eslint.config.mjs`. Both run in the `conventions` / `lint` jobs of `.github/workflows/quality.yml`. Advisory feedback at write time: `.claude/hooks/shell-contract.js`.
 
@@ -329,7 +329,7 @@ Follow standard clean code principles, opinionated:
 - **No boolean flag arguments** — split into named functions (`approveGuarantee` / `rejectGuarantee`, not `setGuaranteeStatus(id, approved)`).
 - **No barrel files** — every import references the actual file path (`./Foo`, never `.` or `./index`).
 - **No comments by default** — only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader. Don't explain WHAT (well-named identifiers do that) and don't reference the current task or PR (that belongs in the PR description, not the code — comments rot, PRs don't).
-- **English-only code identifiers** — all types, `as const` value objects, string literal enum values, DB field values, function/variable names, and i18n **keys** are English (American spelling: `canceled`, not `cancelled`). Portuguese belongs ONLY in `messages/pt-BR.json` **values**. When touching a page that uses PT literals in code, translate them in the same commit — never propagate PT into new code just because the surrounding UI has it. A few PT identifiers are sanctioned rather than grandfathered: `SCORE_TIER` (`bom` / `regular` / `ruim` / `negado`) and the `terms.tierRate.{bom,regular,ruim}` keys that mirror it name a Brazilian credit-tier vocabulary with no English equivalent in use. PT free text still sitting in `guaranteeHistory.message` and `invoices.lineItems[].description` is a recorded deferral (`.claude/notes/deferred-conventions.md`), not a precedent — flag it but don't drive-by-rename unless the surrounding change makes it cheap.
+- **English-only code identifiers** — all types, `as const` value objects, string literal enum values, DB field values, function/variable names, and i18n **keys** are English (American spelling: `canceled`, not `cancelled`). Portuguese belongs ONLY in `messages/pt-BR.json` **values**. When touching a page that uses PT literals in code, translate them in the same commit — never propagate PT into new code just because the surrounding UI has it. A few PT identifiers are sanctioned rather than grandfathered: `SCORE_TIER` (`bom` / `regular` / `ruim` / `negado`) and the `terms.tierRate.{bom,regular,ruim}` keys that mirror it name a Brazilian credit-tier vocabulary with no English equivalent in use. PT free text still sitting in `guaranteeHistory.message` and `invoices.lineItems[].description` is a recorded deferral ([#357](https://github.com/mutav-finance/mutav-app/issues/357)), not a precedent — flag it but don't drive-by-rename unless the surrounding change makes it cheap.
 - **TypeScript strict** — see Key Patterns / TypeScript escape hatches below.
 - **Branch workflow** — feature branches → squash merge PRs to main. Commit subjects are commitlint-gated (`.husky/commit-msg`): lowercase `type(scope):`, **lowercase subject** (sentence-case / Start Case / PascalCase / UPPER all rejected), no trailing period, header ≤100 chars, and **every body and footer line ≤100 chars** (hard error — wrap bullets). Types: `build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test` — no `wip`. `pre-commit` runs a whole-monorepo `bun run typecheck` plus `eslint --fix --max-warnings=0` on staged files (one warning blocks the commit); `pre-push` runs `bun run changelog:validate` and refuses direct pushes to `main`.
 
@@ -454,7 +454,7 @@ Never use the legacy promise-chain + `cancelled`-flag idiom inside `useEffect`. 
 - **`useEffectEvent` + `useEffect`** — when an effect calls a function but should only re-run on data changes, isolate the function reference with `useEffectEvent`. The effect's dependency array declares only reactive values (e.g. `contractId`), not function references. Prevents unnecessary re-runs on parent re-renders.
 - **`use()` + Suspense** — when an async result is the primary render data, lift the promise to the parent via `useMemo` and read it with `use()` in the child. No `useState`, no `useEffect`. Requires a `<Suspense>` boundary upstream.
 
-For mutations and other stateful async ops, prefer a `useFunction`-style helper (deferred — see `.claude/notes/deferred-conventions.md`) over manual `useState` + `try/catch` once that lands.
+For mutations and other stateful async ops, prefer a `useFunction`-style helper (not yet adopted) over manual `useState` + `try/catch` once that lands.
 
 ### Testing
 
@@ -553,7 +553,7 @@ Define error codes as `as const` value objects in the entity file (e.g. `GUARANT
 
 Mutav operates in Brazil. Convention choices:
 
-- **Money** — store as **integer cents** (`v.number()` representing centavos). Field naming: suffix `Cents` (e.g. `rentCents`, `availableGuaranteeCents`). Float reais is a precision trap; cents is the industry-standard fix. Existing `*BRL: v.number()` fields predate this rule and need migration — see `.claude/notes/deferred-conventions.md`. Display via `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)`.
+- **Money** — store as **integer cents** (`v.number()` representing centavos). Field naming: suffix `Cents` (e.g. `rentCents`, `availableGuaranteeCents`). Float reais is a precision trap; cents is the industry-standard fix. The legacy `*BRL` float fields are gone; the remaining money-type work (`Cents` brand, currency field, rounding policy) is [#358](https://github.com/mutav-finance/mutav-app/issues/358). Display via `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)`.
 - **CPF / CNPJ** — store as digits-only strings (CPF = 11 chars, CNPJ = 14 chars). Validate with proper checksum algorithms; never use regex alone. Format only at display time (`123.456.789-01`, `12.345.678/0001-90`).
 - **Phone** — digits-only string (`+55` country code optional based on source). Format at display.
 - **Dates** — stored as ISO 8601 strings (`v.string()`) when no time-zone arithmetic is needed (e.g. `nextRenewalDate`, `birthDate`). Use `v.number()` for unix timestamps when comparison/arithmetic matters. Don't store JS `Date` objects in Convex — they don't roundtrip.
@@ -630,7 +630,7 @@ When a query needs data from two domains (e.g. membership + user info), the enri
 
 ### Deferred conventions
 
-Auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain providers, and Convex workpool are tracked in `.claude/notes/deferred-conventions.md` with adoption triggers. Pending refactors (e.g. money → cents migration) live in the same file.
+Auth wrappers, shared `useQuery`, React Hook Form + shadcn Field, server domain providers, and Convex workpool are tracked in [`docs/conventions/deferred.md`](docs/conventions/deferred.md) with adoption triggers. Pending refactors (money types, PT stored values, shared `useQuery`, forms stack) are GitHub issues — the doc ends with the pointer list.
 
 ## Changelog — sync-action runbook
 

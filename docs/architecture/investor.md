@@ -24,17 +24,17 @@ Out of scope:
 
 ## Current state
 
-The investor portal exists as a UI shell at `(investor)/investor/*`:
+The investor portal exists as a UI shell in `apps/fund` at `(investor)/investor/*`:
 
 ```
-src/app/[locale]/(investor)/investor/
+apps/fund/src/app/[locale]/(investor)/investor/
 ├── page.tsx              ← dashboard (3 fund cards + portfolio + KPI strip)
 ├── deposit/page.tsx      ← deposit flow UI
 ├── redeem/page.tsx       ← redeem flow UI
 └── transparency/page.tsx ← protocol transparency
 ```
 
-All data flows from [`src/components/investor/fund-data.ts`](../../src/components/investor/fund-data.ts) — a hardcoded `FUNDS` array and `PROTOCOL_STATS` derivation. There is no Convex query, no chain connection, no wallet, no authentication, no KYC.
+All data flows from [`apps/fund/src/components/investor/fund-data.ts`](../../apps/fund/src/components/investor/fund-data.ts) — a hardcoded `FUNDS` array and `PROTOCOL_STATS` derivation. The app mounts a Convex provider but runs no Convex query; there is no chain connection, no authentication, no KYC, and the wallet button (`connect-wallet.tsx`) is a disabled stub — `@mutav/wallet` is not yet wired into `apps/fund`.
 
 This is intentional. The UI was built ahead of the onchain infrastructure so the portfolio and deposit/redeem flows could be validated visually before contracts and indexer were in place. The target architecture below is how this becomes real.
 

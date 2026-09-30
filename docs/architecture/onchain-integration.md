@@ -1,5 +1,7 @@
 # Chain ↔ Convex Integration — Architecture
 
+> **Stage-2 design — not in the pilot.** This covers the offshore `Mutav-Fund` on-chain; pilot coverage runs on the stage-1 reserve vault instead. See [#208](https://github.com/mutav-finance/mutav-app/issues/208) for pilot scope.
+
 > The `Mutav-Fund` (the offshore fund per [`entities.md`](entities.md)) lives onchain (Stellar / Soroban for v1; additional chains in the future per [`investor.md`](investor.md)). Treasury custody is `Mutav-Fund`'s; treasury operations (NAV updates, liquidation, signer-set changes) are executed by `Mutav-Mgmt` per offshore fund-admin custody norms. The web app is offchain (Convex + Next.js). This document defines the boundary between them: how chain state becomes Convex tables (read path), how user and admin intents become onchain transactions (write path), the contract topology that satisfies the segregated-account model, the offshore custody chain that satisfies fund-admin separation requirements, and the stub-first contract that lets both sides ship independently. The infrastructure here is **shared** between Mutav Admin's A5 (fund observability) and the Investor portal's I2 (real fund data).
 
 Cross-cutting reliability primitives (reconciliation, idempotency, workflow durability, audit-log integrity, NAV safety) are factored into [`reliability.md`](reliability.md). This document references them rather than re-explaining each one.

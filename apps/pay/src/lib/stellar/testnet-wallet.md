@@ -2,7 +2,7 @@
 
 > ⚠️ **DISPOSABLE TESTNET WALLET — DO NOT SEND MAINNET FUNDS.**
 >
-> - The secret key below **is published in this public-by-default repository**. Anyone with read access to the repo, the git history, or this Markdown file controls the account. Treat it as fully compromised by design.
+> - The secret key is **not published here**. An earlier version of this file published it, so the account is **fully compromised** — anyone can control it. For your own testing, regenerate a throwaway testnet key.
 > - **Any real-asset transfer (Stellar mainnet XLM, USDC, BRZ, anything with economic value) sent to this address is irrecoverable** — anyone watching the repo can sweep it instantly.
 > - **Network: Stellar testnet only.** Testnet XLM is minted on demand by friendbot and has zero economic value. If you find yourself about to flip the network selector to "public" while this account is configured — stop.
 > - This wallet exists purely so any developer can `git clone`, `convex env set`, and reproduce the payment flow against a known funded address. It is a scaffold; replace it before any production traffic.
@@ -18,7 +18,7 @@
 | **Status**          | 🧪 **Disposable / public-by-design.** Anyone reading the repo controls this account.                                                 |
 | **Network**         | Stellar **testnet** (`https://horizon-testnet.stellar.org`) — **never** point this account at Stellar public mainnet.                |
 | **Public (G)**      | `GD7ZCGE3Z2KV7STAWXLTKZQP7IYZ2SSJ6VNOQ2CHK4YWRSLIYUECMNWV`                                                                           |
-| **Secret (S)**      | `SBDW2AG65ZSTXYTVIAGJGU7VOKBBQNNVN4KHCL5XAT65USJKYCQ72FW6` ← **published; assume already compromised**                               |
+| **Secret (S)**      | Not published — regenerate a throwaway testnet key (the one in this file's history is compromised)                                   |
 | **Funded by**       | `https://friendbot.stellar.org` on 2026-05-13                                                                                        |
 | **Initial balance** | 10,000.0000000 XLM (testnet, zero economic value)                                                                                    |
 | **Trustlines**      | `USDC` — `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` (Circle testnet, established 2026-05-13, tx `6f2602af6ba43691…`) |
@@ -73,7 +73,7 @@ the trustline-before-faucet gotcha.
 
 1. Reload `/pt-BR/pay/PAY-2026-05-0100` — the QR + address point at this
    wallet's per-payment muxed surface.
-2. Open a second wallet (e.g. import `SBDW2AG6…` into Lobstr in testnet
+2. Open a second wallet (e.g. import your own throwaway testnet key into Lobstr in testnet
    mode, or use the Stellar Lab) and send the exact XLM amount shown to
    the displayed `M…` address.
 3. Verify the inbound payment on the explorer:

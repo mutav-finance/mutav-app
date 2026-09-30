@@ -159,7 +159,7 @@ bunx convex run "anchors:list" --limit 10
 
 ### What's still pending (P1c)
 
-Retention policy — how long do audit entries live, when does the table truncate, what's the policy by action namespace (money-moving vs. PII-access vs. system bookkeeping). The open questions in [#114](https://github.com/mutav-finance/mutav-app/issues/114) need legal counsel input on the CVM 5-year floor and the LGPD data-minimization ceiling, so the policy decision is deferred to a separate PR rather than picked now. Until then, no auto-truncation — the table grows unbounded.
+Retention policy + sweep for `mutavAuditLog` / `mutavAuditAnchors` — tracked in [#116](https://github.com/mutav-finance/mutav-app/issues/116). Until it lands, no auto-truncation.
 
 ### Wired consumers (current)
 

@@ -2,7 +2,7 @@
 #
 # Per the spec at docs/architecture/monorepo-migration.md
 # § Section 6, every app and every package has its own ownership rule.
-# Team handles are placeholders — see spec § Section 10 follow-up.
+# Team handles are placeholders.
 
 # Persona apps
 /apps/agency/         @mutav-finance/agency-team
