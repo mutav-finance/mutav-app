@@ -185,9 +185,9 @@ A3 **does** own the **proposal queue UI** inside the `(admin)` shell — Mutav's
 **Architectural sensitivity to land before A4 ships:**
 
 - **Float sizing** is operational policy (set by `Mutav-Mgmt`'s treasury role based on observed reversal rate × 3 buffer per [`reliability.md`](reliability.md))
-- **Quarantine window length** is pending Draau input per the [Pending Treasury Decisions pack](pending-treasury-decisions.md) (Decision 3 — 7/30/80 day options with stated trade-offs)
+- **Quarantine window length** is pending Draau input — tracked in the private protocol repo's open-questions registry; the quarantine mechanism itself is [#78](https://github.com/mutav-finance/mutav-app/issues/78)
 - **Regulatory cliff Oct 30, 2026** — `Mutav-BR` cannot transact with unauthorized VASPs after this date. Any settlement provider used on `Mutav-BR`'s side must clear the relevant BCB authorizations (IP authorization under Resolutions 494–497, May 2026 window; VASP authorization under Resolutions 519–521). Etherfuse's current status applies to the primary rail; each BaaS hedge candidate's status applies to the hedge path. Document each provider's status before integration ships.
-- **Etherfuse concentration risk.** Etherfuse fills four roles across the architecture (investor on-ramp for `Mutav-Fund`, agency settlement primary for `Mutav-BR` → `Mutav-Fund` cessão, TESOURO issuer to `Mutav-Fund`, TESOURO redemption counterparty for `Mutav-Fund`) — four roles, one counterparty. A4's hedge-rail abstraction is the architectural mitigation; ensure at least one BaaS hedge integration is operational before any volume of agency capital flows through the system, even if Etherfuse-primary handles steady-state. Concentration risk also intersects with L3 (whether Etherfuse permits offshore TESOURO holding at all — see [`regulatory.md`](regulatory.md) § TESOURO as treasury asset).
+- **Etherfuse concentration risk.** Etherfuse fills four roles across the architecture (investor on-ramp for `Mutav-Fund`, agency settlement primary for `Mutav-BR` → `Mutav-Fund` cessão, TESOURO issuer to `Mutav-Fund`, TESOURO redemption counterparty for `Mutav-Fund`) — four roles, one counterparty. A4's hedge-rail abstraction is the architectural mitigation; ensure at least one BaaS hedge integration is operational before any volume of agency capital flows through the system, even if Etherfuse-primary handles steady-state. Concentration risk also intersects with L3 in the private protocol repo's open-questions registry (whether Etherfuse permits offshore TESOURO holding at all — see [`regulatory.md`](regulatory.md) § TESOURO as treasury asset).
 
 ### A5 — Fund-side onchain observability (sketch)
 
@@ -212,7 +212,7 @@ NAV (Net Asset Value) updates are the most safety-critical admin operation in th
   - No automated NAV updates — human-triggered with multisig consensus, always
 - **Failure path:** the regulatory-pause primitive (per [`compliance.md`](compliance.md)) is the kill switch — can be invoked per-tranche, per-fund, or global. Single-actor invocation, multisig lift.
 
-> 📌 **Pending input from Draau (treasury policy owner) — NAV update policy and deposit pricing approach.** Two of the three decisions in the [Pending Treasury Decisions pack](pending-treasury-decisions.md). NAV policy covers epoch length, per-epoch change cap, pause-on-deviation tolerance, and off-NAV operations during paused state. Deposit pricing covers BRL NAV vs dual share class vs USD NAV with TESOURO underlying. Architecture supports any combination — values land in the compliance runbook once decided.
+> 📌 **Pending input from Draau (treasury policy owner) — NAV update policy and deposit pricing approach.** Both are tracked in the private protocol repo's open-questions registry. NAV policy covers epoch length, per-epoch change cap, pause-on-deviation tolerance, and off-NAV operations during paused state. Deposit pricing covers BRL NAV vs dual share class vs USD NAV with TESOURO underlying. Architecture supports any combination — values land in the compliance runbook once decided.
 
 A6 will own:
 

@@ -11,7 +11,7 @@
  * it to the pure detectors, which keeps the detector logic testable in
  * isolation.
  *
- * See docs/superpowers/specs/2026-07-18-agent-facing-changelog-design.md
+ * See docs/architecture/changelog.md
  * for the detector table.
  */
 

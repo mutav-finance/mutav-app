@@ -20,7 +20,7 @@ The waterfall protects MTVL holders from the first chunk of defaults at the cost
 | **MTVM** | Mezzanine   | L2+ (verified, BCB 519/2025 full KYC) plus offshore Fund subscription                                         | Middle        | Second                     | Open (no required holder)   |
 | **MTVL** | Sênior      | L2+ (verified) plus offshore Fund subscription                                                                | Lowest        | First (priority in queue)  | Open (no required holder)   |
 
-**Open: MTVH eligibility floor (L4 vs L5).** PR [mutav#32](https://github.com/mutav-finance/mutav/pull/32) currently says "investidores profissionais"; the colloquial phrase maps to either CVM 175 Art. 4 (qualificado, R$ 1M+) or Art. 11 (profissional, R$ 10M+ / regulated entity). The two carry different marketing rules and subscription thresholds. Pin once Draau resolves. See [`../open-questions.md`](../open-questions.md) — entry in the L-series for this PR.
+**Open: MTVH eligibility floor (L4 vs L5).** PR [mutav#32](https://github.com/mutav-finance/mutav/pull/32) currently says "investidores profissionais"; the colloquial phrase maps to either CVM 175 Art. 4 (qualificado, R$ 1M+) or Art. 11 (profissional, R$ 10M+ / regulated entity). The two carry different marketing rules and subscription thresholds. Pin once Draau resolves. Tracked in the L-series of the private protocol repo's open-questions registry.
 
 ## Default waterfall
 
@@ -115,4 +115,4 @@ This complements [`compliance.md`](compliance.md) § Capability matrix. Read in 
 - [`onchain-integration.md`](onchain-integration.md) — onchain contract topology for the three tranches
 - [`reliability.md`](reliability.md) — per-tranche NAV update audit, waterfall workflow
 - [`admin.md`](admin.md) § A6 — NAV update operational procedure
-- [`../open-questions.md`](../open-questions.md) — MTVH eligibility floor (L4 vs L5), MTVH SitG minimum
+- MTVH eligibility floor (L4 vs L5), MTVH SitG minimum — tracked in the private protocol repo's open-questions registry

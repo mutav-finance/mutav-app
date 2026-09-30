@@ -7,10 +7,10 @@ These are **learning labs**, not Mutav production code. Each bloco is a standalo
 > **Provenance.** Salvaged on 2026-06-21 from the orphaned `feat/masterclass-anchor-x402`
 > branch — a worktree stranded by the `sgr-app` → `mutav-app` repo rename. Kept because
 > it's the only place this material exists: a runnable verification harness for the live
-> Etherfuse Pix flow plus documented API gotchas (see `02-etherfuse/README.md` and
-> `INTEGRATION-PLAN.md`). Since these labs were written, the production Etherfuse
-> integration has landed on `main` (`apps/*/src/lib/anchors/etherfuse/`,
-> `convex/payments/providers/`), so read `INTEGRATION-PLAN.md` as a historical map; the
+> Etherfuse Pix flow plus documented API gotchas (see `02-etherfuse/README.md`). Since
+> these labs were written, the production Etherfuse integration has landed on `main`
+> (`apps/*/src/lib/anchors/etherfuse/`, `convex/payments/providers/`); remaining
+> integration work is tracked in #32, #77, and #84. The
 > `02-etherfuse/` scripts remain useful for smoke-testing the sandbox end-to-end.
 
 ## Blocos
