@@ -6,7 +6,7 @@ The regulatory landscape as of 2026 is the most concrete it has been: BCB Resolu
 
 ## Per-entity license posture (working hypothesis)
 
-The full per-entity questions are tracked in [`../open-questions.md`](../open-questions.md) §§ L1a/b/c, L4a/b/c/d, L5, L6, L7, L8 — all pending external counsel. This table captures the _working hypothesis_ that drives the architecture; nothing here is a legal opinion.
+The full per-entity questions are tracked in the private protocol repo's open-questions registry (L1a/b/c, L4a/b/c/d, L5, L6, L7, L8) — all pending external counsel. This table captures the _working hypothesis_ that drives the architecture; nothing here is a legal opinion.
 
 | Entity       | Likely posture                                                                                                                                                                                                                         | Open question   |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
@@ -132,7 +132,7 @@ CVM's 2026 agenda explicitly addresses tokenized fund structures (gov.br/cvm), s
 
 **Two-layer tokenized claim.** Investors hold MTVH/MTVM/MTVL → those represent a claim on `Mutav-Fund` → which holds TESOURO → which represents a claim on Brazilian Treasury bonds. Even though `Mutav-Fund` is offshore and not CVM-regulated as a fund, the _economic_ layering looks like fund-of-funds. Whether Brazilian regulators care about this layering when BR investors are subscribed (vs only international investors) is open per L6.
 
-**Offshore holder eligibility — the load-bearing question.** TESOURO is issued by Etherfuse, which holds BR regulatory authorizations under CVM and BCB. Whether Etherfuse permits an _offshore entity_ to hold TESOURO (vs restricting to BR-resident holders) is a hard dependency on Etherfuse partner success — see L3 / P3 in [`../open-questions.md`](../open-questions.md). If the answer is no, the architecture inserts a fourth entity (`Mutav-BR-Treasury`) that holds TESOURO on behalf of `Mutav-Fund`, with a corresponding update to the cessão flow.
+**Offshore holder eligibility — the load-bearing question.** TESOURO is issued by Etherfuse, which holds BR regulatory authorizations under CVM and BCB. Whether Etherfuse permits an _offshore entity_ to hold TESOURO (vs restricting to BR-resident holders) is a hard dependency on Etherfuse partner success — see L3 / P3 in the private protocol repo's open-questions registry. If the answer is no, the architecture inserts a fourth entity (`Mutav-BR-Treasury`) that holds TESOURO on behalf of `Mutav-Fund`, with a corresponding update to the cessão flow.
 
 Until L3 resolves, the architecture assumes offshore-Fund holding works. The implementation-level pieces ([`onchain-integration.md`](onchain-integration.md) § Offshore custody chain) are designed to absorb either outcome with minimal rework.
 
@@ -183,7 +183,7 @@ Mutav-BR pays imobiliária (default coverage) or investor (resgate)
 
 ### Open per L7
 
-Whether câmbio reporting can be batched (e.g., monthly summary per cessão) or must be per-event, and which specific BACEN classification applies, is open per [`../open-questions.md`](../open-questions.md) L7. The architecture preserves enough granularity (correlation ids, timestamps, amounts both currencies) to support either answer.
+Whether câmbio reporting can be batched (e.g., monthly summary per cessão) or must be per-event, and which specific BACEN classification applies, is open per L7 in the private protocol repo's open-questions registry. The architecture preserves enough granularity (correlation ids, timestamps, amounts both currencies) to support either answer.
 
 ## Cessão de recebíveis — economic substance risk
 
@@ -195,7 +195,7 @@ Whether câmbio reporting can be batched (e.g., monthly summary per cessão) or 
 
 1. **Preserve enough audit detail to defend the offshore-Fund characterization** if challenged. Every cessão settlement records: the specific receivables transferred (contract IDs, period, amounts), the price (was it fair value? deeply discounted? face?), the relationship between `Mutav-BR` and `Mutav-Fund` (arm's length? same ownership? formal cessão contract with explicit terms?). All of this lives in the cross-entity audit log per [`reliability.md`](reliability.md).
 2. **Not present the offshore Fund as a marketing tool to BR investors that look like FIDC subscribers.** The marketing posture (see § Marketing above) and the investor classification gate are part of the substance defense.
-3. **Allow restructuring if CVM forces the issue.** If counsel concludes the substance risk is material, the architecture can absorb a fourth entity (e.g., a BR-domiciled FIDC that holds the receivables and the offshore Fund holds shares in the FIDC). This is L8 in [`../open-questions.md`](../open-questions.md).
+3. **Allow restructuring if CVM forces the issue.** If counsel concludes the substance risk is material, the architecture can absorb a fourth entity (e.g., a BR-domiciled FIDC that holds the receivables and the offshore Fund holds shares in the FIDC). This is L8 in the private protocol repo's open-questions registry.
 
 The working hypothesis is that the cessão characterization holds — the Credpago-style fiança operator model is established and not treated as FIDC by regulators. But this is the highest-stakes legal question in the entire structure.
 
@@ -335,7 +335,7 @@ Summary of constraints the regulatory floor imposes on architecture (entity-awar
 
 ## Out of scope
 
-- Legal opinions on per-entity license stack — those go to external counsel via the [`../open-questions.md`](../open-questions.md) L-series. This doc reflects the working hypothesis, not opinions.
+- Legal opinions on per-entity license stack — those go to external counsel via the L-series in the private protocol repo's open-questions registry. This doc reflects the working hypothesis, not opinions.
 - Privacy policy and ToS text — operational, written from these architectural commitments (and explicitly covering the cross-entity data flow per [`entities.md`](entities.md))
 - Vendor selection (KYC provider, multisig tool, audit firm) — these are decisions with selection criteria stated here, made by humans, not by architecture
 - Tax reporting (DARF, IRRF, offshore filings) — operational
@@ -353,7 +353,7 @@ Summary of constraints the regulatory floor imposes on architecture (entity-awar
 - [`investor.md`](investor.md) — KYC boundary, wallet-as-identity, per-chain model, Subscription Agreement to `Mutav-Fund`
 - [`onchain-integration.md`](onchain-integration.md) — contract topology, reconciliation, offshore custody
 - [`compliance.md`](compliance.md) — capability matrix with tranche dimension, regulatory pause scoping
-- [`../open-questions.md`](../open-questions.md) — L1a/b/c, L4a/b/c/d, L5, L6, L7, L8 — the questions counsel must answer
+- The private protocol repo's open-questions registry — L1a/b/c, L4a/b/c/d, L5, L6, L7, L8 — the questions counsel must answer
 - [BCB Resolução 519/2025](https://www.bcb.gov.br/) — primary source
 - [CVM Resolução 175](https://conteudo.cvm.gov.br/legislacao/resolucoes/resol175.html) — primary source
 - [LGPD (Lei 13.709/2018)](http://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/L13709.htm) — primary source

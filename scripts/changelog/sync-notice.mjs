@@ -21,7 +21,7 @@
  *
  * Flags may be combined (e.g. the SessionStart hook does `--format=json --mark-seen`).
  *
- * See docs/superpowers/specs/2026-07-18-agent-facing-changelog-design.md.
+ * See docs/architecture/changelog.md.
  */
 
 import { readdirSync, readFileSync, statSync, writeFileSync, mkdirSync, existsSync } from "node:fs";

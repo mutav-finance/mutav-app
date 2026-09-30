@@ -106,7 +106,7 @@ Pix received          Quarantine window           Settled
 
 ### Architectural commitments
 
-- **Every reversible credit event sits in a `quarantine` state** before becoming a settled event. The quarantine duration is policy per credit type — for Pix specifically, see the [Pending Treasury Decisions pack § Decision 3](pending-treasury-decisions.md#decision-3--pix-quarantine-window-length) (7/30/80-day options with trade-offs); SEPA SDD ~8 weeks; etc.
+- **Every reversible credit event sits in a `quarantine` state** before becoming a settled event. The quarantine duration is policy per credit type — for Pix the window length is pending Draau input, tracked in the private protocol repo's open-questions registry (implementation: [#78](https://github.com/mutav-finance/mutav-app/issues/78)); SEPA SDD ~8 weeks; etc.
 - **Quarantined events still produce audit log entries** but do not trigger downstream actions (mint, treasury credit, agency-balance update).
 - **Reversal handlers cancel quarantined events idempotently.** When the BaaS provider notifies of an MED, the matching event flips to `canceled`; if the event already settled (quarantine elapsed), the cancel handler triggers an offsetting treasury operation rather than a silent rollback — chain state is preserved, the loss is accounted for explicitly.
 - **The reconciliation primitive accounts for quarantined events separately.** "Pix balance" splits into `pending_quarantine`, `settled`, and `reversed` buckets, each reconciled against the relevant rail.
@@ -375,7 +375,7 @@ NAV is updated by a designated `treasury` sub-role on `mutavStaff` (the sub-role
 - **Audit log captures inputs.** Not just the resulting per-tranche NAVs — the proposal carries per-tranche active layer, liquidity layer, outstanding shares, so the computation is reproducible by external auditors at any point in history.
 - **No automated NAV updates.** No cron writes NAV. Human-triggered with `Mutav-Mgmt` multisig consensus, always.
 
-> 📌 **Pending input from Draau (treasury policy owner) — NAV update policy.** Epoch length, change cap, deviation tolerance, paused-state policy — Decision 1 in the [Pending Treasury Decisions pack](pending-treasury-decisions.md). Architecture enforces whatever values Draau commits to; runbook holds the numbers.
+> 📌 **Pending input from Draau (treasury policy owner) — NAV update policy.** Epoch length, change cap, deviation tolerance, paused-state policy — tracked in the private protocol repo's open-questions registry. Architecture enforces whatever values Draau commits to; runbook holds the numbers.
 
 ## What this doc is not
 
