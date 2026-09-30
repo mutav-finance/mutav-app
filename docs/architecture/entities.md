@@ -74,7 +74,7 @@ Default detected → Mutav-BR notifies → Mutav-Mgmt instructs Mutav-Fund to li
 - **Function.** Fiança institucional under Art. 37 inciso I da Lei 8.245/91 (Lei do Inquilinato). Consumer-facing brand: every imobiliária, inquilino, and external observer interacts with `Mutav-BR` as "Mutav".
 - **Books.** BR accounting in BRL. Receives 100% of imobiliária fee transfers; recognizes 20% as own revenue, books 80% as cessão de recebíveis to `Mutav-Fund`.
 - **Regulatory anchors.** Lei do Inquilinato (load-bearing legal basis), LGPD, ISS municipal on services, BCB câmbio reporting on transfers to offshore Fund.
-- **License posture.** Working hypothesis: the fiança model keeps `Mutav-BR` outside SUSEP (not a seguradora) and CVM (not a fundo). Open question L1a — needs counsel confirmation; tracked in the private protocol repo's open-questions registry.
+- **License posture.** Tracked in the private protocol repo (open question L1a).
 - **Custody.** Holds BRL only. Never holds crypto or tokenized assets directly. The BRL → crypto leg is performed by Etherfuse on `Mutav-BR`'s behalf during the cessão settlement.
 - **Audit-log code.** `MUTAV_BR`.
 
@@ -83,7 +83,7 @@ Default detected → Mutav-BR notifies → Mutav-Mgmt instructs Mutav-Fund to li
 - **Function.** Holds the treasury (TESOURO via Etherfuse on Stellar). Issues three token tranches `MTVH` / `MTVM` / `MTVL` with a first-loss waterfall (see [`tranches.md`](tranches.md)). Absorbs default losses on instruction from `Mutav-Mgmt`.
 - **Books.** Offshore accounting in chosen base currency (likely USD or fund-base — open per L4c). NAV per tranche updated periodically; recorded position reconciled against on-chain TESOURO balance per [`reliability.md`](reliability.md) § Reconciliation.
 - **Regulatory anchors.** Determined by jurisdiction (Cayman CIMA / BVI FSC / Bermuda BMA / Marshall Islands / UAE ADGM / Próspera — open per L5). Each carries different fund-admin custody rules, reporting cadence, and investor-protection rules.
-- **License posture.** Not BCB- or CVM-regulated as a _fund_ (CVM 175 is a BR construct). But the _offering_ of fund tokens to BR investors triggers CVM rules on oferta pública offshore (L6) and economic-substance scrutiny on the cessão (L8).
+- **License posture.** Tracked in the private protocol repo (open questions L6, L8).
 - **Custody.** Holds TESOURO via a Stellar address. Signing authority delegated to `Mutav-Mgmt` per offshore fund-admin custody norms (independent admin signing per Cayman / BVI / Bermuda standards).
 - **Counterparty to investors.** The Subscription Agreement is between the investor and `Mutav-Fund` — not `Mutav-BR`.
 - **Open dependency on Etherfuse.** Whether Etherfuse permits an offshore entity to hold TESOURO is the load-bearing question L3 / P3 (tracked in the private protocol repo's open-questions registry). If the answer is no, a fourth entity (`Mutav-BR-Treasury`) would hold TESOURO on behalf of `Mutav-Fund`. The rest of the architecture survives either way.
@@ -94,7 +94,7 @@ Default detected → Mutav-BR notifies → Mutav-Mgmt instructs Mutav-Fund to li
 - **Function.** Administers `Mutav-Fund`: proposes NAV updates, executes liquidation instructions, signs treasury operations, files offshore regulatory reports, manages the redemption queue.
 - **Books.** Records its own revenue from `Mutav-Fund` (management fee % of AUM + withdrawal fee % on resgates). Books distinct from `Mutav-Fund`'s books — administrator and fund are separate ledgers even though same physical ops team for v1.
 - **Regulatory anchors.** Same offshore jurisdiction as `Mutav-Fund` (typically must co-locate per fund-admin rules). May need additional fund-admin registration (CIMA/FSC etc).
-- **License posture.** Open per L1c. Same dependency on L5 jurisdiction.
+- **License posture.** Tracked in the private protocol repo (open questions L1c, L5).
 - **Custody.** Holds signing keys for `Mutav-Fund`'s Stellar address. Multisig topology (Lobstr Vault on individual `Mutav-Mgmt` ops staff devices) per [`onchain-integration.md`](onchain-integration.md) § Offshore custody chain.
 - **Audit-log code.** `MUTAV_MGMT`.
 
