@@ -462,7 +462,7 @@
         "appliedAt": "Precificado em",
         "fee": "Taxa mensal",
         "guaranteeFee": "Taxa de garantia",
-        "creditLifeFee": "Prêmio prestamista",
+        "creditLifeFee": "Taxa do seguro prestamista",
         "activationFee": "Taxa única de ativação",
         "ceilingMultiplier": "Multiplicador do teto",
         "coverageCeiling": "Teto de cobertura",
