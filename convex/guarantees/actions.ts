@@ -84,7 +84,7 @@ function buildWhatsAppMessage(args: NotificationArgs & { activationLink: string 
 
 Parabéns pelo novo lar! Sua *Garantia Locatícia MUTAV* está criada e pronta para entrar em vigor.
 
-Falta só uma etapa: a assinatura da apólice, que é feita de forma rápida e totalmente digital pelo link abaixo.
+Falta só uma etapa: a assinatura da garantia, que é feita de forma rápida e totalmente digital pelo link abaixo.
 
 👉 ${args.activationLink}
 
@@ -121,7 +121,7 @@ function buildEmailHtml(args: NotificationArgs & { activationLink: string }): st
             </p>
 
             <p style="margin:0 0 16px;">
-              A sua apólice de garantia já está gerada e aguarda apenas a sua assinatura
+              A sua garantia já está gerada e aguarda apenas a sua assinatura
               para entrar em vigor. O processo é 100% digital e leva menos de dois minutos:
               basta acessar o botão abaixo, confirmar os seus dados e assinar com biometria.
               Simples assim.
@@ -134,7 +134,7 @@ function buildEmailHtml(args: NotificationArgs & { activationLink: string }): st
             </p>
 
             <p style="margin:0 0 32px;">
-              Após a assinatura, você receberá a confirmação da apólice e o seu contrato
+              Após a assinatura, você receberá a confirmação da garantia e o seu contrato
               estará completamente ativo. Bem-vindo ao seu novo lar!
             </p>
 
@@ -149,7 +149,7 @@ function buildEmailHtml(args: NotificationArgs & { activationLink: string }): st
                 <td style="background-color:#c47e10;">
                   <a href="${args.activationLink}"
                      style="display:block;padding:14px 32px;color:#1a1a1a;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.02em;">
-                    Assinar minha apólice
+                    Assinar minha garantia
                   </a>
                 </td>
               </tr>
@@ -162,7 +162,7 @@ function buildEmailHtml(args: NotificationArgs & { activationLink: string }): st
           <td style="font-size:14px;color:#1a1a1a;line-height:1.75;padding-bottom:40px;">
             <p style="margin:0 0 12px;">
               O corretor ou a imobiliária responsável pela sua locação poderão tirar qualquer
-              dúvida sobre a apólice e acompanhar você durante o processo de assinatura.
+              dúvida sobre a garantia e acompanhar você durante o processo de assinatura.
             </p>
             <p style="margin:0;color:#6b6860;font-size:13px;">
               Este link é válido por 30 dias. Caso tenha expirado, entre em contato com a imobiliária para solicitar o reenvio.
