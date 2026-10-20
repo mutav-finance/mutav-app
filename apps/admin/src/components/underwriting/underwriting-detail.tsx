@@ -68,6 +68,11 @@ export function UnderwritingDetail({
         }
         title={t("detail.title", { id: detail.publicId })}
         subtitle={detail.agency.name}
+        actions={
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/guarantees/${detail.publicId}`}>{t("actions.openGuarantee")}</Link>
+          </Button>
+        }
       />
       <PageContent variant="narrow">
         <DecisionCard view={view} />

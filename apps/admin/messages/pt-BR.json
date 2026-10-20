@@ -39,7 +39,8 @@
       "observability": "Observabilidade",
       "nav": "NAV",
       "staff": "Equipe",
-      "documents": "Documentos"
+      "documents": "Documentos",
+      "guarantees": "Garantias"
     }
   },
   "accessDenied": {
@@ -339,7 +340,8 @@
       "refuse": "Recusar",
       "markSent": "Marcar contrato enviado",
       "cancel": "Cancelar",
-      "retry": "Tentar novamente"
+      "retry": "Tentar novamente",
+      "openGuarantee": "Abrir garantia"
     },
     "detail": {
       "title": "Garantia {id}",
@@ -567,7 +569,8 @@
     "actions": {
       "approve": "Aprovar",
       "reject": "Recusar",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "openGuarantee": "Abrir garantia"
     },
     "reject": {
       "title": "Recusar documento",
@@ -578,7 +581,8 @@
     "toast": {
       "approved": "Documento aprovado.",
       "rejected": "Documento recusado; a imobiliária foi notificada.",
-      "uploaded": "Documento anexado e enviado para análise."
+      "uploaded": "Documento anexado e enviado para análise.",
+      "approvedAndSigned": "Contrato assinado aprovado. A análise passou para Assinada — a garantia pode ser ativada."
     },
     "errors": {
       "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
@@ -595,6 +599,142 @@
       "REJECTION_REASON_TOO_LONG": "O motivo da recusa é longo demais.",
       "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente.",
       "FORBIDDEN": "Seu perfil na equipe não permite esta ação.",
+      "unexpected": "Algo deu errado. Tente novamente."
+    }
+  },
+  "staffGuarantees": {
+    "title": "Garantias",
+    "subtitle": "Rascunhos a caminho da ativação. A Mutav ativa uma garantia quando o contrato está assinado e o contrato de locação assinado foi aprovado.",
+    "notAvailable": "—",
+    "moreAvailable": "Há mais garantias além desta página.",
+    "tabs": {
+      "signed": "Prontas para ativar",
+      "awaiting_signature": "Aguardando assinatura"
+    },
+    "empty": {
+      "signed": "Nenhum rascunho assinado aguardando ativação.",
+      "awaiting_signature": "Nenhum contrato aguardando assinatura."
+    },
+    "columns": {
+      "guarantee": "Garantia",
+      "agency": "Imobiliária",
+      "tenant": "Inquilino",
+      "rent": "Aluguel",
+      "rate": "Taxa",
+      "review": "Análise",
+      "signedContract": "Contrato assinado",
+      "actions": "Ações"
+    },
+    "reviewStatus": {
+      "editing": "Rascunho",
+      "analysis_requested": "Análise solicitada",
+      "accepted": "Aprovada",
+      "awaiting_signature": "Aguardando assinatura",
+      "signed": "Assinada",
+      "refused": "Recusada"
+    },
+    "signedContract": {
+      "approved": "Aprovado",
+      "pending_review": "Aguardando revisão",
+      "rejected": "Recusado",
+      "missing": "Não enviado"
+    },
+    "guaranteeState": {
+      "drafted": "Rascunho",
+      "active": "Ativa",
+      "in_arrears": "Em atraso",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura comprometida",
+      "in_eviction": "Em despejo",
+      "closed": "Encerrada"
+    },
+    "propertyKind": {
+      "residential": "Residencial",
+      "commercial": "Comercial"
+    },
+    "plan": {
+      "basic": "Mutav Fiança",
+      "plus": "Mutav Fiança +"
+    },
+    "agencyInactive": "Imobiliária inativa",
+    "actions": {
+      "open": "Abrir",
+      "activate": "Ativar garantia",
+      "cancel": "Cancelar",
+      "retry": "Tentar novamente",
+      "openUnderwriting": "Abrir dossiê da análise",
+      "openGuarantee": "Abrir garantia"
+    },
+    "stepper": {
+      "progressLabel": "Caminho até a ativação",
+      "doneSuffix": " (concluída)",
+      "currentSuffix": " (atual)",
+      "steps": {
+        "editing": "Rascunho",
+        "analysis_requested": "Análise",
+        "accepted": "Aprovada",
+        "awaiting_signature": "Em assinatura",
+        "signed": "Assinada",
+        "active": "Ativa"
+      }
+    },
+    "detail": {
+      "title": "Garantia {id}",
+      "back": "← Garantias",
+      "notFound": "Garantia não encontrada",
+      "activation": "Ativação",
+      "summary": "Resumo",
+      "lease": "Locação",
+      "terms": "Condições",
+      "history": "Histórico",
+      "ready": "Todas as condições foram cumpridas. Ao ativar, a garantia entra em vigor agora e a taxa de ativação entra na próxima fatura mensal.",
+      "blockedHeading": "Ainda não é possível ativar:",
+      "activatedOn": "Ativada em {date}",
+      "fields": {
+        "agency": "Imobiliária",
+        "tenant": "Inquilino",
+        "status": "Situação",
+        "review": "Análise",
+        "signedContract": "Contrato assinado",
+        "sentAt": "Contrato enviado em",
+        "propertyKind": "Imóvel",
+        "address": "Endereço",
+        "rent": "Aluguel",
+        "totalRent": "Aluguel + encargos",
+        "product": "Produto",
+        "plan": "Plano",
+        "feeRate": "Taxa",
+        "staffRate": "Taxa definida pela Mutav",
+        "fee": "Mensalidade",
+        "coverageCeiling": "Teto de cobertura",
+        "activationFee": "Taxa de ativação"
+      }
+    },
+    "blockers": {
+      "NOT_DRAFTED": "A garantia não é mais um rascunho.",
+      "REVIEW_NOT_SIGNED": "A análise não está em Assinada — aprove o contrato de locação assinado depois que o contrato for enviado para assinatura.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Nenhum contrato de locação assinado foi aprovado ainda.",
+      "AGENCY_NOT_ACTIVE": "O cadastro da imobiliária não está ativo."
+    },
+    "confirm": {
+      "title": "Ativar esta garantia?",
+      "description": "A Mutav passa a garantir esta locação a partir de agora. A cobertura começa no teto das condições assinadas, a imobiliária é avisada por e-mail e a taxa de ativação entra na próxima fatura.",
+      "confirm": "Ativar"
+    },
+    "toast": {
+      "activated": "Garantia ativada. A imobiliária foi avisada."
+    },
+    "errors": {
+      "NOT_FOUND": "Essa garantia não existe mais.",
+      "NOT_DRAFTED": "A garantia não é mais um rascunho.",
+      "REVIEW_NOT_SIGNED": "A análise ainda não está em Assinada.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Aprove o contrato de locação assinado antes de ativar.",
+      "AGENCY_NOT_ACTIVE": "A imobiliária não está ativa; ela não pode receber uma nova garantia.",
+      "CAPACITY_INVARIANT_BROKEN": "Os valores de cobertura da garantia estão inconsistentes. Escale antes de ativar.",
+      "SELF_TRANSITION": "A garantia já está nessa situação.",
+      "TERMINAL_STATE": "A garantia está encerrada.",
+      "ILLEGAL_TRANSITION": "Esta garantia não pode ser ativada na situação atual.",
+      "FORBIDDEN": "A ativação exige o perfil de compliance.",
       "unexpected": "Algo deu errado. Tente novamente."
     }
   }

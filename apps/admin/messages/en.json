@@ -39,7 +39,8 @@
       "observability": "Observability",
       "nav": "NAV",
       "staff": "Staff",
-      "documents": "Documents"
+      "documents": "Documents",
+      "guarantees": "Guarantees"
     }
   },
   "accessDenied": {
@@ -339,7 +340,8 @@
       "refuse": "Refuse",
       "markSent": "Mark contract sent",
       "cancel": "Cancel",
-      "retry": "Try again"
+      "retry": "Try again",
+      "openGuarantee": "Open guarantee"
     },
     "detail": {
       "title": "Guarantee {id}",
@@ -567,7 +569,8 @@
     "actions": {
       "approve": "Approve",
       "reject": "Reject",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "openGuarantee": "Open guarantee"
     },
     "reject": {
       "title": "Reject document",
@@ -578,7 +581,8 @@
     "toast": {
       "approved": "Document approved.",
       "rejected": "Document rejected; the agency was notified.",
-      "uploaded": "Document attached and queued for review."
+      "uploaded": "Document attached and queued for review.",
+      "approvedAndSigned": "Signed contract approved. The review moved to Signed — the guarantee can be activated."
     },
     "errors": {
       "GUARANTEE_NOT_FOUND": "Guarantee not found.",
@@ -596,6 +600,142 @@
       "UPLOAD_FAILED": "The file could not be uploaded. Please try again.",
       "FORBIDDEN": "Your staff role cannot perform this action.",
       "unexpected": "Something went wrong. Please try again."
+    }
+  },
+  "staffGuarantees": {
+    "title": "Guarantees",
+    "subtitle": "Drafts on the road to activation. Mutav activates a guarantee once its contract is signed and the signed rental contract is approved.",
+    "notAvailable": "—",
+    "moreAvailable": "More guarantees are waiting beyond this page.",
+    "tabs": {
+      "signed": "Ready to activate",
+      "awaiting_signature": "Awaiting signature"
+    },
+    "empty": {
+      "signed": "No signed draft is waiting for activation.",
+      "awaiting_signature": "No contract is out for signature."
+    },
+    "columns": {
+      "guarantee": "Guarantee",
+      "agency": "Agency",
+      "tenant": "Tenant",
+      "rent": "Rent",
+      "rate": "Fee rate",
+      "review": "Review",
+      "signedContract": "Signed contract",
+      "actions": "Actions"
+    },
+    "reviewStatus": {
+      "editing": "Draft",
+      "analysis_requested": "Analysis requested",
+      "accepted": "Accepted",
+      "awaiting_signature": "Awaiting signature",
+      "signed": "Signed",
+      "refused": "Refused"
+    },
+    "signedContract": {
+      "approved": "Approved",
+      "pending_review": "Awaiting review",
+      "rejected": "Rejected",
+      "missing": "Not uploaded"
+    },
+    "guaranteeState": {
+      "drafted": "Drafted",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "propertyKind": {
+      "residential": "Residential",
+      "commercial": "Commercial"
+    },
+    "plan": {
+      "basic": "Mutav Fiança",
+      "plus": "Mutav Fiança +"
+    },
+    "agencyInactive": "Agency not active",
+    "actions": {
+      "open": "Open",
+      "activate": "Activate guarantee",
+      "cancel": "Cancel",
+      "retry": "Try again",
+      "openUnderwriting": "Open underwriting case file",
+      "openGuarantee": "Open guarantee"
+    },
+    "stepper": {
+      "progressLabel": "Road to activation",
+      "doneSuffix": " (done)",
+      "currentSuffix": " (current)",
+      "steps": {
+        "editing": "Draft",
+        "analysis_requested": "Analysis",
+        "accepted": "Accepted",
+        "awaiting_signature": "Out for signature",
+        "signed": "Signed",
+        "active": "Active"
+      }
+    },
+    "detail": {
+      "title": "Guarantee {id}",
+      "back": "← Guarantees",
+      "notFound": "Guarantee not found",
+      "activation": "Activation",
+      "summary": "Summary",
+      "lease": "Lease",
+      "terms": "Terms",
+      "history": "History",
+      "ready": "Every precondition holds. Activating puts the guarantee on risk now and bills its activation fee on the next monthly invoice.",
+      "blockedHeading": "Activation is not possible yet:",
+      "activatedOn": "Activated on {date}",
+      "fields": {
+        "agency": "Agency",
+        "tenant": "Tenant",
+        "status": "Status",
+        "review": "Review",
+        "signedContract": "Signed contract",
+        "sentAt": "Contract sent on",
+        "propertyKind": "Property",
+        "address": "Address",
+        "rent": "Rent",
+        "totalRent": "Rent + charges",
+        "product": "Product",
+        "plan": "Plan",
+        "feeRate": "Fee rate",
+        "staffRate": "Rate set by Mutav",
+        "fee": "Monthly fee",
+        "coverageCeiling": "Coverage ceiling",
+        "activationFee": "Activation fee"
+      }
+    },
+    "blockers": {
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "REVIEW_NOT_SIGNED": "The review is not at Signed — approve the signed rental contract once the contract is out for signature.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "No signed rental contract has been approved yet.",
+      "AGENCY_NOT_ACTIVE": "The agency's onboarding is not active."
+    },
+    "confirm": {
+      "title": "Activate this guarantee?",
+      "description": "Mutav goes on risk for this lease from now. Coverage starts at the ceiling of the signed terms, the agency is notified by email and the activation fee goes on its next invoice.",
+      "confirm": "Activate"
+    },
+    "toast": {
+      "activated": "Guarantee activated. The agency was notified."
+    },
+    "errors": {
+      "NOT_FOUND": "That guarantee no longer exists.",
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "REVIEW_NOT_SIGNED": "The review is not at Signed yet.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Approve the signed rental contract before activating.",
+      "AGENCY_NOT_ACTIVE": "The agency is not active; it cannot take a new guarantee.",
+      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures are inconsistent. Escalate before activating.",
+      "SELF_TRANSITION": "The guarantee is already in that state.",
+      "TERMINAL_STATE": "The guarantee is closed.",
+      "ILLEGAL_TRANSITION": "This guarantee cannot be activated from its current state.",
+      "FORBIDDEN": "Activation needs the compliance role.",
+      "unexpected": "Something went wrong. Try again."
     }
   }
 }

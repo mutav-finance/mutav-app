@@ -33,8 +33,9 @@ export function useDocumentReview() {
     setBusy(true);
     try {
       const result = await approveMutation({ documentId: target.id });
-      if (result.success) toast.success(t("toast.approved"));
-      else toast.error(t(errorMessageKey(result.error.code)));
+      if (!result.success) toast.error(t(errorMessageKey(result.error.code)));
+      else if (result.data.reviewSigned) toast.success(t("toast.approvedAndSigned"));
+      else toast.success(t("toast.approved"));
     } catch (error) {
       toast.error(t(thrownMessageKey(error)));
     } finally {

@@ -6,6 +6,7 @@ import { usePreloadedQuery, type Preloaded } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@convex/_generated/api";
 import { formatDateTimeBR } from "@mutav/i18n/brazil";
+import { Link } from "@mutav/i18n/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
@@ -79,7 +80,17 @@ function QueueRow({ row, review }: { row: PendingDocumentRow; review: DocumentRe
       <TableCell>{t(`labels.${row.key}`)}</TableCell>
       <TableCell>{row.agencyName ?? t("notAvailable")}</TableCell>
       <TableCell>
-        <Mono>{row.guaranteePublicId ?? t("notAvailable")}</Mono>
+        {row.guaranteePublicId === null ? (
+          <Mono>{t("notAvailable")}</Mono>
+        ) : (
+          <Link
+            href={`/guarantees/${row.guaranteePublicId}`}
+            aria-label={t("actions.openGuarantee")}
+            className="underline-offset-4 hover:underline"
+          >
+            <Mono>{row.guaranteePublicId}</Mono>
+          </Link>
+        )}
       </TableCell>
       <TableCell>
         <Button
