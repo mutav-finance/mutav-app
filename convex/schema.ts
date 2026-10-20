@@ -114,6 +114,17 @@ const settlementMethod = v.union(
 
 const memberRole = v.union(v.literal("owner"), v.literal("admin"), v.literal("member"));
 
+// Canonical `INVITABLE_ROLE` / `INVITE_STATUS` live in
+// `convex/agencies/domain.ts`. Ownership is never granted by invite.
+const invitableRole = v.union(v.literal("admin"), v.literal("member"));
+
+const inviteStatus = v.union(
+  v.literal("pending"),
+  v.literal("accepted"),
+  v.literal("revoked"),
+  v.literal("expired"),
+);
+
 const agencyType = v.union(v.literal("autonomo"), v.literal("empresa"));
 
 const onboardingState = v.union(
@@ -314,6 +325,23 @@ export default defineSchema(
       .index("by_user", ["userId"])
       .index("by_agency", ["agencyId"])
       .index("by_user_agency", ["userId", "agencyId"]),
+
+    // Invitations into an agency, managed by its owners/admins. `email` is
+    // stored lowercased and trimmed so `by_email_status` matches the invitee's
+    // `users.email` regardless of how the inviter typed it.
+    agencyInvites: defineTable({
+      agencyId: v.id("agencies"),
+      email: v.string(),
+      role: invitableRole,
+      status: inviteStatus,
+      invitedBy: v.id("users"),
+      createdAt: v.string(),
+      expiresAt: v.string(),
+      acceptedBy: v.optional(v.id("users")),
+      acceptedAt: v.optional(v.string()),
+    })
+      .index("by_agency_status", ["agencyId", "status"])
+      .index("by_email_status", ["email", "status"]),
 
     // Mutav-internal staff capability grants. One row per (user, role); a person
     // holding multiple capabilities has multiple rows. Distinct from

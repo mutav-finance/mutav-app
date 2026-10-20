@@ -3,8 +3,8 @@ import { customMutation, customQuery } from "convex-helpers/server/customFunctio
 import { mutation, query } from "../_generated/server";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import type { User } from "../users/domain";
-import { ONBOARDING_STATE } from "../agencies/domain";
-import type { Membership } from "../agencies/domain";
+import { ONBOARDING_STATE, hasRole } from "../agencies/domain";
+import type { MemberRole, Membership } from "../agencies/domain";
 import type { AppendAuditEntryInput } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import { meetsMinRole } from "../mutavStaff/domain";
@@ -174,6 +174,40 @@ export const mutationWithActiveAgency = customMutation(mutation, {
     return { ctx: { user, membership, agencyId }, args: {} };
   },
 });
+
+function assertMemberRole(membership: Membership, minRole: MemberRole): void {
+  if (!hasRole(membership.role, minRole)) {
+    throw new ForbiddenError(`Requires agency '${minRole}' role or higher`);
+  }
+}
+
+/**
+ * Role-gated agency reads. `minRole` is checked against the membership ladder
+ * (`member` < `admin` < `owner`) via `hasRole`. Fail-closed.
+ */
+export const queryWithAgencyRole = ({ minRole }: { minRole: MemberRole }) =>
+  customQuery(query, {
+    args: { agencyId: v.id("agencies") },
+    input: async (ctx, { agencyId }) => {
+      const user = await resolveCurrentUser(ctx);
+      const membership = await resolveMembership(ctx, user, agencyId);
+      assertMemberRole(membership, minRole);
+      return { ctx: { user, membership, agencyId }, args: {} };
+    },
+  });
+
+/** `mutationWithActiveAgency` plus the membership-ladder gate of `queryWithAgencyRole`. */
+export const mutationWithActiveAgencyRole = ({ minRole }: { minRole: MemberRole }) =>
+  customMutation(mutation, {
+    args: { agencyId: v.id("agencies") },
+    input: async (ctx, { agencyId }) => {
+      const user = await resolveCurrentUser(ctx);
+      const membership = await resolveMembership(ctx, user, agencyId);
+      assertMemberRole(membership, minRole);
+      await assertAgencyActive(ctx, agencyId);
+      return { ctx: { user, membership, agencyId }, args: {} };
+    },
+  });
 
 // ─── Mutav staff wrappers ────────────────────────────────────────────────────
 //
