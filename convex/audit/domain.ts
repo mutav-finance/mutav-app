@@ -87,6 +87,12 @@ export const AUDIT_ACTION = {
   // convex/coverOperations/mutations.ts).
   COVER_OPERATION_RECORDED: "cover_operation.recorded",
   COVER_OPERATION_EXECUTED: "cover_operation.executed",
+  // agencies/ (member management — emitted by convex/agencies/members.ts).
+  MEMBERSHIP_INVITED: "membership.invited",
+  MEMBERSHIP_INVITE_REVOKED: "membership.invite_revoked",
+  MEMBERSHIP_INVITE_ACCEPTED: "membership.invite_accepted",
+  MEMBERSHIP_ROLE_CHANGED: "membership.role_changed",
+  MEMBERSHIP_REMOVED: "membership.removed",
 } as const satisfies Record<string, string>;
 
 export type AuditActionKey = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -127,6 +133,11 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.DELINQUENCY_DISPUTED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_RECORDED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_EXECUTED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_INVITED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_INVITE_REVOKED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_INVITE_ACCEPTED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_ROLE_CHANGED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_REMOVED),
 );
 
 /**
