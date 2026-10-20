@@ -2,16 +2,22 @@ import { GUARANTEE_STATE, type GuaranteeState } from "@convex/guarantees/domain"
 import { REVIEW_STATUS, type ReviewStatus } from "@convex/guarantees/review";
 
 /**
- * The agency-facing stepper for Mutav's underwriting review. `refused` is not
- * a step on the happy path — it replaces everything after the request — so it
- * is reported as a flag beside the steps rather than as one of them.
+ * The agency-facing stepper for the road to activation: Mutav's underwriting
+ * review, then the guarantee going on risk. `active` is the lifecycle state,
+ * not a review status — Mutav staff activate a `signed` draft — so it closes
+ * the stepper. `refused` is not a step on the happy path — it replaces
+ * everything after the request — so it is reported as a flag beside the steps
+ * rather than as one of them.
  */
+export const ACTIVE_STEP = GUARANTEE_STATE.ACTIVE;
+
 export const REVIEW_STEPS = [
   REVIEW_STATUS.EDITING,
   REVIEW_STATUS.ANALYSIS_REQUESTED,
   REVIEW_STATUS.ACCEPTED,
   REVIEW_STATUS.AWAITING_SIGNATURE,
   REVIEW_STATUS.SIGNED,
+  ACTIVE_STEP,
 ] as const;
 
 export type ReviewStep = (typeof REVIEW_STEPS)[number];
@@ -24,7 +30,20 @@ export type ReviewStepper = {
 
 const REFUSED_AFTER_STEP: ReviewStep = REVIEW_STATUS.ANALYSIS_REQUESTED;
 
-export function reviewStepper(status: ReviewStatus): ReviewStepper {
+/** Where the stepper stands: the review status, or `active` once on risk. */
+export function currentReviewStep({
+  status,
+  review,
+}: {
+  status: GuaranteeState;
+  review: ReviewStatus;
+}): ReviewStep | typeof REVIEW_STATUS.REFUSED {
+  return status === GUARANTEE_STATE.DRAFTED || review === REVIEW_STATUS.REFUSED
+    ? review
+    : ACTIVE_STEP;
+}
+
+export function reviewStepper(status: ReviewStep | typeof REVIEW_STATUS.REFUSED): ReviewStepper {
   if (status === REVIEW_STATUS.REFUSED) {
     const lastDone = REVIEW_STEPS.indexOf(REFUSED_AFTER_STEP);
     return {
@@ -57,9 +76,11 @@ export function canRequestAnalysis({
 }
 
 /**
- * The review card is about the road to activation. Once a guarantee is in
- * force the review is history; a refused draft keeps the card so the agency
- * sees why it closed.
+ * The review card is about the road to activation. It stays while the
+ * guarantee is `active`, so the agency sees the completed road end at
+ * "Active"; once anything else happens to it (arrears, cover, closure) the
+ * review is history. A refused draft keeps the card so the agency sees why it
+ * closed.
  */
 export function showsReviewCard({
   status,
@@ -68,7 +89,11 @@ export function showsReviewCard({
   status: GuaranteeState;
   review: ReviewStatus;
 }): boolean {
-  return status === GUARANTEE_STATE.DRAFTED || review === REVIEW_STATUS.REFUSED;
+  return (
+    status === GUARANTEE_STATE.DRAFTED ||
+    status === GUARANTEE_STATE.ACTIVE ||
+    review === REVIEW_STATUS.REFUSED
+  );
 }
 
 const BASIS_POINTS_PER_PERCENT = 100;

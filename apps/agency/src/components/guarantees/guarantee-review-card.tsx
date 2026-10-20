@@ -10,15 +10,16 @@ import { StepIndicator } from "@mutav/ui/step-indicator";
 import { formatDateBR } from "@mutav/i18n/brazil";
 import type { ReviewStatus } from "@convex/guarantees/review";
 import type { Guarantee } from "@/lib/guarantees/types";
-import { REVIEW_STEPS } from "@/lib/guarantees/review";
+import { ACTIVE_STEP, REVIEW_STEPS } from "@/lib/guarantees/review";
 import { useGuaranteeReviewCard } from "./use-guarantee-review-card";
 
-const REVIEW_TONE: Record<ReviewStatus, Tone> = {
+const REVIEW_TONE: Record<ReviewStatus | typeof ACTIVE_STEP, Tone> = {
   editing: "neutral",
   analysis_requested: "expiring",
   accepted: "success",
   awaiting_signature: "success",
   signed: "success",
+  active: "success",
   refused: "error",
 };
 
@@ -36,9 +37,9 @@ export function GuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) {
           maximumFractionDigits: 2,
         });
   const statusLabel =
-    review.status === "accepted" && staffRate !== null
+    view.step === "accepted" && staffRate !== null
       ? t("acceptedAt", { rate: staffRate })
-      : t(`status.${review.status}`);
+      : t(`status.${view.step}`);
 
   return (
     <Card>
@@ -49,7 +50,7 @@ export function GuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) {
       </CardHeader>
       <CardContent className="grid gap-4 py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <StatusTag tone={REVIEW_TONE[review.status]}>{statusLabel}</StatusTag>
+          <StatusTag tone={REVIEW_TONE[view.step]}>{statusLabel}</StatusTag>
           {review.requestedAt && (
             <span className="text-muted-foreground text-base-sm">
               {t("requestedOn", { date: formatDateBR(review.requestedAt) })}
@@ -73,7 +74,7 @@ export function GuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) {
           />
         )}
 
-        <p className="text-muted-foreground text-base-sm">{t(`description.${review.status}`)}</p>
+        <p className="text-muted-foreground text-base-sm">{t(`description.${view.step}`)}</p>
 
         <dl className="text-base-sm grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">

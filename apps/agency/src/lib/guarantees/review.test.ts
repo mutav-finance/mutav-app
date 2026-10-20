@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bpsToPercent,
   canRequestAnalysis,
+  currentReviewStep,
   requestAnalysisErrorKey,
   reviewStepper,
   showsReviewCard,
@@ -16,9 +17,28 @@ describe("reviewStepper", () => {
         { step: "accepted", state: "current" },
         { step: "awaiting_signature", state: "upcoming" },
         { step: "signed", state: "upcoming" },
+        { step: "active", state: "upcoming" },
       ],
       refused: false,
     });
+  });
+
+  it("a signed draft waits on Mutav's activation as the last step", () => {
+    expect(reviewStepper("signed").steps.slice(-2)).toEqual([
+      { step: "signed", state: "current" },
+      { step: "active", state: "upcoming" },
+    ]);
+  });
+
+  it("an activated guarantee ends the road at active", () => {
+    expect(reviewStepper("active").steps.map((step) => step.state)).toEqual([
+      "done",
+      "done",
+      "done",
+      "done",
+      "done",
+      "current",
+    ]);
   });
 
   it("starts a fresh draft at editing", () => {
@@ -33,9 +53,21 @@ describe("reviewStepper", () => {
         { step: "accepted", state: "upcoming" },
         { step: "awaiting_signature", state: "upcoming" },
         { step: "signed", state: "upcoming" },
+        { step: "active", state: "upcoming" },
       ],
       refused: true,
     });
+  });
+});
+
+describe("currentReviewStep", () => {
+  it.each([
+    ["drafted", "awaiting_signature", "awaiting_signature"],
+    ["drafted", "signed", "signed"],
+    ["active", "signed", "active"],
+    ["closed", "refused", "refused"],
+  ] as const)("%s + %s → %s", (status, review, expected) => {
+    expect(currentReviewStep({ status, review })).toBe(expected);
   });
 });
 
@@ -53,7 +85,8 @@ describe("canRequestAnalysis / showsReviewCard", () => {
     ["drafted", "awaiting_signature", true],
     ["closed", "refused", true],
     ["closed", "editing", false],
-    ["active", "signed", false],
+    ["active", "signed", true],
+    ["in_arrears", "signed", false],
   ] as const)("%s + %s → card shown %s", (status, review, expected) => {
     expect(showsReviewCard({ status, review })).toBe(expected);
   });

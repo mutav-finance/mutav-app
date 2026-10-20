@@ -404,7 +404,8 @@
         "analysis_requested": "Análise solicitada",
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
-        "signed": "Assinada"
+        "signed": "Assinada",
+        "active": "Ativa"
       },
       "status": {
         "editing": "Rascunho",
@@ -412,7 +413,8 @@
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
         "signed": "Assinada",
-        "refused": "Recusada"
+        "refused": "Recusada",
+        "active": "Ativa"
       },
       "acceptedAt": "Aprovada com taxa de {rate}",
       "description": {
@@ -420,8 +422,9 @@
         "analysis_requested": "A Mutav está analisando o inquilino. Você será avisado por e-mail quando houver uma decisão.",
         "accepted": "A Mutav aprovou este contrato. O contrato será enviado ao inquilino para assinatura.",
         "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Após a assinatura, a Mutav registra o documento e ativa a garantia.",
-        "signed": "O contrato está assinado. A Mutav ativa a garantia após registrar o documento.",
-        "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada."
+        "signed": "A Mutav registrou o contrato assinado. A Mutav ativa a garantia assim que todas as verificações forem concluídas.",
+        "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada.",
+        "active": "A Mutav ativou esta garantia. Ela está em vigor e a taxa de ativação entra na próxima fatura mensal."
       },
       "requestedOn": "Solicitada em {date}",
       "refusalReason": "Motivo informado pela Mutav",
