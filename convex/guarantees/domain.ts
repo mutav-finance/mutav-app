@@ -8,6 +8,7 @@ export type GuaranteeTerms = Guarantee["terms"];
 export type GuaranteeCapacity = Guarantee["capacity"];
 export type GuaranteeClosure = NonNullable<Guarantee["closure"]>;
 export type GuaranteeUnderwriting = Guarantee["underwriting"];
+export type GuaranteeReviewDecision = NonNullable<GuaranteeUnderwriting["decision"]>;
 export type GuaranteeHistory = Doc<"guaranteeHistory">;
 export type GuaranteeHistoryId = Id<"guaranteeHistory">;
 export type ContractApplication = Doc<"contractApplications">;
@@ -162,9 +163,10 @@ export const scoreTierValidator = v.union(
 );
 
 /**
- * Score tiers that can be priced. `negado` has no rate: a denied tenant is
- * rejected before pricing (see the `create` mutation), so it is excluded from
- * the rate table at the type level — pricing a denied tier is a compile error.
+ * Score tiers that can be priced from the catalog. `negado` has no rate, so it
+ * is excluded from the rate table at the type level — pricing a `negado` tier
+ * from the catalog is a compile error. A `negado` draft is quoted at
+ * `provisionalPricingTier` until compliance sets its rate (`review.ts`).
  */
 export type PriceableTier = Exclude<ScoreTier, typeof SCORE_TIER.NEGADO>;
 
@@ -227,7 +229,6 @@ export function tierForScore(score: number): ScoreTier {
 // `LEASE_ERROR_CODE.LEASE_HAS_OPEN_GUARANTEE`) are composed into a mutation's
 // error union at the call site rather than duplicated here.
 export const GUARANTEE_ERROR_CODE = {
-  TENANT_DENIED: "TENANT_DENIED",
   INVALID_RENT: "INVALID_RENT",
   CREDIT_ASSESSMENT_REQUIRED: "CREDIT_ASSESSMENT_REQUIRED",
   INVALID_TAX_ID: "INVALID_TAX_ID",
@@ -251,6 +252,13 @@ export type GuaranteeErrorCode = (typeof GUARANTEE_ERROR_CODE)[keyof typeof GUAR
  * forever.
  */
 export const CONTRACT_APPLICATION_VALIDITY_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * How long a bureau assessment stays usable: as the score cache the wizard
+ * reads, as the input `create` prices from, and as the input Mutav reviews
+ * when the agency requests analysis.
+ */
+export const CREDIT_ASSESSMENT_FRESHNESS_MS = 24 * 60 * 60 * 1000;
 
 export type UrgencyTier =
   | "overdue"

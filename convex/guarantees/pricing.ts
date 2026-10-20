@@ -6,6 +6,7 @@ import {
   type PriceableTier,
 } from "./domain";
 import type { ProductTerms } from "../products/domain";
+import { BASIS_POINTS_PER_UNIT, rateToBps } from "./review";
 
 /**
  * Guarantee pricing. Lives in the backend (shared by every app) so the wizard
@@ -40,6 +41,12 @@ export type PriceGuaranteeInput = {
   productSlug: string;
   /** ISO timestamp the snapshot is taken at; stored as `terms.appliedAt`. */
   appliedAt: string;
+  /**
+   * The rate Mutav compliance set when it accepted the draft, in basis points.
+   * When present it replaces the product's tier rate; `tier` still decides
+   * which product the draft was resolved under, but no longer its price.
+   */
+  staffFeeRateBps?: number;
 };
 
 export type PricedGuarantee = {
@@ -53,7 +60,12 @@ export type PricedGuarantee = {
  * ceiling would leak into `capacity` and the platform exposure aggregate.
  */
 export function priceGuarantee(input: PriceGuaranteeInput, terms: PricingTable): PricedGuarantee {
-  const taxaFeeCents = Math.round(input.rentCents * terms.tierRate[input.tier]);
+  const tierRate = terms.tierRate[input.tier];
+  const taxaFeeCents =
+    input.staffFeeRateBps === undefined
+      ? Math.round(input.rentCents * tierRate)
+      : Math.round((input.rentCents * input.staffFeeRateBps) / BASIS_POINTS_PER_UNIT);
+  const feeRateBps = input.staffFeeRateBps ?? rateToBps(tierRate);
   const prestamistaFeeCents =
     input.plan === GUARANTEE_PLAN.PLUS ? terms.prestamistaPremiumCents : 0;
   const coverageCeilingCents = Math.round(input.rentCents * terms.coverageCeilingMultiplier);
@@ -73,6 +85,7 @@ export function priceGuarantee(input: PriceGuaranteeInput, terms: PricingTable):
       exitCostMultiplier: terms.exitCostMultiplier,
       coverageCeilingCents,
       exitCostCapCents,
+      feeRateBps,
       appliedAt: input.appliedAt,
     },
     capacity: {

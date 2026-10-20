@@ -1564,7 +1564,7 @@ describe("one-open-guarantee rule — lease side", () => {
     expect(sweep).toEqual([]);
   });
 
-  test("CLOSE_REASONS lists the seven documented reasons", () => {
+  test("CLOSE_REASONS lists the eight documented reasons", () => {
     expect([...CLOSE_REASONS]).toEqual([
       "end_of_lease",
       "rescission",
@@ -1572,6 +1572,7 @@ describe("one-open-guarantee rule — lease side", () => {
       "eviction",
       "dispute_reversal",
       "canceled_pre_activation",
+      "underwriting_refused",
       "death",
     ]);
   });

@@ -32,10 +32,37 @@ describe("priceGuarantee", () => {
         exitCostMultiplier: 6,
         coverageCeilingCents: 3_000_000,
         exitCostCapCents: 600_000,
+        feeRateBps: 900,
         appliedAt: APPLIED_AT,
       },
       capacity: { ceilingCents: 3_000_000, availableCents: 3_000_000, reservedCents: 0 },
     });
+  });
+
+  test("a staff-set rate replaces the tier rate and is snapshotted as feeRateBps", () => {
+    const priced = priceGuarantee(
+      {
+        rentCents: 250_000,
+        tier: "ruim",
+        plan: "basic",
+        productSlug: PRODUCT_SLUG,
+        appliedAt: APPLIED_AT,
+        staffFeeRateBps: 1_750,
+      },
+      DEFAULT_PRICING_TABLE,
+    );
+    expect(priced.terms.taxaFeeCents).toBe(43_750);
+    expect(priced.terms.feeCents).toBe(43_750);
+    expect(priced.terms.feeRateBps).toBe(1_750);
+    expect(priced.terms.coverageCeilingCents).toBe(7_500_000);
+  });
+
+  test.each([
+    ["bom", 900],
+    ["regular", 1_200],
+    ["ruim", 1_500],
+  ] as const)("the %s tier snapshots its catalog rate as %i bps", (tier, bps) => {
+    expect(price({ rentCents: 100_000, tier, plan: "basic" }).terms.feeRateBps).toBe(bps);
   });
 
   test("regular tier — 12% taxa", () => {

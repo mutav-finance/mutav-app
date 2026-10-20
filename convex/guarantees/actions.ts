@@ -9,8 +9,70 @@ import {
   getAppUrl,
   getWhatsAppApiUrl,
   getWhatsAppApiKey,
+  getOptionalResendApiKey,
 } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
+
+// ─── Review decision → agency ─────────────────────────────────────────────────
+
+const BASIS_POINTS_PER_PERCENT = 100;
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+/**
+ * Tells the agency Mutav decided its draft. Scheduled by `acceptAnalysis` /
+ * `refuseAnalysis` after the decision is committed, so a delivery failure
+ * never rolls the decision back. Skipped, with a warning, when Resend is not
+ * configured. The email carries no score and no tenant identity — only the
+ * guarantee id, the outcome and what the agency needs to act on it.
+ */
+export const sendReviewDecisionNotification = internalAction({
+  args: {
+    publicId: v.string(),
+    recipients: v.array(v.string()),
+    decision: v.union(
+      v.object({ outcome: v.literal("accepted"), feeRateBps: v.number() }),
+      v.object({ outcome: v.literal("refused"), reason: v.string() }),
+    ),
+  },
+  handler: async (_ctx, args) => {
+    const apiKey = getOptionalResendApiKey();
+    if (!apiKey) {
+      logWarn("[notifications] RESEND_API_KEY not set, skipping review decision email");
+      return;
+    }
+    if (args.recipients.length === 0) {
+      logWarn("[notifications] review decision has no recipient", { publicId: args.publicId });
+      return;
+    }
+    const link = `${getAppUrl()}/guarantees/${args.publicId}`;
+    const accepted = args.decision.outcome === "accepted";
+    const subject = accepted
+      ? `Análise Mutav aprovada — garantia ${args.publicId}`
+      : `Análise Mutav recusada — garantia ${args.publicId}`;
+    const body =
+      args.decision.outcome === "accepted"
+        ? `<p>A Mutav aprovou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong> com taxa de ${(args.decision.feeRateBps / BASIS_POINTS_PER_PERCENT).toFixed(2)}% do aluguel.</p><p>O próximo passo é o envio do contrato ao inquilino para assinatura.</p>`
+        : `<p>A Mutav recusou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong>.</p><p>Motivo: ${escapeHtml(args.decision.reason)}</p><p>A proposta foi encerrada. Você pode iniciar uma nova proposta a qualquer momento.</p>`;
+    try {
+      await new Resend(apiKey).emails.send({
+        from: getResendFromEmail(),
+        to: args.recipients,
+        subject,
+        html: `<!DOCTYPE html><html lang="pt-BR"><body style="font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.6;">${body}<p><a href="${link}">Ver garantia</a></p><p style="color:#9e9c98;font-size:12px;">MUTAV · e-mail automático.</p></body></html>`,
+      });
+    } catch (error) {
+      logError("[notifications] review decision email rejected", { reason: error });
+    }
+  },
+});
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 

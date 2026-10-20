@@ -35,7 +35,6 @@ import {
   DOCUMENT_STATUS,
   GUARANTEE_STATE,
   isInsured,
-  SCORE_TIER,
   TENANT_APPROVAL_STATUS,
   tierForScore,
   type CloseReason,
@@ -48,6 +47,11 @@ import {
 } from "./guarantees/domain";
 import type { UserId } from "./users/domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee } from "./guarantees/pricing";
+import {
+  provisionalPricingTier,
+  REVIEW_STATUS,
+  reviewStatusForInsertedState,
+} from "./guarantees/review";
 import {
   insuredCentsPlatform,
   guaranteesByState,
@@ -480,6 +484,99 @@ async function insertSeedGuaranteeOnLease(
   });
 }
 
+type SeedReviewRow = {
+  guaranteeId: GuaranteeId;
+  publicId: string;
+  terms: GuaranteeTerms;
+  review:
+    | { status: typeof REVIEW_STATUS.ANALYSIS_REQUESTED; requestedDaysAgo: number }
+    | {
+        status: typeof REVIEW_STATUS.AWAITING_SIGNATURE;
+        requestedDaysAgo: number;
+        decidedDaysAgo: number;
+        sentDaysAgo: number;
+        feeRateBps: number;
+        note: string;
+      };
+};
+
+/**
+ * Walk seeded drafts through Mutav's review the way the review mutations
+ * would: the agency asked, compliance decided (re-pricing at its own rate) and
+ * sent the contract. Each step leaves the history row the mutation writes.
+ */
+async function applyAprovadaReviews(
+  ctx: MutationCtx,
+  {
+    product,
+    ownerUserId,
+    staffUserId,
+    rows,
+  }: { product: Product; ownerUserId: UserId; staffUserId: UserId; rows: SeedReviewRow[] },
+): Promise<void> {
+  const owner = await ctx.db.get(ownerUserId);
+  const staff = await ctx.db.get(staffUserId);
+  if (!owner || !staff) throw new Error("Seed review needs the owner and staff personas");
+
+  for (const row of rows) {
+    const guarantee = await ctx.db.get(row.guaranteeId);
+    if (!guarantee) throw new Error(`Seed review targets missing guarantee ${row.publicId}`);
+    const requestedAt = daysAgo(row.review.requestedDaysAgo, "14:00");
+    const history = (at: string, username: string, message: string) =>
+      ctx.db.insert("guaranteeHistory", {
+        agencyId: guarantee.agencyId,
+        guaranteePublicId: guarantee.publicId,
+        at,
+        username,
+        message,
+      });
+
+    await history(requestedAt, owner.name, "Análise Mutav solicitada");
+    const analysisRequest = { requestedAt, requestedBy: ownerUserId };
+
+    if (row.review.status === REVIEW_STATUS.ANALYSIS_REQUESTED) {
+      await ctx.db.patch(guarantee._id, {
+        underwriting: { ...guarantee.underwriting, review: row.review.status, analysisRequest },
+      });
+      continue;
+    }
+
+    const decidedAt = daysAgo(row.review.decidedDaysAgo, "10:00");
+    const sentAt = daysAgo(row.review.sentDaysAgo, "11:00");
+    const repriced = priceGuarantee(
+      {
+        rentCents: row.terms.rentCents,
+        tier: provisionalPricingTier(guarantee.underwriting.tier),
+        plan: row.terms.plan,
+        productSlug: product.slug,
+        appliedAt: decidedAt,
+        staffFeeRateBps: row.review.feeRateBps,
+      },
+      product.terms,
+    );
+    // Only the fee moves with the rate; the ceiling and exit-cost cap the
+    // aggregates read are rent-driven, so no aggregate rewrite is needed.
+    await ctx.db.patch(guarantee._id, {
+      terms: repriced.terms,
+      underwriting: {
+        ...guarantee.underwriting,
+        review: row.review.status,
+        analysisRequest,
+        decision: {
+          outcome: "accepted",
+          feeRateBps: row.review.feeRateBps,
+          note: row.review.note,
+          decidedAt,
+          decidedBy: staffUserId,
+        },
+        signatureRequest: { sentAt, sentBy: staffUserId },
+      },
+    });
+    await history(decidedAt, staff.name, "Análise Mutav aprovada");
+    await history(sentAt, staff.name, "Contrato enviado para assinatura");
+  }
+}
+
 async function insertSeedGuarantee(
   ctx: MutationCtx,
   {
@@ -501,14 +598,11 @@ async function insertSeedGuarantee(
   },
 ): Promise<SeededLeaseAndGuarantee> {
   const tier = tierForScore(tenant.score);
-  if (tier === SCORE_TIER.NEGADO) {
-    throw new Error(`Seed tenant for guarantee ${publicId} has a denied score`);
-  }
 
   const priced = priceGuarantee(
     {
       rentCents,
-      tier,
+      tier: provisionalPricingTier(tier),
       plan: guarantee.plan ?? DEFAULT_GUARANTEE_PLAN,
       productSlug: product.slug,
       // The terms snapshot is taken at activation; only drafts have nothing to date it.
@@ -530,7 +624,14 @@ async function insertSeedGuarantee(
     ...(guarantee.closure ? { closure: guarantee.closure } : {}),
     activatedAt: guarantee.activatedAt,
     nextRenewalDate: guarantee.nextRenewalDate,
-    underwriting: { score: tenant.score, tier },
+    underwriting: {
+      score: tenant.score,
+      tier,
+      review: reviewStatusForInsertedState({
+        state: guarantee.state,
+        closeReason: guarantee.closure?.reason,
+      }),
+    },
     tenantApproval: {
       status: tenant.approvalStatus,
       termApprovedAt: tenant.termApprovedAt,
@@ -2896,7 +2997,7 @@ type SeedPersonasResult = Array<{
  * awaiting it, one in eviction, one draft, and two closed lives — end of lease
  * and a dispute reversal that released its cover. Every notice, cover and
  * activation is dated back from the reseed, so the book always reads as
- * current. Distinct `publicId` range (1000031–1000041) so it doesn't collide
+ * current. Distinct `publicId` range (1000031–1000043) so it doesn't collide
  * with the fictional Paulista/Atlântica/Horizonte ids.
  *
  * Idempotent — if a guarantee in the seeded range already exists, the
@@ -2907,14 +3008,20 @@ async function populateAprovadaBook(
   ctx: MutationCtx,
   {
     agencyId,
+    ownerUserId,
     staffUserId,
     coverBatches,
-  }: { agencyId: AgencyId; staffUserId: UserId; coverBatches: SeedCoverBatches },
+  }: {
+    agencyId: AgencyId;
+    ownerUserId: UserId;
+    staffUserId: UserId;
+    coverBatches: SeedCoverBatches;
+  },
 ) {
   const FIRST_PID = 31;
 
   // Idempotency must be GLOBAL, not per-agency. publicId carries no
-  // DB-level uniqueness constraint; this range (1000031–1000041) is the
+  // DB-level uniqueness constraint; this range (1000031–1000043) is the
   // single canonical Aprovada starter book — if any guarantee already
   // claims it, abort regardless of which agency owns it. Earlier the
   // check filtered by agencyId, which let `seedAprovadaContracts`
@@ -2964,6 +3071,8 @@ async function populateAprovadaBook(
     lease: AprovadaLease | { renews: number };
     /** Underwriting of this life; defaults to the lease tenant's score. */
     score?: number;
+    /** Where Mutav's review of a draft stands; drafts without it stay `editing`. */
+    review?: SeedReviewRow["review"];
   };
 
   // The lease that outlives its first guarantee: the tenant renewed, the old
@@ -3243,6 +3352,69 @@ async function populateAprovadaBook(
       lease: { renews: 5 },
       score: 740,
     },
+    // Waiting in Mutav's underwriting queue. The bureau scored the tenant
+    // `negado`; the draft exists anyway because the score is an input to
+    // compliance's decision, not the decision (ADR 0009).
+    {
+      n: 11,
+      state: GUARANTEE_STATE.DRAFTED,
+      activatedAt: null,
+      nextRenewalDate: dateDaysAgo(-730),
+      review: { status: REVIEW_STATUS.ANALYSIS_REQUESTED, requestedDaysAgo: 1 },
+      lease: {
+        rentCents: 272_000,
+        condoCents: 34_000,
+        property: {
+          cep: "05433-000",
+          streetAndNumber: "Rua Fradique Coutinho, 712",
+          neighborhood: "Vila Madalena",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 33",
+        },
+        tenant: {
+          fullName: "Priscila Nogueira Duarte",
+          cpf: seedCpf(141),
+          birthDate: "1993-03-11",
+          phoneSuffix: "41",
+          emailLocal: "priscila.duarte",
+          score: 390,
+        },
+      },
+    },
+    // Accepted by compliance at its own rate and sent to the tenant to sign.
+    {
+      n: 12,
+      state: GUARANTEE_STATE.DRAFTED,
+      activatedAt: null,
+      nextRenewalDate: dateDaysAgo(-730),
+      review: {
+        status: REVIEW_STATUS.AWAITING_SIGNATURE,
+        requestedDaysAgo: 4,
+        decidedDaysAgo: 3,
+        sentDaysAgo: 2,
+        feeRateBps: 1_300,
+        note: "Renda comprovada acima de 3x o aluguel; taxa intermediária.",
+      },
+      lease: {
+        rentCents: 318_000,
+        condoCents: 41_000,
+        property: {
+          cep: "04038-001",
+          streetAndNumber: "Rua Domingos de Morais, 2200",
+          neighborhood: "Vila Mariana",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 104",
+        },
+        tenant: {
+          fullName: "Eduardo Matos Figueira",
+          cpf: seedCpf(142),
+          birthDate: "1987-06-27",
+          phoneSuffix: "42",
+          emailLocal: "eduardo.figueira",
+          score: 590,
+        },
+      },
+    },
   ];
 
   const inserted: Array<{ spec: AprovadaSpec; lease: AprovadaLease } & SeededLeaseAndGuarantee> =
@@ -3317,6 +3489,13 @@ async function populateAprovadaBook(
     });
     inserted.push({ spec, lease, ...row });
   }
+
+  await applyAprovadaReviews(ctx, {
+    product,
+    ownerUserId,
+    staffUserId,
+    rows: inserted.flatMap((row) => (row.spec.review ? [{ ...row, review: row.spec.review }] : [])),
+  });
 
   // Every in-force guarantee bills its fee, arrears or not.
   const insuredRows = inserted.filter((r) => isInsured({ status: r.spec.state }));
@@ -3715,6 +3894,7 @@ const CLOSE_REASON_LABEL: Record<CloseReason, string> = {
   eviction: "despejo",
   dispute_reversal: "contestação revertida",
   canceled_pre_activation: "cancelada antes da ativação",
+  underwriting_refused: "recusada na análise Mutav",
   death: "falecimento",
 };
 
@@ -3984,9 +4164,14 @@ export const seedReset = internalMutation({
     };
     const fictional = await seedFictional(ctx, { ...args, staffUserId, coverBatches });
 
-    const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
-    const aprovada = aprovadaAgencyId
-      ? await populateAprovadaBook(ctx, { agencyId: aprovadaAgencyId, staffUserId, coverBatches })
+    const owner = personas.find((p) => p.persona === "agencyowner");
+    const aprovada = owner?.agencyId
+      ? await populateAprovadaBook(ctx, {
+          agencyId: owner.agencyId,
+          ownerUserId: owner.userId,
+          staffUserId,
+          coverBatches,
+        })
       : null;
 
     await attachTenantSnapshots(ctx);
