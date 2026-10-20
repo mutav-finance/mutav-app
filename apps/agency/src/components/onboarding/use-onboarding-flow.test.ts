@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { onboardingReducer } from "@/components/onboarding/use-onboarding-flow";
+import { buildInitialState, onboardingReducer } from "@/components/onboarding/use-onboarding-flow";
 import type { AgencyId } from "@convex/agencies/domain";
 
 // onboardingReducer is pure — no React, no Convex. Tests run in plain node env.
@@ -123,5 +123,50 @@ describe("onboardingReducer", () => {
       expect(s3.agencyId).toBe(AGENCY_ID);
       expect(s3.step).toBe(2);
     });
+  });
+});
+
+describe("buildInitialState", () => {
+  const draft = {
+    agencyId: AGENCY_ID,
+    agencyType: "autonomo" as const,
+    name: "Corretor",
+    email: "c@test.br",
+    phone: "11999999999",
+    creci: "CRECI-F 1",
+    cpf: "11144477735",
+    cnpj: "",
+    representanteName: "",
+    representanteCpf: "",
+    bankingInfo: {
+      bank: "Banco",
+      agency: "0001",
+      account: "123-4",
+      accountType: "corrente" as const,
+    },
+  };
+
+  it("starts empty without a draft", () => {
+    const state = buildInitialState({ initialType: "empresa" });
+    expect(state.agencyId).toBeNull();
+    expect(state.snapshot.agencyType).toBe("empresa");
+    expect(state.snapshot.name).toBe("");
+  });
+
+  it("prefills profile + banking from a matching draft", () => {
+    const state = buildInitialState({ initialType: "autonomo", initialDraft: draft });
+    expect(state.agencyId).toBe(AGENCY_ID);
+    expect(state.step).toBe(1);
+    expect(state.snapshot.cpf).toBe("11144477735");
+    expect(state.snapshot.bankName).toBe("Banco");
+    expect(state.snapshot.bankBranch).toBe("0001");
+    expect(state.snapshot.bankAccountType).toBe("corrente");
+    expect(state.snapshot.bankPixKey).toBe("");
+  });
+
+  it("ignores a draft of the other agency type", () => {
+    const state = buildInitialState({ initialType: "empresa", initialDraft: draft });
+    expect(state.agencyId).toBeNull();
+    expect(state.snapshot.name).toBe("");
   });
 });

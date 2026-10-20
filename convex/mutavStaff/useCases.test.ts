@@ -1,8 +1,9 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
 import schema from "../schema";
+import type { AgencyId } from "../agencies/domain";
 import type { MutavStaffRole } from "./domain";
 
 // Opaque identity values for withIdentity. The aud-bind was removed (Convex
@@ -184,6 +185,276 @@ describe("audit trail", () => {
     expect(entries.length).toBe(1);
     expect(entries[0].action).toBe("onboarding.reviewed");
     expect(entries[0].actor).toEqual({ kind: "user", userId: staffUserId });
+  });
+});
+
+async function auditEntriesFor(t: T, agencyId: AgencyId) {
+  const entries = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+  return entries.filter(
+    (entry) => entry.resourceType === "agency" && entry.resourceId === agencyId,
+  );
+}
+
+describe("startOnboardingReview", () => {
+  test("compliance moves submitted → under_review and audits it", async () => {
+    const t = convexTest(schema);
+    const staffUserId = await seedStaff(t, "auth0|compliance", ["compliance"]);
+    const agencyId = await seedSubmittedAgency(t);
+
+    const result = await t
+      .withIdentity({ subject: "auth0|compliance" })
+      .mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
+
+    expect(result).toEqual({
+      success: true,
+      data: { agencyId, alreadyUnderReview: false },
+      message: "Review started",
+    });
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.onboardingState).toBe("under_review");
+    const entries = await auditEntriesFor(t, agencyId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].action).toBe("onboarding.review_started");
+    expect(entries[0].actor).toEqual({ kind: "user", userId: staffUserId });
+  });
+
+  test("is idempotent — a second call succeeds without a second audit entry", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|compliance", ["compliance"]);
+    const agencyId = await seedSubmittedAgency(t);
+    const asCompliance = t.withIdentity({ subject: "auth0|compliance" });
+
+    await asCompliance.mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
+    const second = await asCompliance.mutation(api.mutavStaff.useCases.startOnboardingReview, {
+      agencyId,
+    });
+
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+    expect(second.data.alreadyUnderReview).toBe(true);
+    const entries = await auditEntriesFor(t, agencyId);
+    expect(entries).toHaveLength(1);
+  });
+
+  test.each(["in_progress", "active", "rejected"] as const)(
+    "NOT_REVIEWABLE from %s",
+    async (state) => {
+      const t = convexTest(schema);
+      await seedStaff(t, "auth0|compliance", ["compliance"]);
+      const agencyId = await seedSubmittedAgency(t);
+      await t.run((ctx) => ctx.db.patch(agencyId, { onboardingState: state }));
+
+      const result = await t
+        .withIdentity({ subject: "auth0|compliance" })
+        .mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.code).toBe("NOT_REVIEWABLE");
+      const agency = await t.run((ctx) => ctx.db.get(agencyId));
+      expect(agency?.onboardingState).toBe(state);
+      expect(await auditEntriesFor(t, agencyId)).toHaveLength(0);
+    },
+  );
+
+  test("NOT_FOUND for a deleted agency", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|compliance", ["compliance"]);
+    const agencyId = await seedSubmittedAgency(t);
+    await t.run((ctx) => ctx.db.delete(agencyId));
+
+    const result = await t
+      .withIdentity({ subject: "auth0|compliance" })
+      .mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOT_FOUND");
+  });
+
+  test("admin satisfies the compliance gate", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    const agencyId = await seedSubmittedAgency(t);
+
+    const result = await t
+      .withIdentity({ subject: "auth0|admin" })
+      .mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
+
+    expect(result.success).toBe(true);
+  });
+
+  test.each([["support"], ["treasury"]] as const)(
+    "%s is rejected by the role gate",
+    async (role) => {
+      const t = convexTest(schema);
+      await seedStaff(t, `auth0|${role}`, [role]);
+      const agencyId = await seedSubmittedAgency(t);
+
+      await expect(
+        t
+          .withIdentity({ subject: `auth0|${role}` })
+          .mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId }),
+      ).rejects.toThrow();
+      const agency = await t.run((ctx) => ctx.db.get(agencyId));
+      expect(agency?.onboardingState).toBe("submitted");
+    },
+  );
+
+  test("a user with no staff row is rejected", async () => {
+    const t = convexTest(schema);
+    await seedPlainUser(t, "auth0|nobody");
+    const agencyId = await seedSubmittedAgency(t);
+
+    await expect(
+      t
+        .withIdentity({ subject: "auth0|nobody" })
+        .mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("reviewOnboarding — source states, reason and decision email", () => {
+  beforeAll(() => {
+    process.env.PII_ENCRYPTION_KEY = Buffer.from(new Uint8Array(32).fill(0xaa)).toString("base64");
+    process.env.PII_HMAC_KEY = Buffer.from(new Uint8Array(32).fill(0xbb)).toString("base64");
+  });
+
+  test.each(["approved", "rejected"] as const)(
+    "%s from under_review succeeds",
+    async (decision) => {
+      const t = convexTest(schema);
+      await seedStaff(t, "auth0|admin", ["admin"]);
+      const agencyId = await seedSubmittedAgency(t);
+      const asAdmin = t.withIdentity({ subject: "auth0|admin" });
+      await asAdmin.mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
+
+      const result = await asAdmin.mutation(api.mutavStaff.useCases.reviewOnboarding, {
+        agencyId,
+        decision,
+        rejectionReason: decision === "rejected" ? "Documento ilegível" : undefined,
+      });
+
+      expect(result.success).toBe(true);
+      const agency = await t.run((ctx) => ctx.db.get(agencyId));
+      expect(agency?.onboardingState).toBe(decision === "approved" ? "active" : "rejected");
+      const actions = (await auditEntriesFor(t, agencyId)).map((entry) => entry.action);
+      expect(actions).toEqual(["onboarding.review_started", "onboarding.reviewed"]);
+    },
+  );
+
+  test.each(["", "   ", undefined])(
+    "REJECTION_REASON_REQUIRED when the reason is %j",
+    async (rejectionReason) => {
+      const t = convexTest(schema);
+      await seedStaff(t, "auth0|admin", ["admin"]);
+      const agencyId = await seedSubmittedAgency(t);
+
+      const result = await t
+        .withIdentity({ subject: "auth0|admin" })
+        .mutation(api.mutavStaff.useCases.reviewOnboarding, {
+          agencyId,
+          decision: "rejected",
+          rejectionReason,
+        });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.code).toBe("REJECTION_REASON_REQUIRED");
+      const agency = await t.run((ctx) => ctx.db.get(agencyId));
+      expect(agency?.onboardingState).toBe("submitted");
+      expect(await auditEntriesFor(t, agencyId)).toHaveLength(0);
+    },
+  );
+
+  test("stores the trimmed rejection reason", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    const agencyId = await seedSubmittedAgency(t);
+
+    await t
+      .withIdentity({ subject: "auth0|admin" })
+      .mutation(api.mutavStaff.useCases.reviewOnboarding, {
+        agencyId,
+        decision: "rejected",
+        rejectionReason: "  CRECI vencido  ",
+      });
+
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.onboardingRejectionReason).toBe("CRECI vencido");
+  });
+
+  test.each(["in_progress", "active", "rejected"] as const)(
+    "NOT_REVIEWABLE from %s",
+    async (state) => {
+      const t = convexTest(schema);
+      await seedStaff(t, "auth0|admin", ["admin"]);
+      const agencyId = await seedSubmittedAgency(t);
+      await t.run((ctx) => ctx.db.patch(agencyId, { onboardingState: state }));
+
+      const result = await t
+        .withIdentity({ subject: "auth0|admin" })
+        .mutation(api.mutavStaff.useCases.reviewOnboarding, { agencyId, decision: "approved" });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.code).toBe("NOT_REVIEWABLE");
+    },
+  );
+
+  test("NOT_FOUND for a deleted agency", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    const agencyId = await seedSubmittedAgency(t);
+    await t.run((ctx) => ctx.db.delete(agencyId));
+
+    const result = await t
+      .withIdentity({ subject: "auth0|admin" })
+      .mutation(api.mutavStaff.useCases.reviewOnboarding, { agencyId, decision: "approved" });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOT_FOUND");
+  });
+
+  test.each(["approved", "rejected"] as const)(
+    "%s schedules the decision email by agency id, with no address in the args",
+    async (decision) => {
+      const t = convexTest(schema);
+      await seedStaff(t, "auth0|admin", ["admin"]);
+      const agencyId = await seedSubmittedAgency(t);
+
+      await t
+        .withIdentity({ subject: "auth0|admin" })
+        .mutation(api.mutavStaff.useCases.reviewOnboarding, {
+          agencyId,
+          decision,
+          rejectionReason: decision === "rejected" ? "Documento ilegível" : undefined,
+        });
+
+      const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+      expect(scheduled.map((job) => job.name)).toEqual([
+        "agencies/actions:sendOnboardingDecisionEmail",
+      ]);
+      expect(scheduled[0].args).toEqual([{ agencyId, decision }]);
+      expect(JSON.stringify(scheduled[0].args)).not.toContain("x@test.br");
+    },
+  );
+
+  test("a failed review schedules no email", async () => {
+    const t = convexTest(schema);
+    await seedStaff(t, "auth0|admin", ["admin"]);
+    const agencyId = await seedSubmittedAgency(t);
+
+    await t
+      .withIdentity({ subject: "auth0|admin" })
+      .mutation(api.mutavStaff.useCases.reviewOnboarding, {
+        agencyId,
+        decision: "rejected",
+      });
+
+    const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(scheduled).toHaveLength(0);
   });
 });
 

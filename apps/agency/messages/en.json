@@ -1122,7 +1122,15 @@
       "noReason": "No reason provided.",
       "contactLabel": "Have questions or want to appeal?",
       "contactLink": "Contact us",
-      "homeButton": "Back"
+      "resubmitHint": "Your data is still saved. Fix what is needed and resubmit your application for a new review.",
+      "resubmitButton": "Fix and resubmit",
+      "resubmitting": "Reopening application…",
+      "errors": {
+        "NOT_FOUND": "We couldn't find your application. Reload the page.",
+        "NOT_OWNER": "Only the account owner can resubmit this application.",
+        "NOT_REJECTED": "This application is no longer rejected. Reload the page.",
+        "unknown": "Something went wrong. Please try again."
+      }
     },
     "loading": "Loading…",
     "steps": {

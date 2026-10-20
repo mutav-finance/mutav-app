@@ -1122,7 +1122,15 @@
       "noReason": "Nenhum motivo informado.",
       "contactLabel": "Tem dúvidas ou deseja recorrer?",
       "contactLink": "Fale conosco",
-      "homeButton": "Voltar"
+      "resubmitHint": "Seus dados continuam salvos. Corrija o que for necessário e reenvie o cadastro para uma nova análise.",
+      "resubmitButton": "Corrigir e reenviar",
+      "resubmitting": "Reabrindo cadastro…",
+      "errors": {
+        "NOT_FOUND": "Não encontramos o seu cadastro. Recarregue a página.",
+        "NOT_OWNER": "Apenas o responsável pelo cadastro pode reenviá-lo.",
+        "NOT_REJECTED": "Este cadastro não está mais reprovado. Recarregue a página.",
+        "unknown": "Algo deu errado. Tente novamente."
+      }
     },
     "loading": "Carregando…",
     "steps": {

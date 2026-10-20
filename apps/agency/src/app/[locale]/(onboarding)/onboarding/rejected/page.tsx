@@ -1,16 +1,16 @@
 import { getTranslations } from "next-intl/server";
 import { Link, redirect } from "@mutav/i18n/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
-import { Button } from "@mutav/ui/button";
 import { StatusTag } from "@mutav/ui/status-tag";
+import { ResubmitButton } from "@/components/onboarding/resubmit-button";
+import { fetchMyOnboardingStatus } from "@/lib/onboarding";
 import { resolveUserDestination } from "@/lib/user-destination";
 
 type Props = {
-  searchParams: Promise<{ reason?: string }>;
   params: Promise<{ locale: string }>;
 };
 
-export default async function OnboardingRejectedPage({ searchParams, params }: Props) {
+export default async function OnboardingRejectedPage({ params }: Props) {
   const { locale } = await params;
   const dest = await resolveUserDestination();
 
@@ -25,32 +25,33 @@ export default async function OnboardingRejectedPage({ searchParams, params }: P
   }
 
   const t = await getTranslations("onboarding.rejected");
-  const { reason } = await searchParams;
+  // The reason comes from the server, never from the URL — a query-string
+  // reason would let anyone craft a page that puts words in Mutav's mouth.
+  const status = await fetchMyOnboardingStatus();
+  const reason = status?.state === "rejected" ? status.rejectionReason : null;
+  const agencyId = status?.state === "rejected" ? status.agencyId : null;
 
   return (
     <PageContent variant="narrow" className="py-16 md:py-24">
       <div className="flex flex-col items-center gap-6">
-        {/* Status pill — acima da moldura */}
         <StatusTag tone="critical" pulse>
           {t("title")}
         </StatusTag>
 
-        {/* Card com moldura e fundo error/5 */}
         <div className="border-border bg-error/5 flex w-full flex-col items-center gap-6 rounded border p-8 text-center md:p-12">
           <div className="flex flex-col gap-3">
             <h1 className="text-text text-2xl font-semibold">{t("title")}</h1>
             <p className="text-text-2 max-w-sm text-sm">{t("subtitle")}</p>
           </div>
 
-          {/* Motivo da reprovação */}
           <div className="border-border bg-error/10 w-full max-w-sm rounded border p-4 text-center">
             <p className="text-text-3 mb-1.5 text-xs font-medium tracking-wide uppercase">
               {t("reasonLabel")}
             </p>
-            <p className="text-text text-sm">
-              {reason ? decodeURIComponent(reason) : t("noReason")}
-            </p>
+            <p className="text-text text-sm whitespace-pre-line">{reason ?? t("noReason")}</p>
           </div>
+
+          <p className="text-text-2 max-w-sm text-sm">{t("resubmitHint")}</p>
 
           <p className="text-text-3 text-sm">
             {t("contactLabel")}{" "}
@@ -60,10 +61,7 @@ export default async function OnboardingRejectedPage({ searchParams, params }: P
           </p>
         </div>
 
-        {/* Botão abaixo da moldura */}
-        <Button variant="outline" asChild>
-          <Link href="/onboarding">{t("homeButton")}</Link>
-        </Button>
+        {agencyId && <ResubmitButton agencyId={agencyId} />}
       </div>
     </PageContent>
   );

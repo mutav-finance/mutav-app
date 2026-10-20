@@ -6,8 +6,7 @@ import { useConvex, useMutation, usePreloadedQuery, type Preloaded } from "conve
 import type { FunctionReturnType } from "convex/server";
 import { toast } from "sonner";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
-import type { AgencyDocumentKind, OnboardingState } from "@convex/agencies/domain";
+import type { AgencyDocumentKind, AgencyId, OnboardingState } from "@convex/agencies/domain";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
@@ -22,6 +21,7 @@ import {
 import { Button } from "@mutav/ui/button";
 import { Input } from "@mutav/ui/input";
 import { Badge } from "@mutav/ui/badge";
+import { ReviewRow } from "@mutav/ui/review-row";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@mutav/ui/alert-dialog";
 import { DownloadIcon } from "lucide-react";
-import { maskCNPJ } from "@mutav/i18n/brazil";
+import { maskCNPJ, maskCPF, maskPhone } from "@mutav/i18n/brazil";
 
 type PendingAgency = FunctionReturnType<typeof api.mutavStaff.useCases.listPendingReviews>[number];
 
@@ -70,11 +70,60 @@ function stateBadgeVariant(state: OnboardingState | undefined) {
   return state === "under_review" ? "outline" : "secondary";
 }
 
+function KybDetails({ agency }: { agency: PendingAgency }) {
+  const t = useTranslations("adminReview.fields");
+  const isCompany = agency.agencyType === "empresa";
+  const banking = agency.bankingInfo;
+
+  return (
+    <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">
+      <div className="flex flex-col">
+        <ReviewRow
+          label={t("agencyType")}
+          value={agency.agencyType ? t(`agencyTypes.${agency.agencyType}`) : ""}
+        />
+        {isCompany ? (
+          <ReviewRow label={t("cnpj")} value={agency.cnpj ? maskCNPJ(agency.cnpj) : ""} mono />
+        ) : (
+          <ReviewRow label={t("cpf")} value={agency.cpf ? maskCPF(agency.cpf) : ""} mono />
+        )}
+        <ReviewRow label={t("creci")} value={agency.creci ?? ""} />
+        {isCompany && (
+          <>
+            <ReviewRow label={t("representativeName")} value={agency.representanteName ?? ""} />
+            <ReviewRow
+              label={t("representativeCpf")}
+              value={agency.representanteCpf ? maskCPF(agency.representanteCpf) : ""}
+              mono
+            />
+          </>
+        )}
+        <ReviewRow label={t("email")} value={agency.email ?? ""} />
+        <ReviewRow label={t("phone")} value={agency.phone ? maskPhone(agency.phone) : ""} mono />
+      </div>
+      <div className="flex flex-col">
+        {banking ? (
+          <>
+            <ReviewRow label={t("bank")} value={banking.bank} />
+            <ReviewRow label={t("branch")} value={banking.agency ?? ""} mono />
+            <ReviewRow label={t("account")} value={banking.account} mono />
+            <ReviewRow label={t("accountType")} value={t(`accountTypes.${banking.accountType}`)} />
+            <ReviewRow label={t("pixKey")} value={banking.pixKey ?? ""} mono />
+          </>
+        ) : (
+          <ReviewRow label={t("bank")} value="" missing={t("bankingMissing")} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ReviewCard({ agency }: { agency: PendingAgency }) {
   const t = useTranslations("adminReview");
   const locale = useLocale();
   const convex = useConvex();
   const reviewOnboarding = useMutation(api.mutavStaff.useCases.reviewOnboarding);
+  const startOnboardingReview = useMutation(api.mutavStaff.useCases.startOnboardingReview);
 
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -83,7 +132,9 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
     ? new Intl.DateTimeFormat(locale).format(new Date(agency.onboardingSubmittedAt))
     : null;
 
-  const cnpjLabel = agency.cnpj ? maskCNPJ(agency.cnpj) : (agency.cpf ?? null);
+  const taxIdLabel = agency.cnpj ? maskCNPJ(agency.cnpj) : agency.cpf ? maskCPF(agency.cpf) : null;
+  const isUnderReview = agency.onboardingState === "under_review";
+  const trimmedReason = reason.trim();
 
   async function openDocument(kind: AgencyDocumentKind) {
     const url = await convex.query(api.mutavStaff.useCases.getDocumentDownloadUrl, {
@@ -97,8 +148,24 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  async function startReview() {
+    setBusy(true);
+    try {
+      const result = await startOnboardingReview({ agencyId: agency._id });
+      if (!result.success) {
+        toast.error(t(`errors.${result.error.code}`));
+        return;
+      }
+      toast.success(t("reviewStarted"));
+    } catch {
+      toast.error(t("errors.unexpected"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function review(args: {
-    agencyId: Id<"agencies">;
+    agencyId: AgencyId;
     decision: "approved" | "rejected";
     rejectionReason?: string;
   }) {
@@ -124,7 +191,7 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
     <Card>
       <CardHeader>
         <CardTitle>{agency.name}</CardTitle>
-        {cnpjLabel && <CardDescription>{cnpjLabel}</CardDescription>}
+        {taxIdLabel && <CardDescription>{taxIdLabel}</CardDescription>}
         <CardAction>
           <Badge variant={stateBadgeVariant(agency.onboardingState)}>
             {t(`state.${agency.onboardingState}`)}
@@ -138,9 +205,11 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
           </p>
         )}
 
-        {agency.documents.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-foreground text-base-sm font-medium">{t("documentsLabel")}</p>
+        <KybDetails agency={agency} />
+
+        <div className="flex flex-col gap-2">
+          <p className="text-foreground text-base-sm font-medium">{t("documentsLabel")}</p>
+          {agency.documents.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {agency.documents.map((doc) => (
                 <Button
@@ -154,50 +223,64 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
                 </Button>
               ))}
             </div>
+          ) : (
+            <p className="text-muted-foreground text-base-sm">{t("noDocuments")}</p>
+          )}
+        </div>
+
+        {isUnderReview ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={busy}
+              onClick={() => review({ agencyId: agency._id, decision: "approved" })}
+            >
+              {t("approve")}
+            </Button>
+
+            <AlertDialog onOpenChange={(open) => !open && setReason("")}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={busy}>
+                  {t("reject")}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("rejectDialogTitle")}</AlertDialogTitle>
+                  <AlertDialogDescription>{t("rejectDialogDescription")}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <Input
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder={t("rejectReasonPlaceholder")}
+                  aria-label={t("rejectReasonPlaceholder")}
+                  required
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={!trimmedReason}
+                    onClick={() =>
+                      review({
+                        agencyId: agency._id,
+                        decision: "rejected",
+                        rejectionReason: trimmedReason,
+                      })
+                    }
+                  >
+                    {t("confirmReject")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        ) : (
+          <div className="flex flex-col items-start gap-2">
+            <Button disabled={busy} onClick={startReview}>
+              {t("startReview")}
+            </Button>
+            <p className="text-muted-foreground text-base-sm">{t("startReviewHint")}</p>
           </div>
         )}
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            disabled={busy}
-            onClick={() => review({ agencyId: agency._id, decision: "approved" })}
-          >
-            {t("approve")}
-          </Button>
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" disabled={busy}>
-                {t("reject")}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t("rejectDialogTitle")}</AlertDialogTitle>
-                <AlertDialogDescription>{t("rejectDialogDescription")}</AlertDialogDescription>
-              </AlertDialogHeader>
-              <Input
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder={t("rejectReasonPlaceholder")}
-              />
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() =>
-                    review({
-                      agencyId: agency._id,
-                      decision: "rejected",
-                      rejectionReason: reason || undefined,
-                    })
-                  }
-                >
-                  {t("confirmReject")}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
       </CardContent>
     </Card>
   );
