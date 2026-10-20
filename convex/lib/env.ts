@@ -72,6 +72,11 @@ export function getResendApiKey(): string {
   return key;
 }
 
+/** Delivery guard for best-effort email actions: false in local dev without secrets. */
+export function isResendConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
 export function getResendFromEmail(): string {
   const from = process.env.RESEND_FROM_EMAIL;
   if (!from) throw new Error("RESEND_FROM_EMAIL is not set");
