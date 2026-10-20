@@ -394,6 +394,52 @@
       "actionsMenu": "Ações da garantia",
       "ofCeiling": "de {ceiling}"
     },
+    "review": {
+      "heading": "Análise Mutav",
+      "progressLabel": "Progresso da análise Mutav",
+      "doneSuffix": " (concluída)",
+      "currentSuffix": " (atual)",
+      "steps": {
+        "editing": "Rascunho",
+        "analysis_requested": "Análise solicitada",
+        "accepted": "Aprovada",
+        "awaiting_signature": "Aguardando assinatura",
+        "signed": "Assinada"
+      },
+      "status": {
+        "editing": "Rascunho",
+        "analysis_requested": "Análise solicitada",
+        "accepted": "Aprovada",
+        "awaiting_signature": "Aguardando assinatura",
+        "signed": "Assinada",
+        "refused": "Recusada"
+      },
+      "acceptedAt": "Aprovada com taxa de {rate}",
+      "description": {
+        "editing": "Revise o rascunho e solicite a análise da Mutav quando estiver pronto. A Mutav decide se assume este contrato e com qual taxa.",
+        "analysis_requested": "A Mutav está analisando o inquilino. Você será avisado por e-mail quando houver uma decisão.",
+        "accepted": "A Mutav aprovou este contrato. O contrato será enviado ao inquilino para assinatura.",
+        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Após a assinatura, a Mutav registra o documento e ativa a garantia.",
+        "signed": "O contrato está assinado. A Mutav ativa a garantia após registrar o documento.",
+        "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada."
+      },
+      "requestedOn": "Solicitada em {date}",
+      "refusalReason": "Motivo informado pela Mutav",
+      "refusedNextStep": "Você pode iniciar uma nova proposta para este inquilino a qualquer momento.",
+      "scoreLabel": "Score do bureau",
+      "scoreHint": "Insumo da análise Mutav — não é uma decisão",
+      "staffRateLabel": "Taxa definida pela Mutav",
+      "requestAnalysis": "Solicitar análise Mutav",
+      "requesting": "Solicitando…",
+      "toastRequested": "Análise solicitada. A Mutav vai avaliar esta proposta.",
+      "errors": {
+        "NOT_FOUND": "Proposta não encontrada.",
+        "NOT_DRAFTED": "Esta proposta não é mais um rascunho.",
+        "NOT_EDITING": "A análise da Mutav já foi solicitada para esta proposta.",
+        "CREDIT_ASSESSMENT_REQUIRED": "A consulta de crédito do inquilino expirou. Refaça a consulta em uma nova proposta antes de solicitar a análise.",
+        "UNEXPECTED": "Erro inesperado. Tente novamente."
+      }
+    },
     "state": {
       "drafted": "Rascunho",
       "active": "Ativa",
@@ -410,6 +456,7 @@
       "eviction": "Despejo",
       "dispute_reversal": "Contestação revertida",
       "canceled_pre_activation": "Cancelada antes da ativação",
+      "underwriting_refused": "Recusada na análise Mutav",
       "death": "Falecimento"
     },
     "actions": {
@@ -911,13 +958,12 @@
     },
     "simulation": {
       "heading": "Resultado da Simulação",
-      "approvedValueLabel": "Valor locatício aprovado",
-      "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
-      "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
-      "closeButton": "Voltar ao início",
+      "approvedValueLabel": "Valor do aluguel",
       "noApplicationTitle": "Consulta de crédito não liberada",
       "noApplicationMessage": "A consulta ao birô só é liberada depois que a imobiliária registra a intenção de locação para este CPF/CNPJ. Volte à etapa 1, confira o CPF/CNPJ, o imóvel e o valor do aluguel e avance de novo para registrar.",
-      "noApplicationAction": "Voltar para a etapa 1"
+      "noApplicationAction": "Voltar para a etapa 1",
+      "inputMessage": "O score é um dos insumos da análise Mutav. Selecione a cobertura para continuar; a Mutav confirma a taxa ao aprovar.",
+      "lowScoreMessage": "Score do bureau baixo. Você ainda pode enviar a proposta: a Mutav decide considerando o score como um dos insumos. A taxa exibida é provisória."
     },
     "coverage": {
       "exitCoverage": "Cobertura de saída",
@@ -960,7 +1006,6 @@
       "errorToast": "Erro ao criar a garantia. Tente novamente.",
       "errors": {
         "INVALID_TAX_ID": "Documento do inquilino inválido (CPF/CNPJ). Verifique o número e tente novamente.",
-        "TENANT_DENIED": "O score de crédito do inquilino foi negado. Não é possível criar a garantia.",
         "INVALID_RENT": "Valores inválidos. O aluguel deve ser maior que zero.",
         "CREDIT_ASSESSMENT_REQUIRED": "A análise de crédito deste inquilino expirou. Refaça a consulta antes de criar a garantia.",
         "PRODUCT_UNAVAILABLE": "Nenhum produto de garantia disponível para esta imobiliária. Fale com a Mutav."
@@ -971,11 +1016,15 @@
       "cancelBlock": "Cancelar"
     },
     "success": {
-      "heading": "PROPOSTA DE GARANTIA CRIADA",
-      "subtitle": "A proposta foi enviada com sucesso e aguarda ativação pelo inquilino.",
-      "description": "A garantia será efetivada mediante o aceite dos termos e o pagamento da taxa de ativação pelo inquilino. A proposta foi enviada por e-mail e WhatsApp para o inquilino.",
+      "heading": "RASCUNHO DE GARANTIA CRIADO",
+      "subtitle": "O rascunho foi salvo. A Mutav analisa a proposta antes de qualquer envio ao inquilino.",
+      "description": "Solicite agora a análise da Mutav ou abra a garantia para revisá-la antes. Se a Mutav aprovar, ela define a taxa e o contrato é enviado ao inquilino para assinatura.",
       "viewGuarantee": "Ver garantia",
-      "createAnother": "Criar outra garantia"
+      "createAnother": "Criar outra garantia",
+      "requestedDescription": "Análise solicitada. Você será avisado por e-mail quando a Mutav decidir.",
+      "requestAnalysis": "Solicitar análise Mutav",
+      "requesting": "Solicitando…",
+      "requested": "Análise solicitada. A Mutav vai avaliar esta proposta."
     },
     "nav": {
       "back": "Voltar",

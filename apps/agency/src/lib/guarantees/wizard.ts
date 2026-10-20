@@ -300,13 +300,15 @@ export type CreditScoreRequestStatus = FunctionReturnType<
 export const SCORE_PANEL_STATE = {
   LOADING: "loading",
   NO_APPLICATION: "noApplication",
-  DENIED: "denied",
+  LOW_SCORE: "lowScore",
   SCORED: "scored",
 } as const;
 
 export type ScorePanelState = (typeof SCORE_PANEL_STATE)[keyof typeof SCORE_PANEL_STATE];
 
-const DENIED_SCORE_CEILING = 400;
+// Below the catalog's lowest priced tier. Not a refusal: the draft still
+// goes to Mutav, which decides with the score as one input (ADR 0009).
+const LOW_SCORE_CEILING = 400;
 
 /**
  * What step 2 shows for the current subject. `noApplication` is a real state,
@@ -331,8 +333,8 @@ export function resolveScorePanelState(input: {
     return SCORE_PANEL_STATE.LOADING;
   }
 
-  if (input.cachedScore !== null && input.cachedScore < DENIED_SCORE_CEILING) {
-    return SCORE_PANEL_STATE.DENIED;
+  if (input.cachedScore !== null && input.cachedScore < LOW_SCORE_CEILING) {
+    return SCORE_PANEL_STATE.LOW_SCORE;
   }
 
   return SCORE_PANEL_STATE.SCORED;

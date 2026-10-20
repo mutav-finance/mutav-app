@@ -147,7 +147,7 @@ describe("seedReset", () => {
     // active: 21 fictional + 26 filler + Aprovada's performing and renewed
     // lives. default_verified: Aprovada ×2 + Paulista. cover_committed:
     // Aprovada ×2 + Atlântica. in_eviction: Horizonte + Aprovada. drafted:
-    // 5 pendente + 1 Aprovada. closed: 2 encerrado + Aprovada's first term →
+    // 5 pendente + 3 Aprovada (editing, analysis_requested, awaiting_signature). closed: 2 encerrado + Aprovada's first term →
     // end_of_lease, 1 cancelado → canceled_pre_activation, and Aprovada's
     // reversed cover → dispute_reversal.
     expect(byState.counts).toEqual({
@@ -156,7 +156,7 @@ describe("seedReset", () => {
       default_verified: 3,
       cover_committed: 3,
       in_eviction: 2,
-      drafted: 6,
+      drafted: 8,
       closed: 5,
     });
     expect(byState.closedReasons).toEqual([
@@ -335,7 +335,7 @@ describe("seedReset", () => {
     });
 
     expect(probe.offProduct).toBe(0);
-    expect(probe.sample.underwriting).toEqual({ score: 750, tier: "regular" });
+    expect(probe.sample.underwriting).toEqual({ score: 750, tier: "regular", review: "signed" });
     expect(probe.leaseRentCents).toBe(320_000);
     // Literal expectations: the product's parameters applied to a R$ 3.200,00
     // rent at the regular tier on the basic plan — no prestamista premium.
@@ -353,6 +353,7 @@ describe("seedReset", () => {
       exitCostMultiplier: 6,
       coverageCeilingCents: 9_600_000,
       exitCostCapCents: 1_920_000,
+      feeRateBps: 1_200,
       // The snapshot is dated at activation, not at the tenant's term approval.
       // Seed timestamps are normalized to UTC so they compare against the
       // `Z`-form strings the runtime writes.
@@ -413,11 +414,11 @@ describe("seedReset", () => {
       };
     });
 
-    expect(audit.total).toBe(69);
+    expect(audit.total).toBe(71);
     expect(audit.activatedWithoutTimestamp).toEqual([]);
     expect(audit.neverActivatedWithTimestamp).toEqual([]);
-    // 6 drafts + the one canceled_pre_activation.
-    expect(audit.neverActivatedCount).toBe(7);
+    // 8 drafts + the one canceled_pre_activation.
+    expect(audit.neverActivatedCount).toBe(9);
   });
 
   test("capacity holds available + reserved = ceiling on every row, and the reserved leg matches the cover applied on the guarantee's resolved notice", async () => {
@@ -639,12 +640,12 @@ describe("seedReset", () => {
       return { total: leases.length, leasesWithOpen, violations };
     });
 
-    // One lease per seeded guarantee (58 fictional + 11 Aprovada) except the
+    // One lease per seeded guarantee (58 fictional + 13 Aprovada) except the
     // renewed Aprovada lease, which carries two. Four closed guarantees leave
     // their lease with a null pointer; the fifth's lease points at its
     // successor.
-    expect(audit.total).toBe(68);
-    expect(audit.leasesWithOpen).toBe(64);
+    expect(audit.total).toBe(70);
+    expect(audit.leasesWithOpen).toBe(66);
     expect(audit.violations).toEqual([]);
   });
 
@@ -686,6 +687,74 @@ describe("seedReset", () => {
         renewalAfterClose: true,
       },
     ]);
+  });
+
+  test("the agencyowner book carries one draft in Mutav's queue and one awaiting signature; every other draft is editing", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+    const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
+
+    const drafts = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) =>
+          q.eq("agencyId", aprovadaId).eq("status", GUARANTEE_STATE.DRAFTED),
+        )
+        .collect();
+      return rows
+        .map((row) => ({
+          publicId: row.publicId,
+          review: row.underwriting.review,
+          tier: row.underwriting.tier,
+          requested: row.underwriting.analysisRequest !== undefined,
+          decision: row.underwriting.decision?.outcome ?? null,
+          feeRateBps: row.terms.feeRateBps,
+          sent: row.underwriting.signatureRequest !== undefined,
+        }))
+        .sort((a, b) => a.publicId.localeCompare(b.publicId));
+    });
+
+    expect(drafts).toEqual([
+      {
+        publicId: "1000035",
+        review: "editing",
+        tier: "regular",
+        requested: false,
+        decision: null,
+        feeRateBps: 1_200,
+        sent: false,
+      },
+      {
+        publicId: "1000042",
+        review: "analysis_requested",
+        tier: "negado",
+        requested: true,
+        decision: null,
+        feeRateBps: 1_500,
+        sent: false,
+      },
+      {
+        publicId: "1000043",
+        review: "awaiting_signature",
+        tier: "ruim",
+        requested: true,
+        decision: "accepted",
+        feeRateBps: 1_300,
+        sent: true,
+      },
+    ]);
+
+    const otherDrafts = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("guarantees")
+        .withIndex("by_status", (q) => q.eq("status", GUARANTEE_STATE.DRAFTED))
+        .collect();
+      return rows
+        .filter((row) => row.agencyId !== aprovadaId)
+        .map((row) => row.underwriting.review);
+    });
+    expect(otherDrafts.length).toBeGreaterThan(0);
+    expect(new Set(otherDrafts)).toEqual(new Set(["editing"]));
   });
 
   test("registers tenants and links every seeded lease by tenantId", async () => {
@@ -934,8 +1003,8 @@ describe("seedReset", () => {
       guarantees: (await ctx.db.query("guarantees").collect()).length,
     }));
     expect(counts.products).toBe(1);
-    expect(counts.leases).toBe(68);
-    expect(counts.guarantees).toBe(69);
+    expect(counts.leases).toBe(70);
+    expect(counts.guarantees).toBe(71);
   });
 
   test("agencyowner's agency walks every one of the seven guarantee states", async () => {

@@ -26,6 +26,7 @@ import {
 } from "@/lib/guarantees/wizard";
 import { formatBRLCents } from "@mutav/i18n/brazil";
 import { priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
+import { provisionalPricingTier } from "@convex/guarantees/review";
 import type { PublicProduct } from "@convex/products/domain";
 import { PROPERTY_KIND } from "@convex/leases/domain";
 
@@ -48,7 +49,7 @@ export function WizardStep4({ data, agencyId, product, onChange, onComplete, onB
   const [missing, setMissing] = React.useState<MissingFields>(new Set());
   const [editing, setEditing] = React.useState<EditingState>(WIZARD_VIEWING);
 
-  const priceableTier = data.scoreTier && data.scoreTier !== "negado" ? data.scoreTier : null;
+  const priceableTier = data.scoreTier ? provisionalPricingTier(data.scoreTier) : null;
   // Client-side preview only — the stored `terms` snapshot is priced by
   // `guarantees.create` against the product the server resolves.
   const preview =

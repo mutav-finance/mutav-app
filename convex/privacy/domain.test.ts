@@ -301,6 +301,8 @@ describe("tier assignments agree with POL-SEC-004 §4.2", () => {
     "guaranteeDelinquencyNotices.updatedAmountCents",
     "guaranteeHistory.tenantSnapshot.contactCpf",
     "guaranteeHistory.tenantSnapshot.taxId",
+    "guarantees.terms.feeRateBps",
+    "guarantees.underwriting.decision.feeRateBps",
     "guarantees.underwriting.score",
     "guarantees.underwriting.tier",
     "invoices.accessToken",

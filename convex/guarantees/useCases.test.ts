@@ -912,7 +912,7 @@ describe("create (lease + drafted guarantee)", () => {
     expect(await t.run((ctx) => ctx.db.query("leases").collect())).toHaveLength(0);
   });
 
-  test("rejects a denied credit tier (negado) before any write", async () => {
+  test("a negado score is an input, not a refusal: the draft is created at editing, quoted at the ruim rate", async () => {
     const t = convexTest(schema);
     const { asUser, agencyId } = await setup(t);
     await seedFreshCreditAssessment(t, { agencyId, document: VALID_CPF, score: 200 });
@@ -922,13 +922,14 @@ describe("create (lease + drafted guarantee)", () => {
       ...createArgs(),
     });
 
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error.code).toBe("TENANT_DENIED");
-
-    expect(await t.run((ctx) => ctx.db.query("guarantees").collect())).toHaveLength(0);
-    expect(await t.run((ctx) => ctx.db.query("leases").collect())).toHaveLength(0);
-    expect(await t.run((ctx) => ctx.db.query("tenants").collect())).toHaveLength(0);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const [row] = await t.run((ctx) => ctx.db.query("guarantees").collect());
+    expect(row.status).toBe("drafted");
+    expect(row.underwriting.tier).toBe("negado");
+    expect(row.underwriting.score).toBe(200);
+    expect(row.underwriting.review).toBe("editing");
+    expect(row.terms.feeRateBps).toBe(1_500);
   });
 
   test("refuses when no enabled default product exists", async () => {

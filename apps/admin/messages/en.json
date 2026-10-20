@@ -33,6 +33,7 @@
       "overview": "Overview",
       "agencies": "Agencies",
       "compliance": "Compliance",
+      "underwriting": "Underwriting",
       "defaults": "Default requests",
       "treasury": "Treasury",
       "observability": "Observability",
@@ -268,6 +269,157 @@
         "notePlaceholder": "Anything the audit trail should carry",
         "confirm": "Mark executed"
       }
+    }
+  },
+  "underwriting": {
+    "title": "Underwriting",
+    "subtitle": "Drafts whose agency asked Mutav to analyse the tenant. Accept with a fee rate, or refuse with a reason.",
+    "notAvailable": "—",
+    "mockScore": "Mock score",
+    "daysWaiting": "{days, plural, =0 {today} one {# day} other {# days}}",
+    "queue": {
+      "heading": "Awaiting decision",
+      "empty": "No draft is waiting for Mutav's analysis.",
+      "moreAvailable": "More requests are waiting beyond this page."
+    },
+    "dispatch": {
+      "heading": "Accepted — contract to send",
+      "subtitle": "Send the contract to the tenant, then mark it sent here.",
+      "empty": "No accepted draft is waiting for its contract."
+    },
+    "columns": {
+      "guarantee": "Guarantee",
+      "agency": "Agency",
+      "tenant": "Tenant",
+      "rent": "Rent",
+      "score": "Bureau score",
+      "bureau": "Bureau",
+      "waiting": "Waiting",
+      "actions": "Actions"
+    },
+    "tier": {
+      "bom": "Good",
+      "regular": "Fair",
+      "ruim": "Poor",
+      "negado": "Below catalog"
+    },
+    "reviewStatus": {
+      "editing": "Draft",
+      "analysis_requested": "Analysis requested",
+      "accepted": "Accepted",
+      "awaiting_signature": "Awaiting signature",
+      "signed": "Signed",
+      "refused": "Refused"
+    },
+    "guaranteeState": {
+      "drafted": "Drafted",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "signalStatus": {
+      "ok": "ok",
+      "error": "error"
+    },
+    "propertyKind": {
+      "residential": "Residential",
+      "commercial": "Commercial"
+    },
+    "plan": {
+      "basic": "Mutav Fiança",
+      "plus": "Mutav Fiança +"
+    },
+    "actions": {
+      "open": "Open",
+      "accept": "Accept",
+      "refuse": "Refuse",
+      "markSent": "Mark contract sent",
+      "cancel": "Cancel",
+      "retry": "Try again"
+    },
+    "detail": {
+      "title": "Guarantee {id}",
+      "back": "← Underwriting queue",
+      "notFound": "Guarantee not found",
+      "decision": "Decision",
+      "credit": "Credit analysis",
+      "tenant": "Tenant",
+      "lease": "Lease",
+      "terms": "Terms on the table",
+      "history": "History",
+      "signals": "Bureau signals",
+      "scoreIsInput": "The bureau score is an input to this decision, not the decision.",
+      "sendHint": "There is no e-signature integration yet: send the contract to the tenant yourself, then mark it sent.",
+      "fields": {
+        "name": "Name",
+        "taxId": "CPF / CNPJ",
+        "email": "Email",
+        "phone": "Phone",
+        "propertyKind": "Property",
+        "address": "Address",
+        "rent": "Rent",
+        "totalRent": "Rent + charges",
+        "requestedAt": "Requested on",
+        "staffRate": "Rate set by Mutav",
+        "note": "Internal note",
+        "refusalReason": "Refusal reason",
+        "decidedBy": "Decided by",
+        "sentAt": "Contract sent on",
+        "provider": "Provider",
+        "assessedAt": "Assessed on",
+        "policyVersion": "Policy",
+        "product": "Product",
+        "plan": "Plan",
+        "feeRate": "Fee rate",
+        "fee": "Monthly fee",
+        "coverageCeiling": "Coverage ceiling",
+        "exitCostCap": "Exit-cost cap",
+        "activationFee": "Activation fee"
+      }
+    },
+    "accept": {
+      "title": "Accept this contract?",
+      "description": "Mutav takes this guarantee at the rate below. The terms are re-priced at that rate and the agency is notified.",
+      "rateLabel": "Fee rate (% of monthly rent)",
+      "rateHint": "Between {min}% and {max}%, up to two decimals.",
+      "noteLabel": "Internal note (optional)",
+      "notePlaceholder": "Not shown to the agency",
+      "confirm": "Accept"
+    },
+    "refuse": {
+      "title": "Refuse this contract?",
+      "description": "The draft is closed for good and the agency is notified with the reason. The agency may start a new proposal.",
+      "reasonLabel": "Reason (shown to the agency)",
+      "reasonPlaceholder": "Why Mutav will not take this contract",
+      "confirm": "Refuse"
+    },
+    "toast": {
+      "accepted": "Contract accepted. The agency was notified.",
+      "refused": "Contract refused. The draft is closed.",
+      "sent": "Marked as sent for signature."
+    },
+    "errors": {
+      "NOT_FOUND": "That guarantee no longer exists.",
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures do not add up. Escalate before deciding.",
+      "INVALID_FEE_RATE": "The rate must be between 1% and 30%.",
+      "TEXT_TOO_LONG": "The text is too long.",
+      "REFUSAL_REASON_REQUIRED": "Enter the reason for the refusal.",
+      "PRODUCT_UNAVAILABLE": "No product can price this draft. Check the catalog.",
+      "REVIEW_SELF_TRANSITION": "This decision was already recorded.",
+      "REVIEW_TERMINAL": "The review is already finished for this draft.",
+      "REVIEW_ILLEGAL_TRANSITION": "That step is not available at the draft's current review stage. Reload the page.",
+      "SELF_TRANSITION": "The guarantee is already in that state.",
+      "TERMINAL_STATE": "The guarantee is closed.",
+      "ILLEGAL_TRANSITION": "The guarantee's lifecycle refuses this move.",
+      "REASON_NOT_ALLOWED_FROM_STATE": "This close reason is not allowed from the guarantee's state.",
+      "CLOSURE_REQUIRED": "Closing a guarantee needs a close reason.",
+      "CLOSURE_NOT_ALLOWED": "A close reason was supplied for a move that does not close the guarantee.",
+      "FORBIDDEN": "Your staff role cannot perform this action.",
+      "unexpected": "Something went wrong. Please try again."
     }
   },
   "shellSwitcher": {

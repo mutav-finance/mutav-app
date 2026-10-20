@@ -46,6 +46,13 @@ export const AUDIT_ACTION = {
   GUARANTEE_REPRICED: "guarantee.repriced",
   GUARANTEE_CAPACITY_RESERVED: "guarantee.capacity_reserved",
   GUARANTEE_CAPACITY_RELEASED: "guarantee.capacity_released",
+  // guarantees/ underwriting review (emitted by convex/guarantees/reviewMutations.ts —
+  // the agency edits and requests analysis; staff accept, refuse, send for signature).
+  GUARANTEE_DRAFT_UPDATED: "guarantee.draft_updated",
+  GUARANTEE_ANALYSIS_REQUESTED: "guarantee.analysis_requested",
+  GUARANTEE_ANALYSIS_ACCEPTED: "guarantee.analysis_accepted",
+  GUARANTEE_ANALYSIS_REFUSED: "guarantee.analysis_refused",
+  GUARANTEE_SENT_FOR_SIGNATURE: "guarantee.sent_for_signature",
   // leases/ (current — emitted alongside guarantee creation).
   LEASE_CREATED: "lease.created",
   // payments/ (frozen wire values — historical rows only; never emitted by
@@ -100,6 +107,11 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.GUARANTEE_REPRICED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RESERVED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RELEASED),
+  v.literal(AUDIT_ACTION.GUARANTEE_DRAFT_UPDATED),
+  v.literal(AUDIT_ACTION.GUARANTEE_ANALYSIS_REQUESTED),
+  v.literal(AUDIT_ACTION.GUARANTEE_ANALYSIS_ACCEPTED),
+  v.literal(AUDIT_ACTION.GUARANTEE_ANALYSIS_REFUSED),
+  v.literal(AUDIT_ACTION.GUARANTEE_SENT_FOR_SIGNATURE),
   v.literal(AUDIT_ACTION.LEASE_CREATED),
   v.literal(AUDIT_ACTION.PAYMENT_BATCH_GENERATED),
   v.literal(AUDIT_ACTION.PAYMENT_MARKED_OVERDUE),

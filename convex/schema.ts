@@ -28,14 +28,25 @@ const closeReason = v.union(
   v.literal("eviction"),
   v.literal("dispute_reversal"),
   v.literal("canceled_pre_activation"),
+  v.literal("underwriting_refused"),
   v.literal("death"),
 );
 
 // Canonical `SCORE_TIER` lives in `convex/guarantees/domain.ts`. `negado` is
-// deliberately absent from the priceable set: a denied tenant is rejected
-// before pricing, so no product carries a rate for it.
+// deliberately absent from the priceable set: no product carries a rate for
+// it — a `negado` draft is quoted provisionally and priced by compliance.
 const priceableTier = v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"));
 const scoreTier = v.union(priceableTier, v.literal("negado"));
+
+// Canonical `REVIEW_STATUS` lives in `convex/guarantees/review.ts`.
+const reviewStatus = v.union(
+  v.literal("editing"),
+  v.literal("analysis_requested"),
+  v.literal("accepted"),
+  v.literal("awaiting_signature"),
+  v.literal("signed"),
+  v.literal("refused"),
+);
 
 const documentStatus = v.union(v.literal("pendente"), v.literal("enviado"), v.literal("aprovado"));
 
@@ -444,12 +455,47 @@ export default defineSchema(
       ),
       activatedAt: v.union(v.string(), v.null()),
       nextRenewalDate: v.string(),
-      // Creation-time underwriting snapshot. The living score is the
-      // creditAnalysis domain's, keyed by document.
+      // Creation-time underwriting snapshot plus Mutav's review of the draft.
+      // The living score is the creditAnalysis domain's, keyed by document;
+      // the score here is an INPUT to the review, not its verdict. `review`
+      // is a sub-status inside `drafted` (canonical value object and moves:
+      // `convex/guarantees/review.ts`, ADR 0009).
       underwriting: v.object({
         score: v.number(),
         tier: scoreTier,
         assessmentId: v.optional(v.id("creditAnalysisAssessments")),
+        review: reviewStatus,
+        analysisRequest: v.optional(
+          v.object({
+            requestedAt: v.string(),
+            requestedBy: v.id("users"),
+          }),
+        ),
+        decision: v.optional(
+          v.union(
+            v.object({
+              outcome: v.literal("accepted"),
+              // The guarantee-fee rate compliance set, in basis points of
+              // monthly rent. Also snapshotted as `terms.feeRateBps`.
+              feeRateBps: v.number(),
+              note: v.optional(v.string()),
+              decidedAt: v.string(),
+              decidedBy: v.id("users"),
+            }),
+            v.object({
+              outcome: v.literal("refused"),
+              reason: v.string(),
+              decidedAt: v.string(),
+              decidedBy: v.id("users"),
+            }),
+          ),
+        ),
+        signatureRequest: v.optional(
+          v.object({
+            sentAt: v.string(),
+            sentBy: v.id("users"),
+          }),
+        ),
       }),
       // Per-guarantee relationship state — approval belongs to a guarantee,
       // not to the person.
@@ -474,6 +520,9 @@ export default defineSchema(
         exitCostMultiplier: v.number(),
         coverageCeilingCents: v.number(),
         exitCostCapCents: v.number(),
+        // The rate `taxaFeeCents` was priced at, in basis points of rent: the
+        // product's tier rate on a draft, the compliance-set rate once accepted.
+        feeRateBps: v.number(),
         appliedAt: v.string(),
       }),
       capacity: v.object({
@@ -493,7 +542,14 @@ export default defineSchema(
       .index("by_agency_status", ["agencyId", "status"])
       .index("by_agency_status_nextRenewalDate", ["agencyId", "status", "nextRenewalDate"])
       .index("by_lease", ["leaseId"])
-      .index("by_product", ["productId"]),
+      .index("by_product", ["productId"])
+      // Mutav's underwriting queue: drafts awaiting a decision, oldest request
+      // first. `status` is in the key so a draft canceled mid-review drops out.
+      .index("by_review_status_requestedAt", [
+        "underwriting.review",
+        "status",
+        "underwriting.analysisRequest.requestedAt",
+      ]),
 
     // Guarantee products — pricing parameters as data: they vary by agency /
     // region / tenant score and become admin-adjustable. Each guarantee

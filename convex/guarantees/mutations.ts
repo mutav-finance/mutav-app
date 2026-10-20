@@ -9,13 +9,13 @@ import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { resolveProduct } from "../products/useCases";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import { priceGuarantee } from "./pricing";
+import { provisionalPricingTier } from "./review";
 import {
   CLOSE_REASON,
   closeReasonValidator,
   GUARANTEE_ERROR_CODE,
   GUARANTEE_STATE,
   guaranteePlanValidator,
-  SCORE_TIER,
   type Guarantee,
   type GuaranteeCapacity,
 } from "./domain";
@@ -288,7 +288,6 @@ type RepriceErrorResult = {
     | typeof GUARANTEE_ERROR_CODE.GUARANTEE_CLOSED
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENT
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENEWAL_DATE
-    | typeof GUARANTEE_ERROR_CODE.TENANT_DENIED
     | typeof PRODUCT_ERROR_CODE.PRODUCT_UNAVAILABLE;
 };
 
@@ -346,14 +345,11 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
       };
     }
 
-    const tier = guarantee.underwriting.tier;
-    if (tier === SCORE_TIER.NEGADO) {
-      return {
-        success: false,
-        error: { code: GUARANTEE_ERROR_CODE.TENANT_DENIED },
-        message: "A denied credit tier carries no rate and cannot be priced",
-      };
-    }
+    // A rate compliance set on acceptance survives the reajuste: it was a
+    // decision about this tenant, and the catalog's tier rate is not.
+    const tier = provisionalPricingTier(guarantee.underwriting.tier);
+    const decision = guarantee.underwriting.decision;
+    const staffFeeRateBps = decision?.outcome === "accepted" ? decision.feeRateBps : undefined;
 
     const lease = await ctx.db.get(guarantee.leaseId);
     if (!lease) throw new Error(`Guarantee ${guarantee.publicId} points at a missing lease`);
@@ -383,6 +379,7 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
         plan: args.plan ?? guarantee.terms.plan,
         productSlug: product.slug,
         appliedAt: at,
+        ...(staffFeeRateBps === undefined ? {} : { staffFeeRateBps }),
       },
       product.terms,
     );

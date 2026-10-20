@@ -106,6 +106,7 @@ export const CLOSE_REASON = {
   EVICTION: "eviction",
   DISPUTE_REVERSAL: "dispute_reversal",
   CANCELED_PRE_ACTIVATION: "canceled_pre_activation",
+  UNDERWRITING_REFUSED: "underwriting_refused",
   DEATH: "death",
 } as const;
 
@@ -118,6 +119,7 @@ export const CLOSE_REASONS: readonly CloseReason[] = [
   CLOSE_REASON.EVICTION,
   CLOSE_REASON.DISPUTE_REVERSAL,
   CLOSE_REASON.CANCELED_PRE_ACTIVATION,
+  CLOSE_REASON.UNDERWRITING_REFUSED,
   CLOSE_REASON.DEATH,
 ] as const;
 
@@ -128,12 +130,14 @@ export const closeReasonValidator = v.union(
   v.literal(CLOSE_REASON.EVICTION),
   v.literal(CLOSE_REASON.DISPUTE_REVERSAL),
   v.literal(CLOSE_REASON.CANCELED_PRE_ACTIVATION),
+  v.literal(CLOSE_REASON.UNDERWRITING_REFUSED),
   v.literal(CLOSE_REASON.DEATH),
 );
 
 /**
- * A draft is canceled, never ended: the lease-ending reasons exclude `drafted`
- * on purpose, and `canceled_pre_activation` is the only way out of it.
+ * A draft is canceled or refused, never ended: the lease-ending reasons exclude
+ * `drafted` on purpose. `canceled_pre_activation` is the agency (or staff)
+ * withdrawing it; `underwriting_refused` is Mutav declining to take it on.
  */
 const ENDED_FROM_ANY_ACTIVATED_STATE: readonly GuaranteeState[] = [
   GUARANTEE_STATE.ACTIVE,
@@ -151,6 +155,7 @@ export const CLOSE_REASON_ALLOWED_FROM: Readonly<Record<CloseReason, readonly Gu
   eviction: [GUARANTEE_STATE.IN_EVICTION],
   dispute_reversal: [GUARANTEE_STATE.DEFAULT_VERIFIED, GUARANTEE_STATE.COVER_COMMITTED],
   canceled_pre_activation: [GUARANTEE_STATE.DRAFTED],
+  underwriting_refused: [GUARANTEE_STATE.DRAFTED],
 } as const;
 
 export type CloseError = { code: "TERMINAL_STATE" } | { code: "REASON_NOT_ALLOWED_FROM_STATE" };

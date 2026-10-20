@@ -212,7 +212,7 @@ describe("resolveScorePanelState", () => {
   });
 
   test("denies below the 400 threshold and scores at or above it", () => {
-    expect(resolveScorePanelState({ ...BOUND_AND_SCORED, cachedScore: 399 })).toBe("denied");
+    expect(resolveScorePanelState({ ...BOUND_AND_SCORED, cachedScore: 399 })).toBe("lowScore");
     expect(resolveScorePanelState({ ...BOUND_AND_SCORED, cachedScore: 400 })).toBe("scored");
   });
 
