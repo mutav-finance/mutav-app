@@ -474,6 +474,53 @@
         "plus": "Mutav Fiança +"
       }
     },
+    "signedContract": {
+      "heading": "Signed contract",
+      "help": "The guarantee contract is signed outside the platform: download the template, collect the signatures and upload the signed PDF here. The guarantee can only be activated once the signed contract is attached.",
+      "constraints": "PDF only, up to 10 MB.",
+      "upload": "Upload signed contract",
+      "replace": "Replace",
+      "uploading": "Uploading…",
+      "download": "Download",
+      "downloadTemplate": "Download template",
+      "loading": "Loading contract",
+      "uploadedBy": "Uploaded by {who} on {when}",
+      "uploaderKind": {
+        "agency": "Agency",
+        "staff": "MUTAV team"
+      },
+      "noneOnFile": "No signed contract attached.",
+      "locked": "Guarantee active: the contract is locked.",
+      "uploaded": "Signed contract uploaded.",
+      "replaced": "Signed contract replaced.",
+      "activated": "Guarantee activated.",
+      "activate": "Activate guarantee",
+      "activateHint": "Puts the guarantee in force",
+      "activateDisabledHint": "Upload the signed contract to activate",
+      "activateDialog": {
+        "title": "Activate guarantee?",
+        "description": "The guarantee goes into force and the signed contract is locked. This cannot be undone.",
+        "confirm": "Yes, activate",
+        "activating": "Activating…",
+        "back": "Back"
+      },
+      "errors": {
+        "NOT_FOUND": "Guarantee not found.",
+        "SIGNED_CONTRACT_LOCKED": "The contract can no longer be changed: the guarantee is already active.",
+        "SIGNED_CONTRACT_REQUIRED": "Upload the signed contract before activating the guarantee.",
+        "FILE_NOT_FOUND": "The uploaded file was not found. Please try again.",
+        "FILE_ALREADY_ATTACHED": "This file is already attached to a guarantee.",
+        "INVALID_FILE_TYPE": "Upload the contract as a PDF.",
+        "FILE_TOO_LARGE": "The PDF must be 10 MB or smaller.",
+        "INVALID_FILE_NAME": "Invalid file name. Rename the PDF and try again.",
+        "UPLOAD_FAILED": "The file could not be uploaded. Please try again.",
+        "CAPACITY_INVARIANT_BROKEN": "This guarantee's coverage is inconsistent. Contact MUTAV.",
+        "SELF_TRANSITION": "This guarantee is already active.",
+        "ILLEGAL_TRANSITION": "This guarantee cannot be activated in its current state.",
+        "TERMINAL_STATE": "This guarantee is closed.",
+        "UNEXPECTED": "Unexpected error. Please try again."
+      }
+    },
     "documents": {
       "heading": "Documents",
       "send": "Upload",

@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { Preloaded } from "convex/react";
 import type { api } from "@convex/_generated/api";
 import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
+import { Link } from "@mutav/i18n/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
@@ -141,7 +142,12 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
       <TableCell>{row.tenantName ?? t("notAvailable")}</TableCell>
       <TableCell>
         <div className="flex flex-col gap-1">
-          <Mono>{row.guaranteePublicId}</Mono>
+          <Link
+            href={`/guarantees/${encodeURIComponent(row.guaranteePublicId)}`}
+            className="hover:text-primary underline-offset-4 hover:underline"
+          >
+            <Mono>{row.guaranteePublicId}</Mono>
+          </Link>
           <GuaranteeStateTag state={row.guaranteeState}>
             {t(`guaranteeState.${row.guaranteeState}`)}
           </GuaranteeStateTag>
