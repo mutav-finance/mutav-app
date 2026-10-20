@@ -1,16 +1,20 @@
 import { v } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
+import { internal } from "../_generated/api";
 import type { Result } from "../lib/result";
 import { mutationWithActiveAgency, mutationWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
-import type { AgencyId } from "../agencies/domain";
+import { ONBOARDING_STATE, type AgencyId } from "../agencies/domain";
 import { ufFromCityUF } from "../leases/domain";
 import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { resolveProduct } from "../products/useCases";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import { priceGuarantee } from "./pricing";
-import { provisionalPricingTier } from "./review";
+import { activationBlockers, provisionalPricingTier, type ActivationBlocker } from "./review";
+import { hasApprovedSignedContract } from "./documents";
+import { decisionRecipients } from "./reviewMutations";
 import {
+  ACTIVATION_FEE_STATUS,
   CLOSE_REASON,
   closeReasonValidator,
   GUARANTEE_ERROR_CODE,
@@ -33,10 +37,10 @@ import {
  * rewrite, the history row and the audit entry — no mutation in this file
  * patches `status` itself.
  *
- * Wrappers follow the authority model: an agency may activate the guarantee it
- * sold and close it when its lease ends; every other terminal or adversarial
- * move (an arbitrary close reason, eviction, a new price) is Mutav compliance
- * staff. `cancelDraft` stays in `useCases.ts` — the agency UI binds to it
+ * Wrappers follow the authority model: an agency may close the guarantee it
+ * sold when its lease ends; activation and every other terminal or
+ * adversarial move (an arbitrary close reason, eviction, a new price) is Mutav
+ * compliance staff. `cancelDraft` stays in `useCases.ts` — the agency UI binds to it
  * there — and composes the same helper.
  */
 
@@ -81,56 +85,130 @@ const notFound = (publicId: string) => ({
 });
 
 // ---------------------------------------------------------------------------
-// activate — drafted → active, agency
+// staffActivate — drafted → active, compliance staff
 // ---------------------------------------------------------------------------
 
-type ActivateSuccessResult = { publicId: string; capacity: GuaranteeCapacity };
-type ActivateErrorResult = {
-  code: typeof GUARANTEE_ERROR_CODE.NOT_FOUND | TransitionErrorCode;
+type PutOnRiskSuccess = { guarantee: Guarantee };
+type PutOnRiskError = {
+  code: typeof GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN | TransitionErrorCode;
 };
 
 /**
  * Put a sold guarantee on risk. Capacity is (re)initialized from the `terms`
  * snapshot at this moment — a draft can carry no reservation (nothing can
  * default before cover starts), so the full ceiling is available and the
- * ceiling the guarantee runs on is the one it was priced under.
+ * ceiling the guarantee runs on is the one it was priced under. The one-time
+ * activation fee is marked for the next monthly invoice in the same write.
  */
-export const activate = mutationWithActiveAgency({
+async function putDraftOnRisk(
+  ctx: MutationCtx,
+  { guarantee, actor }: { guarantee: Guarantee; actor: GuaranteeActor },
+): Promise<Result<PutOnRiskSuccess, PutOnRiskError>> {
+  // Nothing can have drawn cover before the guarantee went on risk, so a
+  // reservation on a draft is drift rather than history. Refuse it — writing
+  // the fresh capacity over it would silently destroy the reserved cents,
+  // the same drift `reserveCoverCapacity` refuses instead of repairing.
+  if (guarantee.capacity.reservedCents !== 0) {
+    return {
+      success: false,
+      error: { code: GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN },
+      message: `Guarantee ${guarantee.publicId} carries ${guarantee.capacity.reservedCents} reserved cents before activation`,
+    };
+  }
+
+  const ceilingCents = guarantee.terms.coverageCeilingCents;
+  const applied = await applyGuaranteeTransition(ctx, {
+    guarantee,
+    to: GUARANTEE_STATE.ACTIVE,
+    capacity: { ceilingCents, availableCents: ceilingCents, reservedCents: 0 },
+    actor,
+    message: "Garantia ativada",
+  });
+  if (!applied.success) {
+    return { success: false, error: { code: applied.error.code }, message: applied.message };
+  }
+
+  if (guarantee.terms.oneTimeActivationFeeCents > 0) {
+    await ctx.db.patch(guarantee._id, { activationFee: { status: ACTIVATION_FEE_STATUS.PENDING } });
+  }
+  const after = await ctx.db.get(guarantee._id);
+  if (!after) throw new Error("Guarantee row vanished mid-transaction");
+
+  return {
+    success: true,
+    data: { guarantee: after },
+    message: `Guarantee ${guarantee.publicId} activated`,
+  };
+}
+
+type StaffActivateSuccessResult = { publicId: string; capacity: GuaranteeCapacity };
+type StaffActivateErrorResult = {
+  code: typeof GUARANTEE_ERROR_CODE.NOT_FOUND | ActivationBlocker | PutOnRiskError["code"];
+};
+
+/**
+ * Mutav registers the signed contract and activates the guarantee. Staff-only:
+ * going on risk is Mutav's decision, not the agency's. Every precondition is
+ * checked before the first write — the draft's review is `signed`, a signed
+ * rental contract has been approved, and the agency is still active — and
+ * each refusal has its own code (`activationBlockers`).
+ */
+export const staffActivate = mutationWithMutavRole({ minRole: "compliance" })({
   args: { publicId: v.string() },
-  handler: async (ctx, args): Promise<Result<ActivateSuccessResult, ActivateErrorResult>> => {
-    const guarantee = await findAgencyGuarantee(ctx, {
-      publicId: args.publicId,
-      agencyId: ctx.agencyId,
-    });
+  handler: async (
+    ctx,
+    args,
+  ): Promise<Result<StaffActivateSuccessResult, StaffActivateErrorResult>> => {
+    const guarantee = await findGuaranteeByPublicId(ctx, args.publicId);
     if (!guarantee) return notFound(args.publicId);
 
-    // Nothing can have drawn cover before the guarantee went on risk, so a
-    // reservation on a draft is drift rather than history. Refuse it — writing
-    // the fresh capacity over it would silently destroy the reserved cents,
-    // the same drift `reserveCoverCapacity` refuses instead of repairing.
-    if (guarantee.capacity.reservedCents !== 0) {
+    const agency = await ctx.db.get(guarantee.agencyId);
+    const blockers = activationBlockers({
+      status: guarantee.status,
+      review: guarantee.underwriting.review,
+      signedContractApproved: await hasApprovedSignedContract(ctx, guarantee._id),
+      agencyActive: agency?.onboardingState === ONBOARDING_STATE.ACTIVE,
+    });
+    const blocker = blockers[0];
+    if (blocker !== undefined) {
       return {
         success: false,
-        error: { code: GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN },
-        message: `Guarantee ${guarantee.publicId} carries ${guarantee.capacity.reservedCents} reserved cents before activation`,
+        error: { code: blocker },
+        message: `Guarantee ${guarantee.publicId} cannot be activated: ${blockers.join(", ")}`,
       };
     }
 
-    const ceilingCents = guarantee.terms.coverageCeilingCents;
-    const applied = await applyGuaranteeTransition(ctx, {
-      guarantee,
-      to: GUARANTEE_STATE.ACTIVE,
-      capacity: { ceilingCents, availableCents: ceilingCents, reservedCents: 0 },
-      actor: actorFrom(ctx.user),
-      message: "Garantia ativada",
+    const activated = await putDraftOnRisk(ctx, { guarantee, actor: actorFrom(ctx.user) });
+    if (!activated.success) return activated;
+    const after = activated.data.guarantee;
+
+    await ctx.appendStaffAudit({
+      action: AUDIT_ACTION.GUARANTEE_ACTIVATED,
+      resourceType: "guarantees",
+      resourceId: guarantee.publicId,
+      payload: {
+        guaranteeId: guarantee._id,
+        agencyId: guarantee.agencyId,
+        review: guarantee.underwriting.review,
+        signedContractApproved: true,
+        capacity: after.capacity,
+        activatedAt: after.activatedAt,
+        activationFeeCents: guarantee.terms.oneTimeActivationFeeCents,
+      },
     });
-    if (!applied.success) {
-      return { success: false, error: { code: applied.error.code }, message: applied.message };
-    }
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.guarantees.actions.sendGuaranteeActivatedNotification,
+      {
+        publicId: guarantee.publicId,
+        recipients: await decisionRecipients(ctx, guarantee),
+      },
+    );
 
     return {
       success: true,
-      data: { publicId: guarantee.publicId, capacity: applied.data.guarantee.capacity },
+      data: { publicId: guarantee.publicId, capacity: after.capacity },
       message: `Guarantee ${guarantee.publicId} activated`,
     };
   },
@@ -306,8 +384,8 @@ function isCalendarDate(value: string): boolean {
  * Money rule: `capacity` is not touched at all. The coverage a guarantee runs
  * on is the one it was activated under, and a reajuste must not silently move
  * how much Mutav is on risk for on an in-force guarantee. The new ceiling lives
- * in `terms.coverageCeilingCents`; `activate` reads it from there, so a draft
- * repriced before it goes on risk still starts on the new figure.
+ * in `terms.coverageCeilingCents`; `staffActivate` reads it from there, so a
+ * draft repriced before it goes on risk still starts on the new figure.
  */
 export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
   args: {

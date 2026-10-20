@@ -7,6 +7,16 @@ export type Guarantee = Doc<"guarantees">;
 export type GuaranteeId = Id<"guarantees">;
 export type GuaranteeTerms = Guarantee["terms"];
 export type GuaranteeCapacity = Guarantee["capacity"];
+export type ActivationFeeBilling = NonNullable<Guarantee["activationFee"]>;
+
+/** Billing marker of the one-time activation fee (`guarantees.activationFee`). */
+export const ACTIVATION_FEE_STATUS = {
+  PENDING: "pending",
+  INVOICED: "invoiced",
+} as const satisfies Record<
+  Uppercase<ActivationFeeBilling["status"]>,
+  ActivationFeeBilling["status"]
+>;
 export type GuaranteeClosure = NonNullable<Guarantee["closure"]>;
 export type GuaranteeUnderwriting = Guarantee["underwriting"];
 export type GuaranteeReviewDecision = NonNullable<GuaranteeUnderwriting["decision"]>;
@@ -353,6 +363,38 @@ export function isSignedContractApproved(
       document.key === DOCUMENT_KEY.RENTAL_CONTRACT &&
       document.status === GUARANTEE_DOCUMENT_STATUS.APPROVED,
   );
+}
+
+export const SIGNED_CONTRACT_STATUS = {
+  APPROVED: "approved",
+  PENDING_REVIEW: "pending_review",
+  REJECTED: "rejected",
+  MISSING: "missing",
+} as const;
+
+export type SignedContractStatus =
+  (typeof SIGNED_CONTRACT_STATUS)[keyof typeof SIGNED_CONTRACT_STATUS];
+
+/**
+ * One word for the state of a guarantee's signed rental contract, for the
+ * staff activation screens: `approved` as soon as any file was approved (the
+ * activation gate, `isSignedContractApproved`), otherwise the status of the
+ * newest live upload, otherwise `missing`. Expects newest-first rows.
+ */
+export function signedContractStatus(
+  newestFirst: readonly Pick<GuaranteeDocument, "key" | "status">[],
+): SignedContractStatus {
+  if (isSignedContractApproved(newestFirst)) return SIGNED_CONTRACT_STATUS.APPROVED;
+  const latest = newestFirst.find(
+    (document) =>
+      document.key === DOCUMENT_KEY.RENTAL_CONTRACT &&
+      document.status !== GUARANTEE_DOCUMENT_STATUS.SUPERSEDED,
+  );
+  if (latest?.status === GUARANTEE_DOCUMENT_STATUS.PENDING_REVIEW) {
+    return SIGNED_CONTRACT_STATUS.PENDING_REVIEW;
+  }
+  if (latest?.status === GUARANTEE_DOCUMENT_STATUS.REJECTED) return SIGNED_CONTRACT_STATUS.REJECTED;
+  return SIGNED_CONTRACT_STATUS.MISSING;
 }
 
 export const TENANT_APPROVAL_STATUS = {

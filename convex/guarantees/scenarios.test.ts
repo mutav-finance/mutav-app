@@ -493,13 +493,17 @@ describe("schema conformance — strict harness", () => {
       expect(declared).toEqual([...CLOSE_REASONS]);
     });
 
-    test("declares exactly the seven guarantee indexes with their field lists", () => {
+    test("declares exactly the eight guarantee indexes with their field lists", () => {
       const indexes = schema.tables.guarantees[" indexes"]();
 
       expect(indexes).toEqual([
         { indexDescriptor: "by_publicId", fields: ["publicId"] },
         { indexDescriptor: "by_status", fields: ["status"] },
         { indexDescriptor: "by_agency_status", fields: ["agencyId", "status"] },
+        {
+          indexDescriptor: "by_agency_activationFeeStatus",
+          fields: ["agencyId", "activationFee.status"],
+        },
         {
           indexDescriptor: "by_agency_status_nextRenewalDate",
           fields: ["agencyId", "status", "nextRenewalDate"],

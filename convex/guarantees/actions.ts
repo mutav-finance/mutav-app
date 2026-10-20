@@ -74,6 +74,39 @@ export const sendReviewDecisionNotification = internalAction({
   },
 });
 
+/**
+ * Tells the agency Mutav activated its guarantee. Scheduled by `staffActivate`
+ * after the activation is committed, so a delivery failure never rolls it
+ * back. Skipped, with a warning, when Resend is not configured. Carries only
+ * the guarantee id — no tenant identity, no figures.
+ */
+export const sendGuaranteeActivatedNotification = internalAction({
+  args: { publicId: v.string(), recipients: v.array(v.string()) },
+  handler: async (_ctx, args) => {
+    const apiKey = getOptionalResendApiKey();
+    if (!apiKey) {
+      logWarn("[notifications] RESEND_API_KEY not set, skipping activation email");
+      return;
+    }
+    if (args.recipients.length === 0) {
+      logWarn("[notifications] activation has no recipient", { publicId: args.publicId });
+      return;
+    }
+    const link = `${getAppUrl()}/guarantees/${encodeURIComponent(args.publicId)}`;
+    const publicId = escapeHtml(args.publicId);
+    try {
+      await new Resend(apiKey).emails.send({
+        from: getResendFromEmail(),
+        to: args.recipients,
+        subject: `Garantia ativada — ${args.publicId}`,
+        html: `<!DOCTYPE html><html lang="pt-BR"><body style="font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.6;"><p>A Mutav registrou o contrato assinado e ativou a garantia <strong>${publicId}</strong>.</p><p>A garantia está em vigor a partir de hoje. A taxa de ativação entra na próxima fatura mensal.</p><p><a href="${link}">Ver garantia</a></p><p style="color:#9e9c98;font-size:12px;">MUTAV · e-mail automático.</p></body></html>`,
+      });
+    } catch (error) {
+      logError("[notifications] activation email rejected", { reason: error });
+    }
+  },
+});
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 type NotificationArgs = {

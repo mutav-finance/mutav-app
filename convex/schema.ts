@@ -538,10 +538,28 @@ export default defineSchema(
         availableCents: v.number(),
         reservedCents: v.number(),
       }),
+      // The one-time activation fee's billing marker. `staffActivate` sets it
+      // `pending`; the first monthly billing run after activation puts the fee
+      // on that invoice and flips it to `invoiced`, so the fee is billed once
+      // whatever day of the month the guarantee went on risk. Absent on a
+      // draft and on rows the seed inserts already active.
+      activationFee: v.optional(
+        v.union(
+          v.object({ status: v.literal("pending") }),
+          v.object({
+            status: v.literal("invoiced"),
+            invoiceId: v.id("invoices"),
+            invoicedAt: v.string(),
+          }),
+        ),
+      ),
     })
       .index("by_publicId", ["publicId"])
       .index("by_status", ["status"])
       .index("by_agency_status", ["agencyId", "status"])
+      // Monthly billing: one agency's guarantees whose activation fee is
+      // still to be invoiced.
+      .index("by_agency_activationFeeStatus", ["agencyId", "activationFee.status"])
       .index("by_agency_status_nextRenewalDate", ["agencyId", "status", "nextRenewalDate"])
       .index("by_lease", ["leaseId"])
       .index("by_product", ["productId"])

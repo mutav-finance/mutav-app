@@ -18,8 +18,6 @@ import schema from "../schema";
 type T = TestConvex<typeof schema>;
 
 const RENT_CENTS = 100_000;
-// 30x the fixture rent under `DEFAULT_PRICING_TABLE`.
-const CEILING_CENTS = 3_000_000;
 
 function setup(): T {
   const t = convexTest(schema);
@@ -93,90 +91,6 @@ async function seedGuarantee(
     publicId,
   );
 }
-
-describe("guarantees.activate", () => {
-  let t: T;
-  let fx: Fixture;
-
-  beforeEach(async () => {
-    t = setup();
-    fx = await makeFixture(t, "1");
-  });
-
-  test("moves a draft on risk and initializes capacity from the terms snapshot", async () => {
-    const { guaranteeId } = await seedGuarantee(t, fx, "A1", GUARANTEE_STATE.DRAFTED);
-    const asUser = t.withIdentity({ subject: fx.subject });
-
-    const result = await asUser.mutation(api.guarantees.mutations.activate, {
-      agencyId: fx.agencyId,
-      publicId: "A1",
-    });
-
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-    expect(result.data.capacity).toEqual({
-      ceilingCents: CEILING_CENTS,
-      availableCents: CEILING_CENTS,
-      reservedCents: 0,
-    });
-
-    const after = await readGuarantee(t, guaranteeId);
-    expect(after.status).toBe(GUARANTEE_STATE.ACTIVE);
-    expect(after.activatedAt).not.toBeNull();
-    expect(after.capacity.ceilingCents).toBe(after.terms.coverageCeilingCents);
-  });
-
-  test("refuses to activate a guarantee that is already in force", async () => {
-    const { guaranteeId } = await seedGuarantee(t, fx, "A2", GUARANTEE_STATE.ACTIVE);
-    const asUser = t.withIdentity({ subject: fx.subject });
-
-    const result = await asUser.mutation(api.guarantees.mutations.activate, {
-      agencyId: fx.agencyId,
-      publicId: "A2",
-    });
-
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error.code).toBe("SELF_TRANSITION");
-    expect((await readGuarantee(t, guaranteeId)).status).toBe(GUARANTEE_STATE.ACTIVE);
-  });
-
-  test("refuses a draft that somehow carries reserved cents instead of zeroing them", async () => {
-    const { guaranteeId } = await seedGuarantee(t, fx, "A4", GUARANTEE_STATE.DRAFTED, {
-      availableCents: 2_000_000,
-    });
-    const before = await readGuarantee(t, guaranteeId);
-    expect(before.capacity.reservedCents).toBe(1_000_000);
-    const asUser = t.withIdentity({ subject: fx.subject });
-
-    const result = await asUser.mutation(api.guarantees.mutations.activate, {
-      agencyId: fx.agencyId,
-      publicId: "A4",
-    });
-
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error.code).toBe("CAPACITY_INVARIANT_BROKEN");
-    const after = await readGuarantee(t, guaranteeId);
-    expect(after.status).toBe(GUARANTEE_STATE.DRAFTED);
-    expect(after.capacity).toEqual(before.capacity);
-  });
-
-  test("returns NOT_FOUND for another agency's draft without revealing it", async () => {
-    const other = await makeFixture(t, "2");
-    await seedGuarantee(t, other, "A3", GUARANTEE_STATE.DRAFTED);
-    const asUser = t.withIdentity({ subject: fx.subject });
-
-    const result = await asUser.mutation(api.guarantees.mutations.activate, {
-      agencyId: fx.agencyId,
-      publicId: "A3",
-    });
-
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error.code).toBe("NOT_FOUND");
-  });
-});
 
 describe("guarantees.closeEndOfLease", () => {
   let t: T;

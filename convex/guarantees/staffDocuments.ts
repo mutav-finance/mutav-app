@@ -3,14 +3,16 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Result } from "../lib/result";
 import { mutationWithMutavRole, queryWithMutavRole } from "../lib/auth";
-import { AUDIT_ACTION } from "../audit/domain";
+import { AUDIT_ACTION, type AppendAuditEntryInput } from "../audit/domain";
 import type { AgencyId } from "../agencies/domain";
 import type { UserId } from "../users/domain";
 import {
+  DOCUMENT_KEY,
   GUARANTEE_DOCUMENT_ERROR_CODE,
   GUARANTEE_DOCUMENT_MAX_REJECTION_REASON_LENGTH,
   GUARANTEE_DOCUMENT_STATUS,
   GUARANTEE_DOCUMENT_UPLOADER_KIND,
+  GUARANTEE_STATE,
   documentKeyValidator,
   type Guarantee,
   type GuaranteeDocument,
@@ -26,6 +28,7 @@ import {
   type GenerateGuaranteeDocumentUploadUrlErrorResult,
   type GenerateGuaranteeDocumentUploadUrlSuccessResult,
 } from "./documents";
+import { assertReviewTransition, REVIEW_STATUS } from "./review";
 
 // Role split: `support` handles the paperwork (attaches and reads documents
 // for an agency that emailed them in); deciding whether a contract is
@@ -156,6 +159,10 @@ type ReviewGuaranteeDocumentSuccessResult = {
 type ReviewGuaranteeDocumentErrorCode =
   | typeof GUARANTEE_DOCUMENT_ERROR_CODE.DOCUMENT_NOT_FOUND
   | typeof GUARANTEE_DOCUMENT_ERROR_CODE.NOT_PENDING_REVIEW;
+type ApproveGuaranteeDocumentSuccessResult = ReviewGuaranteeDocumentSuccessResult & {
+  /** True when this approval moved the draft's review `awaiting_signature → signed`. */
+  reviewSigned: boolean;
+};
 type ApproveGuaranteeDocumentErrorResult = { code: ReviewGuaranteeDocumentErrorCode };
 type RejectGuaranteeDocumentErrorResult = {
   code:
@@ -200,12 +207,69 @@ async function loadReviewableDocument(
   return { success: true, data: { document, guarantee }, message: "Document reviewable" };
 }
 
+type StaffAuditAppender = (input: Omit<AppendAuditEntryInput, "actor">) => Promise<unknown>;
+
+/**
+ * Approving the signed rental contract is the moment Mutav registers the
+ * signature, so a draft that was `awaiting_signature` moves to `signed` in the
+ * same transaction. From any other review status nothing moves: an approval
+ * while the review is still `accepted` is kept, and `staffActivate`'s
+ * `REVIEW_NOT_SIGNED` precondition is what holds the draft back. Returns
+ * whether the review moved.
+ */
+async function markReviewSignedOnContractApproval(
+  ctx: MutationCtx,
+  {
+    guarantee,
+    document,
+    username,
+    appendStaffAudit,
+  }: {
+    guarantee: Guarantee;
+    document: GuaranteeDocument;
+    username: string;
+    appendStaffAudit: StaffAuditAppender;
+  },
+): Promise<boolean> {
+  if (document.key !== DOCUMENT_KEY.RENTAL_CONTRACT) return false;
+  if (guarantee.status !== GUARANTEE_STATE.DRAFTED) return false;
+  if (guarantee.underwriting.review !== REVIEW_STATUS.AWAITING_SIGNATURE) return false;
+  const move = assertReviewTransition(guarantee.underwriting.review, REVIEW_STATUS.SIGNED);
+  if (!move.success) return false;
+
+  const at = new Date().toISOString();
+  await ctx.db.patch(guarantee._id, {
+    underwriting: { ...guarantee.underwriting, review: REVIEW_STATUS.SIGNED },
+  });
+  await ctx.db.insert("guaranteeHistory", {
+    agencyId: guarantee.agencyId,
+    guaranteePublicId: guarantee.publicId,
+    at,
+    username,
+    message: "Contrato assinado registrado",
+  });
+  await appendStaffAudit({
+    action: AUDIT_ACTION.GUARANTEE_SIGNED,
+    resourceType: "guarantees",
+    resourceId: guarantee.publicId,
+    payload: {
+      guaranteeId: guarantee._id,
+      agencyId: guarantee.agencyId,
+      documentId: document._id,
+      at,
+    },
+  });
+  return true;
+}
+
 export const approveGuaranteeDocument = mutationWithMutavRole({ minRole: REVIEW_ROLE })({
   args: { documentId: v.id("guaranteeDocuments") },
   handler: async (
     ctx,
     args,
-  ): Promise<Result<ReviewGuaranteeDocumentSuccessResult, ApproveGuaranteeDocumentErrorResult>> => {
+  ): Promise<
+    Result<ApproveGuaranteeDocumentSuccessResult, ApproveGuaranteeDocumentErrorResult>
+  > => {
     const loaded = await loadReviewableDocument(ctx, args.documentId);
     if (!loaded.success) return loaded;
     const { document, guarantee } = loaded.data;
@@ -222,9 +286,20 @@ export const approveGuaranteeDocument = mutationWithMutavRole({ minRole: REVIEW_
       payload: { documentId: document._id, key: document.key },
     });
 
+    const reviewSigned = await markReviewSignedOnContractApproval(ctx, {
+      guarantee,
+      document,
+      username: ctx.user.name,
+      appendStaffAudit: ctx.appendStaffAudit,
+    });
+
     return {
       success: true,
-      data: { documentId: document._id, status: GUARANTEE_DOCUMENT_STATUS.APPROVED },
+      data: {
+        documentId: document._id,
+        status: GUARANTEE_DOCUMENT_STATUS.APPROVED,
+        reviewSigned,
+      },
       message: "Document approved",
     };
   },

@@ -32,6 +32,7 @@ import type * as delinquencies_machine from "../delinquencies/machine.js";
 import type * as delinquencies_mutations from "../delinquencies/mutations.js";
 import type * as delinquencies_useCases from "../delinquencies/useCases.js";
 import type * as guarantees_actions from "../guarantees/actions.js";
+import type * as guarantees_activationQueries from "../guarantees/activationQueries.js";
 import type * as guarantees_aggregate from "../guarantees/aggregate.js";
 import type * as guarantees_aggregateWrites from "../guarantees/aggregateWrites.js";
 import type * as guarantees_backfill from "../guarantees/backfill.js";
@@ -137,6 +138,7 @@ declare const fullApi: ApiFromModules<{
   "delinquencies/mutations": typeof delinquencies_mutations;
   "delinquencies/useCases": typeof delinquencies_useCases;
   "guarantees/actions": typeof guarantees_actions;
+  "guarantees/activationQueries": typeof guarantees_activationQueries;
   "guarantees/aggregate": typeof guarantees_aggregate;
   "guarantees/aggregateWrites": typeof guarantees_aggregateWrites;
   "guarantees/backfill": typeof guarantees_backfill;

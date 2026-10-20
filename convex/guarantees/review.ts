@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Result } from "../lib/result";
 import { CLOSE_REASON, GUARANTEE_STATE, type CloseReason, type GuaranteeState } from "./machine";
-import { SCORE_TIER, type PriceableTier, type ScoreTier } from "./domain";
+import { GUARANTEE_ERROR_CODE, SCORE_TIER, type PriceableTier, type ScoreTier } from "./domain";
 
 /**
  * Mutav's underwriting review of a draft — a sub-status that lives inside
@@ -10,9 +10,9 @@ import { SCORE_TIER, type PriceableTier, type ScoreTier } from "./domain";
  * to go on risk". Keeping them apart leaves the seven-state machine, its
  * aggregates and every insured-state read untouched.
  *
- * `signed` is reserved for the signed-document upload and staff activation
- * that follow; nothing writes it yet, but it is in the value object so those
- * steps need no schema change.
+ * `signed` is written by `approveGuaranteeDocument` when compliance approves
+ * the signed rental contract of a draft that is `awaiting_signature`; it is
+ * the review status `staffActivate` requires.
  */
 export const REVIEW_STATUS = {
   EDITING: "editing",
@@ -161,3 +161,43 @@ export const REVIEW_ERROR_CODE = {
   REFUSAL_REASON_REQUIRED: "REFUSAL_REASON_REQUIRED",
   TEXT_TOO_LONG: "TEXT_TOO_LONG",
 } as const satisfies Record<string, string>;
+
+/**
+ * Why staff may not activate a draft yet. Each is a distinct refusal code of
+ * `staffActivate` and a distinct reason the admin console shows next to a
+ * disabled Activate button.
+ */
+export const ACTIVATION_ERROR_CODE = {
+  REVIEW_NOT_SIGNED: "REVIEW_NOT_SIGNED",
+  SIGNED_CONTRACT_NOT_APPROVED: "SIGNED_CONTRACT_NOT_APPROVED",
+  AGENCY_NOT_ACTIVE: "AGENCY_NOT_ACTIVE",
+} as const satisfies Record<string, string>;
+
+export type ActivationBlocker =
+  | typeof GUARANTEE_ERROR_CODE.NOT_DRAFTED
+  | (typeof ACTIVATION_ERROR_CODE)[keyof typeof ACTIVATION_ERROR_CODE];
+
+export type ActivationReadiness = {
+  status: GuaranteeState;
+  review: ReviewStatus;
+  signedContractApproved: boolean;
+  agencyActive: boolean;
+};
+
+/**
+ * Every precondition staff activation checks, in the order it checks them.
+ * An empty list means the draft can go on risk. The mutation refuses with the
+ * first entry; the console lists them all.
+ */
+export function activationBlockers(readiness: ActivationReadiness): ActivationBlocker[] {
+  const blockers: ActivationBlocker[] = [];
+  if (readiness.status !== GUARANTEE_STATE.DRAFTED) blockers.push(GUARANTEE_ERROR_CODE.NOT_DRAFTED);
+  if (readiness.review !== REVIEW_STATUS.SIGNED) {
+    blockers.push(ACTIVATION_ERROR_CODE.REVIEW_NOT_SIGNED);
+  }
+  if (!readiness.signedContractApproved) {
+    blockers.push(ACTIVATION_ERROR_CODE.SIGNED_CONTRACT_NOT_APPROVED);
+  }
+  if (!readiness.agencyActive) blockers.push(ACTIVATION_ERROR_CODE.AGENCY_NOT_ACTIVE);
+  return blockers;
+}

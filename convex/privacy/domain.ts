@@ -1166,6 +1166,28 @@ export const PII_FIELD_REGISTRY = {
       legalNormRef: null,
       note: "Capacity earmarked by committed cover — a mirror of the arrears the reserve is standing behind.",
     },
+    "activationFee.status": {
+      ...COUNSEL_PENDING,
+      tier: TIER.T3,
+      dataClass: CLASS.OPERATIONAL_REFERENCE,
+      subjectType: SUBJECT.AGENCY,
+      legalNormRef: null,
+      note: "Billing marker for the one-time activation fee the agency owes; says nothing about the tenant.",
+    },
+    "activationFee.invoiceId": {
+      ...COUNSEL_PENDING,
+      tier: TIER.T3,
+      dataClass: CLASS.OPERATIONAL_REFERENCE,
+      subjectType: SUBJECT.AGENCY,
+      legalNormRef: null,
+    },
+    "activationFee.invoicedAt": {
+      ...COUNSEL_PENDING,
+      tier: TIER.T3,
+      dataClass: CLASS.OPERATIONAL_REFERENCE,
+      subjectType: SUBJECT.AGENCY,
+      legalNormRef: null,
+    },
   },
 
   // The append-only PII duplicate: a frozen "as-signed" copy of the tenant.
