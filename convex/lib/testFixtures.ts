@@ -311,7 +311,7 @@ export type CoverCandidate = {
 /**
  * One user who owns one agency with one guarantee already in default — the
  * starting point of every cover-ledger test. The rent is 300_000 cents, so
- * the priced ceiling is 9_000_000 (30x).
+ * the priced ceiling is 4_500_000 (15x).
  */
 export async function seedCoverCandidate(
   t: TestConvex<typeof schema>,

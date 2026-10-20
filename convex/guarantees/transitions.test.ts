@@ -25,10 +25,10 @@ import schema from "../schema";
 type T = TestConvex<typeof schema>;
 
 const RENT_CENTS = 100_000;
-// `DEFAULT_PRICING_TABLE.coverageCeilingMultiplier` is 30, so the fixture's
-// rent prices a 3,000,000-cent ceiling. Spelled out rather than derived so a
+// `DEFAULT_PRICING_TABLE.coverageCeilingMultiplier` is 15, so the fixture's
+// rent prices a 1,500,000-cent ceiling. Spelled out rather than derived so a
 // pricing change fails these tests loudly instead of silently agreeing.
-const CEILING_CENTS = 3_000_000;
+const CEILING_CENTS = 1_500_000;
 
 function setup(): T {
   const t = convexTest(schema);
@@ -390,7 +390,7 @@ describe("cover capacity arithmetic", () => {
     expect(result.data.appliedCents).toBe(250_000);
     expect(result.data.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
-      availableCents: 2_750_000,
+      availableCents: 1_250_000,
       reservedCents: 250_000,
     });
     expect(isBalanced(result.data.capacity)).toBe(true);
@@ -398,8 +398,8 @@ describe("cover capacity arithmetic", () => {
   });
 
   test("clamps to what is available when the notice is worth more than the ceiling", async () => {
-    // 400,000 already reserved, so 2,600,000 is all that is left to draw on.
-    const guarantee = await seedActive("C2", 2_600_000);
+    // 400,000 already reserved, so 1,100,000 is all that is left to draw on.
+    const guarantee = await seedActive("C2", 1_100_000);
 
     const result = await t.run((ctx) =>
       reserveCoverCapacity(ctx, { guarantee, amountCents: 9_999_999, actor }),
@@ -407,7 +407,7 @@ describe("cover capacity arithmetic", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.appliedCents).toBe(2_600_000);
+    expect(result.data.appliedCents).toBe(1_100_000);
     expect(result.data.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
       availableCents: 0,

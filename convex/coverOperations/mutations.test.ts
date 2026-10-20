@@ -21,7 +21,7 @@ function setup() {
 
 type T = ReturnType<typeof setup>;
 
-const CEILING_CENTS = 9_000_000;
+const CEILING_CENTS = 4_500_000;
 
 function orThrow<TValue>(value: TValue | null | undefined, label: string): TValue {
   if (value === null || value === undefined) throw new Error(`Expected non-null ${label}.`);
@@ -136,7 +136,7 @@ describe("staffRecordCover", () => {
     expect(guarantee.status).toBe("cover_committed");
     expect(guarantee.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
-      availableCents: 8_750_000,
+      availableCents: 4_250_000,
       reservedCents: 250_000,
     });
 
@@ -367,7 +367,7 @@ describe("staffRecordCoverBatch", () => {
     expect(guarantee.status).toBe("cover_committed");
     expect(guarantee.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
-      availableCents: 8_650_000,
+      availableCents: 4_150_000,
       reservedCents: 350_000,
     });
     const guaranteeAudit = await t.run((ctx) =>

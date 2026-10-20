@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { priceGuarantee, splitCommission, DEFAULT_PRICING_TABLE } from "./pricing";
+import {
+  priceGuarantee,
+  splitCommission,
+  DEFAULT_PRICING_TABLE,
+  isPlanOffered,
+  sellablePlan,
+} from "./pricing";
+import { PRESTAMISTA_ENABLED } from "./flags";
 
 const APPLIED_AT = "2026-07-18T12:00:00.000Z";
 const PRODUCT_SLUG = "mutav-fianca";
@@ -16,7 +23,7 @@ function price(input: {
 }
 
 describe("priceGuarantee", () => {
-  test("bom tier, basic plan — 9% taxa, no prestamista, 30x ceiling, 6x exit cap", () => {
+  test("bom tier, basic plan — 9% taxa, no prestamista, 15x ceiling, 6x exit cap", () => {
     expect(price({ rentCents: 100_000, tier: "bom", plan: "basic" })).toEqual({
       terms: {
         productSlug: PRODUCT_SLUG,
@@ -28,13 +35,13 @@ describe("priceGuarantee", () => {
         oneTimeActivationFeeCents: 15_000,
         commissionRate: 0.015,
         prestamistaCommissionRate: 0.25,
-        coverageCeilingMultiplier: 30,
+        coverageCeilingMultiplier: 15,
         exitCostMultiplier: 6,
-        coverageCeilingCents: 3_000_000,
+        coverageCeilingCents: 1_500_000,
         exitCostCapCents: 600_000,
         appliedAt: APPLIED_AT,
       },
-      capacity: { ceilingCents: 3_000_000, availableCents: 3_000_000, reservedCents: 0 },
+      capacity: { ceilingCents: 1_500_000, availableCents: 1_500_000, reservedCents: 0 },
     });
   });
 
@@ -42,21 +49,24 @@ describe("priceGuarantee", () => {
     const priced = price({ rentCents: 200_000, tier: "regular", plan: "basic" });
     expect(priced.terms.feeCents).toBe(24_000);
     expect(priced.terms.taxaFeeCents).toBe(24_000);
-    expect(priced.terms.coverageCeilingCents).toBe(6_000_000);
+    expect(priced.terms.coverageCeilingCents).toBe(3_000_000);
   });
 
   test("ruim tier — 15% taxa", () => {
     const priced = price({ rentCents: 300_000, tier: "ruim", plan: "basic" });
     expect(priced.terms.feeCents).toBe(45_000);
-    expect(priced.terms.coverageCeilingCents).toBe(9_000_000);
+    expect(priced.terms.coverageCeilingCents).toBe(4_500_000);
     expect(priced.terms.exitCostCapCents).toBe(1_800_000);
   });
 
-  test("plus plan adds the R$ 12,80 prestamista premium on top of the taxa", () => {
+  test("prestamista off: a plus request prices as basic and keeps the premium out of every total", () => {
     const priced = price({ rentCents: 100_000, tier: "bom", plan: "plus" });
+    expect(priced.terms.plan).toBe("basic");
     expect(priced.terms.taxaFeeCents).toBe(9_000);
-    expect(priced.terms.prestamistaFeeCents).toBe(1_280);
-    expect(priced.terms.feeCents).toBe(10_280);
+    expect(priced.terms.prestamistaFeeCents).toBe(0);
+    expect(priced.terms.feeCents).toBe(9_000);
+    // 9_000 x 1.5% = 135; total = 9_135, with no prestamista commission.
+    expect(splitCommission(priced.terms)).toEqual({ commissionCents: 135, totalCents: 9_135 });
   });
 
   test("taxa is rounded to whole cents", () => {
@@ -117,13 +127,26 @@ describe("priceGuarantee", () => {
     );
     expect(priced.terms.commissionRate).toBe(0.02);
     expect(priced.terms.prestamistaCommissionRate).toBe(0.3);
-    // 9_000 x 2% = 180; 1_280 x 30% = 384
-    expect(splitCommission(priced.terms).commissionCents).toBe(564);
+    // 9_000 x 2% = 180; prestamista is off, so no premium commission.
+    expect(splitCommission(priced.terms).commissionCents).toBe(180);
   });
 
   test("capacity invariant holds at pricing time: available + reserved = ceiling", () => {
     const { capacity } = price({ rentCents: 123_456, tier: "regular", plan: "plus" });
     expect(capacity.availableCents + capacity.reservedCents).toBe(capacity.ceilingCents);
+  });
+});
+
+describe("prestamista flag (off for the pilot)", () => {
+  test("is off", () => {
+    expect(PRESTAMISTA_ENABLED).toBe(false);
+  });
+
+  test("offers only the basic plan", () => {
+    expect(isPlanOffered("basic")).toBe(true);
+    expect(isPlanOffered("plus")).toBe(false);
+    expect(sellablePlan("plus")).toBe("basic");
+    expect(sellablePlan("basic")).toBe("basic");
   });
 });
 
