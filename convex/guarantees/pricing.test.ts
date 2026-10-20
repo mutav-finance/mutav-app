@@ -16,7 +16,7 @@ function price(input: {
 }
 
 describe("priceGuarantee", () => {
-  test("bom tier, basic plan — 9% taxa, no prestamista, 30x ceiling, 6x exit cap", () => {
+  test("bom tier, basic plan — 9% taxa, no prestamista, 15x ceiling, 6x exit cap", () => {
     expect(price({ rentCents: 100_000, tier: "bom", plan: "basic" })).toEqual({
       terms: {
         productSlug: PRODUCT_SLUG,
@@ -28,13 +28,13 @@ describe("priceGuarantee", () => {
         oneTimeActivationFeeCents: 15_000,
         commissionRate: 0.015,
         prestamistaCommissionRate: 0.25,
-        coverageCeilingMultiplier: 30,
+        coverageCeilingMultiplier: 15,
         exitCostMultiplier: 6,
-        coverageCeilingCents: 3_000_000,
+        coverageCeilingCents: 1_500_000,
         exitCostCapCents: 600_000,
         appliedAt: APPLIED_AT,
       },
-      capacity: { ceilingCents: 3_000_000, availableCents: 3_000_000, reservedCents: 0 },
+      capacity: { ceilingCents: 1_500_000, availableCents: 1_500_000, reservedCents: 0 },
     });
   });
 
@@ -42,13 +42,13 @@ describe("priceGuarantee", () => {
     const priced = price({ rentCents: 200_000, tier: "regular", plan: "basic" });
     expect(priced.terms.feeCents).toBe(24_000);
     expect(priced.terms.taxaFeeCents).toBe(24_000);
-    expect(priced.terms.coverageCeilingCents).toBe(6_000_000);
+    expect(priced.terms.coverageCeilingCents).toBe(3_000_000);
   });
 
   test("ruim tier — 15% taxa", () => {
     const priced = price({ rentCents: 300_000, tier: "ruim", plan: "basic" });
     expect(priced.terms.feeCents).toBe(45_000);
-    expect(priced.terms.coverageCeilingCents).toBe(9_000_000);
+    expect(priced.terms.coverageCeilingCents).toBe(4_500_000);
     expect(priced.terms.exitCostCapCents).toBe(1_800_000);
   });
 

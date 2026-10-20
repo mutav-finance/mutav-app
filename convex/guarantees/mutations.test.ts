@@ -18,8 +18,8 @@ import schema from "../schema";
 type T = TestConvex<typeof schema>;
 
 const RENT_CENTS = 100_000;
-// 30x the fixture rent under `DEFAULT_PRICING_TABLE`.
-const CEILING_CENTS = 3_000_000;
+// 15x the fixture rent under `DEFAULT_PRICING_TABLE`.
+const CEILING_CENTS = 1_500_000;
 
 function setup(): T {
   const t = convexTest(schema);
@@ -143,7 +143,7 @@ describe("guarantees.activate", () => {
 
   test("refuses a draft that somehow carries reserved cents instead of zeroing them", async () => {
     const { guaranteeId } = await seedGuarantee(t, fx, "A4", GUARANTEE_STATE.DRAFTED, {
-      availableCents: 2_000_000,
+      availableCents: 500_000,
     });
     const before = await readGuarantee(t, guaranteeId);
     expect(before.capacity.reservedCents).toBe(1_000_000);
@@ -335,9 +335,9 @@ describe("guarantees.reprice", () => {
   });
 
   test("writes a new terms snapshot and renewal date without touching capacity", async () => {
-    // 1,000,000 available means 2,000,000 already reserved against the 3,000,000 ceiling.
+    // 500,000 available means 1,000,000 already reserved against the 1,500,000 ceiling.
     const { guaranteeId } = await seedGuarantee(t, fx, "R1", GUARANTEE_STATE.ACTIVE, {
-      availableCents: 1_000_000,
+      availableCents: 500_000,
     });
     const before = await readGuarantee(t, guaranteeId);
     const asStaff = t.withIdentity({ subject: fx.subject });
@@ -360,17 +360,17 @@ describe("guarantees.reprice", () => {
     // The new ceiling lives in the snapshot; the coverage the guarantee is on
     // risk for is the one it was activated under and does not move with a
     // reajuste.
-    expect(after.terms.coverageCeilingCents).toBe(6_000_000);
+    expect(after.terms.coverageCeilingCents).toBe(3_000_000);
     expect(after.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 1_000_000,
-      reservedCents: 2_000_000,
+      ceilingCents: 1_500_000,
+      availableCents: 500_000,
+      reservedCents: 1_000_000,
     });
   });
 
   test("a rent cut below what is reserved still leaves the live coverage intact", async () => {
     const { guaranteeId } = await seedGuarantee(t, fx, "R2", GUARANTEE_STATE.ACTIVE, {
-      availableCents: 1_000_000,
+      availableCents: 500_000,
     });
     const before = await readGuarantee(t, guaranteeId);
     const asStaff = t.withIdentity({ subject: fx.subject });
@@ -383,9 +383,9 @@ describe("guarantees.reprice", () => {
 
     expect(result.success).toBe(true);
     const after = await readGuarantee(t, guaranteeId);
-    // 50,000 x 30 = 1,500,000, below the 2,000,000 already reserved — harmless
+    // 50,000 x 15 = 750,000, below the 1,000,000 already reserved — harmless
     // precisely because capacity is untouched.
-    expect(after.terms.coverageCeilingCents).toBe(1_500_000);
+    expect(after.terms.coverageCeilingCents).toBe(750_000);
     expect(after.capacity).toEqual(before.capacity);
   });
 

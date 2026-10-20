@@ -694,9 +694,9 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
     const byId = new Map(page.page.map((row) => [row.id, row]));
     expect(byId.get("U5")?.status).toBe(GUARANTEE_STATE.CLOSED);
     expect(byId.get("U5")?.availableCapacityCents).toBe(0);
-    // Default seed: R$ 1.000,00 rent x 30 = R$ 30.000,00 ceiling, untouched.
-    expect(byId.get("U1")?.availableCapacityCents).toBe(3_000_000);
-    expect(byId.get("U4")?.availableCapacityCents).toBe(3_000_000);
+    // Default seed: R$ 1.000,00 rent x 15 = R$ 15.000,00 ceiling, untouched.
+    expect(byId.get("U1")?.availableCapacityCents).toBe(1_500_000);
+    expect(byId.get("U4")?.availableCapacityCents).toBe(1_500_000);
 
     const closedRow = await t.run((ctx) =>
       ctx.db
@@ -705,8 +705,8 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
         .unique(),
     );
     expect(closedRow?.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 3_000_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_500_000,
       reservedCents: 0,
     });
   });

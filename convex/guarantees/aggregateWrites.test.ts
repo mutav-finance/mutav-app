@@ -58,7 +58,7 @@ async function platformActiveSum(t: ReturnType<typeof convexTest>) {
 }
 
 // Every seeded guarantee prices at rentCents 100_000 through the default
-// product: 30x ceiling = 3_000_000, 6x exit cap = 600_000.
+// product: 15x ceiling = 1_500_000, 6x exit cap = 600_000.
 const EXIT_CAP = 600_000;
 
 describe("insertGuaranteeAggregates", () => {

@@ -41,8 +41,8 @@ const SEED_NOW = "2026-09-28T15:00:00.000Z";
 
 // Worst-case exposure over the in-force book and its verified-default slice,
 // in BRL centavos: available rent-coverage + exit-cost cap per guarantee.
-const SUM_INSURED_CENTS = 689_806_900;
-const VERIFIED_DEFAULT_EXPOSURE_CENTS = 72_078_600;
+const SUM_INSURED_CENTS = 401_431_900;
+const VERIFIED_DEFAULT_EXPOSURE_CENTS = 41_433_600;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -301,7 +301,7 @@ describe("seedReset", () => {
     expect(product.terms).toEqual(DEFAULT_PRICING_TABLE);
     expect(product.terms).toEqual({
       tierRate: { bom: 0.09, regular: 0.12, ruim: 0.15 },
-      coverageCeilingMultiplier: 30,
+      coverageCeilingMultiplier: 15,
       exitCostMultiplier: 6,
       activationFeeCents: 15_000,
       commissionRate: 0.015,
@@ -349,9 +349,9 @@ describe("seedReset", () => {
       oneTimeActivationFeeCents: 15_000,
       commissionRate: 0.015,
       prestamistaCommissionRate: 0.25,
-      coverageCeilingMultiplier: 30,
+      coverageCeilingMultiplier: 15,
       exitCostMultiplier: 6,
-      coverageCeilingCents: 9_600_000,
+      coverageCeilingCents: 4_800_000,
       exitCostCapCents: 1_920_000,
       // The snapshot is dated at activation, not at the tenant's term approval.
       // Seed timestamps are normalized to UTC so they compare against the
@@ -359,8 +359,8 @@ describe("seedReset", () => {
       appliedAt: "2025-06-03T13:00:00.000Z",
     });
     expect(probe.sample.capacity).toEqual({
-      ceilingCents: 9_600_000,
-      availableCents: 9_600_000,
+      ceilingCents: 4_800_000,
+      availableCents: 4_800_000,
       reservedCents: 0,
     });
   });

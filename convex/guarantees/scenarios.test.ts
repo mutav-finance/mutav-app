@@ -76,16 +76,16 @@ const BASIC_BOM_TERMS: GuaranteeTerms = {
   oneTimeActivationFeeCents: 15_000,
   commissionRate: 0.015,
   prestamistaCommissionRate: 0.25,
-  coverageCeilingMultiplier: 30,
+  coverageCeilingMultiplier: 15,
   exitCostMultiplier: 6,
-  coverageCeilingCents: 3_000_000,
+  coverageCeilingCents: 1_500_000,
   exitCostCapCents: 600_000,
   appliedAt: AT,
 };
 
 const FULL_CAPACITY: GuaranteeCapacity = {
-  ceilingCents: 3_000_000,
-  availableCents: 3_000_000,
+  ceilingCents: 1_500_000,
+  availableCents: 1_500_000,
   reservedCents: 0,
 };
 
@@ -1012,9 +1012,9 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       oneTimeActivationFeeCents: 15_000,
       commissionRate: 0.015,
       prestamistaCommissionRate: 0.25,
-      coverageCeilingMultiplier: 30,
+      coverageCeilingMultiplier: 15,
       exitCostMultiplier: 6,
-      coverageCeilingCents: 3_000_000,
+      coverageCeilingCents: 1_500_000,
       exitCostCapCents: 600_000,
       appliedAt: "2026-01-01T00:00:00.000Z",
     });
@@ -1041,13 +1041,13 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     expect(row.terms.prestamistaFeeCents).toBe(1_280);
     expect(row.terms.feeCents).toBe(10_280);
     expect(row.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 3_000_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_500_000,
       reservedCents: 0,
     });
   });
 
-  test("stores the ruim/plus snapshot for rent 250_000 with capacity ceiling 7_500_000", async () => {
+  test("stores the ruim/plus snapshot for rent 250_000 with capacity ceiling 3_750_000", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId } = await seedGuaranteeWithLease(
@@ -1068,15 +1068,15 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       oneTimeActivationFeeCents: 15_000,
       commissionRate: 0.015,
       prestamistaCommissionRate: 0.25,
-      coverageCeilingMultiplier: 30,
+      coverageCeilingMultiplier: 15,
       exitCostMultiplier: 6,
-      coverageCeilingCents: 7_500_000,
+      coverageCeilingCents: 3_750_000,
       exitCostCapCents: 1_500_000,
       appliedAt: "2026-01-01T00:00:00.000Z",
     });
     expect(row.capacity).toEqual({
-      ceilingCents: 7_500_000,
-      availableCents: 7_500_000,
+      ceilingCents: 3_750_000,
+      availableCents: 3_750_000,
       reservedCents: 0,
     });
     expect(row.underwriting).toEqual({ score: 750, tier: "ruim" });
@@ -1129,21 +1129,21 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     expect(regularRow.underwriting).toEqual({ score: 650, tier: "regular", assessmentId });
     expect(regularRow.terms.taxaFeeCents).toBe(24_000);
     expect(regularRow.terms.feeCents).toBe(24_000);
-    expect(regularRow.terms.coverageCeilingCents).toBe(6_000_000);
+    expect(regularRow.terms.coverageCeilingCents).toBe(3_000_000);
     expect(regularRow.terms.exitCostCapCents).toBe(1_200_000);
     expect(regularRow.capacity).toEqual({
-      ceilingCents: 6_000_000,
-      availableCents: 6_000_000,
+      ceilingCents: 3_000_000,
+      availableCents: 3_000_000,
       reservedCents: 0,
     });
 
     expect(ruimRow.underwriting).toEqual({ score: 750, tier: "ruim" });
     expect(ruimRow.terms.taxaFeeCents).toBe(45_000);
-    expect(ruimRow.terms.coverageCeilingCents).toBe(9_000_000);
+    expect(ruimRow.terms.coverageCeilingCents).toBe(4_500_000);
     expect(ruimRow.terms.exitCostCapCents).toBe(1_800_000);
     expect(ruimRow.capacity).toEqual({
-      ceilingCents: 9_000_000,
-      availableCents: 9_000_000,
+      ceilingCents: 4_500_000,
+      availableCents: 4_500_000,
       reservedCents: 0,
     });
   });
@@ -1199,10 +1199,10 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     expect(lease.rent.totalRentCents).toBe(135_000);
     expect(guarantee.terms.rentCents).toBe(100_000);
     expect(guarantee.terms.taxaFeeCents).toBe(9_000);
-    expect(guarantee.terms.coverageCeilingCents).toBe(3_000_000);
+    expect(guarantee.terms.coverageCeilingCents).toBe(1_500_000);
     expect(guarantee.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 3_000_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_500_000,
       reservedCents: 0,
     });
   });
@@ -1223,7 +1223,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
         status: "active",
         tier: "regular",
         rentCents: 200_000,
-        availableCents: 5_500_000,
+        availableCents: 2_500_000,
       },
       "P4-REG",
     );
@@ -1243,7 +1243,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     expect(rows).toHaveLength(9);
     expect(rows.every((r) => r.sumMatchesCeiling && r.ceilingMatchesTerms)).toBe(true);
-    expect(rows.find((r) => r.publicId === "P4")?.reservedCents).toBe(2_990_000);
+    expect(rows.find((r) => r.publicId === "P4")?.reservedCents).toBe(1_490_000);
     expect(rows.find((r) => r.publicId === "P4-REG")?.reservedCents).toBe(500_000);
   });
 
@@ -1269,8 +1269,8 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     });
 
     expect(row.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 2_700_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_200_000,
       reservedCents: 300_000,
     });
     expect(row.capacity.availableCents + row.capacity.reservedCents).toBe(
@@ -1333,7 +1333,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     expect(product.terms.tierRate.bom).toBe(0.2);
     expect(soldRow.terms).toEqual(BASIC_BOM_TERMS);
-    expect(soldRow.capacity.ceilingCents).toBe(3_000_000);
+    expect(soldRow.capacity.ceilingCents).toBe(1_500_000);
     expect(newRow.productId).toBe(soldRow.productId);
     expect(newRow.terms).toEqual({
       productSlug: "mutav-fianca",
@@ -1424,15 +1424,15 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       oneTimeActivationFeeCents: 15_000,
       commissionRate: 0.015,
       prestamistaCommissionRate: 0.25,
-      coverageCeilingMultiplier: 30,
+      coverageCeilingMultiplier: 15,
       exitCostMultiplier: 6,
-      coverageCeilingCents: 3_600_000,
+      coverageCeilingCents: 1_800_000,
       exitCostCapCents: 720_000,
       appliedAt: "2027-01-01T00:00:00.000Z",
     });
     expect(row.capacity).toEqual({
-      ceilingCents: 3_600_000,
-      availableCents: 3_300_000,
+      ceilingCents: 1_800_000,
+      availableCents: 1_500_000,
       reservedCents: 300_000,
     });
     expect(row.status).toBe("active");
@@ -1955,8 +1955,8 @@ describe("machine + db composition — guard before patch", () => {
     expect(final.activatedAt).toBe("2026-02-01T00:00:00.000Z");
     expect(final.terms).toEqual(BASIC_BOM_TERMS);
     expect(final.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 2_700_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_200_000,
       reservedCents: 300_000,
     });
     expect(lease.openGuaranteeId).toBe(null);
@@ -1967,7 +1967,7 @@ describe("machine + db composition — guard before patch", () => {
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const committed = await seedGuaranteeWithLease(
       t,
-      { agencyId, status: "cover_committed", activatedAt: AT, availableCents: 2_700_000 },
+      { agencyId, status: "cover_committed", activatedAt: AT, availableCents: 1_200_000 },
       "DR-CC",
     );
     const verified = await seedGuaranteeWithLease(
@@ -1977,7 +1977,7 @@ describe("machine + db composition — guard before patch", () => {
     );
     const active = await seedGuaranteeWithLease(
       t,
-      { agencyId, status: "active", activatedAt: AT, availableCents: 2_900_000 },
+      { agencyId, status: "active", activatedAt: AT, availableCents: 1_400_000 },
       "DR-ACT",
     );
 
@@ -2018,8 +2018,8 @@ describe("machine + db composition — guard before patch", () => {
       closedAt: "2026-06-01T00:00:00.000Z",
     });
     expect(fromCommitted.row.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 3_000_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_500_000,
       reservedCents: 0,
     });
     expect(fromCommitted.lease.openGuaranteeId).toBe(null);
@@ -2029,8 +2029,8 @@ describe("machine + db composition — guard before patch", () => {
       reason: "dispute_reversal",
     });
     expect(fromVerified.row.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 3_000_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_500_000,
       reservedCents: 0,
     });
     expect(fromVerified.lease.openGuaranteeId).toBe(null);
@@ -2039,8 +2039,8 @@ describe("machine + db composition — guard before patch", () => {
     expect(fromActive.row.status).toBe("active");
     expect(fromActive.row.closure).toBeUndefined();
     expect(fromActive.row.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 2_900_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_400_000,
       reservedCents: 100_000,
     });
     expect(fromActive.lease.openGuaranteeId).toBe(active.guaranteeId);
@@ -2516,7 +2516,7 @@ describe("index reads — leases, products, guaranteeHistory", () => {
     });
     expect(row.terms).toEqual({
       tierRate: { bom: 0.09, regular: 0.12, ruim: 0.15 },
-      coverageCeilingMultiplier: 30,
+      coverageCeilingMultiplier: 15,
       exitCostMultiplier: 6,
       activationFeeCents: 15_000,
       commissionRate: 0.015,
