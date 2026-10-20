@@ -52,6 +52,8 @@ import type * as invoices_lib_muxedAddress from "../invoices/lib/muxedAddress.js
 import type * as invoices_lib_muxedId from "../invoices/lib/muxedId.js";
 import type * as invoices_mutations from "../invoices/mutations.js";
 import type * as invoices_useCases from "../invoices/useCases.js";
+import type * as launch_domain from "../launch/domain.js";
+import type * as launch_useCases from "../launch/useCases.js";
 import type * as leases_domain from "../leases/domain.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_auth0Mgmt from "../lib/auth0Mgmt.js";
@@ -152,6 +154,8 @@ declare const fullApi: ApiFromModules<{
   "invoices/lib/muxedId": typeof invoices_lib_muxedId;
   "invoices/mutations": typeof invoices_mutations;
   "invoices/useCases": typeof invoices_useCases;
+  "launch/domain": typeof launch_domain;
+  "launch/useCases": typeof launch_useCases;
   "leases/domain": typeof leases_domain;
   "lib/auth": typeof lib_auth;
   "lib/auth0Mgmt": typeof lib_auth0Mgmt;
