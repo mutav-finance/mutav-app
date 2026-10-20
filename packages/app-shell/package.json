@@ -6,7 +6,8 @@
   "sideEffects": false,
   "exports": {
     "./convex-auth-provider": "./src/convex-auth-provider.tsx",
-    "./convex-public-provider": "./src/convex-public-provider.tsx"
+    "./convex-public-provider": "./src/convex-public-provider.tsx",
+    "./storage-upload": "./src/storage-upload.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

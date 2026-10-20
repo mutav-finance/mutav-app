@@ -38,7 +38,8 @@
       "treasury": "Tesouraria",
       "observability": "Observabilidade",
       "nav": "NAV",
-      "staff": "Equipe"
+      "staff": "Equipe",
+      "documents": "Documentos"
     }
   },
   "accessDenied": {
@@ -514,6 +515,87 @@
     },
     "actions": {
       "retry": "Tentar novamente"
+    }
+  },
+  "guaranteeDocuments": {
+    "queue": {
+      "title": "Documentos de garantias",
+      "subtitle": "Arquivos anexados às garantias por imobiliárias e pela equipe, aguardando decisão de compliance, do mais antigo ao mais recente.",
+      "empty": "Nenhum documento aguardando análise.",
+      "moreAvailable": "Há mais documentos na fila — apenas a página mais antiga é exibida."
+    },
+    "panel": {
+      "heading": "Documentos",
+      "upload": "Enviar",
+      "uploading": "Enviando…",
+      "chooseFile": "Escolher arquivo para {document}",
+      "loading": "Carregando…",
+      "empty": "Nenhum arquivo enviado.",
+      "notFound": "Garantia não encontrada."
+    },
+    "columns": {
+      "document": "Documento",
+      "agency": "Imobiliária",
+      "guarantee": "Garantia",
+      "file": "Arquivo",
+      "uploaded": "Enviado",
+      "actions": "Ações"
+    },
+    "labels": {
+      "rentalContract": "Contrato de locação assinado",
+      "inspection": "Vistoria",
+      "policy": "Apólice"
+    },
+    "status": {
+      "pending_review": "Em análise",
+      "approved": "Aprovado",
+      "rejected": "Recusado",
+      "superseded": "Substituído"
+    },
+    "uploaderKind": {
+      "agency_user": "Imobiliária · {name}",
+      "staff": "Mutav · {name}"
+    },
+    "uploadedBy": {
+      "agency_user": "Enviado por {name} (imobiliária) em {date} · {size}",
+      "staff": "Enviado por {name} (Mutav) em {date} · {size}"
+    },
+    "reviewedBy": "Analisado por {name} em {date}",
+    "rejectionReason": "Motivo da recusa: {reason}",
+    "unknownUser": "usuário removido",
+    "notAvailable": "—",
+    "actions": {
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "cancel": "Cancelar"
+    },
+    "reject": {
+      "title": "Recusar documento",
+      "description": "Recusando “{file}”. A imobiliária vê o motivo na página da garantia e o recebe por e-mail.",
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "ex.: falta a assinatura do locador na página 3"
+    },
+    "toast": {
+      "approved": "Documento aprovado.",
+      "rejected": "Documento recusado; a imobiliária foi notificada.",
+      "uploaded": "Documento anexado e enviado para análise."
+    },
+    "errors": {
+      "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
+      "GUARANTEE_CLOSED": "Esta garantia está encerrada e não aceita novos documentos.",
+      "FILE_NOT_FOUND": "O arquivo enviado não foi encontrado. Tente novamente.",
+      "FILE_ALREADY_ATTACHED": "Este arquivo já foi anexado.",
+      "UNSUPPORTED_CONTENT_TYPE": "Formato não aceito. Envie PDF, JPG ou PNG.",
+      "FILE_TOO_LARGE": "Arquivo maior que 15 MB.",
+      "FILE_EMPTY": "O arquivo está vazio.",
+      "INVALID_FILE_NAME": "Nome de arquivo inválido.",
+      "DOCUMENT_NOT_FOUND": "Documento não encontrado.",
+      "NOT_PENDING_REVIEW": "Este documento já foi analisado ou substituído.",
+      "REJECTION_REASON_REQUIRED": "Informe o motivo da recusa.",
+      "REJECTION_REASON_TOO_LONG": "O motivo da recusa é longo demais.",
+      "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente.",
+      "FORBIDDEN": "Seu perfil na equipe não permite esta ação.",
+      "unexpected": "Algo deu errado. Tente novamente."
     }
   }
 }
