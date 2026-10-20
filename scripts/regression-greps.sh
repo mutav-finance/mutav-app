@@ -32,7 +32,7 @@ SRC_GLOB=(apps/agency/src convex)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Bare public mutation/query handlers must use the auth wrappers
-#    or the documented resource-by-id pattern (assertAgencyAccess).
+#    or the documented resource-by-id pattern (assertAgencyAccess, or assertActiveAgencyAccess for writes).
 #    Allowlist (with rationale):
 #    - convex/users/useCases.ts: getMe is the only bare query intentionally
 #      returning null on missing JWT (UI needs to distinguish loading vs
@@ -79,8 +79,8 @@ for file in $files_with_bare; do
   if [[ "$file" == "convex/invoices/mutations.ts" ]]; then
     continue
   fi
-  # File must call assertAgencyAccess somewhere (resource-by-id pattern)
-  if ! rg -q 'assertAgencyAccess' "$file"; then
+  # File must call assertAgencyAccess or assertActiveAgencyAccess somewhere (resource-by-id pattern)
+  if ! rg -q 'assert(Active)?AgencyAccess' "$file"; then
     fail "$file uses bare public mutation/query without assertAgencyAccess. Use a wrapper from convex/lib/auth.ts."
     bare_violations=$((bare_violations + 1))
   fi
