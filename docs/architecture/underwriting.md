@@ -86,6 +86,7 @@ guarantees/      COMPOSITION → coverageDecisions  (verify + creditAnalysis ∩
 
 - `creditAnalysis` provider+signal engine is built, renamed, and trimmed (slice A1, PR #188; originally `convex/screening/`).
 - `products` catalog is built (slice A2, shipped with the lease/guarantee split — see [ADR 0007](decisions/0007-lease-guarantee-split.md)). It lives at `convex/products/` and is read by `guarantees.create`; there is no admin CRUD UI yet, so the catalog is seeded rather than edited.
+- **Mutav's human review is built** ([ADR 0009](decisions/0009-underwriting-review.md)): the agency requests analysis on a draft, compliance accepts at a rate it sets or refuses (closing the draft as `underwriting_refused`), then marks the contract sent for signature. The bureau score is an input to that decision — `create` no longer refuses a `negado` tier. The decision lives on `guarantees.underwriting.decision`; it is the pilot's decision record until `coverageDecisions` lands. Lifecycle detail: [`guarantee-lifecycle.md`](guarantee-lifecycle.md) § 6.1a.
 - `compliance/verification`, the `guarantees` underwriting composition + `coverageDecisions`, and the compliance substrate are not yet built.
 
 ## Related reading
