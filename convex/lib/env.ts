@@ -112,7 +112,14 @@ const DEFAULT_HORIZON_TESTNET = "https://horizon-testnet.stellar.org";
 const DEFAULT_HORIZON_PUBLIC = "https://horizon.stellar.org";
 
 export function getMutavSourceAccount(): string {
-  return process.env.STELLAR_MUTAV_SOURCE_ACCOUNT ?? DEV_FALLBACK_TREASURY;
+  const account = process.env.STELLAR_MUTAV_SOURCE_ACCOUNT;
+  if (account) return account;
+  // The fallback is a demo account; on mainnet it would route real payments
+  // to an address Mutav may not control.
+  if (getStellarNetwork() === "public") {
+    throw new Error("STELLAR_MUTAV_SOURCE_ACCOUNT must be set when STELLAR_NETWORK=public");
+  }
+  return DEV_FALLBACK_TREASURY;
 }
 
 export function getStellarNetwork(): "testnet" | "public" {
@@ -489,4 +496,103 @@ export function getPiiHmacKey(): Uint8Array {
     throw new Error(`PII_HMAC_KEY must decode to 32 bytes; got ${key.length}.`);
   }
   return key;
+}
+
+// ─── Launch readiness ────────────────────────────────────────────────────────
+
+/**
+ * When a variable has to be set:
+ * - `launch` — onboarding an agency through to an active guarantee needs it.
+ * - `feature` — one feature needs it (payments, bureau, anchoring); unset
+ *   means that feature is off or mocked, not that launch is blocked.
+ */
+export type EnvRequirement = "launch" | "feature";
+
+export type EnvManifestEntry = {
+  name: string;
+  requirement: EnvRequirement;
+  feature: string;
+};
+
+/**
+ * Every variable `convex/lib/env.ts` reads. A test keeps this list in step
+ * with the getters above, so a new getter cannot ship without a decision on
+ * whether launch depends on it.
+ */
+export const ENV_MANIFEST: readonly EnvManifestEntry[] = [
+  { name: "AUTH0_DOMAIN", requirement: "launch", feature: "sign-in (prod Auth0 tenant)" },
+  { name: "AUTH0_CLIENT_ID", requirement: "launch", feature: "sign-in (prod Auth0 tenant)" },
+  { name: "APP_URL", requirement: "launch", feature: "links in emails" },
+  { name: "RESEND_API_KEY", requirement: "launch", feature: "transactional email" },
+  { name: "RESEND_FROM_EMAIL", requirement: "launch", feature: "transactional email" },
+  { name: "PII_ENCRYPTION_KEY", requirement: "launch", feature: "PII encryption at rest" },
+  { name: "PII_HMAC_KEY", requirement: "launch", feature: "CPF/CNPJ lookups and claims" },
+  { name: "SCORE_PROVIDER", requirement: "launch", feature: "credit bureau (mock if unset)" },
+  { name: "CPFCNPJ_TOKEN", requirement: "feature", feature: "credit bureau: cpfcnpj" },
+  { name: "BIGDATACORP_LOGIN", requirement: "feature", feature: "credit bureau: bigdatacorp" },
+  { name: "BIGDATACORP_PASSWORD", requirement: "feature", feature: "credit bureau: bigdatacorp" },
+  { name: "BIGDATACORP_DATASET", requirement: "feature", feature: "credit bureau: bigdatacorp" },
+  { name: "AUTH0_MGMT_CLIENT_ID", requirement: "feature", feature: "Auth0 management API" },
+  { name: "AUTH0_MGMT_CLIENT_SECRET", requirement: "feature", feature: "Auth0 management API" },
+  { name: "AUDIT_ANCHOR_SECRET", requirement: "feature", feature: "on-chain audit anchoring" },
+  { name: "WHATSAPP_API_URL", requirement: "feature", feature: "WhatsApp notifications" },
+  { name: "WHATSAPP_API_KEY", requirement: "feature", feature: "WhatsApp notifications" },
+  { name: "STELLAR_NETWORK", requirement: "feature", feature: "payments: Stellar network" },
+  { name: "STELLAR_MUTAV_SOURCE_ACCOUNT", requirement: "feature", feature: "payments: Stellar" },
+  { name: "STELLAR_HORIZON_URL", requirement: "feature", feature: "payments: Stellar" },
+  { name: "STELLAR_SOROBAN_RPC_URL", requirement: "feature", feature: "payments: Stellar" },
+  { name: "STELLAR_RESERVE_CONTRACT_ID", requirement: "feature", feature: "reserve transparency" },
+  {
+    name: "STELLAR_RESERVE_POLICY_CONTRACT_ID",
+    requirement: "feature",
+    feature: "reserve transparency",
+  },
+  {
+    name: "STELLAR_RESERVE_REGISTRY_CONTRACT_ID",
+    requirement: "feature",
+    feature: "reserve transparency",
+  },
+  { name: "STELLAR_RESERVE_BRL_SYMBOLS", requirement: "feature", feature: "reserve transparency" },
+  { name: "STELLAR_RESERVE_USD_SYMBOLS", requirement: "feature", feature: "reserve transparency" },
+  { name: "BCB_PTAX_BASE_URL", requirement: "feature", feature: "reserve transparency (FX)" },
+  { name: "MUTAV_TREASURY_SECRET", requirement: "feature", feature: "payments: anchor auth" },
+  {
+    name: "MUTAV_STELLAR_SECRET_ENCRYPTION_KEY",
+    requirement: "feature",
+    feature: "payments: per-agency anchor accounts",
+  },
+  { name: "ETHERFUSE_API_KEY", requirement: "feature", feature: "payments: Pix via Etherfuse" },
+  { name: "ETHERFUSE_BASE_URL", requirement: "feature", feature: "payments: Pix via Etherfuse" },
+  {
+    name: "ETHERFUSE_WEBHOOK_SECRET",
+    requirement: "feature",
+    feature: "payments: Pix via Etherfuse",
+  },
+  { name: "RESEND_INVESTIDOR_AUDIENCE_ID", requirement: "feature", feature: "waitlist sync" },
+  { name: "RESEND_IMOBILIARIA_AUDIENCE_ID", requirement: "feature", feature: "waitlist sync" },
+];
+
+export type EnvPresence = EnvManifestEntry & { set: boolean };
+
+/** Which manifest variables are set. Reports presence only — never a value. */
+export function reportEnvPresence(): EnvPresence[] {
+  return ENV_MANIFEST.map((entry) => ({ ...entry, set: Boolean(process.env[entry.name]) }));
+}
+
+/**
+ * The non-secret settings readiness compares against known-unsafe values
+ * (the dev Auth0 tenant, the mock bureau, sandbox payment rails).
+ */
+export function getLaunchSettings(): {
+  auth0Domain: string;
+  scoreProvider: string;
+  stellarNetwork: "testnet" | "public";
+  etherfuseBaseUrl: string;
+} {
+  return {
+    auth0Domain: getAuth0Domain(),
+    scoreProvider: getScoreProvider(),
+    stellarNetwork: getStellarNetwork(),
+    etherfuseBaseUrl: getEtherfuseBaseUrl(),
+  };
 }

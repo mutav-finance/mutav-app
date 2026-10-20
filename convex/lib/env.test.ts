@@ -10,6 +10,9 @@ import {
   getReserveBrlPeggedSymbols,
   getReserveUsdSymbols,
   getBcbPtaxBaseUrl,
+  ENV_MANIFEST,
+  getMutavSourceAccount,
+  reportEnvPresence,
 } from "./env";
 
 describe("getAuth0MgmtClientId", () => {
@@ -238,5 +241,71 @@ describe("getStellarRpcUrl", () => {
     delete process.env[URLK];
     process.env[NET] = "public";
     expect(getStellarRpcUrl()).toBe("https://mainnet.sorobanrpc.com");
+  });
+});
+
+describe("ENV_MANIFEST", () => {
+  test("lists every variable env.ts reads, exactly once", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(new URL("./env.ts", import.meta.url), "utf8");
+    const dotted = [...source.matchAll(/process\.env\.([A-Z0-9_]+)/g)].map((m) => m[1]);
+    const quoted = [...source.matchAll(/"(RESEND_[A-Z_]+_AUDIENCE_ID)"/g)].map((m) => m[1]);
+    const read = new Set([...dotted, ...quoted]);
+    const listed = ENV_MANIFEST.map((entry) => entry.name);
+
+    expect(new Set(listed).size).toBe(listed.length);
+    expect(new Set(listed)).toEqual(read);
+  });
+});
+
+describe("reportEnvPresence", () => {
+  let original: string | undefined;
+  beforeEach(() => {
+    original = process.env.RESEND_API_KEY;
+  });
+  afterEach(() => {
+    if (original === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = original;
+  });
+
+  test("reports presence and never the value", () => {
+    process.env.RESEND_API_KEY = "re_secret_value";
+
+    const entry = reportEnvPresence().find((e) => e.name === "RESEND_API_KEY");
+
+    expect(entry).toEqual({
+      name: "RESEND_API_KEY",
+      requirement: "launch",
+      feature: "transactional email",
+      set: true,
+    });
+    expect(JSON.stringify(reportEnvPresence())).not.toContain("re_secret_value");
+  });
+});
+
+describe("getMutavSourceAccount", () => {
+  const saved = {
+    network: process.env.STELLAR_NETWORK,
+    account: process.env.STELLAR_MUTAV_SOURCE_ACCOUNT,
+  };
+  afterEach(() => {
+    if (saved.network === undefined) delete process.env.STELLAR_NETWORK;
+    else process.env.STELLAR_NETWORK = saved.network;
+    if (saved.account === undefined) delete process.env.STELLAR_MUTAV_SOURCE_ACCOUNT;
+    else process.env.STELLAR_MUTAV_SOURCE_ACCOUNT = saved.account;
+  });
+
+  test("refuses the demo fallback on mainnet", () => {
+    process.env.STELLAR_NETWORK = "public";
+    delete process.env.STELLAR_MUTAV_SOURCE_ACCOUNT;
+
+    expect(() => getMutavSourceAccount()).toThrow(/must be set when STELLAR_NETWORK=public/);
+  });
+
+  test("keeps the demo fallback on testnet", () => {
+    delete process.env.STELLAR_NETWORK;
+    delete process.env.STELLAR_MUTAV_SOURCE_ACCOUNT;
+
+    expect(getMutavSourceAccount()).toMatch(/^G[A-Z2-7]{55}$/);
   });
 });
