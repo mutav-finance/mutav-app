@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import type { Result } from "../lib/result";
-import { mutationWithAgencyScope, mutationWithMutavRole } from "../lib/auth";
+import { mutationWithActiveAgency, mutationWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
 import type { AgencyId } from "../agencies/domain";
 import { ufFromCityUF } from "../leases/domain";
@@ -95,7 +95,7 @@ type ActivateErrorResult = {
  * default before cover starts), so the full ceiling is available and the
  * ceiling the guarantee runs on is the one it was priced under.
  */
-export const activate = mutationWithAgencyScope({
+export const activate = mutationWithActiveAgency({
   args: { publicId: v.string() },
   handler: async (ctx, args): Promise<Result<ActivateSuccessResult, ActivateErrorResult>> => {
     const guarantee = await findAgencyGuarantee(ctx, {
@@ -154,7 +154,7 @@ type StaffCloseErrorResult = {
  * and belongs to compliance, so this mutation takes no reason argument rather
  * than validating one it would always reject.
  */
-export const closeEndOfLease = mutationWithAgencyScope({
+export const closeEndOfLease = mutationWithActiveAgency({
   args: { publicId: v.string(), note: v.optional(v.string()) },
   handler: async (ctx, args): Promise<Result<CloseSuccessResult, CloseErrorResult>> => {
     const guarantee = await findAgencyGuarantee(ctx, {

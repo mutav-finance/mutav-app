@@ -1186,3 +1186,64 @@ describe("seedReset", () => {
     expect(auditRows).toBe(0);
   });
 });
+
+describe("lockForRealData", () => {
+  test("clears the demo dataset, drops the seeded staff grants and keeps the default product", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const result = await t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" });
+
+    expect(result.staffGrantsRemoved).toBe(1);
+    expect(result.product).toBe("mutav-fianca");
+    const remaining = await t.run(async (ctx) => ({
+      agencies: (await ctx.db.query("agencies").collect()).length,
+      users: (await ctx.db.query("users").collect()).length,
+      guarantees: (await ctx.db.query("guarantees").collect()).length,
+      staff: (await ctx.db.query("mutavStaff").collect()).length,
+      products: (await ctx.db.query("products").collect()).length,
+      locks: (await ctx.db.query("deploymentLocks").collect()).length,
+    }));
+    expect(remaining).toEqual({
+      agencies: 0,
+      users: 0,
+      guarantees: 0,
+      staff: 0,
+      products: 1,
+      locks: 1,
+    });
+  });
+
+  test("keeps the waitlist and writes an audit entry", async () => {
+    const t = setup();
+    await t.run((ctx) =>
+      ctx.db.insert("waitlist", {
+        email: "lead@example.com",
+        audience: "imobiliaria",
+        ts: Date.parse(SEED_NOW),
+      }),
+    );
+
+    await t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" });
+
+    const { waitlist, audit } = await t.run(async (ctx) => ({
+      waitlist: await ctx.db.query("waitlist").collect(),
+      audit: await ctx.db.query("mutavAuditLog").collect(),
+    }));
+    expect(waitlist).toHaveLength(1);
+    expect(audit.map((entry) => entry.action)).toContain("deployment.locked_for_real_data");
+  });
+
+  test("makes every seed entrypoint refuse afterwards, including a second lock", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" });
+
+    await expect(t.mutation(internal.seed.seedReset, {})).rejects.toThrow(/locked for real data/);
+    await expect(t.mutation(internal.seed.seedTestPersonas, {})).rejects.toThrow(
+      /locked for real data/,
+    );
+    await expect(t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" })).rejects.toThrow(
+      /locked for real data/,
+    );
+  });
+});

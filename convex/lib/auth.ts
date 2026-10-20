@@ -3,6 +3,7 @@ import { customMutation, customQuery } from "convex-helpers/server/customFunctio
 import { mutation, query } from "../_generated/server";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import type { User } from "../users/domain";
+import { ONBOARDING_STATE } from "../agencies/domain";
 import type { Membership } from "../agencies/domain";
 import type { AppendAuditEntryInput } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
@@ -102,6 +103,28 @@ export async function assertAgencyAccess(
   return resolveMembership(ctx, user, agencyId);
 }
 
+/**
+ * Membership is not enough to write business data: an agency still in
+ * onboarding, or one staff rejected, must not originate guarantees or touch
+ * invoices. The UI routes such users away, but the API is reachable directly.
+ */
+async function assertAgencyActive(ctx: DbCtx, agencyId: Membership["agencyId"]): Promise<void> {
+  const agency = await ctx.db.get(agencyId);
+  if (agency?.onboardingState !== ONBOARDING_STATE.ACTIVE) {
+    throw new ForbiddenError("Agency is not active");
+  }
+}
+
+/** `assertAgencyAccess` plus the active-agency gate — for resource-by-id writes. */
+export async function assertActiveAgencyAccess(
+  ctx: DbCtx,
+  agencyId: Membership["agencyId"],
+): Promise<Membership> {
+  const membership = await assertAgencyAccess(ctx, agencyId);
+  await assertAgencyActive(ctx, agencyId);
+  return membership;
+}
+
 // ─── Wrappers ─────────────────────────────────────────────────────────────────
 
 export const queryWithAuth = customQuery(query, {
@@ -134,6 +157,20 @@ export const mutationWithAgencyScope = customMutation(mutation, {
   input: async (ctx, { agencyId }) => {
     const user = await resolveCurrentUser(ctx);
     const membership = await resolveMembership(ctx, user, agencyId);
+    return { ctx: { user, membership, agencyId }, args: {} };
+  },
+});
+
+/**
+ * `mutationWithAgencyScope` for business writes: also requires the agency to
+ * have passed staff review. Onboarding mutations keep the plain wrapper.
+ */
+export const mutationWithActiveAgency = customMutation(mutation, {
+  args: { agencyId: v.id("agencies") },
+  input: async (ctx, { agencyId }) => {
+    const user = await resolveCurrentUser(ctx);
+    const membership = await resolveMembership(ctx, user, agencyId);
+    await assertAgencyActive(ctx, agencyId);
     return { ctx: { user, membership, agencyId }, args: {} };
   },
 });

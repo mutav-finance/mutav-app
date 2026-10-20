@@ -2,7 +2,11 @@ import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import type { Result } from "../lib/result";
-import { assertAgencyAccess, mutationWithAgencyScope, mutationWithMutavRole } from "../lib/auth";
+import {
+  assertActiveAgencyAccess,
+  mutationWithActiveAgency,
+  mutationWithMutavRole,
+} from "../lib/auth";
 import {
   GUARANTEE_STATE,
   isInsured,
@@ -173,7 +177,7 @@ const RENT_DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  * system paths and would falsely elevate the row on the transparency
  * dashboard if agencies could self-attest.
  */
-export const openNotice = mutationWithAgencyScope({
+export const openNotice = mutationWithActiveAgency({
   args: {
     guaranteePublicId: v.string(),
     rentDueDate: v.string(),
@@ -345,7 +349,7 @@ type MarkResolvedError = {
 /**
  * Agency-side resolution. Deliberately excludes `cover_committed` and
  * `staff_dispute` at the validator — those are staff-only dispositions.
- * Bare mutation + inline assertAgencyAccess is the resource-by-id pattern:
+ * Bare mutation + inline assertActiveAgencyAccess is the resource-by-id pattern:
  * the deep-linkable noticePublicId means the agency ID comes from the row,
  * not from client args.
  */
@@ -376,9 +380,9 @@ export const markResolved = mutation({
     // Write path: let the throw propagate on cross-agency access. Unlike
     // reads, writes should fail loudly — the caller must not silently
     // observe a null when their action was refused. `membership.userId` is
-    // the authenticated caller's id — assertAgencyAccess resolved it from
+    // the authenticated caller's id — assertActiveAgencyAccess resolved it from
     // the identity token — so no separate user re-fetch is needed.
-    const membership = await assertAgencyAccess(ctx, notice.agencyId);
+    const membership = await assertActiveAgencyAccess(ctx, notice.agencyId);
 
     if (notice.status === DELINQUENCY_STATUS.VERIFIED) {
       return {
@@ -486,7 +490,7 @@ export const markCanceled = mutation({
 
     // See markResolved above for why membership.userId (not a re-fetch) is
     // the authored-by id on a bare mutation.
-    const membership = await assertAgencyAccess(ctx, notice.agencyId);
+    const membership = await assertActiveAgencyAccess(ctx, notice.agencyId);
 
     if (notice.status === DELINQUENCY_STATUS.VERIFIED) {
       return {
