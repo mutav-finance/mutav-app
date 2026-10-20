@@ -255,6 +255,8 @@ export const PERSONAL_DATA_TABLES = [
  * letting it default.
  */
 export const OUT_OF_SCOPE_TABLES = {
+  deploymentLocks:
+    "One operational row recording when a deployment stopped accepting seed data: a timestamp and a fixed reason string. Nothing in it identifies or relates to a person.",
   mutavAuditAnchors:
     "Merkle roots and their submission metadata. §4.2 records `rootHash` as T4 and states plainly that it is not personal data; §2.3 puts published on-chain records out of scope. Every column here is an integrity commitment or a submission outcome about a transaction, not about a person.",
   reserveSnapshots:

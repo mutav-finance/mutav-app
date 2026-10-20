@@ -252,6 +252,8 @@ The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outs
 - `schemaValidation: false` is intentional for this window — a deploy tolerates older data at rest until the operator reseeds (`bun run seed`). Don't flip it to `true` yet.
 - Deploy runbook: `convex deploy` → `bun run seed`. Never assume in-place data preservation.
 
+**The switch is `seed:lockForRealData`** (`bunx convex run --prod seed:lockForRealData '{"confirm":"LOCK"}'`): run once on production before the first real agency signs up. It clears the demo dataset, drops the staff grants the wipe orphaned (the seeded `systemadmin` admin role), keeps the default product, and writes a `deploymentLocks` row after which `seedReset` / `seedTestPersonas` throw.
+
 **This inverts once the first real (non-seed) data reaches the app.** From that point: switch to in-place migrations (widen → migrate → narrow, two PRs — the `schemaValidation` toggle pattern), add each `internal.migrations.<name>` to `runAll` (auto-run by `scripts/run-migrations.sh` on deploy), and re-enable strict `schemaValidation`. The full policy note lives at the top of `convex/migrations.ts`.
 
 ### Layout primitives

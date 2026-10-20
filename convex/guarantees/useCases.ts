@@ -64,7 +64,7 @@ import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import {
   assertAgencyAccess,
-  mutationWithAgencyScope,
+  mutationWithActiveAgency,
   queryWithAgencyScope,
   queryWithAuth,
 } from "../lib/auth";
@@ -817,7 +817,7 @@ type OpenContractApplicationErrorResult = { code: typeof GUARANTEE_ERROR_CODE.IN
  * member who declared it, and the only thing that authorises a bureau
  * consultation on the subject.
  */
-export const openContractApplication = mutationWithAgencyScope({
+export const openContractApplication = mutationWithActiveAgency({
   args: {
     document: v.string(),
     entityType: tenantEntityTypeValidator,
@@ -857,7 +857,7 @@ export const openContractApplication = mutationWithAgencyScope({
   },
 });
 
-export const requestCreditScore = mutationWithAgencyScope({
+export const requestCreditScore = mutationWithActiveAgency({
   args: { document: v.string() },
   handler: async (ctx, { document }) => {
     const digits = document.replace(/\D/g, "");
@@ -926,7 +926,7 @@ type CreateGuaranteeErrorResult = {
  * (`tenantSnapshot`, the as-signed mitigation). Every error Result happens
  * before any write.
  */
-export const create = mutationWithAgencyScope({
+export const create = mutationWithActiveAgency({
   args: {
     lease: v.object({
       propertyKind: propertyKindValidator,
@@ -1156,7 +1156,7 @@ type CancelDraftErrorResult = {
  * lifecycle mechanics belong to the shared helper, so there is still exactly
  * one implementation of the transition.
  */
-export const cancelDraft = mutationWithAgencyScope({
+export const cancelDraft = mutationWithActiveAgency({
   args: { publicId: v.string() },
   handler: async (ctx, args): Promise<Result<CancelDraftSuccessResult, CancelDraftErrorResult>> => {
     const candidates = await ctx.db
