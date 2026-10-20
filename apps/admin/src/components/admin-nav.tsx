@@ -9,6 +9,7 @@ import {
   ActivityIcon,
   ScaleIcon,
   UsersIcon,
+  FileSignatureIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { NavMain } from "@/components/nav-main";
@@ -20,6 +21,7 @@ export function AdminNav() {
     { title: tMain("overview"), href: "/", icon: <LayoutDashboardIcon /> },
     { title: tMain("agencies"), href: "/agencies", icon: <BuildingIcon /> },
     { title: tMain("compliance"), href: "/compliance", icon: <ShieldCheckIcon /> },
+    { title: tMain("guarantees"), href: "/guarantees", icon: <FileSignatureIcon /> },
     { title: tMain("defaults"), href: "/defaults", icon: <AlertOctagonIcon /> },
     { title: tMain("treasury"), href: "/treasury", icon: <CoinsIcon /> },
     { title: tMain("observability"), href: "/observability", icon: <ActivityIcon /> },

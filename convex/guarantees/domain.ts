@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { Result } from "../lib/result";
 import { GUARANTEE_STATE, type GuaranteeState } from "./machine";
 
 export type Guarantee = Doc<"guarantees">;
@@ -210,6 +211,71 @@ export const DOCUMENT_STATUS = {
   APROVADO: "aprovado",
 } as const satisfies Record<Uppercase<DocumentStatus>, DocumentStatus>;
 
+export type SignedContract = Doc<"guaranteeSignedContracts">;
+export type SignedContractId = Id<"guaranteeSignedContracts">;
+export type SignedContractUploaderKind = SignedContract["uploadedBy"]["kind"];
+
+/** Who put the signed contract on file: the agency that sold it, or Mutav staff. */
+export const SIGNED_CONTRACT_UPLOADER = {
+  AGENCY: "agency",
+  STAFF: "staff",
+} as const satisfies Record<Uppercase<SignedContractUploaderKind>, SignedContractUploaderKind>;
+
+export const SIGNED_CONTRACT_CONTENT_TYPE = "application/pdf";
+export const SIGNED_CONTRACT_MAX_BYTES = 10 * 1024 * 1024;
+export const SIGNED_CONTRACT_FILE_NAME_MAX_LENGTH = 200;
+
+export const SIGNED_CONTRACT_FILE_ERROR_CODE = {
+  INVALID_FILE_TYPE: "INVALID_FILE_TYPE",
+  FILE_TOO_LARGE: "FILE_TOO_LARGE",
+  INVALID_FILE_NAME: "INVALID_FILE_NAME",
+} as const satisfies Record<string, string>;
+
+export type SignedContractFileErrorCode =
+  (typeof SIGNED_CONTRACT_FILE_ERROR_CODE)[keyof typeof SIGNED_CONTRACT_FILE_ERROR_CODE];
+
+/**
+ * Server-side file check. `contentType` and `sizeBytes` come from the
+ * `_storage` system row, which the upload endpoint records from the request —
+ * never from the mutation's args. A missing content type is refused.
+ */
+export function checkSignedContractFile({
+  contentType,
+  sizeBytes,
+  fileName,
+}: {
+  contentType: string | undefined;
+  sizeBytes: number;
+  fileName: string;
+}): Result<{ fileName: string }, { code: SignedContractFileErrorCode }> {
+  const name = fileName.trim();
+  if (name.length === 0 || name.length > SIGNED_CONTRACT_FILE_NAME_MAX_LENGTH) {
+    return {
+      success: false,
+      error: { code: SIGNED_CONTRACT_FILE_ERROR_CODE.INVALID_FILE_NAME },
+      message: `File name must be 1-${SIGNED_CONTRACT_FILE_NAME_MAX_LENGTH} characters`,
+    };
+  }
+  const isPdf =
+    contentType?.split(";")[0].trim().toLowerCase() === SIGNED_CONTRACT_CONTENT_TYPE &&
+    name.toLowerCase().endsWith(".pdf");
+  if (!isPdf) {
+    return {
+      success: false,
+      error: { code: SIGNED_CONTRACT_FILE_ERROR_CODE.INVALID_FILE_TYPE },
+      message: `Only ${SIGNED_CONTRACT_CONTENT_TYPE} files are accepted`,
+    };
+  }
+  if (sizeBytes <= 0 || sizeBytes > SIGNED_CONTRACT_MAX_BYTES) {
+    return {
+      success: false,
+      error: { code: SIGNED_CONTRACT_FILE_ERROR_CODE.FILE_TOO_LARGE },
+      message: `File must be between 1 byte and ${SIGNED_CONTRACT_MAX_BYTES} bytes`,
+    };
+  }
+  return { success: true, data: { fileName: name }, message: "File accepted" };
+}
+
 export const TENANT_APPROVAL_STATUS = {
   APROVADO: "aprovado",
   PENDENTE: "pendente",
@@ -240,6 +306,10 @@ export const GUARANTEE_ERROR_CODE = {
   RELEASE_EXCEEDS_RESERVED: "RELEASE_EXCEEDS_RESERVED",
   GUARANTEE_CLOSED: "GUARANTEE_CLOSED",
   INVALID_RENEWAL_DATE: "INVALID_RENEWAL_DATE",
+  SIGNED_CONTRACT_REQUIRED: "SIGNED_CONTRACT_REQUIRED",
+  SIGNED_CONTRACT_LOCKED: "SIGNED_CONTRACT_LOCKED",
+  FILE_NOT_FOUND: "FILE_NOT_FOUND",
+  FILE_ALREADY_ATTACHED: "FILE_ALREADY_ATTACHED",
 } as const satisfies Record<string, string>;
 
 export type GuaranteeErrorCode = (typeof GUARANTEE_ERROR_CODE)[keyof typeof GUARANTEE_ERROR_CODE];

@@ -9,6 +9,7 @@ import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { resolveProduct } from "../products/useCases";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import { priceGuarantee } from "./pricing";
+import { findSignedContract } from "./signedContracts";
 import {
   CLOSE_REASON,
   closeReasonValidator,
@@ -86,7 +87,10 @@ const notFound = (publicId: string) => ({
 
 type ActivateSuccessResult = { publicId: string; capacity: GuaranteeCapacity };
 type ActivateErrorResult = {
-  code: typeof GUARANTEE_ERROR_CODE.NOT_FOUND | TransitionErrorCode;
+  code:
+    | typeof GUARANTEE_ERROR_CODE.NOT_FOUND
+    | typeof GUARANTEE_ERROR_CODE.SIGNED_CONTRACT_REQUIRED
+    | TransitionErrorCode;
 };
 
 /**
@@ -94,6 +98,12 @@ type ActivateErrorResult = {
  * snapshot at this moment — a draft can carry no reservation (nothing can
  * default before cover starts), so the full ceiling is available and the
  * ceiling the guarantee runs on is the one it was priced under.
+ *
+ * Agency-only, by design: Mutav staff may put the signed contract on file but
+ * the agency that sold the guarantee is the one that puts it on risk. A draft
+ * without a signed contract on file is refused (`SIGNED_CONTRACT_REQUIRED`).
+ * The check applies to drafts only, so a replayed activation still lands on
+ * the machine's `SELF_TRANSITION`.
  */
 export const activate = mutationWithAgencyScope({
   args: { publicId: v.string() },
@@ -103,6 +113,17 @@ export const activate = mutationWithAgencyScope({
       agencyId: ctx.agencyId,
     });
     if (!guarantee) return notFound(args.publicId);
+
+    if (
+      guarantee.status === GUARANTEE_STATE.DRAFTED &&
+      !(await findSignedContract(ctx, guarantee._id))
+    ) {
+      return {
+        success: false,
+        error: { code: GUARANTEE_ERROR_CODE.SIGNED_CONTRACT_REQUIRED },
+        message: `Guarantee ${guarantee.publicId} has no signed contract on file`,
+      };
+    }
 
     // Nothing can have drawn cover before the guarantee went on risk, so a
     // reservation on a draft is drift rather than history. Refuse it — writing

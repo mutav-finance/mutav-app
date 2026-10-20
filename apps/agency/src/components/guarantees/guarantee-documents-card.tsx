@@ -10,9 +10,11 @@ import type {
   DocumentStatus,
 } from "@/lib/guarantees/types";
 import { StatusTag } from "@mutav/ui/guarantee-state-tag";
+import { templateHref } from "@/lib/guarantees/templates";
 
-const docKeys: GuaranteeDocumentKey[] = ["rentalContract", "inspection", "policy"];
-const keysWithTemplate = new Set<GuaranteeDocumentKey>(["rentalContract", "inspection"]);
+// The contract is collected by `SignedContractCard`; this card keeps the
+// documents whose upload is not built yet.
+const docKeys: GuaranteeDocumentKey[] = ["inspection", "policy"];
 
 const statusTone: Record<DocumentStatus, "accent" | "neutral" | "success"> = {
   pendente: "accent",
@@ -33,10 +35,11 @@ export function GuaranteeDocumentsCard({ documents }: { documents: GuaranteeDocu
           {t("heading")}
         </Eyebrow>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <CardContent className="grid gap-3 sm:grid-cols-2">
         {docKeys.map((key) => {
           const doc = byKey.get(key);
           const status = doc?.status ?? "pendente";
+          const template = templateHref(key);
           return (
             <div key={key} className="border-border flex flex-col gap-3 rounded border p-4">
               <div className="flex items-start gap-2">
@@ -60,11 +63,11 @@ export function GuaranteeDocumentsCard({ documents }: { documents: GuaranteeDocu
                     </TooltipTrigger>
                     <TooltipContent>{t("sendDisabled")}</TooltipContent>
                   </Tooltip>
-                  {keysWithTemplate.has(key) && (
+                  {template && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button variant="ghost" size="sm" className="self-start" asChild>
-                          <a href={`/templates/${key}.pdf`} download>
+                          <a href={template} download>
                             <DownloadIcon className="size-4" strokeWidth={1.25} aria-hidden />
                             <span className="sr-only">{t("downloadTemplate")}</span>
                           </a>

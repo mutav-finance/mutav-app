@@ -474,6 +474,53 @@
         "plus": "Mutav Fiança +"
       }
     },
+    "signedContract": {
+      "heading": "Contrato assinado",
+      "help": "O contrato de fiança é assinado fora da plataforma: baixe o modelo, colete as assinaturas e envie aqui o PDF assinado. A garantia só pode ser ativada com o contrato assinado anexado.",
+      "constraints": "Apenas PDF, até 10 MB.",
+      "upload": "Enviar contrato assinado",
+      "replace": "Substituir",
+      "uploading": "Enviando…",
+      "download": "Baixar",
+      "downloadTemplate": "Baixar modelo",
+      "loading": "Carregando contrato",
+      "uploadedBy": "Enviado por {who} em {when}",
+      "uploaderKind": {
+        "agency": "Imobiliária",
+        "staff": "Equipe MUTAV"
+      },
+      "noneOnFile": "Nenhum contrato assinado anexado.",
+      "locked": "Garantia ativada: o contrato está bloqueado para alterações.",
+      "uploaded": "Contrato assinado enviado.",
+      "replaced": "Contrato assinado substituído.",
+      "activated": "Garantia ativada.",
+      "activate": "Ativar garantia",
+      "activateHint": "Coloca a garantia em vigor",
+      "activateDisabledHint": "Envie o contrato assinado para ativar",
+      "activateDialog": {
+        "title": "Ativar garantia?",
+        "description": "A garantia entra em vigor e o contrato assinado fica bloqueado para alterações. Esta ação não pode ser desfeita.",
+        "confirm": "Sim, ativar",
+        "activating": "Ativando…",
+        "back": "Voltar"
+      },
+      "errors": {
+        "NOT_FOUND": "Garantia não encontrada.",
+        "SIGNED_CONTRACT_LOCKED": "O contrato não pode mais ser alterado: a garantia já foi ativada.",
+        "SIGNED_CONTRACT_REQUIRED": "Envie o contrato assinado antes de ativar a garantia.",
+        "FILE_NOT_FOUND": "O arquivo enviado não foi encontrado. Tente novamente.",
+        "FILE_ALREADY_ATTACHED": "Este arquivo já está vinculado a uma garantia.",
+        "INVALID_FILE_TYPE": "Envie o contrato em PDF.",
+        "FILE_TOO_LARGE": "O PDF deve ter até 10 MB.",
+        "INVALID_FILE_NAME": "Nome de arquivo inválido. Renomeie o PDF e tente novamente.",
+        "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente.",
+        "CAPACITY_INVARIANT_BROKEN": "A cobertura desta garantia está inconsistente. Fale com a MUTAV.",
+        "SELF_TRANSITION": "Esta garantia já está ativa.",
+        "ILLEGAL_TRANSITION": "Esta garantia não pode ser ativada no estado atual.",
+        "TERMINAL_STATE": "Esta garantia está encerrada.",
+        "UNEXPECTED": "Erro inesperado. Tente novamente."
+      }
+    },
     "documents": {
       "heading": "Documentos",
       "send": "Enviar",

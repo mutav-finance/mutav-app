@@ -25,6 +25,7 @@ import { GuaranteeLeaseCard } from "./guarantee-lease-card";
 import { GuaranteeSummaryCard } from "./guarantee-summary-card";
 import { GuaranteeTermsCard } from "./guarantee-terms-card";
 import { GuaranteeTenantCard } from "./guarantee-tenant-card";
+import { SignedContractCard } from "./signed-contract-card";
 
 export function GuaranteeDetailsPage({
   preloaded,
@@ -69,6 +70,11 @@ export function GuaranteeDetailsPage({
         <GuaranteeTenantCard tenant={guarantee.tenant} />
         <GuaranteeLeaseCard lease={guarantee.lease} />
         <GuaranteeTermsCard terms={guarantee.terms} />
+        <SignedContractCard
+          agencyId={guarantee.agencyId}
+          publicId={guarantee.id}
+          status={guarantee.status}
+        />
         <GuaranteeDocumentsCard documents={guarantee.documents} />
         <GuaranteeHistoryCard history={guarantee.history} />
       </PageContent>

@@ -526,6 +526,30 @@ export default defineSchema(
       .index("by_slug", ["slug"])
       .index("by_enabled_isDefault", ["enabled", "isDefault"]),
 
+    // The fiança contract, signed offline, as a PDF in Convex File Storage.
+    // At most one row per guarantee: a replace before activation overwrites
+    // the row and deletes the superseded blob (the audit log keeps the old
+    // file's name, size and sha256). Activation requires the row; once the
+    // guarantee leaves `drafted` the row is locked.
+    // Canonical `SIGNED_CONTRACT_UPLOADER` lives in `convex/guarantees/domain.ts`.
+    guaranteeSignedContracts: defineTable({
+      agencyId: v.id("agencies"),
+      guaranteeId: v.id("guarantees"),
+      guaranteePublicId: v.string(),
+      storageId: v.id("_storage"),
+      fileName: v.string(),
+      sizeBytes: v.number(),
+      sha256: v.string(),
+      uploadedAt: v.string(),
+      uploadedBy: v.object({
+        kind: v.union(v.literal("agency"), v.literal("staff")),
+        userId: v.id("users"),
+        name: v.string(),
+      }),
+    })
+      .index("by_guarantee", ["guaranteeId"])
+      .index("by_storage", ["storageId"]),
+
     guaranteeHistory: defineTable({
       agencyId: v.id("agencies"),
       guaranteePublicId: v.string(),

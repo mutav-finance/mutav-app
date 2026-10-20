@@ -279,6 +279,9 @@ const DEMO_TABLES = [
   // don't leave dangling guaranteeId pointers mid-wipe.
   "guaranteeDelinquencyNotices",
   "guaranteeHistory",
+  // Signed-contract rows own a File Storage blob each; the wipe deletes the
+  // blob with the row (see `wipeDemoTables`).
+  "guaranteeSignedContracts",
   // guarantees ↔ leases point at each other (`leaseId` / `openGuaranteeId`);
   // guarantees go first so no lease pointer outlives its target, and the
   // product a guarantee priced against goes after every guarantee.
@@ -293,6 +296,16 @@ const DEMO_TABLES = [
 ] as const;
 
 async function wipeDemoTables(ctx: MutationCtx) {
+  let contracts = await ctx.db.query("guaranteeSignedContracts").take(200);
+  while (contracts.length > 0) {
+    for (const row of contracts) {
+      if (await ctx.db.system.get("_storage", row.storageId)) {
+        await ctx.storage.delete(row.storageId);
+      }
+      await ctx.db.delete(row._id);
+    }
+    contracts = await ctx.db.query("guaranteeSignedContracts").take(200);
+  }
   for (const table of DEMO_TABLES) {
     let rows = await ctx.db.query(table).take(200);
     while (rows.length > 0) {

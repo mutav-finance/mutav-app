@@ -33,6 +33,7 @@
       "overview": "Overview",
       "agencies": "Agencies",
       "compliance": "Compliance",
+      "guarantees": "Guarantees",
       "defaults": "Default requests",
       "treasury": "Treasury",
       "observability": "Observability",
@@ -267,6 +268,64 @@
         "noteLabel": "Note (optional)",
         "notePlaceholder": "Anything the audit trail should carry",
         "confirm": "Mark executed"
+      }
+    }
+  },
+  "guarantees": {
+    "title": "Guarantees",
+    "subtitle": "Open a guarantee by the ID the agency gives you.",
+    "lookup": {
+      "label": "Guarantee ID",
+      "placeholder": "e.g. CTR-XXXXXXXX",
+      "submit": "Open"
+    },
+    "detail": {
+      "title": "Guarantee {id}",
+      "summary": "Summary",
+      "status": "Status:",
+      "agency": "Agency:",
+      "rent": "Rent:",
+      "ceiling": "Coverage ceiling:",
+      "notAvailable": "—",
+      "notFound": "Guarantee not found (or the ID matches more than one guarantee)."
+    },
+    "state": {
+      "drafted": "Draft",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover recorded",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "signedContract": {
+      "heading": "Signed contract",
+      "help": "The guarantee contract is signed outside the platform. Upload the signed PDF here if the agency sent it to MUTAV.",
+      "constraints": "PDF only, up to 10 MB.",
+      "upload": "Upload signed contract",
+      "replace": "Replace",
+      "uploading": "Uploading…",
+      "download": "Download",
+      "uploadedBy": "Uploaded by {who} ({kind}) on {when}",
+      "uploaderKind": {
+        "agency": "agency",
+        "staff": "MUTAV team"
+      },
+      "noneOnFile": "No signed contract attached.",
+      "locked": "Guarantee active: the contract is locked.",
+      "activationByAgency": "The agency activates the guarantee once the signed contract is attached.",
+      "uploaded": "Signed contract uploaded.",
+      "replaced": "Signed contract replaced.",
+      "errors": {
+        "NOT_FOUND": "Guarantee not found.",
+        "SIGNED_CONTRACT_LOCKED": "The contract can no longer be changed: the guarantee is already active.",
+        "FILE_NOT_FOUND": "The uploaded file was not found. Please try again.",
+        "FILE_ALREADY_ATTACHED": "This file is already attached to a guarantee.",
+        "INVALID_FILE_TYPE": "Upload the contract as a PDF.",
+        "FILE_TOO_LARGE": "The PDF must be 10 MB or smaller.",
+        "INVALID_FILE_NAME": "Invalid file name. Rename the PDF and try again.",
+        "UPLOAD_FAILED": "The file could not be uploaded. Please try again.",
+        "UNEXPECTED": "Unexpected error. Please try again."
       }
     }
   },

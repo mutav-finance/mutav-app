@@ -39,6 +39,7 @@ import type * as guarantees_domain from "../guarantees/domain.js";
 import type * as guarantees_machine from "../guarantees/machine.js";
 import type * as guarantees_mutations from "../guarantees/mutations.js";
 import type * as guarantees_pricing from "../guarantees/pricing.js";
+import type * as guarantees_signedContracts from "../guarantees/signedContracts.js";
 import type * as guarantees_tenantIdentity from "../guarantees/tenantIdentity.js";
 import type * as guarantees_transitions from "../guarantees/transitions.js";
 import type * as guarantees_useCases from "../guarantees/useCases.js";
@@ -139,6 +140,7 @@ declare const fullApi: ApiFromModules<{
   "guarantees/machine": typeof guarantees_machine;
   "guarantees/mutations": typeof guarantees_mutations;
   "guarantees/pricing": typeof guarantees_pricing;
+  "guarantees/signedContracts": typeof guarantees_signedContracts;
   "guarantees/tenantIdentity": typeof guarantees_tenantIdentity;
   "guarantees/transitions": typeof guarantees_transitions;
   "guarantees/useCases": typeof guarantees_useCases;

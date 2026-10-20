@@ -33,6 +33,7 @@
       "overview": "Visão geral",
       "agencies": "Imobiliárias",
       "compliance": "Compliance",
+      "guarantees": "Garantias",
       "defaults": "Solicitações de inadimplência",
       "treasury": "Tesouraria",
       "observability": "Observabilidade",
@@ -267,6 +268,64 @@
         "noteLabel": "Observação (opcional)",
         "notePlaceholder": "O que a trilha de auditoria deve registrar",
         "confirm": "Marcar executado"
+      }
+    }
+  },
+  "guarantees": {
+    "title": "Garantias",
+    "subtitle": "Abra uma garantia pelo ID informado pela imobiliária.",
+    "lookup": {
+      "label": "ID da garantia",
+      "placeholder": "Ex.: CTR-XXXXXXXX",
+      "submit": "Abrir"
+    },
+    "detail": {
+      "title": "Garantia {id}",
+      "summary": "Resumo",
+      "status": "Situação:",
+      "agency": "Imobiliária:",
+      "rent": "Aluguel:",
+      "ceiling": "Teto de cobertura:",
+      "notAvailable": "—",
+      "notFound": "Garantia não encontrada (ou o ID corresponde a mais de uma garantia)."
+    },
+    "state": {
+      "drafted": "Rascunho",
+      "active": "Ativa",
+      "in_arrears": "Em atraso",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura registrada",
+      "in_eviction": "Em despejo",
+      "closed": "Encerrada"
+    },
+    "signedContract": {
+      "heading": "Contrato assinado",
+      "help": "O contrato de fiança é assinado fora da plataforma. Envie aqui o PDF assinado, se a imobiliária o encaminhou à MUTAV.",
+      "constraints": "Apenas PDF, até 10 MB.",
+      "upload": "Enviar contrato assinado",
+      "replace": "Substituir",
+      "uploading": "Enviando…",
+      "download": "Baixar",
+      "uploadedBy": "Enviado por {who} ({kind}) em {when}",
+      "uploaderKind": {
+        "agency": "imobiliária",
+        "staff": "equipe MUTAV"
+      },
+      "noneOnFile": "Nenhum contrato assinado anexado.",
+      "locked": "Garantia ativada: o contrato está bloqueado para alterações.",
+      "activationByAgency": "A ativação é feita pela imobiliária, depois que o contrato assinado estiver anexado.",
+      "uploaded": "Contrato assinado enviado.",
+      "replaced": "Contrato assinado substituído.",
+      "errors": {
+        "NOT_FOUND": "Garantia não encontrada.",
+        "SIGNED_CONTRACT_LOCKED": "O contrato não pode mais ser alterado: a garantia já foi ativada.",
+        "FILE_NOT_FOUND": "O arquivo enviado não foi encontrado. Tente novamente.",
+        "FILE_ALREADY_ATTACHED": "Este arquivo já está vinculado a uma garantia.",
+        "INVALID_FILE_TYPE": "Envie o contrato em PDF.",
+        "FILE_TOO_LARGE": "O PDF deve ter até 10 MB.",
+        "INVALID_FILE_NAME": "Nome de arquivo inválido. Renomeie o PDF e tente novamente.",
+        "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente.",
+        "UNEXPECTED": "Erro inesperado. Tente novamente."
       }
     }
   },

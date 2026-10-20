@@ -46,6 +46,10 @@ export const AUDIT_ACTION = {
   GUARANTEE_REPRICED: "guarantee.repriced",
   GUARANTEE_CAPACITY_RESERVED: "guarantee.capacity_reserved",
   GUARANTEE_CAPACITY_RELEASED: "guarantee.capacity_released",
+  // guarantees/signedContracts.ts — the offline-signed contract PDF put on
+  // file (first upload) or swapped before activation (replace).
+  GUARANTEE_SIGNED_CONTRACT_UPLOADED: "guarantee.signed_contract_uploaded",
+  GUARANTEE_SIGNED_CONTRACT_REPLACED: "guarantee.signed_contract_replaced",
   // leases/ (current — emitted alongside guarantee creation).
   LEASE_CREATED: "lease.created",
   // payments/ (frozen wire values — historical rows only; never emitted by
@@ -98,6 +102,8 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.GUARANTEE_REPRICED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RESERVED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RELEASED),
+  v.literal(AUDIT_ACTION.GUARANTEE_SIGNED_CONTRACT_UPLOADED),
+  v.literal(AUDIT_ACTION.GUARANTEE_SIGNED_CONTRACT_REPLACED),
   v.literal(AUDIT_ACTION.LEASE_CREATED),
   v.literal(AUDIT_ACTION.PAYMENT_BATCH_GENERATED),
   v.literal(AUDIT_ACTION.PAYMENT_MARKED_OVERDUE),

@@ -94,6 +94,27 @@ async function seedGuarantee(
   );
 }
 
+/** A signed contract on file — the precondition `activate` checks for a draft. */
+async function putSignedContractOnFile(
+  t: T,
+  { guaranteeId, publicId, fx }: { guaranteeId: GuaranteeId; publicId: string; fx: Fixture },
+): Promise<void> {
+  await t.run(async (ctx) => {
+    const storageId = await ctx.storage.store(new Blob(["%PDF-1.7"]));
+    await ctx.db.insert("guaranteeSignedContracts", {
+      agencyId: fx.agencyId,
+      guaranteeId,
+      guaranteePublicId: publicId,
+      storageId,
+      fileName: "contrato.pdf",
+      sizeBytes: 8,
+      sha256: "fixture",
+      uploadedAt: "2026-01-02T00:00:00.000Z",
+      uploadedBy: { kind: "agency", userId: fx.userId, name: "Fixture User" },
+    });
+  });
+}
+
 describe("guarantees.activate", () => {
   let t: T;
   let fx: Fixture;
@@ -105,6 +126,7 @@ describe("guarantees.activate", () => {
 
   test("moves a draft on risk and initializes capacity from the terms snapshot", async () => {
     const { guaranteeId } = await seedGuarantee(t, fx, "A1", GUARANTEE_STATE.DRAFTED);
+    await putSignedContractOnFile(t, { guaranteeId, publicId: "A1", fx });
     const asUser = t.withIdentity({ subject: fx.subject });
 
     const result = await asUser.mutation(api.guarantees.mutations.activate, {
@@ -145,6 +167,7 @@ describe("guarantees.activate", () => {
     const { guaranteeId } = await seedGuarantee(t, fx, "A4", GUARANTEE_STATE.DRAFTED, {
       availableCents: 2_000_000,
     });
+    await putSignedContractOnFile(t, { guaranteeId, publicId: "A4", fx });
     const before = await readGuarantee(t, guaranteeId);
     expect(before.capacity.reservedCents).toBe(1_000_000);
     const asUser = t.withIdentity({ subject: fx.subject });
@@ -160,6 +183,25 @@ describe("guarantees.activate", () => {
     const after = await readGuarantee(t, guaranteeId);
     expect(after.status).toBe(GUARANTEE_STATE.DRAFTED);
     expect(after.capacity).toEqual(before.capacity);
+  });
+
+  test("refuses a draft with no signed contract on file and leaves it drafted", async () => {
+    const { guaranteeId } = await seedGuarantee(t, fx, "A5", GUARANTEE_STATE.DRAFTED);
+    const asUser = t.withIdentity({ subject: fx.subject });
+
+    const result = await asUser.mutation(api.guarantees.mutations.activate, {
+      agencyId: fx.agencyId,
+      publicId: "A5",
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("SIGNED_CONTRACT_REQUIRED");
+    const after = await readGuarantee(t, guaranteeId);
+    expect(after.status).toBe(GUARANTEE_STATE.DRAFTED);
+    expect(after.activatedAt).toBeNull();
+    const audit = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+    expect(audit).toHaveLength(0);
   });
 
   test("returns NOT_FOUND for another agency's draft without revealing it", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "vitest";
 import {
+  checkSignedContractFile,
   expiringRenewalBounds,
   getUrgencyTier,
   GUARANTEE_STATE,
@@ -165,5 +166,55 @@ describe("tierForScore", () => {
     [399, "negado"],
   ] as const)("score %i → %s", (score, tier) => {
     expect(tierForScore(score)).toBe(tier);
+  });
+});
+
+describe("checkSignedContractFile", () => {
+  const TEN_MIB = 10 * 1024 * 1024;
+
+  test.each([
+    { contentType: "application/pdf", sizeBytes: 1, fileName: "a.pdf" },
+    { contentType: "application/pdf", sizeBytes: TEN_MIB, fileName: "CONTRATO.PDF" },
+    { contentType: "Application/PDF; charset=binary", sizeBytes: 2048, fileName: " c.pdf " },
+  ])("accepts $contentType / $sizeBytes bytes / '$fileName'", (input) => {
+    const result = checkSignedContractFile(input);
+    expect(result.success).toBe(true);
+  });
+
+  it("returns the trimmed file name", () => {
+    const result = checkSignedContractFile({
+      contentType: "application/pdf",
+      sizeBytes: 10,
+      fileName: "  contrato.pdf ",
+    });
+    expect(result).toMatchObject({ success: true, data: { fileName: "contrato.pdf" } });
+  });
+
+  test.each([
+    { contentType: "image/png", sizeBytes: 10, fileName: "a.pdf", code: "INVALID_FILE_TYPE" },
+    { contentType: undefined, sizeBytes: 10, fileName: "a.pdf", code: "INVALID_FILE_TYPE" },
+    {
+      contentType: "application/pdf",
+      sizeBytes: 10,
+      fileName: "a.docx",
+      code: "INVALID_FILE_TYPE",
+    },
+    {
+      contentType: "application/pdf",
+      sizeBytes: TEN_MIB + 1,
+      fileName: "a.pdf",
+      code: "FILE_TOO_LARGE",
+    },
+    { contentType: "application/pdf", sizeBytes: 0, fileName: "a.pdf", code: "FILE_TOO_LARGE" },
+    { contentType: "application/pdf", sizeBytes: 10, fileName: "   ", code: "INVALID_FILE_NAME" },
+    {
+      contentType: "application/pdf",
+      sizeBytes: 10,
+      fileName: `${"x".repeat(197)}.pdf`,
+      code: "INVALID_FILE_NAME",
+    },
+  ])("refuses $contentType / $sizeBytes bytes / '$fileName' as $code", ({ code, ...input }) => {
+    const result = checkSignedContractFile(input);
+    expect(result).toMatchObject({ success: false, error: { code } });
   });
 });
