@@ -33,6 +33,7 @@
       "overview": "Visão geral",
       "agencies": "Imobiliárias",
       "compliance": "Compliance",
+      "underwriting": "Análise de crédito",
       "defaults": "Solicitações de inadimplência",
       "treasury": "Tesouraria",
       "observability": "Observabilidade",
@@ -268,6 +269,157 @@
         "notePlaceholder": "O que a trilha de auditoria deve registrar",
         "confirm": "Marcar executado"
       }
+    }
+  },
+  "underwriting": {
+    "title": "Análise de crédito",
+    "subtitle": "Rascunhos cuja imobiliária pediu a análise da Mutav. Aprove com uma taxa ou recuse com um motivo.",
+    "notAvailable": "—",
+    "mockScore": "Score simulado",
+    "daysWaiting": "{days, plural, =0 {hoje} one {# dia} other {# dias}}",
+    "queue": {
+      "heading": "Aguardando decisão",
+      "empty": "Nenhum rascunho aguardando a análise da Mutav.",
+      "moreAvailable": "Há mais pedidos além desta página."
+    },
+    "dispatch": {
+      "heading": "Aprovadas — contrato a enviar",
+      "subtitle": "Envie o contrato ao inquilino e marque-o como enviado aqui.",
+      "empty": "Nenhum rascunho aprovado aguardando o contrato."
+    },
+    "columns": {
+      "guarantee": "Garantia",
+      "agency": "Imobiliária",
+      "tenant": "Inquilino",
+      "rent": "Aluguel",
+      "score": "Score do bureau",
+      "bureau": "Bureau",
+      "waiting": "Aguardando",
+      "actions": "Ações"
+    },
+    "tier": {
+      "bom": "Bom",
+      "regular": "Regular",
+      "ruim": "Ruim",
+      "negado": "Abaixo do catálogo"
+    },
+    "reviewStatus": {
+      "editing": "Rascunho",
+      "analysis_requested": "Análise solicitada",
+      "accepted": "Aprovada",
+      "awaiting_signature": "Aguardando assinatura",
+      "signed": "Assinada",
+      "refused": "Recusada"
+    },
+    "guaranteeState": {
+      "drafted": "Rascunho",
+      "active": "Ativa",
+      "in_arrears": "Em atraso",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura comprometida",
+      "in_eviction": "Em despejo",
+      "closed": "Encerrada"
+    },
+    "signalStatus": {
+      "ok": "ok",
+      "error": "erro"
+    },
+    "propertyKind": {
+      "residential": "Residencial",
+      "commercial": "Comercial"
+    },
+    "plan": {
+      "basic": "Mutav Fiança",
+      "plus": "Mutav Fiança +"
+    },
+    "actions": {
+      "open": "Abrir",
+      "accept": "Aprovar",
+      "refuse": "Recusar",
+      "markSent": "Marcar contrato enviado",
+      "cancel": "Cancelar",
+      "retry": "Tentar novamente"
+    },
+    "detail": {
+      "title": "Garantia {id}",
+      "back": "← Fila de análise",
+      "notFound": "Garantia não encontrada",
+      "decision": "Decisão",
+      "credit": "Análise de crédito",
+      "tenant": "Inquilino",
+      "lease": "Locação",
+      "terms": "Condições propostas",
+      "history": "Histórico",
+      "signals": "Sinais do bureau",
+      "scoreIsInput": "O score do bureau é um insumo desta decisão, não a decisão.",
+      "sendHint": "Ainda não há integração de assinatura eletrônica: envie o contrato ao inquilino e depois marque-o como enviado.",
+      "fields": {
+        "name": "Nome",
+        "taxId": "CPF / CNPJ",
+        "email": "E-mail",
+        "phone": "Telefone",
+        "propertyKind": "Imóvel",
+        "address": "Endereço",
+        "rent": "Aluguel",
+        "totalRent": "Aluguel + encargos",
+        "requestedAt": "Solicitada em",
+        "staffRate": "Taxa definida pela Mutav",
+        "note": "Nota interna",
+        "refusalReason": "Motivo da recusa",
+        "decidedBy": "Decidido por",
+        "sentAt": "Contrato enviado em",
+        "provider": "Provedor",
+        "assessedAt": "Avaliado em",
+        "policyVersion": "Política",
+        "product": "Produto",
+        "plan": "Plano",
+        "feeRate": "Taxa",
+        "fee": "Mensalidade",
+        "coverageCeiling": "Teto de cobertura",
+        "exitCostCap": "Teto de custo de saída",
+        "activationFee": "Taxa de ativação"
+      }
+    },
+    "accept": {
+      "title": "Aprovar este contrato?",
+      "description": "A Mutav assume esta garantia com a taxa abaixo. As condições são reprecificadas com essa taxa e a imobiliária é avisada.",
+      "rateLabel": "Taxa (% do aluguel mensal)",
+      "rateHint": "Entre {min}% e {max}%, até duas casas decimais.",
+      "noteLabel": "Nota interna (opcional)",
+      "notePlaceholder": "Não é exibida à imobiliária",
+      "confirm": "Aprovar"
+    },
+    "refuse": {
+      "title": "Recusar este contrato?",
+      "description": "O rascunho é encerrado definitivamente e a imobiliária é avisada com o motivo. A imobiliária pode iniciar uma nova proposta.",
+      "reasonLabel": "Motivo (exibido à imobiliária)",
+      "reasonPlaceholder": "Por que a Mutav não assume este contrato",
+      "confirm": "Recusar"
+    },
+    "toast": {
+      "accepted": "Contrato aprovado. A imobiliária foi avisada.",
+      "refused": "Contrato recusado. O rascunho foi encerrado.",
+      "sent": "Marcado como enviado para assinatura."
+    },
+    "errors": {
+      "NOT_FOUND": "Essa garantia não existe mais.",
+      "NOT_DRAFTED": "A garantia não é mais um rascunho.",
+      "CAPACITY_INVARIANT_BROKEN": "Os valores de cobertura da garantia não fecham. Escale antes de decidir.",
+      "INVALID_FEE_RATE": "A taxa deve ficar entre 1% e 30%.",
+      "TEXT_TOO_LONG": "O texto é longo demais.",
+      "REFUSAL_REASON_REQUIRED": "Informe o motivo da recusa.",
+      "PRODUCT_UNAVAILABLE": "Nenhum produto consegue precificar este rascunho. Verifique o catálogo.",
+      "REVIEW_SELF_TRANSITION": "Esta decisão já foi registrada.",
+      "REVIEW_TERMINAL": "A análise deste rascunho já terminou.",
+      "REVIEW_ILLEGAL_TRANSITION": "Essa etapa não está disponível na fase atual da análise. Recarregue a página.",
+      "SELF_TRANSITION": "A garantia já está nesse estado.",
+      "TERMINAL_STATE": "A garantia está encerrada.",
+      "ILLEGAL_TRANSITION": "O ciclo de vida da garantia não permite esta mudança.",
+      "REASON_NOT_ALLOWED_FROM_STATE": "Este motivo de encerramento não é permitido no estado da garantia.",
+      "CLOSURE_REQUIRED": "Encerrar uma garantia exige um motivo.",
+      "CLOSURE_NOT_ALLOWED": "Um motivo de encerramento foi informado para uma mudança que não encerra a garantia.",
+      "FORBIDDEN": "Seu papel na equipe não permite esta ação.",
+      "unexpected": "Algo deu errado. Tente novamente."
     }
   },
   "shellSwitcher": {

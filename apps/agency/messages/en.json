@@ -394,6 +394,52 @@
       "actionsMenu": "Guarantee actions",
       "ofCeiling": "of {ceiling}"
     },
+    "review": {
+      "heading": "Mutav analysis",
+      "progressLabel": "Mutav analysis progress",
+      "doneSuffix": " (done)",
+      "currentSuffix": " (current)",
+      "steps": {
+        "editing": "Draft",
+        "analysis_requested": "Analysis requested",
+        "accepted": "Accepted",
+        "awaiting_signature": "Awaiting signature",
+        "signed": "Signed"
+      },
+      "status": {
+        "editing": "Draft",
+        "analysis_requested": "Analysis requested",
+        "accepted": "Accepted",
+        "awaiting_signature": "Awaiting signature",
+        "signed": "Signed",
+        "refused": "Refused"
+      },
+      "acceptedAt": "Accepted at {rate}",
+      "description": {
+        "editing": "Review the draft and request Mutav's analysis when it is ready. Mutav decides whether it takes this contract and at which rate.",
+        "analysis_requested": "Mutav is analysing the tenant. You will be notified by email when there is a decision.",
+        "accepted": "Mutav accepted this contract. The contract will be sent to the tenant for signature.",
+        "awaiting_signature": "The contract was sent to the tenant for signature. Once signed, Mutav registers the document and activates the guarantee.",
+        "signed": "The contract is signed. Mutav activates the guarantee after registering the document.",
+        "refused": "Mutav did not accept this contract and the proposal was closed."
+      },
+      "requestedOn": "Requested on {date}",
+      "refusalReason": "Reason given by Mutav",
+      "refusedNextStep": "You can start a new proposal for this tenant at any time.",
+      "scoreLabel": "Bureau score",
+      "scoreHint": "Input to Mutav's analysis — not a decision",
+      "staffRateLabel": "Fee rate set by Mutav",
+      "requestAnalysis": "Request Mutav analysis",
+      "requesting": "Requesting…",
+      "toastRequested": "Analysis requested. Mutav will review this proposal.",
+      "errors": {
+        "NOT_FOUND": "Proposal not found.",
+        "NOT_DRAFTED": "This proposal is no longer a draft.",
+        "NOT_EDITING": "Mutav's analysis was already requested for this proposal.",
+        "CREDIT_ASSESSMENT_REQUIRED": "The tenant's credit check has expired. Run it again in a new proposal before requesting analysis.",
+        "UNEXPECTED": "Unexpected error. Please try again."
+      }
+    },
     "state": {
       "drafted": "Draft",
       "active": "Active",
@@ -410,6 +456,7 @@
       "eviction": "Eviction",
       "dispute_reversal": "Dispute reversed",
       "canceled_pre_activation": "Canceled before activation",
+      "underwriting_refused": "Refused in Mutav's analysis",
       "death": "Death"
     },
     "actions": {
@@ -911,13 +958,12 @@
     },
     "simulation": {
       "heading": "Simulation Result",
-      "approvedValueLabel": "Approved rental value",
-      "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
-      "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
-      "closeButton": "Back to home",
+      "approvedValueLabel": "Rental value",
       "noApplicationTitle": "Credit check not released",
       "noApplicationMessage": "The bureau is only consulted after the agency records that it intends to rent to this CPF/CNPJ. Go back to step 1, check the CPF/CNPJ, the property and the rent, and continue again to record it.",
-      "noApplicationAction": "Back to step 1"
+      "noApplicationAction": "Back to step 1",
+      "inputMessage": "The score is one input to Mutav's analysis. Select the coverage to continue; Mutav confirms the fee rate when it accepts.",
+      "lowScoreMessage": "Low bureau score. You can still submit the proposal: Mutav decides with the score as one input. The rate shown is provisional."
     },
     "coverage": {
       "exitCoverage": "Exit coverage",
@@ -961,7 +1007,6 @@
       "errorToast": "Failed to create the guarantee. Please try again.",
       "errors": {
         "INVALID_TAX_ID": "Invalid tenant document (CPF/CNPJ). Check the number and try again.",
-        "TENANT_DENIED": "The tenant's credit score was denied. The guarantee cannot be created.",
         "INVALID_RENT": "Invalid amounts. Rent must be greater than zero.",
         "CREDIT_ASSESSMENT_REQUIRED": "The credit assessment for this tenant has expired. Run the credit check again before creating the guarantee.",
         "PRODUCT_UNAVAILABLE": "No guarantee product is available for this agency. Contact Mutav."
@@ -971,11 +1016,15 @@
       "cancelBlock": "Cancel"
     },
     "success": {
-      "heading": "GUARANTEE PROPOSAL CREATED",
-      "subtitle": "The proposal has been successfully sent and is awaiting activation by the tenant.",
-      "description": "The guarantee will be activated upon the tenant's acceptance of the terms and payment of the activation fee. The proposal has been sent to the tenant via email and WhatsApp.",
+      "heading": "GUARANTEE DRAFT CREATED",
+      "subtitle": "The draft is saved. Mutav analyses it before anything goes to the tenant.",
+      "description": "Request Mutav's analysis now, or open the guarantee to review it first. If Mutav accepts, it sets the fee rate and the contract is sent to the tenant for signature.",
       "viewGuarantee": "View guarantee",
-      "createAnother": "Create another guarantee"
+      "createAnother": "Create another guarantee",
+      "requestedDescription": "Analysis requested. You will be notified by email when Mutav decides.",
+      "requestAnalysis": "Request Mutav analysis",
+      "requesting": "Requesting…",
+      "requested": "Analysis requested. Mutav will review this proposal."
     },
     "nav": {
       "back": "Back",
