@@ -1025,7 +1025,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     expect(row.nextRenewalDate).toBe("2026-12-31");
   });
 
-  test("persists the plus plan with the prestamista premium folded into feeCents and capacity unmoved", async () => {
+  test("prestamista off: a plus request persists as basic with no premium and capacity unmoved", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId } = await seedGuaranteeWithLease(
@@ -1036,10 +1036,10 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     const row = await t.run((ctx) => getGuarantee(ctx, guaranteeId));
 
-    expect(row.terms.plan).toBe("plus");
+    expect(row.terms.plan).toBe("basic");
     expect(row.terms.taxaFeeCents).toBe(9_000);
-    expect(row.terms.prestamistaFeeCents).toBe(1_280);
-    expect(row.terms.feeCents).toBe(10_280);
+    expect(row.terms.prestamistaFeeCents).toBe(0);
+    expect(row.terms.feeCents).toBe(9_000);
     expect(row.capacity).toEqual({
       ceilingCents: 1_500_000,
       availableCents: 1_500_000,
@@ -1047,7 +1047,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     });
   });
 
-  test("stores the ruim/plus snapshot for rent 250_000 with capacity ceiling 3_750_000", async () => {
+  test("stores the ruim snapshot of a plus request (prestamista off) for rent 250_000 with capacity ceiling 3_750_000", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId } = await seedGuaranteeWithLease(
@@ -1060,11 +1060,11 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     expect(row.terms).toEqual({
       productSlug: "mutav-fianca",
-      plan: "plus",
+      plan: "basic",
       rentCents: 250_000,
-      feeCents: 38_780,
+      feeCents: 37_500,
       taxaFeeCents: 37_500,
-      prestamistaFeeCents: 1_280,
+      prestamistaFeeCents: 0,
       oneTimeActivationFeeCents: 15_000,
       commissionRate: 0.015,
       prestamistaCommissionRate: 0.25,

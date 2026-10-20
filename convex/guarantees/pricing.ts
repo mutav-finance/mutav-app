@@ -6,6 +6,7 @@ import {
   type PriceableTier,
 } from "./domain";
 import type { ProductTerms } from "../products/domain";
+import { PRESTAMISTA_ENABLED } from "./flags";
 
 /**
  * Guarantee pricing. Lives in the backend (shared by every app) so the wizard
@@ -47,21 +48,35 @@ export type PricedGuarantee = {
   capacity: GuaranteeCapacity;
 };
 
+/** Whether a plan can be sold right now; Plus is gated on `PRESTAMISTA_ENABLED`. */
+export function isPlanOffered(plan: GuaranteePlan): boolean {
+  return plan !== GUARANTEE_PLAN.PLUS || PRESTAMISTA_ENABLED;
+}
+
+/**
+ * The plan a request is actually priced and stored under. A Plus request
+ * while prestamista is off (a stale wizard draft, a direct API call) falls
+ * back to Basic, so the placeholder premium can never reach a fee or a total.
+ */
+export function sellablePlan(plan: GuaranteePlan): GuaranteePlan {
+  return isPlanOffered(plan) ? plan : GUARANTEE_PLAN.BASIC;
+}
+
 /**
  * Every money figure is rounded to whole cents: multipliers are product data
  * and may be fractional once the catalog is admin-editable, and a fractional
  * ceiling would leak into `capacity` and the platform exposure aggregate.
  */
 export function priceGuarantee(input: PriceGuaranteeInput, terms: PricingTable): PricedGuarantee {
+  const plan = sellablePlan(input.plan);
   const taxaFeeCents = Math.round(input.rentCents * terms.tierRate[input.tier]);
-  const prestamistaFeeCents =
-    input.plan === GUARANTEE_PLAN.PLUS ? terms.prestamistaPremiumCents : 0;
+  const prestamistaFeeCents = plan === GUARANTEE_PLAN.PLUS ? terms.prestamistaPremiumCents : 0;
   const coverageCeilingCents = Math.round(input.rentCents * terms.coverageCeilingMultiplier);
   const exitCostCapCents = Math.round(input.rentCents * terms.exitCostMultiplier);
   return {
     terms: {
       productSlug: input.productSlug,
-      plan: input.plan,
+      plan,
       rentCents: input.rentCents,
       feeCents: taxaFeeCents + prestamistaFeeCents,
       taxaFeeCents,
