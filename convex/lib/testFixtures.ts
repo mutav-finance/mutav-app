@@ -4,8 +4,6 @@ import type { AgencyId } from "../agencies/domain";
 import {
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
-  DOCUMENT_KEY,
-  DOCUMENT_STATUS,
   GUARANTEE_STATE,
   SCORE_TIER,
   TENANT_APPROVAL_STATUS,
@@ -282,11 +280,6 @@ export async function seedGuaranteeWithLease(
         availableCents,
         reservedCents: priced.capacity.ceilingCents - availableCents,
       },
-      documents: [
-        { key: DOCUMENT_KEY.RENTAL_CONTRACT, status: DOCUMENT_STATUS.PENDENTE },
-        { key: DOCUMENT_KEY.INSPECTION, status: DOCUMENT_STATUS.PENDENTE },
-        { key: DOCUMENT_KEY.POLICY, status: DOCUMENT_STATUS.PENDENTE },
-      ],
     });
     if (spec.status !== GUARANTEE_STATE.CLOSED) {
       await ctx.db.patch(leaseId, { openGuaranteeId: guaranteeId });

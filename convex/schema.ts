@@ -37,7 +37,15 @@ const closeReason = v.union(
 const priceableTier = v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"));
 const scoreTier = v.union(priceableTier, v.literal("negado"));
 
-const documentStatus = v.union(v.literal("pendente"), v.literal("enviado"), v.literal("aprovado"));
+// Canonical `GUARANTEE_DOCUMENT_STATUS` / `DOCUMENT_KEY` live in
+// `convex/guarantees/domain.ts`; inlined here to avoid the entity-file →
+// `_generated/dataModel` circular import.
+const guaranteeDocumentStatus = v.union(
+  v.literal("pending_review"),
+  v.literal("approved"),
+  v.literal("rejected"),
+  v.literal("superseded"),
+);
 
 const documentKey = v.union(
   v.literal("rentalContract"),
@@ -481,12 +489,6 @@ export default defineSchema(
         availableCents: v.number(),
         reservedCents: v.number(),
       }),
-      documents: v.array(
-        v.object({
-          key: documentKey,
-          status: documentStatus,
-        }),
-      ),
     })
       .index("by_publicId", ["publicId"])
       .index("by_status", ["status"])
@@ -879,6 +881,33 @@ export default defineSchema(
     })
       .index("by_agency", ["agencyId"])
       .index("by_external_id", ["externalBankAccountId"]),
+
+    // Files attached to a guarantee (signed rental contract, inspection,
+    // policy) by the agency or by Mutav staff, each reviewed by staff. One row
+    // per uploaded file, never overwritten: a re-upload for the same key marks
+    // the earlier `pending_review` rows `superseded` and keeps them as history.
+    guaranteeDocuments: defineTable({
+      guaranteeId: v.id("guarantees"),
+      agencyId: v.id("agencies"),
+      key: documentKey,
+      storageId: v.id("_storage"),
+      fileName: v.string(),
+      contentType: v.string(),
+      sizeBytes: v.number(),
+      uploadedBy: v.union(
+        v.object({ kind: v.literal("agency_user"), userId: v.id("users") }),
+        v.object({ kind: v.literal("staff"), userId: v.id("users") }),
+      ),
+      uploadedAt: v.string(),
+      status: guaranteeDocumentStatus,
+      reviewedBy: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.string()),
+      rejectionReason: v.optional(v.string()),
+    })
+      .index("by_guarantee", ["guaranteeId"])
+      .index("by_guarantee_key", ["guaranteeId", "key"])
+      .index("by_status", ["status"])
+      .index("by_storageId", ["storageId"]),
 
     agencyDocuments: defineTable({
       agencyId: v.id("agencies"),

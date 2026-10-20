@@ -46,6 +46,11 @@ export const AUDIT_ACTION = {
   GUARANTEE_REPRICED: "guarantee.repriced",
   GUARANTEE_CAPACITY_RESERVED: "guarantee.capacity_reserved",
   GUARANTEE_CAPACITY_RELEASED: "guarantee.capacity_released",
+  // guarantees/ documents (emitted by convex/guarantees/documents.ts and
+  // convex/guarantees/staffDocuments.ts).
+  GUARANTEE_DOCUMENT_ATTACHED: "guarantee.document_attached",
+  GUARANTEE_DOCUMENT_APPROVED: "guarantee.document_approved",
+  GUARANTEE_DOCUMENT_REJECTED: "guarantee.document_rejected",
   // leases/ (current — emitted alongside guarantee creation).
   LEASE_CREATED: "lease.created",
   // payments/ (frozen wire values — historical rows only; never emitted by
@@ -100,6 +105,9 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.GUARANTEE_REPRICED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RESERVED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RELEASED),
+  v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_ATTACHED),
+  v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_APPROVED),
+  v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_REJECTED),
   v.literal(AUDIT_ACTION.LEASE_CREATED),
   v.literal(AUDIT_ACTION.PAYMENT_BATCH_GENERATED),
   v.literal(AUDIT_ACTION.PAYMENT_MARKED_OVERDUE),

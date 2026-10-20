@@ -477,17 +477,40 @@
     "documents": {
       "heading": "Documents",
       "send": "Upload",
-      "sendDisabled": "Coming soon",
+      "uploading": "Uploading…",
       "downloadTemplate": "Download standard template",
+      "chooseFile": "Choose a file for {document}",
+      "loading": "Loading…",
+      "empty": "No file uploaded yet.",
+      "uploaded": "Document sent to Mutav for review.",
+      "acceptedFormats": "PDF, JPG or PNG, up to 15 MB. Every file is reviewed by the Mutav team.",
+      "closedGuarantee": "Guarantee closed — it no longer accepts documents.",
+      "uploadedBy": "Uploaded by {name} on {date}",
+      "uploadedByMutav": "Mutav",
+      "unknownUser": "removed user",
+      "rejectionReason": "Rejection reason: {reason}",
       "labels": {
-        "rentalContract": "Rental contract",
+        "rentalContract": "Signed rental contract",
         "inspection": "Inspection",
         "policy": "Policy"
       },
       "status": {
-        "pendente": "Pending",
-        "enviado": "Uploaded",
-        "aprovado": "Approved"
+        "pending_review": "Under review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "superseded": "Replaced"
+      },
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Guarantee not found.",
+        "GUARANTEE_CLOSED": "This guarantee is closed and no longer accepts documents.",
+        "FILE_NOT_FOUND": "The uploaded file was not found. Please try again.",
+        "FILE_ALREADY_ATTACHED": "This file is already attached.",
+        "UNSUPPORTED_CONTENT_TYPE": "Unsupported format. Upload a PDF, JPG or PNG.",
+        "FILE_TOO_LARGE": "File is larger than 15 MB.",
+        "FILE_EMPTY": "The file is empty.",
+        "INVALID_FILE_NAME": "Invalid file name.",
+        "DOCUMENT_NOT_FOUND": "Document not found.",
+        "UPLOAD_FAILED": "The file could not be uploaded. Please try again."
       }
     },
     "history": {

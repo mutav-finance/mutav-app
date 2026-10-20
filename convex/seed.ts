@@ -32,7 +32,6 @@ import {
   assertTransition,
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
-  DOCUMENT_STATUS,
   GUARANTEE_STATE,
   isInsured,
   SCORE_TIER,
@@ -280,6 +279,9 @@ const DEMO_TABLES = [
   // Notices FK-reference guarantees + users. Wipe before guarantees so we
   // don't leave dangling guaranteeId pointers mid-wipe.
   "guaranteeDelinquencyNotices",
+  // Guarantee documents FK-reference guarantees; their storage blobs are
+  // deleted by `deleteGuaranteeDocumentBlobs` before the rows go.
+  "guaranteeDocuments",
   "guaranteeHistory",
   // guarantees ↔ leases point at each other (`leaseId` / `openGuaranteeId`);
   // guarantees go first so no lease pointer outlives its target, and the
@@ -294,7 +296,15 @@ const DEMO_TABLES = [
   "agencies",
 ] as const;
 
+async function deleteGuaranteeDocumentBlobs(ctx: MutationCtx) {
+  for await (const document of ctx.db.query("guaranteeDocuments")) {
+    const blob = await ctx.db.system.get(document.storageId);
+    if (blob) await ctx.storage.delete(document.storageId);
+  }
+}
+
 async function wipeDemoTables(ctx: MutationCtx) {
+  await deleteGuaranteeDocumentBlobs(ctx);
   for (const table of DEMO_TABLES) {
     let rows = await ctx.db.query(table).take(200);
     while (rows.length > 0) {
@@ -372,7 +382,6 @@ type SeedLeaseSpec = {
     plan?: GuaranteePlan;
     /** Capacity reserved against committed cover; `available = ceiling - reserved`. */
     reservedCents?: number;
-    documents: Guarantee["documents"];
   };
   tenant: SeedTenantBlock;
 };
@@ -541,7 +550,6 @@ async function insertSeedGuarantee(
       availableCents: priced.capacity.ceilingCents - reservedCents,
       reservedCents,
     },
-    documents: guarantee.documents,
   });
 
   if (guarantee.state !== GUARANTEE_STATE.CLOSED) {
@@ -677,12 +685,6 @@ function externalRefForSettlement(method: SettlementMethod): string | undefined 
       return method.txId ?? undefined;
   }
 }
-
-const APPROVED_DOCUMENTS: Guarantee["documents"] = [
-  { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-  { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-  { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-];
 
 /**
  * A checksum-valid CPF from nine base digits — `getOrCreateTenant` rejects any
@@ -1010,7 +1012,6 @@ function performingFillerSpec({
       state: GUARANTEE_STATE.ACTIVE,
       activatedAt,
       nextRenewalDate: `${renewalYear}${filler.activatedMonth.slice(4)}-12`,
-      documents: APPROVED_DOCUMENTS,
     },
     tenant: {
       approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1188,11 +1189,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-06-03T10:00:00-03:00"),
         nextRenewalDate: "2027-03-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1226,11 +1222,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-07-08T10:00:00-03:00"),
         nextRenewalDate: "2027-04-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1264,11 +1255,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-08-12T10:00:00-03:00"),
         nextRenewalDate: "2027-05-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1303,11 +1289,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-09-05T10:00:00-03:00"),
         nextRenewalDate: "2026-11-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1341,11 +1322,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-02-22T10:00:00-03:00"),
         nextRenewalDate: "2027-01-20",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1380,11 +1356,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-01-10T10:00:00-03:00"),
         nextRenewalDate: "2027-02-10",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1418,11 +1389,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-12-28T10:00:00-03:00"),
         nextRenewalDate: dateDaysAgo(-30),
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1456,11 +1422,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-05T10:00:00-03:00"),
         nextRenewalDate: dateDaysAgo(-45),
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1494,11 +1455,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-04-18T10:00:00-03:00"),
         nextRenewalDate: "2027-06-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1532,11 +1488,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-03-25T10:00:00-03:00"),
         nextRenewalDate: "2026-12-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1571,11 +1522,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-03-15T10:00:00-03:00"),
         nextRenewalDate: "2027-07-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1609,11 +1555,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-15T10:00:00-03:00"),
         nextRenewalDate: "2026-10-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1647,11 +1588,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-08-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -1685,11 +1621,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-09-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -1725,11 +1656,6 @@ async function seedFictional(
         closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-03-10T18:00:00-03:00") },
         activatedAt: d("2024-08-01T10:00:00-03:00"),
         nextRenewalDate: "2025-02-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1766,11 +1692,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-06-15T10:00:00-03:00"),
         nextRenewalDate: "2027-03-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1804,11 +1725,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-07-22T10:00:00-03:00"),
         nextRenewalDate: "2027-05-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1843,11 +1759,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-03-05T10:00:00-03:00"),
         nextRenewalDate: "2026-11-20",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1881,11 +1792,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-01-20T10:00:00-03:00"),
         nextRenewalDate: "2027-01-10",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1919,11 +1825,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-12-15T10:00:00-03:00"),
         nextRenewalDate: "2026-08-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1958,11 +1859,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-04-02T10:00:00-03:00"),
         nextRenewalDate: "2027-04-20",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1996,11 +1892,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-06-03T10:00:00-03:00"),
         nextRenewalDate: "2026-07-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2034,11 +1925,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-22T10:00:00-03:00"),
         nextRenewalDate: "2027-02-28",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2073,11 +1959,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-09-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -2111,11 +1992,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-10-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -2151,11 +2027,6 @@ async function seedFictional(
         closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-01-20T18:00:00-03:00") },
         activatedAt: d("2024-06-15T10:00:00-03:00"),
         nextRenewalDate: "2024-12-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2193,11 +2064,6 @@ async function seedFictional(
         },
         activatedAt: null,
         nextRenewalDate: "2026-06-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.REPROVADO,
@@ -2234,11 +2100,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-08-01T10:00:00-03:00"),
         nextRenewalDate: "2027-04-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2277,11 +2138,6 @@ async function seedFictional(
         activatedAt: d("2026-02-05T10:00:00-03:00"),
         reservedCents: HORIZONTE_COVER_APPLIED_CENTS,
         nextRenewalDate: "2026-10-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2316,11 +2172,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-08-10",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -2389,7 +2240,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DEFAULT_VERIFIED,
         activatedAt: d("2025-10-20T10:00:00-03:00"),
         nextRenewalDate: "2027-10-20",
-        documents: APPROVED_DOCUMENTS,
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2444,7 +2294,6 @@ async function seedFictional(
         activatedAt: d("2025-11-18T10:00:00-03:00"),
         reservedCents: ATLANTICA_COVER_APPLIED_CENTS,
         nextRenewalDate: "2027-11-18",
-        documents: APPROVED_DOCUMENTS,
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -3262,13 +3111,6 @@ async function populateAprovadaBook(
       activatedAt: spec.activatedAt,
       nextRenewalDate: spec.nextRenewalDate,
       ...(spec.reservedCents === undefined ? {} : { reservedCents: spec.reservedCents }),
-      documents: isApproved
-        ? APPROVED_DOCUMENTS
-        : [
-            { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-            { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-            { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-          ],
     };
     const approval = {
       approvalStatus: isApproved

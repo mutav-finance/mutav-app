@@ -37,7 +37,8 @@
       "treasury": "Treasury",
       "observability": "Observability",
       "nav": "NAV",
-      "staff": "Staff"
+      "staff": "Staff",
+      "documents": "Documents"
     }
   },
   "accessDenied": {
@@ -362,6 +363,87 @@
     },
     "actions": {
       "retry": "Try again"
+    }
+  },
+  "guaranteeDocuments": {
+    "queue": {
+      "title": "Guarantee documents",
+      "subtitle": "Files agencies and staff attached to guarantees, awaiting a compliance decision, oldest first.",
+      "empty": "No documents awaiting review.",
+      "moreAvailable": "More documents are queued — only the oldest page is shown."
+    },
+    "panel": {
+      "heading": "Documents",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "chooseFile": "Choose a file for {document}",
+      "loading": "Loading…",
+      "empty": "No file uploaded yet.",
+      "notFound": "Guarantee not found."
+    },
+    "columns": {
+      "document": "Document",
+      "agency": "Agency",
+      "guarantee": "Guarantee",
+      "file": "File",
+      "uploaded": "Uploaded",
+      "actions": "Actions"
+    },
+    "labels": {
+      "rentalContract": "Signed rental contract",
+      "inspection": "Inspection",
+      "policy": "Policy"
+    },
+    "status": {
+      "pending_review": "Under review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "superseded": "Replaced"
+    },
+    "uploaderKind": {
+      "agency_user": "Agency · {name}",
+      "staff": "Mutav · {name}"
+    },
+    "uploadedBy": {
+      "agency_user": "Uploaded by {name} (agency) on {date} · {size}",
+      "staff": "Uploaded by {name} (Mutav) on {date} · {size}"
+    },
+    "reviewedBy": "Reviewed by {name} on {date}",
+    "rejectionReason": "Rejection reason: {reason}",
+    "unknownUser": "removed user",
+    "notAvailable": "—",
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "cancel": "Cancel"
+    },
+    "reject": {
+      "title": "Reject document",
+      "description": "Rejecting “{file}”. The agency sees the reason on the guarantee page and receives it by email.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "e.g. landlord signature missing on page 3"
+    },
+    "toast": {
+      "approved": "Document approved.",
+      "rejected": "Document rejected; the agency was notified.",
+      "uploaded": "Document attached and queued for review."
+    },
+    "errors": {
+      "GUARANTEE_NOT_FOUND": "Guarantee not found.",
+      "GUARANTEE_CLOSED": "This guarantee is closed and no longer accepts documents.",
+      "FILE_NOT_FOUND": "The uploaded file was not found. Please try again.",
+      "FILE_ALREADY_ATTACHED": "This file is already attached.",
+      "UNSUPPORTED_CONTENT_TYPE": "Unsupported format. Upload a PDF, JPG or PNG.",
+      "FILE_TOO_LARGE": "File is larger than 15 MB.",
+      "FILE_EMPTY": "The file is empty.",
+      "INVALID_FILE_NAME": "Invalid file name.",
+      "DOCUMENT_NOT_FOUND": "Document not found.",
+      "NOT_PENDING_REVIEW": "This document was already decided or replaced.",
+      "REJECTION_REASON_REQUIRED": "A rejection reason is required.",
+      "REJECTION_REASON_TOO_LONG": "The rejection reason is too long.",
+      "UPLOAD_FAILED": "The file could not be uploaded. Please try again.",
+      "FORBIDDEN": "Your staff role cannot perform this action.",
+      "unexpected": "Something went wrong. Please try again."
     }
   }
 }
