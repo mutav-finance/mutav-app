@@ -90,12 +90,6 @@ const FULL_CAPACITY: GuaranteeCapacity = {
   reservedCents: 0,
 };
 
-const PENDING_DOCUMENTS: Guarantee["documents"] = [
-  { key: "rentalContract", status: "pendente" },
-  { key: "inspection", status: "pendente" },
-  { key: "policy", status: "pendente" },
-];
-
 const NO_ELIGIBILITY_RESTRICTION: Product["eligibility"] = {
   agencyIds: null,
   regionUFs: null,
@@ -222,7 +216,6 @@ function guaranteeDoc(spec: RawGuaranteeSpec): NewGuarantee {
     tenantApproval: spec.tenantApproval ?? { status: "pendente", termApprovedAt: null },
     terms: spec.terms ?? { ...BASIC_BOM_TERMS },
     capacity: spec.capacity ?? { ...FULL_CAPACITY },
-    documents: [...PENDING_DOCUMENTS],
   };
 }
 
@@ -500,13 +493,17 @@ describe("schema conformance — strict harness", () => {
       expect(declared).toEqual([...CLOSE_REASONS]);
     });
 
-    test("declares exactly the seven guarantee indexes with their field lists", () => {
+    test("declares exactly the eight guarantee indexes with their field lists", () => {
       const indexes = schema.tables.guarantees[" indexes"]();
 
       expect(indexes).toEqual([
         { indexDescriptor: "by_publicId", fields: ["publicId"] },
         { indexDescriptor: "by_status", fields: ["status"] },
         { indexDescriptor: "by_agency_status", fields: ["agencyId", "status"] },
+        {
+          indexDescriptor: "by_agency_activationFeeStatus",
+          fields: ["agencyId", "activationFee.status"],
+        },
         {
           indexDescriptor: "by_agency_status_nextRenewalDate",
           fields: ["agencyId", "status", "nextRenewalDate"],
@@ -554,7 +551,6 @@ describe("schema conformance — strict harness", () => {
           "agencyId",
           "capacity",
           ...(state === "closed" ? ["closure"] : []),
-          "documents",
           "leaseId",
           "nextRenewalDate",
           "productId",
@@ -670,7 +666,7 @@ describe("schema conformance — strict harness", () => {
       },
     );
 
-    test("round-trips tenantApproval and document status literals through a validated partial patch", async () => {
+    test("round-trips tenantApproval status literals through a validated partial patch", async () => {
       const t = setupStrict();
       const agencyId = await seedAgency(t, "Agency A", "00000000000101");
       const { guaranteeId } = await seedGuaranteeWithLease(
@@ -681,28 +677,18 @@ describe("schema conformance — strict harness", () => {
 
       const row = await t.run(async (ctx) => {
         await ctx.db.patch(guaranteeId, {
-          documents: [
-            { key: "rentalContract", status: "aprovado" },
-            { key: "inspection", status: "enviado" },
-            { key: "policy", status: "pendente" },
-          ],
           tenantApproval: { status: "aprovado", termApprovedAt: "2026-02-01T00:00:00.000Z" },
         });
         return getGuarantee(ctx, guaranteeId);
       });
 
-      expect(row.documents).toEqual([
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "enviado" },
-        { key: "policy", status: "pendente" },
-      ]);
       expect(row.tenantApproval).toEqual({
         status: "aprovado",
         termApprovedAt: "2026-02-01T00:00:00.000Z",
       });
     });
 
-    test("a patch with an English document status literal is refused by the validator", async () => {
+    test("a patch carrying the removed embedded documents field is refused by the validator", async () => {
       const t = setupStrict();
       const agencyId = await seedAgency(t, "Agency A", "00000000000101");
       const { guaranteeId } = await seedGuaranteeWithLease(
@@ -880,11 +866,6 @@ describe("schema conformance — strict harness", () => {
         table: "guarantees",
         label: "guarantees.closure.reason expired",
         overrides: { status: "closed", closure: { reason: "expired", closedAt: CLOSED_AT } },
-      },
-      {
-        table: "guarantees",
-        label: "guarantees.documents[].status approved",
-        overrides: { documents: [{ key: "rentalContract", status: "approved" }] },
       },
       {
         table: "guarantees",

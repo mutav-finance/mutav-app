@@ -27,8 +27,6 @@ import {
   CLOSE_REASON,
   CONTRACT_APPLICATION_VALIDITY_MS,
   CREDIT_ASSESSMENT_FRESHNESS_MS,
-  DOCUMENT_KEY,
-  DOCUMENT_STATUS,
   GUARANTEE_ERROR_CODE,
   GUARANTEE_EVENT,
   GUARANTEE_STATE,
@@ -266,8 +264,8 @@ export const listByAgency = queryWithAgencyScope({
 });
 
 /**
- * Lightweight summary of a guarantee for list views — drops the `terms`,
- * `documents` and lease join and carries only the tenant's display name.
+ * Lightweight summary of a guarantee for list views — drops the `terms` and the
+ * lease join and carries only the tenant's display name.
  * Use `shapeGuarantee` for the detail view.
  *
  * `availableCapacityCents` is a projection, not the row: the row keeps
@@ -1079,11 +1077,6 @@ export const create = mutationWithActiveAgency({
       tenantApproval: { status: TENANT_APPROVAL_STATUS.PENDENTE, termApprovedAt: null },
       terms: priced.terms,
       capacity: priced.capacity,
-      documents: [
-        { key: DOCUMENT_KEY.RENTAL_CONTRACT, status: DOCUMENT_STATUS.PENDENTE },
-        { key: DOCUMENT_KEY.INSPECTION, status: DOCUMENT_STATUS.PENDENTE },
-        { key: DOCUMENT_KEY.POLICY, status: DOCUMENT_STATUS.PENDENTE },
-      ],
     });
 
     const doc = await ctx.db.get(guaranteeId);
@@ -1270,7 +1263,6 @@ function shapeGuarantee({
     review: shapeGuaranteeReview(guarantee.underwriting),
     terms: guarantee.terms,
     capacity: guarantee.capacity,
-    documents: guarantee.documents,
     lease: shapeLease(lease),
     tenant: shapeGuaranteeTenant(guarantee, identity),
     history: history.map((h) => ({

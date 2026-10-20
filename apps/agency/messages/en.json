@@ -404,7 +404,8 @@
         "analysis_requested": "Analysis requested",
         "accepted": "Accepted",
         "awaiting_signature": "Awaiting signature",
-        "signed": "Signed"
+        "signed": "Signed",
+        "active": "Active"
       },
       "status": {
         "editing": "Draft",
@@ -412,7 +413,8 @@
         "accepted": "Accepted",
         "awaiting_signature": "Awaiting signature",
         "signed": "Signed",
-        "refused": "Refused"
+        "refused": "Refused",
+        "active": "Active"
       },
       "acceptedAt": "Accepted at {rate}",
       "description": {
@@ -420,8 +422,9 @@
         "analysis_requested": "Mutav is analysing the tenant. You will be notified by email when there is a decision.",
         "accepted": "Mutav accepted this contract. The contract will be sent to the tenant for signature.",
         "awaiting_signature": "The contract was sent to the tenant for signature. Once signed, Mutav registers the document and activates the guarantee.",
-        "signed": "The contract is signed. Mutav activates the guarantee after registering the document.",
-        "refused": "Mutav did not accept this contract and the proposal was closed."
+        "signed": "The signed contract was registered by Mutav. Mutav activates the guarantee once every check is complete.",
+        "refused": "Mutav did not accept this contract and the proposal was closed.",
+        "active": "Mutav activated this guarantee. It is in force and its activation fee is billed on the next monthly invoice."
       },
       "requestedOn": "Requested on {date}",
       "refusalReason": "Reason given by Mutav",
@@ -524,17 +527,40 @@
     "documents": {
       "heading": "Documents",
       "send": "Upload",
-      "sendDisabled": "Coming soon",
+      "uploading": "Uploading…",
       "downloadTemplate": "Download standard template",
+      "chooseFile": "Choose a file for {document}",
+      "loading": "Loading…",
+      "empty": "No file uploaded yet.",
+      "uploaded": "Document sent to Mutav for review.",
+      "acceptedFormats": "PDF, JPG or PNG, up to 15 MB. Every file is reviewed by the Mutav team.",
+      "closedGuarantee": "Guarantee closed — it no longer accepts documents.",
+      "uploadedBy": "Uploaded by {name} on {date}",
+      "uploadedByMutav": "Mutav",
+      "unknownUser": "removed user",
+      "rejectionReason": "Rejection reason: {reason}",
       "labels": {
-        "rentalContract": "Rental contract",
+        "rentalContract": "Signed rental contract",
         "inspection": "Inspection",
         "policy": "Policy"
       },
       "status": {
-        "pendente": "Pending",
-        "enviado": "Uploaded",
-        "aprovado": "Approved"
+        "pending_review": "Under review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "superseded": "Replaced"
+      },
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Guarantee not found.",
+        "GUARANTEE_CLOSED": "This guarantee is closed and no longer accepts documents.",
+        "FILE_NOT_FOUND": "The uploaded file was not found. Please try again.",
+        "FILE_ALREADY_ATTACHED": "This file is already attached.",
+        "UNSUPPORTED_CONTENT_TYPE": "Unsupported format. Upload a PDF, JPG or PNG.",
+        "FILE_TOO_LARGE": "File is larger than 15 MB.",
+        "FILE_EMPTY": "The file is empty.",
+        "INVALID_FILE_NAME": "Invalid file name.",
+        "DOCUMENT_NOT_FOUND": "Document not found.",
+        "UPLOAD_FAILED": "The file could not be uploaded. Please try again."
       }
     },
     "history": {

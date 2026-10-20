@@ -42,7 +42,7 @@ export type ApplyGuaranteeTransitionInput = {
   to: GuaranteeState;
   /** Required when `to` is `closed`, rejected otherwise. */
   closure?: GuaranteeClosureInput;
-  /** Included in the same patch as the status — used by `activate`. */
+  /** Included in the same patch as the status — used by `staffActivate`. */
   capacity?: GuaranteeCapacity;
   actor: GuaranteeActor;
   /** Human sentence for the history timeline; the structured twin is derived. */
@@ -336,7 +336,7 @@ export type DisputeReversalError = {
 /**
  * Every cent a committed cover reserved on this guarantee, read back from the
  * notices that drew it. Nothing moves a guarantee out of `cover_committed`
- * except a close or eviction, and `activate` starts every life at zero, so on
+ * except a close or eviction, and `staffActivate` starts every life at zero, so on
  * a sound row this sum IS `reservedCents` — the caller refuses when it is not.
  */
 async function sumAppliedCover(ctx: MutationCtx, guaranteeId: GuaranteeId): Promise<number> {

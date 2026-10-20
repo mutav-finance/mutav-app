@@ -48,7 +48,15 @@ const reviewStatus = v.union(
   v.literal("refused"),
 );
 
-const documentStatus = v.union(v.literal("pendente"), v.literal("enviado"), v.literal("aprovado"));
+// Canonical `GUARANTEE_DOCUMENT_STATUS` / `DOCUMENT_KEY` live in
+// `convex/guarantees/domain.ts`; inlined here to avoid the entity-file →
+// `_generated/dataModel` circular import.
+const guaranteeDocumentStatus = v.union(
+  v.literal("pending_review"),
+  v.literal("approved"),
+  v.literal("rejected"),
+  v.literal("superseded"),
+);
 
 const documentKey = v.union(
   v.literal("rentalContract"),
@@ -530,16 +538,28 @@ export default defineSchema(
         availableCents: v.number(),
         reservedCents: v.number(),
       }),
-      documents: v.array(
-        v.object({
-          key: documentKey,
-          status: documentStatus,
-        }),
+      // The one-time activation fee's billing marker. `staffActivate` sets it
+      // `pending`; the first monthly billing run after activation puts the fee
+      // on that invoice and flips it to `invoiced`, so the fee is billed once
+      // whatever day of the month the guarantee went on risk. Absent on a
+      // draft and on rows the seed inserts already active.
+      activationFee: v.optional(
+        v.union(
+          v.object({ status: v.literal("pending") }),
+          v.object({
+            status: v.literal("invoiced"),
+            invoiceId: v.id("invoices"),
+            invoicedAt: v.string(),
+          }),
+        ),
       ),
     })
       .index("by_publicId", ["publicId"])
       .index("by_status", ["status"])
       .index("by_agency_status", ["agencyId", "status"])
+      // Monthly billing: one agency's guarantees whose activation fee is
+      // still to be invoiced.
+      .index("by_agency_activationFeeStatus", ["agencyId", "activationFee.status"])
       .index("by_agency_status_nextRenewalDate", ["agencyId", "status", "nextRenewalDate"])
       .index("by_lease", ["leaseId"])
       .index("by_product", ["productId"])
@@ -935,6 +955,33 @@ export default defineSchema(
     })
       .index("by_agency", ["agencyId"])
       .index("by_external_id", ["externalBankAccountId"]),
+
+    // Files attached to a guarantee (signed rental contract, inspection,
+    // policy) by the agency or by Mutav staff, each reviewed by staff. One row
+    // per uploaded file, never overwritten: a re-upload for the same key marks
+    // the earlier `pending_review` rows `superseded` and keeps them as history.
+    guaranteeDocuments: defineTable({
+      guaranteeId: v.id("guarantees"),
+      agencyId: v.id("agencies"),
+      key: documentKey,
+      storageId: v.id("_storage"),
+      fileName: v.string(),
+      contentType: v.string(),
+      sizeBytes: v.number(),
+      uploadedBy: v.union(
+        v.object({ kind: v.literal("agency_user"), userId: v.id("users") }),
+        v.object({ kind: v.literal("staff"), userId: v.id("users") }),
+      ),
+      uploadedAt: v.string(),
+      status: guaranteeDocumentStatus,
+      reviewedBy: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.string()),
+      rejectionReason: v.optional(v.string()),
+    })
+      .index("by_guarantee", ["guaranteeId"])
+      .index("by_guarantee_key", ["guaranteeId", "key"])
+      .index("by_status", ["status"])
+      .index("by_storageId", ["storageId"]),
 
     agencyDocuments: defineTable({
       agencyId: v.id("agencies"),

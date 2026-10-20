@@ -136,7 +136,7 @@ type RepriceDraftSuccess = {
 /**
  * Re-snapshot a draft's `terms` through the same product resolution and
  * pricing `create` and `reprice` use. A draft has nothing reserved, so its
- * capacity is re-initialised from the new ceiling; `activate` reads the
+ * capacity is re-initialised from the new ceiling; `staffActivate` reads the
  * ceiling from `terms` again when it goes on risk.
  */
 async function repriceDraft(
@@ -185,7 +185,10 @@ async function repriceDraft(
  * Who hears about a decision: the agency's registered address and the member
  * who asked for the analysis. Deduplicated, blanks dropped.
  */
-async function decisionRecipients(ctx: MutationCtx, guarantee: Guarantee): Promise<string[]> {
+export async function decisionRecipients(
+  ctx: MutationCtx,
+  guarantee: Guarantee,
+): Promise<string[]> {
   const agency = await ctx.db.get(guarantee.agencyId);
   const requesterId = guarantee.underwriting.analysisRequest?.requestedBy;
   const requester = requesterId ? await ctx.db.get(requesterId) : null;
