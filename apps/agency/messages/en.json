@@ -1104,7 +1104,38 @@
         ]
       },
       "ctaButton": "Start registration",
-      "ctaNoteReview": "reviewed in up to 2 business days"
+      "ctaNoteReview": "reviewed in up to 2 business days",
+      "invites": {
+        "title": "You've been invited",
+        "description": "Accept an invite to join an existing agency instead of registering a new one.",
+        "invitedBy": "Invited by {name}",
+        "roleLabel": "as {role}",
+        "roles": {
+          "admin": "admin",
+          "member": "member"
+        },
+        "expires": "Expires {date}",
+        "accept": "Accept invite",
+        "accepting": "Joining…",
+        "accepted": "Welcome to {agency}!",
+        "or": "Or register a new agency below.",
+        "errors": {
+          "INVALID_EMAIL": "Enter a valid email address.",
+          "INVITE_ALREADY_PENDING": "There is already an open invite for this email.",
+          "ALREADY_MEMBER": "This person is already a member of the agency.",
+          "INVITE_NOT_FOUND": "Invite not found.",
+          "INVITE_NOT_PENDING": "This invite is no longer pending.",
+          "INVITE_EXPIRED": "This invite has expired. Ask for a new one.",
+          "INVITE_EMAIL_MISMATCH": "This invite was sent to a different email address.",
+          "EMAIL_NOT_VERIFIED": "Verify your email address before accepting the invite.",
+          "MEMBERSHIP_NOT_FOUND": "Member not found.",
+          "CANNOT_CHANGE_OWN_ROLE": "You cannot change your own role.",
+          "CANNOT_REMOVE_SELF": "You cannot remove yourself.",
+          "INSUFFICIENT_ROLE": "Your role does not allow this change.",
+          "LAST_OWNER": "The agency must keep at least one owner.",
+          "UNEXPECTED": "Something went wrong. Please try again."
+        }
+      }
     },
     "status": {
       "title": "Application under review",
@@ -1351,5 +1382,81 @@
     "default_verified": "Default verified",
     "cover_paid": "Cover committed",
     "closed": "Closed"
+  },
+  "members": {
+    "meta": {
+      "title": "Members — MUTAV",
+      "description": "Manage who has access to your agency and their roles."
+    },
+    "heading": "Members",
+    "subheading": "Who can access this agency, and what each person can do.",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "table": {
+      "heading": "Team",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "joined": "Joined",
+      "actions": "Actions",
+      "you": "you",
+      "empty": "No members yet.",
+      "loading": "Loading members…"
+    },
+    "actions": {
+      "invite": "Invite member",
+      "remove": "Remove",
+      "changeRoleLabel": "Change role for {name}"
+    },
+    "removeDialog": {
+      "title": "Remove member?",
+      "description": "{name} will lose access to this agency immediately.",
+      "cancel": "Cancel",
+      "confirm": "Remove"
+    },
+    "inviteSheet": {
+      "title": "Invite member",
+      "description": "We'll email an invite. It expires in 7 days.",
+      "email": "Email",
+      "emailPlaceholder": "name@agency.com",
+      "role": "Role",
+      "cancel": "Cancel",
+      "submit": "Send invite",
+      "submitting": "Sending…"
+    },
+    "invites": {
+      "heading": "Pending invites",
+      "empty": "No pending invites.",
+      "email": "Email",
+      "role": "Role",
+      "invitedBy": "Invited by",
+      "expires": "Expires",
+      "revoke": "Revoke"
+    },
+    "toasts": {
+      "invited": "Invite sent to {email}.",
+      "roleChanged": "Role updated.",
+      "removed": "Member removed.",
+      "revoked": "Invite revoked."
+    },
+    "errors": {
+      "INVALID_EMAIL": "Enter a valid email address.",
+      "INVITE_ALREADY_PENDING": "There is already an open invite for this email.",
+      "ALREADY_MEMBER": "This person is already a member of the agency.",
+      "INVITE_NOT_FOUND": "Invite not found.",
+      "INVITE_NOT_PENDING": "This invite is no longer pending.",
+      "INVITE_EXPIRED": "This invite has expired. Ask for a new one.",
+      "INVITE_EMAIL_MISMATCH": "This invite was sent to a different email address.",
+      "EMAIL_NOT_VERIFIED": "Verify your email address before accepting the invite.",
+      "MEMBERSHIP_NOT_FOUND": "Member not found.",
+      "CANNOT_CHANGE_OWN_ROLE": "You cannot change your own role.",
+      "CANNOT_REMOVE_SELF": "You cannot remove yourself.",
+      "INSUFFICIENT_ROLE": "Your role does not allow this change.",
+      "LAST_OWNER": "The agency must keep at least one owner.",
+      "UNEXPECTED": "Something went wrong. Please try again."
+    }
   }
 }

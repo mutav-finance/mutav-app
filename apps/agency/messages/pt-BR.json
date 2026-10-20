@@ -1104,7 +1104,38 @@
         ]
       },
       "ctaButton": "Começar cadastro",
-      "ctaNoteReview": "análise em até 2 dias úteis"
+      "ctaNoteReview": "análise em até 2 dias úteis",
+      "invites": {
+        "title": "Você recebeu um convite",
+        "description": "Aceite um convite para entrar em uma imobiliária existente em vez de cadastrar uma nova.",
+        "invitedBy": "Convidado por {name}",
+        "roleLabel": "como {role}",
+        "roles": {
+          "admin": "administrador",
+          "member": "membro"
+        },
+        "expires": "Expira em {date}",
+        "accept": "Aceitar convite",
+        "accepting": "Entrando…",
+        "accepted": "Boas-vindas à {agency}!",
+        "or": "Ou cadastre uma nova imobiliária abaixo.",
+        "errors": {
+          "INVALID_EMAIL": "Informe um e-mail válido.",
+          "INVITE_ALREADY_PENDING": "Já existe um convite em aberto para este e-mail.",
+          "ALREADY_MEMBER": "Esta pessoa já faz parte da imobiliária.",
+          "INVITE_NOT_FOUND": "Convite não encontrado.",
+          "INVITE_NOT_PENDING": "Este convite não está mais pendente.",
+          "INVITE_EXPIRED": "Este convite expirou. Peça um novo.",
+          "INVITE_EMAIL_MISMATCH": "Este convite foi enviado para outro e-mail.",
+          "EMAIL_NOT_VERIFIED": "Confirme seu e-mail antes de aceitar o convite.",
+          "MEMBERSHIP_NOT_FOUND": "Membro não encontrado.",
+          "CANNOT_CHANGE_OWN_ROLE": "Você não pode alterar o seu próprio papel.",
+          "CANNOT_REMOVE_SELF": "Você não pode remover a si mesmo.",
+          "INSUFFICIENT_ROLE": "Seu papel não permite esta alteração.",
+          "LAST_OWNER": "A imobiliária precisa manter ao menos um proprietário.",
+          "UNEXPECTED": "Algo deu errado. Tente novamente."
+        }
+      }
     },
     "status": {
       "title": "Cadastro em análise",
@@ -1351,5 +1382,81 @@
     "default_verified": "Inadimplência verificada",
     "cover_paid": "Cobertura registrada",
     "closed": "Encerradas"
+  },
+  "members": {
+    "meta": {
+      "title": "Membros — MUTAV",
+      "description": "Gerencie quem tem acesso à sua imobiliária e o papel de cada pessoa."
+    },
+    "heading": "Membros",
+    "subheading": "Quem acessa esta imobiliária e o que cada pessoa pode fazer.",
+    "roles": {
+      "owner": "Proprietário",
+      "admin": "Administrador",
+      "member": "Membro"
+    },
+    "table": {
+      "heading": "Equipe",
+      "name": "Nome",
+      "email": "E-mail",
+      "role": "Papel",
+      "joined": "Entrou em",
+      "actions": "Ações",
+      "you": "você",
+      "empty": "Nenhum membro ainda.",
+      "loading": "Carregando membros…"
+    },
+    "actions": {
+      "invite": "Convidar membro",
+      "remove": "Remover",
+      "changeRoleLabel": "Alterar papel de {name}"
+    },
+    "removeDialog": {
+      "title": "Remover membro?",
+      "description": "{name} perderá o acesso a esta imobiliária imediatamente.",
+      "cancel": "Cancelar",
+      "confirm": "Remover"
+    },
+    "inviteSheet": {
+      "title": "Convidar membro",
+      "description": "Enviaremos um convite por e-mail. Ele expira em 7 dias.",
+      "email": "E-mail",
+      "emailPlaceholder": "nome@imobiliaria.com.br",
+      "role": "Papel",
+      "cancel": "Cancelar",
+      "submit": "Enviar convite",
+      "submitting": "Enviando…"
+    },
+    "invites": {
+      "heading": "Convites pendentes",
+      "empty": "Nenhum convite pendente.",
+      "email": "E-mail",
+      "role": "Papel",
+      "invitedBy": "Convidado por",
+      "expires": "Expira em",
+      "revoke": "Revogar"
+    },
+    "toasts": {
+      "invited": "Convite enviado para {email}.",
+      "roleChanged": "Papel atualizado.",
+      "removed": "Membro removido.",
+      "revoked": "Convite revogado."
+    },
+    "errors": {
+      "INVALID_EMAIL": "Informe um e-mail válido.",
+      "INVITE_ALREADY_PENDING": "Já existe um convite em aberto para este e-mail.",
+      "ALREADY_MEMBER": "Esta pessoa já faz parte da imobiliária.",
+      "INVITE_NOT_FOUND": "Convite não encontrado.",
+      "INVITE_NOT_PENDING": "Este convite não está mais pendente.",
+      "INVITE_EXPIRED": "Este convite expirou. Peça um novo.",
+      "INVITE_EMAIL_MISMATCH": "Este convite foi enviado para outro e-mail.",
+      "EMAIL_NOT_VERIFIED": "Confirme seu e-mail antes de aceitar o convite.",
+      "MEMBERSHIP_NOT_FOUND": "Membro não encontrado.",
+      "CANNOT_CHANGE_OWN_ROLE": "Você não pode alterar o seu próprio papel.",
+      "CANNOT_REMOVE_SELF": "Você não pode remover a si mesmo.",
+      "INSUFFICIENT_ROLE": "Seu papel não permite esta alteração.",
+      "LAST_OWNER": "A imobiliária precisa manter ao menos um proprietário.",
+      "UNEXPECTED": "Algo deu errado. Tente novamente."
+    }
   }
 }
