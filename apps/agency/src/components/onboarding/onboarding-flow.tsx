@@ -6,11 +6,20 @@ import { StepProfile } from "@/components/onboarding/step-profile";
 import { StepBanking } from "@/components/onboarding/step-banking";
 import { StepDocuments } from "@/components/onboarding/step-documents";
 import { StepReview } from "@/components/onboarding/step-review";
-import { useOnboardingFlow } from "@/components/onboarding/use-onboarding-flow";
+import {
+  useOnboardingFlow,
+  type OnboardingDraft,
+} from "@/components/onboarding/use-onboarding-flow";
 
-export function OnboardingFlow({ initialType }: { initialType?: "autonomo" | "empresa" }) {
+export function OnboardingFlow({
+  initialType,
+  initialDraft,
+}: {
+  initialType?: "autonomo" | "empresa";
+  initialDraft?: OnboardingDraft | null;
+}) {
   const t = useTranslations("onboarding");
-  const vm = useOnboardingFlow({ initialType });
+  const vm = useOnboardingFlow({ initialType, initialDraft });
 
   if (vm.isSubmitted) {
     return (
