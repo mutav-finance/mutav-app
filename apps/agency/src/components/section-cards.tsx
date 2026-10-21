@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import { AlertTriangleIcon, CalendarIcon, FileTextIcon, ShieldAlertIcon } from "lucide-react";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@mutav/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { api } from "@convex/_generated/api";
 import { INSURED_STATES } from "@convex/guarantees/domain";
@@ -41,15 +41,12 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <FileTextIcon className="size-3.5" />
-            {t("inForce.label")}
+            {t("inForce.footer")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {inForceCount ?? "—"}
           </CardTitle>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">{t("inForce.footer")}</div>
-        </CardFooter>
       </Card>
 
       {/* Drafts */}
@@ -57,15 +54,12 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <AlertTriangleIcon className="size-3.5" />
-            {t("drafted.label")}
+            {t("drafted.footer")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {summary ? summary.drafted : "—"}
           </CardTitle>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">{t("drafted.footer")}</div>
-        </CardFooter>
       </Card>
 
       {/* Next invoice */}
@@ -73,7 +67,9 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <CalendarIcon className="size-3.5" />
-            {t("nextPayment.label")}
+            {nextPayment
+              ? t("nextPayment.dueOn", { date: formatDateBR(nextPayment.dueDate) })
+              : t("nextPayment.footer")}
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {nextPayment === undefined
@@ -83,13 +79,6 @@ export function SectionCards() {
                 : formatBRLCents(nextPayment.totalCents)}
           </CardTitle>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">
-            {nextPayment
-              ? t("nextPayment.dueOn", { date: formatDateBR(nextPayment.dueDate) })
-              : t("nextPayment.footer")}
-          </div>
-        </CardFooter>
       </Card>
 
       {/* Counts overdue Mutav invoices (the agency's bill), not delinquency
@@ -98,14 +87,6 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <ShieldAlertIcon className="size-3.5" />
-            {t("overdueInvoices.label")}
-          </CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {overdueCount === undefined ? <Skeleton className="h-8 w-10" /> : overdueCount}
-          </CardTitle>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">
             {overdueCount === undefined ? (
               <Skeleton className="h-4 w-32" />
             ) : overdueCount === 0 ? (
@@ -113,8 +94,11 @@ export function SectionCards() {
             ) : (
               t("overdueInvoices.footerSome", { count: overdueCount })
             )}
-          </div>
-        </CardFooter>
+          </CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {overdueCount === undefined ? <Skeleton className="h-8 w-10" /> : overdueCount}
+          </CardTitle>
+        </CardHeader>
       </Card>
     </div>
   );

@@ -1,3 +1,4 @@
+import { maskBRLAmount } from "@mutav/i18n/brazil";
 import { Input } from "./input";
 
 // The input owns its placeholder: the "R$" adornment is already rendered, so a
@@ -25,7 +26,7 @@ export function CurrencyInput({
         value={value}
         placeholder={AMOUNT_PLACEHOLDER}
         inputMode="decimal"
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(maskBRLAmount(e.target.value))}
         onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
       />
     </div>

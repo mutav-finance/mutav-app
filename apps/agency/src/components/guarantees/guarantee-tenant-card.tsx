@@ -3,7 +3,7 @@ import { useTranslations } from "next-intl";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
-import { maskCNPJ, maskCPF } from "@mutav/i18n/brazil";
+import { maskCNPJ, maskCPF, maskPhone } from "@mutav/i18n/brazil";
 import { formatDateBR, formatDateTimeBR } from "@mutav/i18n/brazil";
 import type { GuaranteeTenant } from "@/lib/guarantees/types";
 import { FieldGroup, FieldGroupHeader, FieldRow } from "./field-row";
@@ -66,7 +66,7 @@ export function GuaranteeTenantCard({ tenant }: { tenant: GuaranteeTenant }) {
             </>
           )}
           <FieldRow label={tFields("email")} value={tenant.email} />
-          <FieldRow label={tFields("phone")} value={tenant.phone} mono />
+          <FieldRow label={tFields("phone")} value={maskPhone(tenant.phone)} mono />
         </FieldGroup>
       </CardContent>
       {isRejected && (

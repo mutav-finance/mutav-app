@@ -259,12 +259,18 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
           <h2 className="text-base font-semibold">{t("coverage.summary.heading")}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <SummaryRow
-              label={t("coverage.summary.exitCost")}
-              value={preview ? formatBRLCents(preview.exitCostCapCents) : null}
+              label={t("coverage.summary.coverageCeiling")}
+              value={
+                preview
+                  ? t("coverage.summary.coverageCeilingValue", {
+                      count: preview.coverageCeilingMultiplier,
+                    })
+                  : null
+              }
             />
             <SummaryRow
-              label={t("coverage.summary.fee")}
-              value={preview ? formatBRLCents(preview.feeCents) : null}
+              label={t("coverage.summary.exitCost")}
+              value={preview ? formatBRLCents(preview.exitCostCapCents) : null}
             />
             <SummaryRow
               label={t("coverage.summary.commission")}
