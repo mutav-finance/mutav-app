@@ -254,17 +254,21 @@
   },
   "metrics": {
     "inForce": {
+      "label": "Guarantees in force",
       "footer": "Active, in arrears and under cover"
     },
     "drafted": {
+      "label": "Drafts",
       "footer": "Awaiting activation"
     },
     "nextPayment": {
+      "label": "Next Invoice",
       "footer": "No pending invoices",
       "noneLabel": "None",
-      "dueOn": "Next invoice · {date}"
+      "dueOn": "Due on {date}"
     },
     "overdueInvoices": {
+      "label": "Overdue invoices",
       "footerNone": "All Mutav invoices are up to date",
       "footerSome": "{count, plural, one {# Mutav invoice past its due date} other {# Mutav invoices past their due date}}"
     }

@@ -254,17 +254,21 @@
   },
   "metrics": {
     "inForce": {
+      "label": "Garantias em vigor",
       "footer": "Ativas, inadimplentes e em cobertura"
     },
     "drafted": {
+      "label": "Rascunhos",
       "footer": "Aguardando ativação"
     },
     "nextPayment": {
+      "label": "Próxima Fatura",
       "footer": "Nenhuma fatura pendente",
       "noneLabel": "Nenhuma",
-      "dueOn": "Próxima fatura · {date}"
+      "dueOn": "Vence em {date}"
     },
     "overdueInvoices": {
+      "label": "Faturas em atraso",
       "footerNone": "Todas as faturas Mutav estão em dia",
       "footerSome": "{count, plural, one {# fatura Mutav em atraso} other {# faturas Mutav em atraso}}"
     }
