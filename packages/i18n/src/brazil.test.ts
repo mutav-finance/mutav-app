@@ -5,10 +5,27 @@ import {
   formatDateTimeBR,
   formatDateTimeBRT,
   formatWallClockDateTimeBR,
+  maskBRLAmount,
 } from "./brazil";
 
 // Intl emits a non-breaking space between "R$" and the figure.
 const NBSP = " ";
+
+describe("maskBRLAmount", () => {
+  it.each([
+    ["1000000", "1.000.000"],
+    ["1000000,5", "1.000.000,5"],
+    ["1234,567", "1.234,56"],
+    ["1.2.3.4", "1.234"],
+    ["R$ 2500,00", "2.500,00"],
+    ["0,50", "0,50"],
+    ["007", "7"],
+    ["12,3,4", "12,34"],
+    ["", ""],
+  ])("masks %j as %j", (raw, masked) => {
+    expect(maskBRLAmount(raw)).toBe(masked);
+  });
+});
 
 describe("Brazil money and date formatters", () => {
   it("formats BRL cents in pt-BR regardless of the host locale", () => {

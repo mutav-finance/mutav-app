@@ -18,6 +18,8 @@ import {
 } from "@mutav/ui/breadcrumb";
 import { Mono } from "@mutav/ui/mono";
 import { Link } from "@mutav/i18n/navigation";
+import { Button } from "@mutav/ui/button";
+import { ArrowLeftIcon } from "lucide-react";
 import type { api } from "@convex/_generated/api";
 import { GuaranteeDocumentsCard } from "./guarantee-documents-card";
 import { GuaranteeHistoryCard } from "./guarantee-history-card";
@@ -46,21 +48,29 @@ export function GuaranteeDetailsPage({
         variant="hero"
         width="narrow"
         breadcrumb={
-          <Breadcrumb>
-            <Eyebrow as={BreadcrumbList}>
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href="/">{tNav("dashboard")}</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>
-                  <Mono>#{guarantee.id}</Mono>
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </Eyebrow>
-          </Breadcrumb>
+          <>
+            <Button variant="ghost" size="sm" className="-ml-2 w-fit" asChild>
+              <Link href="/guarantees">
+                <ArrowLeftIcon data-icon="inline-start" />
+                {t("backToList")}
+              </Link>
+            </Button>
+            <Breadcrumb>
+              <Eyebrow as={BreadcrumbList}>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href="/">{tNav("dashboard")}</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>
+                    <Mono>#{guarantee.id}</Mono>
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </Eyebrow>
+            </Breadcrumb>
+          </>
         }
         title={t("heroTitle", { state: tState(guarantee.status) })}
       />

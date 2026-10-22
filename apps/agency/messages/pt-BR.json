@@ -218,10 +218,10 @@
       "propertyOwners": "Locadores"
     },
     "agency": {
-      "groupLabel": "Agência",
+      "groupLabel": "Imobiliária",
       "members": "Membros",
       "commission": "Comissão",
-      "agencySettings": "Configurações da Agência"
+      "agencySettings": "Configurações da Imobiliária"
     },
     "agencySwitcher": {
       "workspacesLabel": "Espaços de trabalho",
@@ -230,7 +230,8 @@
         "admin": "Administrador",
         "member": "Membro"
       }
-    }
+    },
+    "support": "Suporte"
   },
   "chart": {
     "title": "Carteira vigente",
@@ -524,7 +525,8 @@
     },
     "loading": {
       "label": "Carregando garantia"
-    }
+    },
+    "backToList": "Voltar para garantias"
   },
   "guaranteeList": {
     "meta": {
@@ -551,7 +553,8 @@
       "tenant": "Locatário",
       "availableGuarantee": "Garantia disponível",
       "nextRenewalDate": "Próxima renovação",
-      "creationTime": "Criado em"
+      "creationTime": "Criado em",
+      "open": "Abrir"
     },
     "urgency": {
       "overdue": "Vencido",
@@ -584,7 +587,8 @@
       "previousPage": "Página anterior",
       "nextPage": "Próxima página",
       "lastPage": "Última página"
-    }
+    },
+    "openAria": "Abrir {id}"
   },
   "invoiceList": {
     "meta": {
@@ -606,7 +610,8 @@
       "dueDate": "Vencimento",
       "total": "Total",
       "state": "Status",
-      "guarantees": "Garantias"
+      "guarantees": "Garantias",
+      "open": "Abrir"
     },
     "search": {
       "placeholder": "Buscar por ID ou competência"
@@ -621,7 +626,8 @@
       "previousPage": "Página anterior",
       "nextPage": "Próxima página",
       "lastPage": "Última página"
-    }
+    },
+    "openAria": "Abrir {id}"
   },
   "checkout": {
     "common": {
@@ -938,10 +944,11 @@
       },
       "summary": {
         "heading": "Resumo",
+        "coverageCeiling": "Cobertura",
+        "coverageCeilingValue": "até {count} aluguéis",
         "exitCost": "Custo de saída",
-        "fee": "Valor da taxa",
         "commission": "Comissão (1,5%)",
-        "guarantee": "Valor da garantia"
+        "guarantee": "Valor da garantia (mensal)"
       }
     },
     "complementary": {
@@ -1053,7 +1060,6 @@
       "tag": "Programa de parceiros",
       "title": "Garantia locatícia sem fiador.",
       "titleLine2": "Feita pra quem tem muito o que fazer.",
-      "subtitle": "Capital segregado. Auditável em tempo real, por qualquer pessoa, a qualquer momento.",
       "warningTitle": "Atenção para imobiliárias:",
       "warningBody": "o cadastro precisa ser feito pelo sócio com participação igual ou superior a 25%, ou por um administrador com poderes para abrir contas em nome da empresa. Tenha o contrato social em mãos para comprovar.",
       "checklistTitle": "O que você vai precisar",
@@ -1222,7 +1228,7 @@
       "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
       "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
       "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
-      "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte.",
+      "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte: parceiros@mutav.finance.",
       "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
       "AGENCY_TYPE_REQUIRED": "Selecione o tipo de cadastro para continuar.",
       "BANKING_INFO_REQUIRED": "Preencha os dados bancários antes de finalizar.",
@@ -1266,7 +1272,8 @@
         "cnpj": "CNPJ inválido.",
         "representanteName": "Nome do responsável obrigatório.",
         "representanteCpf": "CPF do responsável inválido."
-      }
+      },
+      "backButton": "Voltar"
     }
   },
   "transparency": {

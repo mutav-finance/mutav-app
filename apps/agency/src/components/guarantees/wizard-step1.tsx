@@ -18,7 +18,7 @@ import {
   type DraftWizardData,
 } from "@/lib/guarantees/wizard";
 import { maskCPF, maskCNPJ, isValidCPF, isValidCNPJ } from "@mutav/i18n/brazil";
-import { formatBRLCents } from "@mutav/i18n/brazil";
+import { formatBRLCents, formatCentsPlain } from "@mutav/i18n/brazil";
 
 type Props = {
   data: DraftWizardData;
@@ -35,13 +35,13 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
   const [isOpeningApplication, setIsOpeningApplication] = React.useState(false);
   const openApplication = useMutation(api.guarantees.useCases.openContractApplication);
   const [rentInput, setRentInput] = React.useState(
-    data.rentCents > 0 ? (data.rentCents / 100).toFixed(2).replace(".", ",") : "",
+    data.rentCents > 0 ? formatCentsPlain(data.rentCents) : "",
   );
   const [condoInput, setCondoInput] = React.useState(
-    data.condoCents > 0 ? (data.condoCents / 100).toFixed(2).replace(".", ",") : "",
+    data.condoCents > 0 ? formatCentsPlain(data.condoCents) : "",
   );
   const [otherInput, setOtherInput] = React.useState(
-    data.otherFeesCents > 0 ? (data.otherFeesCents / 100).toFixed(2).replace(".", ",") : "",
+    data.otherFeesCents > 0 ? formatCentsPlain(data.otherFeesCents) : "",
   );
 
   const handleCurrencyBlur = (

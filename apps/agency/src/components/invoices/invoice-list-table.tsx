@@ -29,7 +29,7 @@ import {
 import { api } from "@convex/_generated/api";
 import { derivedStatus, type InvoiceDisplayStatus } from "@convex/invoices/domain";
 import { useWorkspace } from "@/providers/workspace";
-import { Link } from "@mutav/i18n/navigation";
+import { Link, useRouter } from "@mutav/i18n/navigation";
 import { Badge } from "@mutav/ui/badge";
 import { Button } from "@mutav/ui/button";
 import {
@@ -149,6 +149,25 @@ function buildColumns(
         );
       },
     },
+    {
+      id: "open",
+      header: () => <span className="sr-only">{t("columns.open")}</span>,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <Button variant="ghost" size="sm" asChild>
+            <Link
+              href={`/invoices/${row.original.id}`}
+              aria-label={t("openAria", { id: row.original.id })}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {t("columns.open")}
+              <ChevronRightIcon data-icon="inline-end" />
+            </Link>
+          </Button>
+        </div>
+      ),
+    },
   ];
 }
 
@@ -157,6 +176,7 @@ export function InvoiceListTable() {
   const tState = useTranslations("invoiceDetails.state");
   const tMethod = useTranslations("invoiceDetails.method");
 
+  const router = useRouter();
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
 
@@ -321,7 +341,11 @@ export function InvoiceListTable() {
             <TableBody>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow
+                    key={row.id}
+                    onClick={() => router.push(`/invoices/${row.original.id}`)}
+                    className="hover:bg-muted/50 cursor-pointer"
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

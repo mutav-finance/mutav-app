@@ -22,7 +22,6 @@ export function WelcomeScreen() {
           <span className="block">{t("title")}</span>
           <span className="text-text-2 block font-normal">{t("titleLine2")}</span>
         </h1>
-        <p className="text-text-2 max-w-xl text-base leading-relaxed">{t("subtitle")}</p>
       </div>
 
       {/* Aviso sócio majoritário — relevante apenas para empresa */}
