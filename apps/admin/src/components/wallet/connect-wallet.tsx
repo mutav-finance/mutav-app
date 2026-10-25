@@ -8,9 +8,11 @@ import { useWallet } from "@mutav/wallet/provider";
 const truncate = (address: string) => `${address.slice(0, 4)}…${address.slice(-4)}`;
 
 /**
- * Staff wallet control for the admin header. Each admin connects their own wallet
- * (Freighter — hardware-optional via Ledger — or xBull); that key is one signer
- * of the vault's M-of-N admin multisig (ADR 0005).
+ * Staff wallet control for the admin app header. Stellar legacy: this wires
+ * Freighter (hardware-optional via Ledger) or xBull, one signer of the Stellar
+ * vault's M-of-N admin multisig (ADR 0005). On the Solana pilot the protocol
+ * admin is the Squads v4 multisig, signed at reserve.mutav.finance /admin
+ * today; Squads signing moves into apps/admin per mutav#151.
  *
  * Connecting proves ownership in the same gesture: the provider has
  * `verifyOwnershipOnConnect`, so picking the wallet immediately signs a

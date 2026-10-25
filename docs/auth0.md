@@ -3,6 +3,7 @@
 How Auth0 is wired into Mutav, what to set where, and how to fix it when login breaks. Written from the code as of 2026-10-25.
 
 - **Why Auth0:** [ADR 0009](architecture/decisions/0009-keep-auth0-for-pilot.md).
+- **Vocabulary** (identity, MUTAV staff, admin app, protocol admin, operator): the chain-neutral [security baseline](https://github.com/mutav-finance/mutav-protocol-solana/blob/main/docs/security/baseline.md), the [Solana glossary](https://github.com/mutav-finance/mutav-protocol-solana/blob/main/docs/introduction/glossary.md) Authority section, and the terminology block in [`AGENTS.md`](../AGENTS.md). Auth0 is **identity only**: it proves who you are and grants nothing. Nothing here touches the protocol admin or the operator key.
 - **Function wrappers and authorization rules** (`queryWithAgencyScope`, `mutavStaff` gates, Auth0 Organizations model): [`auth.md`](auth.md).
 - **Dev logins:** [`test-personas.md`](test-personas.md).
 
@@ -24,7 +25,7 @@ browser ◀──── ID token ◀──── GET /api/auth/convex-token ─�
 
 **Which apps use Auth0.** Only `apps/agency` (`app.mutav.finance`, port 3000) and `apps/admin` (`admin.mutav.finance`, port 3003). `apps/pay` is a publicId-bearer URL and `apps/fund` is wallet-as-identity. Neither carries the Auth0 SDK ([ADR 0003](architecture/decisions/0003-persona-app-origin-isolation-single-convex.md) §2), and their CSPs don't allow Auth0 origins. Keep it that way.
 
-**One Auth0 application backs every authenticated app** (ADR 0003, amendment of 2026-06-21). Agency and admin share the client id. The client id is the JWT `aud`, and Convex validates it with **one** provider. Admin access is never decided by `aud`. Convex does not surface that claim, so the staff gate is the `mutavStaff` row.
+**One Auth0 application backs every authenticated app** (ADR 0003, amendment of 2026-06-21). Agency and admin share the client id. The client id is the JWT `aud`, and Convex validates it with **one** provider. Admin-app access is never decided by `aud`. Convex does not surface that claim, so the staff gate is the `mutavStaff` row.
 
 The pieces, file by file:
 
@@ -143,12 +144,12 @@ The admin app does not pin a connection today (`/auth/login` carries no `connect
 - Operational ladder `support` < `compliance` < `admin`, checked by `meetsMinRole`. `treasury` is off the ladder and is checked with `hasExactRole`.
 - Wrappers: `queryWithMutavStaff` / `mutationWithMutavStaff` / `queryWithMutavRole({ minRole })` / `mutationWithMutavRole({ minRole })` in `convex/lib/auth.ts`.
 - There is no claim-based provisioning. A roles claim injected by an Auth0 Action is **not** read by Convex. Every row comes from one of three paths, and each writes an audit entry:
-  1. **Genesis admin**, once per deployment, refused once any admin exists:
+  1. **Genesis staff admin role**, once per deployment, refused once any staff admin exists:
      ```bash
      bunx convex run mutavStaff:useCases:bootstrapFirstAdmin '{"auth0Sub":"auth0|<id>","email":"<email>"}'
      ```
-  2. **Normal grants:** the `/staff` page in `apps/admin` (`createStaffRole`, admin only). Revoke with `deleteStaffRole`. It refuses to remove the last admin.
-  3. **Recovery** when no admin can log in: `internal.mutavStaff.useCases.grantStaffRole` via `bunx convex run`. Needs the deploy key.
+  2. **Normal grants:** the `/staff` page in `apps/admin` (`createStaffRole`, staff admin role only). Revoke with `deleteStaffRole`. It refuses to remove the last staff admin.
+  3. **Recovery** when no staff admin can log in: `internal.mutavStaff.useCases.grantStaffRole` via `bunx convex run`. Needs the deploy key.
 - The target must have **logged in once** first, so that a `users` row with that `subject` exists. Find the subject in Auth0 → User Management → Users → `user_id`.
 
 ## Local development
@@ -208,8 +209,8 @@ Target state ([#206](https://github.com/mutav-finance/mutav-app/issues/206), [AD
 | Convex calls are anonymous even with a session                                                                            | `NEXT_PUBLIC_AUTH0_DOMAIN` was unset **at build time**, so the bundle rendered a bare `ConvexProvider`. Set it and **rebuild**. A runtime change does nothing.                                                                                                                                                                      |
 | Auth0 error page: `Callback URL mismatch`                                                                                 | `APP_BASE_URL` + `/auth/callback` is not in Allowed Callback URLs. Add the exact URL (scheme, host and port). Previews on the dev tenant need their URL pattern allowed, or login on that preview won't work.                                                                                                                       |
 | `InvalidStateError` / login loop                                                                                          | A transaction or session cookie was dropped. Check that the cookies are `SameSite=Lax` (not Strict) and `Secure` over https, and that you're not mixing `localhost` and `127.0.0.1`. Clear the cookies for the origin and retry. Admin sends callback errors to `/auth/logout` on purpose, to break loops.                          |
-| Admin: signed in but bounced to the agency app                                                                            | No `mutavStaff` row for your subject (`not-staff`). Grant a role (see "Connections and staff roles").                                                                                                                                                                                                                               |
-| Admin: bounced back to login although signed in                                                                           | `getStaffMember()` resolved to `anonymous`: session decrypt failed (e.g. after an `AUTH0_SECRET` rotation, so clear the cookies) or the Convex `getMyStaff` read failed (it fails closed). Check the server logs for `[admin] …`.                                                                                                   |
+| Admin app: signed in but bounced to the agency app                                                                        | No `mutavStaff` row for your subject (`not-staff`). Grant a role (see "Connections and staff roles").                                                                                                                                                                                                                               |
+| Admin app: bounced back to login although signed in                                                                       | `getStaffMember()` resolved to `anonymous`: session decrypt failed (e.g. after an `AUTH0_SECRET` rotation, so clear the cookies) or the Convex `getMyStaff` read failed (it fails closed). Check the server logs for `[admin] …`.                                                                                                   |
 | Vercel: `403 forbidden … scope "mutav"` or "project not found"                                                            | Wrong scope. Run `vercel switch mutav`, or pass `--scope mutav`. In the Vercel MCP, use `teamId: team_GNLcWCe3CRw43IgLIjconlkU`. This is not a permissions bug.                                                                                                                                                                     |
 | `verify-convex-deploy: refusing to deploy — key/environment mismatch`                                                     | `CONVEX_DEPLOY_KEY` in that Vercel environment is the wrong kind (`prod:` vs `preview:`). Re-add the right key to the right environment.                                                                                                                                                                                            |
 | `AUTH0_DOMAIN must be a bare host` (Management API)                                                                       | The Convex env value has `https://`. Strip it.                                                                                                                                                                                                                                                                                      |
