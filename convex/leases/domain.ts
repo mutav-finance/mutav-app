@@ -39,11 +39,20 @@ export const leasePropertyValidator = v.object({
   complement: v.string(),
 });
 
+/**
+ * The day of the month the contract says rent is due. Any calendar day is
+ * accepted as written: a lease due "todo dia 31" falls due on the last day of
+ * the shorter months (see `dueDateFor`) instead of being rewritten to fit.
+ */
+export const LEASE_DUE_DAY_MIN = 1;
+export const LEASE_DUE_DAY_MAX = 31;
+
 /** Rent bundle as the agency submits it; `totalRentCents` is derived server-side. */
 export const leaseRentInputValidator = v.object({
   rentCents: v.number(),
   condoCents: v.number(),
   otherFeesCents: v.number(),
+  dueDay: v.number(),
 });
 
 export const leaseRentValidator = v.object({
@@ -51,13 +60,19 @@ export const leaseRentValidator = v.object({
   condoCents: v.number(),
   otherFeesCents: v.number(),
   totalRentCents: v.number(),
+  dueDay: v.number(),
 });
 
 export type LeaseRentInput = {
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
+  dueDay: number;
 };
+
+export function isValidDueDay(dueDay: number): boolean {
+  return Number.isInteger(dueDay) && dueDay >= LEASE_DUE_DAY_MIN && dueDay <= LEASE_DUE_DAY_MAX;
+}
 
 export function isValidRentInput(rent: LeaseRentInput): boolean {
   return (
@@ -66,8 +81,33 @@ export function isValidRentInput(rent: LeaseRentInput): boolean {
     Number.isInteger(rent.condoCents) &&
     rent.condoCents >= 0 &&
     Number.isInteger(rent.otherFeesCents) &&
-    rent.otherFeesCents >= 0
+    rent.otherFeesCents >= 0 &&
+    isValidDueDay(rent.dueDay)
   );
+}
+
+const REFERENCE_MONTH_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+/**
+ * The rent due date (`YYYY-MM-DD`) for one month of a lease. A due day past
+ * the month's length lands on its last day, so "dia 31" is 30/04 and 28/02 or
+ * 29/02. `null` when `referenceMonth` is not a `YYYY-MM` month or the due day
+ * is out of range.
+ */
+export function dueDateFor({
+  referenceMonth,
+  dueDay,
+}: {
+  referenceMonth: string;
+  dueDay: number;
+}): string | null {
+  const match = REFERENCE_MONTH_PATTERN.exec(referenceMonth);
+  if (!match || !isValidDueDay(dueDay)) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const day = Math.min(dueDay, lastDay);
+  return `${referenceMonth}-${String(day).padStart(2, "0")}`;
 }
 
 export function buildLeaseRent(rent: LeaseRentInput): LeaseRent {

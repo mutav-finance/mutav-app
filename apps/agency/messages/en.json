@@ -474,7 +474,9 @@
         "cityUF": "City/State",
         "complement": "Complement",
         "tag": "Tag",
-        "description": "Description"
+        "description": "Description",
+        "dueDay": "Rent due day",
+        "dueDayValue": "Every month on the {day}"
       },
       "propertyKind": {
         "residential": "Residential",
@@ -951,7 +953,11 @@
       "rent": "Monthly rent",
       "condo": "Condo fee",
       "otherFees": "Other fees",
-      "total": "Total rent"
+      "total": "Total rent",
+      "dueDay": "Rent due day",
+      "dueDayHint": "As written in the contract. In shorter months, days 29–31 fall due on the last day of the month.",
+      "dueDayPlaceholder": "Select the day",
+      "dueDayOption": "Every month on the {day}"
     },
     "tenant": {
       "fullName": "Full name",
@@ -1056,7 +1062,8 @@
       "birthDateFuture": "Date of birth cannot be in the future",
       "birthDateInvalid": "Invalid date",
       "emailInvalid": "Invalid e-mail",
-      "phoneInvalid": "Invalid phone number"
+      "phoneInvalid": "Invalid phone number",
+      "dueDayRequired": "Enter the rent due day."
     }
   },
   "paymentFlow": {

@@ -805,6 +805,13 @@ export const PII_FIELD_REGISTRY = {
       subjectType: SUBJECT.TENANT,
       legalNormRef: null,
     },
+    "rent.dueDay": {
+      ...COUNSEL_PENDING,
+      tier: TIER.T2,
+      dataClass: CLASS.FINANCIAL_OBLIGATION,
+      subjectType: SUBJECT.TENANT,
+      legalNormRef: null,
+    },
     payer: {
       ...COUNSEL_PENDING,
       tier: TIER.T3,

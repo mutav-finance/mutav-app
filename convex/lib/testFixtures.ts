@@ -241,7 +241,7 @@ export async function seedGuaranteeWithLease(
       },
       tag: "",
       description: "",
-      rent: { rentCents, condoCents: 0, otherFeesCents: 0, totalRentCents: rentCents },
+      rent: { rentCents, condoCents: 0, otherFeesCents: 0, totalRentCents: rentCents, dueDay: 5 },
       payer: DEFAULT_PAYER,
       openGuaranteeId: null,
     });

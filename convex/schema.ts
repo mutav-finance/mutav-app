@@ -419,6 +419,8 @@ export default defineSchema(
         condoCents: v.number(),
         otherFeesCents: v.number(),
         totalRentCents: v.number(),
+        // Day of the month the contract says rent is due (1–31).
+        dueDay: v.number(),
       }),
       payer,
       openGuaranteeId: v.union(v.id("guarantees"), v.null()),

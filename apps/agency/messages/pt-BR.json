@@ -474,7 +474,9 @@
         "cityUF": "Cidade/UF",
         "complement": "Complemento",
         "tag": "Tag",
-        "description": "Descrição"
+        "description": "Descrição",
+        "dueDay": "Vencimento do aluguel",
+        "dueDayValue": "Todo dia {day}"
       },
       "propertyKind": {
         "residential": "Residencial",
@@ -951,7 +953,11 @@
       "rent": "Aluguel mensal",
       "condo": "Condomínio",
       "otherFees": "Outras taxas",
-      "total": "Total"
+      "total": "Total",
+      "dueDay": "Dia do vencimento do aluguel",
+      "dueDayHint": "Como está no contrato. Nos meses mais curtos, dias 29–31 vencem no último dia do mês.",
+      "dueDayPlaceholder": "Selecione o dia",
+      "dueDayOption": "Todo dia {day}"
     },
     "tenant": {
       "fullName": "Nome completo",
@@ -1056,7 +1062,8 @@
       "birthDateFuture": "Data de nascimento não pode ser futura",
       "birthDateInvalid": "Data inválida",
       "emailInvalid": "E-mail inválido",
-      "phoneInvalid": "Telefone inválido"
+      "phoneInvalid": "Telefone inválido",
+      "dueDayRequired": "Informe o dia do vencimento do aluguel."
     }
   },
   "paymentFlow": {
