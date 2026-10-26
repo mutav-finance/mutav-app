@@ -87,7 +87,11 @@ async function tenantCount(t: ReturnType<typeof setup>): Promise<number> {
   });
 }
 
-describe("seedReset", () => {
+// A full reseed is one large transaction (~1–3 s locally). Under CI's parallel
+// turbo test jobs the first, cold run can pass the 5 s default.
+const SEED_TEST_TIMEOUT_MS = 30_000;
+
+describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
   test("agencyowner's agency (Imobiliária Aprovada) has guarantees — the partial-seed regression guard", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
@@ -1187,7 +1191,7 @@ describe("seedReset", () => {
   });
 });
 
-describe("lockForRealData", () => {
+describe("lockForRealData", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
   test("clears the demo dataset, drops the seeded staff grants and keeps the default product", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
