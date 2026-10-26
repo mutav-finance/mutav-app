@@ -73,7 +73,7 @@ A close is a transition **plus** a reason, and the reason is gated by the state 
 | `eviction`                | `in_eviction` only                    | the eviction concluded                                                                                             |
 | `dispute_reversal`        | `default_verified`, `cover_committed` | a verified default was overturned                                                                                  |
 | `canceled_pre_activation` | `drafted` only                        | a draft is **canceled**, never ended ([`machine.ts:137-141`](../../convex/guarantees/machine.ts))                  |
-| `underwriting_refused`    | `drafted` only                        | Mutav **refused** the draft in its underwriting review (§ 6.1a; [ADR 0009](decisions/0009-underwriting-review.md)) |
+| `underwriting_refused`    | `drafted` only                        | Mutav **refused** the draft in its underwriting review (§ 6.1a; [ADR 0010](decisions/0010-underwriting-review.md)) |
 
 "Any activated state" = `ENDED_FROM_ANY_ACTIVATED_STATE` = the five insured states ([`machine.ts:142-148`](../../convex/guarantees/machine.ts)).
 
@@ -119,7 +119,7 @@ Two actors move a guarantee: the **agency** (any member of the guarantee's agenc
 
 ### 6.1a Pre-activation underwriting review — `convex/guarantees/reviewMutations.ts`
 
-Between creation and activation a draft goes through Mutav's underwriting review ([ADR 0009](decisions/0009-underwriting-review.md)). The review is a **sub-status inside `drafted`**, `guarantees.underwriting.review`, not a lifecycle state: it moves no capacity, touches no aggregate key and is invisible to the transition matrix in § 3. Value object and moves: `REVIEW_STATUS` / `ALLOWED_REVIEW_TRANSITIONS` / `assertReviewTransition` — [`review.ts:17-105`](../../convex/guarantees/review.ts); schema at [`schema.ts:463-499`](../../convex/schema.ts); proof: the exhaustive 6×6 matrix in [`review.test.ts`](../../convex/guarantees/review.test.ts).
+Between creation and activation a draft goes through Mutav's underwriting review ([ADR 0010](decisions/0010-underwriting-review.md)). The review is a **sub-status inside `drafted`**, `guarantees.underwriting.review`, not a lifecycle state: it moves no capacity, touches no aggregate key and is invisible to the transition matrix in § 3. Value object and moves: `REVIEW_STATUS` / `ALLOWED_REVIEW_TRANSITIONS` / `assertReviewTransition` — [`review.ts:17-105`](../../convex/guarantees/review.ts); schema at [`schema.ts:463-499`](../../convex/schema.ts); proof: the exhaustive 6×6 matrix in [`review.test.ts`](../../convex/guarantees/review.test.ts).
 
 | from →               | `analysis_requested` | `accepted` | `awaiting_signature` | `signed` | `refused` |
 | -------------------- | :------------------: | :--------: | :------------------: | :------: | :-------: |

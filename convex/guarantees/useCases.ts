@@ -927,7 +927,7 @@ type CreateGuaranteeErrorResult = {
  * The draft starts Mutav's review at `editing`. The bureau score is recorded
  * as an input to that review, not a verdict: a `negado` score no longer
  * refuses the draft — compliance accepts with a rate or refuses it
- * (`reviewMutations.ts`, ADR 0009). Nothing goes to the tenant yet; the
+ * (`reviewMutations.ts`, ADR 0010). Nothing goes to the tenant yet; the
  * contract is sent only once Mutav has accepted.
  */
 export const create = mutationWithActiveAgency({
