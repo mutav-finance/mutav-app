@@ -129,29 +129,51 @@
       }
     },
     "openNoticeSheet": {
-      "title": "Informar atraso",
+      "pickTitle": "Informar atraso",
+      "pickDescription": "Qual garantia? Busque pelo nome do inquilino ou pelo endereço.",
+      "searchPlaceholder": "Nome do inquilino ou endereço",
+      "loading": "Carregando…",
+      "noMatches": "Nenhuma garantia encontrada.",
+      "recentDue": "Vencimento recente",
+      "unnamedTenant": "Inquilino sem nome",
+      "dueDay": "vence dia {day}",
+      "outstanding": "Já informado: {months}",
+      "outOfReach": "Fora do alcance",
+      "notInForce": "ainda não está em vigor",
+      "change": "Trocar",
+      "title": "Aluguel não pago",
       "description": "Registra um aluguel não pago. Nada é pago ainda: a MUTAV analisa o caso antes de cobrir.",
       "fields": {
-        "guaranteePublicId": "Garantia",
-        "guaranteePublicIdPlaceholder": "ID da garantia (ex.: 1000001)",
-        "rentDueDate": "Data de vencimento do aluguel",
+        "month": "Mês de referência",
+        "monthPlaceholder": "Selecione o mês",
         "originalAmount": "Valor em aberto"
+      },
+      "dueOn": "Vencimento: {date}",
+      "alreadyReported": "O aluguel de {month} já foi informado para esta garantia.",
+      "amountHint": "Aluguel e encargos do contrato. Reduza se houve pagamento parcial.",
+      "whatHappens": {
+        "heading": "O que acontece agora",
+        "arrears": "A garantia passa a Em atraso. Nada é pago ainda.",
+        "review": "A MUTAV analisa o caso e você acompanha em Acionamentos.",
+        "cure": "Se o inquilino pagar, marque “Inquilino pagou”."
       },
       "cancel": "Cancelar",
       "submit": "Informar atraso",
       "submitting": "Informando…",
-      "success": "Atraso {publicId} informado.",
+      "success": "Atraso de {month} informado.",
       "errors": {
-        "MISSING_GUARANTEE": "Informe a garantia.",
-        "MISSING_DATE": "Informe a data de vencimento.",
         "INVALID_AMOUNT": "Informe um valor válido maior que zero.",
         "GUARANTEE_NOT_FOUND": "Garantia não encontrada nesta imobiliária.",
         "GUARANTEE_NOT_INSURED": "A garantia informada não está em vigor.",
         "DUPLICATE_NOTICE": "Já existe um atraso informado para essa garantia nessa data.",
         "INVALID_EVIDENCE_SOURCE": "Fonte de evidência inválida.",
-        "INVALID_RENT_DUE_DATE": "Data de vencimento inválida (use AAAA-MM-DD).",
         "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode entrar em atraso a partir do estado atual.",
-        "UNEXPECTED": "Não foi possível informar o atraso. Tente novamente."
+        "UNEXPECTED": "Não foi possível informar o atraso. Tente novamente.",
+        "MISSING_MONTH": "Selecione o mês do aluguel.",
+        "INVALID_REFERENCE_MONTH": "Mês inválido.",
+        "RENT_NOT_YET_DUE": "Esse aluguel ainda não venceu.",
+        "RENT_DUE_BEFORE_ACTIVATION": "Esse aluguel venceu antes de a garantia entrar em vigor.",
+        "AMOUNT_ABOVE_MONTHLY_RENT": "O valor passa do total mensal do contrato."
       }
     },
     "detailSheet": {

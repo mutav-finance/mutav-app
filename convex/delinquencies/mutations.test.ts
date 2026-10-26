@@ -187,7 +187,7 @@ describe("openNotice", () => {
       t.mutation(api.delinquencies.mutations.openNotice, {
         agencyId: fx.agencyId,
         guaranteePublicId: fx.guaranteePublicId,
-        rentDueDate: "2026-06-05",
+        referenceMonth: "2026-06",
         originalAmountCents: 300_000,
       }),
     ).rejects.toThrow(/Authentication required/);
@@ -202,7 +202,7 @@ describe("openNotice", () => {
       asA.mutation(api.delinquencies.mutations.openNotice, {
         agencyId: b.agencyId,
         guaranteePublicId: b.guaranteePublicId,
-        rentDueDate: "2026-06-05",
+        referenceMonth: "2026-06",
         originalAmountCents: 300_000,
       }),
     ).rejects.toThrow(/not a member/);
@@ -217,7 +217,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     const after = Date.now();
@@ -252,7 +252,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-07-05",
+      referenceMonth: "2026-07",
       originalAmountCents: 250_000,
     });
     expect(result.success).toBe(true);
@@ -273,7 +273,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
       evidenceSource: "bank_attested",
     });
@@ -289,7 +289,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
       evidenceSource: "onchain_observed",
     });
@@ -298,19 +298,19 @@ describe("openNotice", () => {
     expect(result.error.code).toBe("INVALID_EVIDENCE_SOURCE");
   });
 
-  test("rentDueDate with ISO datetime shape → INVALID_RENT_DUE_DATE (only YYYY-MM-DD accepted)", async () => {
+  test("referenceMonth given as a full date → INVALID_REFERENCE_MONTH (only YYYY-MM accepted)", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05T00:00:00Z",
+      referenceMonth: "2026-06-05",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error.code).toBe("INVALID_RENT_DUE_DATE");
+    expect(result.error.code).toBe("INVALID_REFERENCE_MONTH");
   });
 
   test("originalAmountCents = 0 → INVALID_AMOUNT (positive integer required)", async () => {
@@ -320,7 +320,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 0,
     });
     expect(result.success).toBe(false);
@@ -335,7 +335,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: -1,
     });
     expect(result.success).toBe(false);
@@ -350,7 +350,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300.5,
     });
     expect(result.success).toBe(false);
@@ -365,7 +365,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: "CT-does-not-exist",
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
@@ -381,7 +381,7 @@ describe("openNotice", () => {
     const result = await asA.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: a.agencyId,
       guaranteePublicId: b.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
@@ -397,7 +397,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
@@ -413,7 +413,7 @@ describe("openNotice", () => {
     const first = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(first.success).toBe(true);
@@ -421,7 +421,7 @@ describe("openNotice", () => {
     const second = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(second.success).toBe(false);
@@ -445,7 +445,7 @@ describe("openNotice", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(true);
@@ -453,12 +453,10 @@ describe("openNotice", () => {
     expect(result.data.publicId).toBe("DN-CT-1-2026-06-05-2");
   });
 
-  test("two notices on same guarantee in same month, different due dates → distinct publicIds retrievable via getByPublicId", async () => {
-    // Regression for the month-granularity collision: previously both notices
-    // would base on `DN-CT-1-2026-04` and rely on the suffix loop. That loop
-    // only saw prior rows on the SAME (guarantee, rentDueDate) tuple via
-    // `by_guarantee_dueDate`, so the second notice would get the same base
-    // publicId as the first and permanently break getByPublicId's `.unique()`.
+  test("re-filing a month after its first notice resolved → suffixed publicId, both retrievable via getByPublicId", async () => {
+    // The due date comes from the lease, so a month has exactly one; a re-file
+    // collides on the base publicId and must take the next suffix, or
+    // getByPublicId's `.unique()` would break for both rows.
     const t = setup();
     const fx = await makeFixture(t);
     const asUser = t.withIdentity({ subject: fx.subject });
@@ -466,7 +464,7 @@ describe("openNotice", () => {
     const first = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-04-05",
+      referenceMonth: "2026-04",
       originalAmountCents: 300_000,
     });
     expect(first.success).toBe(true);
@@ -474,8 +472,6 @@ describe("openNotice", () => {
     expect(first.data.publicId).toBe("DN-CT-1-2026-04-05");
 
     // Resolve the first so the second is not blocked by DUPLICATE_NOTICE.
-    // (Same day would collide on the idempotency check; different day means
-    // no collision anyway — but resolving keeps the test hermetic.)
     const resolve = await asUser.mutation(api.delinquencies.mutations.markResolved, {
       noticePublicId: first.data.publicId,
       resolution: { kind: "tenant_cured" },
@@ -485,12 +481,12 @@ describe("openNotice", () => {
     const second = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-04-20",
+      referenceMonth: "2026-04",
       originalAmountCents: 300_000,
     });
     expect(second.success).toBe(true);
     if (!second.success) return;
-    expect(second.data.publicId).toBe("DN-CT-1-2026-04-20");
+    expect(second.data.publicId).toBe("DN-CT-1-2026-04-05-2");
     expect(second.data.publicId).not.toBe(first.data.publicId);
 
     // Both must be retrievable via getByPublicId (no `.unique()` throw).
@@ -503,7 +499,79 @@ describe("openNotice", () => {
     expect(detailA?.publicId).toBe(first.data.publicId);
     expect(detailA?.rentDueDate).toBe("2026-04-05");
     expect(detailB?.publicId).toBe(second.data.publicId);
-    expect(detailB?.rentDueDate).toBe("2026-04-20");
+    expect(detailB?.rentDueDate).toBe("2026-04-05");
+  });
+
+  test("a month whose rent is not yet due → RENT_NOT_YET_DUE", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .mutation(api.delinquencies.mutations.openNotice, {
+        agencyId: fx.agencyId,
+        guaranteePublicId: fx.guaranteePublicId,
+        referenceMonth: "2099-01",
+        originalAmountCents: 300_000,
+      });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("RENT_NOT_YET_DUE");
+  });
+
+  test("a rent due before the guarantee was activated → RENT_DUE_BEFORE_ACTIVATION", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .mutation(api.delinquencies.mutations.openNotice, {
+        agencyId: fx.agencyId,
+        guaranteePublicId: fx.guaranteePublicId,
+        referenceMonth: "2024-05",
+        originalAmountCents: 300_000,
+      });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("RENT_DUE_BEFORE_ACTIVATION");
+  });
+
+  test("an amount above the lease's monthly total → AMOUNT_ABOVE_MONTHLY_RENT", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .mutation(api.delinquencies.mutations.openNotice, {
+        agencyId: fx.agencyId,
+        guaranteePublicId: fx.guaranteePublicId,
+        referenceMonth: "2026-06",
+        originalAmountCents: 300_001,
+      });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("AMOUNT_ABOVE_MONTHLY_RENT");
+  });
+
+  test("a month whose notice staff already verified → DUPLICATE_NOTICE", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const args = {
+      agencyId: fx.agencyId,
+      guaranteePublicId: fx.guaranteePublicId,
+      referenceMonth: "2026-06",
+      originalAmountCents: 300_000,
+    };
+    const first = await asUser.mutation(api.delinquencies.mutations.openNotice, args);
+    if (!first.success) throw new Error(first.message);
+    const verified = await asUser.mutation(api.delinquencies.mutations.staffVerifyDefault, {
+      noticePublicId: first.data.publicId,
+    });
+    expect(verified.success).toBe(true);
+
+    const second = await asUser.mutation(api.delinquencies.mutations.openNotice, args);
+    expect(second.success).toBe(false);
+    if (second.success) return;
+    expect(second.error.code).toBe("DUPLICATE_NOTICE");
   });
 });
 
@@ -1346,7 +1414,7 @@ describe("openNotice — composed guarantee transition", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(true);
@@ -1371,7 +1439,7 @@ describe("openNotice — composed guarantee transition", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-07-05",
+      referenceMonth: "2026-07",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(true);
@@ -1397,7 +1465,7 @@ describe("openNotice — composed guarantee transition", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-08-05",
+      referenceMonth: "2026-08",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(true);
@@ -1413,7 +1481,7 @@ describe("openNotice — composed guarantee transition", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);
@@ -2256,7 +2324,7 @@ describe("agency-side notice writes — audit", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(true);
@@ -2276,7 +2344,7 @@ describe("agency-side notice writes — audit", () => {
     const result = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId: fx.agencyId,
       guaranteePublicId: fx.guaranteePublicId,
-      rentDueDate: "2026-06-05",
+      referenceMonth: "2026-06",
       originalAmountCents: 300_000,
     });
     expect(result.success).toBe(false);

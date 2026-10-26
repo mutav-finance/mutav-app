@@ -55,7 +55,7 @@ import {
 import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
 import {
   buildLeaseRent,
-  dueDateFor,
+  latestDueDateOnOrBefore,
   DEFAULT_PAYER,
   PROPERTY_KIND,
   type LeaseId,
@@ -122,15 +122,10 @@ function seedDueDay(guaranteePublicId: string): number {
   return SEED_DUE_DAYS[hash % SEED_DUE_DAYS.length];
 }
 
-/** The latest date on or before `isoDate` that falls on the lease's due day. */
 function dueDateOnOrBefore(isoDate: string, dueDay: number): string {
-  const sameMonth = dueDateFor({ referenceMonth: isoDate.slice(0, 7), dueDay });
-  if (sameMonth && sameMonth <= isoDate) return sameMonth;
-  const [year, month] = isoDate.split("-").map(Number);
-  const previous = new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
-  const previousMonth = dueDateFor({ referenceMonth: previous, dueDay });
-  if (!previousMonth) throw new Error(`Seed due day ${dueDay} is out of range`);
-  return previousMonth;
+  const dueDate = latestDueDateOnOrBefore({ isoDate, dueDay });
+  if (!dueDate) throw new Error(`Seed due day ${dueDay} is out of range`);
+  return dueDate;
 }
 
 /**

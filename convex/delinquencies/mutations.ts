@@ -15,6 +15,7 @@ import {
   type GuaranteeState,
 } from "../guarantees/domain";
 import { applyGuaranteeTransition, type GuaranteeActor } from "../guarantees/transitions";
+import { dueDateFor, isReferenceMonth } from "../leases/domain";
 import type { UserId } from "../users/domain";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
@@ -25,6 +26,8 @@ import {
   NOTICE_RESOLUTION_KIND,
   NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
+  brazilToday,
+  isRentOverdue,
   noticeEvidenceSourceValidator,
   type DelinquencyNotice,
   type DelinquencyNoticeId,
@@ -157,18 +160,13 @@ type OpenNoticeError = {
     | "GUARANTEE_NOT_INSURED"
     | "DUPLICATE_NOTICE"
     | "INVALID_EVIDENCE_SOURCE"
-    | "INVALID_RENT_DUE_DATE"
+    | "INVALID_REFERENCE_MONTH"
     | "INVALID_AMOUNT"
+    | "RENT_NOT_YET_DUE"
+    | "RENT_DUE_BEFORE_ACTIVATION"
+    | "AMOUNT_ABOVE_MONTHLY_RENT"
     | GuaranteeRefusedErrorCode;
 };
-
-// YYYY-MM-DD, calendar-plausible (day 01-31). We don't fully validate
-// calendar validity (Feb 30 is accepted); a later normalize-via-Date pass
-// can tighten this if needed. Prevents ambiguous formats like ISO
-// datetimes ("2026-06-05T00:00:00Z") which would bypass the
-// `by_guarantee_dueDate` duplicate check and split the publicId collision
-// domain — two calls for the same day would produce distinct publicIds.
-const RENT_DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * The agency-side entry point for filing a delinquency notice. Restricts
@@ -180,7 +178,9 @@ const RENT_DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export const openNotice = mutationWithActiveAgency({
   args: {
     guaranteePublicId: v.string(),
-    rentDueDate: v.string(),
+    // `YYYY-MM`. The due date is the lease's due day in that month, so the
+    // agency names the rent it means and never types a date.
+    referenceMonth: v.string(),
     originalAmountCents: v.number(),
     evidenceSource: v.optional(noticeEvidenceSourceValidator),
   },
@@ -195,11 +195,11 @@ export const openNotice = mutationWithActiveAgency({
       };
     }
 
-    if (!RENT_DUE_DATE_PATTERN.test(args.rentDueDate)) {
+    if (!isReferenceMonth(args.referenceMonth)) {
       return {
         success: false,
-        error: { code: "INVALID_RENT_DUE_DATE" },
-        message: `rentDueDate must be YYYY-MM-DD (got '${args.rentDueDate}').`,
+        error: { code: "INVALID_REFERENCE_MONTH" },
+        message: `referenceMonth must be YYYY-MM (got '${args.referenceMonth}').`,
       };
     }
 
@@ -240,21 +240,64 @@ export const openNotice = mutationWithActiveAgency({
       };
     }
 
-    // Idempotency: one OPEN notice per (guarantee, dueDate). Prior notices
-    // that resolved or canceled are legal — the agency may re-file if a
-    // stale/withdrawn notice needs to be reopened.
+    const lease = await ctx.db.get(guarantee.leaseId);
+    if (!lease) {
+      throw new Error(`Guarantee ${guarantee.publicId} references a missing leases row`);
+    }
+    const rentDueDate = dueDateFor({
+      referenceMonth: args.referenceMonth,
+      dueDay: lease.rent.dueDay,
+    });
+    if (rentDueDate === null) {
+      throw new Error(`Lease ${lease.publicId} has an out-of-range due day ${lease.rent.dueDay}`);
+    }
+
+    if (!isRentOverdue({ rentDueDate, today: brazilToday(Date.now()) })) {
+      return {
+        success: false,
+        error: { code: "RENT_NOT_YET_DUE" },
+        message: `Rent due ${rentDueDate} is not late yet.`,
+      };
+    }
+
+    // `activatedAt` is set on every insured guarantee; a rent due before the
+    // guarantee was in force is not one it covers.
+    if (guarantee.activatedAt !== null && rentDueDate < guarantee.activatedAt.slice(0, 10)) {
+      return {
+        success: false,
+        error: { code: "RENT_DUE_BEFORE_ACTIVATION" },
+        message: `Rent due ${rentDueDate} predates the guarantee's activation on ${guarantee.activatedAt}.`,
+      };
+    }
+
+    if (args.originalAmountCents > lease.rent.totalRentCents) {
+      return {
+        success: false,
+        error: { code: "AMOUNT_ABOVE_MONTHLY_RENT" },
+        message: `${args.originalAmountCents} exceeds the lease's monthly total of ${lease.rent.totalRentCents}.`,
+      };
+    }
+
+    // Idempotency: one outstanding notice per (guarantee, dueDate) — open or
+    // already verified by staff. Prior notices that resolved or canceled are
+    // legal — the agency may re-file if a stale/withdrawn notice needs to be
+    // reopened.
     const priorForDueDate = await ctx.db
       .query("guaranteeDelinquencyNotices")
       .withIndex("by_guarantee_dueDate", (q) =>
-        q.eq("guaranteeId", guarantee._id).eq("rentDueDate", args.rentDueDate),
+        q.eq("guaranteeId", guarantee._id).eq("rentDueDate", rentDueDate),
       )
       .collect();
 
-    if (priorForDueDate.some((n) => n.status === DELINQUENCY_STATUS.OPEN)) {
+    if (
+      priorForDueDate.some(
+        (n) => n.status === DELINQUENCY_STATUS.OPEN || n.status === DELINQUENCY_STATUS.VERIFIED,
+      )
+    ) {
       return {
         success: false,
         error: { code: "DUPLICATE_NOTICE" },
-        message: `An open notice already exists for guarantee '${guarantee.publicId}' on ${args.rentDueDate}.`,
+        message: `An outstanding notice already exists for guarantee '${guarantee.publicId}' on ${rentDueDate}.`,
       };
     }
 
@@ -264,7 +307,7 @@ export const openNotice = mutationWithActiveAgency({
     // `by_guarantee_dueDate` prefix scanned into `priorForDueDate`. Suffixes
     // -2, -3, ... deterministic and greppable rather than random; picked
     // in-memory to avoid per-candidate DB round-trips.
-    const yyyymmdd = args.rentDueDate.slice(0, 10);
+    const yyyymmdd = rentDueDate;
     const basePublicId = `DN-${args.guaranteePublicId}-${yyyymmdd}`;
     const takenPublicIds = new Set(priorForDueDate.map((n) => n.publicId));
     let publicId = basePublicId;
@@ -303,7 +346,7 @@ export const openNotice = mutationWithActiveAgency({
       guaranteeId: guarantee._id,
       agencyId: ctx.agencyId,
       status: DELINQUENCY_STATUS.OPEN,
-      rentDueDate: args.rentDueDate,
+      rentDueDate,
       originalAmountCents: args.originalAmountCents,
       updatedAmountCents: args.originalAmountCents,
       evidenceSource,
@@ -322,7 +365,7 @@ export const openNotice = mutationWithActiveAgency({
         noticeId,
         guaranteeId: guarantee._id,
         agencyId: ctx.agencyId,
-        rentDueDate: args.rentDueDate,
+        rentDueDate,
         originalAmountCents: args.originalAmountCents,
         evidenceSource,
         openedAt,

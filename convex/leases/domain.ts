@@ -88,6 +88,11 @@ export function isValidRentInput(rent: LeaseRentInput): boolean {
 
 const REFERENCE_MONTH_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
+/** A `YYYY-MM` month a rent is due in. */
+export function isReferenceMonth(value: string): boolean {
+  return REFERENCE_MONTH_PATTERN.test(value);
+}
+
 /**
  * The rent due date (`YYYY-MM-DD`) for one month of a lease. A due day past
  * the month's length lands on its last day, so "dia 31" is 30/04 and 28/02 or
@@ -108,6 +113,25 @@ export function dueDateFor({
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const day = Math.min(dueDay, lastDay);
   return `${referenceMonth}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * The most recent due date on or before `isoDate` (`YYYY-MM-DD`): this month's
+ * if it has already come, otherwise last month's.
+ */
+export function latestDueDateOnOrBefore({
+  isoDate,
+  dueDay,
+}: {
+  isoDate: string;
+  dueDay: number;
+}): string | null {
+  const sameMonth = dueDateFor({ referenceMonth: isoDate.slice(0, 7), dueDay });
+  if (sameMonth === null) return null;
+  if (sameMonth <= isoDate) return sameMonth;
+  const [year, month] = isoDate.split("-").map(Number);
+  const previousMonth = new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
+  return dueDateFor({ referenceMonth: previousMonth, dueDay });
 }
 
 export function buildLeaseRent(rent: LeaseRentInput): LeaseRent {

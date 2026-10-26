@@ -931,3 +931,106 @@ describe("getByPublicIdInternal", () => {
     expect(miss).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// listReportableGuarantees — the "which guarantee?" picker
+// ---------------------------------------------------------------------------
+
+describe("listReportableGuarantees", () => {
+  async function setLeaseDueDay(t: T, guaranteeId: GuaranteeId, dueDay: number) {
+    await t.run(async (ctx) => {
+      const guarantee = await ctx.db.get(guaranteeId);
+      if (!guarantee) throw new Error("fixture guarantee missing");
+      const lease = await ctx.db.get(guarantee.leaseId);
+      if (!lease) throw new Error("fixture lease missing");
+      await ctx.db.patch(lease._id, { rent: { ...lease.rent, dueDay } });
+    });
+  }
+
+  test("unauthenticated → throws", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await expect(
+      t.query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId }),
+    ).rejects.toThrow();
+  });
+
+  test("lists only the caller's agency", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1");
+    await makeFixture(t, "2");
+    const rows = await t
+      .withIdentity({ subject: a.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: a.agencyId });
+    expect(rows.map((row) => row.guaranteePublicId)).toEqual(["CT-1"]);
+  });
+
+  test("drafts are listed last and flagged ineligible", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId: fx.agencyId, status: "drafted", activatedAt: null, tenantTaxId: "52998224725" },
+      "CT-draft",
+    );
+    const rows = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId });
+    expect(
+      rows.map((row) => [row.guaranteePublicId, row.eligible, row.lastDueDate === null]),
+    ).toEqual([
+      ["CT-1", true, false],
+      ["CT-draft", false, true],
+    ]);
+  });
+
+  test("months with an open or verified notice are reported as outstanding", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-open", rentDueDate: "2026-08-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-verified",
+      status: "verified",
+      rentDueDate: "2026-09-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-cured",
+      status: "resolved",
+      rentDueDate: "2026-07-05",
+    });
+    const [row] = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId });
+    expect([...row.outstandingMonths].sort()).toEqual(["2026-08", "2026-09"]);
+  });
+
+  test("sorts by the due date that passed most recently", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const second = await seedGuaranteeWithLease(
+      t,
+      {
+        agencyId: fx.agencyId,
+        status: "active",
+        activatedAt: "2024-06-01T00:00:00.000Z",
+        tenantTaxId: "52998224725",
+      },
+      "CT-recent",
+    );
+    // Pinned relative to today: the fixture lease falls due on the 1st and the
+    // second on today's day of the month, so the second passed more recently
+    // (on the 1st itself the two tie).
+    const today = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayDay = Number(today.slice(8, 10));
+    await setLeaseDueDay(t, fx.guaranteeId, 1);
+    await setLeaseDueDay(t, second.guaranteeId, todayDay === 1 ? 1 : todayDay);
+    const rows = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId });
+    if (todayDay === 1) {
+      expect(rows[0].lastDueDate).toBe(rows[1].lastDueDate);
+    } else {
+      expect(rows.map((row) => row.guaranteePublicId)).toEqual(["CT-recent", "CT-1"]);
+    }
+  });
+});

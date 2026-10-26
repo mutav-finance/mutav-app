@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { buildLeaseRent, dueDateFor, isValidRentInput, ufFromCityUF } from "./domain";
+import {
+  buildLeaseRent,
+  dueDateFor,
+  isValidRentInput,
+  latestDueDateOnOrBefore,
+  ufFromCityUF,
+} from "./domain";
 
 describe("ufFromCityUF", () => {
   test.each([
@@ -80,5 +86,18 @@ describe("dueDateFor", () => {
     ["2026-10", 32, null],
   ])("%s, day %i → %s", (referenceMonth, dueDay, expected) => {
     expect(dueDateFor({ referenceMonth, dueDay })).toBe(expected);
+  });
+});
+
+describe("latestDueDateOnOrBefore", () => {
+  test.each([
+    ["2026-10-26", 5, "2026-10-05"],
+    ["2026-10-05", 5, "2026-10-05"],
+    ["2026-10-04", 5, "2026-09-05"],
+    ["2026-03-15", 31, "2026-02-28"],
+    ["2026-01-03", 10, "2025-12-10"],
+    ["2026-10-26", 0, null],
+  ])("%s, day %i → %s", (isoDate, dueDay, expected) => {
+    expect(latestDueDateOnOrBefore({ isoDate, dueDay })).toBe(expected);
   });
 });

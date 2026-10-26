@@ -144,8 +144,8 @@ async function planCover(
     };
   }
 
-  // `openNotice` refuses any rentDueDate that is not YYYY-MM-DD, so a miss
-  // here is corrupted data, not a caller mistake.
+  // `openNotice` derives rentDueDate as YYYY-MM-DD from the lease's due day,
+  // so a miss here is corrupted data, not a caller mistake.
   const coveragePeriod = coveragePeriodOf(notice.rentDueDate);
   if (coveragePeriod === null) {
     throw new Error(`Notice ${notice.publicId} has an unreadable rentDueDate.`);

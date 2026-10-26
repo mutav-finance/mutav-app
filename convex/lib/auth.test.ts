@@ -84,8 +84,8 @@ describe("assertActiveAgencyAccess", () => {
     const opened = await asUser.mutation(api.delinquencies.mutations.openNotice, {
       agencyId,
       guaranteePublicId: "C1",
-      rentDueDate: "2026-06-05",
-      originalAmountCents: 300_000,
+      referenceMonth: "2026-06",
+      originalAmountCents: 100_000,
     });
     if (!opened.success) throw new Error(opened.message);
     await t.run((ctx) => ctx.db.patch(agencyId, { onboardingState: "rejected" }));

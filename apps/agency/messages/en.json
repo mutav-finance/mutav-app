@@ -129,29 +129,51 @@
       }
     },
     "openNoticeSheet": {
-      "title": "Report late rent",
+      "pickTitle": "Report late rent",
+      "pickDescription": "Which guarantee? Search by tenant name or address.",
+      "searchPlaceholder": "Tenant name or address",
+      "loading": "Loading…",
+      "noMatches": "No guarantee found.",
+      "recentDue": "Recently due",
+      "unnamedTenant": "Unnamed tenant",
+      "dueDay": "due on the {day}",
+      "outstanding": "Already reported: {months}",
+      "outOfReach": "Out of reach",
+      "notInForce": "not in force yet",
+      "change": "Change",
+      "title": "Unpaid rent",
       "description": "Records an unpaid rent. Nothing is paid yet: MUTAV reviews the case before covering it.",
       "fields": {
-        "guaranteePublicId": "Guarantee",
-        "guaranteePublicIdPlaceholder": "Guarantee ID (e.g. 1000001)",
-        "rentDueDate": "Rent due date",
+        "month": "Rent month",
+        "monthPlaceholder": "Select the month",
         "originalAmount": "Amount owed"
+      },
+      "dueOn": "Due on {date}",
+      "alreadyReported": "The {month} rent is already reported for this guarantee.",
+      "amountHint": "Rent and contract charges. Lower it if part was paid.",
+      "whatHappens": {
+        "heading": "What happens next",
+        "arrears": "The guarantee moves to In arrears. Nothing is paid yet.",
+        "review": "MUTAV reviews the case; follow it under Claims.",
+        "cure": "If the tenant pays, mark “Tenant paid”."
       },
       "cancel": "Cancel",
       "submit": "Report late rent",
       "submitting": "Reporting…",
-      "success": "Late rent {publicId} reported.",
+      "success": "Late rent for {month} reported.",
       "errors": {
-        "MISSING_GUARANTEE": "Guarantee is required.",
-        "MISSING_DATE": "Rent due date is required.",
         "INVALID_AMOUNT": "Enter a valid amount greater than zero.",
         "GUARANTEE_NOT_FOUND": "Guarantee not found in this agency.",
         "GUARANTEE_NOT_INSURED": "The guarantee is not in force.",
         "DUPLICATE_NOTICE": "Late rent is already reported for this guarantee on that date.",
         "INVALID_EVIDENCE_SOURCE": "Invalid evidence source.",
-        "INVALID_RENT_DUE_DATE": "Invalid rent due date (use YYYY-MM-DD).",
         "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot go into arrears from its current state.",
-        "UNEXPECTED": "Could not report the late rent. Please try again."
+        "UNEXPECTED": "Could not report the late rent. Please try again.",
+        "MISSING_MONTH": "Select the rent month.",
+        "INVALID_REFERENCE_MONTH": "Invalid month.",
+        "RENT_NOT_YET_DUE": "This rent is not due yet.",
+        "RENT_DUE_BEFORE_ACTIVATION": "This rent fell due before the guarantee was in force.",
+        "AMOUNT_ABOVE_MONTHLY_RENT": "The amount is above the contract's monthly total."
       }
     },
     "detailSheet": {
