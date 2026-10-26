@@ -12,7 +12,6 @@ import type {
   GuaranteeId,
   GuaranteeEvent,
   GuaranteeState,
-  GuaranteeUnderwriting,
   StateTimelineBucket,
 } from "./domain";
 import type { AgencyId } from "../agencies/domain";
@@ -1222,7 +1221,10 @@ function shapeLease(lease: Lease) {
  * message to the agency. The refusal reason is shown: the agency is the one
  * that has to tell the tenant why.
  */
-export function shapeGuaranteeReview(underwriting: GuaranteeUnderwriting) {
+export function shapeGuaranteeReview({
+  underwriting,
+  registrationRefusal,
+}: Pick<Guarantee, "underwriting" | "registrationRefusal">) {
   const decision = underwriting.decision;
   return {
     status: underwriting.review,
@@ -1231,6 +1233,10 @@ export function shapeGuaranteeReview(underwriting: GuaranteeUnderwriting) {
     acceptedFeeRateBps: decision?.outcome === "accepted" ? decision.feeRateBps : null,
     refusalReason: decision?.outcome === "refused" ? decision.reason : null,
     sentForSignatureAt: underwriting.signatureRequest?.sentAt ?? null,
+    signedAt: underwriting.signedAt ?? null,
+    // The agency learns only that the reserve has no room yet ("waiting for
+    // reserve capacity"); the program's error code is a staff concern.
+    reserveRefusedAt: registrationRefusal?.refusedAt ?? null,
   };
 }
 
@@ -1260,7 +1266,7 @@ function shapeGuarantee({
     activatedAt: guarantee.activatedAt,
     nextRenewalDate: guarantee.nextRenewalDate,
     underwriting: { score: guarantee.underwriting.score, tier: guarantee.underwriting.tier },
-    review: shapeGuaranteeReview(guarantee.underwriting),
+    review: shapeGuaranteeReview(guarantee),
     terms: guarantee.terms,
     capacity: guarantee.capacity,
     lease: shapeLease(lease),

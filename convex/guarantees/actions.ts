@@ -75,8 +75,8 @@ export const sendReviewDecisionNotification = internalAction({
 });
 
 /**
- * Tells the agency Mutav activated its guarantee. Scheduled by `staffActivate`
- * after the activation is committed, so a delivery failure never rolls it
+ * Tells the agency its guarantee is active. Scheduled by `confirmRegistration`
+ * once the on-chain registration is verified and the activation committed, so a delivery failure never rolls it
  * back. Skipped, with a warning, when Resend is not configured. Carries only
  * the guarantee id — no tenant identity, no figures.
  */
@@ -99,7 +99,7 @@ export const sendGuaranteeActivatedNotification = internalAction({
         from: getResendFromEmail(),
         to: args.recipients,
         subject: `Garantia ativada — ${args.publicId}`,
-        html: `<!DOCTYPE html><html lang="pt-BR"><body style="font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.6;"><p>A Mutav registrou o contrato assinado e ativou a garantia <strong>${publicId}</strong>.</p><p>A garantia está em vigor a partir de hoje. A taxa de ativação entra na próxima fatura mensal.</p><p><a href="${link}">Ver garantia</a></p><p style="color:#9e9c98;font-size:12px;">MUTAV · e-mail automático.</p></body></html>`,
+        html: `<!DOCTYPE html><html lang="pt-BR"><body style="font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.6;"><p>A garantia <strong>${publicId}</strong> foi registrada na reserva da Mutav e está ativa.</p><p>A garantia está em vigor a partir de hoje. A taxa de ativação entra na próxima fatura mensal.</p><p><a href="${link}">Ver garantia</a></p><p style="color:#9e9c98;font-size:12px;">MUTAV · e-mail automático.</p></body></html>`,
       });
     } catch (error) {
       logError("[notifications] activation email rejected", { reason: error });

@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest, type TestConvex } from "convex-test";
 import { beforeEach, describe, expect, test } from "vitest";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import type { AgencyId, OnboardingState } from "../agencies/domain";
 import type { GuaranteeId, GuaranteeState } from "../guarantees/domain";
 import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
@@ -173,7 +173,7 @@ describe("generateMonthlyInvoices — activation fee", () => {
     expect(invoices[0]?.lineItems.map((item) => item.kind)).toEqual(["recurring"]);
   });
 
-  test("staff activation marks the fee and the next month's run bills it", async () => {
+  test("a confirmed registration marks the fee and the next month's run bills it", async () => {
     await t.run(async (ctx) => {
       const userId = await ctx.db.insert("users", {
         publicId: "staff-billing",
@@ -198,7 +198,7 @@ describe("generateMonthlyInvoices — activation fee", () => {
       const guarantee = await ctx.db.get(guaranteeId);
       if (!guarantee) throw new Error("guarantee vanished");
       await ctx.db.patch(guaranteeId, {
-        underwriting: { ...guarantee.underwriting, review: "signed" },
+        underwriting: { ...guarantee.underwriting, review: "pending_registration" },
       });
       const storageId = await ctx.storage.store(new Blob(["%PDF"], { type: "application/pdf" }));
       const userId = (await ctx.db.query("users").first())?._id;
@@ -217,9 +217,16 @@ describe("generateMonthlyInvoices — activation fee", () => {
       });
     });
 
+    // Activation is the on-chain registration (ADR 0010): the verified
+    // transaction's write half is what puts the guarantee on risk and bills it.
     const activated = await t
       .withIdentity({ subject: STAFF_SUBJECT })
-      .mutation(api.guarantees.mutations.staffActivate, { publicId: "E2E1" });
+      .mutation(internal.guarantees.registration.recordRegistrationConfirmed, {
+        publicId: "E2E1",
+        txSignature: "5".repeat(88),
+        slot: 1,
+        registeredAt: new Date().toISOString(),
+      });
     expect(activated.success).toBe(true);
     const nextPeriod = nextPeriodMonth(new Date());
     await bill(t, nextPeriod);

@@ -4,6 +4,8 @@ import type { QueryCtx } from "../_generated/server";
 import { queryWithMutavRole } from "../lib/auth";
 import { MOCK_CREDIT_PROVIDER } from "../creditAnalysis/domain";
 import type { CreditAnalysisAssessment } from "../creditAnalysis/domain";
+import { latestOfferHold } from "../reserve/offerHolds";
+import { offerHoldStatus } from "../reserve/registration";
 import { agencySubmittedTenant } from "./tenantIdentity";
 import { shapeGuaranteeReview } from "./useCases";
 import { GUARANTEE_STATE, type Guarantee, type ScoreTier } from "./domain";
@@ -168,10 +170,13 @@ export const getAnalysisDetail = queryWithMutavRole({ minRole: "compliance" })({
       closure: guarantee.closure ?? null,
       agency: { name: agency.name },
       review: {
-        ...shapeGuaranteeReview(guarantee.underwriting),
+        ...shapeGuaranteeReview(guarantee),
         status: reviewStatus,
         decisionNote: decision?.outcome === "accepted" ? (decision.note ?? null) : null,
         decidedByName: decidedBy?.name ?? null,
+        // Whether the offer still holds reserve capital: a lapsed hold is
+        // what makes a re-send available (ADR 0010).
+        offerHold: offerHoldStatus(await latestOfferHold(ctx, guarantee._id), Date.now()),
       },
       tenant: tenant
         ? {

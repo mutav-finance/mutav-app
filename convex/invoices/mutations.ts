@@ -220,7 +220,7 @@ export type GenerateMonthlyInvoicesSkipReason =
  *   `recurring` line item (`terms.feeCents`) — a guarantee in arrears or under
  *   cover is still insured and still billed.
  * - Every guarantee whose activation fee is still `pending`
- *   (`guarantees.activationFee`, set by `staffActivate`) gets an `activation`
+ *   (`guarantees.activationFee`, set by `confirmRegistration`) gets an `activation`
  *   line item (`terms.oneTimeActivationFeeCents`) on the first invoice issued
  *   after it went on risk, and is flipped to `invoiced` with that invoice's id
  *   in the same transaction. The period is generated on the 1st, so matching

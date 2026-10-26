@@ -29,6 +29,7 @@ import {
   type GenerateGuaranteeDocumentUploadUrlSuccessResult,
 } from "./documents";
 import { assertReviewTransition, REVIEW_STATUS } from "./review";
+import { pinOfferHoldOnSignature } from "../reserve/offerHolds";
 
 // Role split: `support` handles the paperwork (attaches and reads documents
 // for an agency that emailed them in); deciding whether a contract is
@@ -160,7 +161,7 @@ type ReviewGuaranteeDocumentErrorCode =
   | typeof GUARANTEE_DOCUMENT_ERROR_CODE.DOCUMENT_NOT_FOUND
   | typeof GUARANTEE_DOCUMENT_ERROR_CODE.NOT_PENDING_REVIEW;
 type ApproveGuaranteeDocumentSuccessResult = ReviewGuaranteeDocumentSuccessResult & {
-  /** True when this approval moved the draft's review `awaiting_signature → signed`. */
+  /** True when this approval moved the review `awaiting_signature → pending_registration`. */
   reviewSigned: boolean;
 };
 type ApproveGuaranteeDocumentErrorResult = { code: ReviewGuaranteeDocumentErrorCode };
@@ -211,13 +212,16 @@ type StaffAuditAppender = (input: Omit<AppendAuditEntryInput, "actor">) => Promi
 
 /**
  * Approving the signed rental contract is the moment Mutav registers the
- * signature, so a draft that was `awaiting_signature` moves to `signed` in the
- * same transaction. From any other review status nothing moves: an approval
- * while the review is still `accepted` is kept, and `staffActivate`'s
- * `REVIEW_NOT_SIGNED` precondition is what holds the draft back. Returns
- * whether the review moved.
+ * signature. A draft that was `awaiting_signature` walks `signed` →
+ * `pending_registration` in the same transaction (ADR 0010: signed is not
+ * active) — the signed moment is kept on `underwriting.signedAt` — and its
+ * offer hold, if still inside its period, is pinned to the pending
+ * registration. From any other review status nothing moves: an approval
+ * while the review is still `accepted` is kept, and `confirmRegistration`'s
+ * `REVIEW_NOT_PENDING_REGISTRATION` precondition holds the draft back.
+ * Returns whether the review moved.
  */
-async function markReviewSignedOnContractApproval(
+async function queueRegistrationOnContractApproval(
   ctx: MutationCtx,
   {
     guarantee,
@@ -234,19 +238,34 @@ async function markReviewSignedOnContractApproval(
   if (document.key !== DOCUMENT_KEY.RENTAL_CONTRACT) return false;
   if (guarantee.status !== GUARANTEE_STATE.DRAFTED) return false;
   if (guarantee.underwriting.review !== REVIEW_STATUS.AWAITING_SIGNATURE) return false;
-  const move = assertReviewTransition(guarantee.underwriting.review, REVIEW_STATUS.SIGNED);
-  if (!move.success) return false;
+  const signing = assertReviewTransition(guarantee.underwriting.review, REVIEW_STATUS.SIGNED);
+  const queueing = assertReviewTransition(REVIEW_STATUS.SIGNED, REVIEW_STATUS.PENDING_REGISTRATION);
+  if (!signing.success || !queueing.success) return false;
 
-  const at = new Date().toISOString();
+  const now = Date.now();
+  const at = new Date(now).toISOString();
   await ctx.db.patch(guarantee._id, {
-    underwriting: { ...guarantee.underwriting, review: REVIEW_STATUS.SIGNED },
+    underwriting: {
+      ...guarantee.underwriting,
+      review: REVIEW_STATUS.PENDING_REGISTRATION,
+      signedAt: at,
+    },
   });
+  const holdPinned = await pinOfferHoldOnSignature(ctx, { guaranteeId: guarantee._id, now });
+
   await ctx.db.insert("guaranteeHistory", {
     agencyId: guarantee.agencyId,
     guaranteePublicId: guarantee.publicId,
     at,
     username,
     message: "Contrato assinado registrado",
+  });
+  await ctx.db.insert("guaranteeHistory", {
+    agencyId: guarantee.agencyId,
+    guaranteePublicId: guarantee.publicId,
+    at,
+    username,
+    message: "Aguardando registro na reserva",
   });
   await appendStaffAudit({
     action: AUDIT_ACTION.GUARANTEE_SIGNED,
@@ -256,6 +275,19 @@ async function markReviewSignedOnContractApproval(
       guaranteeId: guarantee._id,
       agencyId: guarantee.agencyId,
       documentId: document._id,
+      at,
+    },
+  });
+  await appendStaffAudit({
+    action: AUDIT_ACTION.GUARANTEE_REGISTRATION_QUEUED,
+    resourceType: "guarantees",
+    resourceId: guarantee.publicId,
+    payload: {
+      guaranteeId: guarantee._id,
+      agencyId: guarantee.agencyId,
+      from: queueing.data.from,
+      to: queueing.data.to,
+      holdPinned,
       at,
     },
   });
@@ -286,7 +318,7 @@ export const approveGuaranteeDocument = mutationWithMutavRole({ minRole: REVIEW_
       payload: { documentId: document._id, key: document.key },
     });
 
-    const reviewSigned = await markReviewSignedOnContractApproval(ctx, {
+    const reviewSigned = await queueRegistrationOnContractApproval(ctx, {
       guarantee,
       document,
       username: ctx.user.name,
