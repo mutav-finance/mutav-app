@@ -68,6 +68,11 @@ export function UnderwritingDetail({
         }
         title={t("detail.title", { id: detail.publicId })}
         subtitle={detail.agency.name}
+        actions={
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/guarantees/${detail.publicId}`}>{t("actions.openGuarantee")}</Link>
+          </Button>
+        }
       />
       <PageContent variant="narrow">
         <DecisionCard view={view} />
@@ -205,13 +210,31 @@ function DecisionCard({ view }: { view: UnderwritingDetailViewModel }) {
               </>
             )}
             {view.canSend && (
-              <Button disabled={view.busy} onClick={view.send}>
-                {t("actions.markSent")}
-              </Button>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="offer-hold-days">{t("send.holdDaysLabel")}</Label>
+                  <Input
+                    id="offer-hold-days"
+                    inputMode="numeric"
+                    className="w-32"
+                    value={view.holdDays.input}
+                    onChange={(event) => view.holdDays.setInput(event.target.value)}
+                    placeholder={t("send.holdDaysPlaceholder")}
+                    aria-invalid={!view.holdDays.isValid}
+                  />
+                </div>
+                <Button disabled={view.busy || !view.holdDays.isValid} onClick={view.send}>
+                  {view.canResend ? t("actions.resend") : t("actions.markSent")}
+                </Button>
+              </div>
             )}
           </div>
         )}
-        {view.canSend && <p className="text-muted-foreground">{t("detail.sendHint")}</p>}
+        {view.canSend && (
+          <p className="text-muted-foreground">
+            {view.canResend ? t("detail.resendHint") : t("detail.sendHint")}
+          </p>
+        )}
       </div>
     </Section>
   );

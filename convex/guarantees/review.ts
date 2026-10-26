@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Result } from "../lib/result";
 import { CLOSE_REASON, GUARANTEE_STATE, type CloseReason, type GuaranteeState } from "./machine";
-import { SCORE_TIER, type PriceableTier, type ScoreTier } from "./domain";
+import { GUARANTEE_ERROR_CODE, SCORE_TIER, type PriceableTier, type ScoreTier } from "./domain";
 
 /**
  * Mutav's underwriting review of a draft — a sub-status that lives inside
@@ -10,9 +10,11 @@ import { SCORE_TIER, type PriceableTier, type ScoreTier } from "./domain";
  * to go on risk". Keeping them apart leaves the seven-state machine, its
  * aggregates and every insured-state read untouched.
  *
- * `signed` is reserved for the signed-document upload and staff activation
- * that follow; nothing writes it yet, but it is in the value object so those
- * steps need no schema change.
+ * Approving the signed rental contract of an `awaiting_signature` draft walks
+ * the review through `signed` into `pending_registration` in one transaction
+ * (ADR 0010): signed is not active. The draft then waits for the operator's
+ * `register_guarantee`; only `confirmRegistration`, once the transaction is
+ * verified on chain, moves the lifecycle drafted → active.
  */
 export const REVIEW_STATUS = {
   EDITING: "editing",
@@ -20,6 +22,7 @@ export const REVIEW_STATUS = {
   ACCEPTED: "accepted",
   AWAITING_SIGNATURE: "awaiting_signature",
   SIGNED: "signed",
+  PENDING_REGISTRATION: "pending_registration",
   REFUSED: "refused",
 } as const;
 
@@ -31,6 +34,7 @@ export const REVIEW_STATUSES: readonly ReviewStatus[] = [
   REVIEW_STATUS.ACCEPTED,
   REVIEW_STATUS.AWAITING_SIGNATURE,
   REVIEW_STATUS.SIGNED,
+  REVIEW_STATUS.PENDING_REGISTRATION,
   REVIEW_STATUS.REFUSED,
 ] as const;
 
@@ -40,11 +44,12 @@ export const reviewStatusValidator = v.union(
   v.literal(REVIEW_STATUS.ACCEPTED),
   v.literal(REVIEW_STATUS.AWAITING_SIGNATURE),
   v.literal(REVIEW_STATUS.SIGNED),
+  v.literal(REVIEW_STATUS.PENDING_REGISTRATION),
   v.literal(REVIEW_STATUS.REFUSED),
 );
 
 export const TERMINAL_REVIEW_STATUSES: ReadonlySet<ReviewStatus> = new Set([
-  REVIEW_STATUS.SIGNED,
+  REVIEW_STATUS.PENDING_REGISTRATION,
   REVIEW_STATUS.REFUSED,
 ]);
 
@@ -59,7 +64,8 @@ export const ALLOWED_REVIEW_TRANSITIONS: Readonly<Record<ReviewStatus, readonly 
   analysis_requested: [REVIEW_STATUS.ACCEPTED, REVIEW_STATUS.REFUSED],
   accepted: [REVIEW_STATUS.AWAITING_SIGNATURE],
   awaiting_signature: [REVIEW_STATUS.SIGNED],
-  signed: [],
+  signed: [REVIEW_STATUS.PENDING_REGISTRATION],
+  pending_registration: [],
   refused: [],
 } as const;
 
@@ -103,8 +109,8 @@ export const assertReviewTransition = (
  * The review status a row inserted directly in `state` carries — for the seed
  * and test fixtures, which insert guarantees in their target state rather
  * than walking them there. An activated guarantee has, by construction, been
- * through the whole review; a draft closed before activation never left it,
- * unless Mutav refused it.
+ * through the whole review and its registration; a draft closed before
+ * activation never left it, unless Mutav refused it.
  */
 export function reviewStatusForInsertedState({
   state,
@@ -116,7 +122,7 @@ export function reviewStatusForInsertedState({
   if (state === GUARANTEE_STATE.DRAFTED) return REVIEW_STATUS.EDITING;
   if (closeReason === CLOSE_REASON.UNDERWRITING_REFUSED) return REVIEW_STATUS.REFUSED;
   if (closeReason === CLOSE_REASON.CANCELED_PRE_ACTIVATION) return REVIEW_STATUS.EDITING;
-  return REVIEW_STATUS.SIGNED;
+  return REVIEW_STATUS.PENDING_REGISTRATION;
 }
 
 /**
@@ -161,3 +167,44 @@ export const REVIEW_ERROR_CODE = {
   REFUSAL_REASON_REQUIRED: "REFUSAL_REASON_REQUIRED",
   TEXT_TOO_LONG: "TEXT_TOO_LONG",
 } as const satisfies Record<string, string>;
+
+/**
+ * Why a registration cannot be recorded for a draft yet. Each is a distinct
+ * refusal code of `confirmRegistration` and a distinct reason the admin
+ * console shows next to the disabled "Record registration" form.
+ */
+export const REGISTRATION_ERROR_CODE = {
+  REVIEW_NOT_PENDING_REGISTRATION: "REVIEW_NOT_PENDING_REGISTRATION",
+  SIGNED_CONTRACT_NOT_APPROVED: "SIGNED_CONTRACT_NOT_APPROVED",
+  AGENCY_NOT_ACTIVE: "AGENCY_NOT_ACTIVE",
+} as const satisfies Record<string, string>;
+
+export type RegistrationBlocker =
+  | typeof GUARANTEE_ERROR_CODE.NOT_DRAFTED
+  | (typeof REGISTRATION_ERROR_CODE)[keyof typeof REGISTRATION_ERROR_CODE];
+
+export type RegistrationReadiness = {
+  status: GuaranteeState;
+  review: ReviewStatus;
+  signedContractApproved: boolean;
+  agencyActive: boolean;
+};
+
+/**
+ * Every precondition `confirmRegistration` checks before it reads the chain,
+ * in the order it checks them. An empty list means the draft is waiting for
+ * the operator's `register_guarantee`. The action refuses with the first
+ * entry; the console lists them all.
+ */
+export function registrationBlockers(readiness: RegistrationReadiness): RegistrationBlocker[] {
+  const blockers: RegistrationBlocker[] = [];
+  if (readiness.status !== GUARANTEE_STATE.DRAFTED) blockers.push(GUARANTEE_ERROR_CODE.NOT_DRAFTED);
+  if (readiness.review !== REVIEW_STATUS.PENDING_REGISTRATION) {
+    blockers.push(REGISTRATION_ERROR_CODE.REVIEW_NOT_PENDING_REGISTRATION);
+  }
+  if (!readiness.signedContractApproved) {
+    blockers.push(REGISTRATION_ERROR_CODE.SIGNED_CONTRACT_NOT_APPROVED);
+  }
+  if (!readiness.agencyActive) blockers.push(REGISTRATION_ERROR_CODE.AGENCY_NOT_ACTIVE);
+  return blockers;
+}

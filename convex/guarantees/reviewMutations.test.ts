@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest, type TestConvex } from "convex-test";
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { AgencyId } from "../agencies/domain";
 import type { UserId } from "../users/domain";
 import type { MutavStaffRole } from "../mutavStaff/domain";
@@ -661,68 +661,6 @@ describe("guarantees.reviewMutations.refuseAnalysis", () => {
   });
 });
 
-describe("guarantees.reviewMutations.markSentForSignature", () => {
-  test("accepted → awaiting_signature, stamps who sent it and when", async () => {
-    const w = await world();
-    const publicId = await createDraft(w);
-    await requestAnalysisFor(w, publicId);
-    await acceptFor(w, publicId);
-    const result = await w.t
-      .withIdentity({ subject: w.compliance.subject })
-      .mutation(api.guarantees.reviewMutations.markSentForSignature, { publicId });
-    expect(result.success).toBe(true);
-
-    const row = await readByPublicId(w.t, publicId);
-    expect(row.status).toBe("drafted");
-    expect(row.underwriting.review).toBe("awaiting_signature");
-    expect(row.underwriting.signatureRequest).toEqual({
-      sentAt: START,
-      sentBy: w.compliance.userId,
-    });
-    expect(await auditActions(w.t, publicId)).toContain("guarantee.sent_for_signature");
-    expect(await historyMessages(w.t, publicId)).toContain("Contrato enviado para assinatura");
-  });
-
-  test("REVIEW_ILLEGAL_TRANSITION before acceptance", async () => {
-    const w = await world();
-    const publicId = await createDraft(w);
-    await requestAnalysisFor(w, publicId);
-    const result = await w.t
-      .withIdentity({ subject: w.compliance.subject })
-      .mutation(api.guarantees.reviewMutations.markSentForSignature, { publicId });
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.code).toBe("REVIEW_ILLEGAL_TRANSITION");
-  });
-
-  test("NOT_DRAFTED on a refused guarantee", async () => {
-    const w = await world();
-    const publicId = await createDraft(w);
-    await requestAnalysisFor(w, publicId);
-    const asStaff = w.t.withIdentity({ subject: w.compliance.subject });
-    await asStaff.mutation(api.guarantees.reviewMutations.refuseAnalysis, {
-      publicId,
-      reason: "no",
-    });
-    const result = await asStaff.mutation(api.guarantees.reviewMutations.markSentForSignature, {
-      publicId,
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.code).toBe("NOT_DRAFTED");
-  });
-
-  test("support staff is refused by the role gate", async () => {
-    const w = await world();
-    const publicId = await createDraft(w);
-    await requestAnalysisFor(w, publicId);
-    await acceptFor(w, publicId);
-    await expect(
-      w.t
-        .withIdentity({ subject: w.support.subject })
-        .mutation(api.guarantees.reviewMutations.markSentForSignature, { publicId }),
-    ).rejects.toThrow(/Requires 'compliance' role or higher/);
-  });
-});
-
 describe("guarantees.reviewQueries", () => {
   test("listAnalysisQueue: only drafts in analysis_requested, oldest request first", async () => {
     const w = await world();
@@ -770,7 +708,13 @@ describe("guarantees.reviewQueries", () => {
     expect(rows.map((row) => [row.publicId, row.provisionalFeeRateBps])).toEqual([
       [publicId, 1_300],
     ]);
-    await asStaff.mutation(api.guarantees.reviewMutations.markSentForSignature, { publicId });
+    // The send itself reads the reserve (registration.test.ts covers it);
+    // here its write half runs directly with a reading that fits.
+    await asStaff.mutation(internal.guarantees.registration.sendForSignatureWithHold, {
+      publicId,
+      freeCapitalBaseUnits: BigInt(10) ** BigInt(15),
+      coverageRatioBps: 2_500,
+    });
     expect(await asStaff.query(api.guarantees.reviewQueries.listAwaitingDispatch, {})).toEqual([]);
   });
 
@@ -868,6 +812,8 @@ describe("guarantees.reviewQueries", () => {
       acceptedFeeRateBps: 1_300,
       refusalReason: null,
       sentForSignatureAt: null,
+      signedAt: null,
+      reserveRefusedAt: null,
     });
     const refusedView = await asOwner.query(api.guarantees.useCases.getByPublicId, {
       publicId: refused,

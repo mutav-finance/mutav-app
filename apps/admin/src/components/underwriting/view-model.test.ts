@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
+import en from "../../../messages/en.json";
+import ptBR from "../../../messages/pt-BR.json";
 import {
   daysWaiting,
   errorMessageKey,
   outcomeForResult,
   outcomeForThrown,
+  parseHoldDaysInput,
   parseRatePercent,
   RATE_BOUNDS_PERCENT,
   ratePercentInput,
+  UNDERWRITING_ERROR_CODES,
 } from "./view-model";
 
 describe("parseRatePercent", () => {
@@ -66,5 +70,34 @@ describe("daysWaiting", () => {
     const now = Date.parse("2026-10-05T12:00:00.000Z");
     expect(daysWaiting({ requestedAt: "2026-10-03T13:00:00.000Z", now })).toBe(1);
     expect(daysWaiting({ requestedAt: "2026-10-06T00:00:00.000Z", now })).toBe(0);
+  });
+});
+
+describe("parseHoldDaysInput", () => {
+  it.each([
+    ["", undefined],
+    ["  ", undefined],
+    ["7", 7],
+    [" 1 ", 1],
+    ["90", 90],
+    ["0", null],
+    ["91", null],
+    ["2.5", null],
+    ["abc", null],
+    ["-3", null],
+  ] as const)("%j → %s", (input, expected) => {
+    expect(parseHoldDaysInput(input)).toBe(expected);
+  });
+});
+
+describe("underwriting messages", () => {
+  it.each([
+    ["en", en],
+    ["pt-BR", ptBR],
+  ] as const)("%s carries a message for every error code", (_locale, messages) => {
+    const errors: Record<string, string> = messages.underwriting.errors;
+    for (const code of [...UNDERWRITING_ERROR_CODES, "FORBIDDEN", "unexpected"]) {
+      expect(errors[code]).toEqual(expect.any(String));
+    }
   });
 });

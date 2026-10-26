@@ -151,7 +151,8 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     // active: 21 fictional + 26 filler + Aprovada's performing and renewed
     // lives. default_verified: Aprovada ×2 + Paulista. cover_committed:
     // Aprovada ×2 + Atlântica. in_eviction: Horizonte + Aprovada. drafted:
-    // 5 pendente + 3 Aprovada (editing, analysis_requested, awaiting_signature). closed: 2 encerrado + Aprovada's first term →
+    // 5 pendente + 5 Aprovada (editing, analysis_requested, awaiting_signature,
+    // 2× pending_registration). closed: 2 encerrado + Aprovada's first term →
     // end_of_lease, 1 cancelado → canceled_pre_activation, and Aprovada's
     // reversed cover → dispute_reversal.
     expect(byState.counts).toEqual({
@@ -160,7 +161,7 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       default_verified: 3,
       cover_committed: 3,
       in_eviction: 2,
-      drafted: 8,
+      drafted: 10,
       closed: 5,
     });
     expect(byState.closedReasons).toEqual([
@@ -339,7 +340,11 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     });
 
     expect(probe.offProduct).toBe(0);
-    expect(probe.sample.underwriting).toEqual({ score: 750, tier: "regular", review: "signed" });
+    expect(probe.sample.underwriting).toEqual({
+      score: 750,
+      tier: "regular",
+      review: "pending_registration",
+    });
     expect(probe.leaseRentCents).toBe(320_000);
     // Literal expectations: the product's parameters applied to a R$ 3.200,00
     // rent at the regular tier on the basic plan — no prestamista premium.
@@ -418,11 +423,11 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       };
     });
 
-    expect(audit.total).toBe(71);
+    expect(audit.total).toBe(73);
     expect(audit.activatedWithoutTimestamp).toEqual([]);
     expect(audit.neverActivatedWithTimestamp).toEqual([]);
-    // 8 drafts + the one canceled_pre_activation.
-    expect(audit.neverActivatedCount).toBe(9);
+    // 10 drafts + the one canceled_pre_activation.
+    expect(audit.neverActivatedCount).toBe(11);
   });
 
   test("capacity holds available + reserved = ceiling on every row, and the reserved leg matches the cover applied on the guarantee's resolved notice", async () => {
@@ -644,12 +649,12 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       return { total: leases.length, leasesWithOpen, violations };
     });
 
-    // One lease per seeded guarantee (58 fictional + 13 Aprovada) except the
+    // One lease per seeded guarantee (58 fictional + 15 Aprovada) except the
     // renewed Aprovada lease, which carries two. Four closed guarantees leave
     // their lease with a null pointer; the fifth's lease points at its
     // successor.
-    expect(audit.total).toBe(70);
-    expect(audit.leasesWithOpen).toBe(66);
+    expect(audit.total).toBe(72);
+    expect(audit.leasesWithOpen).toBe(68);
     expect(audit.violations).toEqual([]);
   });
 
@@ -693,7 +698,7 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     ]);
   });
 
-  test("the agencyowner book carries one draft in Mutav's queue and one awaiting signature; every other draft is editing", async () => {
+  test("the agencyowner book walks drafts from Mutav's queue to a pending registration; every other draft is editing", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
     const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
@@ -745,6 +750,72 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
         decision: "accepted",
         feeRateBps: 1_300,
         sent: true,
+      },
+      {
+        publicId: "1000044",
+        review: "pending_registration",
+        tier: "regular",
+        requested: true,
+        decision: "accepted",
+        feeRateBps: 1_100,
+        sent: true,
+      },
+      {
+        publicId: "1000045",
+        review: "pending_registration",
+        tier: "regular",
+        requested: true,
+        decision: "accepted",
+        feeRateBps: 1_400,
+        sent: true,
+      },
+    ]);
+
+    const offers = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) =>
+          q.eq("agencyId", aprovadaId).eq("status", GUARANTEE_STATE.DRAFTED),
+        )
+        .collect();
+      const offered = rows.filter((row) => row.underwriting.signatureRequest !== undefined);
+      return Promise.all(
+        offered.map(async (row) => {
+          const holds = await ctx.db
+            .query("offerHolds")
+            .withIndex("by_guarantee", (q) => q.eq("guaranteeId", row._id))
+            .collect();
+          return {
+            publicId: row.publicId,
+            holds: holds.map((hold) => ({
+              holdDays: hold.holdDays,
+              pinned: hold.signedAt !== undefined,
+              released: hold.releasedAt !== undefined,
+            })),
+            signed: row.underwriting.signedAt !== undefined,
+            refusal: row.registrationRefusal?.programErrorName ?? null,
+          };
+        }),
+      );
+    });
+    expect(offers.sort((a, b) => a.publicId.localeCompare(b.publicId))).toEqual([
+      {
+        publicId: "1000043",
+        holds: [{ holdDays: 7, pinned: false, released: false }],
+        signed: false,
+        refusal: null,
+      },
+      {
+        publicId: "1000044",
+        holds: [{ holdDays: 7, pinned: true, released: false }],
+        signed: true,
+        refusal: null,
+      },
+      {
+        publicId: "1000045",
+        holds: [{ holdDays: 7, pinned: true, released: false }],
+        signed: true,
+        refusal: "InsufficientFreeCapital",
       },
     ]);
 
@@ -1007,8 +1078,8 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       guarantees: (await ctx.db.query("guarantees").collect()).length,
     }));
     expect(counts.products).toBe(1);
-    expect(counts.leases).toBe(70);
-    expect(counts.guarantees).toBe(71);
+    expect(counts.leases).toBe(72);
+    expect(counts.guarantees).toBe(73);
   });
 
   test("agencyowner's agency walks every one of the seven guarantee states", async () => {

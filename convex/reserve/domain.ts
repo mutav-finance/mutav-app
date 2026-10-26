@@ -4,6 +4,11 @@ import type { Doc, Id } from "../_generated/dataModel";
 export type ReserveSnapshot = Doc<"reserveSnapshots">;
 export type ReserveSnapshotId = Id<"reserveSnapshots">;
 
+/** An off-chain hold of free capital for an offer out for signature (ADR 0010). */
+export type OfferHold = Doc<"offerHolds">;
+export type OfferHoldId = Id<"offerHolds">;
+export type PlatformSettings = Doc<"platformSettings">;
+
 /** One approved asset held by the reserve vault, as read from chain. */
 export type ReserveAsset = {
   contractAddress: string; // SEP-41 token contract id (C...)

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { customMutation, customQuery } from "convex-helpers/server/customFunctions";
-import { mutation, query } from "../_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "../_generated/server";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import type { User } from "../users/domain";
 import { ONBOARDING_STATE } from "../agencies/domain";
@@ -249,6 +249,41 @@ export const queryWithMutavRole = ({ minRole }: { minRole: MutavLadderRole }) =>
 
 export const mutationWithMutavRole = ({ minRole }: { minRole: MutavLadderRole }) =>
   customMutation(mutation, {
+    args: {},
+    input: async (ctx) => {
+      const { user, roles } = await resolveStaffUser(ctx);
+      if (!meetsMinRole(roles, minRole)) {
+        throw new ForbiddenError(`Requires '${minRole}' role or higher`);
+      }
+      const appendStaffAudit = (input: StaffAuditInput) =>
+        appendAuditEntry(ctx, { actor: { kind: "user", userId: user._id }, ...input });
+      return { ctx: { user, mutavStaffRoles: roles, appendStaffAudit }, args: {} };
+    },
+  });
+
+/**
+ * The same role gate for the internal half of a staff action. An action has
+ * no `ctx.db`, so it reads the chain and hands the writes to an internal
+ * function; `ctx.runQuery` / `ctx.runMutation` carry the action's identity,
+ * and these wrappers re-resolve the staff member from it. Callable only from
+ * other Convex functions, so an internal mutation may take values the action
+ * read from the chain (free capital, a verified slot) that a public mutation
+ * must never accept from a client.
+ */
+export const internalQueryWithMutavRole = ({ minRole }: { minRole: MutavLadderRole }) =>
+  customQuery(internalQuery, {
+    args: {},
+    input: async (ctx) => {
+      const { user, roles } = await resolveStaffUser(ctx);
+      if (!meetsMinRole(roles, minRole)) {
+        throw new ForbiddenError(`Requires '${minRole}' role or higher`);
+      }
+      return { ctx: { user, mutavStaffRoles: roles }, args: {} };
+    },
+  });
+
+export const internalMutationWithMutavRole = ({ minRole }: { minRole: MutavLadderRole }) =>
+  customMutation(internalMutation, {
     args: {},
     input: async (ctx) => {
       const { user, roles } = await resolveStaffUser(ctx);

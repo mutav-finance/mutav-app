@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, usePreloadedQuery, type Preloaded } from "convex/react";
+import { useAction, useMutation, usePreloadedQuery, type Preloaded } from "convex/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { api } from "@convex/_generated/api";
@@ -9,6 +9,7 @@ import {
   UNDERWRITING_ACTION,
   outcomeForResult,
   outcomeForThrown,
+  parseHoldDaysInput,
   parseRatePercent,
   ratePercentInput,
   type ActionOutcome,
@@ -22,8 +23,11 @@ type UseUnderwritingDetailArgs = {
 
 /**
  * View model for one case file. Owns the accept / refuse dialogs, their form
- * state, the in-flight flag and the toasts; which actions are on offer
- * follows the review status the server reports, never local state.
+ * state, the optional hold-period override, the in-flight flag and the
+ * toasts; which actions are on offer follows the review status the server
+ * reports, never local state. Sending reads the reserve and holds capital for
+ * the offer (ADR 0010), so it is an action; a re-send is on offer only once
+ * the previous hold has lapsed.
  */
 export function useUnderwritingDetail({ preloaded }: UseUnderwritingDetailArgs) {
   const t = useTranslations("underwriting");
@@ -31,7 +35,7 @@ export function useUnderwritingDetail({ preloaded }: UseUnderwritingDetailArgs) 
 
   const acceptAnalysis = useMutation(api.guarantees.reviewMutations.acceptAnalysis);
   const refuseAnalysis = useMutation(api.guarantees.reviewMutations.refuseAnalysis);
-  const markSentForSignature = useMutation(api.guarantees.reviewMutations.markSentForSignature);
+  const sendForSignature = useAction(api.guarantees.registration.sendForSignature);
 
   const [busy, setBusy] = useState(false);
   const [acceptOpen, setAcceptOpen] = useState(false);
@@ -39,11 +43,15 @@ export function useUnderwritingDetail({ preloaded }: UseUnderwritingDetailArgs) 
   const [note, setNote] = useState("");
   const [refuseOpen, setRefuseOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [holdDaysInput, setHoldDaysInput] = useState("");
 
   const reviewStatus = detail?.review.status ?? null;
   const isDraft = detail?.status === "drafted";
   const canDecide = isDraft && reviewStatus === "analysis_requested";
-  const canSend = isDraft && reviewStatus === "accepted";
+  const canResend =
+    isDraft && reviewStatus === "awaiting_signature" && detail?.review.offerHold !== "active";
+  const canSend = (isDraft && reviewStatus === "accepted") || canResend;
+  const parsedHoldDays = parseHoldDaysInput(holdDaysInput);
   const parsedRateBps = parseRatePercent(rateInput);
 
   function report(outcome: ActionOutcome) {
@@ -101,9 +109,13 @@ export function useUnderwritingDetail({ preloaded }: UseUnderwritingDetailArgs) 
   }
 
   async function send() {
-    if (!detail) return;
+    if (!detail || parsedHoldDays === null) return;
     const publicId = detail.publicId;
-    await run(UNDERWRITING_ACTION.SEND, () => markSentForSignature({ publicId }));
+    const offerHoldDays = parsedHoldDays;
+    const ok = await run(UNDERWRITING_ACTION.SEND, () =>
+      sendForSignature({ publicId, ...(offerHoldDays === undefined ? {} : { offerHoldDays }) }),
+    );
+    if (ok) setHoldDaysInput("");
   }
 
   return {
@@ -111,6 +123,12 @@ export function useUnderwritingDetail({ preloaded }: UseUnderwritingDetailArgs) 
     busy,
     canDecide,
     canSend,
+    canResend,
+    holdDays: {
+      input: holdDaysInput,
+      setInput: setHoldDaysInput,
+      isValid: parsedHoldDays !== null,
+    },
     accept: {
       isOpen: acceptOpen,
       open: openAccept,

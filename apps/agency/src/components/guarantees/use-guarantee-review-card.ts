@@ -9,6 +9,8 @@ import type { Guarantee } from "@/lib/guarantees/types";
 import {
   bpsToPercent,
   canRequestAnalysis,
+  currentReviewStep,
+  isWaitingForReserveCapacity,
   requestAnalysisErrorKey,
   reviewStepper,
 } from "@/lib/guarantees/review";
@@ -24,7 +26,8 @@ export function useGuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) 
   const [isRequesting, setIsRequesting] = React.useState(false);
 
   const review = guarantee.review;
-  const stepper = reviewStepper(review.status);
+  const step = currentReviewStep({ status: guarantee.status, review: review.status });
+  const stepper = reviewStepper(step);
   const currentStepIndex = stepper.steps.findIndex((step) => step.state === "current");
   const acceptedRatePercent =
     review.acceptedFeeRateBps === null ? null : bpsToPercent(review.acceptedFeeRateBps);
@@ -50,11 +53,17 @@ export function useGuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) 
 
   return {
     review,
+    step,
     stepper,
     currentStep: currentStepIndex + 1,
     acceptedRatePercent,
     score: guarantee.underwriting.score,
     canRequest: canRequestAnalysis({ status: guarantee.status, review: review.status }),
+    waitingForReserveCapacity: isWaitingForReserveCapacity({
+      status: guarantee.status,
+      review: review.status,
+      reserveRefusedAt: review.reserveRefusedAt,
+    }),
     isRequesting,
     request,
   };

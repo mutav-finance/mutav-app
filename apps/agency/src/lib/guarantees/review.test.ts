@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   bpsToPercent,
   canRequestAnalysis,
+  currentReviewStep,
+  isWaitingForReserveCapacity,
   requestAnalysisErrorKey,
   reviewStepper,
   showsReviewCard,
@@ -16,9 +18,31 @@ describe("reviewStepper", () => {
         { step: "accepted", state: "current" },
         { step: "awaiting_signature", state: "upcoming" },
         { step: "signed", state: "upcoming" },
+        { step: "pending_registration", state: "upcoming" },
+        { step: "active", state: "upcoming" },
       ],
       refused: false,
     });
+  });
+
+  it("ends Signed → Waiting for reserve → Active", () => {
+    expect(reviewStepper("pending_registration").steps.slice(-3)).toEqual([
+      { step: "signed", state: "done" },
+      { step: "pending_registration", state: "current" },
+      { step: "active", state: "upcoming" },
+    ]);
+  });
+
+  it("an activated guarantee ends the road at active", () => {
+    expect(reviewStepper("active").steps.map((step) => step.state)).toEqual([
+      "done",
+      "done",
+      "done",
+      "done",
+      "done",
+      "done",
+      "current",
+    ]);
   });
 
   it("starts a fresh draft at editing", () => {
@@ -33,9 +57,22 @@ describe("reviewStepper", () => {
         { step: "accepted", state: "upcoming" },
         { step: "awaiting_signature", state: "upcoming" },
         { step: "signed", state: "upcoming" },
+        { step: "pending_registration", state: "upcoming" },
+        { step: "active", state: "upcoming" },
       ],
       refused: true,
     });
+  });
+});
+
+describe("currentReviewStep", () => {
+  it.each([
+    ["drafted", "awaiting_signature", "awaiting_signature"],
+    ["drafted", "pending_registration", "pending_registration"],
+    ["active", "pending_registration", "active"],
+    ["closed", "refused", "refused"],
+  ] as const)("%s + %s → %s", (status, review, expected) => {
+    expect(currentReviewStep({ status, review })).toBe(expected);
   });
 });
 
@@ -53,7 +90,8 @@ describe("canRequestAnalysis / showsReviewCard", () => {
     ["drafted", "awaiting_signature", true],
     ["closed", "refused", true],
     ["closed", "editing", false],
-    ["active", "signed", false],
+    ["active", "signed", true],
+    ["in_arrears", "signed", false],
   ] as const)("%s + %s → card shown %s", (status, review, expected) => {
     expect(showsReviewCard({ status, review })).toBe(expected);
   });
@@ -73,5 +111,16 @@ describe("requestAnalysisErrorKey", () => {
       "errors.CREDIT_ASSESSMENT_REQUIRED",
     );
     expect(requestAnalysisErrorKey("SOMETHING_ELSE")).toBe("errors.UNEXPECTED");
+  });
+});
+
+describe("isWaitingForReserveCapacity", () => {
+  it.each([
+    ["drafted", "pending_registration", "2026-10-20T12:00:00.000Z", true],
+    ["drafted", "pending_registration", null, false],
+    ["drafted", "awaiting_signature", "2026-10-20T12:00:00.000Z", false],
+    ["active", "pending_registration", "2026-10-20T12:00:00.000Z", false],
+  ] as const)("%s + %s + refusedAt %s → %s", (status, review, reserveRefusedAt, expected) => {
+    expect(isWaitingForReserveCapacity({ status, review, reserveRefusedAt })).toBe(expected);
   });
 });

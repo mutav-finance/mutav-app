@@ -38,7 +38,9 @@
       "treasury": "Treasury",
       "observability": "Observability",
       "nav": "NAV",
-      "staff": "Staff"
+      "staff": "Staff",
+      "documents": "Documents",
+      "guarantees": "Guarantees"
     }
   },
   "accessDenied": {
@@ -336,9 +338,11 @@
       "open": "Open",
       "accept": "Accept",
       "refuse": "Refuse",
-      "markSent": "Mark contract sent",
+      "markSent": "Send for signature",
       "cancel": "Cancel",
-      "retry": "Try again"
+      "retry": "Try again",
+      "openGuarantee": "Open guarantee",
+      "resend": "Re-send for signature"
     },
     "detail": {
       "title": "Guarantee {id}",
@@ -352,7 +356,7 @@
       "history": "History",
       "signals": "Bureau signals",
       "scoreIsInput": "The bureau score is an input to this decision, not the decision.",
-      "sendHint": "There is no e-signature integration yet: send the contract to the tenant yourself, then mark it sent.",
+      "sendHint": "Sending checks the reserve's free capital and holds this offer's coverage for the hold period. There is no e-signature integration yet: send the contract to the tenant yourself.",
       "fields": {
         "name": "Name",
         "taxId": "CPF / CNPJ",
@@ -378,7 +382,8 @@
         "coverageCeiling": "Coverage ceiling",
         "exitCostCap": "Exit-cost cap",
         "activationFee": "Activation fee"
-      }
+      },
+      "resendHint": "The previous hold lapsed. Re-sending re-runs the reserve preflight and holds capital again."
     },
     "accept": {
       "title": "Accept this contract?",
@@ -399,7 +404,7 @@
     "toast": {
       "accepted": "Contract accepted. The agency was notified.",
       "refused": "Contract refused. The draft is closed.",
-      "sent": "Marked as sent for signature."
+      "sent": "Sent for signature. Reserve capital is held for this offer."
     },
     "errors": {
       "NOT_FOUND": "That guarantee no longer exists.",
@@ -418,8 +423,18 @@
       "REASON_NOT_ALLOWED_FROM_STATE": "This close reason is not allowed from the guarantee's state.",
       "CLOSURE_REQUIRED": "Closing a guarantee needs a close reason.",
       "CLOSURE_NOT_ALLOWED": "A close reason was supplied for a move that does not close the guarantee.",
+      "INVALID_HOLD_DAYS": "The hold period must be a whole number of days between 1 and 90.",
+      "INSUFFICIENT_FREE_CAPITAL": "The reserve's free capital, after the offers already holding it, does not cover this offer. Nothing was sent.",
+      "TOO_MANY_OPEN_HOLDS": "Too many offers are holding reserve capital to check this one safely. Escalate.",
+      "OFFER_STILL_HELD": "This offer still holds reserve capital; re-send once the hold lapses.",
+      "INVALID_RESERVE_READING": "The reserve reading was out of range. Nothing was sent.",
+      "RESERVE_READER_UNAVAILABLE": "Mutav cannot read the reserve yet, so the offer cannot be checked. Nothing was sent.",
       "FORBIDDEN": "Your staff role cannot perform this action.",
       "unexpected": "Something went wrong. Please try again."
+    },
+    "send": {
+      "holdDaysLabel": "Hold period (days)",
+      "holdDaysPlaceholder": "Default"
     }
   },
   "shellSwitcher": {
@@ -514,6 +529,257 @@
     },
     "actions": {
       "retry": "Try again"
+    }
+  },
+  "guaranteeDocuments": {
+    "queue": {
+      "title": "Guarantee documents",
+      "subtitle": "Files agencies and staff attached to guarantees, awaiting a compliance decision, oldest first.",
+      "empty": "No documents awaiting review.",
+      "moreAvailable": "More documents are queued — only the oldest page is shown."
+    },
+    "panel": {
+      "heading": "Documents",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "chooseFile": "Choose a file for {document}",
+      "loading": "Loading…",
+      "empty": "No file uploaded yet.",
+      "notFound": "Guarantee not found."
+    },
+    "columns": {
+      "document": "Document",
+      "agency": "Agency",
+      "guarantee": "Guarantee",
+      "file": "File",
+      "uploaded": "Uploaded",
+      "actions": "Actions"
+    },
+    "labels": {
+      "rentalContract": "Signed rental contract",
+      "inspection": "Inspection",
+      "policy": "Policy"
+    },
+    "status": {
+      "pending_review": "Under review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "superseded": "Replaced"
+    },
+    "uploaderKind": {
+      "agency_user": "Agency · {name}",
+      "staff": "Mutav · {name}"
+    },
+    "uploadedBy": {
+      "agency_user": "Uploaded by {name} (agency) on {date} · {size}",
+      "staff": "Uploaded by {name} (Mutav) on {date} · {size}"
+    },
+    "reviewedBy": "Reviewed by {name} on {date}",
+    "rejectionReason": "Rejection reason: {reason}",
+    "unknownUser": "removed user",
+    "notAvailable": "—",
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "cancel": "Cancel",
+      "openGuarantee": "Open guarantee"
+    },
+    "reject": {
+      "title": "Reject document",
+      "description": "Rejecting “{file}”. The agency sees the reason on the guarantee page and receives it by email.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "e.g. landlord signature missing on page 3"
+    },
+    "toast": {
+      "approved": "Document approved.",
+      "rejected": "Document rejected; the agency was notified.",
+      "uploaded": "Document attached and queued for review.",
+      "approvedAndSigned": "Signed contract approved. The guarantee is now waiting for its registration in the reserve."
+    },
+    "errors": {
+      "GUARANTEE_NOT_FOUND": "Guarantee not found.",
+      "GUARANTEE_CLOSED": "This guarantee is closed and no longer accepts documents.",
+      "FILE_NOT_FOUND": "The uploaded file was not found. Please try again.",
+      "FILE_ALREADY_ATTACHED": "This file is already attached.",
+      "UNSUPPORTED_CONTENT_TYPE": "Unsupported format. Upload a PDF, JPG or PNG.",
+      "FILE_TOO_LARGE": "File is larger than 15 MB.",
+      "FILE_EMPTY": "The file is empty.",
+      "INVALID_FILE_NAME": "Invalid file name.",
+      "DOCUMENT_NOT_FOUND": "Document not found.",
+      "NOT_PENDING_REVIEW": "This document was already decided or replaced.",
+      "REJECTION_REASON_REQUIRED": "A rejection reason is required.",
+      "REJECTION_REASON_TOO_LONG": "The rejection reason is too long.",
+      "UPLOAD_FAILED": "The file could not be uploaded. Please try again.",
+      "FORBIDDEN": "Your staff role cannot perform this action.",
+      "unexpected": "Something went wrong. Please try again."
+    }
+  },
+  "staffGuarantees": {
+    "title": "Guarantees",
+    "subtitle": "Drafts on the road to activation. A guarantee becomes active when its on-chain registration in the reserve is confirmed — nobody clicks Activate.",
+    "notAvailable": "—",
+    "moreAvailable": "More guarantees are waiting beyond this page.",
+    "tabs": {
+      "pending_registration": "Waiting for registration",
+      "awaiting_signature": "Awaiting signature"
+    },
+    "empty": {
+      "pending_registration": "No signed draft is waiting for its registration.",
+      "awaiting_signature": "No contract is out for signature."
+    },
+    "columns": {
+      "guarantee": "Guarantee",
+      "agency": "Agency",
+      "tenant": "Tenant",
+      "rent": "Rent",
+      "rate": "Fee rate",
+      "review": "Review",
+      "signedContract": "Signed contract",
+      "actions": "Actions",
+      "reserve": "Reserve"
+    },
+    "reviewStatus": {
+      "editing": "Draft",
+      "analysis_requested": "Analysis requested",
+      "accepted": "Accepted",
+      "awaiting_signature": "Awaiting signature",
+      "signed": "Signed",
+      "pending_registration": "Waiting for registration",
+      "refused": "Refused"
+    },
+    "signedContract": {
+      "approved": "Approved",
+      "pending_review": "Awaiting review",
+      "rejected": "Rejected",
+      "missing": "Not uploaded"
+    },
+    "guaranteeState": {
+      "drafted": "Drafted",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "propertyKind": {
+      "residential": "Residential",
+      "commercial": "Commercial"
+    },
+    "plan": {
+      "basic": "Mutav Fiança",
+      "plus": "Mutav Fiança +"
+    },
+    "agencyInactive": "Agency not active",
+    "actions": {
+      "open": "Open",
+      "retry": "Try again",
+      "openUnderwriting": "Open underwriting case file",
+      "openGuarantee": "Open guarantee",
+      "recordRegistration": "Record registration"
+    },
+    "stepper": {
+      "progressLabel": "Road to activation",
+      "doneSuffix": " (done)",
+      "currentSuffix": " (current)",
+      "steps": {
+        "editing": "Draft",
+        "analysis_requested": "Analysis",
+        "accepted": "Accepted",
+        "awaiting_signature": "Out for signature",
+        "signed": "Signed",
+        "pending_registration": "Waiting for reserve",
+        "active": "Active"
+      }
+    },
+    "detail": {
+      "title": "Guarantee {id}",
+      "back": "← Guarantees",
+      "notFound": "Guarantee not found",
+      "activation": "Registration",
+      "summary": "Summary",
+      "lease": "Lease",
+      "terms": "Terms",
+      "history": "History",
+      "blockedHeading": "A registration cannot be recorded yet:",
+      "activatedOn": "Registered and active since {date}",
+      "fields": {
+        "agency": "Agency",
+        "tenant": "Tenant",
+        "status": "Status",
+        "review": "Review",
+        "signedContract": "Signed contract",
+        "sentAt": "Contract sent on",
+        "propertyKind": "Property",
+        "address": "Address",
+        "rent": "Rent",
+        "totalRent": "Rent + charges",
+        "product": "Product",
+        "plan": "Plan",
+        "feeRate": "Fee rate",
+        "staffRate": "Rate set by Mutav",
+        "fee": "Monthly fee",
+        "coverageCeiling": "Coverage ceiling",
+        "activationFee": "Activation fee"
+      }
+    },
+    "blockers": {
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "REVIEW_NOT_PENDING_REGISTRATION": "The review is not waiting for registration — approve the signed rental contract once the contract is out for signature.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "No signed rental contract has been approved yet.",
+      "AGENCY_NOT_ACTIVE": "The agency's onboarding is not active."
+    },
+    "toast": {
+      "registered": "Registration verified. The guarantee is active and the agency was notified.",
+      "registrationRefused": "The reserve refused the registration ({error}). The guarantee stays waiting for registration."
+    },
+    "errors": {
+      "NOT_FOUND": "That guarantee no longer exists.",
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "REVIEW_NOT_PENDING_REGISTRATION": "The guarantee is not waiting for registration.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Approve the signed rental contract first.",
+      "AGENCY_NOT_ACTIVE": "The agency is not active; it cannot take a new guarantee.",
+      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures are inconsistent. Escalate before registering.",
+      "SELF_TRANSITION": "The guarantee is already in that state.",
+      "TERMINAL_STATE": "The guarantee is closed.",
+      "ILLEGAL_TRANSITION": "This guarantee cannot go active from its current state.",
+      "INVALID_TX_SIGNATURE": "That is not a Solana transaction signature.",
+      "RESERVE_READER_UNAVAILABLE": "Mutav cannot read the reserve yet, so the registration cannot be verified. Nothing was changed.",
+      "TX_NOT_FOUND": "No finalized transaction with that signature was found. Check it and try again once it is confirmed.",
+      "NOT_REGISTER_GUARANTEE": "That transaction is not a register_guarantee on the reserve program.",
+      "ARGS_MISMATCH": "That transaction registered a different id or different covers than this guarantee expects.",
+      "FORBIDDEN": "Recording a registration needs the compliance role.",
+      "unexpected": "Something went wrong. Try again."
+    },
+    "registration": {
+      "explainer": "The operator registers this guarantee in the reserve (register_guarantee) with exactly the values below, then you paste the transaction signature here. Mutav verifies it on chain before the guarantee goes active and its activation fee is billed.",
+      "fields": {
+        "onchainId": "On-chain guarantee id",
+        "defaultCover": "default_cover (base units)",
+        "exitCover": "exit_cover (base units)"
+      },
+      "txLabel": "register_guarantee transaction signature",
+      "txPlaceholder": "Base58 signature from the operator console",
+      "txInvalid": "That is not a Solana transaction signature.",
+      "verifying": "Verifying on chain…",
+      "confirmedTx": "Registration transaction:",
+      "refusedHeading": "The reserve refused the registration: {error} ({code})",
+      "refusedOn": "Recorded on {date}",
+      "refusedNextStep": "The guarantee stays waiting for registration. Wait for reserve capacity and register again, or cancel the draft.",
+      "refusedTag": "Refused: {error}"
+    },
+    "offerHold": {
+      "label": "Offer hold",
+      "amount": "Capital held",
+      "period": "Hold period",
+      "periodValue": "{days} days, until {date}",
+      "lapsedHint": "The hold lapsed before the contract was signed. Re-send the offer from the underwriting case file — it re-runs the reserve preflight.",
+      "status": {
+        "none": "No hold",
+        "active": "Holding capital",
+        "lapsed": "Hold lapsed — re-send",
+        "released": "Released"
+      }
     }
   }
 }

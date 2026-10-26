@@ -404,7 +404,9 @@
         "analysis_requested": "Análise solicitada",
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
-        "signed": "Assinada"
+        "signed": "Assinada",
+        "pending_registration": "Aguardando reserva",
+        "active": "Ativa"
       },
       "status": {
         "editing": "Rascunho",
@@ -412,20 +414,25 @@
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
         "signed": "Assinada",
-        "refused": "Recusada"
+        "pending_registration": "Aguardando reserva",
+        "refused": "Recusada",
+        "active": "Ativa"
       },
       "acceptedAt": "Aprovada com taxa de {rate}",
       "description": {
         "editing": "Revise o rascunho e solicite a análise da Mutav quando estiver pronto. A Mutav decide se assume este contrato e com qual taxa.",
         "analysis_requested": "A Mutav está analisando o inquilino. Você será avisado por e-mail quando houver uma decisão.",
         "accepted": "A Mutav aprovou este contrato. O contrato será enviado ao inquilino para assinatura.",
-        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Após a assinatura, a Mutav registra o documento e ativa a garantia.",
-        "signed": "O contrato está assinado. A Mutav ativa a garantia após registrar o documento.",
-        "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada."
+        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Quando o contrato assinado for aprovado, a garantia é registrada na reserva da Mutav.",
+        "signed": "O contrato assinado foi aprovado pela Mutav. A garantia está sendo registrada na reserva da Mutav.",
+        "pending_registration": "O contrato assinado foi aprovado. A garantia fica ativa assim que o registro na reserva da Mutav for confirmado.",
+        "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada.",
+        "active": "Esta garantia está registrada na reserva da Mutav e em vigor. A taxa de ativação entra na próxima fatura mensal."
       },
       "requestedOn": "Solicitada em {date}",
       "refusalReason": "Motivo informado pela Mutav",
       "refusedNextStep": "Você pode iniciar uma nova proposta para este inquilino a qualquer momento.",
+      "waitingForReserveCapacity": "Aguardando capacidade da reserva: a reserva ainda não pôde receber esta garantia. A Mutav fará o registro assim que houver capacidade — nada é necessário da sua parte.",
       "scoreLabel": "Score do bureau",
       "scoreHint": "Insumo da análise Mutav — não é uma decisão",
       "staffRateLabel": "Taxa definida pela Mutav",
@@ -524,17 +531,40 @@
     "documents": {
       "heading": "Documentos",
       "send": "Enviar",
-      "sendDisabled": "Disponível em breve",
+      "uploading": "Enviando…",
       "downloadTemplate": "Baixar modelo padrão",
+      "chooseFile": "Escolher arquivo para {document}",
+      "loading": "Carregando…",
+      "empty": "Nenhum arquivo enviado.",
+      "uploaded": "Documento enviado para análise da Mutav.",
+      "acceptedFormats": "PDF, JPG ou PNG, até 15 MB. Cada arquivo é analisado pela equipe Mutav.",
+      "closedGuarantee": "Garantia encerrada — não aceita novos documentos.",
+      "uploadedBy": "Enviado por {name} em {date}",
+      "uploadedByMutav": "Mutav",
+      "unknownUser": "usuário removido",
+      "rejectionReason": "Motivo da recusa: {reason}",
       "labels": {
-        "rentalContract": "Contrato de locação",
+        "rentalContract": "Contrato de locação assinado",
         "inspection": "Vistoria",
         "policy": "Apólice"
       },
       "status": {
-        "pendente": "Pendente",
-        "enviado": "Enviado",
-        "aprovado": "Aprovado"
+        "pending_review": "Em análise",
+        "approved": "Aprovado",
+        "rejected": "Recusado",
+        "superseded": "Substituído"
+      },
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
+        "GUARANTEE_CLOSED": "Esta garantia está encerrada e não aceita novos documentos.",
+        "FILE_NOT_FOUND": "O arquivo enviado não foi encontrado. Tente novamente.",
+        "FILE_ALREADY_ATTACHED": "Este arquivo já foi anexado.",
+        "UNSUPPORTED_CONTENT_TYPE": "Formato não aceito. Envie PDF, JPG ou PNG.",
+        "FILE_TOO_LARGE": "Arquivo maior que 15 MB.",
+        "FILE_EMPTY": "O arquivo está vazio.",
+        "INVALID_FILE_NAME": "Nome de arquivo inválido.",
+        "DOCUMENT_NOT_FOUND": "Documento não encontrado.",
+        "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente."
       }
     },
     "history": {

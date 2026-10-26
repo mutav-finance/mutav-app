@@ -4,6 +4,8 @@ import type { UserId } from "../users/domain";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import { NOTICE_RESOLUTION_KIND } from "../delinquencies/domain";
+import { OFFER_HOLD_RELEASE_REASON } from "../reserve/registration";
+import { releaseOfferHolds } from "../reserve/offerHolds";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import {
   assertClose,
@@ -42,7 +44,7 @@ export type ApplyGuaranteeTransitionInput = {
   to: GuaranteeState;
   /** Required when `to` is `closed`, rejected otherwise. */
   closure?: GuaranteeClosureInput;
-  /** Included in the same patch as the status — used by `activate`. */
+  /** Included in the same patch as the status — used by `confirmRegistration`. */
   capacity?: GuaranteeCapacity;
   actor: GuaranteeActor;
   /** Human sentence for the history timeline; the structured twin is derived. */
@@ -172,6 +174,19 @@ export async function applyGuaranteeTransition(
       at,
     },
   });
+
+  // A draft closed before registration gives back any reserve capital its
+  // offer still holds (ADR 0010) — whichever path closed it.
+  if (isClosing && guarantee.status === GUARANTEE_STATE.DRAFTED) {
+    await releaseOfferHolds(ctx, {
+      guaranteeId: guarantee._id,
+      reason:
+        closeReason === CLOSE_REASON.UNDERWRITING_REFUSED
+          ? OFFER_HOLD_RELEASE_REASON.REFUSED
+          : OFFER_HOLD_RELEASE_REASON.CANCELED,
+      now: Date.parse(at),
+    });
+  }
 
   // A lease carries at most one non-closed guarantee; releasing the pointer
   // here is what lets the lease take a new one immediately.
@@ -336,7 +351,7 @@ export type DisputeReversalError = {
 /**
  * Every cent a committed cover reserved on this guarantee, read back from the
  * notices that drew it. Nothing moves a guarantee out of `cover_committed`
- * except a close or eviction, and `activate` starts every life at zero, so on
+ * except a close or eviction, and `confirmRegistration` starts every life at zero, so on
  * a sound row this sum IS `reservedCents` — the caller refuses when it is not.
  */
 async function sumAppliedCover(ctx: MutationCtx, guaranteeId: GuaranteeId): Promise<number> {

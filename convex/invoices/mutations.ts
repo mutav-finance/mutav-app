@@ -7,8 +7,13 @@ import type { Result } from "../lib/result";
 import { SettlementMethods } from "../payments/domain";
 import { recordSettlement } from "../payments/settlement";
 import { generateInvoiceAccessToken } from "../lib/randomId";
-import type { AgencyId } from "../agencies/domain";
-import { INSURED_STATES, type Guarantee, type GuaranteeId } from "../guarantees/domain";
+import { ONBOARDING_STATE, type AgencyId } from "../agencies/domain";
+import {
+  ACTIVATION_FEE_STATUS,
+  INSURED_STATES,
+  type Guarantee,
+  type GuaranteeId,
+} from "../guarantees/domain";
 import {
   accessTokenExpiryFrom,
   INVOICE_LINE_ITEM_KIND,
@@ -179,14 +184,33 @@ async function collectInsuredGuarantees(
   return perState.flat();
 }
 
-function activatedWithin(
-  guarantee: Guarantee,
-  period: { startMs: number; endMs: number },
-): boolean {
-  if (guarantee.activatedAt === null) return false;
-  const activatedMs = Date.parse(guarantee.activatedAt);
-  return activatedMs >= period.startMs && activatedMs < period.endMs;
+/**
+ * Guarantees whose one-time activation fee is still to be billed. Read through
+ * `by_agency_activationFeeStatus` rather than off the insured set, so a
+ * guarantee activated and closed between two billing runs still pays its fee.
+ * Only guarantees activated before the billed period ends qualify — a manual
+ * run for an earlier month never bills a fee from the future.
+ */
+async function collectPendingActivationFees(
+  ctx: { db: Pick<MutationCtx["db"], "query"> },
+  { agencyId, periodEndMs }: { agencyId: AgencyId; periodEndMs: number },
+): Promise<Guarantee[]> {
+  const pending = await ctx.db
+    .query("guarantees")
+    .withIndex("by_agency_activationFeeStatus", (q) =>
+      q.eq("agencyId", agencyId).eq("activationFee.status", ACTIVATION_FEE_STATUS.PENDING),
+    )
+    .collect();
+  return pending.filter(
+    (guarantee) =>
+      guarantee.activatedAt !== null && Date.parse(guarantee.activatedAt) < periodEndMs,
+  );
 }
+
+export type GenerateMonthlyInvoicesSkipReason =
+  | "already_invoiced"
+  | "agency_not_active"
+  | "nothing_to_bill";
 
 /**
  * Generate one `invoices` record per agency for the given billing period.
@@ -195,8 +219,15 @@ function activatedWithin(
  * - Every in-force guarantee (any `INSURED_STATES` member) contributes a
  *   `recurring` line item (`terms.feeCents`) — a guarantee in arrears or under
  *   cover is still insured and still billed.
- * - Guarantees whose `activatedAt` falls within the period also get an
- *   `activation` line item (`terms.oneTimeActivationFeeCents`).
+ * - Every guarantee whose activation fee is still `pending`
+ *   (`guarantees.activationFee`, set by `confirmRegistration`) gets an `activation`
+ *   line item (`terms.oneTimeActivationFeeCents`) on the first invoice issued
+ *   after it went on risk, and is flipped to `invoiced` with that invoice's id
+ *   in the same transaction. The period is generated on the 1st, so matching
+ *   `activatedAt` against the period would skip every guarantee activated
+ *   after the 1st; the marker bills each fee exactly once instead.
+ * - Only agencies whose onboarding is `active` are billed, and an invoice
+ *   that would total R$0 is not created (a pending fee stays pending).
  * - Idempotent: skips agencies that already have a record for the period.
  * - `state` starts as `open`; the payment method is derived from the
  *   settlement row once the invoice is paid.
@@ -208,11 +239,8 @@ function activatedWithin(
 export const generateMonthlyInvoices = internalMutation({
   args: { periodMonth: v.string() },
   handler: async (ctx, { periodMonth }) => {
-    // Period boundaries (UTC ms) — used to detect newly activated guarantees.
     const [yearStr, monthStr] = periodMonth.split("-");
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-    const period = { startMs: Date.UTC(year, month - 1, 1), endMs: Date.UTC(year, month, 1) };
+    const periodEndMs = Date.UTC(Number(yearStr), Number(monthStr), 1);
 
     const dueDate = `${periodMonth}-10`;
     const issuedAt = new Date().toISOString().slice(0, 10);
@@ -220,12 +248,17 @@ export const generateMonthlyInvoices = internalMutation({
     const agencies = await ctx.db.query("agencies").collect();
 
     type Result =
-      | { agencyId: string; skipped: true }
+      | { agencyId: string; skipped: true; reason: GenerateMonthlyInvoicesSkipReason }
       | { agencyId: string; invoiceId: string; totalCents: number; lineItemCount: number };
 
     const results: Result[] = [];
 
     for (const agency of agencies) {
+      if (agency.onboardingState !== ONBOARDING_STATE.ACTIVE) {
+        results.push({ agencyId: agency._id, skipped: true, reason: "agency_not_active" });
+        continue;
+      }
+
       // ── Idempotency check ──────────────────────────────────────────────────
       const existing = await ctx.db
         .query("invoices")
@@ -235,7 +268,7 @@ export const generateMonthlyInvoices = internalMutation({
         .unique();
 
       if (existing !== null) {
-        results.push({ agencyId: agency._id, skipped: true });
+        results.push({ agencyId: agency._id, skipped: true, reason: "already_invoiced" });
         continue;
       }
 
@@ -253,20 +286,28 @@ export const generateMonthlyInvoices = internalMutation({
           amountCents: guarantee.terms.feeCents,
           description: `Mensalidade — garantia ${guarantee.publicId}`,
         });
+      }
 
-        // Activation fee — guarantees first activated within this billing period.
-        if (activatedWithin(guarantee, period) && guarantee.terms.oneTimeActivationFeeCents > 0) {
-          lineItems.push({
-            guaranteeId: guarantee._id,
-            guaranteePublicId: guarantee.publicId,
-            kind: INVOICE_LINE_ITEM_KIND.ACTIVATION,
-            amountCents: guarantee.terms.oneTimeActivationFeeCents,
-            description: `Taxa de ativação — garantia ${guarantee.publicId}`,
-          });
-        }
+      const pendingActivationFees = await collectPendingActivationFees(ctx, {
+        agencyId: agency._id,
+        periodEndMs,
+      });
+      for (const guarantee of pendingActivationFees) {
+        if (guarantee.terms.oneTimeActivationFeeCents <= 0) continue;
+        lineItems.push({
+          guaranteeId: guarantee._id,
+          guaranteePublicId: guarantee.publicId,
+          kind: INVOICE_LINE_ITEM_KIND.ACTIVATION,
+          amountCents: guarantee.terms.oneTimeActivationFeeCents,
+          description: `Taxa de ativação — garantia ${guarantee.publicId}`,
+        });
       }
 
       const totalCents = lineItems.reduce((sum, item) => sum + item.amountCents, 0);
+      if (totalCents <= 0) {
+        results.push({ agencyId: agency._id, skipped: true, reason: "nothing_to_bill" });
+        continue;
+      }
 
       const publicId = await allocateInvoiceDocumentNumber(ctx, agency);
 
@@ -283,6 +324,13 @@ export const generateMonthlyInvoices = internalMutation({
         muxedId: generateInvoiceMuxedId(),
         lineItems,
       });
+
+      const invoicedAt = new Date().toISOString();
+      for (const guarantee of pendingActivationFees) {
+        await ctx.db.patch(guarantee._id, {
+          activationFee: { status: ACTIVATION_FEE_STATUS.INVOICED, invoiceId, invoicedAt },
+        });
+      }
 
       results.push({
         agencyId: agency._id,

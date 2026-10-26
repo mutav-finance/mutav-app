@@ -45,11 +45,13 @@ import {
  *
  *   editing ──requestAnalysis──▶ analysis_requested ──acceptAnalysis──▶ accepted
  *      ▲ updateDraft                    │                                  │
- *      └────────────                    └─refuseAnalysis─▶ refused        markSentForSignature
- *                                          (guarantee closed,              ▼
+ *      └────────────                    └─refuseAnalysis─▶ refused        sendForSignature
+ *                                          (guarantee closed,              ▼ (registration.ts)
  *                                           underwriting_refused)   awaiting_signature
  *
- * The agency drafts, adjusts and asks; Mutav compliance decides and sends.
+ * The agency drafts, adjusts and asks; Mutav compliance decides. Sending for
+ * signature reads the reserve (a preflight and an offer hold), so it lives
+ * with the registration actions in `registration.ts` (ADR 0010).
  * Every move is gated by `assertReviewTransition` before the first write and
  * is recorded twice: a `guaranteeHistory` row for the agency timeline and a
  * hash-chained audit entry. None of these moves the lifecycle state except a
@@ -136,7 +138,7 @@ type RepriceDraftSuccess = {
 /**
  * Re-snapshot a draft's `terms` through the same product resolution and
  * pricing `create` and `reprice` use. A draft has nothing reserved, so its
- * capacity is re-initialised from the new ceiling; `activate` reads the
+ * capacity is re-initialised from the new ceiling; `confirmRegistration` reads the
  * ceiling from `terms` again when it goes on risk.
  */
 async function repriceDraft(
@@ -185,7 +187,10 @@ async function repriceDraft(
  * Who hears about a decision: the agency's registered address and the member
  * who asked for the analysis. Deduplicated, blanks dropped.
  */
-async function decisionRecipients(ctx: MutationCtx, guarantee: Guarantee): Promise<string[]> {
+export async function decisionRecipients(
+  ctx: MutationCtx,
+  guarantee: Guarantee,
+): Promise<string[]> {
   const agency = await ctx.db.get(guarantee.agencyId);
   const requesterId = guarantee.underwriting.analysisRequest?.requestedBy;
   const requester = requesterId ? await ctx.db.get(requesterId) : null;
@@ -630,81 +635,6 @@ export const refuseAnalysis = mutationWithMutavRole({ minRole: "compliance" })({
       success: true,
       data: { publicId: guarantee.publicId },
       message: `Analysis refused for ${guarantee.publicId}; guarantee closed`,
-    };
-  },
-});
-
-// ---------------------------------------------------------------------------
-// markSentForSignature — compliance staff, accepted → awaiting_signature
-// ---------------------------------------------------------------------------
-
-type MarkSentSuccessResult = { publicId: string };
-type MarkSentErrorResult = {
-  code:
-    | typeof GUARANTEE_ERROR_CODE.NOT_FOUND
-    | typeof GUARANTEE_ERROR_CODE.NOT_DRAFTED
-    | ReviewTransitionErrorCode;
-};
-
-/**
- * Mutav has sent the accepted contract to the tenant. There is no e-signature
- * integration in the pilot: compliance sends the contract itself and records
- * that it did. The tenant proposal notification goes out here — not at
- * draft creation — because only now is there something for the tenant to sign.
- */
-export const markSentForSignature = mutationWithMutavRole({ minRole: "compliance" })({
-  args: { publicId: v.string() },
-  handler: async (ctx, args): Promise<Result<MarkSentSuccessResult, MarkSentErrorResult>> => {
-    const guarantee = await findGuaranteeByPublicId(ctx, args.publicId);
-    if (!guarantee) return notFound(args.publicId);
-    if (guarantee.status !== GUARANTEE_STATE.DRAFTED) return notDrafted(guarantee);
-    const move = assertReviewTransition(
-      guarantee.underwriting.review,
-      REVIEW_STATUS.AWAITING_SIGNATURE,
-    );
-    if (!move.success) {
-      return { success: false, error: { code: move.error.code }, message: move.message };
-    }
-
-    const at = new Date().toISOString();
-    await ctx.db.patch(guarantee._id, {
-      underwriting: {
-        ...guarantee.underwriting,
-        review: REVIEW_STATUS.AWAITING_SIGNATURE,
-        signatureRequest: { sentAt: at, sentBy: ctx.user._id },
-      },
-    });
-
-    await insertReviewHistory(ctx, {
-      guarantee,
-      at,
-      username: ctx.user.name,
-      message: "Contrato enviado para assinatura",
-    });
-    await ctx.appendStaffAudit({
-      action: AUDIT_ACTION.GUARANTEE_SENT_FOR_SIGNATURE,
-      resourceType: "guarantees",
-      resourceId: guarantee.publicId,
-      payload: { guaranteeId: guarantee._id, agencyId: guarantee.agencyId, at },
-    });
-
-    const tenant = await agencySubmittedTenant(ctx, guarantee);
-    if (tenant) {
-      await ctx.scheduler.runAfter(0, internal.guarantees.actions.sendProposalNotifications, {
-        publicId: guarantee.publicId,
-        tenantName: tenant.fullName,
-        tenantEmail: tenant.email,
-        tenantPhone: tenant.phone,
-        rentCents: guarantee.terms.rentCents,
-        availableGuaranteeCents: guarantee.capacity.availableCents,
-        feeCents: guarantee.terms.feeCents,
-      });
-    }
-
-    return {
-      success: true,
-      data: { publicId: guarantee.publicId },
-      message: `Guarantee ${guarantee.publicId} sent for signature`,
     };
   },
 });
