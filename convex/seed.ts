@@ -3203,7 +3203,7 @@ async function populateAprovadaBook(
     },
     // Waiting in Mutav's underwriting queue. The bureau scored the tenant
     // `negado`; the draft exists anyway because the score is an input to
-    // compliance's decision, not the decision (ADR 0010).
+    // compliance's decision, not the decision (ADR 0011).
     {
       n: 11,
       state: GUARANTEE_STATE.DRAFTED,
