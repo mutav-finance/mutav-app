@@ -2549,95 +2549,105 @@ describe("composition — assertTransition gates the write, so terminal / self-t
 // seed integration
 // ---------------------------------------------------------------------------
 
-describe("seed integration — the seeded delinquency book matches the scenario doc's realistic shape", () => {
-  test("seedReset populates the agencyowner's agency with a notice book that covers every status and resolution kind, each notice on the guarantee state it implies, with every user reference live", async () => {
-    const t = setup();
-    await t.mutation(internal.seed.seedReset, {});
+// A full reseed is one large transaction; under CI's parallel test jobs the cold
+// first run can pass the 5 s default.
+const SEED_TEST_TIMEOUT_MS = 30_000;
 
-    const aprovada = await t.run(async (ctx) => {
-      const rows = await ctx.db.query("agencies").collect();
-      return rows.find((a) => a.name === "Imobiliária Aprovada") ?? null;
+describe(
+  "seed integration — the seeded delinquency book matches the scenario doc's realistic shape",
+  { timeout: SEED_TEST_TIMEOUT_MS },
+  () => {
+    test("seedReset populates the agencyowner's agency with a notice book that covers every status and resolution kind, each notice on the guarantee state it implies, with every user reference live", async () => {
+      const t = setup();
+      await t.mutation(internal.seed.seedReset, {});
+
+      const aprovada = await t.run(async (ctx) => {
+        const rows = await ctx.db.query("agencies").collect();
+        return rows.find((a) => a.name === "Imobiliária Aprovada") ?? null;
+      });
+      expect(aprovada).not.toBeNull();
+      if (!aprovada) return;
+
+      const byStatus = (status: "open" | "verified" | "resolved" | "canceled") =>
+        t.run((ctx) =>
+          ctx.db
+            .query("guaranteeDelinquencyNotices")
+            .withIndex("by_agency_status", (q) =>
+              q.eq("agencyId", aprovada._id).eq("status", status),
+            )
+            .collect(),
+        );
+      const [openRows, verifiedRows, resolvedRows, canceledRows] = await Promise.all([
+        byStatus("open"),
+        byStatus("verified"),
+        byStatus("resolved"),
+        byStatus("canceled"),
+      ]);
+
+      expect(openRows.length).toBe(1);
+      expect(verifiedRows.length).toBe(2);
+      expect(resolvedRows.length).toBe(6);
+      expect(canceledRows.length).toBe(1);
+      expect(resolvedRows.map((r) => r.resolution?.kind).sort()).toEqual([
+        "cover_committed",
+        "cover_committed",
+        "cover_committed",
+        "cover_committed",
+        "staff_dispute",
+        "tenant_cured",
+      ]);
+      const all = [...openRows, ...verifiedRows, ...resolvedRows, ...canceledRows];
+      for (const r of all) {
+        expect(r.publicId.startsWith("DN-")).toBe(true);
+      }
+
+      // The notice book and the guarantee states tell one story: an open notice
+      // sits on `in_arrears`, a verified one on `default_verified`, a cured
+      // tenant leaves `active`, a staff dispute puts the guarantee back in
+      // arrears, and committed cover moves it along the cover path
+      // (`cover_committed` → `in_eviction` → `closed`). A canceled notice leaves
+      // the guarantee `active`.
+      const guaranteeStatusOf = async (guaranteeId: (typeof all)[number]["guaranteeId"]) =>
+        (await t.run((ctx) => ctx.db.get(guaranteeId)))?.status ?? null;
+      expect(await guaranteeStatusOf(openRows[0].guaranteeId)).toBe("in_arrears");
+      for (const r of verifiedRows) {
+        expect(await guaranteeStatusOf(r.guaranteeId)).toBe("default_verified");
+      }
+      for (const r of resolvedRows) {
+        const status = await guaranteeStatusOf(r.guaranteeId);
+        switch (r.resolution?.kind) {
+          case "tenant_cured":
+            expect(status).toBe("active");
+            break;
+          case "staff_dispute":
+            expect(status).toBe("in_arrears");
+            break;
+          case "cover_committed":
+            expect(["cover_committed", "in_eviction", "closed"]).toContain(status);
+            break;
+          default:
+            throw new Error(`unexpected resolution kind ${String(r.resolution?.kind)}`);
+        }
+      }
+      expect(await guaranteeStatusOf(canceledRows[0].guaranteeId)).toBe("active");
+
+      // No dangling FKs — every opener, verifier, resolver and canceler must be
+      // a live seeded user. A regression that left a stale id (or forgot to
+      // reseed the user) would fail this.
+      for (const r of all) {
+        const { verification, resolution, cancellation } = r;
+        expect(await t.run((ctx) => ctx.db.get(r.openedByUserId))).not.toBeNull();
+        if (verification) {
+          expect(await t.run((ctx) => ctx.db.get(verification.verifiedByUserId))).not.toBeNull();
+        }
+        if (resolution) {
+          expect(await t.run((ctx) => ctx.db.get(resolution.resolvedByUserId))).not.toBeNull();
+        }
+        if (cancellation) {
+          expect(await t.run((ctx) => ctx.db.get(cancellation.canceledByUserId))).not.toBeNull();
+        }
+      }
+      expect(canceledRows[0].cancellation).toBeDefined();
     });
-    expect(aprovada).not.toBeNull();
-    if (!aprovada) return;
-
-    const byStatus = (status: "open" | "verified" | "resolved" | "canceled") =>
-      t.run((ctx) =>
-        ctx.db
-          .query("guaranteeDelinquencyNotices")
-          .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovada._id).eq("status", status))
-          .collect(),
-      );
-    const [openRows, verifiedRows, resolvedRows, canceledRows] = await Promise.all([
-      byStatus("open"),
-      byStatus("verified"),
-      byStatus("resolved"),
-      byStatus("canceled"),
-    ]);
-
-    expect(openRows.length).toBe(1);
-    expect(verifiedRows.length).toBe(2);
-    expect(resolvedRows.length).toBe(6);
-    expect(canceledRows.length).toBe(1);
-    expect(resolvedRows.map((r) => r.resolution?.kind).sort()).toEqual([
-      "cover_committed",
-      "cover_committed",
-      "cover_committed",
-      "cover_committed",
-      "staff_dispute",
-      "tenant_cured",
-    ]);
-    const all = [...openRows, ...verifiedRows, ...resolvedRows, ...canceledRows];
-    for (const r of all) {
-      expect(r.publicId.startsWith("DN-")).toBe(true);
-    }
-
-    // The notice book and the guarantee states tell one story: an open notice
-    // sits on `in_arrears`, a verified one on `default_verified`, a cured
-    // tenant leaves `active`, a staff dispute puts the guarantee back in
-    // arrears, and committed cover moves it along the cover path
-    // (`cover_committed` → `in_eviction` → `closed`). A canceled notice leaves
-    // the guarantee `active`.
-    const guaranteeStatusOf = async (guaranteeId: (typeof all)[number]["guaranteeId"]) =>
-      (await t.run((ctx) => ctx.db.get(guaranteeId)))?.status ?? null;
-    expect(await guaranteeStatusOf(openRows[0].guaranteeId)).toBe("in_arrears");
-    for (const r of verifiedRows) {
-      expect(await guaranteeStatusOf(r.guaranteeId)).toBe("default_verified");
-    }
-    for (const r of resolvedRows) {
-      const status = await guaranteeStatusOf(r.guaranteeId);
-      switch (r.resolution?.kind) {
-        case "tenant_cured":
-          expect(status).toBe("active");
-          break;
-        case "staff_dispute":
-          expect(status).toBe("in_arrears");
-          break;
-        case "cover_committed":
-          expect(["cover_committed", "in_eviction", "closed"]).toContain(status);
-          break;
-        default:
-          throw new Error(`unexpected resolution kind ${String(r.resolution?.kind)}`);
-      }
-    }
-    expect(await guaranteeStatusOf(canceledRows[0].guaranteeId)).toBe("active");
-
-    // No dangling FKs — every opener, verifier, resolver and canceler must be
-    // a live seeded user. A regression that left a stale id (or forgot to
-    // reseed the user) would fail this.
-    for (const r of all) {
-      const { verification, resolution, cancellation } = r;
-      expect(await t.run((ctx) => ctx.db.get(r.openedByUserId))).not.toBeNull();
-      if (verification) {
-        expect(await t.run((ctx) => ctx.db.get(verification.verifiedByUserId))).not.toBeNull();
-      }
-      if (resolution) {
-        expect(await t.run((ctx) => ctx.db.get(resolution.resolvedByUserId))).not.toBeNull();
-      }
-      if (cancellation) {
-        expect(await t.run((ctx) => ctx.db.get(cancellation.canceledByUserId))).not.toBeNull();
-      }
-    }
-    expect(canceledRows[0].cancellation).toBeDefined();
-  });
-});
+  },
+);
