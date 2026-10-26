@@ -14,19 +14,14 @@ import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { StepIndicator } from "@mutav/ui/step-indicator";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@mutav/ui/alert-dialog";
+import { Input } from "@mutav/ui/input";
+import { Label } from "@mutav/ui/label";
+import { Mono } from "@mutav/ui/mono";
 import { GuaranteeDocumentsPanel } from "@/components/guarantees/guarantee-documents-panel";
 import {
   ACTIVATION_STEPS,
+  baseUnitsToCents,
+  OFFER_HOLD_TONE,
   REVIEW_STATUS_TONE,
   SIGNED_CONTRACT_TONE,
 } from "@/components/guarantees/view-model";
@@ -75,7 +70,7 @@ export function ActivationDetail({
         }
       />
       <PageContent variant="narrow">
-        <ActivationCard view={view} />
+        <RegistrationCard view={view} />
         <SummaryCard view={view} />
         <GuaranteeDocumentsPanel publicId={detail.publicId} />
         <LeaseCard view={view} />
@@ -93,8 +88,6 @@ export function ActivationDetail({
           </ul>
         </Section>
       </PageContent>
-
-      <ConfirmActivateDialog view={view} />
     </PageShell>
   );
 }
@@ -131,10 +124,11 @@ function usePercent() {
     format.number(bps / BASIS_POINTS_PER_UNIT, { style: "percent", maximumFractionDigits: 2 });
 }
 
-function ActivationCard({ view }: { view: ActivationDetailViewModel }) {
+function RegistrationCard({ view }: { view: ActivationDetailViewModel }) {
   const t = useTranslations("staffGuarantees");
   const detail = view.detail;
   if (!detail) return null;
+  const { registration } = detail;
 
   return (
     <Section title={t("detail.activation")}>
@@ -147,28 +141,147 @@ function ActivationCard({ view }: { view: ActivationDetailViewModel }) {
           currentSuffix={t("stepper.currentSuffix")}
         />
         {view.isActive && detail.activatedAt !== null ? (
-          <p>{t("detail.activatedOn", { date: formatDateBR(detail.activatedAt) })}</p>
-        ) : view.canActivate ? (
-          <p className="text-muted-foreground">{t("detail.ready")}</p>
+          <div className="flex flex-col gap-1">
+            <p>{t("detail.activatedOn", { date: formatDateBR(detail.activatedAt) })}</p>
+            {registration.confirmed && (
+              <p className="text-muted-foreground break-all">
+                {t("registration.confirmedTx")} <Mono>{registration.confirmed.txSignature}</Mono>
+              </p>
+            )}
+          </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            <p className="font-medium">{t("detail.blockedHeading")}</p>
-            <ul className="text-muted-foreground flex list-disc flex-col gap-1 pl-5">
-              {view.blockers.map((blocker) => (
-                <li key={blocker}>{t(`blockers.${blocker}`)}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {!view.isActive && (
-          <div>
-            <Button disabled={!view.canActivate || view.busy} onClick={view.confirm.open}>
-              {t("actions.activate")}
-            </Button>
-          </div>
+          <>
+            <p className="text-muted-foreground">{t("registration.explainer")}</p>
+            <ExpectedRegistration view={view} />
+            <OfferHoldRows view={view} />
+            {registration.refusal && (
+              <div className="border-destructive/40 flex flex-col gap-1 rounded-md border p-3">
+                <p className="font-medium">
+                  {t("registration.refusedHeading", {
+                    error: registration.refusal.programErrorName,
+                    code: registration.refusal.programErrorCode,
+                  })}
+                </p>
+                <p className="text-muted-foreground">
+                  {t("registration.refusedOn", {
+                    date: formatDateBR(registration.refusal.refusedAt),
+                  })}
+                </p>
+                <p className="text-muted-foreground break-all">
+                  <Mono>{registration.refusal.txSignature}</Mono>
+                </p>
+                <p className="text-muted-foreground">{t("registration.refusedNextStep")}</p>
+              </div>
+            )}
+            {view.canRegister ? (
+              <RecordRegistrationForm view={view} />
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className="font-medium">{t("detail.blockedHeading")}</p>
+                <ul className="text-muted-foreground flex list-disc flex-col gap-1 pl-5">
+                  {view.blockers.map((blocker) => (
+                    <li key={blocker}>{t(`blockers.${blocker}`)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Section>
+  );
+}
+
+function ExpectedRegistration({ view }: { view: ActivationDetailViewModel }) {
+  const t = useTranslations("staffGuarantees");
+  const detail = view.detail;
+  if (!detail) return null;
+  const { expected } = detail.registration;
+  const cover = (baseUnits: string) => (
+    <span className="flex flex-col">
+      <Mono>{baseUnits}</Mono>
+      <span className="text-muted-foreground text-xs">
+        {formatBRLCents(baseUnitsToCents(baseUnits))}
+      </span>
+    </span>
+  );
+
+  return (
+    <Rows
+      rows={[
+        [
+          t("registration.fields.onchainId"),
+          <Mono key="id" className="break-all">
+            {expected.onchainIdHex}
+          </Mono>,
+        ],
+        [t("registration.fields.defaultCover"), cover(expected.defaultCoverBaseUnits)],
+        [t("registration.fields.exitCover"), cover(expected.exitCoverBaseUnits)],
+      ]}
+    />
+  );
+}
+
+function OfferHoldRows({ view }: { view: ActivationDetailViewModel }) {
+  const t = useTranslations("staffGuarantees");
+  const hold = view.detail?.offerHold;
+  if (!hold) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Rows
+        rows={[
+          [
+            t("offerHold.label"),
+            <StatusTag key="hold" tone={OFFER_HOLD_TONE[hold.status]}>
+              {t(`offerHold.status.${hold.status}`)}
+            </StatusTag>,
+          ],
+          [t("offerHold.amount"), formatBRLCents(baseUnitsToCents(hold.amountBaseUnits))],
+          [
+            t("offerHold.period"),
+            t("offerHold.periodValue", {
+              days: hold.holdDays,
+              date: formatDateBR(new Date(hold.expiresAt).toISOString()),
+            }),
+          ],
+        ]}
+      />
+      {hold.status === "lapsed" && <p className="text-destructive">{t("offerHold.lapsedHint")}</p>}
+    </div>
+  );
+}
+
+function RecordRegistrationForm({ view }: { view: ActivationDetailViewModel }) {
+  const t = useTranslations("staffGuarantees");
+  const form = view.registration;
+  const showInvalid = form.txSignature.trim().length > 0 && !form.signatureIsValid;
+
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void form.submit();
+      }}
+    >
+      <Label htmlFor="registration-tx">{t("registration.txLabel")}</Label>
+      <Input
+        id="registration-tx"
+        value={form.txSignature}
+        onChange={(event) => form.setTxSignature(event.target.value)}
+        placeholder={t("registration.txPlaceholder")}
+        autoComplete="off"
+        spellCheck={false}
+        aria-invalid={showInvalid}
+      />
+      {showInvalid && <p className="text-destructive text-xs">{t("registration.txInvalid")}</p>}
+      <div>
+        <Button type="submit" disabled={view.busy || !form.signatureIsValid}>
+          {view.busy ? t("registration.verifying") : t("actions.recordRegistration")}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -261,31 +374,5 @@ function TermsCard({ view }: { view: ActivationDetailViewModel }) {
         ]}
       />
     </Section>
-  );
-}
-
-function ConfirmActivateDialog({ view }: { view: ActivationDetailViewModel }) {
-  const t = useTranslations("staffGuarantees");
-  return (
-    <AlertDialog open={view.confirm.isOpen} onOpenChange={(open) => !open && view.confirm.close()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("confirm.title")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("confirm.description")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={view.busy || !view.canActivate}
-            onClick={(event) => {
-              event.preventDefault();
-              void view.confirm.submit();
-            }}
-          >
-            {t("confirm.confirm")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }

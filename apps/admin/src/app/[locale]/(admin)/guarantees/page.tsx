@@ -4,8 +4,9 @@ import { getStaffMember } from "@/lib/auth";
 import { ActivationQueue } from "@/components/guarantees/activation-queue";
 
 /**
- * Drafts on the road to activation, across every agency: signed drafts ready
- * to activate, and contracts still out for signature.
+ * Drafts on the road to activation, across every agency: signed drafts
+ * waiting for their on-chain registration, and contracts still out for
+ * signature (ADR 0010).
  *
  * Re-checks the staff gate here, not only in the `(admin)` layout: App Router
  * renders the layout and page concurrently, so the layout's `redirect()` does
@@ -18,10 +19,10 @@ export default async function GuaranteesPage() {
   const token = gate.session.tokenSet.idToken;
   if (!token) return null;
 
-  const [signed, awaitingSignature] = await Promise.all([
+  const [pendingRegistration, awaitingSignature] = await Promise.all([
     preloadQuery(
       api.guarantees.activationQueries.listActivationQueue,
-      { review: "signed" },
+      { review: "pending_registration" },
       { token },
     ),
     preloadQuery(
@@ -31,5 +32,10 @@ export default async function GuaranteesPage() {
     ),
   ]);
 
-  return <ActivationQueue signed={signed} awaitingSignature={awaitingSignature} />;
+  return (
+    <ActivationQueue
+      pendingRegistration={pendingRegistration}
+      awaitingSignature={awaitingSignature}
+    />
+  );
 }

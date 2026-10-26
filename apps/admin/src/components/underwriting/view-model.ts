@@ -19,7 +19,7 @@ export const UNDERWRITING_ACTION = {
 export type UnderwritingAction = (typeof UNDERWRITING_ACTION)[keyof typeof UNDERWRITING_ACTION];
 
 /**
- * Every code the three staff mutations can return, each with a message under
+ * Every code the three staff decisions can return, each with a message under
  * `underwriting.errors`. Anything else falls back to `errors.unexpected`
  * rather than the server's English sentence.
  */
@@ -40,6 +40,13 @@ export const UNDERWRITING_ERROR_CODES = [
   "REASON_NOT_ALLOWED_FROM_STATE",
   "CLOSURE_REQUIRED",
   "CLOSURE_NOT_ALLOWED",
+  // Sending for signature reads the reserve and holds capital (ADR 0010).
+  "INVALID_HOLD_DAYS",
+  "INSUFFICIENT_FREE_CAPITAL",
+  "TOO_MANY_OPEN_HOLDS",
+  "OFFER_STILL_HELD",
+  "INVALID_RESERVE_READING",
+  "RESERVE_READER_UNAVAILABLE",
 ] as const;
 
 const TRANSLATED_CODES: ReadonlySet<string> = new Set(UNDERWRITING_ERROR_CODES);
@@ -110,6 +117,25 @@ export const RATE_BOUNDS_PERCENT = {
   min: MIN_STAFF_FEE_RATE_BPS / BASIS_POINTS_PER_PERCENT,
   max: MAX_STAFF_FEE_RATE_BPS / BASIS_POINTS_PER_PERCENT,
 } as const;
+
+const HOLD_DAYS_INPUT_PATTERN = /^\d{1,2}$/;
+const MIN_HOLD_DAYS = 1;
+const MAX_HOLD_DAYS = 90;
+
+/**
+ * The optional per-contract hold period. Blank means "use the agency,
+ * product or platform setting" (`undefined`); a whole number of days in range
+ * is the override; anything else is `null` and keeps the button disabled.
+ */
+export function parseHoldDaysInput(input: string): number | undefined | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return undefined;
+  if (!HOLD_DAYS_INPUT_PATTERN.test(trimmed)) return null;
+  const days = Number(trimmed);
+  return days >= MIN_HOLD_DAYS && days <= MAX_HOLD_DAYS ? days : null;
+}
+
+export const HOLD_DAYS_BOUNDS = { min: MIN_HOLD_DAYS, max: MAX_HOLD_DAYS } as const;
 
 const DAY_MS = 86_400_000;
 

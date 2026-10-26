@@ -338,10 +338,11 @@
       "open": "Abrir",
       "accept": "Aprovar",
       "refuse": "Recusar",
-      "markSent": "Marcar contrato enviado",
+      "markSent": "Enviar para assinatura",
       "cancel": "Cancelar",
       "retry": "Tentar novamente",
-      "openGuarantee": "Abrir garantia"
+      "openGuarantee": "Abrir garantia",
+      "resend": "Reenviar para assinatura"
     },
     "detail": {
       "title": "Garantia {id}",
@@ -355,7 +356,7 @@
       "history": "Histórico",
       "signals": "Sinais do bureau",
       "scoreIsInput": "O score do bureau é um insumo desta decisão, não a decisão.",
-      "sendHint": "Ainda não há integração de assinatura eletrônica: envie o contrato ao inquilino e depois marque-o como enviado.",
+      "sendHint": "O envio confere o capital livre da reserva e reserva a cobertura desta oferta pelo prazo definido. Ainda não há assinatura eletrônica: envie o contrato ao inquilino por conta própria.",
       "fields": {
         "name": "Nome",
         "taxId": "CPF / CNPJ",
@@ -381,7 +382,8 @@
         "coverageCeiling": "Teto de cobertura",
         "exitCostCap": "Teto de custo de saída",
         "activationFee": "Taxa de ativação"
-      }
+      },
+      "resendHint": "A reserva anterior expirou. O reenvio refaz a checagem da reserva e reserva o capital de novo."
     },
     "accept": {
       "title": "Aprovar este contrato?",
@@ -402,7 +404,7 @@
     "toast": {
       "accepted": "Contrato aprovado. A imobiliária foi avisada.",
       "refused": "Contrato recusado. O rascunho foi encerrado.",
-      "sent": "Marcado como enviado para assinatura."
+      "sent": "Enviado para assinatura. O capital da reserva está reservado para esta oferta."
     },
     "errors": {
       "NOT_FOUND": "Essa garantia não existe mais.",
@@ -421,8 +423,18 @@
       "REASON_NOT_ALLOWED_FROM_STATE": "Este motivo de encerramento não é permitido no estado da garantia.",
       "CLOSURE_REQUIRED": "Encerrar uma garantia exige um motivo.",
       "CLOSURE_NOT_ALLOWED": "Um motivo de encerramento foi informado para uma mudança que não encerra a garantia.",
+      "INVALID_HOLD_DAYS": "O prazo da reserva deve ser um número inteiro de dias entre 1 e 90.",
+      "INSUFFICIENT_FREE_CAPITAL": "O capital livre da reserva, descontadas as ofertas que já o reservam, não cobre esta oferta. Nada foi enviado.",
+      "TOO_MANY_OPEN_HOLDS": "Há ofertas demais reservando capital para checar esta com segurança. Escale.",
+      "OFFER_STILL_HELD": "Esta oferta ainda reserva capital; reenvie quando a reserva expirar.",
+      "INVALID_RESERVE_READING": "A leitura da reserva veio fora do esperado. Nada foi enviado.",
+      "RESERVE_READER_UNAVAILABLE": "A Mutav ainda não consegue ler a reserva, então a oferta não pode ser checada. Nada foi enviado.",
       "FORBIDDEN": "Seu papel na equipe não permite esta ação.",
       "unexpected": "Algo deu errado. Tente novamente."
+    },
+    "send": {
+      "holdDaysLabel": "Prazo da reserva (dias)",
+      "holdDaysPlaceholder": "Padrão"
     }
   },
   "shellSwitcher": {
@@ -582,7 +594,7 @@
       "approved": "Documento aprovado.",
       "rejected": "Documento recusado; a imobiliária foi notificada.",
       "uploaded": "Documento anexado e enviado para análise.",
-      "approvedAndSigned": "Contrato assinado aprovado. A análise passou para Assinada — a garantia pode ser ativada."
+      "approvedAndSigned": "Contrato assinado aprovado. A garantia agora aguarda o registro na reserva."
     },
     "errors": {
       "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
@@ -604,16 +616,16 @@
   },
   "staffGuarantees": {
     "title": "Garantias",
-    "subtitle": "Rascunhos a caminho da ativação. A Mutav ativa uma garantia quando o contrato está assinado e o contrato de locação assinado foi aprovado.",
+    "subtitle": "Propostas a caminho da ativação. A garantia fica ativa quando o registro na reserva é confirmado on-chain — ninguém clica em Ativar.",
     "notAvailable": "—",
     "moreAvailable": "Há mais garantias além desta página.",
     "tabs": {
-      "signed": "Prontas para ativar",
+      "pending_registration": "Aguardando registro",
       "awaiting_signature": "Aguardando assinatura"
     },
     "empty": {
-      "signed": "Nenhum rascunho assinado aguardando ativação.",
-      "awaiting_signature": "Nenhum contrato aguardando assinatura."
+      "pending_registration": "Nenhuma proposta assinada aguardando registro.",
+      "awaiting_signature": "Nenhum contrato enviado para assinatura."
     },
     "columns": {
       "guarantee": "Garantia",
@@ -623,7 +635,8 @@
       "rate": "Taxa",
       "review": "Análise",
       "signedContract": "Contrato assinado",
-      "actions": "Ações"
+      "actions": "Ações",
+      "reserve": "Reserva"
     },
     "reviewStatus": {
       "editing": "Rascunho",
@@ -631,6 +644,7 @@
       "accepted": "Aprovada",
       "awaiting_signature": "Aguardando assinatura",
       "signed": "Assinada",
+      "pending_registration": "Aguardando registro",
       "refused": "Recusada"
     },
     "signedContract": {
@@ -659,11 +673,10 @@
     "agencyInactive": "Imobiliária inativa",
     "actions": {
       "open": "Abrir",
-      "activate": "Ativar garantia",
-      "cancel": "Cancelar",
       "retry": "Tentar novamente",
       "openUnderwriting": "Abrir dossiê da análise",
-      "openGuarantee": "Abrir garantia"
+      "openGuarantee": "Abrir garantia",
+      "recordRegistration": "Registrar transação"
     },
     "stepper": {
       "progressLabel": "Caminho até a ativação",
@@ -675,6 +688,7 @@
         "accepted": "Aprovada",
         "awaiting_signature": "Em assinatura",
         "signed": "Assinada",
+        "pending_registration": "Aguardando reserva",
         "active": "Ativa"
       }
     },
@@ -682,14 +696,13 @@
       "title": "Garantia {id}",
       "back": "← Garantias",
       "notFound": "Garantia não encontrada",
-      "activation": "Ativação",
+      "activation": "Registro",
       "summary": "Resumo",
       "lease": "Locação",
       "terms": "Condições",
       "history": "Histórico",
-      "ready": "Todas as condições foram cumpridas. Ao ativar, a garantia entra em vigor agora e a taxa de ativação entra na próxima fatura mensal.",
-      "blockedHeading": "Ainda não é possível ativar:",
-      "activatedOn": "Ativada em {date}",
+      "blockedHeading": "Ainda não é possível registrar:",
+      "activatedOn": "Registrada e ativa desde {date}",
       "fields": {
         "agency": "Imobiliária",
         "tenant": "Inquilino",
@@ -711,31 +724,62 @@
       }
     },
     "blockers": {
-      "NOT_DRAFTED": "A garantia não é mais um rascunho.",
-      "REVIEW_NOT_SIGNED": "A análise não está em Assinada — aprove o contrato de locação assinado depois que o contrato for enviado para assinatura.",
+      "NOT_DRAFTED": "A garantia não é mais uma proposta.",
+      "REVIEW_NOT_PENDING_REGISTRATION": "A análise não está aguardando registro — aprove o contrato de locação assinado depois que o contrato for enviado para assinatura.",
       "SIGNED_CONTRACT_NOT_APPROVED": "Nenhum contrato de locação assinado foi aprovado ainda.",
       "AGENCY_NOT_ACTIVE": "O cadastro da imobiliária não está ativo."
     },
-    "confirm": {
-      "title": "Ativar esta garantia?",
-      "description": "A Mutav passa a garantir esta locação a partir de agora. A cobertura começa no teto das condições assinadas, a imobiliária é avisada por e-mail e a taxa de ativação entra na próxima fatura.",
-      "confirm": "Ativar"
-    },
     "toast": {
-      "activated": "Garantia ativada. A imobiliária foi avisada."
+      "registered": "Registro verificado. A garantia está ativa e a imobiliária foi avisada.",
+      "registrationRefused": "A reserva recusou o registro ({error}). A garantia continua aguardando registro."
     },
     "errors": {
       "NOT_FOUND": "Essa garantia não existe mais.",
-      "NOT_DRAFTED": "A garantia não é mais um rascunho.",
-      "REVIEW_NOT_SIGNED": "A análise ainda não está em Assinada.",
-      "SIGNED_CONTRACT_NOT_APPROVED": "Aprove o contrato de locação assinado antes de ativar.",
-      "AGENCY_NOT_ACTIVE": "A imobiliária não está ativa; ela não pode receber uma nova garantia.",
-      "CAPACITY_INVARIANT_BROKEN": "Os valores de cobertura da garantia estão inconsistentes. Escale antes de ativar.",
-      "SELF_TRANSITION": "A garantia já está nessa situação.",
+      "NOT_DRAFTED": "A garantia não é mais uma proposta.",
+      "REVIEW_NOT_PENDING_REGISTRATION": "A garantia não está aguardando registro.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Aprove primeiro o contrato de locação assinado.",
+      "AGENCY_NOT_ACTIVE": "A imobiliária não está ativa; não pode receber uma nova garantia.",
+      "CAPACITY_INVARIANT_BROKEN": "Os valores de cobertura da garantia estão inconsistentes. Escale antes de registrar.",
+      "SELF_TRANSITION": "A garantia já está nesse estado.",
       "TERMINAL_STATE": "A garantia está encerrada.",
-      "ILLEGAL_TRANSITION": "Esta garantia não pode ser ativada na situação atual.",
-      "FORBIDDEN": "A ativação exige o perfil de compliance.",
-      "unexpected": "Algo deu errado. Tente novamente."
+      "ILLEGAL_TRANSITION": "Esta garantia não pode ficar ativa a partir do estado atual.",
+      "INVALID_TX_SIGNATURE": "Isso não é uma assinatura de transação Solana.",
+      "RESERVE_READER_UNAVAILABLE": "A Mutav ainda não consegue ler a reserva, então o registro não pode ser verificado. Nada foi alterado.",
+      "TX_NOT_FOUND": "Nenhuma transação finalizada com essa assinatura foi encontrada. Confira e tente de novo quando ela for confirmada.",
+      "NOT_REGISTER_GUARANTEE": "Essa transação não é um register_guarantee no programa da reserva.",
+      "ARGS_MISMATCH": "Essa transação registrou um id ou coberturas diferentes dos esperados para esta garantia.",
+      "FORBIDDEN": "Registrar a transação exige o papel de compliance.",
+      "unexpected": "Algo deu errado. Tente de novo."
+    },
+    "registration": {
+      "explainer": "O operador registra esta garantia na reserva (register_guarantee) exatamente com os valores abaixo; depois, cole aqui a assinatura da transação. A Mutav verifica on-chain antes de ativar a garantia e cobrar a taxa de ativação.",
+      "fields": {
+        "onchainId": "Id on-chain da garantia",
+        "defaultCover": "default_cover (unidades base)",
+        "exitCover": "exit_cover (unidades base)"
+      },
+      "txLabel": "Assinatura da transação register_guarantee",
+      "txPlaceholder": "Assinatura base58 do console do operador",
+      "txInvalid": "Isso não é uma assinatura de transação Solana.",
+      "verifying": "Verificando on-chain…",
+      "confirmedTx": "Transação de registro:",
+      "refusedHeading": "A reserva recusou o registro: {error} ({code})",
+      "refusedOn": "Registrado em {date}",
+      "refusedNextStep": "A garantia continua aguardando registro. Aguarde capacidade na reserva e registre de novo, ou cancele a proposta.",
+      "refusedTag": "Recusado: {error}"
+    },
+    "offerHold": {
+      "label": "Reserva da oferta",
+      "amount": "Capital reservado",
+      "period": "Prazo da reserva",
+      "periodValue": "{days} dias, até {date}",
+      "lapsedHint": "A reserva expirou antes da assinatura. Reenvie a oferta pela ficha de análise — o envio refaz a checagem da reserva.",
+      "status": {
+        "none": "Sem reserva",
+        "active": "Capital reservado",
+        "lapsed": "Reserva expirada — reenviar",
+        "released": "Liberada"
+      }
     }
   }
 }

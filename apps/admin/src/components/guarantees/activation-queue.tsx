@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@mutav/ui/tabs";
 import { useActivationQueue } from "@/hooks/use-activation-queue";
 import {
   ACTIVATION_TABS,
+  OFFER_HOLD_TONE,
   REVIEW_STATUS_TONE,
   SIGNED_CONTRACT_TONE,
 } from "@/components/guarantees/view-model";
@@ -28,14 +29,14 @@ type ActivationQueuePreload = Preloaded<
 >;
 
 export function ActivationQueue({
-  signed,
+  pendingRegistration,
   awaitingSignature,
 }: {
-  signed: ActivationQueuePreload;
+  pendingRegistration: ActivationQueuePreload;
   awaitingSignature: ActivationQueuePreload;
 }) {
   const t = useTranslations("staffGuarantees");
-  const view = useActivationQueue({ signed, awaitingSignature });
+  const view = useActivationQueue({ pendingRegistration, awaitingSignature });
 
   return (
     <PageShell>
@@ -84,6 +85,7 @@ function QueueTable({ rows }: { rows: readonly ActivationQueueRow[] }) {
           <TableHead className="text-right">{t("columns.rate")}</TableHead>
           <TableHead>{t("columns.review")}</TableHead>
           <TableHead>{t("columns.signedContract")}</TableHead>
+          <TableHead>{t("columns.reserve")}</TableHead>
           <TableHead className="text-right">{t("columns.actions")}</TableHead>
         </TableRow>
       </TableHeader>
@@ -113,6 +115,19 @@ function QueueTable({ rows }: { rows: readonly ActivationQueueRow[] }) {
               <StatusTag tone={SIGNED_CONTRACT_TONE[row.signedContract]}>
                 {t(`signedContract.${row.signedContract}`)}
               </StatusTag>
+            </TableCell>
+            <TableCell>
+              {row.registrationRefusal ? (
+                <StatusTag tone="error">
+                  {t("registration.refusedTag", {
+                    error: row.registrationRefusal.programErrorName,
+                  })}
+                </StatusTag>
+              ) : (
+                <StatusTag tone={OFFER_HOLD_TONE[row.offerHold]}>
+                  {t(`offerHold.status.${row.offerHold}`)}
+                </StatusTag>
+              )}
             </TableCell>
             <TableCell className="text-right">
               <Button size="sm" variant={row.blockers.length === 0 ? "default" : "outline"} asChild>
