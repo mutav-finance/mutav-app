@@ -45,7 +45,17 @@ const reviewStatus = v.union(
   v.literal("accepted"),
   v.literal("awaiting_signature"),
   v.literal("signed"),
+  v.literal("pending_registration"),
   v.literal("refused"),
+);
+
+// Canonical `OFFER_HOLD_RELEASE_REASON` lives in `convex/reserve/registration.ts`.
+const offerHoldReleaseReason = v.union(
+  v.literal("registered"),
+  v.literal("expired"),
+  v.literal("canceled"),
+  v.literal("refused"),
+  v.literal("resent"),
 );
 
 // Canonical `GUARANTEE_DOCUMENT_STATUS` / `DOCUMENT_KEY` live in
@@ -296,6 +306,9 @@ export default defineSchema(
       // publish in a field the customer cannot avoid reading.
       invoiceRef: v.optional(v.string()),
       nextInvoiceSequence: v.optional(v.number()),
+      // Agency override of the offer hold period (ADR 0010): wins over the
+      // product and platform settings, loses to a per-contract value.
+      offerHoldDays: v.optional(v.number()),
     })
       .index("by_cnpj", ["cnpj"])
       .index("by_cpf", ["cpf"])
@@ -504,7 +517,34 @@ export default defineSchema(
             sentBy: v.id("users"),
           }),
         ),
+        // When compliance approved the signed rental contract. The review
+        // passes through `signed` and lands in `pending_registration` in the
+        // same transaction, so this is where the signed moment is kept.
+        signedAt: v.optional(v.string()),
       }),
+      // The confirmed on-chain `register_guarantee` (ADR 0010): written in the
+      // same transaction that moves the guarantee drafted → active.
+      registration: v.optional(
+        v.object({
+          onchainIdHex: v.string(),
+          txSignature: v.string(),
+          slot: v.number(),
+          registeredAt: v.string(),
+          confirmedAt: v.string(),
+          confirmedBy: v.id("users"),
+        }),
+      ),
+      // The reserve's latest refusal of this guarantee's registration. The
+      // guarantee stays `pending_registration`; cleared once one succeeds.
+      registrationRefusal: v.optional(
+        v.object({
+          programErrorCode: v.number(),
+          programErrorName: v.string(),
+          txSignature: v.string(),
+          refusedAt: v.string(),
+          recordedBy: v.id("users"),
+        }),
+      ),
       // Per-guarantee relationship state — approval belongs to a guarantee,
       // not to the person.
       tenantApproval: v.object({
@@ -538,7 +578,7 @@ export default defineSchema(
         availableCents: v.number(),
         reservedCents: v.number(),
       }),
-      // The one-time activation fee's billing marker. `staffActivate` sets it
+      // The one-time activation fee's billing marker. `confirmRegistration` sets it
       // `pending`; the first monthly billing run after activation puts the fee
       // on that invoice and flips it to `invoiced`, so the fee is billed once
       // whatever day of the month the guarantee went on risk. Absent on a
@@ -596,6 +636,8 @@ export default defineSchema(
         commissionRate: v.number(),
         prestamistaPremiumCents: v.number(),
         prestamistaCommissionRate: v.number(),
+        // Product override of the offer hold period (ADR 0010).
+        offerHoldDays: v.optional(v.number()),
       }),
       // `null` on every axis = no restriction. A non-null list restricts to
       // its members; `minTier` is the worst tier still eligible.
@@ -1080,6 +1122,37 @@ export default defineSchema(
     })
       .index("by_status", ["status", "anchoredAt"])
       .index("by_periodEnd", ["periodEnd"]),
+
+    // Off-chain hold of reserve free capital for an offer out for signature
+    // (ADR 0010). Sending a contract for signature holds cover × c for the
+    // hold period fixed here; the preflight measures free capital minus every
+    // active hold. Valid only while MUTAV's operator is the sole caller of
+    // `register_guarantee` — a second registrant moves the hold on chain.
+    // Amounts are BRS base units (6 decimals), exact as int64.
+    offerHolds: defineTable({
+      guaranteeId: v.id("guarantees"),
+      agencyId: v.id("agencies"),
+      amountBaseUnits: v.int64(),
+      holdDays: v.number(),
+      createdAt: v.number(),
+      expiresAt: v.number(),
+      // Set when the signed contract is approved within the period: the held
+      // allocation then belongs to the pending registration and no longer lapses.
+      signedAt: v.optional(v.number()),
+      releasedAt: v.optional(v.number()),
+      releaseReason: v.optional(offerHoldReleaseReason),
+    })
+      .index("by_guarantee", ["guaranteeId"])
+      // Every unreleased hold, soonest expiry first: the preflight sum and the sweep.
+      .index("by_releasedAt_expiresAt", ["releasedAt", "expiresAt"]),
+
+    // Singleton platform-wide settings. Absent row = every default applies.
+    platformSettings: defineTable({
+      key: v.literal("platform"),
+      // Platform default of the offer hold period (ADR 0010); falls back to
+      // `OFFER_HOLD_DAYS_DEFAULT` when unset.
+      offerHoldDays: v.optional(v.number()),
+    }).index("by_key", ["key"]),
 
     // The asset object mirrors reserveAssetValidator in convex/reserve/domain.ts (including valueCents) — kept inline here because importing an entity file into schema.ts would create a circular dependency through _generated/dataModel (same reason as agencyDocumentKind above).
     reserveSnapshots: defineTable({

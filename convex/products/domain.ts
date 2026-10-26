@@ -22,6 +22,7 @@ export const productTermsValidator = v.object({
   commissionRate: v.number(),
   prestamistaPremiumCents: v.number(),
   prestamistaCommissionRate: v.number(),
+  offerHoldDays: v.optional(v.number()),
 });
 
 /**

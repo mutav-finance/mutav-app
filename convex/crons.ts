@@ -64,4 +64,16 @@ crons.interval(
   {},
 );
 
+/**
+ * Hourly. Writes down offer holds whose period lapsed without a signature
+ * (ADR 0010). The preflight already treats them as released; the sweep makes
+ * the release visible and audited.
+ */
+crons.interval(
+  "sweep expired offer holds",
+  { hours: 1 },
+  internal.reserve.offerHolds.sweepExpiredOfferHolds,
+  {},
+);
+
 export default crons;

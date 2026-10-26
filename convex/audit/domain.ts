@@ -54,11 +54,21 @@ export const AUDIT_ACTION = {
   GUARANTEE_ANALYSIS_REFUSED: "guarantee.analysis_refused",
   GUARANTEE_SENT_FOR_SIGNATURE: "guarantee.sent_for_signature",
   // Emitted by convex/guarantees/staffDocuments.ts when approving the signed
-  // rental contract moves the review awaiting_signature → signed.
+  // rental contract moves the review awaiting_signature → signed, and right
+  // after it `registration_queued` for signed → pending_registration (ADR 0010).
   GUARANTEE_SIGNED: "guarantee.signed",
-  // Emitted by convex/guarantees/mutations.ts `staffActivate`, next to the
-  // drafted → active `guarantee.transitioned` entry, with the preconditions held.
+  GUARANTEE_REGISTRATION_QUEUED: "guarantee.registration_queued",
+  // Emitted by convex/guarantees/registration.ts `confirmRegistration`, next to
+  // the drafted → active `guarantee.transitioned` entry, once the operator's
+  // `register_guarantee` is verified on chain.
   GUARANTEE_ACTIVATED: "guarantee.activated",
+  // Emitted by convex/guarantees/registration.ts when the reserve program
+  // refused the registration; the guarantee stays pending_registration.
+  GUARANTEE_REGISTRATION_REFUSED: "guarantee.registration_refused",
+  // reserve/ offer holds (emitted by convex/reserve/offerHolds.ts — the expiry
+  // sweep, and the platform / product / agency hold-period settings).
+  OFFER_HOLD_RELEASED: "offer_hold.released",
+  OFFER_HOLD_SETTING_UPDATED: "offer_hold.setting_updated",
   // guarantees/ documents (emitted by convex/guarantees/documents.ts and
   // convex/guarantees/staffDocuments.ts).
   GUARANTEE_DOCUMENT_ATTACHED: "guarantee.document_attached",
@@ -124,7 +134,11 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.GUARANTEE_ANALYSIS_REFUSED),
   v.literal(AUDIT_ACTION.GUARANTEE_SENT_FOR_SIGNATURE),
   v.literal(AUDIT_ACTION.GUARANTEE_SIGNED),
+  v.literal(AUDIT_ACTION.GUARANTEE_REGISTRATION_QUEUED),
   v.literal(AUDIT_ACTION.GUARANTEE_ACTIVATED),
+  v.literal(AUDIT_ACTION.GUARANTEE_REGISTRATION_REFUSED),
+  v.literal(AUDIT_ACTION.OFFER_HOLD_RELEASED),
+  v.literal(AUDIT_ACTION.OFFER_HOLD_SETTING_UPDATED),
   v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_ATTACHED),
   v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_APPROVED),
   v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_REJECTED),
