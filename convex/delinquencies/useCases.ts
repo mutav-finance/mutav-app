@@ -6,9 +6,13 @@ import { assertAgencyAccess, queryWithAgencyScope, queryWithMutavRole } from "..
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
 import type { GuaranteeCapacity, GuaranteeId, GuaranteeState } from "../guarantees/domain";
+import type { CoverOperation, CoverOperationStatus } from "../coverOperations/domain";
 import {
   DELINQUENCY_STATUS,
+  agencyCanAct,
   delinquencyStatusValidator,
+  toAgencyCaseStatus,
+  type AgencyCaseStatus,
   type DelinquencyNotice,
   type DelinquencyStatus,
   type NoticeEvidenceSource,
@@ -21,15 +25,18 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 // branch without hard-coding the number in two places.
 export const STATS_TAKE_LIMIT = 1000;
 
-// Temporary: the agency app's status tag knows `open | resolved | canceled`
-// only. A staff-verified notice is still outstanding from the agency's side,
-// so agency reads surface it as `open` (and count it with the open ones)
-// until the agency UI grows a `verified` state. Deleted with the contracts
-// facade.
-export type AgencyNoticeStatus = Exclude<DelinquencyStatus, typeof DELINQUENCY_STATUS.VERIFIED>;
-
-function toAgencyNoticeStatus(status: DelinquencyStatus): AgencyNoticeStatus {
-  return status === DELINQUENCY_STATUS.VERIFIED ? DELINQUENCY_STATUS.OPEN : status;
+// The agency's `open` filter means "still outstanding": a staff-verified
+// notice has not been settled either, so it stays in the same list. Each row
+// still carries its own `caseStatus`, so the two are told apart on screen.
+function matchesAgencyStatusFilter(
+  status: DelinquencyStatus,
+  filter: DelinquencyStatus | undefined,
+): boolean {
+  if (filter === undefined) return true;
+  if (filter === DELINQUENCY_STATUS.OPEN) {
+    return status === DELINQUENCY_STATUS.OPEN || status === DELINQUENCY_STATUS.VERIFIED;
+  }
+  return status === filter;
 }
 
 /**
@@ -54,7 +61,10 @@ export type OutstandingNoticeStatus =
 export type DelinquencyNoticeRow = {
   publicId: string;
   guaranteeId: GuaranteeId;
-  status: AgencyNoticeStatus;
+  status: DelinquencyStatus;
+  caseStatus: AgencyCaseStatus;
+  /** Whether the agency may still withdraw the notice or mark it cured. */
+  canAct: boolean;
   rentDueDate: string;
   originalAmountCents: number;
   updatedAmountCents: number;
@@ -83,6 +93,14 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
     canceledAt: string;
     canceledByUserId: UserId;
     note: string | null;
+  } | null;
+  /** The payout behind a cover resolution; null for every other outcome. */
+  cover: {
+    status: CoverOperationStatus;
+    requestedCents: number;
+    appliedCents: number;
+    executedAt: string | null;
+    paymentReference: string | null;
   } | null;
 };
 
@@ -123,11 +141,31 @@ export type DelinquencyAdminQueueRow = {
   openedAt: string;
 };
 
-function shapeDelinquencyNoticeRow(notice: DelinquencyNotice): DelinquencyNoticeRow {
+async function loadCoverOperation(
+  ctx: QueryCtx,
+  notice: DelinquencyNotice,
+): Promise<CoverOperation | null> {
+  const coverOperationId = notice.resolution?.coverOperationId;
+  return coverOperationId ? await ctx.db.get(coverOperationId) : null;
+}
+
+async function shapeAgencyNoticeRow(
+  ctx: QueryCtx,
+  notice: DelinquencyNotice,
+): Promise<DelinquencyNoticeRow> {
+  return shapeDelinquencyNoticeRow(notice, await loadCoverOperation(ctx, notice));
+}
+
+function shapeDelinquencyNoticeRow(
+  notice: DelinquencyNotice,
+  coverOperation: CoverOperation | null,
+): DelinquencyNoticeRow {
   return {
     publicId: notice.publicId,
     guaranteeId: notice.guaranteeId,
-    status: toAgencyNoticeStatus(notice.status),
+    status: notice.status,
+    caseStatus: toAgencyCaseStatus({ notice, coverOperation }),
+    canAct: agencyCanAct(notice.status),
     rentDueDate: notice.rentDueDate,
     originalAmountCents: notice.originalAmountCents,
     updatedAmountCents: notice.updatedAmountCents,
@@ -138,9 +176,13 @@ function shapeDelinquencyNoticeRow(notice: DelinquencyNotice): DelinquencyNotice
   };
 }
 
-function shapeDelinquencyNoticeDetail(notice: DelinquencyNotice): DelinquencyNoticeDetail {
+async function shapeDelinquencyNoticeDetail(
+  ctx: QueryCtx,
+  notice: DelinquencyNotice,
+): Promise<DelinquencyNoticeDetail> {
+  const coverOperation = await loadCoverOperation(ctx, notice);
   return {
-    ...shapeDelinquencyNoticeRow(notice),
+    ...shapeDelinquencyNoticeRow(notice, coverOperation),
     openedByUserId: notice.openedByUserId,
     agencyId: notice.agencyId,
     resolution: notice.resolution
@@ -158,6 +200,15 @@ function shapeDelinquencyNoticeDetail(notice: DelinquencyNotice): DelinquencyNot
           canceledAt: notice.cancellation.canceledAt,
           canceledByUserId: notice.cancellation.canceledByUserId,
           note: notice.cancellation.note ?? null,
+        }
+      : null,
+    cover: coverOperation
+      ? {
+          status: coverOperation.status,
+          requestedCents: coverOperation.requestedCents,
+          appliedCents: coverOperation.appliedCents,
+          executedAt: coverOperation.execution?.executedAt ?? null,
+          paymentReference: coverOperation.execution?.paymentReference ?? null,
         }
       : null,
   };
@@ -277,8 +328,8 @@ export const listByAgency = queryWithAgencyScope({
     const matchesFilters = (notice: DelinquencyNotice) =>
       (dueDateFrom == null || notice.rentDueDate.slice(0, 10) >= dueDateFrom) &&
       (dueDateTo == null || notice.rentDueDate.slice(0, 10) <= dueDateTo) &&
-      (args.amountFromCents == null || notice.updatedAmountCents >= args.amountFromCents) &&
-      (args.amountToCents == null || notice.updatedAmountCents <= args.amountToCents);
+      (args.amountFromCents == null || notice.originalAmountCents >= args.amountFromCents) &&
+      (args.amountToCents == null || notice.originalAmountCents <= args.amountToCents);
 
     const { guaranteePublicId } = args;
     if (guaranteePublicId !== undefined) {
@@ -297,15 +348,15 @@ export const listByAgency = queryWithAgencyScope({
             .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guarantee._id))
             .take(GUARANTEE_NOTICE_HISTORY_LIMIT)
         : [];
-      const page = notices
-        .filter(
-          (notice) =>
-            (args.status === undefined ||
-              toAgencyNoticeStatus(notice.status) === toAgencyNoticeStatus(args.status)) &&
-            matchesFilters(notice),
-        )
-        .sort((a, b) => b._creationTime - a._creationTime)
-        .map(shapeDelinquencyNoticeRow);
+      const page = await Promise.all(
+        notices
+          .filter(
+            (notice) =>
+              matchesAgencyStatusFilter(notice.status, args.status) && matchesFilters(notice),
+          )
+          .sort((a, b) => b._creationTime - a._creationTime)
+          .map((notice) => shapeAgencyNoticeRow(ctx, notice)),
+      );
       return { page, isDone: true, continueCursor: "" };
     }
 
@@ -315,7 +366,8 @@ export const listByAgency = queryWithAgencyScope({
       .withIndex("by_agency_status", (q) => q.eq("agencyId", ctx.agencyId).eq("status", status))
       .order("desc")
       .paginate(args.paginationOpts);
-    // Verified notices ride along with the open page (see `AgencyNoticeStatus`);
+    // Verified notices ride along with the open page (see
+    // `matchesAgencyStatusFilter`);
     // the agency list reads a single page, so a bounded take is enough.
     const verifiedRows =
       status === DELINQUENCY_STATUS.OPEN
@@ -328,10 +380,12 @@ export const listByAgency = queryWithAgencyScope({
             .take(args.paginationOpts.numItems)
         : [];
 
-    const page = [...verifiedRows, ...result.page]
-      .sort((a, b) => b._creationTime - a._creationTime)
-      .filter(matchesFilters)
-      .map(shapeDelinquencyNoticeRow);
+    const page = await Promise.all(
+      [...verifiedRows, ...result.page]
+        .sort((a, b) => b._creationTime - a._creationTime)
+        .filter(matchesFilters)
+        .map((notice) => shapeAgencyNoticeRow(ctx, notice)),
+    );
 
     return { page, isDone: result.isDone, continueCursor: result.continueCursor };
   },
@@ -357,7 +411,7 @@ export const getByPublicId = query({
       return null;
     }
 
-    return shapeDelinquencyNoticeDetail(notice);
+    return await shapeDelinquencyNoticeDetail(ctx, notice);
   },
 });
 

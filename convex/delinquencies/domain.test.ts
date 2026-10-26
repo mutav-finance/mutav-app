@@ -1,6 +1,8 @@
 // @vitest-environment edge-runtime
 import { describe, expect, test } from "vitest";
+import { COVER_OPERATION_STATUS } from "../coverOperations/domain";
 import {
+  AGENCY_CASE_STATUSES,
   DELINQUENCY_STATUS,
   NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
@@ -8,6 +10,8 @@ import {
   isCanceled,
   isOpen,
   isResolved,
+  agencyCanAct,
+  toAgencyCaseStatus,
 } from "./domain";
 
 describe("pure predicates", () => {
@@ -57,5 +61,101 @@ describe("value-object constants", () => {
       "system_scheduled",
       "tenant_confirmed",
     ]);
+  });
+});
+
+describe("toAgencyCaseStatus", () => {
+  const recorded = { status: COVER_OPERATION_STATUS.RECORDED };
+  const executed = { status: COVER_OPERATION_STATUS.EXECUTED };
+
+  test.each([
+    ["open", { status: DELINQUENCY_STATUS.OPEN }, null, "reported"],
+    ["verified", { status: DELINQUENCY_STATUS.VERIFIED }, null, "under_review"],
+    [
+      "cover recorded but not paid",
+      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED } },
+      recorded,
+      "approved",
+    ],
+    [
+      "cover executed",
+      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED } },
+      executed,
+      "paid",
+    ],
+    [
+      "cover resolution whose ledger row is missing",
+      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED } },
+      null,
+      "approved",
+    ],
+    [
+      "tenant cured",
+      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.TENANT_CURED } },
+      null,
+      "cured",
+    ],
+    [
+      "staff dispute",
+      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.STAFF_DISPUTE } },
+      null,
+      "refused",
+    ],
+    [
+      "stale",
+      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.STALE } },
+      null,
+      "expired",
+    ],
+    [
+      "agency withdrew",
+      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.AGENCY_WITHDREW } },
+      null,
+      "withdrawn",
+    ],
+    [
+      "duplicate",
+      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.DUPLICATE } },
+      null,
+      "withdrawn",
+    ],
+    [
+      "data error",
+      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.DATA_ERROR } },
+      null,
+      "withdrawn",
+    ],
+    [
+      "staff dismissed",
+      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.STAFF_DISMISSED } },
+      null,
+      "refused",
+    ],
+  ] as const)("%s → %s", (_label, notice, coverOperation, expected) => {
+    expect(toAgencyCaseStatus({ notice, coverOperation })).toBe(expected);
+  });
+
+  test("every case status is reachable", () => {
+    expect([...AGENCY_CASE_STATUSES].sort()).toEqual([
+      "approved",
+      "cured",
+      "expired",
+      "paid",
+      "refused",
+      "reported",
+      "under_review",
+      "withdrawn",
+    ]);
+  });
+});
+
+describe("agencyCanAct", () => {
+  test.each([
+    [DELINQUENCY_STATUS.OPEN, true],
+    [DELINQUENCY_STATUS.VERIFIED, false],
+    [DELINQUENCY_STATUS.RESOLVED, false],
+    [DELINQUENCY_STATUS.CANCELED, false],
+  ] as const)("%s → %s", (status, expected) => {
+    expect(agencyCanAct(status)).toBe(expected);
   });
 });

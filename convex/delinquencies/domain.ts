@@ -20,6 +20,7 @@ export {
 export type { DelinquencyStatus, TransitionError, TransitionSuccess } from "./machine";
 
 import { DELINQUENCY_STATUS, type DelinquencyStatus } from "./machine";
+import { COVER_OPERATION_STATUS, type CoverOperation } from "../coverOperations/domain";
 
 /**
  * A cover draw is only legal against a default compliance has actually
@@ -135,3 +136,76 @@ export const isResolved = (status: DelinquencyStatus): boolean =>
 
 export const isCanceled = (status: DelinquencyStatus): boolean =>
   status === DELINQUENCY_STATUS.CANCELED;
+
+// ---- agency case status ----------------------------------------------------
+
+/**
+ * The one status an agency sees for a notice. Staff work happens in two
+ * tables (the notice and its cover operation), so the agency's view is a
+ * function of both: a cover resolution is only `paid` once the payout row is
+ * `executed`; before that Mutav owes the money and the case is `approved`.
+ */
+export const AGENCY_CASE_STATUS = {
+  REPORTED: "reported",
+  UNDER_REVIEW: "under_review",
+  APPROVED: "approved",
+  PAID: "paid",
+  CURED: "cured",
+  WITHDRAWN: "withdrawn",
+  REFUSED: "refused",
+  EXPIRED: "expired",
+} as const;
+
+export type AgencyCaseStatus = (typeof AGENCY_CASE_STATUS)[keyof typeof AGENCY_CASE_STATUS];
+
+export const AGENCY_CASE_STATUSES: readonly AgencyCaseStatus[] = Object.values(AGENCY_CASE_STATUS);
+
+type CaseStatusInput = {
+  notice: {
+    status: DelinquencyStatus;
+    resolution?: { kind: NoticeResolutionKind };
+    cancellation?: { reason: NoticeCancellationReason };
+  };
+  coverOperation: Pick<CoverOperation, "status"> | null;
+};
+
+export function toAgencyCaseStatus({ notice, coverOperation }: CaseStatusInput): AgencyCaseStatus {
+  switch (notice.status) {
+    case DELINQUENCY_STATUS.OPEN:
+      return AGENCY_CASE_STATUS.REPORTED;
+    case DELINQUENCY_STATUS.VERIFIED:
+      return AGENCY_CASE_STATUS.UNDER_REVIEW;
+    case DELINQUENCY_STATUS.CANCELED:
+      return notice.cancellation?.reason === NOTICE_CANCELLATION_REASON.STAFF_DISMISSED
+        ? AGENCY_CASE_STATUS.REFUSED
+        : AGENCY_CASE_STATUS.WITHDRAWN;
+    case DELINQUENCY_STATUS.RESOLVED:
+      return resolvedCaseStatus(notice.resolution?.kind, coverOperation);
+  }
+}
+
+function resolvedCaseStatus(
+  kind: NoticeResolutionKind | undefined,
+  coverOperation: Pick<CoverOperation, "status"> | null,
+): AgencyCaseStatus {
+  switch (kind) {
+    case NOTICE_RESOLUTION_KIND.COVER_COMMITTED:
+      return coverOperation?.status === COVER_OPERATION_STATUS.EXECUTED
+        ? AGENCY_CASE_STATUS.PAID
+        : AGENCY_CASE_STATUS.APPROVED;
+    case NOTICE_RESOLUTION_KIND.TENANT_CURED:
+      return AGENCY_CASE_STATUS.CURED;
+    case NOTICE_RESOLUTION_KIND.STAFF_DISPUTE:
+      return AGENCY_CASE_STATUS.REFUSED;
+    case NOTICE_RESOLUTION_KIND.STALE:
+    case undefined:
+      return AGENCY_CASE_STATUS.EXPIRED;
+  }
+}
+
+/**
+ * The agency's own dispositions (`markResolved`, `markCanceled`) are refused
+ * once staff verify the default, so the UI offers them on `open` only.
+ */
+export const agencyCanAct = (status: DelinquencyStatus): boolean =>
+  status === DELINQUENCY_STATUS.OPEN;

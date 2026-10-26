@@ -14,6 +14,7 @@
     "./card": "./src/card.tsx",
     "./chart": "./src/chart.tsx",
     "./checkbox": "./src/checkbox.tsx",
+    "./claim-status-tag": "./src/claim-status-tag.tsx",
     "./cn": "./src/cn.ts",
     "./collapsible": "./src/collapsible.tsx",
     "./currency-input": "./src/currency-input.tsx",

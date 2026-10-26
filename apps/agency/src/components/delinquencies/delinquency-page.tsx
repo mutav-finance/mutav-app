@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
-import { SearchIcon, EyeIcon, FileTextIcon, ReceiptTextIcon, PlusIcon, XIcon } from "lucide-react";
+import { SearchIcon, EyeIcon, PlusIcon, XIcon } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import { Button } from "@mutav/ui/button";
@@ -17,10 +17,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { usePathname, useRouter } from "@mutav/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useWorkspace } from "@/providers/workspace";
-import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-status-tag";
+import { ClaimStatusTag } from "@mutav/ui/claim-status-tag";
 import { OpenNoticeSheet } from "@/components/delinquencies/open-notice-sheet";
 import { NoticeDetailSheet } from "@/components/delinquencies/notice-detail-sheet";
-import { formatBRLCents, formatDateTimeBR } from "@mutav/i18n/brazil";
+import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { DELINQUENCIES_GUARANTEE_PARAM } from "@/lib/guarantees/delinquency-actions";
 
 const OPEN_QUERY_KEY = "notice";
@@ -132,8 +132,8 @@ export function DelinquencyPage() {
 
   const sorted = React.useMemo<DelinquencyRow[]>(() => {
     const copy = [...(result?.page ?? [])];
-    if (order === "amount") copy.sort((a, b) => b.updatedAmountCents - a.updatedAmountCents);
-    else if (order === "status") copy.sort((a, b) => a.status.localeCompare(b.status));
+    if (order === "amount") copy.sort((a, b) => b.originalAmountCents - a.originalAmountCents);
+    else if (order === "status") copy.sort((a, b) => a.caseStatus.localeCompare(b.caseStatus));
     // Server already returns openedAt desc for the "date" default.
     return copy;
   }, [result?.page, order]);
@@ -277,9 +277,8 @@ export function DelinquencyPage() {
               <TableRow>
                 <TableHead>{t("table.col.notice")}</TableHead>
                 <TableHead>{t("table.col.status")}</TableHead>
-                <TableHead>{t("table.col.noticeAt")}</TableHead>
+                <TableHead>{t("table.col.rentDueDate")}</TableHead>
                 <TableHead className="text-right">{t("table.col.amount")}</TableHead>
-                <TableHead className="text-right">{t("table.col.updatedAmount")}</TableHead>
                 <TableHead className="text-center">{t("table.col.action")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -287,7 +286,7 @@ export function DelinquencyPage() {
               {noAgency ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={5}
                     className="text-muted-foreground py-10 text-center text-sm"
                   >
                     {t("table.noAgency")}
@@ -296,7 +295,7 @@ export function DelinquencyPage() {
               ) : isLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={5}
                     className="text-muted-foreground py-10 text-center text-sm"
                   >
                     {t("table.loading")}
@@ -305,7 +304,7 @@ export function DelinquencyPage() {
               ) : sorted.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={5}
                     className="text-muted-foreground py-10 text-center text-sm"
                   >
                     {t("table.empty")}
@@ -325,22 +324,19 @@ export function DelinquencyPage() {
                       </button>
                     </TableCell>
                     <TableCell>
-                      <DelinquencyStatusTag status={row.status}>
-                        {t(`status.${row.status}`)}
-                      </DelinquencyStatusTag>
+                      <ClaimStatusTag status={row.caseStatus}>
+                        {t(`caseStatus.${row.caseStatus}`)}
+                      </ClaimStatusTag>
                     </TableCell>
                     <TableCell>
                       <Mono className="text-muted-foreground text-sm">
-                        {formatDateTimeBR(row.openedAt)}
+                        {formatDateBR(row.rentDueDate)}
                       </Mono>
                     </TableCell>
                     <TableCell className="text-right">
                       <Mono className="text-sm font-semibold">
                         {formatBRLCents(row.originalAmountCents)}
                       </Mono>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Mono className="text-sm">{formatBRLCents(row.updatedAmountCents)}</Mono>
                     </TableCell>
                     <TableCell className="text-center">
                       <Button
@@ -390,14 +386,6 @@ export function DelinquencyPageActions() {
 
   return (
     <>
-      <Button variant="outline" size="sm" disabled>
-        <FileTextIcon className="size-4" strokeWidth={1.25} />
-        {t("actions.report")}
-      </Button>
-      <Button variant="outline" size="sm" disabled>
-        <ReceiptTextIcon className="size-4" strokeWidth={1.25} />
-        {t("actions.statement")}
-      </Button>
       <Button size="sm" onClick={openNew}>
         <PlusIcon className="size-4" strokeWidth={1.5} />
         {t("actions.openNotice")}

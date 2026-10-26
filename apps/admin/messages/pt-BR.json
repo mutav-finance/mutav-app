@@ -163,8 +163,8 @@
       "select": "Selecionar"
     },
     "noticeStatus": {
-      "open": "Informado",
-      "verified": "Inadimplência confirmada"
+      "open": "Atraso informado",
+      "verified": "Em análise"
     },
     "guaranteeState": {
       "drafted": "Rascunho",

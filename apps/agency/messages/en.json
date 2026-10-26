@@ -69,20 +69,28 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Delinquencies — MUTAV",
-      "description": "Track and manage delinquency actions for your agency's guarantees."
+      "title": "Claims — MUTAV",
+      "description": "Track late rent and cover requests for your agency's guarantees."
     },
-    "heading": "Delinquency Actions",
-    "subheading": "Track and manage delinquencies for your guarantees",
+    "heading": "Claims",
+    "subheading": "Late rent and cover requests",
     "actions": {
-      "report": "Generate report",
-      "statement": "Payment statement",
-      "openNotice": "Open notice"
+      "openNotice": "Report late rent"
     },
     "status": {
-      "open": "Open",
-      "resolved": "Resolved",
+      "open": "In progress",
+      "resolved": "Closed",
       "canceled": "Canceled"
+    },
+    "caseStatus": {
+      "reported": "Late rent reported",
+      "under_review": "Under review",
+      "approved": "Approved",
+      "paid": "Paid",
+      "cured": "Settled by tenant",
+      "withdrawn": "Withdrawn",
+      "refused": "Refused",
+      "expired": "Expired"
     },
     "evidenceSource": {
       "agency_reported": "Agency-reported",
@@ -97,10 +105,10 @@
       "orderDate": "Date",
       "orderAmount": "Amount",
       "orderStatus": "Status",
-      "dateFrom": "Notice date — from",
-      "dateTo": "Notice date — to",
-      "amountFrom": "Amount — from",
-      "amountTo": "Amount — to",
+      "dateFrom": "Due date — from",
+      "dateTo": "Due date — to",
+      "amountFrom": "Amount owed — from",
+      "amountTo": "Amount owed — to",
       "search": "Search",
       "clear": "Clear",
       "guarantee": "Guarantee {id}",
@@ -111,44 +119,43 @@
       "empty": "No delinquencies found.",
       "loading": "Loading…",
       "noAgency": "Select an agency.",
-      "view": "View delinquency",
+      "view": "View claim",
       "col": {
         "notice": "Notice",
         "status": "Status",
-        "noticeAt": "Notice date",
-        "amount": "Amount",
-        "updatedAmount": "Updated amount",
+        "rentDueDate": "Due date",
+        "amount": "Amount owed",
         "action": "Action"
       }
     },
     "openNoticeSheet": {
-      "title": "Open delinquency notice",
-      "description": "Register a delinquency notice for an overdue rent payment.",
+      "title": "Report late rent",
+      "description": "Records an unpaid rent. Nothing is paid yet: MUTAV reviews the case before covering it.",
       "fields": {
         "guaranteePublicId": "Guarantee",
         "guaranteePublicIdPlaceholder": "Guarantee ID (e.g. 1000001)",
         "rentDueDate": "Rent due date",
-        "originalAmount": "Original delinquency amount"
+        "originalAmount": "Amount owed"
       },
       "cancel": "Cancel",
-      "submit": "Open notice",
-      "submitting": "Opening…",
-      "success": "Notice {publicId} opened.",
+      "submit": "Report late rent",
+      "submitting": "Reporting…",
+      "success": "Late rent {publicId} reported.",
       "errors": {
         "MISSING_GUARANTEE": "Guarantee is required.",
         "MISSING_DATE": "Rent due date is required.",
         "INVALID_AMOUNT": "Enter a valid amount greater than zero.",
         "GUARANTEE_NOT_FOUND": "Guarantee not found in this agency.",
         "GUARANTEE_NOT_INSURED": "The guarantee is not in force.",
-        "DUPLICATE_NOTICE": "An open notice already exists for this guarantee and due date.",
+        "DUPLICATE_NOTICE": "Late rent is already reported for this guarantee on that date.",
         "INVALID_EVIDENCE_SOURCE": "Invalid evidence source.",
         "INVALID_RENT_DUE_DATE": "Invalid rent due date (use YYYY-MM-DD).",
-        "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot be moved into arrears from its current state.",
-        "UNEXPECTED": "Could not open the notice. Please try again."
+        "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot go into arrears from its current state.",
+        "UNEXPECTED": "Could not report the late rent. Please try again."
       }
     },
     "detailSheet": {
-      "title": "Notice details",
+      "title": "Claim",
       "loading": "Loading…",
       "notFound": "Notice not found.",
       "close": "Close",
@@ -157,16 +164,15 @@
         "rentDueDate": "Due date",
         "openedAt": "Opened at",
         "originalAmount": "Original amount",
-        "updatedAmount": "Updated amount",
         "evidenceSource": "Source"
       },
       "resolution": {
         "heading": "Resolution",
         "kind": {
-          "tenant_cured": "Tenant paid the debt",
+          "tenant_cured": "Tenant paid",
           "cover_committed": "Covered by the reserve",
-          "stale": "Closed by prescription",
-          "staff_dispute": "Mutav dispute"
+          "stale": "Expired without a claim",
+          "staff_dispute": "Refused by MUTAV"
         }
       },
       "cancellation": {
@@ -175,27 +181,56 @@
           "agency_withdrew": "Withdrawn by the agency",
           "duplicate": "Duplicate entry",
           "data_error": "Data error",
-          "staff_dismissed": "Dismissed by Mutav"
+          "staff_dismissed": "Refused by MUTAV"
         }
       },
       "cancel": {
-        "trigger": "Cancel notice",
-        "dialogTitle": "Cancel notice?",
-        "dialogDescription": "Cancels the open notice. This cannot be undone.",
+        "trigger": "Withdraw",
+        "dialogTitle": "Withdraw this claim?",
+        "dialogDescription": "Use this when the late rent was reported by mistake. If the tenant paid, use “Tenant paid”.",
         "reasonLabel": "Reason",
         "noteLabel": "Note (optional)",
         "notePlaceholder": "Internal note about the cancellation",
         "back": "Back",
-        "confirm": "Cancel notice",
-        "submitting": "Canceling…",
-        "success": "Notice canceled.",
+        "confirm": "Withdraw",
+        "submitting": "Withdrawing…",
+        "success": "Claim withdrawn.",
         "errors": {
           "NOTICE_NOT_FOUND": "Notice not found.",
           "SELF_TRANSITION": "The notice is already in this state.",
           "TERMINAL_STATE": "The notice is already closed.",
           "ILLEGAL_TRANSITION": "Illegal transition for the current state.",
-          "NOTICE_VERIFIED": "Mutav has already verified this default; only Mutav can close it.",
-          "UNEXPECTED": "Could not cancel the notice. Please try again."
+          "NOTICE_VERIFIED": "MUTAV has already confirmed this late rent; contact MUTAV to close it.",
+          "UNEXPECTED": "Could not withdraw the claim. Please try again."
+        }
+      },
+      "cover": {
+        "heading": "Cover payout",
+        "requested": "Requested",
+        "approved": "Approved",
+        "paid": "Paid",
+        "pending": "Awaiting payment",
+        "paidAt": "Paid on {date}",
+        "reference": "Payment reference"
+      },
+      "cure": {
+        "trigger": "Tenant paid",
+        "dialogTitle": "Did the tenant pay?",
+        "dialogDescription": "Closes the case as settled. The guarantee returns to Active if no other late rent is open.",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "E.g. paid on 10/12 via Pix",
+        "back": "Back",
+        "confirm": "Confirm payment",
+        "submitting": "Saving…",
+        "success": "Case settled.",
+        "errors": {
+          "NOTICE_NOT_FOUND": "Claim not found.",
+          "SELF_TRANSITION": "The claim is already in that state.",
+          "TERMINAL_STATE": "The claim is already closed.",
+          "ILLEGAL_TRANSITION": "Invalid transition for the current state.",
+          "NOTICE_VERIFIED": "MUTAV has already confirmed this late rent; contact MUTAV to close it.",
+          "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot return to Active from its current state.",
+          "UNEXPECTED": "Could not record the payment. Please try again."
         }
       }
     }
@@ -208,7 +243,7 @@
       "dashboard": "Dashboard",
       "guarantees": "Guarantees",
       "invoices": "Invoices",
-      "delinquencies": "Delinquencies",
+      "delinquencies": "Claims",
       "transparency": "Transparency"
     },
     "cadastros": {
@@ -368,9 +403,9 @@
       "closureReason": "Closure reason:",
       "nextRenewal": "Estimated next renewal:",
       "availableGuarantee": "Available guarantee:",
-      "guaranteeTooltip": "This value accounts for all open, under-review, provisioned, and paid delinquencies.",
-      "openDelinquency": "Open delinquency",
-      "trackDelinquencies": "Track delinquencies",
+      "guaranteeTooltip": "This amount already subtracts the approved and paid covers on this guarantee.",
+      "openDelinquency": "Report late rent",
+      "trackDelinquencies": "View claims",
       "cancelProposal": "Cancel proposal",
       "idLabel": "Guarantee ID",
       "guaranteeTooltipLabel": "Available guarantee details",
@@ -387,10 +422,10 @@
         "NOT_DRAFTED": "Only drafted guarantees can be canceled.",
         "UNEXPECTED": "Unexpected error. Please try again."
       },
-      "openDelinquencyHint": "Register a new delinquency",
-      "trackDelinquenciesHint": "View delinquencies for this guarantee",
+      "openDelinquencyHint": "Report an unpaid rent",
+      "trackDelinquenciesHint": "View this guarantee's claims",
       "openDelinquencyDisabledHint": "Available only for guarantees in force",
-      "trackDelinquenciesDisabledHint": "This guarantee was never in force, so it has no delinquencies",
+      "trackDelinquenciesDisabledHint": "This guarantee was never in force, so it has no claims",
       "actionsMenu": "Guarantee actions",
       "ofCeiling": "of {ceiling}"
     },
