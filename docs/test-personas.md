@@ -55,7 +55,7 @@ The personas own different slices of the seed data:
 
 The fictional dataset seeds the **demo agencies** (Paulista/Atlântica/Horizonte) — **none of which is a login persona's workspace**. That is why the seed no longer exposes the fictional/Aprovada steps as separate entrypoints: only `seedReset` runs all of them, so logging in as `agencyowner` always lands on a populated **Aprovada** dashboard. `convex/seed.test.ts` is the regression guard — it fails if any change lets `agencyowner`'s agency come up with zero guarantees.
 
-The Aprovada book also exercises Mutav's underwriting review ([ADR 0010](architecture/decisions/0010-underwriting-review.md)): guarantee `1000042` sits in the admin `/underwriting` queue (`analysis_requested`, bureau score `negado`), `1000043` was accepted at 13% and is `awaiting_signature`, and `1000035` is a plain `editing` draft with the "Request Mutav analysis" button. Log in as `systemadmin` on the admin app to decide on `1000042`.
+The Aprovada book also exercises Mutav's underwriting review ([ADR 0011](architecture/decisions/0011-underwriting-review.md)): guarantee `1000042` sits in the admin `/underwriting` queue (`analysis_requested`, bureau score `negado`), `1000043` was accepted at 13% and is `awaiting_signature`, and `1000035` is a plain `editing` draft with the "Request Mutav analysis" button. Log in as `systemadmin` on the admin app to decide on `1000042`.
 
 ## Recreating the personas on a fresh Auth0 tenant
 

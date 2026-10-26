@@ -307,7 +307,7 @@ export const SCORE_PANEL_STATE = {
 export type ScorePanelState = (typeof SCORE_PANEL_STATE)[keyof typeof SCORE_PANEL_STATE];
 
 // Below the catalog's lowest priced tier. Not a refusal: the draft still
-// goes to Mutav, which decides with the score as one input (ADR 0010).
+// goes to Mutav, which decides with the score as one input (ADR 0011).
 const LOW_SCORE_CEILING = 400;
 
 /**

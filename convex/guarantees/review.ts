@@ -5,7 +5,7 @@ import { SCORE_TIER, type PriceableTier, type ScoreTier } from "./domain";
 
 /**
  * Mutav's underwriting review of a draft — a sub-status that lives inside
- * `drafted` rather than a new lifecycle state (ADR 0010). The lifecycle
+ * `drafted` rather than a new lifecycle state (ADR 0011). The lifecycle
  * machine answers "is Mutav on risk"; this one answers "where is the decision
  * to go on risk". Keeping them apart leaves the seven-state machine, its
  * aggregates and every insured-state read untouched.

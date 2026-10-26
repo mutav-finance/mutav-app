@@ -459,7 +459,7 @@ export default defineSchema(
       // The living score is the creditAnalysis domain's, keyed by document;
       // the score here is an INPUT to the review, not its verdict. `review`
       // is a sub-status inside `drafted` (canonical value object and moves:
-      // `convex/guarantees/review.ts`, ADR 0010).
+      // `convex/guarantees/review.ts`, ADR 0011).
       underwriting: v.object({
         score: v.number(),
         tier: scoreTier,
