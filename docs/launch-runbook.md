@@ -17,20 +17,25 @@ Scope: agency onboarding → staff approval → guarantee request → Mutav unde
 Production must stop trusting the dev tenant (`dev-ay46ib0hhi1mdwpw.us.auth0.com`). Its test personas share a password that is published in this repo, and one of them holds the Mutav `admin` role.
 
 1. Create the tenant `mutav-prod` (region US, matching dev).
-2. **Agency application** (Regular Web Application):
-   - Callback `https://app.mutav.finance/auth/callback`
-   - Logout `https://app.mutav.finance`
-   - Web origin `https://app.mutav.finance`
-3. **Admin application** (Regular Web Application), same URLs on `admin.mutav.finance`.
-   - Restrict it to the `mutavStaff` database connection.
-   - Turn on MFA (Security → Multi-factor Auth → Always) and apply it to this application.
-4. Database connections:
+2. **One application** (Regular Web Application) for both agency and admin. This is how dev works
+   today: `convex/auth.config.ts` registers a single provider whose `applicationID` is
+   `AUTH0_CLIENT_ID`, so both apps must present the same `aud` (#215,
+   [`docs/auth0.md`](auth0.md)). Do **not** create a separate admin application; its tokens would
+   be rejected by Convex. Staff access is the `mutavStaff` row in Convex, not the Auth0 app.
+   - Callbacks `https://app.mutav.finance/auth/callback`, `https://admin.mutav.finance/auth/callback`
+   - Logout `https://app.mutav.finance`, `https://admin.mutav.finance`
+   - Web origins `https://app.mutav.finance`, `https://admin.mutav.finance`
+3. **MFA (#206):** one Post-Login Action that requires MFA for **all** logins; WebAuthn (security
+   key or passkey) as the staff factor, not SMS or email OTP.
+4. Database connections, both enabled on the one application:
    - Agencies: sign-up enabled, email verification on.
    - `mutavStaff`: sign-up **disabled**. Create each staff user by hand.
 5. Optional: a Management API machine-to-machine app. Only `convex/smoke/auth0Mgmt.ts` uses it today.
-6. Copy each app's domain, client id and client secret straight into the password manager.
+6. Copy the application's domain, client id and client secret straight into the password manager.
 
-Check: signing in at `https://app.mutav.finance` shows the `mutav-prod` universal login, not the dev one.
+Check: signing in at `https://app.mutav.finance` shows the `mutav-prod` universal login, not the dev
+one, and a staff account can sign in at `https://admin.mutav.finance` and reach Convex (no
+`UnauthenticatedError`).
 
 ## 2. Generate the production keys
 
@@ -45,7 +50,7 @@ This writes `PII_ENCRYPTION_KEY`, `PII_HMAC_KEY` and `MUTAV_STELLAR_SECRET_ENCRY
 ```bash
 scripts/launch-secrets.sh apply ~/.mutav-launch/prod-secrets-<stamp>.env --prod
 bunx convex env set --prod AUTH0_DOMAIN <mutav-prod domain>
-bunx convex env set --prod AUTH0_CLIENT_ID <agency app client id>
+bunx convex env set --prod AUTH0_CLIENT_ID <the one application's client id>
 bunx convex env set --prod APP_URL https://app.mutav.finance
 bunx convex env set --prod RESEND_API_KEY <prod key, sending domain verified>
 bunx convex env set --prod RESEND_FROM_EMAIL "Mutav <no-reply@mutav.finance>"
@@ -65,7 +70,7 @@ Set these in each project's **Production** scope only:
 | Project | Variables                                                                                                                                                                                                                                                                  |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | agency  | `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET` (`openssl rand -hex 32`), `APP_BASE_URL`, `NEXT_PUBLIC_AUTH0_DOMAIN`, `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_PAY_URL`, `NEXT_PUBLIC_ADMIN_URL`, `CONVEX_DEPLOY_KEY` (prod) |
-| admin   | The same Auth0 set, using the **admin** app's client and its own `AUTH0_SECRET`, plus `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_AGENCY_URL`                                                                                                            |
+| admin   | The same `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID` and `AUTH0_CLIENT_SECRET` as agency (one application), its own `AUTH0_SECRET` and `APP_BASE_URL=https://admin.mutav.finance`, plus `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_AGENCY_URL`                    |
 | pay     | `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_APP_URL`                                                                                                                                                                                                                            |
 | fund    | `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_APP_URL`                                                                                                                                                                                                                            |
 
