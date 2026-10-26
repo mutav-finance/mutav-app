@@ -1,5 +1,12 @@
 import { v } from "convex/values";
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import { internalAction, internalMutation, type MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import {
+  computeCovers,
+  holdAmountBaseUnits,
+  offerHoldExpiresAt,
+  OFFER_HOLD_DAYS_DEFAULT,
+} from "./reserve/registration";
 import { AUDIT_ACTION } from "./audit/domain";
 import { appendAuditEntry } from "./audit/useCases";
 import {
@@ -32,6 +39,7 @@ import {
   assertTransition,
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
+  DOCUMENT_KEY,
   GUARANTEE_STATE,
   isInsured,
   TENANT_APPROVAL_STATUS,
@@ -287,6 +295,9 @@ const DEMO_TABLES = [
   // deleted by `deleteGuaranteeDocumentBlobs` before the rows go.
   "guaranteeDocuments",
   "guaranteeHistory",
+  // Offer holds FK-reference guarantees (ADR 0010): reserve capital held for
+  // a seeded offer. Wiped with the drafts that hold it.
+  "offerHolds",
   // guarantees ↔ leases point at each other (`leaseId` / `openGuaranteeId`);
   // guarantees go first so no lease pointer outlives its target, and the
   // product a guarantee priced against goes after every guarantee.
@@ -493,26 +504,45 @@ async function insertSeedGuaranteeOnLease(
   });
 }
 
+type SeedOfferReview = {
+  requestedDaysAgo: number;
+  decidedDaysAgo: number;
+  sentDaysAgo: number;
+  feeRateBps: number;
+  note: string;
+};
+
 type SeedReviewRow = {
   guaranteeId: GuaranteeId;
   publicId: string;
   terms: GuaranteeTerms;
   review:
     | { status: typeof REVIEW_STATUS.ANALYSIS_REQUESTED; requestedDaysAgo: number }
-    | {
-        status: typeof REVIEW_STATUS.AWAITING_SIGNATURE;
-        requestedDaysAgo: number;
-        decidedDaysAgo: number;
-        sentDaysAgo: number;
-        feeRateBps: number;
-        note: string;
-      };
+    | ({ status: typeof REVIEW_STATUS.AWAITING_SIGNATURE } & SeedOfferReview)
+    | ({
+        status: typeof REVIEW_STATUS.PENDING_REGISTRATION;
+        signedDaysAgo: number;
+        /** The reserve's refusal of an operator attempt, if one is seeded. */
+        refusal?: { programErrorCode: number; programErrorName: string; refusedDaysAgo: number };
+      } & SeedOfferReview);
 };
 
 /**
+ * The coverage ratio `c` seeded offer holds are sized with. The live value is
+ * read from the reserve when staff send a contract; the seed has no chain to
+ * read, so its holds use this demo figure.
+ */
+const SEED_COVERAGE_RATIO_BPS = 2_500;
+
+/** A syntactically valid (base58, 88 chars) stand-in for a refused transaction. */
+const SEED_REFUSED_TX_SIGNATURE = "5".repeat(44) + "J".repeat(44);
+
+/**
  * Walk seeded drafts through Mutav's review the way the review mutations
- * would: the agency asked, compliance decided (re-pricing at its own rate) and
- * sent the contract. Each step leaves the history row the mutation writes.
+ * would: the agency asked, compliance decided (re-pricing at its own rate),
+ * sent the contract (holding reserve capital for the offer) and, for a
+ * pending registration, approved the signed contract. Each step leaves the
+ * history row the mutation writes.
  */
 async function applyAprovadaReviews(
   ctx: MutationCtx,
@@ -583,8 +613,102 @@ async function applyAprovadaReviews(
     });
     await history(decidedAt, staff.name, "Análise Mutav aprovada");
     await history(sentAt, staff.name, "Contrato enviado para assinatura");
+
+    const sentAtMs = Date.parse(sentAt);
+    const signedAt =
+      row.review.status === REVIEW_STATUS.PENDING_REGISTRATION
+        ? daysAgo(row.review.signedDaysAgo, "16:00")
+        : null;
+    await ctx.db.insert("offerHolds", {
+      guaranteeId: guarantee._id,
+      agencyId: guarantee.agencyId,
+      amountBaseUnits: holdAmountBaseUnits({
+        covers: computeCovers(repriced.terms),
+        coverageRatioBps: SEED_COVERAGE_RATIO_BPS,
+      }),
+      holdDays: OFFER_HOLD_DAYS_DEFAULT,
+      createdAt: sentAtMs,
+      expiresAt: offerHoldExpiresAt({ sentAt: sentAtMs, holdDays: OFFER_HOLD_DAYS_DEFAULT }),
+      ...(signedAt === null ? {} : { signedAt: Date.parse(signedAt) }),
+    });
+    if (row.review.status !== REVIEW_STATUS.PENDING_REGISTRATION || signedAt === null) continue;
+
+    const signed = await ctx.db.get(guarantee._id);
+    if (!signed) throw new Error(`Seed review lost guarantee ${row.publicId}`);
+    await ctx.db.patch(guarantee._id, {
+      underwriting: { ...signed.underwriting, signedAt },
+    });
+    await history(signedAt, staff.name, "Contrato assinado registrado");
+    await history(signedAt, staff.name, "Aguardando registro na reserva");
+
+    const refusal = row.review.refusal;
+    if (!refusal) continue;
+    const refusedAt = daysAgo(refusal.refusedDaysAgo, "17:00");
+    await ctx.db.patch(guarantee._id, {
+      registrationRefusal: {
+        programErrorCode: refusal.programErrorCode,
+        programErrorName: refusal.programErrorName,
+        txSignature: SEED_REFUSED_TX_SIGNATURE,
+        refusedAt,
+        recordedBy: staffUserId,
+      },
+    });
+    await history(
+      refusedAt,
+      staff.name,
+      `Registro recusado pela reserva (${refusal.programErrorName})`,
+    );
   }
 }
+
+/**
+ * Seeded drafts waiting for their registration carry the approved signed
+ * rental contract that put them there. A mutation cannot write file storage,
+ * so `seedReset` schedules this action to store a stand-in PDF per draft.
+ */
+export const attachSeedSignedContracts = internalAction({
+  args: {
+    contracts: v.array(
+      v.object({
+        guaranteeId: v.id("guarantees"),
+        agencyId: v.id("agencies"),
+        uploadedBy: v.id("users"),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    for (const contract of args.contracts) {
+      const storageId = await ctx.storage.store(
+        new Blob(["%PDF-1.4\n% Mutav seed — contrato assinado\n"], { type: "application/pdf" }),
+      );
+      await ctx.runMutation(internal.seed.insertSeedSignedContract, { ...contract, storageId });
+    }
+  },
+});
+
+export const insertSeedSignedContract = internalMutation({
+  args: {
+    guaranteeId: v.id("guarantees"),
+    agencyId: v.id("agencies"),
+    uploadedBy: v.id("users"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const blob = await ctx.db.system.get(args.storageId);
+    await ctx.db.insert("guaranteeDocuments", {
+      guaranteeId: args.guaranteeId,
+      agencyId: args.agencyId,
+      key: DOCUMENT_KEY.RENTAL_CONTRACT,
+      storageId: args.storageId,
+      fileName: "contrato-assinado.pdf",
+      contentType: "application/pdf",
+      sizeBytes: blob?.size ?? 0,
+      uploadedBy: { kind: "agency_user", userId: args.uploadedBy },
+      uploadedAt: new Date().toISOString(),
+      status: "approved",
+    });
+  },
+});
 
 async function insertSeedGuarantee(
   ctx: MutationCtx,
@@ -3264,6 +3388,83 @@ async function populateAprovadaBook(
         },
       },
     },
+    // Signed and approved: waiting for the operator's register_guarantee.
+    // Not active yet — activation is the confirmed registration (ADR 0010).
+    {
+      n: 13,
+      state: GUARANTEE_STATE.DRAFTED,
+      activatedAt: null,
+      nextRenewalDate: dateDaysAgo(-730),
+      review: {
+        status: REVIEW_STATUS.PENDING_REGISTRATION,
+        requestedDaysAgo: 6,
+        decidedDaysAgo: 5,
+        sentDaysAgo: 4,
+        signedDaysAgo: 1,
+        feeRateBps: 1_100,
+        note: "Fiador anterior com histórico limpo; taxa reduzida.",
+      },
+      lease: {
+        rentCents: 246_000,
+        condoCents: 29_000,
+        property: {
+          cep: "05015-000",
+          streetAndNumber: "Rua Cardoso de Almeida, 1450",
+          neighborhood: "Perdizes",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 71",
+        },
+        tenant: {
+          fullName: "Larissa Prado Quintela",
+          cpf: seedCpf(143),
+          birthDate: "1991-01-14",
+          phoneSuffix: "43",
+          emailLocal: "larissa.quintela",
+          score: 720,
+        },
+      },
+    },
+    // The operator tried to register it and the reserve refused: it stays
+    // pending, the agency sees it waiting for reserve capacity.
+    {
+      n: 14,
+      state: GUARANTEE_STATE.DRAFTED,
+      activatedAt: null,
+      nextRenewalDate: dateDaysAgo(-730),
+      review: {
+        status: REVIEW_STATUS.PENDING_REGISTRATION,
+        requestedDaysAgo: 9,
+        decidedDaysAgo: 8,
+        sentDaysAgo: 7,
+        signedDaysAgo: 3,
+        feeRateBps: 1_400,
+        note: "Aluguel alto para a renda declarada; taxa acima da tabela.",
+        refusal: {
+          programErrorCode: 6008,
+          programErrorName: "InsufficientFreeCapital",
+          refusedDaysAgo: 2,
+        },
+      },
+      lease: {
+        rentCents: 498_000,
+        condoCents: 72_000,
+        property: {
+          cep: "01426-001",
+          streetAndNumber: "Alameda Lorena, 1820",
+          neighborhood: "Jardins",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 152",
+        },
+        tenant: {
+          fullName: "Henrique Lacerda Bastos",
+          cpf: seedCpf(144),
+          birthDate: "1984-08-02",
+          phoneSuffix: "44",
+          emailLocal: "henrique.bastos",
+          score: 640,
+        },
+      },
+    },
   ];
 
   const inserted: Array<{ spec: AprovadaSpec; lease: AprovadaLease } & SeededLeaseAndGuarantee> =
@@ -3338,6 +3539,16 @@ async function populateAprovadaBook(
     staffUserId,
     rows: inserted.flatMap((row) => (row.spec.review ? [{ ...row, review: row.spec.review }] : [])),
   });
+  const signedContracts = inserted.flatMap((row) =>
+    row.spec.review?.status === REVIEW_STATUS.PENDING_REGISTRATION
+      ? [{ guaranteeId: row.guaranteeId, agencyId, uploadedBy: ownerUserId }]
+      : [],
+  );
+  if (signedContracts.length > 0) {
+    await ctx.scheduler.runAfter(0, internal.seed.attachSeedSignedContracts, {
+      contracts: signedContracts,
+    });
+  }
 
   // Every in-force guarantee bills its fee, arrears or not.
   const insuredRows = inserted.filter((r) => isInsured({ status: r.spec.state }));
