@@ -10,6 +10,7 @@ import {
   bpsToPercent,
   canRequestAnalysis,
   currentReviewStep,
+  isWaitingForReserveCapacity,
   requestAnalysisErrorKey,
   reviewStepper,
 } from "@/lib/guarantees/review";
@@ -58,6 +59,11 @@ export function useGuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) 
     acceptedRatePercent,
     score: guarantee.underwriting.score,
     canRequest: canRequestAnalysis({ status: guarantee.status, review: review.status }),
+    waitingForReserveCapacity: isWaitingForReserveCapacity({
+      status: guarantee.status,
+      review: review.status,
+      reserveRefusedAt: review.reserveRefusedAt,
+    }),
     isRequesting,
     request,
   };

@@ -405,6 +405,7 @@
         "accepted": "Accepted",
         "awaiting_signature": "Awaiting signature",
         "signed": "Signed",
+        "pending_registration": "Waiting for reserve",
         "active": "Active"
       },
       "status": {
@@ -413,6 +414,7 @@
         "accepted": "Accepted",
         "awaiting_signature": "Awaiting signature",
         "signed": "Signed",
+        "pending_registration": "Waiting for reserve",
         "refused": "Refused",
         "active": "Active"
       },
@@ -421,14 +423,16 @@
         "editing": "Review the draft and request Mutav's analysis when it is ready. Mutav decides whether it takes this contract and at which rate.",
         "analysis_requested": "Mutav is analysing the tenant. You will be notified by email when there is a decision.",
         "accepted": "Mutav accepted this contract. The contract will be sent to the tenant for signature.",
-        "awaiting_signature": "The contract was sent to the tenant for signature. Once signed, Mutav registers the document and activates the guarantee.",
-        "signed": "The signed contract was registered by Mutav. Mutav activates the guarantee once every check is complete.",
+        "awaiting_signature": "The contract was sent to the tenant for signature. Once the signed contract is approved, the guarantee is registered in Mutav's reserve.",
+        "signed": "The signed contract was approved by Mutav. The guarantee is being registered in Mutav's reserve.",
+        "pending_registration": "The signed contract was approved. The guarantee becomes active as soon as its registration in Mutav's reserve is confirmed.",
         "refused": "Mutav did not accept this contract and the proposal was closed.",
-        "active": "Mutav activated this guarantee. It is in force and its activation fee is billed on the next monthly invoice."
+        "active": "This guarantee is registered in Mutav's reserve and in force. Its activation fee is billed on the next monthly invoice."
       },
       "requestedOn": "Requested on {date}",
       "refusalReason": "Reason given by Mutav",
       "refusedNextStep": "You can start a new proposal for this tenant at any time.",
+      "waitingForReserveCapacity": "Waiting for reserve capacity: the reserve could not take this guarantee yet. Mutav will register it as soon as capacity is available — nothing is needed from you.",
       "scoreLabel": "Bureau score",
       "scoreHint": "Input to Mutav's analysis — not a decision",
       "staffRateLabel": "Fee rate set by Mutav",

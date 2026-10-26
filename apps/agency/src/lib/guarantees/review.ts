@@ -3,9 +3,10 @@ import { REVIEW_STATUS, type ReviewStatus } from "@convex/guarantees/review";
 
 /**
  * The agency-facing stepper for the road to activation: Mutav's underwriting
- * review, then the guarantee going on risk. `active` is the lifecycle state,
- * not a review status — Mutav staff activate a `signed` draft — so it closes
- * the stepper. `refused` is not a step on the happy path — it replaces
+ * review, then the guarantee going on risk. It ends Signed → Waiting for
+ * reserve → Active: a signed contract waits for its on-chain registration in
+ * the reserve, and `active` — the lifecycle state the confirmed registration
+ * puts it in, not a review status — closes the stepper (ADR 0010). `refused` is not a step on the happy path — it replaces
  * everything after the request — so it is reported as a flag beside the steps
  * rather than as one of them.
  */
@@ -17,6 +18,7 @@ export const REVIEW_STEPS = [
   REVIEW_STATUS.ACCEPTED,
   REVIEW_STATUS.AWAITING_SIGNATURE,
   REVIEW_STATUS.SIGNED,
+  REVIEW_STATUS.PENDING_REGISTRATION,
   ACTIVE_STEP,
 ] as const;
 
@@ -93,6 +95,27 @@ export function showsReviewCard({
     status === GUARANTEE_STATE.DRAFTED ||
     status === GUARANTEE_STATE.ACTIVE ||
     review === REVIEW_STATUS.REFUSED
+  );
+}
+
+/**
+ * The reserve refused the latest registration attempt: the draft keeps
+ * waiting, and the agency is told it waits for reserve capacity. The program's
+ * error stays a staff concern.
+ */
+export function isWaitingForReserveCapacity({
+  status,
+  review,
+  reserveRefusedAt,
+}: {
+  status: GuaranteeState;
+  review: ReviewStatus;
+  reserveRefusedAt: string | null;
+}): boolean {
+  return (
+    status === GUARANTEE_STATE.DRAFTED &&
+    review === REVIEW_STATUS.PENDING_REGISTRATION &&
+    reserveRefusedAt !== null
   );
 }
 

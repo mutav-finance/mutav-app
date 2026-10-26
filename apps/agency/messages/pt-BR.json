@@ -405,6 +405,7 @@
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
         "signed": "Assinada",
+        "pending_registration": "Aguardando reserva",
         "active": "Ativa"
       },
       "status": {
@@ -413,6 +414,7 @@
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
         "signed": "Assinada",
+        "pending_registration": "Aguardando reserva",
         "refused": "Recusada",
         "active": "Ativa"
       },
@@ -421,14 +423,16 @@
         "editing": "Revise o rascunho e solicite a análise da Mutav quando estiver pronto. A Mutav decide se assume este contrato e com qual taxa.",
         "analysis_requested": "A Mutav está analisando o inquilino. Você será avisado por e-mail quando houver uma decisão.",
         "accepted": "A Mutav aprovou este contrato. O contrato será enviado ao inquilino para assinatura.",
-        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Após a assinatura, a Mutav registra o documento e ativa a garantia.",
-        "signed": "A Mutav registrou o contrato assinado. A Mutav ativa a garantia assim que todas as verificações forem concluídas.",
+        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Quando o contrato assinado for aprovado, a garantia é registrada na reserva da Mutav.",
+        "signed": "O contrato assinado foi aprovado pela Mutav. A garantia está sendo registrada na reserva da Mutav.",
+        "pending_registration": "O contrato assinado foi aprovado. A garantia fica ativa assim que o registro na reserva da Mutav for confirmado.",
         "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada.",
-        "active": "A Mutav ativou esta garantia. Ela está em vigor e a taxa de ativação entra na próxima fatura mensal."
+        "active": "Esta garantia está registrada na reserva da Mutav e em vigor. A taxa de ativação entra na próxima fatura mensal."
       },
       "requestedOn": "Solicitada em {date}",
       "refusalReason": "Motivo informado pela Mutav",
       "refusedNextStep": "Você pode iniciar uma nova proposta para este inquilino a qualquer momento.",
+      "waitingForReserveCapacity": "Aguardando capacidade da reserva: a reserva ainda não pôde receber esta garantia. A Mutav fará o registro assim que houver capacidade — nada é necessário da sua parte.",
       "scoreLabel": "Score do bureau",
       "scoreHint": "Insumo da análise Mutav — não é uma decisão",
       "staffRateLabel": "Taxa definida pela Mutav",

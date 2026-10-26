@@ -19,6 +19,7 @@ const REVIEW_TONE: Record<ReviewStatus | typeof ACTIVE_STEP, Tone> = {
   accepted: "success",
   awaiting_signature: "success",
   signed: "success",
+  pending_registration: "expiring",
   active: "success",
   refused: "error",
 };
@@ -75,6 +76,9 @@ export function GuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) {
         )}
 
         <p className="text-muted-foreground text-base-sm">{t(`description.${view.step}`)}</p>
+        {view.waitingForReserveCapacity && (
+          <p className="text-foreground text-base-sm">{t("waitingForReserveCapacity")}</p>
+        )}
 
         <dl className="text-base-sm grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
