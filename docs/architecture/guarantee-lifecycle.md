@@ -116,6 +116,8 @@ Two actors move a guarantee: the **agency** (any member of the guarantee's agenc
 | `enterEviction`   | staff  | `→ in_eviction`                             |                                                                                                                                                                                                                                                                                                    | `mutations.ts:253` |
 | `reprice`         | staff  | **no move**                                 | new `terms` snapshot + `nextRenewalDate`; refuses `closed` (`GUARANTEE_CLOSED`); history row without `transition`; audit `guarantee.repriced`                                                                                                                                                      | `mutations.ts:313` |
 
+> **Decided, not yet built — [ADR 0010](decisions/0010-activation-is-onchain-registration.md).** The agency `activate` above is the code on `main` today. The decided rule replaces it: `drafted → active` happens only when the guarantee's `register_guarantee` is confirmed on-chain, after compliance approves the signed contract (`signed → pending_registration → active`). No agency or staff Activate click; billing starts at `active`.
+
 ### 6.2 Notice mutations — `convex/delinquencies/mutations.ts`
 
 Each row is one mutation that moves the **notice** and, in the same transaction, may move the **guarantee**.
