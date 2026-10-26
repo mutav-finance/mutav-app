@@ -1,4 +1,4 @@
-# ADR 0009 — Mutav underwriting review: a sub-status inside `drafted`, the score as input, a staff-set rate
+# ADR 0010 — Mutav underwriting review: a sub-status inside `drafted`, the score as input, a staff-set rate
 
 **Status:** Accepted (2026-10-20) · **Phase:** First-agency launch · **Related:** [ADR 0002](0002-b2b2c-tenant-credit-data-governance.md) (Mutav is the controller that decides), [ADR 0007](0007-lease-guarantee-split.md) (the seven-state machine this leaves untouched), [`underwriting.md`](../underwriting.md), [`guarantee-lifecycle.md`](../guarantee-lifecycle.md) § 4 and § 6.1a
 
