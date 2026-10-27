@@ -20,12 +20,16 @@ import { claimReadiness, claimRulesFor } from "./claims";
 import type { CoverOperation, CoverOperationStatus } from "../coverOperations/domain";
 import {
   DELINQUENCY_STATUS,
+  DELINQUENCY_STATUSES,
   agencyCanAct,
   brazilToday,
+  caseGroupOf,
+  caseGroupValidator,
   claimableFromDate,
   delinquencyStatusValidator,
   toAgencyCaseStatus,
   type AgencyCaseStatus,
+  type CaseGroup,
   type ClaimEvidenceKind,
   type ClaimRequirement,
   type ClaimStatus,
@@ -104,6 +108,13 @@ export type DelinquencyNoticeRow = {
 export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
   openedByUserId: UserId;
   agencyId: AgencyId;
+  /** When staff confirmed the default; null until then. */
+  verifiedAt: string | null;
+  guaranteePublicId: string;
+  /** Blank when the agency's own submission is missing (never the registry's). */
+  tenantName: string;
+  streetAndNumber: string;
+  complement: string;
   resolution: {
     kind: NoticeResolutionKind;
     resolvedAt: string;
@@ -247,6 +258,15 @@ async function shapeDelinquencyNoticeDetail(
 ): Promise<DelinquencyNoticeDetail> {
   const coverOperation = await loadCoverOperation(ctx, notice);
   const readiness = await claimReadiness(ctx, notice);
+  const guarantee = await ctx.db.get(notice.guaranteeId);
+  if (!guarantee) {
+    throw new Error(`Delinquency notice ${notice.publicId} references a missing guarantees row`);
+  }
+  const lease = await ctx.db.get(guarantee.leaseId);
+  if (!lease) {
+    throw new Error(`Guarantee ${guarantee.publicId} references a missing leases row`);
+  }
+  const tenant = await agencySubmittedTenant(ctx, guarantee);
   return {
     ...shapeDelinquencyNoticeRow(notice, {
       coverOperation,
@@ -271,6 +291,11 @@ async function shapeDelinquencyNoticeDetail(
     missingRequirements: readiness.missing,
     openedByUserId: notice.openedByUserId,
     agencyId: notice.agencyId,
+    verifiedAt: notice.verification?.verifiedAt ?? null,
+    guaranteePublicId: guarantee.publicId,
+    tenantName: tenant?.fullName ?? "",
+    streetAndNumber: lease.property.streetAndNumber,
+    complement: lease.property.complement,
     resolution: notice.resolution
       ? {
           kind: notice.resolution.kind,
@@ -796,3 +821,119 @@ function compareReportable(a: ReportableGuaranteeRow, b: ReportableGuaranteeRow)
   if (byDueDate !== 0) return byDueDate;
   return a.tenantName.localeCompare(b.tenantName, "pt-BR");
 }
+
+// ---- the agency's claims queue ----------------------------------------------
+
+/**
+ * One case in the agency's queue. People recognise a case by tenant, address
+ * and month, so those lead; the public ids ride along for links only.
+ */
+export type ClaimCaseRow = {
+  publicId: string;
+  guaranteePublicId: string;
+  tenantName: string;
+  streetAndNumber: string;
+  complement: string;
+  rentDueDate: string;
+  originalAmountCents: number;
+  caseStatus: AgencyCaseStatus;
+  claimableFrom: string;
+  /** Earliest deadline among unanswered staff requests; null when none. */
+  requestDueAt: string | null;
+  /** The latest thing that happened to the case, for the "Atualizado" column. */
+  updatedAt: string;
+};
+
+const CASES_PER_STATUS_LIMIT = 200;
+
+function lastActivityAt(notice: DelinquencyNotice): string {
+  const stamps = [
+    notice.openedAt,
+    notice.claim?.submittedAt,
+    ...(notice.claim?.requests.flatMap((request) => [request.requestedAt, request.resolvedAt]) ??
+      []),
+    notice.verification?.verifiedAt,
+    notice.resolution?.resolvedAt,
+    notice.cancellation?.canceledAt,
+  ].filter((stamp): stamp is string => typeof stamp === "string");
+  return stamps.reduce((latest, stamp) =>
+    Date.parse(stamp) > Date.parse(latest) ? stamp : latest,
+  );
+}
+
+/**
+ * The agency's claims queue: the cases of one group plus the size of every
+ * group (for the tab counts and the nav badge). The group is derived from the
+ * case status, which needs the cover row and today's date, so all statuses
+ * are read and partitioned here rather than by index — an agency's case book
+ * is small, and each status read is bounded.
+ */
+export const listCases = queryWithAgencyScope({
+  args: { group: caseGroupValidator },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ rows: ClaimCaseRow[]; counts: Record<CaseGroup, number> }> => {
+    const today = brazilToday(Date.now());
+    const notices = (
+      await Promise.all(
+        DELINQUENCY_STATUSES.map((status) =>
+          ctx.db
+            .query("guaranteeDelinquencyNotices")
+            .withIndex("by_agency_status", (q) =>
+              q.eq("agencyId", ctx.agencyId).eq("status", status),
+            )
+            .order("desc")
+            .take(CASES_PER_STATUS_LIMIT),
+        ),
+      )
+    ).flat();
+
+    const counts: Record<CaseGroup, number> = { needs_you: 0, with_mutav: 0, closed: 0 };
+    const rows: ClaimCaseRow[] = [];
+    for (const notice of notices) {
+      const claimableFrom = await claimableFromFor(ctx, notice);
+      const caseStatus = toAgencyCaseStatus({
+        notice,
+        coverOperation: await loadCoverOperation(ctx, notice),
+        claimableFrom,
+        today,
+      });
+      const group = caseGroupOf(caseStatus);
+      counts[group] += 1;
+      if (group !== args.group) continue;
+
+      const guarantee = await ctx.db.get(notice.guaranteeId);
+      if (!guarantee) {
+        throw new Error(
+          `Delinquency notice ${notice.publicId} references a missing guarantees row`,
+        );
+      }
+      const lease = await ctx.db.get(guarantee.leaseId);
+      if (!lease) {
+        throw new Error(`Guarantee ${guarantee.publicId} references a missing leases row`);
+      }
+      const tenant = await agencySubmittedTenant(ctx, guarantee);
+      const openDeadlines = (notice.claim?.requests ?? [])
+        .filter((request) => request.resolvedAt === undefined)
+        .map((request) => request.dueAt)
+        .sort();
+      rows.push({
+        publicId: notice.publicId,
+        guaranteePublicId: guarantee.publicId,
+        tenantName: tenant?.fullName ?? "",
+        streetAndNumber: lease.property.streetAndNumber,
+        complement: lease.property.complement,
+        rentDueDate: notice.rentDueDate,
+        originalAmountCents: notice.originalAmountCents,
+        caseStatus,
+        claimableFrom,
+        requestDueAt: openDeadlines[0] ?? null,
+        updatedAt: lastActivityAt(notice),
+      });
+    }
+
+    rows.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    return { rows, counts };
+  },
+});

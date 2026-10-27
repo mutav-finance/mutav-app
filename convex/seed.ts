@@ -19,6 +19,8 @@ import type { AgencyId } from "./agencies/domain";
 import {
   DELINQUENCY_STATUS,
   NOTICE_CANCELLATION_REASON,
+  CLAIM_DECLARATION_VERSION,
+  CLAIM_STATUS,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
   type DelinquencyNotice,
@@ -3429,6 +3431,19 @@ async function populateAprovadaBook(
       evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
       openedAt: notice.openedAt,
       openedByUserId,
+      // Staff verify only a filed claim, so every verified notice carries one.
+      ...(notice.verification
+        ? {
+            claim: {
+              status: CLAIM_STATUS.SUBMITTED,
+              claimedAmountCents: originalAmountCents,
+              submittedAt: notice.openedAt,
+              submittedByUserId: openedByUserId,
+              declarationVersion: CLAIM_DECLARATION_VERSION,
+              requests: [],
+            },
+          }
+        : {}),
       ...(notice.verification
         ? {
             verification: {

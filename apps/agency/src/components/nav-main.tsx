@@ -4,6 +4,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@mutav/ui/sidebar";
@@ -15,6 +16,8 @@ type NavMainItem = {
   title: string;
   href: string;
   icon?: React.ReactNode;
+  /** A count of items waiting on the user; hidden when zero or absent. */
+  badge?: number;
 };
 
 export function NavMain({ items }: { items: NavMainItem[] }) {
@@ -51,6 +54,7 @@ export function NavMain({ items }: { items: NavMainItem[] }) {
                     <span>{item.title}</span>
                   </Link>
                 </SidebarMenuButton>
+                {item.badge ? <SidebarMenuBadge>{item.badge}</SidebarMenuBadge> : null}
               </SidebarMenuItem>
             );
           })}

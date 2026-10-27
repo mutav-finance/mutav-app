@@ -275,6 +275,41 @@
         "notePlaceholder": "Anything the audit trail should carry",
         "confirm": "Mark executed"
       }
+    },
+    "claimReview": {
+      "trigger": "View claim",
+      "title": "Claim {notice}",
+      "summary": "{tenant} · {amount} · due {due}",
+      "kind": {
+        "nonPaymentProof": "Proof of non-payment",
+        "tenantNotice": "Notice to the tenant"
+      },
+      "status": {
+        "pending_review": "Sent",
+        "accepted": "Accepted",
+        "rejected": "Refused",
+        "superseded": "Replaced"
+      },
+      "noFile": "No file",
+      "askAgain": "Ask again",
+      "reasonPlaceholder": "What is missing or wrong",
+      "reasonFor": "Reason for {item}",
+      "dueAt": "Deadline for the agency to answer",
+      "locked": "Information can only be requested on a filed claim that is not yet confirmed.",
+      "close": "Close",
+      "send": "Request information",
+      "sent": "Request sent to the agency.",
+      "fileMissing": "File not found.",
+      "errors": {
+        "NOTICE_NOT_FOUND": "Claim not found.",
+        "CLAIM_NOT_SUBMITTED": "This claim is not waiting for review.",
+        "NO_REQUESTS": "Choose at least one file.",
+        "REASON_REQUIRED": "Give a reason for each file.",
+        "REASON_TOO_LONG": "One of the reasons is too long.",
+        "INVALID_DUE_DATE": "The deadline must be a future date.",
+        "FORBIDDEN": "Your role does not allow this action.",
+        "unexpected": "Could not send. Please try again."
+      }
     }
   },
   "shellSwitcher": {

@@ -374,3 +374,40 @@ export function missingClaimRequirements({
   const missing: ClaimRequirement[] = CLAIM_EVIDENCE_KINDS.filter((kind) => !usable.has(kind));
   return signedContractApproved ? missing : ["signedContract", ...missing];
 }
+
+// ---- the agency's claims queue ---------------------------------------------
+
+/**
+ * The queue groups cases by who has to act next, not by raw status: the
+ * agency's first tab is the work only it can move.
+ */
+export const CASE_GROUP = {
+  NEEDS_YOU: "needs_you",
+  WITH_MUTAV: "with_mutav",
+  CLOSED: "closed",
+} as const;
+
+export type CaseGroup = (typeof CASE_GROUP)[keyof typeof CASE_GROUP];
+
+export const caseGroupValidator = v.union(
+  v.literal(CASE_GROUP.NEEDS_YOU),
+  v.literal(CASE_GROUP.WITH_MUTAV),
+  v.literal(CASE_GROUP.CLOSED),
+);
+
+const CASE_GROUP_BY_STATUS: Record<AgencyCaseStatus, CaseGroup> = {
+  reported: CASE_GROUP.NEEDS_YOU,
+  ready_to_claim: CASE_GROUP.NEEDS_YOU,
+  info_requested: CASE_GROUP.NEEDS_YOU,
+  under_review: CASE_GROUP.WITH_MUTAV,
+  approved: CASE_GROUP.WITH_MUTAV,
+  paid: CASE_GROUP.CLOSED,
+  cured: CASE_GROUP.CLOSED,
+  withdrawn: CASE_GROUP.CLOSED,
+  refused: CASE_GROUP.CLOSED,
+  expired: CASE_GROUP.CLOSED,
+};
+
+export function caseGroupOf(status: AgencyCaseStatus): CaseGroup {
+  return CASE_GROUP_BY_STATUS[status];
+}

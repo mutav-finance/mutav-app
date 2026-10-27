@@ -11,6 +11,7 @@ import {
   isOpen,
   isResolved,
   agencyCanAct,
+  caseGroupOf,
   toAgencyCaseStatus,
 } from "./domain";
 
@@ -186,5 +187,22 @@ describe("agencyCanAct", () => {
     [DELINQUENCY_STATUS.CANCELED, false],
   ] as const)("%s → %s", (status, expected) => {
     expect(agencyCanAct(status)).toBe(expected);
+  });
+});
+
+describe("caseGroupOf", () => {
+  test.each([
+    ["reported", "needs_you"],
+    ["ready_to_claim", "needs_you"],
+    ["info_requested", "needs_you"],
+    ["under_review", "with_mutav"],
+    ["approved", "with_mutav"],
+    ["paid", "closed"],
+    ["cured", "closed"],
+    ["withdrawn", "closed"],
+    ["refused", "closed"],
+    ["expired", "closed"],
+  ] as const)("%s → %s", (status, group) => {
+    expect(caseGroupOf(status)).toBe(group);
   });
 });
