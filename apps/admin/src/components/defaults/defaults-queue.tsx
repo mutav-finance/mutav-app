@@ -37,6 +37,7 @@ import {
 } from "@/hooks/use-defaults-queue";
 import { daysOpen } from "@/components/defaults/view-model";
 import { CoverPayouts } from "@/components/defaults/cover-payouts";
+import { ArrearsWithoutClaim } from "@/components/defaults/arrears-without-claim";
 import { ClaimReviewDialog } from "@/components/defaults/claim-review-dialog";
 
 export function DefaultsQueue({
@@ -111,6 +112,7 @@ export function DefaultsQueue({
       </PageContent>
 
       <CoverPayouts preloaded={payoutsPreloaded} />
+      <ArrearsWithoutClaim />
 
       <CoverDialog view={view} />
       <DismissDialog view={view} />

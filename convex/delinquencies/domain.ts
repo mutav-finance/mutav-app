@@ -411,3 +411,43 @@ const CASE_GROUP_BY_STATUS: Record<AgencyCaseStatus, CaseGroup> = {
 export function caseGroupOf(status: AgencyCaseStatus): CaseGroup {
   return CASE_GROUP_BY_STATUS[status];
 }
+
+// ---- expiry ----------------------------------------------------------------
+
+export const CLAIM_EXPIRY_REASON = {
+  FILING_WINDOW: "filing_window",
+  REQUEST_DEADLINE: "request_deadline",
+} as const;
+
+export type ClaimExpiryReason = (typeof CLAIM_EXPIRY_REASON)[keyof typeof CLAIM_EXPIRY_REASON];
+
+/**
+ * Why an open notice has lapsed, or null while it is still live: no claim
+ * filed within the product's filing window after the rent fell due, or a
+ * staff request left unanswered past its deadline. A submitted claim waiting
+ * on staff never lapses — the delay is Mutav's, not the agency's.
+ */
+export function claimExpiryReason({
+  notice,
+  rules,
+  today,
+}: {
+  notice: {
+    status: DelinquencyStatus;
+    rentDueDate: string;
+    claim?: { status: ClaimStatus; requests: readonly { dueAt: string; resolvedAt?: string }[] };
+  };
+  rules: ClaimRules;
+  today: string;
+}): ClaimExpiryReason | null {
+  if (notice.status !== DELINQUENCY_STATUS.OPEN) return null;
+  if (notice.claim === undefined) {
+    const deadline = addDays(notice.rentDueDate, rules.filingWindowDays);
+    return today > deadline ? CLAIM_EXPIRY_REASON.FILING_WINDOW : null;
+  }
+  if (notice.claim.status !== CLAIM_STATUS.INFO_REQUESTED) return null;
+  const overdue = notice.claim.requests.some(
+    (request) => request.resolvedAt === undefined && today > request.dueAt,
+  );
+  return overdue ? CLAIM_EXPIRY_REASON.REQUEST_DEADLINE : null;
+}

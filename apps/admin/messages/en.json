@@ -310,6 +310,34 @@
         "FORBIDDEN": "Your role does not allow this action.",
         "unexpected": "Could not send. Please try again."
       }
+    },
+    "arrearsWithoutClaim": {
+      "title": "Arrears without a claim",
+      "subtitle": "Guarantees still in arrears with no open case — usually the claim expired. Decide whether the arrears is over.",
+      "loading": "Loading…",
+      "empty": "No guarantee in arrears without a claim.",
+      "columns": {
+        "tenant": "Tenant · guarantee",
+        "agency": "Agency",
+        "lastRent": "Last rent reported",
+        "closedAt": "Case closed on",
+        "actions": "Actions"
+      },
+      "returnToActive": "Return to Active",
+      "dialogTitle": "End this guarantee's arrears?",
+      "dialogDescription": "The guarantee returns to Active. Use it when the agency confirmed the arrears is over or will not file a claim.",
+      "notePlaceholder": "Reason (kept in the audit trail)",
+      "back": "Back",
+      "confirm": "Return to Active",
+      "returned": "Guarantee back to Active.",
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Guarantee not found.",
+        "NOT_IN_ARREARS": "The guarantee is no longer in arrears.",
+        "NOTICE_OUTSTANDING": "A case is still open; close it first.",
+        "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot return to Active right now.",
+        "FORBIDDEN": "Your role does not allow this action.",
+        "unexpected": "Could not finish. Please try again."
+      }
     }
   },
   "shellSwitcher": {

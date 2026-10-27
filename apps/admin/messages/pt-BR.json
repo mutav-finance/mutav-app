@@ -310,6 +310,34 @@
         "FORBIDDEN": "Seu papel não permite esta ação.",
         "unexpected": "Não foi possível enviar. Tente novamente."
       }
+    },
+    "arrearsWithoutClaim": {
+      "title": "Atrasos sem acionamento",
+      "subtitle": "Garantias ainda em atraso sem nenhum caso aberto — em geral, o acionamento expirou. Decida se o atraso terminou.",
+      "loading": "Carregando…",
+      "empty": "Nenhuma garantia em atraso sem acionamento.",
+      "columns": {
+        "tenant": "Inquilino · garantia",
+        "agency": "Imobiliária",
+        "lastRent": "Último aluguel informado",
+        "closedAt": "Caso encerrado em",
+        "actions": "Ações"
+      },
+      "returnToActive": "Voltar para Ativa",
+      "dialogTitle": "Encerrar o atraso desta garantia?",
+      "dialogDescription": "A garantia volta para Ativa. Use quando a imobiliária confirmou que o atraso terminou ou não vai acionar.",
+      "notePlaceholder": "Motivo (fica na trilha de auditoria)",
+      "back": "Voltar",
+      "confirm": "Voltar para Ativa",
+      "returned": "Garantia de volta a Ativa.",
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
+        "NOT_IN_ARREARS": "A garantia não está mais em atraso.",
+        "NOTICE_OUTSTANDING": "Há um caso em aberto; encerre-o primeiro.",
+        "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode voltar para Ativa agora.",
+        "FORBIDDEN": "Seu papel não permite esta ação.",
+        "unexpected": "Não foi possível concluir. Tente novamente."
+      }
     }
   },
   "shellSwitcher": {

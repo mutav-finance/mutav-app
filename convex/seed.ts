@@ -190,6 +190,7 @@ async function insertSeedCoverOperation(
     !resolution ||
     resolution.kind !== NOTICE_RESOLUTION_KIND.COVER_COMMITTED ||
     resolution.appliedCoverCents === undefined ||
+    resolution.resolvedByUserId === undefined ||
     coveragePeriod === null
   ) {
     throw new Error(`Seed notice ${noticeId} is not a cover-resolved notice.`);
