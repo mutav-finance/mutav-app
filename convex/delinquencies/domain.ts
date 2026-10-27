@@ -147,7 +147,9 @@ export const isCanceled = (status: DelinquencyStatus): boolean =>
  */
 export const AGENCY_CASE_STATUS = {
   REPORTED: "reported",
+  READY_TO_CLAIM: "ready_to_claim",
   UNDER_REVIEW: "under_review",
+  INFO_REQUESTED: "info_requested",
   APPROVED: "approved",
   PAID: "paid",
   CURED: "cured",
@@ -165,14 +167,27 @@ type CaseStatusInput = {
     status: DelinquencyStatus;
     resolution?: { kind: NoticeResolutionKind };
     cancellation?: { reason: NoticeCancellationReason };
+    claim?: { status: ClaimStatus };
   };
   coverOperation: Pick<CoverOperation, "status"> | null;
+  /**
+   * When the claim may be filed, and today's date. Together they split an
+   * unclaimed notice into `reported` (still in the grace period) and
+   * `ready_to_claim`; without them an unclaimed notice reads `reported`.
+   */
+  claimableFrom?: string | null;
+  today?: string;
 };
 
-export function toAgencyCaseStatus({ notice, coverOperation }: CaseStatusInput): AgencyCaseStatus {
+export function toAgencyCaseStatus({
+  notice,
+  coverOperation,
+  claimableFrom,
+  today,
+}: CaseStatusInput): AgencyCaseStatus {
   switch (notice.status) {
     case DELINQUENCY_STATUS.OPEN:
-      return AGENCY_CASE_STATUS.REPORTED;
+      return openCaseStatus({ claim: notice.claim, claimableFrom, today });
     case DELINQUENCY_STATUS.VERIFIED:
       return AGENCY_CASE_STATUS.UNDER_REVIEW;
     case DELINQUENCY_STATUS.CANCELED:
@@ -182,6 +197,21 @@ export function toAgencyCaseStatus({ notice, coverOperation }: CaseStatusInput):
     case DELINQUENCY_STATUS.RESOLVED:
       return resolvedCaseStatus(notice.resolution?.kind, coverOperation);
   }
+}
+
+function openCaseStatus({
+  claim,
+  claimableFrom,
+  today,
+}: {
+  claim: { status: ClaimStatus } | undefined;
+  claimableFrom: string | null | undefined;
+  today: string | undefined;
+}): AgencyCaseStatus {
+  if (claim?.status === CLAIM_STATUS.INFO_REQUESTED) return AGENCY_CASE_STATUS.INFO_REQUESTED;
+  if (claim?.status === CLAIM_STATUS.SUBMITTED) return AGENCY_CASE_STATUS.UNDER_REVIEW;
+  if (claimableFrom && today && today >= claimableFrom) return AGENCY_CASE_STATUS.READY_TO_CLAIM;
+  return AGENCY_CASE_STATUS.REPORTED;
 }
 
 function resolvedCaseStatus(
@@ -230,3 +260,117 @@ export function brazilToday(nowMs: number): string {
  */
 export const isRentOverdue = ({ rentDueDate, today }: { rentDueDate: string; today: string }) =>
   rentDueDate < today;
+
+// ---- claims (acionamento) --------------------------------------------------
+
+/**
+ * Where the agency's request for cover stands while the notice is still open.
+ * `submitted` waits on staff; `info_requested` waits on the agency. Once staff
+ * verify, the notice's own status takes over and the claim stays `submitted`.
+ */
+export const CLAIM_STATUS = {
+  SUBMITTED: "submitted",
+  INFO_REQUESTED: "info_requested",
+} as const;
+
+export type ClaimStatus = (typeof CLAIM_STATUS)[keyof typeof CLAIM_STATUS];
+
+export const claimStatusValidator = v.union(
+  v.literal(CLAIM_STATUS.SUBMITTED),
+  v.literal(CLAIM_STATUS.INFO_REQUESTED),
+);
+
+/** The two files every claim carries. */
+export const CLAIM_EVIDENCE_KIND = {
+  NON_PAYMENT_PROOF: "nonPaymentProof",
+  TENANT_NOTICE: "tenantNotice",
+} as const;
+
+export type ClaimEvidenceKind = (typeof CLAIM_EVIDENCE_KIND)[keyof typeof CLAIM_EVIDENCE_KIND];
+
+export const CLAIM_EVIDENCE_KINDS: readonly ClaimEvidenceKind[] =
+  Object.values(CLAIM_EVIDENCE_KIND);
+
+export const claimEvidenceKindValidator = v.union(
+  v.literal(CLAIM_EVIDENCE_KIND.NON_PAYMENT_PROOF),
+  v.literal(CLAIM_EVIDENCE_KIND.TENANT_NOTICE),
+);
+
+/**
+ * `accepted` is set when staff verify the default; `rejected` when they ask
+ * for that file again; `superseded` when the agency replaced a pending file.
+ */
+export const CLAIM_EVIDENCE_STATUS = {
+  PENDING_REVIEW: "pending_review",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  SUPERSEDED: "superseded",
+} as const;
+
+export type ClaimEvidenceStatus =
+  (typeof CLAIM_EVIDENCE_STATUS)[keyof typeof CLAIM_EVIDENCE_STATUS];
+
+/**
+ * Placeholder values until the product decision is made: a claim opens
+ * `graceDays` after the rent fell due and stays fileable for
+ * `filingWindowDays`. A product's own `claimRules` overrides both.
+ */
+export const CLAIM_GRACE_DAYS_DEFAULT = 10;
+export const CLAIM_FILING_WINDOW_DAYS_DEFAULT = 90;
+
+export type ClaimRules = { graceDays: number; filingWindowDays: number };
+
+export const CLAIM_RULES_DEFAULT: ClaimRules = {
+  graceDays: CLAIM_GRACE_DAYS_DEFAULT,
+  filingWindowDays: CLAIM_FILING_WINDOW_DAYS_DEFAULT,
+};
+
+/** Bumped whenever the attestation text the agency accepts changes. */
+export const CLAIM_DECLARATION_VERSION = "2026-10-26";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function addDays(isoDate: string, days: number): string {
+  return new Date(Date.parse(`${isoDate}T00:00:00Z`) + days * MS_PER_DAY)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/** The first day the claim for a rent due on `rentDueDate` may be filed. */
+export function claimableFromDate({
+  rentDueDate,
+  rules,
+}: {
+  rentDueDate: string;
+  rules: ClaimRules;
+}): string {
+  return addDays(rentDueDate, rules.graceDays);
+}
+
+export type ClaimRequirement = ClaimEvidenceKind | "signedContract";
+
+/**
+ * What still stands between this notice and a fileable claim. Evidence counts
+ * while its newest live file is pending review or accepted; a rejected file
+ * must be replaced. The signed rental contract is a precondition on the
+ * guarantee, not a claim upload, but it gates the claim the same way.
+ */
+export function missingClaimRequirements({
+  evidence,
+  signedContractApproved,
+}: {
+  evidence: readonly { kind: ClaimEvidenceKind; status: ClaimEvidenceStatus }[];
+  signedContractApproved: boolean;
+}): ClaimRequirement[] {
+  const usable = new Set(
+    evidence
+      .filter(
+        (file) =>
+          file.status === CLAIM_EVIDENCE_STATUS.PENDING_REVIEW ||
+          file.status === CLAIM_EVIDENCE_STATUS.ACCEPTED,
+      )
+      .map((file) => file.kind),
+  );
+  const missing: ClaimRequirement[] = CLAIM_EVIDENCE_KINDS.filter((kind) => !usable.has(kind));
+  return signedContractApproved ? missing : ["signedContract", ...missing];
+}

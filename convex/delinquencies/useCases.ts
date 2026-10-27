@@ -15,14 +15,20 @@ import {
 } from "../guarantees/domain";
 import { agencySubmittedTenant } from "../guarantees/tenantIdentity";
 import { latestDueDateOnOrBefore } from "../leases/domain";
+import { listEvidenceForNotice, type ClaimEvidenceRow } from "./claimEvidence";
+import { claimReadiness, claimRulesFor } from "./claims";
 import type { CoverOperation, CoverOperationStatus } from "../coverOperations/domain";
 import {
   DELINQUENCY_STATUS,
   agencyCanAct,
   brazilToday,
+  claimableFromDate,
   delinquencyStatusValidator,
   toAgencyCaseStatus,
   type AgencyCaseStatus,
+  type ClaimEvidenceKind,
+  type ClaimRequirement,
+  type ClaimStatus,
   type DelinquencyNotice,
   type DelinquencyStatus,
   type NoticeEvidenceSource,
@@ -75,6 +81,13 @@ export type DelinquencyNoticeRow = {
   caseStatus: AgencyCaseStatus;
   /** Whether the agency may still withdraw the notice or mark it cured. */
   canAct: boolean;
+  claimStatus: ClaimStatus | null;
+  /**
+   * First day the claim may be filed. Returned so the client can split
+   * `reported` from `ready_to_claim` as days pass without a data change
+   * (a query result does not refresh on its own when the date rolls over).
+   */
+  claimableFrom: string;
   rentDueDate: string;
   originalAmountCents: number;
   updatedAmountCents: number;
@@ -104,6 +117,21 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
     canceledByUserId: UserId;
     note: string | null;
   } | null;
+  claim: {
+    claimedAmountCents: number;
+    submittedAt: string;
+    requests: {
+      id: string;
+      evidenceKind: ClaimEvidenceKind;
+      reason: string;
+      dueAt: string;
+      requestedAt: string;
+      resolvedAt: string | null;
+    }[];
+  } | null;
+  evidence: ClaimEvidenceRow[];
+  /** What still blocks filing the claim; empty once it can be filed. */
+  missingRequirements: ClaimRequirement[];
   /** The payout behind a cover resolution; null for every other outcome. */
   cover: {
     status: CoverOperationStatus;
@@ -149,6 +177,13 @@ export type DelinquencyAdminQueueRow = {
   updatedAmountCents: number;
   evidenceSource: NoticeEvidenceSource;
   openedAt: string;
+  /**
+   * Null while the agency has only reported late rent: staff can verify a
+   * notice only once its claim is `submitted`.
+   */
+  claimStatus: ClaimStatus | null;
+  claimedAmountCents: number | null;
+  evidence: ClaimEvidenceRow[];
 };
 
 async function loadCoverOperation(
@@ -159,23 +194,43 @@ async function loadCoverOperation(
   return coverOperationId ? await ctx.db.get(coverOperationId) : null;
 }
 
+async function claimableFromFor(ctx: QueryCtx, notice: DelinquencyNotice): Promise<string> {
+  const guarantee = await ctx.db.get(notice.guaranteeId);
+  if (!guarantee) {
+    throw new Error(`Delinquency notice ${notice.publicId} references a missing guarantees row`);
+  }
+  const rules = await claimRulesFor(ctx, guarantee);
+  return claimableFromDate({ rentDueDate: notice.rentDueDate, rules });
+}
+
 async function shapeAgencyNoticeRow(
   ctx: QueryCtx,
   notice: DelinquencyNotice,
+  today: string,
 ): Promise<DelinquencyNoticeRow> {
-  return shapeDelinquencyNoticeRow(notice, await loadCoverOperation(ctx, notice));
+  return shapeDelinquencyNoticeRow(notice, {
+    coverOperation: await loadCoverOperation(ctx, notice),
+    claimableFrom: await claimableFromFor(ctx, notice),
+    today,
+  });
 }
 
 function shapeDelinquencyNoticeRow(
   notice: DelinquencyNotice,
-  coverOperation: CoverOperation | null,
+  {
+    coverOperation,
+    claimableFrom,
+    today,
+  }: { coverOperation: CoverOperation | null; claimableFrom: string; today: string },
 ): DelinquencyNoticeRow {
   return {
     publicId: notice.publicId,
     guaranteeId: notice.guaranteeId,
     status: notice.status,
-    caseStatus: toAgencyCaseStatus({ notice, coverOperation }),
+    caseStatus: toAgencyCaseStatus({ notice, coverOperation, claimableFrom, today }),
     canAct: agencyCanAct(notice.status),
+    claimStatus: notice.claim?.status ?? null,
+    claimableFrom,
     rentDueDate: notice.rentDueDate,
     originalAmountCents: notice.originalAmountCents,
     updatedAmountCents: notice.updatedAmountCents,
@@ -191,8 +246,29 @@ async function shapeDelinquencyNoticeDetail(
   notice: DelinquencyNotice,
 ): Promise<DelinquencyNoticeDetail> {
   const coverOperation = await loadCoverOperation(ctx, notice);
+  const readiness = await claimReadiness(ctx, notice);
   return {
-    ...shapeDelinquencyNoticeRow(notice, coverOperation),
+    ...shapeDelinquencyNoticeRow(notice, {
+      coverOperation,
+      claimableFrom: readiness.claimableFrom,
+      today: brazilToday(Date.now()),
+    }),
+    claim: notice.claim
+      ? {
+          claimedAmountCents: notice.claim.claimedAmountCents,
+          submittedAt: notice.claim.submittedAt,
+          requests: notice.claim.requests.map((request) => ({
+            id: request.id,
+            evidenceKind: request.evidenceKind,
+            reason: request.reason,
+            dueAt: request.dueAt,
+            requestedAt: request.requestedAt,
+            resolvedAt: request.resolvedAt ?? null,
+          })),
+        }
+      : null,
+    evidence: await listEvidenceForNotice(ctx, notice._id),
+    missingRequirements: readiness.missing,
     openedByUserId: notice.openedByUserId,
     agencyId: notice.agencyId,
     resolution: notice.resolution
@@ -278,6 +354,9 @@ async function shapeDelinquencyAdminQueueRow(
     updatedAmountCents: notice.updatedAmountCents,
     evidenceSource: notice.evidenceSource,
     openedAt: notice.openedAt,
+    claimStatus: notice.claim?.status ?? null,
+    claimedAmountCents: notice.claim?.claimedAmountCents ?? null,
+    evidence: await listEvidenceForNotice(ctx, notice._id),
   };
 }
 
@@ -333,6 +412,7 @@ export const listByAgency = queryWithAgencyScope({
     // stored day, not lex-compared with a longer string that diverges at
     // position 10. `rentDueDate` is enforced to YYYY-MM-DD at write time by
     // openNotice's validator; the .slice keeps this query defensive.
+    const today = brazilToday(Date.now());
     const dueDateFrom = args.dueDateFrom?.slice(0, 10);
     const dueDateTo = args.dueDateTo?.slice(0, 10);
     const matchesFilters = (notice: DelinquencyNotice) =>
@@ -365,7 +445,7 @@ export const listByAgency = queryWithAgencyScope({
               matchesAgencyStatusFilter(notice.status, args.status) && matchesFilters(notice),
           )
           .sort((a, b) => b._creationTime - a._creationTime)
-          .map((notice) => shapeAgencyNoticeRow(ctx, notice)),
+          .map((notice) => shapeAgencyNoticeRow(ctx, notice, today)),
       );
       return { page, isDone: true, continueCursor: "" };
     }
@@ -394,7 +474,7 @@ export const listByAgency = queryWithAgencyScope({
       [...verifiedRows, ...result.page]
         .sort((a, b) => b._creationTime - a._creationTime)
         .filter(matchesFilters)
-        .map((notice) => shapeAgencyNoticeRow(ctx, notice)),
+        .map((notice) => shapeAgencyNoticeRow(ctx, notice, today)),
     );
 
     return { page, isDone: result.isDone, continueCursor: result.continueCursor };

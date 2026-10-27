@@ -249,6 +249,19 @@ const noticeEvidenceSource = v.union(
   v.literal("system_scheduled"),
 );
 
+// Claim (acionamento) validators — canonical copies in
+// `convex/delinquencies/domain.ts`, inlined for the same reason.
+const claimStatus = v.union(v.literal("submitted"), v.literal("info_requested"));
+
+const claimEvidenceKind = v.union(v.literal("nonPaymentProof"), v.literal("tenantNotice"));
+
+const claimEvidenceStatus = v.union(
+  v.literal("pending_review"),
+  v.literal("accepted"),
+  v.literal("rejected"),
+  v.literal("superseded"),
+);
+
 const coverOperationStatus = v.union(v.literal("recorded"), v.literal("executed"));
 
 export default defineSchema(
@@ -525,6 +538,15 @@ export default defineSchema(
         prestamistaPremiumCents: v.number(),
         prestamistaCommissionRate: v.number(),
       }),
+      // When an agency may file a claim on late rent under this product.
+      // Optional while the values are undecided: absent means the defaults in
+      // `convex/delinquencies/domain.ts` (`CLAIM_RULES_DEFAULT`).
+      claimRules: v.optional(
+        v.object({
+          graceDays: v.number(),
+          filingWindowDays: v.number(),
+        }),
+      ),
       // `null` on every axis = no restriction. A non-null list restricts to
       // its members; `minTier` is the worst tier still eligible.
       eligibility: v.object({
@@ -636,6 +658,31 @@ export default defineSchema(
           canceledAt: v.string(),
           canceledByUserId: v.id("users"),
           note: v.optional(v.string()),
+        }),
+      ),
+
+      // The agency's request that the reserve pay (the "acionamento"). Absent
+      // while the notice only reports late rent; staff verify a notice only
+      // once it carries a submitted claim.
+      claim: v.optional(
+        v.object({
+          status: claimStatus,
+          claimedAmountCents: v.number(),
+          submittedAt: v.string(),
+          submittedByUserId: v.id("users"),
+          // Version of the attestation text the agency member accepted.
+          declarationVersion: v.string(),
+          requests: v.array(
+            v.object({
+              id: v.string(),
+              evidenceKind: claimEvidenceKind,
+              reason: v.string(),
+              dueAt: v.string(),
+              requestedAt: v.string(),
+              requestedByUserId: v.id("users"),
+              resolvedAt: v.optional(v.string()),
+            }),
+          ),
         }),
       ),
     })
@@ -909,6 +956,30 @@ export default defineSchema(
       .index("by_guarantee", ["guaranteeId"])
       .index("by_guarantee_key", ["guaranteeId", "key"])
       .index("by_status", ["status"])
+      .index("by_storageId", ["storageId"]),
+
+    // Files an agency attaches to one late-rent notice to back its claim:
+    // proof the rent went unpaid and the notice sent to the tenant. Kept apart
+    // from `guaranteeDocuments` because they belong to one month's case, not
+    // to the guarantee, and are judged in the claim review, not the document
+    // queue. A newer upload for the same kind supersedes a pending one.
+    claimEvidence: defineTable({
+      noticeId: v.id("guaranteeDelinquencyNotices"),
+      guaranteeId: v.id("guarantees"),
+      agencyId: v.id("agencies"),
+      kind: claimEvidenceKind,
+      storageId: v.id("_storage"),
+      fileName: v.string(),
+      contentType: v.string(),
+      sizeBytes: v.number(),
+      uploadedByUserId: v.id("users"),
+      uploadedAt: v.string(),
+      status: claimEvidenceStatus,
+      reviewedByUserId: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.string()),
+      rejectionReason: v.optional(v.string()),
+    })
+      .index("by_notice_kind", ["noticeId", "kind"])
       .index("by_storageId", ["storageId"]),
 
     agencyDocuments: defineTable({

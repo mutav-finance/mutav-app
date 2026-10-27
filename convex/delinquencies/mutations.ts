@@ -26,6 +26,7 @@ import {
   NOTICE_RESOLUTION_KIND,
   NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
+  CLAIM_STATUS,
   brazilToday,
   isRentOverdue,
   noticeEvidenceSourceValidator,
@@ -34,6 +35,7 @@ import {
   type GuaranteeRefusedErrorCode,
 } from "./domain";
 import type { TransitionError } from "./machine";
+import { acceptPendingEvidence } from "./claimEvidence";
 
 // Reused across every state-changing mutation: the machine's guard error
 // codes map 1:1 onto the mutation-level error codes for transition failures.
@@ -609,7 +611,11 @@ type StaffVerifyDefaultSuccess = {
   guaranteeStatus: GuaranteeState;
 };
 type StaffVerifyDefaultError = {
-  code: "NOTICE_NOT_FOUND" | TransitionErrorCode | GuaranteeRefusedErrorCode;
+  code:
+    | "NOTICE_NOT_FOUND"
+    | "CLAIM_NOT_SUBMITTED"
+    | TransitionErrorCode
+    | GuaranteeRefusedErrorCode;
 };
 
 /**
@@ -659,6 +665,17 @@ export const staffVerifyDefault = mutationWithMutavRole({ minRole: "compliance" 
       return { success: false, error: { code: guard.error.code }, message: guard.message };
     }
 
+    // A report of late rent is not yet a request for cover: staff confirm a
+    // default only once the agency has filed the claim with its evidence, and
+    // not while an information request is still waiting on the agency.
+    if (notice.claim?.status !== CLAIM_STATUS.SUBMITTED) {
+      return {
+        success: false,
+        error: { code: "CLAIM_NOT_SUBMITTED" },
+        message: `Delinquency notice '${notice.publicId}' has no submitted claim to verify.`,
+      };
+    }
+
     // The guarantee moves first: it is the only step that can still be refused
     // without a write, and its own guards run before its first patch.
     const guarantee = await loadGuarantee(ctx, notice.guaranteeId);
@@ -687,6 +704,11 @@ export const staffVerifyDefault = mutationWithMutavRole({ minRole: "compliance" 
     }
 
     const verifiedAt = new Date().toISOString();
+    await acceptPendingEvidence(ctx, {
+      noticeId: notice._id,
+      at: verifiedAt,
+      byUserId: ctx.user._id,
+    });
     await ctx.db.patch(notice._id, {
       status: DELINQUENCY_STATUS.VERIFIED,
       verification: {

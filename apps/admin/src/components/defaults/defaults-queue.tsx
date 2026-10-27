@@ -29,6 +29,7 @@ import {
 import {
   DISMISSAL_KINDS,
   isCoverable,
+  isVerifiable,
   useDefaultsQueue,
   type DefaultsQueueRow,
   type DefaultsQueueViewModel,
@@ -136,6 +137,11 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
           <ClaimStatusTag status={isVerified ? "under_review" : "reported"}>
             {t(`noticeStatus.${row.status}`)}
           </ClaimStatusTag>
+          {row.status === "open" ? (
+            <span className="text-muted-foreground text-xs">
+              {t(`claimStatus.${row.claimStatus ?? "none"}`)}
+            </span>
+          ) : null}
         </div>
       </TableCell>
       <TableCell>{row.agencyName}</TableCell>
@@ -161,7 +167,11 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
       </TableCell>
       <TableCell className="text-right">
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" disabled={view.busy || isVerified} onClick={() => view.verify(row)}>
+          <Button
+            size="sm"
+            disabled={view.busy || !isVerifiable(row)}
+            onClick={() => view.verify(row)}
+          >
             {t("actions.verify")}
           </Button>
           <Button

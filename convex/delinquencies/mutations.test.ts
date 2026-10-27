@@ -2,7 +2,11 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import {
+  registerGuaranteeAggregateComponents,
+  seedGuaranteeWithLease,
+  seedSubmittedClaim,
+} from "../lib/testFixtures";
 import { replaceGuaranteeAggregates } from "../guarantees/aggregateWrites";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
@@ -563,6 +567,7 @@ describe("openNotice", () => {
     };
     const first = await asUser.mutation(api.delinquencies.mutations.openNotice, args);
     if (!first.success) throw new Error(first.message);
+    await seedSubmittedClaim(t, { noticePublicId: first.data.publicId, userId: fx.userId });
     const verified = await asUser.mutation(api.delinquencies.mutations.staffVerifyDefault, {
       noticePublicId: first.data.publicId,
     });
@@ -1549,6 +1554,7 @@ describe("staffVerifyDefault", () => {
     const t = setup();
     const fx = await makeFixture(t, "1", { status: "in_arrears" });
     const noticeId = await insertNotice(t, fx, { publicId: "DN-verify-happy" });
+    await seedSubmittedClaim(t, { noticePublicId: "DN-verify-happy", userId: fx.userId });
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
@@ -1590,10 +1596,28 @@ describe("staffVerifyDefault", () => {
     expect(noticeAudit[0].actor).toEqual({ kind: "user", userId: fx.userId });
   });
 
+  test("a notice without a submitted claim → CLAIM_NOT_SUBMITTED and neither row moves", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "in_arrears" });
+    const noticeId = await insertNotice(t, fx, { publicId: "DN-verify-unclaimed" });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .mutation(api.delinquencies.mutations.staffVerifyDefault, {
+        noticePublicId: "DN-verify-unclaimed",
+      });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("CLAIM_NOT_SUBMITTED");
+    expect(orThrow(await t.run((ctx) => ctx.db.get(noticeId)), "notice row").status).toBe("open");
+    expect((await readGuarantee(t, fx.guaranteeId)).status).toBe("in_arrears");
+  });
+
   test("guarantee still active → GUARANTEE_TRANSITION_REFUSED and neither row moves", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     const noticeId = await insertNotice(t, fx, { publicId: "DN-verify-active" });
+    await seedSubmittedClaim(t, { noticePublicId: "DN-verify-active", userId: fx.userId });
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
@@ -1636,6 +1660,7 @@ describe("staffVerifyDefault", () => {
       publicId: "DN-verify-second",
       rentDueDate: "2026-07-05",
     });
+    await seedSubmittedClaim(t, { noticePublicId: "DN-verify-second", userId: fx.userId });
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
@@ -1659,6 +1684,7 @@ describe("staffVerifyDefault", () => {
     const t = setup();
     const fx = await makeFixture(t, "1", { status: "cover_committed" });
     await insertNotice(t, fx, { publicId: "DN-verify-covered", rentDueDate: "2026-08-05" });
+    await seedSubmittedClaim(t, { noticePublicId: "DN-verify-covered", userId: fx.userId });
     await grantStaffRole(t, fx.userId, "compliance");
     const asCompliance = t.withIdentity({ subject: fx.subject });
 
@@ -1676,6 +1702,7 @@ describe("staffVerifyDefault", () => {
     const a = await makeFixture(t, "1");
     const b = await makeFixture(t, "2", { status: "in_arrears" });
     const noticeId = await insertNotice(t, b, { publicId: "DN-verify-cross" });
+    await seedSubmittedClaim(t, { noticePublicId: "DN-verify-cross", userId: b.userId });
     await grantStaffRole(t, a.userId, "compliance");
     const asStaff = t.withIdentity({ subject: a.subject });
 

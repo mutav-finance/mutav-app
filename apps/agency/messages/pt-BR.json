@@ -84,7 +84,9 @@
     },
     "caseStatus": {
       "reported": "Atraso informado",
+      "ready_to_claim": "Pronto para acionar",
       "under_review": "Em análise",
+      "info_requested": "Pendência",
       "approved": "Aprovado",
       "paid": "Pago",
       "cured": "Regularizado",

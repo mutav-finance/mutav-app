@@ -73,31 +73,46 @@ describe("toAgencyCaseStatus", () => {
     ["verified", { status: DELINQUENCY_STATUS.VERIFIED }, null, "under_review"],
     [
       "cover recorded but not paid",
-      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED } },
+      {
+        status: DELINQUENCY_STATUS.RESOLVED,
+        resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED },
+      },
       recorded,
       "approved",
     ],
     [
       "cover executed",
-      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED } },
+      {
+        status: DELINQUENCY_STATUS.RESOLVED,
+        resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED },
+      },
       executed,
       "paid",
     ],
     [
       "cover resolution whose ledger row is missing",
-      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED } },
+      {
+        status: DELINQUENCY_STATUS.RESOLVED,
+        resolution: { kind: NOTICE_RESOLUTION_KIND.COVER_COMMITTED },
+      },
       null,
       "approved",
     ],
     [
       "tenant cured",
-      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.TENANT_CURED } },
+      {
+        status: DELINQUENCY_STATUS.RESOLVED,
+        resolution: { kind: NOTICE_RESOLUTION_KIND.TENANT_CURED },
+      },
       null,
       "cured",
     ],
     [
       "staff dispute",
-      { status: DELINQUENCY_STATUS.RESOLVED, resolution: { kind: NOTICE_RESOLUTION_KIND.STAFF_DISPUTE } },
+      {
+        status: DELINQUENCY_STATUS.RESOLVED,
+        resolution: { kind: NOTICE_RESOLUTION_KIND.STAFF_DISPUTE },
+      },
       null,
       "refused",
     ],
@@ -109,25 +124,37 @@ describe("toAgencyCaseStatus", () => {
     ],
     [
       "agency withdrew",
-      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.AGENCY_WITHDREW } },
+      {
+        status: DELINQUENCY_STATUS.CANCELED,
+        cancellation: { reason: NOTICE_CANCELLATION_REASON.AGENCY_WITHDREW },
+      },
       null,
       "withdrawn",
     ],
     [
       "duplicate",
-      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.DUPLICATE } },
+      {
+        status: DELINQUENCY_STATUS.CANCELED,
+        cancellation: { reason: NOTICE_CANCELLATION_REASON.DUPLICATE },
+      },
       null,
       "withdrawn",
     ],
     [
       "data error",
-      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.DATA_ERROR } },
+      {
+        status: DELINQUENCY_STATUS.CANCELED,
+        cancellation: { reason: NOTICE_CANCELLATION_REASON.DATA_ERROR },
+      },
       null,
       "withdrawn",
     ],
     [
       "staff dismissed",
-      { status: DELINQUENCY_STATUS.CANCELED, cancellation: { reason: NOTICE_CANCELLATION_REASON.STAFF_DISMISSED } },
+      {
+        status: DELINQUENCY_STATUS.CANCELED,
+        cancellation: { reason: NOTICE_CANCELLATION_REASON.STAFF_DISMISSED },
+      },
       null,
       "refused",
     ],
@@ -140,7 +167,9 @@ describe("toAgencyCaseStatus", () => {
       "approved",
       "cured",
       "expired",
+      "info_requested",
       "paid",
+      "ready_to_claim",
       "refused",
       "reported",
       "under_review",

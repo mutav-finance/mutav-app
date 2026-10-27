@@ -1,5 +1,6 @@
 import type { convexTest, TestConvex } from "convex-test";
 import type schema from "../schema";
+import type { Id } from "../_generated/dataModel";
 import type { AgencyId } from "../agencies/domain";
 import {
   CLOSE_REASON,
@@ -390,4 +391,32 @@ export async function seedCoverNotice(
         : {}),
     }),
   );
+}
+
+/**
+ * Files a claim on a notice without the evidence uploads, for tests about what
+ * staff do after a claim arrives (`staffVerifyDefault` refuses a notice that
+ * carries none). The claim path itself is covered in `delinquencies/claims`.
+ */
+export async function seedSubmittedClaim(
+  t: TestConvex<typeof schema>,
+  { noticePublicId, userId }: { noticePublicId: string; userId: Id<"users"> },
+): Promise<void> {
+  await t.run(async (ctx) => {
+    const notice = await ctx.db
+      .query("guaranteeDelinquencyNotices")
+      .withIndex("by_publicId", (q) => q.eq("publicId", noticePublicId))
+      .unique();
+    if (!notice) throw new Error(`seedSubmittedClaim: no notice '${noticePublicId}'`);
+    await ctx.db.patch(notice._id, {
+      claim: {
+        status: "submitted",
+        claimedAmountCents: notice.originalAmountCents,
+        submittedAt: "2026-06-20T10:00:00.000Z",
+        submittedByUserId: userId,
+        declarationVersion: "test",
+        requests: [],
+      },
+    });
+  });
 }

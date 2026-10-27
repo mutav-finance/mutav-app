@@ -480,17 +480,36 @@ describe("getByPublicId", () => {
     expect(result).toBeNull();
   });
 
-  test("an open notice reads as reported and the agency may still act on it", async () => {
+  test("an open notice inside the grace period reads as reported and the agency may act", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    await insertNotice(t, fx, { publicId: "DN-reported" });
+    const today = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await insertNotice(t, fx, { publicId: "DN-reported", rentDueDate: today });
 
     const result = await t
       .withIdentity({ subject: fx.subject })
       .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-reported" });
     expect(result?.caseStatus).toBe("reported");
     expect(result?.canAct).toBe(true);
+    expect(result?.claim).toBeNull();
     expect(result?.cover).toBeNull();
+  });
+
+  test("an open notice past the grace period reads as ready to claim, listing what is missing", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-ready", rentDueDate: "2026-06-05" });
+
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-ready" });
+    expect(result?.caseStatus).toBe("ready_to_claim");
+    expect(result?.claimableFrom).toBe("2026-06-15");
+    expect(result?.missingRequirements).toEqual([
+      "signedContract",
+      "nonPaymentProof",
+      "tenantNotice",
+    ]);
   });
 
   test("a staff-verified notice reads as under review and locks agency actions", async () => {

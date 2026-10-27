@@ -84,7 +84,9 @@
     },
     "caseStatus": {
       "reported": "Late rent reported",
+      "ready_to_claim": "Ready to claim",
       "under_review": "Under review",
+      "info_requested": "Action needed",
       "approved": "Approved",
       "paid": "Paid",
       "cured": "Settled by tenant",

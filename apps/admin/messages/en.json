@@ -166,6 +166,11 @@
       "open": "Late rent reported",
       "verified": "Under review"
     },
+    "claimStatus": {
+      "none": "Waiting for the agency to file the claim",
+      "submitted": "Claim filed — ready for review",
+      "info_requested": "Waiting on the agency"
+    },
     "guaranteeState": {
       "drafted": "Draft",
       "active": "Active",
@@ -237,7 +242,8 @@
       "COVER_OPERATION_NOT_FOUND": "That cover operation no longer exists.",
       "COVER_ALREADY_EXECUTED": "This payout is already marked as executed.",
       "PAYMENT_REFERENCE_REQUIRED": "Enter the payment reference of the transfer.",
-      "inNotice": "Nothing was recorded. Refused at notice {notice}."
+      "inNotice": "Nothing was recorded. Refused at notice {notice}.",
+      "CLAIM_NOT_SUBMITTED": "The agency has not filed the claim yet, or a request is still waiting on it."
     },
     "payouts": {
       "title": "Payouts awaiting execution",
