@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { StatusTag, type Tone } from "./guarantee-state-tag";
+import { StatusTag, TONE, type Tone } from "./guarantee-state-tag";
+import { StatusBadge } from "./status-badge";
 
 /**
  * The status an agency and Mutav staff both read for one late-rent case.
@@ -54,5 +55,22 @@ export function ClaimStatusTag({
     <StatusTag tone={CLAIM_STATUS_TONE[status]} className={className}>
       {children}
     </StatusTag>
+  );
+}
+
+/** The same status as a tinted pill, for table columns. */
+export function ClaimStatusBadge({
+  status,
+  children,
+  className,
+}: {
+  status: ClaimStatusName;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <StatusBadge tone={TONE[CLAIM_STATUS_TONE[status]]} className={className}>
+      {children}
+    </StatusBadge>
   );
 }

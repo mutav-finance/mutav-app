@@ -12,7 +12,7 @@ import { Checkbox } from "@mutav/ui/checkbox";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
-import { ClaimStatusTag } from "@mutav/ui/claim-status-tag";
+import { ClaimStatusBadge } from "@mutav/ui/claim-status-tag";
 import { GuaranteeStateTag } from "@mutav/ui/guarantee-state-tag";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
@@ -137,9 +137,9 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
       <TableCell>
         <div className="flex flex-col gap-1">
           <Mono>{row.publicId}</Mono>
-          <ClaimStatusTag status={isVerified ? "under_review" : "reported"}>
+          <ClaimStatusBadge status={isVerified ? "under_review" : "reported"}>
             {t(`noticeStatus.${row.status}`)}
-          </ClaimStatusTag>
+          </ClaimStatusBadge>
           {row.status === "open" ? (
             <span className="text-muted-foreground text-xs">
               {t(`claimStatus.${row.claimStatus ?? "none"}`)}
