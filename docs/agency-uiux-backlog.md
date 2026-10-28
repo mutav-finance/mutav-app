@@ -11,7 +11,7 @@ Complexity was sized the same day by reading the code on `fix/agency-ui-polish` 
 | **G**  | 3 to 7 days; schema change, new backend flow, permissions, or several screens             |
 | **GG** | > 1 week, or depends on an external service, or blocked by an open product/legal decision |
 
-Summary: 5 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2 and 7.1 were dropped after review; 6.1 is on hold.
+Summary: 4 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2, 7.1 and 7.3 were dropped after review; 6.1 is on hold.
 
 ## 1. Dashboard (Painel)
 
@@ -77,12 +77,10 @@ Suggested order: 5.3, then 5.2 and 5.4. 5.1 is independent.
 
 - **7.2 [M] Empty states that teach** (steps + CTA). No shared `EmptyState` component; about 5 screens (Garantias, Faturas, Inadimplências, Comissão, empty dashboard) plus detail cards.
   `guarantee-list-table.tsx:386-398`, `invoice-list-table.tsx:359`, `delinquency-page.tsx:305`, `commission-page.tsx:182`
-- **7.3 [P] Consistent tab titles.** Tab titles mix "— MUTAV", "| Mutav" and none; use `title.template` in the root layout.
-  `app/[locale]/layout.tsx:20-28`
 
 ## Proposed plan
 
-1. **Quick wins (about 1 week):** 2.1, 1.2, 2.3, 7.3, 4.1, and the 5.3 copy rename. 6.1 waits for a later round.
+1. **Quick wins (about 1 week):** 2.1, 1.2, 2.3, 4.1, and the 5.3 copy rename. 6.1 waits for a later round.
 2. **Dashboard and guarantees (1 to 2 weeks):** 1.1 (with the 3.1 stopgap on the button), 1.3, 2.2, 2.5, 7.2, 5.1. Needs decisions first: delinquency metric, "attention today" items, actions per status.
 3. **Team and agency profile (2 to 3 weeks):** 5.3, then 5.2 and 5.4.
 4. **Blocked on third parties (start the conversations now):** 3.1 (PSP), 6.2 (SMS), 6.3 (KYC vendor), 6.4 (counsel), 2.4 (LGPD), 2.6 (underwriting).
@@ -93,7 +91,7 @@ Suggested order: 5.3, then 5.2 and 5.4. 5.1 is independent.
 - Keep the "EM BREVE" menu items; the path is to build the pages (5.2, 5.4).
 - Delinquency guide: dropped (a product Mutav does not offer).
 - CredAluga-style "quick actions": optional, probably not needed.
-- Dropped: simplifying the "Carteira vigente" chart (was 1.4), unifying seed invoice IDs (was 3.2), Transparência scope/jargon copy (was 7.1), and the "Outubro De" / Inadimplências heading copy fixes (were part of 7.3).
+- Dropped: simplifying the "Carteira vigente" chart (was 1.4), unifying seed invoice IDs (was 3.2), Transparência scope/jargon copy (was 7.1), and all of 7.3 (tab titles stay as on main; "Outubro De" and heading copy fixes).
 
 ## Keep
 

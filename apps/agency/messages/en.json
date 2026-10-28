@@ -36,7 +36,7 @@
   },
   "commission": {
     "meta": {
-      "title": "Commission",
+      "title": "Commission — MUTAV",
       "description": "Track your agency's monthly commission balance and active guarantee history."
     },
     "heading": "Commission",
@@ -697,7 +697,7 @@
   },
   "guaranteeList": {
     "meta": {
-      "title": "Guarantees",
+      "title": "Guarantees | Mutav",
       "description": "Real estate agency guarantees list"
     },
     "heading": "Guarantees",
@@ -759,7 +759,7 @@
   },
   "invoiceList": {
     "meta": {
-      "title": "Invoices",
+      "title": "Invoices | Mutav",
       "description": "Monthly invoices for the agency"
     },
     "heading": "Invoices",
@@ -806,7 +806,7 @@
     },
     "picker": {
       "meta": {
-        "title": "Pay invoice {publicId}",
+        "title": "Pay invoice {publicId} | Mutav",
         "description": "Choose how to pay your Mutav invoice."
       },
       "heading": "How do you want to pay?",
@@ -828,13 +828,13 @@
     },
     "stellar": {
       "meta": {
-        "title": "Pay with Stellar — {publicId}",
+        "title": "Pay with Stellar — {publicId} | Mutav",
         "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
       }
     },
     "anchortest": {
       "meta": {
-        "title": "AnchorTest — {publicId}",
+        "title": "AnchorTest — {publicId} | Mutav",
         "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
       },
       "orderId": "Order",
@@ -875,7 +875,7 @@
     },
     "pix": {
       "meta": {
-        "title": "Pay with PIX — {publicId}",
+        "title": "Pay with PIX — {publicId} | Mutav",
         "description": "Pay your Mutav invoice via PIX."
       },
       "copyCode": "PIX copy & paste",
@@ -922,7 +922,7 @@
     },
     "pago": {
       "meta": {
-        "title": "Paid — {publicId}",
+        "title": "Paid — {publicId} | Mutav",
         "description": "Mutav payment receipt."
       },
       "badge": {
@@ -946,7 +946,7 @@
   },
   "invoiceDetails": {
     "meta": {
-      "title": "Invoice {id}",
+      "title": "Invoice {id} | Mutav",
       "description": "Invoice details"
     },
     "breadcrumb": "Invoice Details",
@@ -1031,7 +1031,7 @@
   },
   "guaranteeNew": {
     "meta": {
-      "title": "New Guarantee"
+      "title": "New Guarantee | Mutav"
     },
     "heading": "New Guarantee",
     "subheading": "Fill in the details to create a new guarantee",
