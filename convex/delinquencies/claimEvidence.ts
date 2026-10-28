@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
 import type { Result } from "../lib/result";
 import { assertActiveAgencyAccess, assertAgencyAccess, queryWithMutavRole } from "../lib/auth";
 import type { UserId } from "../users/domain";
@@ -13,6 +12,7 @@ import {
   CLAIM_STATUS,
   DELINQUENCY_STATUS,
   claimEvidenceKindValidator,
+  type ClaimEvidenceId,
   type ClaimEvidenceKind,
   type ClaimEvidenceStatus,
   type DelinquencyNotice,
@@ -31,7 +31,7 @@ export type ClaimEvidenceErrorCode =
   | UploadedFileCheckError["code"];
 
 export type ClaimEvidenceRow = {
-  id: Id<"claimEvidence">;
+  id: ClaimEvidenceId;
   kind: ClaimEvidenceKind;
   status: ClaimEvidenceStatus;
   fileName: string;
@@ -42,7 +42,7 @@ export type ClaimEvidenceRow = {
 };
 
 function shapeClaimEvidenceRow(row: {
-  _id: Id<"claimEvidence">;
+  _id: ClaimEvidenceId;
   kind: ClaimEvidenceKind;
   status: ClaimEvidenceStatus;
   fileName: string;
@@ -153,7 +153,7 @@ export const attachClaimEvidence = mutation({
   handler: async (
     ctx,
     args,
-  ): Promise<Result<{ evidenceId: Id<"claimEvidence"> }, { code: ClaimEvidenceErrorCode }>> => {
+  ): Promise<Result<{ evidenceId: ClaimEvidenceId }, { code: ClaimEvidenceErrorCode }>> => {
     const notice = await loadNotice(ctx, args.noticePublicId);
     if (!notice) {
       return { success: false, error: { code: "NOTICE_NOT_FOUND" }, message: "Notice not found" };
