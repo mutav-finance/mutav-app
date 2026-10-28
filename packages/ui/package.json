@@ -18,7 +18,6 @@
     "./cn": "./src/cn.ts",
     "./collapsible": "./src/collapsible.tsx",
     "./currency-input": "./src/currency-input.tsx",
-    "./drawer": "./src/drawer.tsx",
     "./dropdown-menu": "./src/dropdown-menu.tsx",
     "./edit-field": "./src/edit-field.tsx",
     "./eyebrow": "./src/eyebrow.tsx",
@@ -61,7 +60,8 @@
     "./transparency/reserve-panel": "./src/transparency/reserve-panel.tsx",
     "./transparency/types": "./src/transparency/types.ts",
     "./use-mobile": "./src/use-mobile.ts",
-    "./wordmark": "./src/wordmark.tsx"
+    "./wordmark": "./src/wordmark.tsx",
+    "./styles/shadcn-tailwind.css": "./src/styles/shadcn-tailwind.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -76,8 +76,7 @@
     "radix-ui": "^1.4.3",
     "recharts": "3.8.0",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.5.0",
-    "vaul": "^1.1.2"
+    "tailwind-merge": "^3.5.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",
