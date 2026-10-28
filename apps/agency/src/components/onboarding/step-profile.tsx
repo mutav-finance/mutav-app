@@ -4,6 +4,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
@@ -276,7 +277,10 @@ export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmit
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <Button variant="outline" asChild>
+          <Link href="/onboarding">{t("backButton")}</Link>
+        </Button>
         <Button type="submit" size="lg" disabled={isSubmitting}>
           {isSubmitting ? t("savingButton") : t("nextButton")}
         </Button>

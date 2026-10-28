@@ -34,6 +34,7 @@
   --color-error: var(--error);
   --color-warning: var(--warning);
   --color-warning-strong: var(--warning-strong);
+  --color-escalated: var(--escalated);
   --color-warning-dim: var(--warning-dim);
 
   /* shadcn aliases mapped to MUTAV tokens — primitives keep working */
@@ -154,12 +155,16 @@
      orange-600 pair measured OKLab ΔE 1.6 under simulated deuteranopia and 6.7
      under normal color vision, against floors of 6 and 15 — a colorblind
      reader could not tell "in arrears" from "default verified", and a
-     full-color reader barely could. Re-stepped to amber-800 / orange-500,
-     which is the widest gap these ramps allow while --error keeps the red end.
+     full-color reader barely could. Re-stepped to amber-800 / the brand's
+     terminal orange (#d4781a), keeping --error at the red end.
      Re-measured by apps/agency/src/components/guarantees/state-tag.test.ts. */
   --warning: #92400e;
-  --warning-strong: #f97316;
+  --warning-strong: #d4781a;
   --warning-dim: #fff4e0;
+  /* escalated = ink "funds committed" (cover_committed). Not another orange
+     step: the orange-to-red gap has no room for a swatch a colorblind reader
+     can separate from both, and the brand allows no hue outside amber. */
+  --escalated: #1a1a1a;
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1a1a1a;
   --color-primary-foreground: #1a1a1a;
@@ -185,10 +190,11 @@
   --success: #3dab72;
   --error: #c94040;
   /* Measured against the dark surface in its own right, not flipped from the
-     light steps: amber-400 / orange-500. */
+     light steps: amber-400 / brand orange; ink flips to warm white. */
   --warning: #fbbf24;
-  --warning-strong: #f97316;
+  --warning-strong: #d4781a;
   --warning-dim: #4a2c0a;
+  --escalated: #f0f0ee;
   /* Restore canvas-on-accent for dark mode */
   --color-accent-foreground: var(--canvas);
   --color-primary-foreground: var(--canvas);

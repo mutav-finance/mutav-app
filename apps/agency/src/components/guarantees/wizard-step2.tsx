@@ -193,36 +193,23 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
             <p className="text-muted-foreground text-sm">{t("simulation.noApplicationMessage")}</p>
           </div>
         ) : (
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-3xl font-bold">{score}</span>
-                {scoreTier && (
-                  <span
-                    className={cn(
-                      "rounded-full px-3 py-1 text-sm font-medium",
-                      TIER_STYLE[scoreTier],
-                    )}
-                  >
-                    {tierLabel[scoreTier]}
-                  </span>
-                )}
-              </div>
-              <p className="text-muted-foreground text-sm">
-                {isNegado ? t("simulation.deniedMessage") : t("simulation.approvedMessage")}
-              </p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-3xl font-bold">{score}</span>
+              {scoreTier && (
+                <span
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm font-medium",
+                    TIER_STYLE[scoreTier],
+                  )}
+                >
+                  {tierLabel[scoreTier]}
+                </span>
+              )}
             </div>
-
-            {!isNegado && data.rentCents > 0 && (
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <span className="text-muted-foreground text-xs">
-                  {t("simulation.approvedValueLabel")}
-                </span>
-                <span className="font-mono text-2xl font-bold">
-                  {formatBRLCents(data.rentCents)}
-                </span>
-              </div>
-            )}
+            <p className="text-muted-foreground text-sm">
+              {isNegado ? t("simulation.deniedMessage") : t("simulation.approvedMessage")}
+            </p>
           </div>
         )}
       </section>
@@ -259,12 +246,18 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
           <h2 className="text-base font-semibold">{t("coverage.summary.heading")}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <SummaryRow
-              label={t("coverage.summary.exitCost")}
-              value={preview ? formatBRLCents(preview.exitCostCapCents) : null}
+              label={t("coverage.summary.coverageCeiling")}
+              value={
+                preview
+                  ? t("coverage.summary.coverageCeilingValue", {
+                      count: preview.coverageCeilingMultiplier,
+                    })
+                  : null
+              }
             />
             <SummaryRow
-              label={t("coverage.summary.fee")}
-              value={preview ? formatBRLCents(preview.feeCents) : null}
+              label={t("coverage.summary.exitCost")}
+              value={preview ? formatBRLCents(preview.exitCostCapCents) : null}
             />
             <SummaryRow
               label={t("coverage.summary.commission")}

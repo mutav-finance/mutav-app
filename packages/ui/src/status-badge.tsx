@@ -4,7 +4,7 @@ import type { StatusTagTone } from "./status-tag";
 
 /**
  * The tinted pill twin of `StatusTag`, for table cells where a status has to
- * be found at a glance down a column. Same five tones and dot colors, so a
+ * be found at a glance down a column. Same tones and dot colors, so a
  * state reads as one color on every surface. The label stays foreground-dark
  * on a light tint: orange text on white fails contrast, an orange dot on an
  * orange-tinted pill does not.
@@ -14,6 +14,7 @@ const badgeToneClass: Record<StatusTagTone, string> = {
   positive: "bg-success/10 border-success/30",
   warning: "bg-warning/10 border-warning/30",
   "warning-strong": "bg-warning-strong/15 border-warning-strong/40",
+  escalated: "bg-escalated/10 border-escalated/30",
   critical: "bg-error/10 border-error/30",
 };
 
@@ -22,6 +23,7 @@ const dotToneClass: Record<StatusTagTone, string> = {
   positive: "bg-success",
   warning: "bg-warning",
   "warning-strong": "bg-warning-strong",
+  escalated: "bg-escalated",
   critical: "bg-error",
 };
 

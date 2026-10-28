@@ -16,6 +16,7 @@ export const STATE_TONE_TOKEN: Record<StatusTagTone, string> = {
   positive: "--success",
   warning: "--warning",
   "warning-strong": "--warning-strong",
+  escalated: "--escalated",
   critical: "--error",
 };
 
@@ -30,14 +31,16 @@ export const STATE_TONE_HEX: Record<ColorScheme, Record<StatusTagTone, string>> 
     neutral: "#9e9c98",
     positive: "#2e8b5a",
     warning: "#92400e",
-    "warning-strong": "#f97316",
+    "warning-strong": "#d4781a",
+    escalated: "#1a1a1a",
     critical: "#b83232",
   },
   dark: {
     neutral: "#555b66",
     positive: "#3dab72",
     warning: "#fbbf24",
-    "warning-strong": "#f97316",
+    "warning-strong": "#d4781a",
+    escalated: "#f0f0ee",
     critical: "#c94040",
   },
 };
@@ -52,5 +55,6 @@ export const STATE_TONE_SEVERITY_ORDER: readonly StatusTagTone[] = [
   "positive",
   "warning",
   "warning-strong",
+  "escalated",
   "critical",
 ];
