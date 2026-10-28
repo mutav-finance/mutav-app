@@ -15,6 +15,7 @@ import {
   agencyCanAct,
   claimExpiryReason,
   caseGroupOf,
+  coverRequestCents,
   signedContractState,
   toAgencyCaseStatus,
 } from "./domain";
@@ -320,5 +321,23 @@ describe("claimExpiryReason", () => {
     ],
   ] as const)("%s", (_label, notice, today, expected) => {
     expect(claimExpiryReason({ notice, rules, today })).toBe(expected);
+  });
+});
+
+describe("coverRequestCents", () => {
+  test("draws the claimed amount when the agency claimed less than is owed", () => {
+    expect(
+      coverRequestCents({ updatedAmountCents: 428_400, claim: { claimedAmountCents: 200_000 } }),
+    ).toBe(200_000);
+  });
+
+  test("never draws more than the notice says is owed", () => {
+    expect(
+      coverRequestCents({ updatedAmountCents: 300_000, claim: { claimedAmountCents: 420_000 } }),
+    ).toBe(300_000);
+  });
+
+  test("a notice without a claim draws its updated amount", () => {
+    expect(coverRequestCents({ updatedAmountCents: 428_400 })).toBe(428_400);
   });
 });
