@@ -1,6 +1,6 @@
 # Sources (annotated bibliography)
 
-The keys **[Sn]** are the ones cited in `SKILL.md`. The repo is on `@auth0/nextjs-auth0` 4.20.0 and Next.js 16. Sources were retrieved on 2026-10-28. When a source and the installed SDK source disagree, the installed source wins: read `node_modules/@auth0/nextjs-auth0/dist/`.
+The keys **[Sn]** are the ones cited in `SKILL.md`. The repo is on `@auth0/nextjs-auth0` 4.33.0 and Next.js 16. Sources were retrieved on 2026-10-28. When a source and the installed SDK source disagree, the installed source wins: read `node_modules/@auth0/nextjs-auth0/dist/`.
 
 ## Auth0 Next.js SDK
 
@@ -16,7 +16,7 @@ The keys **[Sn]** are the ones cited in `SKILL.md`. The repo is on `@auth0/nextj
   - The `onCallback` example builds `new URL(context.returnTo || "/", appBaseUrl)`. That is the unsafe pattern called out in rule 9.
 - **[S2] Official with-next-intl example**, `examples/with-next-intl/middleware.ts`. https://github.com/auth0/nextjs-auth0/tree/main/examples/with-next-intl
   Runs Auth0 first and returns `/auth*` untouched. It *appends* Auth0 headers onto the intl response (preserving multiple `set-cookie`), and skips `x-middleware-next` when the intl response is a redirect (status 300 or above). This grounds the proxy composition and rule 3.
-- **[S3] SDK source, installed 4.20.0**:
+- **[S3] SDK source, installed 4.33.0**:
   - `dist/server/auth-client.js`: the rolling branch sets cookies and calls `addCacheControlHeadersForSession`. `handleLogout` reads `returnTo` and `federated` from the query.
   - `dist/server/cookies.js` `addCacheControlHeadersForSession`: `Cache-Control: private, no-cache, no-store, must-revalidate, max-age=0`, `Pragma: no-cache`, `Expires: 0`.
   - `dist/utils/url-helpers.js` `toSafeRedirect`: a same-origin check only, which then stores pathname+search+hash.
@@ -55,7 +55,7 @@ The keys **[Sn]** are the ones cited in `SKILL.md`. The repo is on `@auth0/nextj
 - **[S14] Auth0 subdomain wildcards.** https://auth0.com/docs/get-started/applications/wildcards-for-subdomains
   "Wildcard placeholders in subdomains should not be used in production applications". Callback URLs, origins and web origins use exact URLs.
 - **[S17] Auth0 refresh token rotation.** https://auth0.com/docs/secure/tokens/refresh-tokens/refresh-token-rotation
-  Rotation plus reuse detection invalidates the whole token family. It applies only if the SDK requests `offline_access` (it doesn't today; see ADR 0009).
+  Rotation plus reuse detection invalidates the whole token family. The SDK requests `offline_access` by default (`DEFAULT_SCOPES` in `dist/utils/constants.js`: `openid profile email offline_access`), and the apps use the refresh token to renew the ID token, so this applies. A reuse interval (overlap) is needed because the proxy and the convex-token route can refresh concurrently. Tenant settings: `docs/auth0.md`.
 - **[S18] Auth0 multiple environments.** https://auth0.com/docs/get-started/auth0-overview/create-tenants/set-up-multiple-environments
   One tenant per environment. A mixed-use tenant should be tagged Production. Custom domains are recommended for prod. This is the basis for #119 and the reason the dev-persona password is acceptable only on the dev tenant.
 
