@@ -21,6 +21,12 @@ export type { DelinquencyStatus, TransitionError, TransitionSuccess } from "./ma
 
 import { DELINQUENCY_STATUS, type DelinquencyStatus } from "./machine";
 import { COVER_OPERATION_STATUS, type CoverOperation } from "../coverOperations/domain";
+import {
+  DOCUMENT_KEY,
+  GUARANTEE_DOCUMENT_STATUS,
+  isSignedContractApproved,
+  type GuaranteeDocument,
+} from "../guarantees/domain";
 
 /**
  * A cover draw is only legal against a default compliance has actually
@@ -375,6 +381,40 @@ export function missingClaimRequirements({
   return signedContractApproved ? missing : ["signedContract", ...missing];
 }
 
+export const SIGNED_CONTRACT_STATE = {
+  NOT_UPLOADED: "not_uploaded",
+  IN_REVIEW: "in_review",
+  REJECTED: "rejected",
+  APPROVED: "approved",
+} as const;
+export type SignedContractState =
+  (typeof SIGNED_CONTRACT_STATE)[keyof typeof SIGNED_CONTRACT_STATE];
+
+/**
+ * Where the guarantee's signed rental contract stands, so the claim screen can
+ * say what to do about the precondition. Approval follows
+ * `isSignedContractApproved` (one approved file is enough); otherwise the
+ * newest live upload decides between in review and rejected.
+ */
+export function signedContractState(
+  documents: readonly Pick<GuaranteeDocument, "key" | "status" | "uploadedAt">[],
+): SignedContractState {
+  if (isSignedContractApproved(documents)) return SIGNED_CONTRACT_STATE.APPROVED;
+  const newest = documents
+    .filter(
+      (document) =>
+        document.key === DOCUMENT_KEY.RENTAL_CONTRACT &&
+        document.status !== GUARANTEE_DOCUMENT_STATUS.SUPERSEDED,
+    )
+    .reduce<
+      (typeof documents)[number] | null
+    >((latest, document) => (latest === null || Date.parse(document.uploadedAt) > Date.parse(latest.uploadedAt) ? document : latest), null);
+  if (newest === null) return SIGNED_CONTRACT_STATE.NOT_UPLOADED;
+  return newest.status === GUARANTEE_DOCUMENT_STATUS.REJECTED
+    ? SIGNED_CONTRACT_STATE.REJECTED
+    : SIGNED_CONTRACT_STATE.IN_REVIEW;
+}
+
 // ---- the agency's claims queue ---------------------------------------------
 
 /**
@@ -394,6 +434,11 @@ export const caseGroupValidator = v.union(
   v.literal(CASE_GROUP.WITH_MUTAV),
   v.literal(CASE_GROUP.CLOSED),
 );
+
+/** The claims queue's filters: one group, or every case at once. */
+export const CASE_FILTER_ALL = "all";
+export type CaseFilter = CaseGroup | typeof CASE_FILTER_ALL;
+export const caseFilterValidator = v.union(caseGroupValidator, v.literal(CASE_FILTER_ALL));
 
 const CASE_GROUP_BY_STATUS: Record<AgencyCaseStatus, CaseGroup> = {
   reported: CASE_GROUP.NEEDS_YOU,

@@ -7,14 +7,20 @@ import { PlusIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
-import { CASE_GROUP, brazilToday, type CaseGroup } from "@convex/delinquencies/domain";
+import {
+  CASE_FILTER_ALL,
+  CASE_GROUP,
+  brazilToday,
+  type CaseFilter,
+  type CaseGroup,
+} from "@convex/delinquencies/domain";
 import { Badge } from "@mutav/ui/badge";
 import { Button } from "@mutav/ui/button";
 import { ClaimStatusBadge } from "@mutav/ui/claim-status-tag";
 import { Mono } from "@mutav/ui/mono";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@mutav/ui/tabs";
-import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
+import { formatBRLCents, formatDateBR, formatMonthYear } from "@mutav/i18n/brazil";
 import { usePathname, useRouter } from "@mutav/i18n/navigation";
 import { useWorkspace } from "@/providers/workspace";
 import { ClaimCaseSheet } from "@/components/claims/claim-case-sheet";
@@ -29,14 +35,16 @@ const GROUPS: readonly CaseGroup[] = [
   CASE_GROUP.WITH_MUTAV,
   CASE_GROUP.CLOSED,
 ];
+const FILTERS: readonly CaseFilter[] = [...GROUPS, CASE_FILTER_ALL];
 
-function isCaseGroup(value: string): value is CaseGroup {
-  return GROUPS.some((group) => group === value);
+function isCaseFilter(value: string): value is CaseFilter {
+  return FILTERS.some((filter) => filter === value);
 }
 
 /**
  * The claims queue: every late-rent case, grouped by who has to act. The
- * default tab is the work only the agency can move. A row opens the case
+ * default tab is the work only the agency can move; the last tab lists every
+ * case. A row opens the case
  * panel in a sheet (`?case=`); "Informar atraso" opens the report sheet.
  */
 export function ClaimsQueue() {
@@ -45,7 +53,7 @@ export function ClaimsQueue() {
   const locale = useLocale();
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
-  const [group, setGroup] = React.useState<CaseGroup>(CASE_GROUP.NEEDS_YOU);
+  const [group, setGroup] = React.useState<CaseFilter>(CASE_GROUP.NEEDS_YOU);
   const [today] = React.useState(() => brazilToday(Date.now()));
 
   const router = useRouter();
@@ -66,11 +74,6 @@ export function ClaimsQueue() {
     router.replace(query ? `${pathname}?${query}` : pathname);
   }
 
-  const monthOf = (isoDate: string) =>
-    new Intl.DateTimeFormat(locale, { month: "short", year: "2-digit", timeZone: "UTC" }).format(
-      new Date(`${isoDate.slice(0, 7)}-01T00:00:00Z`),
-    );
-
   const nextStepText = (step: NextStep) => {
     switch (step.key) {
       case "waitUntil":
@@ -85,16 +88,22 @@ export function ClaimsQueue() {
   };
 
   const rows = result?.rows ?? [];
+  const countOf = (filter: CaseFilter) => {
+    if (!result) return 0;
+    return filter === CASE_FILTER_ALL
+      ? GROUPS.reduce((sum, option) => sum + result.counts[option], 0)
+      : result.counts[filter];
+  };
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
 
   return (
     <div className="flex flex-col gap-4 px-4 py-4 lg:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={group} onValueChange={(value) => isCaseGroup(value) && setGroup(value)}>
+        <Tabs value={group} onValueChange={(value) => isCaseFilter(value) && setGroup(value)}>
           <TabsList>
-            {GROUPS.map((option) => (
+            {FILTERS.map((option) => (
               <TabsTrigger key={option} value={option}>
-                {t(`tabs.${option}`)} <Badge variant="count">{result?.counts[option] ?? 0}</Badge>
+                {t(`tabs.${option}`)} <Badge variant="count">{countOf(option)}</Badge>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -150,7 +159,12 @@ export function ClaimsQueue() {
                         </span>
                       </button>
                     </TableCell>
-                    <TableCell className="text-sm capitalize">{monthOf(row.rentDueDate)}</TableCell>
+                    <TableCell className="text-sm">
+                      {formatMonthYear(row.rentDueDate, locale, {
+                        month: "short",
+                        capitalize: true,
+                      })}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Mono className="text-sm">{formatBRLCents(row.originalAmountCents)}</Mono>
                     </TableCell>
