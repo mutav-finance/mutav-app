@@ -68,7 +68,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (currentUserRow !== null || provisionAttempted.current) return;
     provisionAttempted.current = true;
-    void provisionMe({}).catch(() => {});
+    void provisionMe({}).catch((error: unknown) => {
+      console.warn("[workspace] provisioning fallback failed", {
+        name: error instanceof Error ? error.name : "unknown",
+      });
+    });
   }, [currentUserRow, provisionMe]);
 
   const agencies = React.useMemo(() => agenciesRaw ?? [], [agenciesRaw]);

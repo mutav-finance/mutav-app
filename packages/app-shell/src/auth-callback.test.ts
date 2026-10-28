@@ -41,12 +41,15 @@ function session(idToken: string | undefined): SessionData {
   };
 }
 
-function fakeConvex({ mutationError }: { mutationError?: Error } = {}) {
+function fakeConvex({
+  mutationError,
+  mutationResult = null,
+}: { mutationError?: Error; mutationResult?: unknown } = {}) {
   const client = {
     setAuth: vi.fn(),
     mutation: vi.fn(async () => {
       if (mutationError) throw mutationError;
-      return null;
+      return mutationResult;
     }),
   };
   const createConvexClient = vi.fn(() => client);
@@ -66,13 +69,16 @@ function hook({
 }
 
 let consoleError: MockInstance<typeof console.error>;
+let consoleWarn: MockInstance<typeof console.warn>;
 
 beforeEach(() => {
   consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 
 afterEach(() => {
   consoleError.mockRestore();
+  consoleWarn.mockRestore();
 });
 
 function loggedText(): string {
@@ -133,6 +139,48 @@ describe("createOnCallback", () => {
       expect(res.headers.get("location")).toBe(`${BASE}/en/claims`);
       expect(consoleError).toHaveBeenCalledWith(expect.any(String), { name: "ConvexError" });
       expect(loggedText()).not.toContain("secret");
+    });
+
+    test("fails open on a refusal and logs only its code", async () => {
+      const convex = fakeConvex({
+        mutationResult: {
+          success: false,
+          error: { code: "EMAIL_NOT_VERIFIED" },
+          message: SECRET_MESSAGE,
+        },
+      });
+      const res = await hook({ convex })(null, { returnTo: "/en/claims" }, session(ID_TOKEN));
+      expect(res.headers.get("location")).toBe(`${BASE}/en/claims`);
+      expect(consoleWarn).toHaveBeenCalledWith(expect.any(String), { code: "EMAIL_NOT_VERIFIED" });
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain("secret");
+    });
+
+    test("logs nothing on a successful provisioning", async () => {
+      const convex = fakeConvex({
+        mutationResult: { success: true, data: { created: false }, message: "ok" },
+      });
+      await hook({ convex })(null, {}, session(ID_TOKEN));
+      expect(consoleWarn).not.toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    test("a mutation throw also logs the cause's code when it has one", async () => {
+      const cause = Object.assign(new Error(SECRET_CAUSE), { code: "ECONNRESET" });
+      const failure = new TypeError(SECRET_MESSAGE, { cause });
+      const convex = fakeConvex({ mutationError: failure });
+      await hook({ convex })(null, {}, session(ID_TOKEN));
+      expect(consoleError).toHaveBeenCalledWith(expect.any(String), {
+        name: "TypeError",
+        causeCode: "ECONNRESET",
+      });
+      expect(loggedText()).not.toContain("secret");
+    });
+
+    test("logs when provisioning is skipped for a missing Convex URL", async () => {
+      await hook({ convexUrl: null })(null, {}, session(ID_TOKEN));
+      expect(consoleWarn).toHaveBeenCalledWith(
+        "[auth0.onCallback] provisioning skipped: no Convex URL",
+      );
     });
 
     test.each([

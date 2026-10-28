@@ -31,6 +31,12 @@ export function createConvexTokenRoute({
     if (result.kind === "token") {
       return NextResponse.json({ token: result.token }, { headers: NO_STORE_HEADERS });
     }
+    if (result.kind !== "none") {
+      console.warn("[convex-token] no token:", {
+        kind: result.kind,
+        code: result.kind === "refresh-failed" ? result.code : null,
+      });
+    }
     return NextResponse.json(
       { error: result.kind },
       { status: UNAUTHORIZED, headers: NO_STORE_HEADERS },

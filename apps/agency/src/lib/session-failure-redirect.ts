@@ -10,7 +10,9 @@ import type { UserDestination } from "@/lib/user-destination";
  *   caller's own path in the shape next-intl builds it (`as-needed`: no
  *   prefix for pt-BR). The SDK routes sit at the root, outside `[locale]`,
  *   so this is `next/navigation`'s redirect.
- * - `not-provisioned` / `backend-unavailable` → `/session-error`, which sits
+ * - `not-provisioned` / `backend-unavailable` → `/session-error`, with a
+ *   provisioning refusal's own reason (`email-not-verified`, `email-bound`)
+ *   when there is one, so the page can say what to do. It sits
  *   outside every gated group, never resolves a destination, and never
  *   redirects. Sending these to login would loop through Auth0 via SSO.
  *
@@ -30,7 +32,10 @@ export function redirectOnSessionFailure({
     const returnTo = getPathname({ href: returnHref, locale });
     nextRedirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
-  if (destination.kind === "not-provisioned" || destination.kind === "backend-unavailable") {
+  if (destination.kind === "not-provisioned") {
+    redirect({ href: `/session-error?reason=${destination.reason ?? destination.kind}`, locale });
+  }
+  if (destination.kind === "backend-unavailable") {
     redirect({ href: `/session-error?reason=${destination.kind}`, locale });
   }
 }

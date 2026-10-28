@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../_generated/api";
 import schema from "../schema";
 
@@ -66,6 +66,57 @@ describe("getOrCreateByIdentity", () => {
     expect(user?.email).toBe("alice@test.br");
     expect(user?.name).toBe("Alice");
     expect(user?.publicId).toMatch(/^user-[0-9a-f]{16}$/);
+    expect(user?.emailVerified).toBe(true);
+  });
+
+  test.each([
+    { label: "false", emailVerified: false },
+    { label: "absent", emailVerified: undefined },
+  ])(
+    "records emailVerified false on an insert when the claim is $label",
+    async ({ emailVerified }) => {
+      const t = convexTest(schema);
+      const asAlice = t.withIdentity({
+        subject: "auth0|alice",
+        email: "alice@test.br",
+        emailVerified,
+      });
+
+      const result = await asAlice.mutation(api.users.useCases.getOrCreateByIdentity, {});
+      if (!result.success) throw new Error(`expected success, got ${result.error.code}`);
+
+      const user = await t.run((ctx) => ctx.db.get(result.data.userId));
+      expect(user?.emailVerified).toBe(false);
+    },
+  );
+
+  test("upgrades emailVerified when an existing subject logs in with a now-verified email", async () => {
+    const t = convexTest(schema);
+    const userId = await t.run((ctx) =>
+      ctx.db.insert("users", {
+        publicId: "alice",
+        subject: "auth0|alice",
+        name: "Alice",
+        email: "alice@test.br",
+        emailVerified: false,
+        createdAt: new Date().toISOString(),
+      }),
+    );
+    const asAlice = t.withIdentity({
+      subject: "auth0|alice",
+      email: "alice@test.br",
+      emailVerified: true,
+    });
+
+    const result = await asAlice.mutation(api.users.useCases.getOrCreateByIdentity, {});
+
+    expect(result).toEqual({
+      success: true,
+      data: { userId, created: false, linked: false },
+      message: "User already provisioned",
+    });
+    const user = await t.run((ctx) => ctx.db.get(userId));
+    expect(user?.emailVerified).toBe(true);
   });
 
   test("is idempotent — same subject returns the same row without creating", async () => {
@@ -119,6 +170,7 @@ describe("getOrCreateByIdentity", () => {
 
     const linked = await t.run((ctx) => ctx.db.get(legacyId));
     expect(linked?.subject).toBe("auth0|alice");
+    expect(linked?.emailVerified).toBe(true);
     // Preserves the legacy display name + publicId — only `subject` is patched.
     expect(linked?.name).toBe("Alice Legacy");
     expect(linked?.publicId).toBe("legacy-alice");
@@ -161,7 +213,7 @@ describe("getOrCreateByIdentity", () => {
     },
   );
 
-  test("refuses a different subject whose email is already bound — no duplicate row", async () => {
+  test("refuses a verified challenger against a verified owner — no duplicate row", async () => {
     const t = convexTest(schema);
     await t.run((ctx) =>
       ctx.db.insert("users", {
@@ -169,6 +221,7 @@ describe("getOrCreateByIdentity", () => {
         subject: "auth0|alice",
         name: "Alice",
         email: "alice@test.br",
+        emailVerified: true,
         createdAt: new Date().toISOString(),
       }),
     );
@@ -190,6 +243,80 @@ describe("getOrCreateByIdentity", () => {
     const all = await t.run((ctx) => ctx.db.query("users").collect());
     expect(all).toHaveLength(1);
     expect(all[0]?.subject).toBe("auth0|alice");
+  });
+
+  describe("a row bound by an unverified identity", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    async function seedSquatter({ emailVerified }: { emailVerified?: boolean }) {
+      const t = convexTest(schema);
+      const squatterId = await t.run((ctx) =>
+        ctx.db.insert("users", {
+          publicId: "squatter",
+          subject: "auth0|squatter",
+          name: "Squatter",
+          email: "alice@test.br",
+          ...(emailVerified === undefined ? {} : { emailVerified }),
+          createdAt: new Date().toISOString(),
+        }),
+      );
+      return { t, squatterId };
+    }
+
+    test.each([
+      { label: "false", emailVerified: false },
+      { label: "absent", emailVerified: undefined },
+    ])(
+      "is taken over by a verified identity (row flag $label) and the takeover is logged by code",
+      async ({ emailVerified }) => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const { t, squatterId } = await seedSquatter({ emailVerified });
+        const asAlice = t.withIdentity({
+          subject: "google-oauth2|alice",
+          email: "alice@test.br",
+          emailVerified: true,
+          name: "Alice",
+        });
+
+        const result = await asAlice.mutation(api.users.useCases.getOrCreateByIdentity, {});
+
+        expect(result).toEqual({
+          success: true,
+          data: { userId: squatterId, created: false, linked: true },
+          message: "Unverified binding replaced by a verified identity",
+        });
+        const all = await t.run((ctx) => ctx.db.query("users").collect());
+        expect(all).toHaveLength(1);
+        expect(all[0]?.subject).toBe("google-oauth2|alice");
+        expect(all[0]?.emailVerified).toBe(true);
+        expect(warn).toHaveBeenCalledWith(expect.any(String), {
+          code: "UNVERIFIED_BINDING_REPLACED",
+        });
+        expect(JSON.stringify(warn.mock.calls)).not.toContain("alice@test.br");
+      },
+    );
+
+    test("is not taken over by another unverified identity", async () => {
+      const { t } = await seedSquatter({ emailVerified: false });
+      const asChallenger = t.withIdentity({
+        subject: "auth0|challenger",
+        email: "alice@test.br",
+        emailVerified: false,
+      });
+
+      const result = await asChallenger.mutation(api.users.useCases.getOrCreateByIdentity, {});
+
+      expect(result).toEqual({
+        success: false,
+        error: { code: "EMAIL_BOUND_TO_OTHER_IDENTITY" },
+        message: "Email is already bound to another identity",
+      });
+      const all = await t.run((ctx) => ctx.db.query("users").collect());
+      expect(all).toHaveLength(1);
+      expect(all[0]?.subject).toBe("auth0|squatter");
+    });
   });
 
   test("throws UnauthenticatedError when no JWT is present", async () => {

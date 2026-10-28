@@ -51,13 +51,18 @@ describe("shouldRouteStaffToAdmin", () => {
 type Agencies = ReadonlyArray<{ onboardingState?: string }>;
 
 const ME = { _id: "user-1" };
+const PROVISIONED = { success: true, data: {}, message: "ok" } as const;
+
+function refused(code: string) {
+  return { success: false, error: { code }, message: "secret refusal detail" } as const;
+}
 
 /**
  * Every dependency succeeds by default and lands on `dashboard`; each test
  * overrides the one step it is about.
  */
 function depsWith(overrides: Partial<UserDestinationDeps> = {}) {
-  const provision = vi.fn<UserDestinationDeps["provision"]>(async () => {});
+  const provision = vi.fn<UserDestinationDeps["provision"]>(async () => PROVISIONED);
   const log = vi.fn<UserDestinationDeps["log"]>();
   const deps: UserDestinationDeps = {
     readToken: async () => ({ kind: "token", token: "id-token" }),
@@ -68,7 +73,7 @@ function depsWith(overrides: Partial<UserDestinationDeps> = {}) {
     log,
     ...overrides,
   };
-  return { deps, provision: deps.provision, log: deps.log };
+  return { deps, provision: deps.provision, log };
 }
 
 function transportError(): TypeError {
@@ -131,6 +136,27 @@ describe("resolveUserDestinationWith", () => {
       });
       expect(await resolveUserDestinationWith(deps)).toEqual({ kind: "not-provisioned" });
       expect(provision).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["EMAIL_NOT_VERIFIED", "email-not-verified"],
+      ["EMAIL_BOUND_TO_OTHER_IDENTITY", "email-bound"],
+    ])("maps a %s refusal to not-provisioned with reason %s", async (code, reason) => {
+      const fetchMe = vi.fn<UserDestinationDeps["fetchMe"]>(async () => null);
+      const { deps, log } = depsWith({ fetchMe, provision: vi.fn(async () => refused(code)) });
+      expect(await resolveUserDestinationWith(deps)).toEqual({ kind: "not-provisioned", reason });
+      expect(fetchMe).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith("provision", { code });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
+    });
+
+    it("maps an unknown refusal code to plain not-provisioned", async () => {
+      const { deps, log } = depsWith({
+        fetchMe: async () => null,
+        provision: vi.fn(async () => refused("SOMETHING_NEW")),
+      });
+      expect(await resolveUserDestinationWith(deps)).toEqual({ kind: "not-provisioned" });
+      expect(log).toHaveBeenCalledWith("provision", { code: "SOMETHING_NEW" });
     });
 
     it("maps a transport error from provisioning to backend-unavailable", async () => {
@@ -210,7 +236,27 @@ describe("resolveUserDestinationWith", () => {
       });
       await resolveUserDestinationWith(deps);
       expect(log).toHaveBeenCalledTimes(1);
-      expect(log).toHaveBeenCalledWith("fetchAgencies", { name: "TypeError" });
+      expect(log).toHaveBeenCalledWith("fetchAgencies", { name: "TypeError", kind: "transport" });
+    });
+
+    it("logs the error kind with the name, never the message", async () => {
+      const { deps, log } = depsWith({
+        fetchMe: async () => {
+          throw new Error('{"code":"InvalidAuthHeader","message":"secret jwt detail"}');
+        },
+      });
+      await resolveUserDestinationWith(deps);
+      expect(log).toHaveBeenCalledWith("getMe", { name: "Error", kind: "auth_rejected" });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
+    });
+
+    it("keeps routing an auth-rejected read to backend-unavailable, never to login", async () => {
+      const { deps } = depsWith({
+        fetchAgencies: async () => {
+          throw new Error("Could not verify OIDC token claim");
+        },
+      });
+      expect(await resolveUserDestinationWith(deps)).toEqual({ kind: "backend-unavailable" });
     });
 
     it("logs nothing on the happy path", async () => {

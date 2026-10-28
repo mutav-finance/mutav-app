@@ -2,17 +2,24 @@ import { describe, expect, it } from "vitest";
 import { parseSessionErrorReason, resolveSessionErrorView } from "./view-model";
 
 describe("parseSessionErrorReason", () => {
-  it("accepts the two known reasons", () => {
-    expect(parseSessionErrorReason("not-provisioned")).toBe("not-provisioned");
-    expect(parseSessionErrorReason("backend-unavailable")).toBe("backend-unavailable");
-  });
-
-  it.each([undefined, "", "session-expired", "<script>", ["not-provisioned", "x"]])(
-    "falls back to backend-unavailable for %j",
-    (raw) => {
-      expect(parseSessionErrorReason(raw)).toBe("backend-unavailable");
+  it.each(["not-provisioned", "backend-unavailable", "email-not-verified", "email-bound"])(
+    "accepts the known reason %s",
+    (reason) => {
+      expect(parseSessionErrorReason(reason)).toBe(reason);
     },
   );
+
+  it.each([
+    undefined,
+    "",
+    "session-expired",
+    "<script>",
+    "EMAIL_NOT_VERIFIED",
+    ["not-provisioned", "x"],
+    ["email-bound"],
+  ])("falls back to backend-unavailable for %j", (raw) => {
+    expect(parseSessionErrorReason(raw)).toBe("backend-unavailable");
+  });
 });
 
 describe("resolveSessionErrorView", () => {
@@ -31,6 +38,24 @@ describe("resolveSessionErrorView", () => {
       eyebrowKey: "backendUnavailable.eyebrow",
       titleKey: "backendUnavailable.title",
       subtitleKey: "backendUnavailable.subtitle",
+    });
+  });
+
+  it("tells the user to verify the email for email-not-verified", () => {
+    expect(resolveSessionErrorView("email-not-verified")).toEqual({
+      tone: "emailNotVerified",
+      eyebrowKey: "emailNotVerified.eyebrow",
+      titleKey: "emailNotVerified.title",
+      subtitleKey: "emailNotVerified.subtitle",
+    });
+  });
+
+  it("points the user to support for email-bound", () => {
+    expect(resolveSessionErrorView("email-bound")).toEqual({
+      tone: "emailBound",
+      eyebrowKey: "emailBound.eyebrow",
+      titleKey: "emailBound.title",
+      subtitleKey: "emailBound.subtitle",
     });
   });
 });

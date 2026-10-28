@@ -3,6 +3,12 @@ import { errorCodeOrName } from "./error-fields";
 
 const ID_TOKEN_NOT_RENEWED = "id_token_not_renewed";
 
+/**
+ * A token this close to `exp` counts as expired: clocks between this server,
+ * Auth0 and Convex drift, and a token that expires in flight fails at Convex.
+ */
+export const CLOCK_SKEW_SECONDS = 30;
+
 export type SessionLike = { tokenSet: { idToken?: string } };
 
 export interface FreshIdTokenAuth {
@@ -26,6 +32,10 @@ export function nowInSeconds(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+export function isExpired({ exp, nowSeconds }: { exp: number; nowSeconds: number }): boolean {
+  return exp <= nowSeconds + CLOCK_SKEW_SECONDS;
+}
+
 export async function getFreshIdToken({
   auth0,
   refreshWindowSeconds,
@@ -46,26 +56,52 @@ export async function getFreshIdToken({
   const nowSeconds = now();
   if (exp - nowSeconds >= refreshWindowSeconds) return { kind: "token", token };
 
-  if (refresh === "allowed") return refreshIdToken({ auth0, previousExp: exp });
-  return exp > nowSeconds ? { kind: "token", token } : { kind: "expired" };
+  if (refresh === "allowed") {
+    return refreshIdToken({ auth0, previous: { token, exp }, now });
+  }
+  return isExpired({ exp, nowSeconds }) ? { kind: "expired" } : { kind: "token", token };
 }
 
 async function readIdToken(auth0: FreshIdTokenAuth): Promise<string | null> {
   try {
     const session = await auth0.getSession();
     return session?.tokenSet.idToken ?? null;
-  } catch {
+  } catch (error) {
+    console.warn("[fresh-id-token] session read failed", { code: errorCodeOrName(error) });
     return null;
   }
 }
 
+/**
+ * A failed refresh falls back to the old token while it is still valid, so the
+ * token route never answers 401 early just because the refresh window opened.
+ */
 async function refreshIdToken({
+  auth0,
+  previous,
+  now,
+}: {
+  auth0: FreshIdTokenAuth;
+  previous: { token: string; exp: number };
+  now: () => number;
+}): Promise<FreshIdToken> {
+  const renewed = await renewIdToken({ auth0, previousExp: previous.exp });
+  if (renewed.kind === "token") return renewed;
+
+  console.warn("[fresh-id-token] refresh failed", { code: renewed.code });
+  if (!isExpired({ exp: previous.exp, nowSeconds: now() })) {
+    return { kind: "token", token: previous.token };
+  }
+  return renewed;
+}
+
+async function renewIdToken({
   auth0,
   previousExp,
 }: {
   auth0: FreshIdTokenAuth;
   previousExp: number;
-}): Promise<FreshIdToken> {
+}): Promise<Extract<FreshIdToken, { kind: "token" } | { kind: "refresh-failed" }>> {
   try {
     await auth0.getAccessToken({ refresh: true });
     const session = await auth0.getSession();

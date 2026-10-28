@@ -3,6 +3,7 @@
 import { useUser } from "@auth0/nextjs-auth0";
 import { ConvexProvider, ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { useCallback, useMemo } from "react";
+import { fetchConvexToken } from "./convex-token-fetch";
 
 /**
  * Bridges Auth0's session cookie to the Convex client. Convex calls
@@ -18,16 +19,7 @@ import { useCallback, useMemo } from "react";
 function useAuthFromAuth0() {
   const { user, isLoading } = useUser();
 
-  const fetchAccessToken = useCallback(async () => {
-    try {
-      const response = await fetch("/api/auth/convex-token", { cache: "no-store" });
-      if (!response.ok) return null;
-      const data = (await response.json()) as { token?: string };
-      return data.token ?? null;
-    } catch {
-      return null;
-    }
-  }, []);
+  const fetchAccessToken = useCallback(() => fetchConvexToken(), []);
 
   return useMemo(
     () => ({

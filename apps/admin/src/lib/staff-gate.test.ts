@@ -55,7 +55,28 @@ describe("getStaffMemberWith", () => {
     });
     expect(await getStaffMemberWith(deps)).toEqual({ kind: "unavailable" });
     expect(log).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledWith("getMyStaff", { name: "TypeError" });
+    expect(log).toHaveBeenCalledWith("getMyStaff", { name: "TypeError", kind: "transport" });
+  });
+
+  it("logs an auth-rejected staff read by kind and still routes it to unavailable", async () => {
+    const { deps, log } = depsWith({
+      fetchStaff: async () => {
+        throw new Error('{"code":"NoAuthProvider","message":"secret token detail"}');
+      },
+    });
+    expect(await getStaffMemberWith(deps)).toEqual({ kind: "unavailable" });
+    expect(log).toHaveBeenCalledWith("getMyStaff", { name: "Error", kind: "auth_rejected" });
+    expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
+  });
+
+  it("logs a server-side staff read failure as server_error", async () => {
+    const { deps, log } = depsWith({
+      fetchStaff: async () => {
+        throw new Error("[Request ID: x] Server Error");
+      },
+    });
+    await getStaffMemberWith(deps);
+    expect(log).toHaveBeenCalledWith("getMyStaff", { name: "Error", kind: "server_error" });
   });
 
   it("lets Next control-flow signals through instead of mapping them", async () => {

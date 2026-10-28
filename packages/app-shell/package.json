@@ -14,7 +14,8 @@
     "./fresh-id-token": "./src/fresh-id-token.ts",
     "./auth-callback": "./src/auth-callback.ts",
     "./convex-token-route": "./src/convex-token-route.ts",
-    "./auth-proxy": "./src/auth-proxy.ts"
+    "./auth-proxy": "./src/auth-proxy.ts",
+    "./convex-error-kind": "./src/convex-error-kind.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

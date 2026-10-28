@@ -1,5 +1,14 @@
 import type { Auth0Client } from "@auth0/nextjs-auth0/server";
-import { describe, expect, expectTypeOf, test, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  test,
+  vi,
+  type MockInstance,
+} from "vitest";
 import { getFreshIdToken, type FreshIdTokenAuth, type SessionLike } from "./fresh-id-token";
 import { idTokenExpiringAt } from "./jwt-fixture";
 
@@ -44,14 +53,28 @@ function run({ auth0, refresh }: { auth0: FreshIdTokenAuth; refresh: "allowed" |
   return getFreshIdToken({ auth0, refreshWindowSeconds: WINDOW, refresh, now: () => NOW });
 }
 
+let consoleWarn: MockInstance<typeof console.warn>;
+
+beforeEach(() => {
+  consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  consoleWarn.mockRestore();
+});
+
 describe("getFreshIdToken", () => {
   test("the SDK client satisfies the narrow interface", () => {
     expectTypeOf<Auth0Client>().toExtend<FreshIdTokenAuth>();
   });
 
-  test("a getSession throw reads as no session", async () => {
-    const auth0 = fakeAuth0({ sessions: [new Error("boom")] });
+  test("a getSession throw reads as no session and logs only the code", async () => {
+    const auth0 = fakeAuth0({ sessions: [new CodedError("session_decrypt_failed", "Error")] });
     expect(await run({ auth0, refresh: "allowed" })).toEqual({ kind: "none" });
+    expect(consoleWarn).toHaveBeenCalledWith(expect.any(String), {
+      code: "session_decrypt_failed",
+    });
+    expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain("secret");
   });
 
   test("a missing session is none", async () => {
@@ -95,6 +118,53 @@ describe("getFreshIdToken", () => {
       });
       expect(await run({ auth0, refresh: "allowed" })).toEqual({ kind: "token", token: renewed });
       expect(auth0.getAccessToken).toHaveBeenCalledWith({ refresh: true });
+    });
+
+    test("a refresh throw while the old token is still valid returns the old token", async () => {
+      const token = idTokenExpiringAt(NOW + 100);
+      const auth0 = fakeAuth0({
+        sessions: [sessionWith(token)],
+        refreshError: new CodedError("failed_to_refresh_token", "AccessTokenError"),
+      });
+      expect(await run({ auth0, refresh: "allowed" })).toEqual({ kind: "token", token });
+      expect(consoleWarn).toHaveBeenCalledWith("[fresh-id-token] refresh failed", {
+        code: "failed_to_refresh_token",
+      });
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain("secret");
+    });
+
+    test("a refresh that does not renew while the old token is still valid returns it", async () => {
+      const token = idTokenExpiringAt(NOW + 100);
+      const auth0 = fakeAuth0({ sessions: [sessionWith(token), sessionWith(token)] });
+      expect(await run({ auth0, refresh: "allowed" })).toEqual({ kind: "token", token });
+      expect(consoleWarn).toHaveBeenCalledWith("[fresh-id-token] refresh failed", {
+        code: "id_token_not_renewed",
+      });
+    });
+
+    test("a refresh throw past exp is refresh-failed and logs the code", async () => {
+      const auth0 = fakeAuth0({
+        sessions: [sessionWith(idTokenExpiringAt(NOW - 10))],
+        refreshError: new CodedError("failed_to_refresh_token", "AccessTokenError"),
+      });
+      expect(await run({ auth0, refresh: "allowed" })).toEqual({
+        kind: "refresh-failed",
+        code: "failed_to_refresh_token",
+      });
+      expect(consoleWarn).toHaveBeenCalledWith("[fresh-id-token] refresh failed", {
+        code: "failed_to_refresh_token",
+      });
+    });
+
+    test.each([
+      ["at the skew margin", "refresh-failed", NOW + 30],
+      ["one second past the skew margin", "token", NOW + 31],
+    ])("a refresh throw with the old token %s is %s", async (_label, kind, exp) => {
+      const auth0 = fakeAuth0({
+        sessions: [sessionWith(idTokenExpiringAt(exp))],
+        refreshError: new CodedError("failed_to_refresh_token", "AccessTokenError"),
+      });
+      expect((await run({ auth0, refresh: "allowed" })).kind).toBe(kind);
     });
 
     test("a refresh that does not renew the id token is refresh-failed", async () => {
@@ -162,19 +232,27 @@ describe("getFreshIdToken", () => {
 
   describe("refresh never", () => {
     test("a token inside the window but not expired is returned as is", async () => {
-      const token = idTokenExpiringAt(NOW + 10);
+      const token = idTokenExpiringAt(NOW + 100);
       const auth0 = fakeAuth0({ sessions: [sessionWith(token)] });
       expect(await run({ auth0, refresh: "never" })).toEqual({ kind: "token", token });
       expect(auth0.getAccessToken).not.toHaveBeenCalled();
     });
 
     test.each([
+      ["at the skew margin", NOW + 30],
+      ["inside the skew margin", NOW + 10],
       ["at exp", NOW],
       ["past exp", NOW - 10],
     ])("a token %s is expired", async (_label, exp) => {
       const auth0 = fakeAuth0({ sessions: [sessionWith(idTokenExpiringAt(exp))] });
       expect(await run({ auth0, refresh: "never" })).toEqual({ kind: "expired" });
       expect(auth0.getAccessToken).not.toHaveBeenCalled();
+    });
+
+    test("a token one second past the skew margin is still returned", async () => {
+      const token = idTokenExpiringAt(NOW + 31);
+      const auth0 = fakeAuth0({ sessions: [sessionWith(token)] });
+      expect(await run({ auth0, refresh: "never" })).toEqual({ kind: "token", token });
     });
   });
 });

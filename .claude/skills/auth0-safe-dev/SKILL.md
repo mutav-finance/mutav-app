@@ -17,8 +17,8 @@ Source keys like **[S3]** point into `references/sources.md`, which holds the an
    *Why:* the cookies API re-serializes the cookie and drops HttpOnly, Secure, SameSite, Expires and Path. It also turns the SDK's chunk deletions (`__session__1=; Max-Age=0`) into live empty cookies. The official next-intl example appends raw headers. Using `.set` in a loop also overwrites earlier `set-cookie` values. [S2][S3][S11]
 2. **Never drop `Cache-Control` from the Auth0 response.** On every rolling refresh the SDK sets `Cache-Control: private, no-cache, no-store, must-revalidate, max-age=0` (plus `Pragma`/`Expires`). Wherever the response's `Set-Cookie` travels, these go with it.
    *Why:* CVE-2025-48947 was a CDN caching `__session` because no-store was missing. OWASP requires no-store on any response that carries a session ID. Vercel's CDN already refuses to cache a response with `set-cookie`, so on Vercel this is defense in depth, but any other cache in the path is not covered. [S4][S12][S15]
-3. **Never copy `x-middleware-next`** (or blanket-copy every auth header) onto a response that redirects or blocks.
-   *Why:* that header makes Next run the route anyway. next-intl often returns a redirect. [S1][S2]
+3. **Never copy `x-middleware-next`** (or blanket-copy every auth header) onto a response that redirects or blocks. The one internal header `carryAuthHeaders` carries is `x-middleware-set-cookie`, merged by cookie name (Auth0 wins) and only onto a non-redirect response.
+   *Why:* `x-middleware-next` makes Next run the route anyway, and next-intl often returns a redirect. `x-middleware-set-cookie` is how Next hands cookies a middleware set to the same request's Server Components; without it a proxy refresh reaches the browser while the render still reads the old session. A redirect renders nothing, so it never gets it. [S1][S2]
 4. **Never wrap or rewrite `/auth/*` responses.** Return the Auth0 response untouched: it is the login, callback and logout flow. [S1]
 5. **Never narrow the proxy matcher** beyond static assets and `api/auth/convex-token`.
    *Why:* rolling sessions require the SDK middleware on every request. A matcher change can also silently drop proxy coverage from Server Functions, so never rely on the proxy for authorization. [S1][S13]
@@ -40,7 +40,7 @@ Source keys like **[S3]** point into `references/sources.md`, which holds the an
 15. **Never refresh tokens in a Server Component.** Refresh only in the proxy (`createAuthProxy`) or a route handler (`createConvexTokenRoute`). Server Components call `getFreshIdToken({ refresh: "never" })`.
     *Why:* Next swallows cookie writes from a Server Component, so the refresh spends the rotating refresh token and the new one is lost. The next refresh then reuses a revoked token.
 16. **Never enable refresh-token rotation without an overlap period** (about 30 s; settings in `docs/auth0.md`).
-    *Why:* the proxy and the token route can refresh the same session at once. Without leeway, reuse detection revokes the whole token family and signs the user out. [S17]
+    *Why:* concurrent refreshes of one session can be N, not two: inside the window every request through the proxy refreshes, RSC prefetches included, plus the token route, and the SDK does not coalesce them. Without leeway, reuse detection revokes the whole token family and signs the user out. The 30 s overlap covers the burst. Keep the ID-token lifetime well above the refresh window: at or below it, every request refreshes. [S17]
 17. **Never map a server-side failure to login.** Use the typed kinds: agency `backend-unavailable` / `not-provisioned` → `/session-error`, admin `unavailable` → `/unavailable`. Only a missing or expired ID token (`session-expired`, `anonymous`) goes to `/auth/login`.
     *Why:* login completes silently through SSO, the same read fails again, and the browser loops through Auth0.
 18. **Don't "fix" or re-flag the dev-tenant persona password** in `docs/test-personas.md`. It is public by design, works on the dev tenant only, and rotates when the prod tenant is cut (#119, ADR 0009). [S18]
@@ -51,7 +51,8 @@ Source keys like **[S3]** point into `references/sources.md`, which holds the an
 
 ```ts
 // apps/*/src/proxy.ts — Auth0 first; /auth/* and /api/* untouched; ID token refreshed near expiry;
-// auth headers folded into the next-intl response by carryAuthHeaders (raw Set-Cookie + no-store, never x-middleware-next)
+// auth headers folded into the next-intl response by carryAuthHeaders (raw Set-Cookie + no-store
+// + x-middleware-set-cookie unless redirecting; never x-middleware-next)
 const authProxy = createAuthProxy({ auth0, handleI18nRouting: createMiddleware(routing), getRefreshWindowSeconds: getIdTokenRefreshWindowSeconds });
 
 // apps/*/src/app/api/auth/convex-token/route.ts — ID token only, no-store, every failure a 401
@@ -88,13 +89,13 @@ const result = await getFreshIdToken({ auth0, refreshWindowSeconds: getIdTokenRe
 
 The commands and snippets are in `references/verification.md`. In short:
 
-1. **Unit:** test the header composition with `NextResponse` fixtures. Give fixture cookies a fixed `expires` date, because `maxAge` makes Next serialize a clock-dependent `Expires`. Assert that every attribute survives, chunk deletions stay deletions, the target's own cookies survive, no-store is carried, and `x-middleware-next` is not. If `onCallback` changes, unit-test returnTo values `//x`, `/\x` and `https://other` against the redirect origin.
+1. **Unit:** test the header composition with `NextResponse` fixtures. Give fixture cookies a fixed `expires` date, because `maxAge` makes Next serialize a clock-dependent `Expires`. Assert that every attribute survives, chunk deletions stay deletions, the target's own cookies survive, no-store is carried, `x-middleware-set-cookie` is merged on a pass-through and absent on a redirect, and `x-middleware-next` is not. If `onCallback` changes, unit-test returnTo values `//x`, `/\x` and `https://other` against the redirect origin.
 2. **Browser:** log in as a persona and make **2 or more navigations** so a rolling refresh happens. Then check:
    - `document.cookie` has no `__session*`.
    - Playwright `context.cookies()` shows `__session` with `httpOnly: true`, `sameSite: "Lax"`, an expiry, `secure: true` on https, and a domain equal to the exact host.
    - A page response after the refresh carries `Cache-Control: private, no-cache, no-store, must-revalidate, max-age=0`.
    - Logout, then login through `/auth/callback`, lands back where you started, with no loop and no stray `__txn_*` cookies.
-3. **Refresh path:** on a preview, set the refresh window above the ID-token lifetime, navigate, and confirm a new `__session` Set-Cookie keeps HttpOnly/Lax/Secure and the token route answers `no-store`.
+3. **Refresh path:** on a preview, **temporarily** set the refresh window above the ID-token lifetime, navigate, and confirm a new `__session` Set-Cookie keeps HttpOnly/Lax/Secure, the token route answers `no-store`, and the same-request render sees the refreshed token (the first navigation after expiry renders the page instead of bouncing to login). **Revert the window afterwards**: left high, every request refreshes.
 4. **No loop:** with an unreachable Convex URL, a signed-in user lands on `/session-error` (or admin `/unavailable`) after at most one Auth0 round trip.
 5. **Prod:** after deploy, repeat step 2 on `app.mutav.finance` and `admin.mutav.finance`.
 6. Report names and flags only. A check that never loaded a page reports `structure only`, not `pass`.

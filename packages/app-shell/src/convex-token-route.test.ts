@@ -83,6 +83,32 @@ describe("createConvexTokenRoute", () => {
     expect(res.headers.get("cache-control")).toBe(NO_STORE);
   });
 
+  test("a failed refresh logs kind and code only", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const refreshError = Object.assign(new Error("secret detail"), {
+      code: "failed_to_refresh_token",
+    });
+    await route({
+      auth0: fakeAuth0({
+        sessions: [{ tokenSet: { idToken: idTokenExpiringAt(NOW - 10) } }],
+        refreshError,
+      }),
+    })();
+    expect(consoleWarn).toHaveBeenCalledWith("[convex-token] no token:", {
+      kind: "refresh-failed",
+      code: "failed_to_refresh_token",
+    });
+    expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain("secret");
+    consoleWarn.mockRestore();
+  });
+
+  test("a none result is not logged", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await route({ auth0: fakeAuth0({ sessions: [null] }) })();
+    expect(consoleWarn).not.toHaveBeenCalledWith("[convex-token] no token:", expect.anything());
+    consoleWarn.mockRestore();
+  });
+
   test("a throwing window getter is a 401, never a 500", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const res = await route({

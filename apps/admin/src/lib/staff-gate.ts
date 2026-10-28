@@ -1,4 +1,5 @@
 import type { SessionData } from "@auth0/nextjs-auth0/types";
+import { classifyConvexError, type ConvexErrorKind } from "@mutav/app-shell/convex-error-kind";
 import type { FreshIdToken } from "@mutav/app-shell/fresh-id-token";
 
 /**
@@ -32,8 +33,11 @@ export type StaffGateDeps = {
   readToken: () => Promise<FreshIdToken>;
   /** `null` when the subject has no `mutavStaff` row. Throws on failure. */
   fetchStaff: (token: string) => Promise<{ roles: string[] } | null>;
-  /** Receives the error name only: messages and causes can carry identity data. */
-  log: (step: StaffGateStep, fields: { name: string }) => void;
+  /**
+   * Receives the error name, plus the classified kind for the Convex read.
+   * Never a message: messages and causes can carry identity data.
+   */
+  log: (step: StaffGateStep, fields: { name: string; kind?: ConvexErrorKind }) => void;
 };
 
 /**
@@ -96,7 +100,10 @@ export async function getStaffMemberWith(deps: StaffGateDeps): Promise<StaffGate
     // is a subject-keyed identity read (queryWithAuth), not an aud-bound
     // capability wrapper.
     if (isNextControlFlowSignal(err)) throw err;
-    deps.log("getMyStaff", { name: errorName(err) });
+    // Logged by kind so an outage reads apart from a misconfigured deployment
+    // (`auth_rejected`); routing stays `unavailable` either way, because
+    // login would loop on a misconfiguration.
+    deps.log("getMyStaff", { name: errorName(err), kind: classifyConvexError(err) });
     return { kind: "unavailable" };
   }
 

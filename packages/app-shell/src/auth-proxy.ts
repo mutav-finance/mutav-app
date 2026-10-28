@@ -1,5 +1,5 @@
 import type { NextRequest, NextResponse } from "next/server";
-import { errorCode, errorName } from "./error-fields";
+import { errorCode, errorCodeOrName, errorName } from "./error-fields";
 import { nowInSeconds, type SessionLike } from "./fresh-id-token";
 import { idTokenExpiresAt } from "./id-token";
 import { carryAuthHeaders } from "./proxy-headers";
@@ -26,6 +26,12 @@ function isAuthOrApiPath(pathname: string): boolean {
  * place that can write the refreshed session onto the response for Server
  * Components, which cannot persist cookies themselves. A failed refresh never
  * blocks the request: the page still renders and Convex judges the old token.
+ *
+ * `carryAuthHeaders` carries raw `Set-Cookie` (for the browser) and, unless the
+ * response redirects, the one internal header `x-middleware-set-cookie` (for
+ * this request): Next merges that header into the cookies the same request's
+ * Server Components read, so the render sees the refreshed session rather than
+ * the one the browser sent. `x-middleware-next` is never carried.
  */
 export function createAuthProxy({
   auth0,
@@ -84,7 +90,8 @@ async function readSession({
 }): Promise<SessionLike | null> {
   try {
     return await auth0.getSession(request);
-  } catch {
+  } catch (error) {
+    console.warn("[auth-proxy] session read failed", { code: errorCodeOrName(error) });
     return null;
   }
 }

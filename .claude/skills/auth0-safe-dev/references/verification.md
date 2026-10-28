@@ -105,12 +105,13 @@ Then the flow:
 
 ## 3. Refresh path (preview)
 
-ID tokens normally live for hours, so force the refresh: on a preview, set `AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS` above the tenant's ID-token lifetime, redeploy, log in, and navigate.
+ID tokens normally live for hours, so force the refresh: on a preview, **temporarily** set `AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS` above the tenant's ID-token lifetime, redeploy, log in, and navigate. This is a test-only setting and must be reverted (last bullet).
 
 - The page response carries a new `__session` Set-Cookie that still has `HttpOnly`, `SameSite=Lax` and `Secure` (check flags only, as in section 2).
 - `GET /api/auth/convex-token` answers with `cache-control: private, no-store`, on a 200 and on a 401 alike.
+- The same-request render sees the refreshed token. Let the ID token expire (or wait until it is inside the skew margin), then make one in-app navigation: the page renders, with no bounce to `/auth/login` and no second Auth0 round trip. A bounce means `x-middleware-set-cookie` is not reaching the render, so the Server Component read the expired token the browser sent.
 - Server logs show no `[auth-proxy] id token refresh failed`. If they do, check the tenant settings in `docs/auth0.md` (Refresh Token grant, rotation overlap).
-- Reset the window env afterwards. Left high, every request refreshes.
+- **Revert the window env afterwards and redeploy.** Left high, every request refreshes, and every concurrent request (RSC prefetches included) spends the refresh token at once.
 
 ## 4. No login loop
 

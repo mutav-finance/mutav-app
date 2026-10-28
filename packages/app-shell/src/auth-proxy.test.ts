@@ -87,13 +87,16 @@ function proxyWith({
 }
 
 let consoleError: MockInstance<typeof console.error>;
+let consoleWarn: MockInstance<typeof console.warn>;
 
 beforeEach(() => {
   consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 
 afterEach(() => {
   consoleError.mockRestore();
+  consoleWarn.mockRestore();
 });
 
 describe("createAuthProxy", () => {
@@ -125,6 +128,20 @@ describe("createAuthProxy", () => {
     expect(res.headers.getSetCookie()).toEqual(["NEXT_LOCALE=en; Path=/", REFRESHED_COOKIE]);
   });
 
+  test("the refreshed session reaches this request's render via x-middleware-set-cookie", async () => {
+    const auth0 = fakeAuth0({ session: sessionExpiringAt(NOW + 10) });
+    const intl = NextResponse.next();
+    intl.cookies.set("NEXT_LOCALE", "en", { path: "/" });
+    const res = await proxyWith({ auth0, intl: () => intl })(
+      new NextRequest(`${BASE}/en/dashboard`),
+    );
+
+    const internal = res.headers.get("x-middleware-set-cookie") ?? "";
+    expect(internal).toContain("NEXT_LOCALE=en");
+    expect(internal).toContain("__session=refreshed");
+    expect(internal).not.toContain("__session=rolled");
+  });
+
   test.each(["/auth/login", "/auth/callback", "/api/auth/convex-token", "/api/other"])(
     "%s returns the auth response untouched and never refreshes",
     async (path) => {
@@ -154,12 +171,14 @@ describe("createAuthProxy", () => {
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain("secret");
   });
 
-  test("a getSession throw skips the refresh and still returns the intl response", async () => {
-    const auth0 = fakeAuth0({ session: null, sessionError: new Error("bad cookie") });
+  test("a getSession throw skips the refresh, still returns the intl response and logs the code", async () => {
+    const auth0 = fakeAuth0({ session: null, sessionError: new CodedError("session_read_failed") });
     const intl = NextResponse.next();
     const res = await proxyWith({ auth0, intl: () => intl })(new NextRequest(`${BASE}/`));
     expect(res).toBe(intl);
     expect(auth0.getAccessToken).not.toHaveBeenCalled();
+    expect(consoleWarn).toHaveBeenCalledWith(expect.any(String), { code: "session_read_failed" });
+    expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain("secret");
   });
 
   test.each([
@@ -177,6 +196,7 @@ describe("createAuthProxy", () => {
     const redirect = NextResponse.redirect(`${BASE}/en`);
     const res = await proxyWith({ auth0, intl: () => redirect })(new NextRequest(`${BASE}/`));
     expect(res.headers.get("x-middleware-next")).toBeNull();
+    expect(res.headers.get("x-middleware-set-cookie")).toBeNull();
     expect(res.headers.getSetCookie()).toEqual([REFRESHED_COOKIE]);
   });
 });

@@ -5,7 +5,12 @@ import ptBR from "../../../messages/pt-BR.json";
 import { resolveSessionErrorView, type SessionErrorReason } from "./view-model";
 
 const locales = { "pt-BR": ptBR, en } as const;
-const REASONS: readonly SessionErrorReason[] = ["not-provisioned", "backend-unavailable"];
+const REASONS: readonly SessionErrorReason[] = [
+  "not-provisioned",
+  "backend-unavailable",
+  "email-not-verified",
+  "email-bound",
+];
 
 describe("sessionError messages", () => {
   for (const [locale, messages] of Object.entries(locales)) {

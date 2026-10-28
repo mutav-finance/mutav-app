@@ -1,4 +1,4 @@
-import { CloudOffIcon, UserRoundXIcon } from "lucide-react";
+import { CloudOffIcon, Link2OffIcon, MailWarningIcon, UserRoundXIcon } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
@@ -14,11 +14,15 @@ import {
 const toneIcon: Record<SessionErrorTone, typeof CloudOffIcon> = {
   notProvisioned: UserRoundXIcon,
   backendUnavailable: CloudOffIcon,
+  emailNotVerified: MailWarningIcon,
+  emailBound: Link2OffIcon,
 };
 
 /**
  * Terminal page for a signed-in user whose destination could not be resolved:
- * the `users` row could not be provisioned, or the backend is unavailable.
+ * the `users` row could not be provisioned (with the refusal reason when there
+ * is one: unverified email, email bound to another sign-in), or the backend is
+ * unavailable.
  *
  * Lives OUTSIDE the `(app)` and `(onboarding)` route groups on purpose: their
  * guards redirect here, and a guard must not re-gate its own redirect target.

@@ -1536,6 +1536,16 @@
       "title": "O serviço está temporariamente indisponível",
       "subtitle": "Não conseguimos carregar seus dados agora. Sua sessão continua ativa; tente novamente em alguns instantes."
     },
+    "emailNotVerified": {
+      "eyebrow": "Confirme seu e-mail",
+      "title": "Confirme seu e-mail para continuar",
+      "subtitle": "Enviamos um e-mail de verificação quando você criou sua conta. Abra a mensagem, clique no link de confirmação e tente novamente."
+    },
+    "emailBound": {
+      "eyebrow": "Conta já vinculada",
+      "title": "Este e-mail já está vinculado a outra forma de acesso",
+      "subtitle": "Entre da mesma forma que entrou antes ou fale com o nosso suporte para recuperar o acesso à sua conta."
+    },
     "tryAgain": "Tentar novamente",
     "logOut": "Sair"
   }

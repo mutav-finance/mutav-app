@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalMutation, mutation, query } from "../_generated/server";
 import { UnauthenticatedError, queryWithAuth } from "../lib/auth";
+import { logWarn } from "../lib/logger";
 import type { Result } from "../lib/result";
 import { USER_ERROR_CODE, type UserId } from "./domain";
 
@@ -29,6 +30,9 @@ export const getMe = query({
   },
 });
 
+/** Audit code logged when a verified identity takes over an unverified binding. */
+const UNVERIFIED_BINDING_REPLACED = "UNVERIFIED_BINDING_REPLACED";
+
 type GetOrCreateByIdentitySuccessResult = {
   userId: UserId;
   created: boolean;
@@ -49,20 +53,26 @@ type GetOrCreateByIdentityErrorResult = {
  * provisioning path existed).
  *
  * Resolution paths, in order:
- * 1. Existing row with matching `subject` → return it unchanged.
+ * 1. Existing row with matching `subject` → return it. If the IdP now vouches
+ *    for the email and the row says unverified, the flag is upgraded.
  * 2. Existing row with matching `email` and no `subject` → link it, but
  *    only when the IdP vouches for the email (`emailVerified === true`).
  *    Subjectless rows are seeded or tenant-cut rows that already hold
  *    agency memberships; linking on an unverified email would hand those
  *    memberships to whoever typed the address. Unverified → error.
- * 3. Existing row with matching `email` and a different `subject` →
- *    error. Inserting a second row would break every `by_email` lookup
- *    that assumes one row per email, and silently merging would let one
- *    identity take over another's account.
- * 4. No match → insert a fresh row keyed on subject + email.
+ * 3. Existing row with matching `email` and a different `subject`:
+ *    - incoming identity verified, row not verified → the row is rebound to
+ *      the verified identity (`linked: true`). An unverified first login must
+ *      not squat on an address its real owner later proves; the takeover is
+ *      logged by code for audit.
+ *    - otherwise → error. Inserting a second row would break every
+ *      `by_email` lookup that assumes one row per email, and merging into a
+ *      verified owner would let one identity take over another's account.
+ * 4. No match → insert a fresh row keyed on subject + email, recording
+ *    whether the email was verified.
  *
- * Callers today ignore the Result: an error leaves `getMe` returning
- * `null`, which the agency app surfaces as `not-provisioned`.
+ * Callers log a refusal by its code; the agency app routes it to
+ * `/session-error` with a reason the user can act on.
  *
  * No args: identity is read from `ctx.auth.getUserIdentity()`. The
  * argless shape is a security invariant — accepting `subject` from
@@ -91,12 +101,16 @@ export const getOrCreateByIdentity = mutation({
       );
     }
     const name = identity.name ?? identity.nickname ?? email.split("@")[0] ?? "user";
+    const emailVerified = identity.emailVerified === true;
 
     const bySubject = await ctx.db
       .query("users")
       .withIndex("by_subject", (q) => q.eq("subject", subject))
       .unique();
     if (bySubject) {
+      if (emailVerified && bySubject.emailVerified !== true) {
+        await ctx.db.patch(bySubject._id, { emailVerified: true });
+      }
       return {
         success: true,
         data: { userId: bySubject._id, created: false, linked: false },
@@ -112,6 +126,17 @@ export const getOrCreateByIdentity = mutation({
       .withIndex("by_email", (q) => q.eq("email", email))
       .first();
     if (byEmail?.subject) {
+      if (emailVerified && byEmail.emailVerified !== true) {
+        await ctx.db.patch(byEmail._id, { subject, emailVerified: true });
+        logWarn("[users] email binding rebound to a verified identity", {
+          code: UNVERIFIED_BINDING_REPLACED,
+        });
+        return {
+          success: true,
+          data: { userId: byEmail._id, created: false, linked: true },
+          message: "Unverified binding replaced by a verified identity",
+        };
+      }
       return {
         success: false,
         error: { code: USER_ERROR_CODE.EMAIL_BOUND_TO_OTHER_IDENTITY },
@@ -119,14 +144,14 @@ export const getOrCreateByIdentity = mutation({
       };
     }
     if (byEmail) {
-      if (identity.emailVerified !== true) {
+      if (!emailVerified) {
         return {
           success: false,
           error: { code: USER_ERROR_CODE.EMAIL_NOT_VERIFIED },
           message: "Email must be verified before linking to an existing user",
         };
       }
-      await ctx.db.patch(byEmail._id, { subject });
+      await ctx.db.patch(byEmail._id, { subject, emailVerified: true });
       return {
         success: true,
         data: { userId: byEmail._id, created: false, linked: true },
@@ -138,6 +163,7 @@ export const getOrCreateByIdentity = mutation({
       publicId: cryptoRandomPublicId(),
       subject,
       email,
+      emailVerified,
       name,
       createdAt: new Date().toISOString(),
     });

@@ -1536,6 +1536,16 @@
       "title": "The service is temporarily unavailable",
       "subtitle": "We couldn't load your data right now. Your session is still active; try again in a moment."
     },
+    "emailNotVerified": {
+      "eyebrow": "Verify your email",
+      "title": "Confirm your email to continue",
+      "subtitle": "We sent you a verification email when you signed up. Open it, click the confirmation link, then try again."
+    },
+    "emailBound": {
+      "eyebrow": "Account already linked",
+      "title": "This email is already linked to another sign-in method",
+      "subtitle": "Sign in the way you did before, or contact support so we can help you access your account."
+    },
     "tryAgain": "Try again",
     "logOut": "Log out"
   }

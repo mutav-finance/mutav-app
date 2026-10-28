@@ -51,8 +51,23 @@ const POSITIVE_INTEGER = /^[1-9]\d*$/;
  */
 export function getIdTokenRefreshWindowSeconds(): number {
   const raw = process.env.AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS;
-  if (!raw || !POSITIVE_INTEGER.test(raw)) return ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT;
+  if (!raw) return ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT;
+  if (!POSITIVE_INTEGER.test(raw)) {
+    warnInvalidRefreshWindowOnce();
+    return ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT;
+  }
   return Number(raw);
+}
+
+let invalidRefreshWindowWarned = false;
+
+/** Once per process: the getter runs on every proxied request. Names the var, never its value. */
+function warnInvalidRefreshWindowOnce(): void {
+  if (invalidRefreshWindowWarned) return;
+  invalidRefreshWindowWarned = true;
+  console.warn(
+    `[env] AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS is not a positive integer; using ${ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT}`,
+  );
 }
 
 export function getConvexUrl(): string | null {

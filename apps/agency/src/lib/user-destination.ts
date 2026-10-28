@@ -1,8 +1,10 @@
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@convex/_generated/api";
+import { classifyConvexError, type ConvexErrorKind } from "@mutav/app-shell/convex-error-kind";
 import { type FreshIdToken, getFreshIdToken } from "@mutav/app-shell/fresh-id-token";
 import { auth0 } from "@/lib/auth0";
 import { getIdTokenRefreshWindowSeconds } from "@/lib/env";
+import type { Result } from "@/lib/result";
 
 /**
  * Only `session-expired` sends the user to Auth0. A backend failure or a
@@ -12,13 +14,34 @@ import { getIdTokenRefreshWindowSeconds } from "@/lib/env";
  */
 export type UserDestination =
   | { kind: "session-expired" }
-  | { kind: "not-provisioned" }
+  | { kind: "not-provisioned"; reason?: ProvisionRefusalReason }
   | { kind: "backend-unavailable" }
   | { kind: "staff" }
   | { kind: "onboarding-welcome" }
   | { kind: "onboarding-status"; state: "submitted" | "under_review" }
   | { kind: "onboarding-rejected" }
   | { kind: "dashboard" };
+
+/**
+ * Why provisioning refused the identity, in the `?reason=` vocabulary of
+ * `/session-error`. Each one tells the user what to do; an unknown code gets
+ * no reason and the generic not-provisioned copy.
+ */
+export type ProvisionRefusalReason = "email-not-verified" | "email-bound";
+
+const REFUSAL_REASON_BY_CODE: Readonly<Record<string, ProvisionRefusalReason>> = {
+  EMAIL_NOT_VERIFIED: "email-not-verified",
+  EMAIL_BOUND_TO_OTHER_IDENTITY: "email-bound",
+};
+
+/** What `getOrCreateByIdentity` returns; only the refusal code is read. */
+export type ProvisionResult = Result<unknown, { code: string }>;
+
+/**
+ * Logged fields: the error name and its classified kind for a throw, or the
+ * refusal code. Never a message: messages and causes can carry identity data.
+ */
+export type UserDestinationLogFields = { name: string; kind: ConvexErrorKind } | { code: string };
 
 /** The resolver step a failure is logged under. */
 export type UserDestinationStep =
@@ -36,11 +59,10 @@ export type UserDestinationDeps = {
   readToken: () => Promise<FreshIdToken>;
   /** `null` when the subject has no `users` row. */
   fetchMe: (token: string) => Promise<unknown>;
-  provision: (token: string) => Promise<void>;
+  provision: (token: string) => Promise<ProvisionResult>;
   fetchAgencies: (token: string) => Promise<ReadonlyArray<{ onboardingState?: string }>>;
   fetchStaff: (token: string) => Promise<boolean>;
-  /** Receives the error name only: messages and causes can carry identity data. */
-  log: (step: UserDestinationStep, fields: { name: string }) => void;
+  log: (step: UserDestinationStep, fields: UserDestinationLogFields) => void;
 };
 
 type Attempt<T> = { ok: true; value: T } | { ok: false; error: unknown };
@@ -53,8 +75,16 @@ async function attempt<T>(run: () => Promise<T>): Promise<Attempt<T>> {
   }
 }
 
-function errorName(error: unknown): string {
-  return error instanceof Error ? error.name : "unknown";
+function errorFields(error: unknown): UserDestinationLogFields {
+  return {
+    name: error instanceof Error ? error.name : "unknown",
+    kind: classifyConvexError(error),
+  };
+}
+
+function notProvisioned(code: string): UserDestination {
+  const reason = REFUSAL_REASON_BY_CODE[code];
+  return reason === undefined ? { kind: "not-provisioned" } : { kind: "not-provisioned", reason };
 }
 
 /**
@@ -91,9 +121,13 @@ export function shouldRouteStaffToAdmin({
  * 1. No usable token → `session-expired` (the only path back to Auth0).
  * 2. `getMe` throws → `backend-unavailable`. `getMe` returns `null` → one
  *    provisioning attempt, then `getMe` again; still `null`, or a non-transport
- *    provisioning error → `not-provisioned`. `listAgenciesForUser` and
+ *    provisioning error → `not-provisioned`. A provisioning refusal (Result
+ *    `success: false`) → `not-provisioned` with the reason the user can act on. `listAgenciesForUser` and
  *    `amIStaff` are `queryWithAuth` and throw without a row, so this step is
  *    what keeps a missing row from looking like an outage.
+ *    Every throw is logged with its `classifyConvexError` kind, but routing
+ *    stays on the error page: sending `auth_rejected` to login would loop on a
+ *    misconfigured deployment.
  * 3. Agencies, then staff. Staff fails closed: a failed staff read never
  *    yields `dashboard`, so a possibly-staff user is never dropped into the
  *    agency dashboard on a Convex blip.
@@ -107,21 +141,26 @@ export async function resolveUserDestinationWith(
 
   const me = await attempt(() => deps.fetchMe(token));
   if (!me.ok) {
-    deps.log("getMe", { name: errorName(me.error) });
+    deps.log("getMe", errorFields(me.error));
     return { kind: "backend-unavailable" };
   }
 
   if (me.value === null) {
     const provisioned = await attempt(() => deps.provision(token));
     if (!provisioned.ok) {
-      deps.log("provision", { name: errorName(provisioned.error) });
+      deps.log("provision", errorFields(provisioned.error));
       return isTransportError(provisioned.error)
         ? { kind: "backend-unavailable" }
         : { kind: "not-provisioned" };
     }
+    if (!provisioned.value.success) {
+      const { code } = provisioned.value.error;
+      deps.log("provision", { code });
+      return notProvisioned(code);
+    }
     const meAgain = await attempt(() => deps.fetchMe(token));
     if (!meAgain.ok) {
-      deps.log("getMeAfterProvision", { name: errorName(meAgain.error) });
+      deps.log("getMeAfterProvision", errorFields(meAgain.error));
       return { kind: "backend-unavailable" };
     }
     if (meAgain.value === null) return { kind: "not-provisioned" };
@@ -129,7 +168,7 @@ export async function resolveUserDestinationWith(
 
   const agenciesResult = await attempt(() => deps.fetchAgencies(token));
   if (!agenciesResult.ok) {
-    deps.log("fetchAgencies", { name: errorName(agenciesResult.error) });
+    deps.log("fetchAgencies", errorFields(agenciesResult.error));
     return { kind: "backend-unavailable" };
   }
   const agencies = agenciesResult.value;
@@ -138,7 +177,7 @@ export async function resolveUserDestinationWith(
   // user with no active agency routes to the admin app.
   const staff = await attempt(() => deps.fetchStaff(token));
   if (!staff.ok) {
-    deps.log("fetchStaff", { name: errorName(staff.error) });
+    deps.log("fetchStaff", errorFields(staff.error));
     return { kind: "backend-unavailable" };
   }
   if (shouldRouteStaffToAdmin({ isStaff: staff.value, agencies })) return { kind: "staff" };
@@ -184,9 +223,7 @@ export function resolveUserDestination(): Promise<UserDestination> {
         refresh: "never",
       }),
     fetchMe: (token) => fetchQuery(api.users.useCases.getMe, {}, { token }),
-    provision: async (token) => {
-      await fetchMutation(api.users.useCases.getOrCreateByIdentity, {}, { token });
-    },
+    provision: (token) => fetchMutation(api.users.useCases.getOrCreateByIdentity, {}, { token }),
     fetchAgencies: (token) => fetchQuery(api.agencies.useCases.listAgenciesForUser, {}, { token }),
     fetchStaff: (token) => fetchQuery(api.mutavStaff.useCases.amIStaff, {}, { token }),
     log: (step, fields) => console.error(`[agency] user-destination ${step} failed`, fields),
