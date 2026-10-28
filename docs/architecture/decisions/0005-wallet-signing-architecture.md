@@ -2,6 +2,8 @@
 
 **Status:** Accepted, **evolving** (2026-06-22) — the wallet integration is firm; the admin-authority _account model_ (native multisig vs contract account) and the vault standard alignment are under active investigation (see § Open). **Supersedes** the [#157](https://github.com/mutav-finance/mutav-app/pull/157) draft · resolves the "vetted, low-CVE replacement" deferred in `CLAUDE.md` when `@creit.tech/stellar-wallets-kit` was removed (9 CVEs via unused Trezor/HOT/NEAR adapters).
 
+> **Solana pilot note (2026-10-25):** this ADR describes the Stellar admin model. For the Solana pilot, the **protocol admin** is the Squads v4 multisig per mutav-protocol-solana [ADR 0020](https://github.com/mutav-finance/mutav-protocol-solana/blob/main/docs/decisions/0020-operator-admin-separation-and-recovery.md); see the [glossary](https://github.com/mutav-finance/mutav-protocol-solana/blob/main/docs/introduction/glossary.md) Authority section. The decision text below is unchanged.
+
 ## Context
 
 `mutav-app` has **three signing surfaces** plus one that signs nothing:

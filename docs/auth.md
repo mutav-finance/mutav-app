@@ -1,5 +1,7 @@
 # Auth — Convex Function Wrappers
 
+> Auth0 setup, env vars, tenants, rotation and troubleshooting live in [`auth0.md`](auth0.md). This doc covers the Convex-side wrappers and authorization model.
+
 > Mutav uses custom Convex function wrappers from [convex-helpers](https://stack.convex.dev/custom-functions) to authenticate and agency-scope every public query and mutation. The wrappers resolve the calling user once, attach `user` / `membership` / `agencyId` to `ctx`, and fail closed on missing identity or membership. Identity is JWT-only via Auth0 — there is no dev-user fallback; a deployment without a real `AUTH0_DOMAIN` rejects every authenticated request. See [`src/lib/auth0.ts`](../src/lib/auth0.ts), [`src/providers/convex.tsx`](../src/providers/convex.tsx), and [`convex/auth.config.ts`](../convex/auth.config.ts) for the wiring.
 
 ## The four wrappers + one helper
