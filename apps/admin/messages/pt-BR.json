@@ -33,7 +33,7 @@
       "overview": "Visão geral",
       "agencies": "Imobiliárias",
       "compliance": "Compliance",
-      "defaults": "Solicitações de inadimplência",
+      "defaults": "Acionamentos",
       "treasury": "Tesouraria",
       "observability": "Observabilidade",
       "nav": "NAV",
@@ -145,7 +145,7 @@
     }
   },
   "defaults": {
-    "title": "Acionamentos de inadimplência",
+    "title": "Acionamentos",
     "subtitle": "Acionamentos aguardando decisão de compliance, dos mais antigos aos mais recentes.",
     "empty": "Nenhum acionamento em aberto.",
     "moreAvailable": "Há mais acionamentos na fila — apenas a página mais antiga é exibida.",
@@ -154,22 +154,17 @@
     "daysOpen": "{days, plural, =0 {hoje} one {# dia} other {# dias}}",
     "columns": {
       "notice": "Acionamento",
-      "agency": "Imobiliária",
-      "tenant": "Inquilino",
+      "tenant": "Inquilino e imobiliária",
       "guarantee": "Garantia",
       "outstanding": "Em aberto",
-      "openFor": "Aberto há",
       "actions": "Ações",
       "select": "Selecionar"
     },
-    "noticeStatus": {
-      "open": "Atraso informado",
-      "verified": "Em análise"
-    },
-    "claimStatus": {
-      "none": "Aguardando acionamento da imobiliária",
-      "submitted": "Acionada — pronta para análise",
-      "info_requested": "Pendência com a imobiliária"
+    "caseStatus": {
+      "awaiting_claim": "Aguardando acionamento",
+      "awaiting_review": "Aguardando análise",
+      "info_requested": "Pendência com a imobiliária",
+      "awaiting_cover": "Inadimplência confirmada"
     },
     "guaranteeState": {
       "drafted": "Rascunho",
@@ -186,7 +181,8 @@
       "dismiss": "Descartar",
       "cancel": "Cancelar",
       "coverSelected": "Registrar cobertura ({count})",
-      "clearSelection": "Limpar seleção"
+      "clearSelection": "Limpar seleção",
+      "more": "Mais ações"
     },
     "cover": {
       "title": "Registrar cobertura",
@@ -266,7 +262,7 @@
         "actions": "Ações"
       },
       "actions": {
-        "markExecuted": "Marcar pagamento executado"
+        "markExecuted": "Marcar pago"
       },
       "execute": {
         "title": "Marcar pagamento executado",
@@ -320,7 +316,8 @@
         "INVALID_DUE_DATE": "O prazo precisa ser uma data futura.",
         "FORBIDDEN": "Seu papel não permite esta ação.",
         "unexpected": "Não foi possível enviar. Tente novamente."
-      }
+      },
+      "verify": "Confirmar inadimplência"
     },
     "arrearsWithoutClaim": {
       "title": "Atrasos sem acionamento",

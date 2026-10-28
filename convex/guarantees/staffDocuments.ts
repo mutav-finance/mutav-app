@@ -334,11 +334,20 @@ export const listDocumentsPendingReview = queryWithMutavRole({ minRole: REVIEW_R
     const shaped = await Promise.all(
       rows.map(async (row) => {
         const guarantee = await ctx.db.get(row.guaranteeId);
+        const lease = guarantee ? await ctx.db.get(guarantee.leaseId) : null;
+        const tenant = lease ? await ctx.db.get(lease.tenantId) : null;
         return {
           ...shapeStaffGuaranteeDocument(row, names),
           agencyName: agencyNames.get(row.agencyId) ?? null,
           guaranteePublicId: guarantee?.publicId ?? null,
           guaranteeStatus: guarantee?.status ?? null,
+          tenantName: tenant?.fullName ?? null,
+          property: lease
+            ? {
+                streetAndNumber: lease.property.streetAndNumber,
+                complement: lease.property.complement,
+              }
+            : null,
         };
       }),
     );

@@ -21,8 +21,8 @@ import { Button } from "@mutav/ui/button";
 import { Input } from "@mutav/ui/input";
 import { Mono } from "@mutav/ui/mono";
 import { PageContent } from "@mutav/ui/page/page-content";
-import { PageHeader } from "@mutav/ui/page/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
+import { SectionHeader } from "@/components/defaults/section-header";
 
 /**
  * Guarantees still in arrears with nothing open — usually because the agency
@@ -61,7 +61,7 @@ export function ArrearsWithoutClaim() {
 
   return (
     <>
-      <PageHeader variant="section" title={t("title")} subtitle={t("subtitle")} />
+      <SectionHeader title={t("title")} subtitle={t("subtitle")} />
       <PageContent variant="full">
         <div className="px-4 lg:px-6">
           {rows === undefined ? (
