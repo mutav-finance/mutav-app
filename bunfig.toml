@@ -1,0 +1,5 @@
+[install]
+# Supply-chain guard: refuse package versions published less than 3 days ago
+# (value in seconds). Freshly published versions are the window in which
+# compromised/worm releases are typically caught and yanked.
+minimumReleaseAge = 259200
