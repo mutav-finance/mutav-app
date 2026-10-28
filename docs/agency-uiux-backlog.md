@@ -11,7 +11,7 @@ Complexity was sized the same day by reading the code on `fix/agency-ui-polish` 
 | **G**  | 3 to 7 days; schema change, new backend flow, permissions, or several screens             |
 | **GG** | > 1 week, or depends on an external service, or blocked by an open product/legal decision |
 
-Summary: 8 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap).
+Summary: 5 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2 and 7.1 were dropped after review; 6.1 is on hold.
 
 ## 1. Dashboard (Painel)
 
@@ -21,8 +21,6 @@ Summary: 8 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap).
   `convex/invoices/useCases.ts:231-254`, `convex/invoices/domain.ts:165-175`
 - **1.3 [M] Greeting + "what needs your attention today" block** above the chart. The greeting is P (`currentUser.name` is in the workspace provider). The block can reuse `getOverdueCount`, `getStatusCounts` and `delinquencies.openStats`. Needs a product list of items and their priority.
   `apps/agency/src/app/[locale]/(app)/page.tsx`, `apps/agency/src/providers/workspace.tsx:107`
-- **1.4 [P] Simplify the "Carteira vigente" chart** (1 area + 5 event bars over 12 months). `GuaranteeStateChart` is shared with Transparência, so change it through the agency wrapper's props (e.g. hide events, 6m default).
-  `apps/agency/src/components/guarantees/agency-state-chart.tsx:12-31`
 
 ## 2. Guarantees and contract creation
 
@@ -30,7 +28,7 @@ Summary: 8 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap).
   `convex/guarantees/useCases.ts:79-135` (throw at :127), `convex/guarantees/tenantIdentity.ts:8-34`
 - **2.2 [M] Contract detail: information and actions per status.** There is no "Ativar" button: `guarantees.mutations.activate` has no UI caller. The actions menu (edit, duplicate, archive) is fully disabled. Needs a status x action matrix from product. Depends on 2.1.
   `guarantee-summary-card.tsx:87-185`, `guarantee-actions-menu.tsx:30-33`, `convex/guarantees/mutations.ts:98`
-- **2.3 [P] "Valor locatício aprovado" card.** Nothing is computed: it echoes the rent typed in step 1 (`data.rentCents`). Rename (e.g. "Aluguel analisado") and add an explanation. M if product wants a real approved ceiling.
+- **2.3 [P] Remove the "Valor locatício aprovado" card.** Nothing is computed: it echoes the rent typed in step 1 (`data.rentCents`), which step 4's review shows again. Drop the card and the `approvedValueLabel` key.
   `wizard-step2.tsx:215-224`, `messages/pt-BR.json:920`
 - **2.4 [G] Resume a creation stopped at step 4.** The `drafted` status does not fit: it is born only on step 4 submit and means a priced proposal awaiting activation. Wizard state lives only in `useReducer`. Needs a wizard-draft table (with personal data), a resume screen and an LGPD retention decision.
   `guarantee-wizard.tsx:19-23`, `wizard-step4.tsx:47`, `convex/schema.ts:367-376`
@@ -43,8 +41,6 @@ Summary: 8 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap).
 
 - **3.1 [GG] Pay / download boleto.** No boleto issuer exists: `payments.method = boleto` only records a settlement; the real providers are Etherfuse (Pix) and Stellar. Needs a bank/PSP integration with settlement webhook. **P stopgap:** point the dashboard button at the existing checkout (Pix/Stellar).
   `apps/agency/src/components/invoices/invoice-method-card.tsx:46-67`, `convex/payments/providers/domain.ts:18-21`, `docs/architecture/decisions/0006-invoice-settlement-split.md`
-- **3.2 [P] Inconsistent invoice IDs** (INV-6E5F-9001 vs INV-2026-09-0500). Production emits only `INV-{ref}-{NNNN}`; the other format comes from the demo seed. Make the seed use `formatInvoiceDocumentNumber`, fix `seed.test.ts`, `resetInvoiceToOpen` and `payment-link.test.ts`, then reseed.
-  `convex/invoices/lib/documentNumber.ts:26-46`, `convex/seed.ts:2648,2690,3323`
 
 ## 4. Status and colors (all tables)
 
@@ -69,7 +65,7 @@ Suggested order: 5.3, then 5.2 and 5.4. 5.1 is independent.
 
 ## 6. Login and onboarding
 
-- **6.1 [P] Customize the Auth0 login screen** (logo, colors, texts). Tenant config is not in the repo: done in the Auth0 dashboard, twice (dev tenant, then `mutav-prod`, #119). See `nav-shell-audit.md:101,145` and #360. M if versioned as code.
+- **6.1 [P] (on hold) Customize the Auth0 login screen** (logo, colors, texts). Tenant config is not in the repo: done in the Auth0 dashboard, twice (dev tenant, then `mutav-prod`, #119). See `nav-shell-audit.md:101,145` and #360. M if versioned as code.
 - **6.2 [GG] Verify email and phone with a code.** Nothing exists today. Email code can come from Auth0 config; there is no SMS provider in the repo (only Resend). Decide Auth0 MFA vs own Convex flow (`phoneVerifiedAt`, rate limit).
   `convex/schema.ts:257`, `convex/agencies/useCases.ts:481`
 - **6.3 [GG] KYC for the autonomous broker.** The broker skips the documents step; today's KYC/KYB is a manual staff review. The only `kycStatus` is Etherfuse's (anchor account). Likely vendor Avenia (`docs/conventions/deferred.md:54`). G if it is document upload + manual review.
@@ -79,16 +75,14 @@ Suggested order: 5.3, then 5.2 and 5.4. 5.1 is independent.
 
 ## 7. Cross-cutting
 
-- **7.1 [P] Transparência: make the protocol-wide scope explicit and drop jargon** (treasury, vault, PTAX, cUSD). Same labels as the dashboard cards but platform-wide numbers. Copy and layout only; M if the agency's own numbers are shown alongside.
-  `apps/agency/src/components/transparency/transparency-page.tsx:44-63`, `messages/pt-BR.json:1279-1355`
 - **7.2 [M] Empty states that teach** (steps + CTA). No shared `EmptyState` component; about 5 screens (Garantias, Faturas, Inadimplências, Comissão, empty dashboard) plus detail cards.
   `guarantee-list-table.tsx:386-398`, `invoice-list-table.tsx:359`, `delinquency-page.tsx:305`, `commission-page.tsx:182`
-- **7.3 [P] Copy fixes.** "Outubro De 2026" comes from the CSS `capitalize` class over Intl output; menu "Inadimplências" vs heading "Acionamentos de Inadimplência"; tab titles mix "— MUTAV", "| Mutav" and none (use `title.template` in the root layout).
-  `commission-page.tsx:38,77`, `app/[locale]/layout.tsx:20-28`
+- **7.3 [P] Consistent tab titles.** Tab titles mix "— MUTAV", "| Mutav" and none; use `title.template` in the root layout.
+  `app/[locale]/layout.tsx:20-28`
 
 ## Proposed plan
 
-1. **Quick wins (about 1 week):** 2.1, 1.2, 2.3, 3.2, 7.3, 1.4, 4.1, 7.1, 6.1, and the 5.3 copy rename.
+1. **Quick wins (about 1 week):** 2.1, 1.2, 2.3, 7.3, 4.1, and the 5.3 copy rename. 6.1 waits for a later round.
 2. **Dashboard and guarantees (1 to 2 weeks):** 1.1 (with the 3.1 stopgap on the button), 1.3, 2.2, 2.5, 7.2, 5.1. Needs decisions first: delinquency metric, "attention today" items, actions per status.
 3. **Team and agency profile (2 to 3 weeks):** 5.3, then 5.2 and 5.4.
 4. **Blocked on third parties (start the conversations now):** 3.1 (PSP), 6.2 (SMS), 6.3 (KYC vendor), 6.4 (counsel), 2.4 (LGPD), 2.6 (underwriting).
@@ -99,6 +93,7 @@ Suggested order: 5.3, then 5.2 and 5.4. 5.1 is independent.
 - Keep the "EM BREVE" menu items; the path is to build the pages (5.2, 5.4).
 - Delinquency guide: dropped (a product Mutav does not offer).
 - CredAluga-style "quick actions": optional, probably not needed.
+- Dropped: simplifying the "Carteira vigente" chart (was 1.4), unifying seed invoice IDs (was 3.2), Transparência scope/jargon copy (was 7.1), and the "Outubro De" / Inadimplências heading copy fixes (were part of 7.3).
 
 ## Keep
 
