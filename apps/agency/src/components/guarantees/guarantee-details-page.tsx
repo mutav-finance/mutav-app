@@ -55,6 +55,12 @@ export function GuaranteeDetailsPage({
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/guarantees">{tNav("guarantees")}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
                 <BreadcrumbPage>
                   <Mono>#{guarantee.id}</Mono>
                 </BreadcrumbPage>
@@ -69,7 +75,11 @@ export function GuaranteeDetailsPage({
         <GuaranteeTenantCard tenant={guarantee.tenant} />
         <GuaranteeLeaseCard lease={guarantee.lease} />
         <GuaranteeTermsCard terms={guarantee.terms} />
-        <GuaranteeDocumentsCard documents={guarantee.documents} />
+        <GuaranteeDocumentsCard
+          publicId={guarantee.id}
+          agencyId={guarantee.agencyId}
+          guaranteeStatus={guarantee.status}
+        />
         <GuaranteeHistoryCard history={guarantee.history} />
       </PageContent>
     </PageShell>

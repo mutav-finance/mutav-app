@@ -249,7 +249,7 @@ describe("schema walk", () => {
     const leases = schemaFieldsForTable(schema, "leases").map((field) => field.fieldPath);
     expect(leases).toContain("property.cep");
     const guarantees = schemaFieldsForTable(schema, "guarantees").map((field) => field.fieldPath);
-    expect(guarantees).toContain("documents[].key");
+    expect(guarantees).toContain("terms.rentCents");
     expect(guarantees).toContain("underwriting.score");
 
     const assessments = schemaFieldsForTable(schema, "creditAnalysisAssessments").map(
@@ -299,6 +299,7 @@ describe("tier assignments agree with POL-SEC-004 §4.2", () => {
     "guaranteeDelinquencyNotices.resolution.kind",
     "guaranteeDelinquencyNotices.status",
     "guaranteeDelinquencyNotices.updatedAmountCents",
+    "guaranteeDocuments.storageId",
     "guaranteeHistory.tenantSnapshot.contactCpf",
     "guaranteeHistory.tenantSnapshot.taxId",
     "guarantees.underwriting.score",
