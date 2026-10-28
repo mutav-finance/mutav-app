@@ -33,7 +33,7 @@
       "overview": "Overview",
       "agencies": "Agencies",
       "compliance": "Compliance",
-      "defaults": "Default requests",
+      "defaults": "Claims",
       "treasury": "Treasury",
       "observability": "Observability",
       "nav": "NAV",
@@ -145,31 +145,26 @@
     }
   },
   "defaults": {
-    "title": "Default requests",
-    "subtitle": "Delinquency notices awaiting a compliance decision, oldest first.",
+    "title": "Claims",
+    "subtitle": "Claims awaiting a compliance decision, oldest first.",
     "empty": "No outstanding notices.",
     "moreAvailable": "More notices are queued — only the oldest page is shown.",
     "notAvailable": "—",
     "dueOn": "Rent due {date}",
     "daysOpen": "{days, plural, =0 {today} one {# day} other {# days}}",
     "columns": {
-      "notice": "Notice",
-      "agency": "Agency",
-      "tenant": "Tenant",
+      "notice": "Claim",
+      "tenant": "Tenant and agency",
       "guarantee": "Guarantee",
       "outstanding": "Outstanding",
-      "openFor": "Open for",
       "actions": "Actions",
       "select": "Select"
     },
-    "noticeStatus": {
-      "open": "Late rent reported",
-      "verified": "Under review"
-    },
-    "claimStatus": {
-      "none": "Waiting for the agency to file the claim",
-      "submitted": "Claim filed — ready for review",
-      "info_requested": "Waiting on the agency"
+    "caseStatus": {
+      "awaiting_claim": "Awaiting claim",
+      "awaiting_review": "Awaiting review",
+      "info_requested": "Waiting on the agency",
+      "awaiting_cover": "Default confirmed"
     },
     "guaranteeState": {
       "drafted": "Draft",
@@ -186,7 +181,8 @@
       "dismiss": "Dismiss",
       "cancel": "Cancel",
       "coverSelected": "Record cover ({count})",
-      "clearSelection": "Clear selection"
+      "clearSelection": "Clear selection",
+      "more": "More actions"
     },
     "cover": {
       "title": "Record cover",
@@ -266,7 +262,7 @@
         "actions": "Actions"
       },
       "actions": {
-        "markExecuted": "Mark payout executed"
+        "markExecuted": "Mark paid"
       },
       "execute": {
         "title": "Mark payout executed",
@@ -320,7 +316,8 @@
         "INVALID_DUE_DATE": "The deadline must be a future date.",
         "FORBIDDEN": "Your role does not allow this action.",
         "unexpected": "Could not send. Please try again."
-      }
+      },
+      "verify": "Verify default"
     },
     "arrearsWithoutClaim": {
       "title": "Arrears without a claim",

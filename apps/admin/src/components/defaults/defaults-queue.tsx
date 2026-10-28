@@ -1,5 +1,6 @@
 "use client";
 
+import { EllipsisVerticalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Preloaded } from "convex/react";
 import type { api } from "@convex/_generated/api";
@@ -14,6 +15,12 @@ import { Label } from "@mutav/ui/label";
 import { Mono } from "@mutav/ui/mono";
 import { ClaimStatusBadge } from "@mutav/ui/claim-status-tag";
 import { GuaranteeStateTag } from "@mutav/ui/guarantee-state-tag";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@mutav/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import {
@@ -35,7 +42,11 @@ import {
   type DefaultsQueueViewModel,
   type DismissalKind,
 } from "@/hooks/use-defaults-queue";
-import { daysOpen } from "@/components/defaults/view-model";
+import {
+  STAFF_CASE_STATUS_TONE,
+  daysOpen,
+  staffCaseStatus,
+} from "@/components/defaults/view-model";
 import { CoverPayouts } from "@/components/defaults/cover-payouts";
 import { ArrearsWithoutClaim } from "@/components/defaults/arrears-without-claim";
 import { ClaimReviewDialog } from "@/components/defaults/claim-review-dialog";
@@ -88,11 +99,9 @@ export function DefaultsQueue({
                         />
                       </TableHead>
                       <TableHead>{t("columns.notice")}</TableHead>
-                      <TableHead>{t("columns.agency")}</TableHead>
                       <TableHead>{t("columns.tenant")}</TableHead>
                       <TableHead>{t("columns.guarantee")}</TableHead>
                       <TableHead className="text-right">{t("columns.outstanding")}</TableHead>
-                      <TableHead className="text-right">{t("columns.openFor")}</TableHead>
                       <TableHead className="text-right">{t("columns.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -114,6 +123,15 @@ export function DefaultsQueue({
       <CoverPayouts preloaded={payoutsPreloaded} />
       <ArrearsWithoutClaim />
 
+      {view.review.target ? (
+        <ClaimReviewDialog
+          key={view.review.target.publicId}
+          row={view.review.target}
+          busy={view.busy}
+          onClose={view.review.close}
+          onVerify={view.review.verify}
+        />
+      ) : null}
       <CoverDialog view={view} />
       <DismissDialog view={view} />
     </PageShell>
@@ -123,6 +141,7 @@ export function DefaultsQueue({
 function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueViewModel }) {
   const t = useTranslations("defaults");
   const isVerified = isCoverable(row);
+  const caseStatus = staffCaseStatus(row);
 
   return (
     <TableRow>
@@ -135,26 +154,25 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
         />
       </TableCell>
       <TableCell>
-        <div className="flex flex-col gap-1">
-          <Mono>{row.publicId}</Mono>
-          <ClaimStatusBadge status={isVerified ? "under_review" : "reported"}>
-            {t(`noticeStatus.${row.status}`)}
+        <div className="flex flex-col items-start gap-1">
+          <ClaimStatusBadge status={STAFF_CASE_STATUS_TONE[caseStatus]}>
+            {t(`caseStatus.${caseStatus}`)}
           </ClaimStatusBadge>
-          {row.status === "open" ? (
-            <span className="text-muted-foreground text-xs">
-              {t(`claimStatus.${row.claimStatus ?? "none"}`)}
-            </span>
-          ) : null}
+          <Mono className="text-muted-foreground text-xs">{row.publicId}</Mono>
         </div>
       </TableCell>
-      <TableCell>{row.agencyName}</TableCell>
-      <TableCell>{row.tenantName ?? t("notAvailable")}</TableCell>
-      <TableCell>
+      <TableCell className="whitespace-normal">
         <div className="flex flex-col gap-1">
-          <Mono>{row.guaranteePublicId}</Mono>
+          <span>{row.tenantName ?? t("notAvailable")}</span>
+          <span className="text-muted-foreground text-base-sm">{row.agencyName}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col items-start gap-1">
           <GuaranteeStateTag state={row.guaranteeState}>
             {t(`guaranteeState.${row.guaranteeState}`)}
           </GuaranteeStateTag>
+          <Mono className="text-muted-foreground text-xs">{row.guaranteePublicId}</Mono>
         </div>
       </TableCell>
       <TableCell className="text-right">
@@ -163,37 +181,47 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
           <span className="text-muted-foreground text-base-sm">
             {t("dueOn", { date: formatDateBR(row.rentDueDate) })}
           </span>
+          <span className="text-muted-foreground text-base-sm">
+            {t("daysOpen", { days: daysOpen({ openedAt: row.openedAt, now: view.now }) })}
+          </span>
         </div>
       </TableCell>
       <TableCell className="text-right">
-        {t("daysOpen", { days: daysOpen({ openedAt: row.openedAt, now: view.now }) })}
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            size="sm"
-            disabled={view.busy || !isVerifiable(row)}
-            onClick={() => view.verify(row)}
-          >
-            {t("actions.verify")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={view.busy || !isVerified}
-            onClick={() => view.cover.openOne(row)}
-          >
-            {t("actions.cover")}
-          </Button>
-          <ClaimReviewDialog row={row} />
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={view.busy}
-            onClick={() => view.dismiss.open(row)}
-          >
-            {t("actions.dismiss")}
-          </Button>
+        <div className="flex items-center justify-end gap-1">
+          {isVerified ? (
+            <Button size="sm" disabled={view.busy} onClick={() => view.cover.openOne(row)}>
+              {t("actions.cover")}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={view.busy || !isVerifiable(row)}
+              onClick={() => void view.verify(row)}
+            >
+              {t("actions.verify")}
+            </Button>
+          )}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon-sm" variant="ghost" aria-label={t("actions.more")}>
+                <EllipsisVerticalIcon aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {row.claimStatus !== null ? (
+                <DropdownMenuItem onSelect={() => view.review.open(row)}>
+                  {t("claimReview.trigger")}
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={view.busy}
+                onSelect={() => view.dismiss.open(row)}
+              >
+                {t("actions.dismiss")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </TableCell>
     </TableRow>

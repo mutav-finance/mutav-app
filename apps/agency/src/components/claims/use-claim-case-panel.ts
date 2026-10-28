@@ -10,6 +10,7 @@ import {
   AGENCY_CASE_STATUS,
   CLAIM_EVIDENCE_KINDS,
   CLAIM_EVIDENCE_STATUS,
+  SIGNED_CONTRACT_STATE,
   brazilToday,
   type ClaimEvidenceId,
   type ClaimEvidenceKind,
@@ -157,13 +158,9 @@ export function useClaimCasePanel({
 
   const amountInput = amountChoice ?? centsToInput(detail.originalAmountCents);
   const amountCents = parseAmountToCents(amountInput);
-  const missing = [
-    ...detail.missingRequirements.filter((requirement) => requirement !== "signedContract"),
-    ...(declared ? [] : (["declaration"] as const)),
-  ];
+  const missing = [...detail.missingRequirements, ...(declared ? [] : (["declaration"] as const))];
   const canSubmit =
     status === AGENCY_CASE_STATUS.READY_TO_CLAIM &&
-    !detail.missingRequirements.includes("signedContract") &&
     missing.length === 0 &&
     amountCents !== null &&
     amountCents <= detail.originalAmountCents;
@@ -203,7 +200,8 @@ export function useClaimCasePanel({
     uploadingKind,
     upload,
     download,
-    signedContractMissing: detail.missingRequirements.includes("signedContract"),
+    pendingSignedContract:
+      detail.signedContract === SIGNED_CONTRACT_STATE.APPROVED ? null : detail.signedContract,
     missing,
     declared,
     setDeclared,

@@ -160,7 +160,8 @@
       "tabs": {
         "needs_you": "Needs you",
         "with_mutav": "With MUTAV",
-        "closed": "Closed"
+        "closed": "Closed",
+        "all": "All"
       },
       "reportLateRent": "Report late rent",
       "col": {
@@ -176,7 +177,8 @@
       "empty": {
         "needs_you": "Nothing is waiting on you.",
         "with_mutav": "No case under review at MUTAV.",
-        "closed": "No closed cases."
+        "closed": "No closed cases.",
+        "all": "No late-rent cases yet."
       },
       "unnamedTenant": "Unnamed tenant",
       "next": {
@@ -246,7 +248,11 @@
       },
       "precondition": {
         "title": "Before claiming",
-        "signedContract": "MUTAV has not approved the signed contract yet. You can upload the evidence now; the claim opens once the contract is approved.",
+        "signedContract": {
+          "not_uploaded": "The signed rental contract has not been uploaded yet. Upload it in the guarantee's documents; you can upload the evidence now, and the claim opens once MUTAV approves the contract.",
+          "in_review": "MUTAV has not approved the signed contract yet. You can upload the evidence now; the claim opens once the contract is approved.",
+          "rejected": "MUTAV rejected the signed contract you uploaded. Upload a new file in the guarantee's documents; the claim opens once the contract is approved."
+        },
         "openDocuments": "View the guarantee's documents"
       },
       "evidence": {
@@ -280,7 +286,7 @@
         "nonPaymentProof": "proof of non-payment",
         "tenantNotice": "notice to the tenant",
         "declaration": "declaration",
-        "signedContract": "approved contract"
+        "signedContract": "approved signed contract"
       },
       "resubmit": "Send back for review",
       "money": {
@@ -497,7 +503,15 @@
     }
   },
   "guaranteeDetails": {
-    "heroTitle": "Guarantee {state}",
+    "heroTitle": {
+      "drafted": "Draft guarantee",
+      "active": "Active guarantee",
+      "in_arrears": "Guarantee in arrears",
+      "default_verified": "Guarantee with verified default",
+      "cover_committed": "Guarantee with committed cover",
+      "in_eviction": "Guarantee in eviction",
+      "closed": "Closed guarantee"
+    },
     "summary": {
       "heading": "Request",
       "currentStatus": "Current status:",
@@ -508,7 +522,6 @@
       "cancelProposal": "Cancel proposal",
       "idLabel": "Guarantee ID",
       "guaranteeTooltipLabel": "Available guarantee details",
-      "cancelProposalHint": "Available only for drafted guarantees",
       "cancelDialog": {
         "title": "Cancel proposal?",
         "description": "The guarantee will be marked as canceled. History will be preserved.",

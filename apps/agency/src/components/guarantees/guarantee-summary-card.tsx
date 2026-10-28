@@ -26,7 +26,6 @@ import {
 } from "@mutav/ui/dropdown-menu";
 import { Mono } from "@mutav/ui/mono";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
-import { cn } from "@mutav/ui/cn";
 import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { GUARANTEE_STATE } from "@convex/guarantees/domain";
 import type { Guarantee } from "@/lib/guarantees/types";
@@ -73,50 +72,35 @@ export function GuaranteeSummaryCard({ guarantee }: { guarantee: Guarantee }) {
           <Eyebrow as={CardTitle} size="xs" className="font-medium">
             {t("heading")}
           </Eyebrow>
-          <CardAction className="flex items-center gap-2">
-            {/* Desktop: show all buttons inline */}
-            <div className="hidden items-center gap-2 sm:flex">
-              {/* A disabled button swallows pointer events and focus, so a span carries the
-                  tooltip — focusable while the button is disabled, so keyboard users reach it too.
-                  Radix wires the trigger's aria-describedby to the tooltip content. */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    className={cn(!isDrafted && "cursor-not-allowed")}
-                    tabIndex={isDrafted ? undefined : 0}
+          {isDrafted ? (
+            <CardAction className="flex items-center gap-2">
+              <Button
+                variant="outline-primary"
+                size="sm"
+                className="hidden sm:inline-flex"
+                onClick={() => setCancelOpen(true)}
+              >
+                {t("cancelProposal")}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline-primary"
+                    size="icon-sm"
+                    className="sm:hidden"
+                    aria-label={t("actionsMenu")}
                   >
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      disabled={!isDrafted}
-                      onClick={() => setCancelOpen(true)}
-                    >
-                      {t("cancelProposal")}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{t("cancelProposalHint")}</TooltipContent>
-              </Tooltip>
-            </div>
-            {/* Mobile: collapse into dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline-primary"
-                  size="icon-sm"
-                  className="sm:hidden"
-                  aria-label={t("actionsMenu")}
-                >
-                  <MoreHorizontalIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={!isDrafted} onClick={() => setCancelOpen(true)}>
-                  {t("cancelProposal")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </CardAction>
+                    <MoreHorizontalIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setCancelOpen(true)}>
+                    {t("cancelProposal")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardAction>
+          ) : null}
         </CardHeader>
         <CardContent className="grid gap-4 py-4">
           <div className="flex flex-col gap-1">

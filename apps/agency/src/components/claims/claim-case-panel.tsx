@@ -23,10 +23,15 @@ import { Field } from "@mutav/ui/field";
 import { Input } from "@mutav/ui/input";
 import { Mono } from "@mutav/ui/mono";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
-import { StepIndicator } from "@mutav/ui/step-indicator";
-import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@mutav/i18n/brazil";
+import {
+  formatBRLCents,
+  formatDateBR,
+  formatDateTimeBR,
+  formatMonthYear,
+} from "@mutav/i18n/brazil";
 import { Link } from "@mutav/i18n/navigation";
 import { CASE_STEPS } from "@/lib/claims/case-view";
+import { CompactStepIndicator } from "@/components/claims/compact-step-indicator";
 import {
   useClaimCasePanel,
   type ClaimEvidenceFile,
@@ -38,14 +43,6 @@ type WithdrawReason = (typeof WITHDRAW_REASONS)[number];
 
 function isWithdrawReason(value: string): value is WithdrawReason {
   return WITHDRAW_REASONS.some((reason) => reason === value);
-}
-
-function monthLabel(locale: string, isoDate: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${isoDate.slice(0, 7)}-01T00:00:00Z`));
 }
 
 /**
@@ -74,7 +71,7 @@ export function ClaimCasePanel({
   }
 
   const { detail } = view;
-  const month = monthLabel(locale, detail.rentDueDate);
+  const month = formatMonthYear(detail.rentDueDate, locale, { month: "long" });
   const address = [detail.streetAndNumber, detail.complement].filter(Boolean).join(" · ");
 
   return (
@@ -96,7 +93,7 @@ export function ClaimCasePanel({
       </header>
 
       {view.step !== null ? (
-        <StepIndicator
+        <CompactStepIndicator
           current={view.step}
           labels={CASE_STEPS.map((step) => t(`steps.${step}`))}
           progressLabel={t("progress")}
@@ -107,10 +104,12 @@ export function ClaimCasePanel({
 
       <WhatNow view={view} month={month} />
 
-      {view.signedContractMissing && view.canEditEvidence ? (
+      {view.pendingSignedContract !== null && view.canEditEvidence ? (
         <div className="border-warning-strong bg-warning-dim rounded border p-3 text-sm">
           <p className="font-medium">{t("precondition.title")}</p>
-          <p className="text-muted-foreground">{t("precondition.signedContract")}</p>
+          <p className="text-muted-foreground">
+            {t(`precondition.signedContract.${view.pendingSignedContract}`)}
+          </p>
           <Link href={`/guarantees/${detail.guaranteePublicId}`} className="text-sm underline">
             {t("precondition.openDocuments")}
           </Link>

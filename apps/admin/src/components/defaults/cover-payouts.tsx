@@ -6,7 +6,6 @@ import type { api } from "@convex/_generated/api";
 import type { CoverPayoutRow } from "@convex/coverOperations/useCases";
 import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
 import { PageContent } from "@mutav/ui/page/page-content";
-import { PageHeader } from "@mutav/ui/page/page-header";
 import { Button } from "@mutav/ui/button";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
@@ -23,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@mutav/ui/alert-dialog";
 import { useCoverPayouts, type CoverPayoutsViewModel } from "@/hooks/use-cover-payouts";
+import { SectionHeader } from "@/components/defaults/section-header";
 
 /**
  * The second half of the cover ledger: covers compliance has recorded whose
@@ -39,7 +39,7 @@ export function CoverPayouts({
 
   return (
     <>
-      <PageHeader variant="section" title={t("title")} subtitle={t("subtitle")} />
+      <SectionHeader title={t("title")} subtitle={t("subtitle")} />
       <PageContent variant="full">
         <div className="px-4 lg:px-6">
           {view.rows.length === 0 ? (
@@ -50,11 +50,9 @@ export function CoverPayouts({
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t("columns.operation")}</TableHead>
-                    <TableHead>{t("columns.batch")}</TableHead>
                     <TableHead>{t("columns.notice")}</TableHead>
                     <TableHead>{t("columns.agency")}</TableHead>
                     <TableHead>{t("columns.payoutAccount")}</TableHead>
-                    <TableHead>{t("columns.guarantee")}</TableHead>
                     <TableHead>{t("columns.period")}</TableHead>
                     <TableHead className="text-right">{t("columns.amount")}</TableHead>
                     <TableHead className="text-right">{t("columns.recordedAt")}</TableHead>
@@ -98,19 +96,25 @@ function PayoutRow({ row, view }: { row: CoverPayoutRow; view: CoverPayoutsViewM
   return (
     <TableRow>
       <TableCell>
-        <Mono>{row.publicId}</Mono>
+        <div className="flex flex-col">
+          <Mono>{row.publicId}</Mono>
+          <span className="text-muted-foreground text-xs">
+            {row.batchId ? <Mono>{row.batchId}</Mono> : t("noBatch")}
+          </span>
+        </div>
       </TableCell>
-      <TableCell>{row.batchId ? <Mono>{row.batchId}</Mono> : t("noBatch")}</TableCell>
       <TableCell>
-        <Mono>{row.noticePublicId}</Mono>
+        <div className="flex flex-col">
+          <Mono>{row.noticePublicId}</Mono>
+          <span className="text-muted-foreground text-xs">
+            <Mono>{row.guaranteePublicId}</Mono>
+          </span>
+        </div>
       </TableCell>
       <TableCell>{row.agencyName}</TableCell>
       <TableCell>
         {row.payoutAccount.bank} ·{" "}
         {t("accountEnding", { last4: accountSuffix(row.payoutAccount.account) })}
-      </TableCell>
-      <TableCell>
-        <Mono>{row.guaranteePublicId}</Mono>
       </TableCell>
       <TableCell>
         <Mono>{row.coveragePeriod}</Mono>

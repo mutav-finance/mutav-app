@@ -1,18 +1,21 @@
 // @vitest-environment edge-runtime
 import { describe, expect, test } from "vitest";
 import { COVER_OPERATION_STATUS } from "../coverOperations/domain";
+import { DOCUMENT_KEY, type GuaranteeDocumentStatus } from "../guarantees/domain";
 import {
   AGENCY_CASE_STATUSES,
   DELINQUENCY_STATUS,
   NOTICE_CANCELLATION_REASON,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
+  SIGNED_CONTRACT_STATE,
   isCanceled,
   isOpen,
   isResolved,
   agencyCanAct,
   claimExpiryReason,
   caseGroupOf,
+  signedContractState,
   toAgencyCaseStatus,
 } from "./domain";
 
@@ -177,6 +180,42 @@ describe("toAgencyCaseStatus", () => {
       "under_review",
       "withdrawn",
     ]);
+  });
+});
+
+describe("signedContractState", () => {
+  const contract = (status: GuaranteeDocumentStatus, day: string) => ({
+    key: DOCUMENT_KEY.RENTAL_CONTRACT,
+    status,
+    uploadedAt: `2026-10-${day}T12:00:00.000Z`,
+  });
+
+  test("no rental contract on file reads as not uploaded", () => {
+    expect(signedContractState([])).toBe(SIGNED_CONTRACT_STATE.NOT_UPLOADED);
+    expect(
+      signedContractState([{ ...contract("approved", "01"), key: DOCUMENT_KEY.INSPECTION }]),
+    ).toBe(SIGNED_CONTRACT_STATE.NOT_UPLOADED);
+  });
+
+  test("the newest live upload decides between in review and rejected", () => {
+    expect(signedContractState([contract("pending_review", "01")])).toBe(
+      SIGNED_CONTRACT_STATE.IN_REVIEW,
+    );
+    expect(
+      signedContractState([contract("pending_review", "01"), contract("rejected", "02")]),
+    ).toBe(SIGNED_CONTRACT_STATE.REJECTED);
+    expect(
+      signedContractState([contract("rejected", "01"), contract("pending_review", "02")]),
+    ).toBe(SIGNED_CONTRACT_STATE.IN_REVIEW);
+    expect(signedContractState([contract("superseded", "01")])).toBe(
+      SIGNED_CONTRACT_STATE.NOT_UPLOADED,
+    );
+  });
+
+  test("any approved file wins, even when a newer one was rejected", () => {
+    expect(signedContractState([contract("approved", "01"), contract("rejected", "02")])).toBe(
+      SIGNED_CONTRACT_STATE.APPROVED,
+    );
   });
 });
 

@@ -160,7 +160,8 @@
       "tabs": {
         "needs_you": "Precisa de você",
         "with_mutav": "Com a MUTAV",
-        "closed": "Encerrados"
+        "closed": "Encerrados",
+        "all": "Todos"
       },
       "reportLateRent": "Informar atraso",
       "col": {
@@ -176,7 +177,8 @@
       "empty": {
         "needs_you": "Nada esperando por você.",
         "with_mutav": "Nenhum caso em análise na MUTAV.",
-        "closed": "Nenhum caso encerrado."
+        "closed": "Nenhum caso encerrado.",
+        "all": "Nenhum caso de atraso ainda."
       },
       "unnamedTenant": "Inquilino sem nome",
       "next": {
@@ -246,7 +248,11 @@
       },
       "precondition": {
         "title": "Antes de acionar",
-        "signedContract": "O contrato assinado ainda não foi aprovado pela MUTAV. Você pode enviar as provas agora; o acionamento libera quando o contrato for aprovado.",
+        "signedContract": {
+          "not_uploaded": "O contrato de locação assinado ainda não foi enviado. Envie-o nos documentos da garantia; você pode enviar as provas agora, e o acionamento libera quando a MUTAV aprovar o contrato.",
+          "in_review": "O contrato assinado ainda não foi aprovado pela MUTAV. Você pode enviar as provas agora; o acionamento libera quando o contrato for aprovado.",
+          "rejected": "A MUTAV recusou o contrato assinado enviado. Envie um novo arquivo nos documentos da garantia; o acionamento libera quando o contrato for aprovado."
+        },
         "openDocuments": "Ver documentos da garantia"
       },
       "evidence": {
@@ -280,7 +286,7 @@
         "nonPaymentProof": "comprovante de não pagamento",
         "tenantNotice": "notificação ao inquilino",
         "declaration": "declaração",
-        "signedContract": "contrato aprovado"
+        "signedContract": "contrato assinado aprovado"
       },
       "resubmit": "Reenviar para análise",
       "money": {
@@ -497,7 +503,15 @@
     }
   },
   "guaranteeDetails": {
-    "heroTitle": "Garantia {state}",
+    "heroTitle": {
+      "drafted": "Garantia em rascunho",
+      "active": "Garantia ativa",
+      "in_arrears": "Garantia em atraso",
+      "default_verified": "Garantia com inadimplência verificada",
+      "cover_committed": "Garantia com cobertura registrada",
+      "in_eviction": "Garantia em despejo",
+      "closed": "Garantia encerrada"
+    },
     "summary": {
       "heading": "Solicitação",
       "currentStatus": "Situação atual:",
@@ -508,7 +522,6 @@
       "cancelProposal": "Cancelar proposta",
       "idLabel": "ID da garantia",
       "guaranteeTooltipLabel": "Detalhes da fiança disponível",
-      "cancelProposalHint": "Disponível apenas para garantias em rascunho",
       "cancelDialog": {
         "title": "Cancelar proposta?",
         "description": "A garantia será marcada como cancelada. O histórico será preservado.",

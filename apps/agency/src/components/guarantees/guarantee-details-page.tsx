@@ -35,7 +35,6 @@ export function GuaranteeDetailsPage({
   const guarantee = usePreloadedQuery(preloaded);
   const t = useTranslations("guaranteeDetails");
   const tNav = useTranslations("nav.main");
-  const tState = useTranslations("guaranteeDetails.state");
 
   if (guarantee === null) {
     notFound();
@@ -69,7 +68,7 @@ export function GuaranteeDetailsPage({
             </Eyebrow>
           </Breadcrumb>
         }
-        title={t("heroTitle", { state: tState(guarantee.status) })}
+        title={t(`heroTitle.${guarantee.status}`)}
       />
       <PageContent variant="narrow">
         <GuaranteeSummaryCard guarantee={guarantee} />

@@ -19,12 +19,13 @@ import { listEvidenceForNotice, type ClaimEvidenceRow } from "./claimEvidence";
 import { claimReadiness, claimRulesFor } from "./claims";
 import type { CoverOperation, CoverOperationStatus } from "../coverOperations/domain";
 import {
+  CASE_FILTER_ALL,
   DELINQUENCY_STATUS,
   DELINQUENCY_STATUSES,
   agencyCanAct,
   brazilToday,
   caseGroupOf,
-  caseGroupValidator,
+  caseFilterValidator,
   claimableFromDate,
   delinquencyStatusValidator,
   toAgencyCaseStatus,
@@ -38,6 +39,7 @@ import {
   type NoticeEvidenceSource,
   type NoticeResolutionKind,
   type NoticeCancellationReason,
+  type SignedContractState,
 } from "./domain";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -144,6 +146,8 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
   evidence: ClaimEvidenceRow[];
   /** What still blocks filing the claim; empty once it can be filed. */
   missingRequirements: ClaimRequirement[];
+  /** Review state of the guarantee's signed rental contract, the claim's precondition. */
+  signedContract: SignedContractState;
   /** The payout behind a cover resolution; null for every other outcome. */
   cover: {
     status: CoverOperationStatus;
@@ -290,6 +294,7 @@ async function shapeDelinquencyNoticeDetail(
       : null,
     evidence: await listEvidenceForNotice(ctx, notice._id),
     missingRequirements: readiness.missing,
+    signedContract: readiness.signedContract,
     openedByUserId: notice.openedByUserId,
     agencyId: notice.agencyId,
     verifiedAt: notice.verification?.verifiedAt ?? null,
@@ -863,14 +868,14 @@ function lastActivityAt(notice: DelinquencyNotice): string {
 }
 
 /**
- * The agency's claims queue: the cases of one group plus the size of every
- * group (for the tab counts and the nav badge). The group is derived from the
+ * The agency's claims queue: the cases of one group (or of all, for the "all"
+ * tab) plus the size of every group (for the tab counts and the nav badge). The group is derived from the
  * case status, which needs the cover row and today's date, so all statuses
  * are read and partitioned here rather than by index — an agency's case book
  * is small, and each status read is bounded.
  */
 export const listCases = queryWithAgencyScope({
-  args: { group: caseGroupValidator },
+  args: { group: caseFilterValidator },
   handler: async (
     ctx,
     args,
@@ -902,7 +907,7 @@ export const listCases = queryWithAgencyScope({
       });
       const group = caseGroupOf(caseStatus);
       counts[group] += 1;
-      if (group !== args.group) continue;
+      if (args.group !== CASE_FILTER_ALL && group !== args.group) continue;
 
       const guarantee = await ctx.db.get(notice.guaranteeId);
       if (!guarantee) {

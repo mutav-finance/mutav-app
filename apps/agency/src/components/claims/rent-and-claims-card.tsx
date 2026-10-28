@@ -11,7 +11,7 @@ import { ClaimStatusBadge, ClaimStatusTag } from "@mutav/ui/claim-status-tag";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Mono } from "@mutav/ui/mono";
 import { StepIndicator } from "@mutav/ui/step-indicator";
-import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
+import { formatBRLCents, formatDateBR, formatMonthYear } from "@mutav/i18n/brazil";
 import { ClaimCaseSheet } from "@/components/claims/claim-case-sheet";
 import { OpenNoticeSheet } from "@/components/delinquencies/open-notice-sheet";
 import { CASE_STEPS, caseStep, liveCaseStatus, nextStepFor } from "@/lib/claims/case-view";
@@ -45,11 +45,6 @@ export function RentAndClaimsCard({ guarantee }: { guarantee: Guarantee }) {
     .map((row) => ({ ...row, live: liveCaseStatus(row, today) }))
     .sort((a, b) => b.rentDueDate.localeCompare(a.rentDueDate));
   const current = cases.find((row) => caseGroupOf(row.live) !== CASE_GROUP.CLOSED) ?? null;
-
-  const monthOf = (isoDate: string) =>
-    new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(
-      new Date(`${isoDate.slice(0, 7)}-01T00:00:00Z`),
-    );
 
   const nextStepText = () => {
     if (!current) return null;
@@ -92,8 +87,10 @@ export function RentAndClaimsCard({ guarantee }: { guarantee: Guarantee }) {
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="font-medium">
-                  {t("rentOf", { month: monthOf(current.rentDueDate) })} ·{" "}
-                  {formatBRLCents(current.originalAmountCents)}
+                  {t("rentOf", {
+                    month: formatMonthYear(current.rentDueDate, locale, { month: "long" }),
+                  })}{" "}
+                  · {formatBRLCents(current.originalAmountCents)}
                 </p>
                 <ClaimStatusTag status={current.live}>{tStatus(current.live)}</ClaimStatusTag>
               </div>
@@ -126,7 +123,12 @@ export function RentAndClaimsCard({ guarantee }: { guarantee: Guarantee }) {
                     key={row.publicId}
                     className="flex items-center justify-between gap-3 px-3 py-2"
                   >
-                    <span className="text-sm capitalize">{monthOf(row.rentDueDate)}</span>
+                    <span className="text-sm">
+                      {formatMonthYear(row.rentDueDate, locale, {
+                        month: "long",
+                        capitalize: true,
+                      })}
+                    </span>
                     <Mono className="text-sm">{formatBRLCents(row.originalAmountCents)}</Mono>
                     <ClaimStatusBadge status={row.live}>{tStatus(row.live)}</ClaimStatusBadge>
                     <Button variant="ghost" size="sm" onClick={() => setOpenCase(row.publicId)}>

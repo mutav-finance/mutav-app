@@ -792,6 +792,8 @@ describe("staff reads", () => {
       ["Agency 2", "GD-2", "inspection"],
     ]);
     expect(queue.rows[0]?.id).toBe(first);
+    expect(queue.rows[0]?.tenantName).toBe("Test Tenant");
+    expect(queue.rows[0]?.property?.streetAndNumber).toBe("Rua Teste, 1");
   });
 
   test("listDocumentsPendingReview requires compliance", async () => {

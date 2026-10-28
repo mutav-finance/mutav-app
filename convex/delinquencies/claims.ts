@@ -5,7 +5,7 @@ import type { Result } from "../lib/result";
 import { assertActiveAgencyAccess, mutationWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
-import { isSignedContractApproved, type Guarantee } from "../guarantees/domain";
+import type { Guarantee } from "../guarantees/domain";
 import {
   CLAIM_DECLARATION_VERSION,
   CLAIM_EVIDENCE_STATUS,
@@ -16,9 +16,12 @@ import {
   claimEvidenceKindValidator,
   claimableFromDate,
   missingClaimRequirements,
+  signedContractState,
+  SIGNED_CONTRACT_STATE,
   type ClaimRequirement,
   type ClaimRules,
   type DelinquencyNotice,
+  type SignedContractState,
 } from "./domain";
 import { listEvidenceForNotice } from "./claimEvidence";
 
@@ -49,13 +52,18 @@ export async function claimRulesFor(ctx: QueryCtx, guarantee: Guarantee): Promis
 
 /**
  * Everything the claim screen and `submitClaim` need to agree on: when the
- * claim opens and what is still missing. One function so the UI's "Falta: …"
- * line and the mutation's refusal can never disagree.
+ * claim opens, what is still missing, and where the signed contract stands.
+ * One function so the UI's "Falta: …" line and the mutation's refusal can
+ * never disagree.
  */
 export async function claimReadiness(
   ctx: QueryCtx,
   notice: DelinquencyNotice,
-): Promise<{ claimableFrom: string; missing: ClaimRequirement[] }> {
+): Promise<{
+  claimableFrom: string;
+  missing: ClaimRequirement[];
+  signedContract: SignedContractState;
+}> {
   const guarantee = await loadGuarantee(ctx, notice);
   const rules = await claimRulesFor(ctx, guarantee);
   const evidence = await listEvidenceForNotice(ctx, notice._id);
@@ -63,12 +71,14 @@ export async function claimReadiness(
     .query("guaranteeDocuments")
     .withIndex("by_guarantee", (q) => q.eq("guaranteeId", guarantee._id))
     .take(GUARANTEE_DOCUMENT_SCAN_LIMIT);
+  const signedContract = signedContractState(documents);
   return {
     claimableFrom: claimableFromDate({ rentDueDate: notice.rentDueDate, rules }),
     missing: missingClaimRequirements({
       evidence,
-      signedContractApproved: isSignedContractApproved(documents),
+      signedContractApproved: signedContract === SIGNED_CONTRACT_STATE.APPROVED,
     }),
+    signedContract,
   };
 }
 

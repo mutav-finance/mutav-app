@@ -514,6 +514,7 @@ describe("getByPublicId", () => {
       "nonPaymentProof",
       "tenantNotice",
     ]);
+    expect(result?.signedContract).toBe("not_uploaded");
   });
 
   test("a staff-verified notice reads as under review and locks agency actions", async () => {
@@ -1103,6 +1104,18 @@ describe("listCases", () => {
       group: "closed",
     });
     expect(closed.rows.map((row) => row.caseStatus).sort()).toEqual(["cured", "withdrawn"]);
+
+    const all = await asUser.query(api.delinquencies.useCases.listCases, {
+      agencyId: fx.agencyId,
+      group: "all",
+    });
+    expect(all.counts).toEqual(needsYou.counts);
+    expect(all.rows.map((row) => row.publicId).sort()).toEqual([
+      "DN-cured",
+      "DN-ready",
+      "DN-review",
+      "DN-withdrawn",
+    ]);
   });
 
   test("an information request surfaces its deadline", async () => {

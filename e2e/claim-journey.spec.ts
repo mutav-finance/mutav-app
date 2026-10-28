@@ -67,8 +67,9 @@ test("late rent to payout across the agency and admin apps", async ({ browser })
   // 4. Staff send the tenant notice back.
   await staff.goto(`${ADMIN_URL}/defaults`);
   const row = staff.getByRole("row").filter({ hasText: casePublicId ?? "" });
-  await expect(row.getByText("Acionada — pronta para análise")).toBeVisible();
-  await row.getByRole("button", { name: "Ver acionamento" }).click();
+  await expect(row.getByText("Aguardando análise")).toBeVisible();
+  await row.getByRole("button", { name: "Mais ações" }).click();
+  await staff.getByRole("menuitem", { name: "Ver acionamento" }).click();
   await staff.getByRole("checkbox").nth(1).check();
   await staff.getByLabel("Motivo para Notificação ao inquilino").fill("Data ilegível.");
   await staff.getByLabel("Prazo para a imobiliária responder").fill("2099-01-01");
@@ -94,7 +95,7 @@ test("late rent to payout across the agency and admin apps", async ({ browser })
     .getByRole("row")
     .filter({ hasText: casePublicId ?? "" })
     .last();
-  await payout.getByRole("button", { name: "Marcar pagamento executado" }).click();
+  await payout.getByRole("button", { name: "Marcar pago" }).click();
   await staff.getByLabel("Referência do pagamento").fill("E2E-REF-0001");
   await staff.getByRole("button", { name: "Marcar executado" }).click();
 

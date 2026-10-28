@@ -78,8 +78,18 @@ function QueueRow({ row, review }: { row: PendingDocumentRow; review: DocumentRe
     <TableRow>
       <TableCell>{t(`labels.${row.key}`)}</TableCell>
       <TableCell>{row.agencyName ?? t("notAvailable")}</TableCell>
-      <TableCell>
-        <Mono>{row.guaranteePublicId ?? t("notAvailable")}</Mono>
+      <TableCell className="whitespace-normal">
+        <div className="flex flex-col gap-1">
+          <span>{row.tenantName ?? t("notAvailable")}</span>
+          {row.property ? (
+            <span className="text-muted-foreground text-base-sm">
+              {[row.property.streetAndNumber, row.property.complement].filter(Boolean).join(" · ")}
+            </span>
+          ) : null}
+          <Mono className="text-muted-foreground text-xs">
+            {row.guaranteePublicId ?? t("notAvailable")}
+          </Mono>
+        </div>
       </TableCell>
       <TableCell>
         <Button
