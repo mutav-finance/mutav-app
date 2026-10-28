@@ -7,12 +7,18 @@ import { ShellSwitcher } from "@/components/shell-switcher";
 import { AppShell } from "@mutav/ui/shell/app-shell";
 import { redirect } from "@mutav/i18n/navigation";
 import { resolveUserDestination } from "@/lib/user-destination";
+import { redirectOnSessionFailure } from "@/lib/session-failure-redirect";
 import { buildCrossAppUrl } from "@mutav/i18n/cross-app";
 import { getAdminUrl } from "@/lib/env";
 
 /**
  * Server-side guard. Resolves the user's canonical destination and
  * renders the (app) shell only when that destination is `dashboard`.
+ *
+ * Only `session-expired` goes to login; a missing user row or a backend
+ * failure goes to `/session-error` (see `redirectOnSessionFailure`). The
+ * login `returnTo` is the locale root: a layout has no cheap access to the
+ * current path.
  */
 export default async function AppLayout({
   children,
@@ -25,9 +31,7 @@ export default async function AppLayout({
   const tA11y = await getTranslations({ locale, namespace: "common.a11y" });
 
   const dest = await resolveUserDestination();
-  if (dest.kind === "login") {
-    nextRedirect("/auth/login");
-  }
+  redirectOnSessionFailure({ destination: dest, locale, returnHref: "/" });
   if (dest.kind === "staff") {
     // Cross-origin jump to the admin app — built from a trusted env base,
     // so `next/navigation` redirect with an absolute URL, NOT the

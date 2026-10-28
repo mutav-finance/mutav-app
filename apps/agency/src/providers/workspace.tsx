@@ -61,10 +61,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // querying by JWT subject) but no row exists yet, kick off a one-shot
   // provisioning mutation. Covers the gap when `onCallback` in
   // `src/lib/auth0.ts` failed transiently — the next session start retries.
+  // The ref makes it fire at most once per mount: `getMe` flips back to null
+  // on every reconnect or auth change, and a mutation that keeps failing must
+  // not be re-sent on each flip.
+  const provisionAttempted = React.useRef(false);
   React.useEffect(() => {
-    if (currentUserRow === null && typeof window !== "undefined") {
-      void provisionMe({}).catch(() => {});
-    }
+    if (currentUserRow !== null || provisionAttempted.current) return;
+    provisionAttempted.current = true;
+    void provisionMe({}).catch(() => {});
   }, [currentUserRow, provisionMe]);
 
   const agencies = React.useMemo(() => agenciesRaw ?? [], [agenciesRaw]);

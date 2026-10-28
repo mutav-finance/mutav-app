@@ -4,6 +4,7 @@ import { PageContent } from "@mutav/ui/page/page-content";
 import { Button } from "@mutav/ui/button";
 import { StatusTag } from "@mutav/ui/status-tag";
 import { resolveUserDestination } from "@/lib/user-destination";
+import { redirectOnSessionFailure } from "@/lib/session-failure-redirect";
 
 type Props = {
   searchParams: Promise<{ reason?: string }>;
@@ -13,6 +14,7 @@ type Props = {
 export default async function OnboardingRejectedPage({ searchParams, params }: Props) {
   const { locale } = await params;
   const dest = await resolveUserDestination();
+  redirectOnSessionFailure({ destination: dest, locale, returnHref: "/onboarding/rejected" });
 
   if (dest.kind === "dashboard") {
     redirect({ href: "/", locale });

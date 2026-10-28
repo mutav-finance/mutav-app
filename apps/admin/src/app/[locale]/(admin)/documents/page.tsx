@@ -15,8 +15,7 @@ export default async function DocumentsReviewPage() {
   const gate = await getStaffMember();
   if (gate.kind !== "staff") return null;
 
-  const token = gate.session.tokenSet.idToken;
-  if (!token) return null;
+  const { token } = gate;
 
   const preloaded = await preloadQuery(
     api.guarantees.staffDocuments.listDocumentsPendingReview,

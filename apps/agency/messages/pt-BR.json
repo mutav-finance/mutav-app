@@ -1524,5 +1524,19 @@
     "default_verified": "Inadimplência verificada",
     "cover_paid": "Cobertura registrada",
     "closed": "Encerradas"
+  },
+  "sessionError": {
+    "notProvisioned": {
+      "eyebrow": "Configuração da conta",
+      "title": "Não conseguimos concluir a configuração da sua conta",
+      "subtitle": "Você entrou normalmente, mas algo deu errado ao preparar sua conta. Tente novamente em alguns instantes. Se o problema continuar, saia e entre de novo."
+    },
+    "backendUnavailable": {
+      "eyebrow": "Serviço indisponível",
+      "title": "O serviço está temporariamente indisponível",
+      "subtitle": "Não conseguimos carregar seus dados agora. Sua sessão continua ativa; tente novamente em alguns instantes."
+    },
+    "tryAgain": "Tentar novamente",
+    "logOut": "Sair"
   }
 }

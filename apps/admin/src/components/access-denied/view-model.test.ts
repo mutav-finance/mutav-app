@@ -47,6 +47,33 @@ describe("resolveAccessDeniedView", () => {
     });
   });
 
+  describe("unavailable", () => {
+    const view = resolveAccessDeniedView({
+      gate: { kind: "unavailable" },
+      locale: "en",
+      agencyUrl: AGENCY_URL,
+    });
+
+    it("does not claim a denial, because staff status could not be read", () => {
+      expect(view.titleKey).toBe("unavailableTitle");
+      expect(view.subtitleKey).toBe("unavailableSubtitle");
+      expect(view.eyebrowKey).toBe("unavailableEyebrow");
+      expect(view.tone).toBe("unavailable");
+    });
+
+    it("offers a retry link to the console rather than a redirect", () => {
+      expect(view.primary).toEqual({ href: "/en", labelKey: "goToAdmin" });
+    });
+
+    it("offers sign-out, not sign-in, since the session is fine", () => {
+      expect(view.secondary).toEqual({ href: "/auth/logout", labelKey: "signOut" });
+    });
+
+    it("carries no email, because the gate returned no session", () => {
+      expect(view.email).toBe("");
+    });
+  });
+
   describe("not-staff", () => {
     const view = resolveAccessDeniedView({
       gate: { kind: "not-staff", session: sessionWith({ email: "someone@example.com" }) },
@@ -94,6 +121,7 @@ describe("resolveAccessDeniedView", () => {
       kind: "staff",
       session: sessionWith({ email: "staff@mutav.finance" }),
       roles: ["admin"],
+      token: "id-token",
     };
 
     it("links back to the console instead of the agency app", () => {

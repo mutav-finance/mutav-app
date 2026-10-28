@@ -51,6 +51,9 @@
     "staffEyebrow": "Access granted",
     "staffTitle": "You have access to the admin console",
     "staffSubtitle": "Your account is part of the Mutav team. This page is shown to people without access.",
+    "unavailableEyebrow": "Service unavailable",
+    "unavailableTitle": "We couldn't check your access",
+    "unavailableSubtitle": "Your session is active, but we couldn't reach the Mutav team records right now. Try again in a moment.",
     "goToAgency": "Go to Agencies",
     "goToAdmin": "Back to the admin console",
     "signIn": "Sign in",
@@ -522,5 +525,12 @@
       "FORBIDDEN": "Your staff role cannot perform this action.",
       "unexpected": "Something went wrong. Please try again."
     }
+  },
+  "unavailable": {
+    "eyebrow": "Service unavailable",
+    "title": "We couldn't check your access",
+    "subtitle": "The service is temporarily unavailable. Your session is still active; try again in a moment.",
+    "tryAgain": "Try again",
+    "logOut": "Log out"
   }
 }
