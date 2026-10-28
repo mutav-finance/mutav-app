@@ -2,28 +2,31 @@
 #
 # Per the spec at docs/architecture/monorepo-migration.md
 # § Section 6, every app and every package has its own ownership rule.
-# Team handles are placeholders.
+# Both founders own everything until per-area teams exist; the `main`
+# ruleset requires a code-owner approval, so every rule must name real
+# accounts. Later rules override earlier ones for matching paths.
+
+# Everything not matched below
+*                     @jubscodes @draaujpeg
 
 # Persona apps
-/apps/agency/         @mutav-finance/agency-team
-/apps/pay/            @mutav-finance/agency-team
-/apps/fund/           @mutav-finance/fund-team
-/apps/admin/          @mutav-finance/admin-team
+/apps/agency/         @jubscodes @draaujpeg
+/apps/pay/            @jubscodes @draaujpeg
+/apps/fund/           @jubscodes @draaujpeg
+/apps/admin/          @jubscodes @draaujpeg
 
 # Mutav API (Convex backend) — single shared deployment
-/convex/              @mutav-finance/api-team
+/convex/              @jubscodes @draaujpeg
 
 # Shared packages
-/packages/ui/         @mutav-finance/design-system
-/packages/*           @mutav-finance/api-team
+/packages/            @jubscodes @draaujpeg
 
-# CI and infra
-/.github/             @mutav-finance/api-team
-/CODEOWNERS           @mutav-finance/api-team
-/turbo.json           @mutav-finance/api-team
-/tsconfig.base.json   @mutav-finance/api-team
-/package.json         @mutav-finance/api-team
-/bun.lock             @mutav-finance/api-team
+# CI and infra (includes this file)
+/.github/             @jubscodes @draaujpeg
+/turbo.json           @jubscodes @draaujpeg
+/tsconfig.base.json   @jubscodes @draaujpeg
+/package.json         @jubscodes @draaujpeg
+/bun.lock             @jubscodes @draaujpeg
 
 # Architecture docs
-/docs/                @mutav-finance/api-team
+/docs/                @jubscodes @draaujpeg
