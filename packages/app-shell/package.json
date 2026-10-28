@@ -8,7 +8,8 @@
     "./convex-auth-provider": "./src/convex-auth-provider.tsx",
     "./convex-public-provider": "./src/convex-public-provider.tsx",
     "./storage-upload": "./src/storage-upload.ts",
-    "./proxy-cookies": "./src/proxy-cookies.ts"
+    "./proxy-headers": "./src/proxy-headers.ts",
+    "./auth-redirect": "./src/auth-redirect.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

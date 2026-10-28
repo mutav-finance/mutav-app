@@ -1,6 +1,7 @@
 import { Auth0Client } from "@auth0/nextjs-auth0/server";
 import { ConvexHttpClient } from "convex/browser";
 import { NextResponse } from "next/server";
+import { sameOriginRedirectUrl } from "@mutav/app-shell/auth-redirect";
 import { api } from "@convex/_generated/api";
 import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
 
@@ -26,6 +27,9 @@ import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
  * after the side-effect.
  */
 export const auth0 = new Auth0Client({
+  // Nothing in the app reads tokens through /auth/access-token; left on, it
+  // hands the Auth0 access token to any same-origin script.
+  enableAccessTokenEndpoint: false,
   async onCallback(error, context, session) {
     const baseUrl = getAppBaseUrl();
 
@@ -73,6 +77,6 @@ export const auth0 = new Auth0Client({
       }
     }
 
-    return NextResponse.redirect(new URL(context.returnTo ?? "/", baseUrl));
+    return NextResponse.redirect(sameOriginRedirectUrl({ returnTo: context.returnTo, baseUrl }));
   },
 });

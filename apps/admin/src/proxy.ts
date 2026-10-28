@@ -2,7 +2,7 @@ import createMiddleware from "next-intl/middleware";
 import type { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { routing } from "@mutav/i18n/routing";
-import { carrySetCookies } from "@mutav/app-shell/proxy-cookies";
+import { carryAuthHeaders } from "@mutav/app-shell/proxy-headers";
 
 const handleI18nRouting = createMiddleware(routing);
 
@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
 
   const intlRes = handleI18nRouting(request);
 
-  return carrySetCookies({ from: authRes, to: intlRes });
+  return carryAuthHeaders({ from: authRes, to: intlRes });
 }
 
 // Excludes real asset extensions, NOT every dotted path — see the same comment
