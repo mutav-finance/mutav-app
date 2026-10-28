@@ -643,7 +643,9 @@ export default defineSchema(
         v.object({
           kind: noticeResolutionKind,
           resolvedAt: v.string(),
-          resolvedByUserId: v.id("users"),
+          // Absent only when the system expired the notice (`stale` by the
+          // daily claim-expiry cron); every human disposition records its actor.
+          resolvedByUserId: v.optional(v.id("users")),
           coverOperationId: v.optional(v.id("coverOperations")),
           coverOperationPublicId: v.optional(v.string()),
           appliedCoverCents: v.optional(v.number()),

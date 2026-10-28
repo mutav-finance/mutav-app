@@ -11,6 +11,7 @@ import {
   isOpen,
   isResolved,
   agencyCanAct,
+  claimExpiryReason,
   caseGroupOf,
   toAgencyCaseStatus,
 } from "./domain";
@@ -204,5 +205,81 @@ describe("caseGroupOf", () => {
     ["expired", "closed"],
   ] as const)("%s → %s", (status, group) => {
     expect(caseGroupOf(status)).toBe(group);
+  });
+});
+
+describe("claimExpiryReason", () => {
+  const rules = { graceDays: 10, filingWindowDays: 90 };
+  const request = (dueAt: string, resolvedAt?: string) => ({
+    dueAt,
+    ...(resolvedAt === undefined ? {} : { resolvedAt }),
+  });
+
+  test.each([
+    [
+      "unclaimed, inside the window",
+      { status: "open", rentDueDate: "2026-06-05" },
+      "2026-08-01",
+      null,
+    ],
+    [
+      "unclaimed, last day of the window",
+      { status: "open", rentDueDate: "2026-06-05" },
+      "2026-09-03",
+      null,
+    ],
+    [
+      "unclaimed, past the window",
+      { status: "open", rentDueDate: "2026-06-05" },
+      "2026-09-04",
+      "filing_window",
+    ],
+    [
+      "submitted claim waiting on staff never lapses",
+      { status: "open", rentDueDate: "2026-01-05", claim: { status: "submitted", requests: [] } },
+      "2026-12-31",
+      null,
+    ],
+    [
+      "request not yet due",
+      {
+        status: "open",
+        rentDueDate: "2026-06-05",
+        claim: { status: "info_requested", requests: [request("2026-07-02")] },
+      },
+      "2026-07-02",
+      null,
+    ],
+    [
+      "request past its deadline",
+      {
+        status: "open",
+        rentDueDate: "2026-06-05",
+        claim: { status: "info_requested", requests: [request("2026-07-02")] },
+      },
+      "2026-07-03",
+      "request_deadline",
+    ],
+    [
+      "answered request does not count",
+      {
+        status: "open",
+        rentDueDate: "2026-06-05",
+        claim: {
+          status: "info_requested",
+          requests: [request("2026-07-02", "2026-07-01T10:00:00Z")],
+        },
+      },
+      "2026-07-10",
+      null,
+    ],
+    [
+      "verified notice is staff's to close",
+      { status: "verified", rentDueDate: "2026-01-05" },
+      "2026-12-31",
+      null,
+    ],
+  ] as const)("%s", (_label, notice, today, expected) => {
+    expect(claimExpiryReason({ notice, rules, today })).toBe(expected);
   });
 });

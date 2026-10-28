@@ -7,7 +7,7 @@ import { api } from "@convex/_generated/api";
 import { CASE_GROUP, brazilToday, caseGroupOf } from "@convex/delinquencies/domain";
 import { Button } from "@mutav/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
-import { ClaimStatusTag } from "@mutav/ui/claim-status-tag";
+import { ClaimStatusBadge, ClaimStatusTag } from "@mutav/ui/claim-status-tag";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Mono } from "@mutav/ui/mono";
 import { StepIndicator } from "@mutav/ui/step-indicator";
@@ -128,7 +128,7 @@ export function RentAndClaimsCard({ guarantee }: { guarantee: Guarantee }) {
                   >
                     <span className="text-sm capitalize">{monthOf(row.rentDueDate)}</span>
                     <Mono className="text-sm">{formatBRLCents(row.originalAmountCents)}</Mono>
-                    <ClaimStatusTag status={row.live}>{tStatus(row.live)}</ClaimStatusTag>
+                    <ClaimStatusBadge status={row.live}>{tStatus(row.live)}</ClaimStatusBadge>
                     <Button variant="ghost" size="sm" onClick={() => setOpenCase(row.publicId)}>
                       {t("view")}
                     </Button>

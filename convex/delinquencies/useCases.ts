@@ -118,7 +118,8 @@ export type DelinquencyNoticeDetail = DelinquencyNoticeRow & {
   resolution: {
     kind: NoticeResolutionKind;
     resolvedAt: string;
-    resolvedByUserId: UserId;
+    /** Null when the system expired the notice. */
+    resolvedByUserId: UserId | null;
     coverOperationPublicId: string | null;
     note: string | null;
   } | null;
@@ -300,7 +301,7 @@ async function shapeDelinquencyNoticeDetail(
       ? {
           kind: notice.resolution.kind,
           resolvedAt: notice.resolution.resolvedAt,
-          resolvedByUserId: notice.resolution.resolvedByUserId,
+          resolvedByUserId: notice.resolution.resolvedByUserId ?? null,
           coverOperationPublicId: notice.resolution.coverOperationPublicId ?? null,
           note: notice.resolution.note ?? null,
         }

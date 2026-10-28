@@ -46,6 +46,7 @@
     "./sidebar": "./src/sidebar.tsx",
     "./skeleton": "./src/skeleton.tsx",
     "./sonner": "./src/sonner.tsx",
+    "./status-badge": "./src/status-badge.tsx",
     "./status-tag": "./src/status-tag.tsx",
     "./step-indicator": "./src/step-indicator.tsx",
     "./table": "./src/table.tsx",

@@ -10,7 +10,7 @@ import type { FunctionReturnType } from "convex/server";
 import { CASE_GROUP, brazilToday, type CaseGroup } from "@convex/delinquencies/domain";
 import { Badge } from "@mutav/ui/badge";
 import { Button } from "@mutav/ui/button";
-import { ClaimStatusTag } from "@mutav/ui/claim-status-tag";
+import { ClaimStatusBadge } from "@mutav/ui/claim-status-tag";
 import { Mono } from "@mutav/ui/mono";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@mutav/ui/tabs";
@@ -155,7 +155,7 @@ export function ClaimsQueue() {
                       <Mono className="text-sm">{formatBRLCents(row.originalAmountCents)}</Mono>
                     </TableCell>
                     <TableCell>
-                      <ClaimStatusTag status={status}>{tStatus(status)}</ClaimStatusTag>
+                      <ClaimStatusBadge status={status}>{tStatus(status)}</ClaimStatusBadge>
                     </TableCell>
                     <TableCell className="text-sm">
                       {nextStepText(

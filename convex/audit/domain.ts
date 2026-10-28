@@ -92,6 +92,8 @@ export const AUDIT_ACTION = {
   DELINQUENCY_CLAIM_SUBMITTED: "delinquency.claim_submitted",
   DELINQUENCY_CLAIM_INFO_REQUESTED: "delinquency.claim_info_requested",
   DELINQUENCY_CLAIM_RESUBMITTED: "delinquency.claim_resubmitted",
+  DELINQUENCY_EXPIRED: "delinquency.expired",
+  GUARANTEE_ARREARS_CLEARED: "guarantee.arrears_cleared",
   // coverOperations/ (the cover-payout ledger — emitted by
   // convex/coverOperations/mutations.ts).
   COVER_OPERATION_RECORDED: "cover_operation.recorded",
@@ -141,6 +143,8 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.DELINQUENCY_CLAIM_SUBMITTED),
   v.literal(AUDIT_ACTION.DELINQUENCY_CLAIM_INFO_REQUESTED),
   v.literal(AUDIT_ACTION.DELINQUENCY_CLAIM_RESUBMITTED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_EXPIRED),
+  v.literal(AUDIT_ACTION.GUARANTEE_ARREARS_CLEARED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_RECORDED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_EXECUTED),
 );
