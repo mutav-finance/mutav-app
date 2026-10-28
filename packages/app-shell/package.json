@@ -7,14 +7,17 @@
   "exports": {
     "./convex-auth-provider": "./src/convex-auth-provider.tsx",
     "./convex-public-provider": "./src/convex-public-provider.tsx",
-    "./storage-upload": "./src/storage-upload.ts"
+    "./storage-upload": "./src/storage-upload.ts",
+    "./proxy-cookies": "./src/proxy-cookies.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "@auth0/nextjs-auth0": "^4.20.0",
     "convex": "^1.39.1",
+    "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

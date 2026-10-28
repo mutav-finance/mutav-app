@@ -47,8 +47,13 @@ export const auth0 = new Auth0Client({
         code: error.code,
         cause,
       });
+      // Redirect errors to /auth/logout, NOT /auth/login: Auth0 SDK v4 will
+      // immediately re-enter the login flow on /auth/login and, if the
+      // upstream failure is deterministic (e.g. invalid state, misconfigured
+      // callback URL), loop indefinitely. /auth/logout clears the transaction
+      // cookie and lands the user on a terminal state.
       return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
+        new URL(`/auth/logout?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
       );
     }
 
