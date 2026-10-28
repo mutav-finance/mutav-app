@@ -1,7 +1,9 @@
 import type { SessionData } from "@auth0/nextjs-auth0/types";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@convex/_generated/api";
+import { getFreshIdToken } from "@mutav/app-shell/fresh-id-token";
 import { auth0 } from "@/lib/auth0";
+import { getIdTokenRefreshWindowSeconds } from "@/lib/env";
 
 /**
  * Three-way result of the admin staff gate, so the layout can route each
@@ -66,12 +68,18 @@ export async function getStaffMember(): Promise<StaffGateResult> {
   }
   if (!session) return { kind: "anonymous" };
 
-  const idToken = session.tokenSet.idToken;
-  if (!idToken) return { kind: "anonymous" };
+  // "never": a Server Component cannot persist a refreshed session cookie, so
+  // the proxy refreshes ahead of expiry and this only reads what is there.
+  const freshIdToken = await getFreshIdToken({
+    auth0,
+    refreshWindowSeconds: getIdTokenRefreshWindowSeconds(),
+    refresh: "never",
+  });
+  if (freshIdToken.kind !== "token") return { kind: "anonymous" };
 
   let staff: { roles: string[] } | null;
   try {
-    staff = await fetchQuery(api.mutavStaff.useCases.getMyStaff, {}, { token: idToken });
+    staff = await fetchQuery(api.mutavStaff.useCases.getMyStaff, {}, { token: freshIdToken.token });
   } catch (err) {
     // Fail closed: errors reading the staff row (Convex transient/network
     // failure) deny access rather than admitting an unverified user. We
@@ -87,15 +95,4 @@ export async function getStaffMember(): Promise<StaffGateResult> {
   if (!staff) return { kind: "not-staff", session };
 
   return { kind: "staff", session, roles: staff.roles };
-}
-
-/**
- * Convenience: returns just the Auth0 ID token from the current session,
- * or `null` when the caller is signed out. Mirrors apps/agency's
- * `getAuthToken()` so the Convex bridge (`fetchQuery`, `preloadQuery`)
- * has a uniform API.
- */
-export async function getAuthToken(): Promise<string | null> {
-  const session = await auth0.getSession();
-  return session?.tokenSet.idToken ?? null;
 }

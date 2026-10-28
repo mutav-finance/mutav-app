@@ -41,6 +41,20 @@ export function getAppBaseUrl(): string {
   return requireUrlInProduction(process.env.APP_BASE_URL, "APP_BASE_URL", "http://localhost:3003");
 }
 
+const ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT = 600;
+const POSITIVE_INTEGER = /^[1-9]\d*$/;
+
+/**
+ * How long before the ID token's `exp` the proxy and the Convex token route
+ * refresh it. Server-only. Anything but a positive integer falls back to the
+ * default, so a typo can't turn refresh off or make it run on every request.
+ */
+export function getIdTokenRefreshWindowSeconds(): number {
+  const raw = process.env.AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS;
+  if (!raw || !POSITIVE_INTEGER.test(raw)) return ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT;
+  return Number(raw);
+}
+
 export function getConvexUrl(): string | null {
   return process.env.NEXT_PUBLIC_CONVEX_URL ?? null;
 }
