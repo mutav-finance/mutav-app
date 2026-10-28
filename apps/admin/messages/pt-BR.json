@@ -242,20 +242,23 @@
       "COVER_OPERATION_NOT_FOUND": "Esta operação de cobertura não existe mais.",
       "COVER_ALREADY_EXECUTED": "Este pagamento já está marcado como executado.",
       "PAYMENT_REFERENCE_REQUIRED": "Informe a referência de pagamento da transferência.",
+      "PAYOUT_ACCOUNT_MISSING": "A imobiliária não tem conta de recebimento cadastrada.",
       "inNotice": "Nada foi registrado. Recusado no acionamento {notice}.",
       "CLAIM_NOT_SUBMITTED": "A imobiliária ainda não acionou a garantia, ou há uma pendência aberta com ela."
     },
     "payouts": {
       "title": "Pagamentos aguardando execução",
-      "subtitle": "Coberturas registradas pelo compliance cujo pagamento ao locador ainda não foi confirmado, dos mais antigos aos mais recentes.",
+      "subtitle": "Coberturas registradas pelo compliance cujo pagamento à imobiliária ainda não foi confirmado, dos mais antigos aos mais recentes.",
       "empty": "Nenhum pagamento aguardando execução.",
       "moreAvailable": "Há mais pagamentos aguardando — apenas a página mais antiga é exibida.",
       "noBatch": "—",
+      "accountEnding": "final {last4}",
       "columns": {
         "operation": "Operação",
         "batch": "Lote",
         "notice": "Acionamento",
         "agency": "Imobiliária",
+        "payoutAccount": "Conta",
         "guarantee": "Garantia",
         "period": "Referência",
         "amount": "Valor",
@@ -267,8 +270,16 @@
       },
       "execute": {
         "title": "Marcar pagamento executado",
-        "description": "Confirma que o pagamento ao locador foi feito. Registre a referência devolvida pelo banco ou Pix para permitir a conciliação.",
+        "description": "Confirma que o pagamento à imobiliária foi feito, na conta registrada no momento da cobertura. Registre a referência devolvida pelo banco ou Pix para permitir a conciliação.",
         "amount": "Valor pago",
+        "account": {
+          "bank": "Banco",
+          "branch": "Agência",
+          "number": "Conta",
+          "pixKey": "Chave Pix",
+          "checking": "Conta corrente",
+          "savings": "Poupança"
+        },
         "referenceLabel": "Referência do pagamento",
         "referencePlaceholder": "ID E2E ou número da transferência",
         "noteLabel": "Observação (opcional)",

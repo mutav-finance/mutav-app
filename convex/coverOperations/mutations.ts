@@ -34,6 +34,7 @@ import {
   MAX_COVER_BATCH_SIZE,
   coveragePeriodOf,
   isExecuted,
+  type CoverPayoutAccount,
 } from "./domain";
 
 /**
@@ -53,9 +54,14 @@ type RecordCoverErrorCode =
   | GuaranteeRefusedErrorCode
   | typeof GUARANTEE_ERROR_CODE.INVALID_AMOUNT
   | typeof GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN
-  | typeof COVER_OPERATION_ERROR_CODE.COVER_ALREADY_RECORDED;
+  | typeof COVER_OPERATION_ERROR_CODE.COVER_ALREADY_RECORDED
+  | typeof COVER_OPERATION_ERROR_CODE.PAYOUT_ACCOUNT_MISSING;
 
-type CoverPlan = { notice: DelinquencyNotice; coveragePeriod: string };
+type CoverPlan = {
+  notice: DelinquencyNotice;
+  coveragePeriod: string;
+  payoutAccount: CoverPayoutAccount;
+};
 
 type RecordedCover = {
   operationPublicId: string;
@@ -168,7 +174,23 @@ async function planCover(
     };
   }
 
-  return { success: true, data: { notice, coveragePeriod }, message: "Cover can be recorded." };
+  // Read in the plan, not the commit: a batch that reaches an agency without
+  // an account must refuse before any notice has reserved capacity.
+  const agency = await ctx.db.get(notice.agencyId);
+  if (!agency) throw new Error(`Notice ${notice.publicId} points at a missing agency.`);
+  if (!agency.bankingInfo) {
+    return {
+      success: false,
+      error: { code: COVER_OPERATION_ERROR_CODE.PAYOUT_ACCOUNT_MISSING },
+      message: `Agency '${agency.name}' has no payout account on file.`,
+    };
+  }
+
+  return {
+    success: true,
+    data: { notice, coveragePeriod, payoutAccount: agency.bankingInfo },
+    message: "Cover can be recorded.",
+  };
 }
 
 async function mintOperationPublicId(ctx: MutationCtx): Promise<string> {
@@ -198,7 +220,7 @@ async function commitCover(
     recordedAt,
   }: { plan: CoverPlan; batchId: string | undefined; note: string | undefined; recordedAt: string },
 ): Promise<RecordedCover> {
-  const { notice, coveragePeriod } = plan;
+  const { notice, coveragePeriod, payoutAccount } = plan;
   const actor: GuaranteeActor = { userId: ctx.user._id, username: ctx.user.name };
 
   // Re-read: an earlier notice of the same batch may already have drawn
@@ -237,6 +259,7 @@ async function commitCover(
     batchId,
     requestedCents: notice.updatedAmountCents,
     appliedCents: reserved.data.appliedCents,
+    payoutAccount,
     recordedAt,
     recordedByUserId: ctx.user._id,
     note,
@@ -311,7 +334,7 @@ function trimToOptional(value: string | undefined): string | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * cover_committed is the money-committing resolution: Mutav owes the landlord
+ * cover_committed is the money-committing resolution: Mutav owes the agency
  * and a regressive receivable is born. Recording writes the ledger row in
  * `recorded`; the payout itself is off-chain and confirmed separately by
  * `staffMarkCoverExecuted`.
@@ -450,7 +473,7 @@ type MarkCoverExecutedError = {
 };
 
 /**
- * Confirms the off-chain payout to the landlord has left. The payment
+ * Confirms the off-chain payout to the agency has left. The payment
  * reference is required because it is the only evidence tying the ledger row
  * to money that actually moved — an `executed` row without one would be
  * indistinguishable from a click.

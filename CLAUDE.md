@@ -2,6 +2,11 @@
 
 # Mutav — Agent Context
 
+> **Everything written in code is English.** Identifiers, string literal values, i18n
+> **keys**, code comments, docstrings, test names, docs, commit messages and PR
+> descriptions. Portuguese lives only in `messages/pt-BR.json` **values**. Sanctioned
+> exceptions and the deferral list: § Code style → English-only code identifiers.
+
 ## Project
 
 Mutav — the web surface for the MUTAV protocol. Agency dashboard, tenant payment, investor portal, Mutav-internal admin, and the **Mutav API** (Convex backend) that orchestrates everything off-chain. Settles guarantees on Stellar via the `Fund` contract published by [`mutav-finance/mutav-stellar`](https://github.com/mutav-finance/mutav-stellar).

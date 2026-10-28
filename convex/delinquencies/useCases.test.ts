@@ -2,7 +2,11 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
-import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import {
+  TEST_PAYOUT_ACCOUNT,
+  registerGuaranteeAggregateComponents,
+  seedGuaranteeWithLease,
+} from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
@@ -564,6 +568,7 @@ describe("getByPublicId", () => {
           coveragePeriod: "2026-06",
           requestedCents: 300_000,
           appliedCents: 250_000,
+          payoutAccount: TEST_PAYOUT_ACCOUNT,
           recordedAt: "2026-06-18T10:00:00.000Z",
           recordedByUserId: fx.userId,
           ...(execution ? { execution: { ...execution, executedByUserId: fx.userId } } : {}),
