@@ -19,6 +19,7 @@ import { insertGuaranteeAggregates } from "../guarantees/aggregateWrites";
 import { DEFAULT_PAYER, PROPERTY_KIND, type LeaseId } from "../leases/domain";
 import { DEFAULT_PRODUCT_SLUG, type ProductId } from "../products/domain";
 import type { TenantId } from "../tenants/domain";
+import type { UserId } from "../users/domain";
 import { hashPii } from "./pii";
 import aggregateComponentSchema from "../../node_modules/@convex-dev/aggregate/src/component/schema";
 import migrationsComponentSchema from "../../node_modules/@convex-dev/migrations/src/component/schema";
@@ -390,4 +391,32 @@ export async function seedCoverNotice(
         : {}),
     }),
   );
+}
+
+/**
+ * Files a claim on a notice without the evidence uploads, for tests about what
+ * staff do after a claim arrives (`staffVerifyDefault` refuses a notice that
+ * carries none). The claim path itself is covered in `delinquencies/claims`.
+ */
+export async function seedSubmittedClaim(
+  t: TestConvex<typeof schema>,
+  { noticePublicId, userId }: { noticePublicId: string; userId: UserId },
+): Promise<void> {
+  await t.run(async (ctx) => {
+    const notice = await ctx.db
+      .query("guaranteeDelinquencyNotices")
+      .withIndex("by_publicId", (q) => q.eq("publicId", noticePublicId))
+      .unique();
+    if (!notice) throw new Error(`seedSubmittedClaim: no notice '${noticePublicId}'`);
+    await ctx.db.patch(notice._id, {
+      claim: {
+        status: "submitted",
+        claimedAmountCents: notice.originalAmountCents,
+        submittedAt: "2026-06-20T10:00:00.000Z",
+        submittedByUserId: userId,
+        declarationVersion: "test",
+        requests: [],
+      },
+    });
+  });
 }

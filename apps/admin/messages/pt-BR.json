@@ -166,6 +166,11 @@
       "open": "Atraso informado",
       "verified": "Em análise"
     },
+    "claimStatus": {
+      "none": "Aguardando acionamento da imobiliária",
+      "submitted": "Acionada — pronta para análise",
+      "info_requested": "Pendência com a imobiliária"
+    },
     "guaranteeState": {
       "drafted": "Rascunho",
       "active": "Ativa",
@@ -237,7 +242,8 @@
       "COVER_OPERATION_NOT_FOUND": "Esta operação de cobertura não existe mais.",
       "COVER_ALREADY_EXECUTED": "Este pagamento já está marcado como executado.",
       "PAYMENT_REFERENCE_REQUIRED": "Informe a referência de pagamento da transferência.",
-      "inNotice": "Nada foi registrado. Recusado no acionamento {notice}."
+      "inNotice": "Nada foi registrado. Recusado no acionamento {notice}.",
+      "CLAIM_NOT_SUBMITTED": "A imobiliária ainda não acionou a garantia, ou há uma pendência aberta com ela."
     },
     "payouts": {
       "title": "Pagamentos aguardando execução",

@@ -295,6 +295,9 @@ const DEMO_TABLES = [
   // Cover operations and notices point at each other; the ledger rows go
   // first so no `resolution.coverOperationId` outlives its row for long.
   "coverOperations",
+  // Claim evidence FK-references notices; its blobs are deleted by
+  // `deleteClaimEvidenceBlobs` before the rows go.
+  "claimEvidence",
   // Notices FK-reference guarantees + users. Wipe before guarantees so we
   // don't leave dangling guaranteeId pointers mid-wipe.
   "guaranteeDelinquencyNotices",
@@ -322,8 +325,16 @@ async function deleteGuaranteeDocumentBlobs(ctx: MutationCtx) {
   }
 }
 
+async function deleteClaimEvidenceBlobs(ctx: MutationCtx) {
+  for await (const evidence of ctx.db.query("claimEvidence")) {
+    const blob = await ctx.db.system.get(evidence.storageId);
+    if (blob) await ctx.storage.delete(evidence.storageId);
+  }
+}
+
 async function wipeDemoTables(ctx: MutationCtx) {
   await deleteGuaranteeDocumentBlobs(ctx);
+  await deleteClaimEvidenceBlobs(ctx);
   for (const table of DEMO_TABLES) {
     let rows = await ctx.db.query(table).take(200);
     while (rows.length > 0) {

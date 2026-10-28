@@ -9,7 +9,9 @@ import { StatusTag, type Tone } from "./guarantee-state-tag";
  */
 export const CLAIM_STATUS_NAMES = [
   "reported",
+  "ready_to_claim",
   "under_review",
+  "info_requested",
   "approved",
   "paid",
   "cured",
@@ -23,11 +25,14 @@ export type ClaimStatusName = (typeof CLAIM_STATUS_NAMES)[number];
 /**
  * Tones follow the guarantee the case drives: a reported case leaves the
  * guarantee `in_arrears` (amber) and a confirmed one `default_verified`
- * (orange), so the case tag and the guarantee tag beside it agree.
+ * (orange), so the case tag and the guarantee tag beside it agree. A claim
+ * waiting on the agency (`info_requested`) shares the act-now orange.
  */
 export const CLAIM_STATUS_TONE: Record<ClaimStatusName, Tone> = {
   reported: "expiring",
+  ready_to_claim: "expiring",
   under_review: "caution",
+  info_requested: "caution",
   approved: "success",
   paid: "success",
   cured: "success",

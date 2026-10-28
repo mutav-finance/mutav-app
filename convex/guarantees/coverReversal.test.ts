@@ -2,7 +2,11 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import {
+  registerGuaranteeAggregateComponents,
+  seedGuaranteeWithLease,
+  seedSubmittedClaim,
+} from "../lib/testFixtures";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import type { AgencyId } from "../agencies/domain";
 import type { UserId } from "../users/domain";
@@ -139,6 +143,7 @@ async function fileAndVerify(
     originalAmountCents: amountCents,
   });
   if (!opened.success) throw new Error(opened.message);
+  await seedSubmittedClaim(t, { noticePublicId: opened.data.publicId, userId: fx.userId });
   const verified = await asUser.mutation(api.delinquencies.mutations.staffVerifyDefault, {
     noticePublicId: opened.data.publicId,
   });

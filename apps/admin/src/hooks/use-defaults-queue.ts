@@ -41,6 +41,15 @@ export function isCoverable(row: DelinquencyAdminQueueRow): boolean {
 }
 
 /**
+ * Staff confirm a default only on an open notice whose claim the agency has
+ * filed and is not still answering an information request — the same rule
+ * `staffVerifyDefault` enforces, so the button never offers a refusal.
+ */
+export function isVerifiable(row: DelinquencyAdminQueueRow): boolean {
+  return row.status === "open" && row.claimStatus === "submitted";
+}
+
+/**
  * Toast wiring for an outcome. Shared by the queue and the payouts panel so a
  * batch refusal names its notice the same way everywhere.
  */
