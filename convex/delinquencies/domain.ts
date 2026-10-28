@@ -8,6 +8,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 
 export type DelinquencyNotice = Doc<"guaranteeDelinquencyNotices">;
 export type DelinquencyNoticeId = Id<"guaranteeDelinquencyNotices">;
+export type ClaimEvidenceId = Id<"claimEvidence">;
 
 export {
   DELINQUENCY_STATUS,
