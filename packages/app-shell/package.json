@@ -9,7 +9,12 @@
     "./convex-public-provider": "./src/convex-public-provider.tsx",
     "./storage-upload": "./src/storage-upload.ts",
     "./proxy-headers": "./src/proxy-headers.ts",
-    "./auth-redirect": "./src/auth-redirect.ts"
+    "./auth-redirect": "./src/auth-redirect.ts",
+    "./id-token": "./src/id-token.ts",
+    "./fresh-id-token": "./src/fresh-id-token.ts",
+    "./auth-callback": "./src/auth-callback.ts",
+    "./convex-token-route": "./src/convex-token-route.ts",
+    "./auth-proxy": "./src/auth-proxy.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
