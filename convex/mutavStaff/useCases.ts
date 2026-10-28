@@ -374,7 +374,7 @@ export const bootstrapFirstAdmin = internalMutation({
 });
 
 /**
- * Operator-side grant of any (auth0Sub, role) pair, for the case
+ * Deploy-CLI grant of any (auth0Sub, role) pair, for the case
  * `bootstrapFirstAdmin` deliberately refuses: an admin already exists, but no
  * one can currently authenticate as one. `createStaffRole` is the normal path
  * and stays the only client-reachable one — it needs a signed-in admin, which
@@ -427,13 +427,16 @@ export const grantStaffRole = internalMutation({
       userId: target._id,
       role,
       // No `addedBy`: a CLI invocation has no acting user. The audit entry
-      // below records the operator kind instead, so the grant is still
+      // below records the deploy-CLI kind instead, so the grant is still
       // attributable to an out-of-band action rather than to a staff member.
       addedBy: undefined,
       createdAt: new Date().toISOString(),
     });
 
     await appendAuditEntry(ctx, {
+      // "operator-cli" is a frozen legacy audit-log value meaning the deploy
+      // CLI, not the protocol operator key. The log is hash-chained
+      // (convex/audit/domain.ts) and useCases.test.ts pins it; don't rename.
       actor: { kind: "system", source: "operator-cli" },
       action: AUDIT_ACTION.STAFF_CREATED,
       resourceType: "mutavStaff",

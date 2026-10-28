@@ -11,6 +11,8 @@ import { Field } from "@mutav/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
 import { Input } from "@mutav/ui/input";
 import { Label } from "@mutav/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mutav/ui/select";
+import { LEASE_DUE_DAY_MAX, LEASE_DUE_DAY_MIN } from "@convex/leases/domain";
 import {
   isPropertyKind,
   isTenantEntityType,
@@ -28,6 +30,11 @@ type Props = {
 };
 
 type Errors = Partial<Record<string, string>>;
+
+const DUE_DAYS = Array.from(
+  { length: LEASE_DUE_DAY_MAX - LEASE_DUE_DAY_MIN + 1 },
+  (_, index) => LEASE_DUE_DAY_MIN + index,
+);
 
 export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
   const t = useTranslations("guaranteeNew");
@@ -70,6 +77,7 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
 
     if (data.cep.replace(/\D/g, "").length !== 8) errs.cep = t("validation.cepInvalid");
     if (data.rentCents <= 0) errs.rentCents = t("validation.rentRequired");
+    if (data.dueDay === null) errs.dueDay = t("validation.dueDayRequired");
 
     if (Object.keys(errs).length > 0 || !isPropertyKind(data.propertyKind)) {
       setErrors(errs);
@@ -218,6 +226,25 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
             />
           </Field>
         </div>
+
+        <Field label={t("rent.dueDay")} error={errors.dueDay}>
+          <Select
+            value={data.dueDay === null ? "" : String(data.dueDay)}
+            onValueChange={(value) => onChange({ dueDay: Number(value) })}
+          >
+            <SelectTrigger className="w-full sm:w-56">
+              <SelectValue placeholder={t("rent.dueDayPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {DUE_DAYS.map((day) => (
+                <SelectItem key={day} value={String(day)}>
+                  {t("rent.dueDayOption", { day: String(day).padStart(2, "0") })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">{t("rent.dueDayHint")}</p>
+        </Field>
 
         <div className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2">
           <span className="text-muted-foreground text-sm">{t("rent.total")}</span>

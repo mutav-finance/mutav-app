@@ -28,7 +28,7 @@ import {
 import { formatBRLCents } from "@mutav/i18n/brazil";
 import { priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
 import type { PublicProduct } from "@convex/products/domain";
-import { PROPERTY_KIND } from "@convex/leases/domain";
+import { LEASE_DUE_DAY_MAX, LEASE_DUE_DAY_MIN, PROPERTY_KIND } from "@convex/leases/domain";
 
 type Props = {
   data: DraftWizardData;
@@ -147,6 +147,7 @@ export function WizardStep4({ data, agencyId, product, onChange, onComplete, onB
             rentCents: validated.rentCents,
             condoCents: validated.condoCents,
             otherFeesCents: validated.otherFeesCents,
+            dueDay: validated.dueDay,
           },
         },
         plan: validated.plan,
@@ -345,6 +346,17 @@ export function WizardStep4({ data, agencyId, product, onChange, onComplete, onB
                 onBlur={(e) => patchDraft({ otherFeesCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
+            <EditField label={t("rent.dueDay")}>
+              <Input
+                type="number"
+                min={LEASE_DUE_DAY_MIN}
+                max={LEASE_DUE_DAY_MAX}
+                defaultValue={data.dueDay ?? ""}
+                onBlur={(e) =>
+                  patchDraft({ dueDay: e.target.value ? Number(e.target.value) : null })
+                }
+              />
+            </EditField>
           </div>
         ) : (
           <div className="flex gap-8">
@@ -354,6 +366,15 @@ export function WizardStep4({ data, agencyId, product, onChange, onComplete, onB
                 value={formatBRLCents(data.rentCents)}
                 mono
                 missing={missingText("rentCents")}
+              />
+              <ReviewRow
+                label={t("rent.dueDay")}
+                value={
+                  data.dueDay === null
+                    ? ""
+                    : t("rent.dueDayOption", { day: String(data.dueDay).padStart(2, "0") })
+                }
+                missing={missingText("dueDay")}
               />
               {data.otherFeesCents > 0 && (
                 <ReviewRow

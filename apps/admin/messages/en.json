@@ -33,11 +33,12 @@
       "overview": "Overview",
       "agencies": "Agencies",
       "compliance": "Compliance",
-      "defaults": "Default requests",
+      "defaults": "Claims",
       "treasury": "Treasury",
       "observability": "Observability",
       "nav": "NAV",
-      "staff": "Staff"
+      "staff": "Staff",
+      "documents": "Documents"
     }
   },
   "accessDenied": {
@@ -144,26 +145,26 @@
     }
   },
   "defaults": {
-    "title": "Default requests",
-    "subtitle": "Delinquency notices awaiting a compliance decision, oldest first.",
+    "title": "Claims",
+    "subtitle": "Claims awaiting a compliance decision, oldest first.",
     "empty": "No outstanding notices.",
     "moreAvailable": "More notices are queued — only the oldest page is shown.",
     "notAvailable": "—",
     "dueOn": "Rent due {date}",
     "daysOpen": "{days, plural, =0 {today} one {# day} other {# days}}",
     "columns": {
-      "notice": "Notice",
-      "agency": "Agency",
-      "tenant": "Tenant",
+      "notice": "Claim",
+      "tenant": "Tenant and agency",
       "guarantee": "Guarantee",
       "outstanding": "Outstanding",
-      "openFor": "Open for",
       "actions": "Actions",
       "select": "Select"
     },
-    "noticeStatus": {
-      "open": "Reported",
-      "verified": "Default verified"
+    "caseStatus": {
+      "awaiting_claim": "Awaiting claim",
+      "awaiting_review": "Awaiting review",
+      "info_requested": "Waiting on the agency",
+      "awaiting_cover": "Default confirmed"
     },
     "guaranteeState": {
       "drafted": "Draft",
@@ -180,7 +181,8 @@
       "dismiss": "Dismiss",
       "cancel": "Cancel",
       "coverSelected": "Record cover ({count})",
-      "clearSelection": "Clear selection"
+      "clearSelection": "Clear selection",
+      "more": "More actions"
     },
     "cover": {
       "title": "Record cover",
@@ -236,19 +238,23 @@
       "COVER_OPERATION_NOT_FOUND": "That cover operation no longer exists.",
       "COVER_ALREADY_EXECUTED": "This payout is already marked as executed.",
       "PAYMENT_REFERENCE_REQUIRED": "Enter the payment reference of the transfer.",
-      "inNotice": "Nothing was recorded. Refused at notice {notice}."
+      "PAYOUT_ACCOUNT_MISSING": "The agency has no payout account on file.",
+      "inNotice": "Nothing was recorded. Refused at notice {notice}.",
+      "CLAIM_NOT_SUBMITTED": "The agency has not filed the claim yet, or a request is still waiting on it."
     },
     "payouts": {
       "title": "Payouts awaiting execution",
-      "subtitle": "Cover recorded by compliance whose off-chain payment to the landlord has not been confirmed yet, oldest first.",
+      "subtitle": "Cover recorded by compliance whose off-chain payment to the agency has not been confirmed yet, oldest first.",
       "empty": "No payouts awaiting execution.",
       "moreAvailable": "More payouts are waiting — only the oldest page is shown.",
       "noBatch": "—",
+      "accountEnding": "ending {last4}",
       "columns": {
         "operation": "Operation",
         "batch": "Batch",
         "notice": "Notice",
         "agency": "Agency",
+        "payoutAccount": "Account",
         "guarantee": "Guarantee",
         "period": "Period",
         "amount": "Amount",
@@ -256,17 +262,89 @@
         "actions": "Actions"
       },
       "actions": {
-        "markExecuted": "Mark payout executed"
+        "markExecuted": "Mark paid"
       },
       "execute": {
         "title": "Mark payout executed",
-        "description": "Confirms the payment to the landlord has left. Record the reference the bank or Pix returned so the ledger can be reconciled.",
+        "description": "Confirms the payment to the agency has left, to the account on file when cover was recorded. Record the reference the bank or Pix returned so the ledger can be reconciled.",
         "amount": "Amount paid",
+        "account": {
+          "bank": "Bank",
+          "branch": "Branch",
+          "number": "Account",
+          "pixKey": "Pix key",
+          "checking": "Checking",
+          "savings": "Savings"
+        },
         "referenceLabel": "Payment reference",
         "referencePlaceholder": "E2E id or transfer number",
         "noteLabel": "Note (optional)",
         "notePlaceholder": "Anything the audit trail should carry",
         "confirm": "Mark executed"
+      }
+    },
+    "claimReview": {
+      "trigger": "View claim",
+      "title": "Claim {notice}",
+      "summary": "{tenant} · {amount} · due {due}",
+      "kind": {
+        "nonPaymentProof": "Proof of non-payment",
+        "tenantNotice": "Notice to the tenant"
+      },
+      "status": {
+        "pending_review": "Sent",
+        "accepted": "Accepted",
+        "rejected": "Refused",
+        "superseded": "Replaced"
+      },
+      "noFile": "No file",
+      "askAgain": "Ask again",
+      "reasonPlaceholder": "What is missing or wrong",
+      "reasonFor": "Reason for {item}",
+      "dueAt": "Deadline for the agency to answer",
+      "locked": "Information can only be requested on a filed claim that is not yet confirmed.",
+      "close": "Close",
+      "send": "Request information",
+      "sent": "Request sent to the agency.",
+      "fileMissing": "File not found.",
+      "errors": {
+        "NOTICE_NOT_FOUND": "Claim not found.",
+        "CLAIM_NOT_SUBMITTED": "This claim is not waiting for review.",
+        "NO_REQUESTS": "Choose at least one file.",
+        "REASON_REQUIRED": "Give a reason for each file.",
+        "REASON_TOO_LONG": "One of the reasons is too long.",
+        "INVALID_DUE_DATE": "The deadline must be a future date.",
+        "FORBIDDEN": "Your role does not allow this action.",
+        "unexpected": "Could not send. Please try again."
+      },
+      "verify": "Verify default"
+    },
+    "arrearsWithoutClaim": {
+      "title": "Arrears without a claim",
+      "subtitle": "Guarantees still in arrears with no open case — usually the claim expired. Decide whether the arrears is over.",
+      "loading": "Loading…",
+      "empty": "No guarantee in arrears without a claim.",
+      "columns": {
+        "tenant": "Tenant · guarantee",
+        "agency": "Agency",
+        "lastRent": "Last rent reported",
+        "closedAt": "Case closed on",
+        "actions": "Actions"
+      },
+      "returnToActive": "Return to Active",
+      "dialogTitle": "End this guarantee's arrears?",
+      "dialogDescription": "The guarantee returns to Active. Use it when the agency confirmed the arrears is over or will not file a claim.",
+      "notePlaceholder": "Reason (kept in the audit trail)",
+      "back": "Back",
+      "confirm": "Return to Active",
+      "returned": "Guarantee back to Active.",
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Guarantee not found.",
+        "NOT_IN_ARREARS": "The guarantee is no longer in arrears.",
+        "NOTICE_OUTSTANDING": "A case is still open; close it first.",
+        "GUARANTEE_TRANSITION_REFUSED": "The guarantee cannot return to Active right now.",
+        "FORBIDDEN": "Your role does not allow this action.",
+        "unexpected": "Could not finish. Please try again."
       }
     }
   },
@@ -362,6 +440,87 @@
     },
     "actions": {
       "retry": "Try again"
+    }
+  },
+  "guaranteeDocuments": {
+    "queue": {
+      "title": "Guarantee documents",
+      "subtitle": "Files agencies and staff attached to guarantees, awaiting a compliance decision, oldest first.",
+      "empty": "No documents awaiting review.",
+      "moreAvailable": "More documents are queued — only the oldest page is shown."
+    },
+    "panel": {
+      "heading": "Documents",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "chooseFile": "Choose a file for {document}",
+      "loading": "Loading…",
+      "empty": "No file uploaded yet.",
+      "notFound": "Guarantee not found."
+    },
+    "columns": {
+      "document": "Document",
+      "agency": "Agency",
+      "guarantee": "Guarantee",
+      "file": "File",
+      "uploaded": "Uploaded",
+      "actions": "Actions"
+    },
+    "labels": {
+      "rentalContract": "Signed rental contract",
+      "inspection": "Inspection",
+      "policy": "Policy"
+    },
+    "status": {
+      "pending_review": "Under review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "superseded": "Replaced"
+    },
+    "uploaderKind": {
+      "agency_user": "Agency · {name}",
+      "staff": "Mutav · {name}"
+    },
+    "uploadedBy": {
+      "agency_user": "Uploaded by {name} (agency) on {date} · {size}",
+      "staff": "Uploaded by {name} (Mutav) on {date} · {size}"
+    },
+    "reviewedBy": "Reviewed by {name} on {date}",
+    "rejectionReason": "Rejection reason: {reason}",
+    "unknownUser": "removed user",
+    "notAvailable": "—",
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "cancel": "Cancel"
+    },
+    "reject": {
+      "title": "Reject document",
+      "description": "Rejecting “{file}”. The agency sees the reason on the guarantee page and receives it by email.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "e.g. landlord signature missing on page 3"
+    },
+    "toast": {
+      "approved": "Document approved.",
+      "rejected": "Document rejected; the agency was notified.",
+      "uploaded": "Document attached and queued for review."
+    },
+    "errors": {
+      "GUARANTEE_NOT_FOUND": "Guarantee not found.",
+      "GUARANTEE_CLOSED": "This guarantee is closed and no longer accepts documents.",
+      "FILE_NOT_FOUND": "The uploaded file was not found. Please try again.",
+      "FILE_ALREADY_ATTACHED": "This file is already attached.",
+      "UNSUPPORTED_CONTENT_TYPE": "Unsupported format. Upload a PDF, JPG or PNG.",
+      "FILE_TOO_LARGE": "File is larger than 15 MB.",
+      "FILE_EMPTY": "The file is empty.",
+      "INVALID_FILE_NAME": "Invalid file name.",
+      "DOCUMENT_NOT_FOUND": "Document not found.",
+      "NOT_PENDING_REVIEW": "This document was already decided or replaced.",
+      "REJECTION_REASON_REQUIRED": "A rejection reason is required.",
+      "REJECTION_REASON_TOO_LONG": "The rejection reason is too long.",
+      "UPLOAD_FAILED": "The file could not be uploaded. Please try again.",
+      "FORBIDDEN": "Your staff role cannot perform this action.",
+      "unexpected": "Something went wrong. Please try again."
     }
   }
 }

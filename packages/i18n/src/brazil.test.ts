@@ -4,6 +4,7 @@ import {
   formatBRLRate,
   formatDateTimeBR,
   formatDateTimeBRT,
+  formatMonthYear,
   formatWallClockDateTimeBR,
   maskBRLAmount,
 } from "./brazil";
@@ -57,5 +58,15 @@ describe("Brazil money and date formatters", () => {
     expect(formatWallClockDateTimeBR("2026-09-29 13:08:26")).toBe("29/09/2026, 13:08");
     expect(formatWallClockDateTimeBR("2026-09-28 13:00")).toBe("28/09/2026, 13:00");
     expect(formatWallClockDateTimeBR("garbage")).toBe("garbage");
+  });
+
+  it("formats a rent month in words, capitalizing only the first letter", () => {
+    expect(formatMonthYear("2026-10-05", "pt-BR", { month: "short" })).toBe("out. de 26");
+    expect(formatMonthYear("2026-10-05", "pt-BR", { month: "long" })).toBe("outubro de 2026");
+    expect(formatMonthYear("2026-10", "pt-BR", { month: "long", capitalize: true })).toBe(
+      "Outubro de 2026",
+    );
+    expect(formatMonthYear("2026-01-31", "en", { month: "long" })).toBe("January 2026");
+    expect(formatMonthYear("garbage", "pt-BR", { month: "short" })).toBe("garbage");
   });
 });
