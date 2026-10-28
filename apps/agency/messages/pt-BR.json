@@ -69,7 +69,7 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Acionamentos",
+      "title": "Acionamentos — MUTAV",
       "description": "Acompanhe os aluguéis em atraso e os pedidos de cobertura das garantias da sua imobiliária."
     },
     "heading": "Acionamentos",
@@ -693,8 +693,7 @@
     },
     "loading": {
       "label": "Carregando garantia"
-    },
-    "backToList": "Voltar para garantias"
+    }
   },
   "guaranteeList": {
     "meta": {

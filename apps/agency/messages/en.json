@@ -69,7 +69,7 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Claims",
+      "title": "Claims — MUTAV",
       "description": "Track late rent and cover requests for your agency's guarantees."
     },
     "heading": "Claims",
@@ -693,8 +693,7 @@
     },
     "loading": {
       "label": "Loading guarantee"
-    },
-    "backToList": "Back to guarantees"
+    }
   },
   "guaranteeList": {
     "meta": {
