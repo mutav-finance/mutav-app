@@ -163,8 +163,8 @@
       "select": "Select"
     },
     "noticeStatus": {
-      "open": "Reported",
-      "verified": "Default verified"
+      "open": "Late rent reported",
+      "verified": "Under review"
     },
     "guaranteeState": {
       "drafted": "Draft",

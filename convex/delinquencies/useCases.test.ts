@@ -270,12 +270,12 @@ describe("listByAgency", () => {
     expect(result.page.map((r) => r.publicId)).toEqual(["DN-mid"]);
   });
 
-  test("amountFromCents / amountToCents narrows to the in-range subset", async () => {
+  test("amountFromCents / amountToCents narrows on the reported amount", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    await insertNotice(t, fx, { publicId: "DN-cheap", updatedAmountCents: 100_000 });
-    await insertNotice(t, fx, { publicId: "DN-mid", updatedAmountCents: 300_000 });
-    await insertNotice(t, fx, { publicId: "DN-expensive", updatedAmountCents: 500_000 });
+    await insertNotice(t, fx, { publicId: "DN-cheap", originalAmountCents: 100_000 });
+    await insertNotice(t, fx, { publicId: "DN-mid", originalAmountCents: 300_000 });
+    await insertNotice(t, fx, { publicId: "DN-expensive", originalAmountCents: 500_000 });
 
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.query(api.delinquencies.useCases.listByAgency, {
@@ -479,6 +479,101 @@ describe("getByPublicId", () => {
     });
     expect(result).toBeNull();
   });
+
+  test("an open notice reads as reported and the agency may still act on it", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-reported" });
+
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-reported" });
+    expect(result?.caseStatus).toBe("reported");
+    expect(result?.canAct).toBe(true);
+    expect(result?.cover).toBeNull();
+  });
+
+  test("a staff-verified notice reads as under review and locks agency actions", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-review", status: "verified" });
+
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-review" });
+    expect(result?.status).toBe("verified");
+    expect(result?.caseStatus).toBe("under_review");
+    expect(result?.canAct).toBe(false);
+  });
+
+  test.each([
+    ["recorded", undefined, "approved", null, null],
+    [
+      "executed",
+      {
+        executedAt: "2026-06-20T10:00:00.000Z",
+        paymentReference: "E00000000202606201000abc",
+      },
+      "paid",
+      "2026-06-20T10:00:00.000Z",
+      "E00000000202606201000abc",
+    ],
+  ] as const)(
+    "a cover resolution whose payout is %s reads as %s",
+    async (coverStatus, execution, expectedCase, expectedExecutedAt, expectedReference) => {
+      const t = setup();
+      const fx = await makeFixture(t);
+      await t.run(async (ctx) => {
+        const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
+          publicId: "DN-covered",
+          guaranteeId: fx.guaranteeId,
+          agencyId: fx.agencyId,
+          status: "resolved",
+          rentDueDate: "2026-06-05",
+          originalAmountCents: 300_000,
+          updatedAmountCents: 300_000,
+          evidenceSource: "agency_reported",
+          openedAt: "2026-06-10T09:00:00-03:00",
+          openedByUserId: fx.userId,
+        });
+        const coverOperationId = await ctx.db.insert("coverOperations", {
+          publicId: "CO-covered",
+          status: coverStatus,
+          noticeId,
+          guaranteeId: fx.guaranteeId,
+          agencyId: fx.agencyId,
+          coveragePeriod: "2026-06",
+          requestedCents: 300_000,
+          appliedCents: 250_000,
+          recordedAt: "2026-06-18T10:00:00.000Z",
+          recordedByUserId: fx.userId,
+          ...(execution ? { execution: { ...execution, executedByUserId: fx.userId } } : {}),
+        });
+        await ctx.db.patch(noticeId, {
+          resolution: {
+            kind: "cover_committed",
+            resolvedAt: "2026-06-18T10:00:00.000Z",
+            resolvedByUserId: fx.userId,
+            coverOperationId,
+            coverOperationPublicId: "CO-covered",
+            appliedCoverCents: 250_000,
+          },
+        });
+      });
+
+      const result = await t
+        .withIdentity({ subject: fx.subject })
+        .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-covered" });
+      expect(result?.caseStatus).toBe(expectedCase);
+      expect(result?.cover).toEqual({
+        status: coverStatus,
+        requestedCents: 300_000,
+        appliedCents: 250_000,
+        executedAt: expectedExecutedAt,
+        paymentReference: expectedReference,
+      });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

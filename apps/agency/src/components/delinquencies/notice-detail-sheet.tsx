@@ -28,7 +28,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@mutav/ui/sheet";
-import { DelinquencyStatusTag } from "@/components/delinquencies/delinquency-status-tag";
+import { ClaimStatusTag } from "@mutav/ui/claim-status-tag";
 import { formatBRLCents, formatDateBR, formatDateTimeBR } from "@mutav/i18n/brazil";
 
 type Props = {
@@ -45,7 +45,7 @@ function isCancelReason(v: string): v is CancelReason {
 
 export function NoticeDetailSheet({ publicId, onClose }: Props) {
   const t = useTranslations("delinquencies.detailSheet");
-  const tStatus = useTranslations("delinquencies.status");
+  const tCaseStatus = useTranslations("delinquencies.caseStatus");
   const tEvidence = useTranslations("delinquencies.evidenceSource");
   const open = publicId != null;
 
@@ -54,14 +54,19 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
     publicId ? { publicId } : "skip",
   );
   const markCanceled = useMutation(api.delinquencies.mutations.markCanceled);
+  const markResolved = useMutation(api.delinquencies.mutations.markResolved);
 
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [cureOpen, setCureOpen] = React.useState(false);
+  const [cureNote, setCureNote] = React.useState("");
   const [reason, setReason] = React.useState<CancelReason>("agency_withdrew");
   const [note, setNote] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 
   function handleClose() {
     setCancelOpen(false);
+    setCureOpen(false);
+    setCureNote("");
     setReason("agency_withdrew");
     setNote("");
     onClose();
@@ -86,6 +91,30 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
       }
     } catch {
       toast.error(t("cancel.errors.UNEXPECTED"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConfirmCure() {
+    if (!detail) return;
+    setSubmitting(true);
+    try {
+      const result = await markResolved({
+        noticePublicId: detail.publicId,
+        resolution: {
+          kind: "tenant_cured",
+          ...(cureNote.trim() ? { note: cureNote.trim() } : {}),
+        },
+      });
+      if (result.success) {
+        toast.success(t("cure.success"));
+        handleClose();
+      } else {
+        toast.error(t(`cure.errors.${result.error.code}`));
+      }
+    } catch {
+      toast.error(t("cure.errors.UNEXPECTED"));
     } finally {
       setSubmitting(false);
     }
@@ -118,9 +147,9 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
                   <div className="flex items-center gap-3">
                     <dt className="text-muted-foreground w-32">{t("fields.status")}</dt>
                     <dd>
-                      <DelinquencyStatusTag status={detail.status}>
-                        {tStatus(detail.status)}
-                      </DelinquencyStatusTag>
+                      <ClaimStatusTag status={detail.caseStatus}>
+                        {tCaseStatus(detail.caseStatus)}
+                      </ClaimStatusTag>
                     </dd>
                   </div>
                   <div className="flex items-center gap-3">
@@ -144,16 +173,51 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
                     </dd>
                   </div>
                   <div className="flex items-center gap-3">
-                    <dt className="text-muted-foreground w-32">{t("fields.updatedAmount")}</dt>
-                    <dd>
-                      <Mono>{formatBRLCents(detail.updatedAmountCents)}</Mono>
-                    </dd>
-                  </div>
-                  <div className="flex items-center gap-3">
                     <dt className="text-muted-foreground w-32">{t("fields.evidenceSource")}</dt>
                     <dd className="text-muted-foreground">{tEvidence(detail.evidenceSource)}</dd>
                   </div>
                 </dl>
+
+                {detail.cover ? (
+                  <div className="border-border flex flex-col gap-2 rounded border p-3">
+                    <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                      {t("cover.heading")}
+                    </p>
+                    <dl className="grid grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <dt className="text-muted-foreground text-xs">{t("cover.requested")}</dt>
+                        <dd>
+                          <Mono>{formatBRLCents(detail.cover.requestedCents)}</Mono>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground text-xs">{t("cover.approved")}</dt>
+                        <dd>
+                          <Mono>{formatBRLCents(detail.cover.appliedCents)}</Mono>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground text-xs">
+                          {detail.cover.executedAt
+                            ? t("cover.paidAt", { date: formatDateBR(detail.cover.executedAt) })
+                            : t("cover.paid")}
+                        </dt>
+                        <dd>
+                          {detail.cover.executedAt ? (
+                            <Mono>{formatBRLCents(detail.cover.appliedCents)}</Mono>
+                          ) : (
+                            <span className="text-muted-foreground">{t("cover.pending")}</span>
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                    {detail.cover.paymentReference ? (
+                      <p className="text-muted-foreground text-xs">
+                        {t("cover.reference")}: <Mono>{detail.cover.paymentReference}</Mono>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {detail.resolution ? (
                   <div className="border-border flex flex-col gap-2 rounded border p-3">
@@ -194,10 +258,13 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
             <Button variant="outline" onClick={handleClose}>
               {t("close")}
             </Button>
-            {detail && detail.status === "open" ? (
-              <Button variant="destructive" onClick={() => setCancelOpen(true)}>
-                {t("cancel.trigger")}
-              </Button>
+            {detail?.canAct ? (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setCancelOpen(true)}>
+                  {t("cancel.trigger")}
+                </Button>
+                <Button onClick={() => setCureOpen(true)}>{t("cure.trigger")}</Button>
+              </div>
             ) : null}
           </SheetFooter>
         </SheetContent>
@@ -255,6 +322,37 @@ export function NoticeDetailSheet({ publicId, onClose }: Props) {
             <AlertDialogCancel disabled={submitting}>{t("cancel.back")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmCancel} disabled={submitting}>
               {submitting ? t("cancel.submitting") : t("cancel.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cureOpen}
+        onOpenChange={(v) => {
+          setCureOpen(v);
+          if (!v) setCureNote("");
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("cure.dialogTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("cure.dialogDescription")}</AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">{t("cure.noteLabel")}</Label>
+            <Input
+              value={cureNote}
+              onChange={(e) => setCureNote(e.target.value)}
+              placeholder={t("cure.notePlaceholder")}
+            />
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>{t("cure.back")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCure} disabled={submitting}>
+              {submitting ? t("cure.submitting") : t("cure.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
