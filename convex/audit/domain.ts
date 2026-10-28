@@ -68,6 +68,8 @@ export const AUDIT_ACTION = {
   STAFF_CREATED: "staff.created",
   STAFF_DELETED: "staff.deleted",
   STAFF_BOOTSTRAP: "staff.bootstrap",
+  // seed.ts — the one-way switch that ends the reseed-first window on a deployment.
+  DEPLOYMENT_LOCKED: "deployment.locked_for_real_data",
   // tenants/ (registry re-encounter with conflicting identity fields —
   // emitted by convex/tenants/useCases.ts for staff review; the registry
   // value is NOT overwritten).
@@ -114,6 +116,7 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.STAFF_CREATED),
   v.literal(AUDIT_ACTION.STAFF_DELETED),
   v.literal(AUDIT_ACTION.STAFF_BOOTSTRAP),
+  v.literal(AUDIT_ACTION.DEPLOYMENT_LOCKED),
   v.literal(AUDIT_ACTION.TENANT_DATA_CONFLICT),
   v.literal(AUDIT_ACTION.DELINQUENCY_OPENED),
   v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED),

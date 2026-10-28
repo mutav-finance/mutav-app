@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { AUDIT_ACTION } from "./audit/domain";
+import { appendAuditEntry } from "./audit/useCases";
 import {
   accessTokenExpiryFrom,
   INVOICE_LINE_ITEM_KIND,
@@ -1068,18 +1070,21 @@ async function seedFictional(
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Paulista",
       cnpj: "00000000000100",
+      onboardingState: "active",
       createdAt: d("2024-03-01T00:00:00-03:00"),
     });
 
     const atlanticaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Atlântica",
       cnpj: "00000000000200",
+      onboardingState: "active",
       createdAt: d("2024-06-15T00:00:00-03:00"),
     });
 
     const horizonteId: AgencyId = await ctx.db.insert("agencies", {
       name: "Horizonte Imóveis",
       cnpj: "00000000000300",
+      onboardingState: "active",
       createdAt: d("2025-01-10T00:00:00-03:00"),
     });
 
@@ -2868,7 +2873,10 @@ async function seedAllPersonas(ctx: MutationCtx): Promise<SeedPersonasResult> {
  */
 export const seedTestPersonas = internalMutation({
   args: {},
-  handler: async (ctx): Promise<SeedPersonasResult> => seedAllPersonas(ctx),
+  handler: async (ctx): Promise<SeedPersonasResult> => {
+    await assertDeploymentUnlocked(ctx);
+    return seedAllPersonas(ctx);
+  },
 });
 
 type SeedPersonasResult = Array<{
@@ -3964,6 +3972,7 @@ async function attachGuaranteeTransitionHistory(ctx: MutationCtx): Promise<numbe
 export const seedReset = internalMutation({
   args: { adminEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    await assertDeploymentUnlocked(ctx);
     await wipeDemoTables(ctx);
     const product = await seedDefaultProduct(ctx);
     const personas = await seedAllPersonas(ctx);
@@ -3984,5 +3993,61 @@ export const seedReset = internalMutation({
     const transitionRows = await attachGuaranteeTransitionHistory(ctx);
 
     return { product: product.slug, fictional, personas, aprovada, transitionRows };
+  },
+});
+
+async function assertDeploymentUnlocked(ctx: MutationCtx): Promise<void> {
+  const lock = await ctx.db.query("deploymentLocks").first();
+  if (lock) {
+    throw new Error(
+      `This deployment was locked for real data at ${lock.lockedAt}; seeding is disabled.`,
+    );
+  }
+}
+
+/**
+ * The one-way switch that ends the reseed-first window on a deployment — run
+ * once on production right before the first real agency signs up:
+ *
+ *   bunx convex run --prod seed:lockForRealData '{"confirm":"LOCK"}'
+ *
+ * Clears the demo dataset (same `DEMO_TABLES` as `seedReset`, so `waitlist`,
+ * the audit chain and credit records survive), drops every staff grant whose
+ * user the wipe removed — which is how the seeded `systemadmin` persona loses
+ * its admin role — keeps the default product the guarantee wizard prices from,
+ * then writes the lock. From then on `seedReset` and `seedTestPersonas` throw.
+ * Bootstrap the real first admin afterwards (`mutavStaff:bootstrapFirstAdmin`).
+ */
+export const lockForRealData = internalMutation({
+  args: { confirm: v.literal("LOCK") },
+  handler: async (ctx) => {
+    await assertDeploymentUnlocked(ctx);
+    await wipeDemoTables(ctx);
+
+    let staffGrantsRemoved = 0;
+    for (const grant of await ctx.db.query("mutavStaff").collect()) {
+      if (await ctx.db.get(grant.userId)) continue;
+      await ctx.db.delete(grant._id);
+      staffGrantsRemoved++;
+    }
+
+    await guaranteesByStatePlatform.clear(ctx);
+    await insuredCentsPlatform.clear(ctx);
+    const product = await seedDefaultProduct(ctx);
+
+    const lockedAt = new Date().toISOString();
+    const lockId = await ctx.db.insert("deploymentLocks", {
+      lockedAt,
+      reason: "real customer data",
+    });
+    await appendAuditEntry(ctx, {
+      actor: { kind: "system", source: "seed_lock_for_real_data" },
+      action: AUDIT_ACTION.DEPLOYMENT_LOCKED,
+      resourceType: "deploymentLock",
+      resourceId: lockId,
+      payload: { lockedAt, staffGrantsRemoved, product: product.slug },
+    });
+
+    return { lockedAt, staffGrantsRemoved, product: product.slug };
   },
 });

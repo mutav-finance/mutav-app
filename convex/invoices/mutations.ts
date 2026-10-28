@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation, type MutationCtx } from "../_generated/server";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
-import { mutationWithAgencyScope } from "../lib/auth";
+import { mutationWithActiveAgency } from "../lib/auth";
 import type { Result } from "../lib/result";
 import { SettlementMethods } from "../payments/domain";
 import { recordSettlement } from "../payments/settlement";
@@ -99,7 +99,7 @@ export const consumeBearerAccess = internalMutation({
  * into a group chat, pasted into a support ticket. Effective on the next
  * request against any bearer entry point.
  */
-export const revokeAccessToken = mutationWithAgencyScope({
+export const revokeAccessToken = mutationWithActiveAgency({
   args: { invoiceId: v.id("invoices") },
   handler: async (ctx, args) => {
     const invoice = await ctx.db.get(args.invoiceId);
@@ -126,7 +126,7 @@ export const revokeAccessToken = mutationWithAgencyScope({
  * restarting the TTL. The point of rotation is that a leaked link can be
  * replaced without voiding and reissuing the bill the tenant still owes.
  */
-export const rotateAccessToken = mutationWithAgencyScope({
+export const rotateAccessToken = mutationWithActiveAgency({
   args: { invoiceId: v.id("invoices") },
   handler: async (ctx, args) => {
     const invoice = await ctx.db.get(args.invoiceId);

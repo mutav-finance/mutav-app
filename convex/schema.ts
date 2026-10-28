@@ -319,6 +319,13 @@ export default defineSchema(
     // holding multiple capabilities has multiple rows. Distinct from
     // `memberships` (agency-scoped) — staff act across all agencies with no
     // agency context. See convex/mutavStaff/domain.ts.
+    // One row, written once by `seed:lockForRealData`. Its presence makes every
+    // seed entrypoint refuse, so a reseed can never wipe real customer data.
+    deploymentLocks: defineTable({
+      lockedAt: v.string(),
+      reason: v.string(),
+    }),
+
     mutavStaff: defineTable({
       userId: v.id("users"),
       role: mutavStaffRole,
