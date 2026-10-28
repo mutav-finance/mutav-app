@@ -2,7 +2,7 @@
 
 Single consolidated backlog of fixes and improvements for the agency app (`apps/agency`, app.mutav.finance). Compiled 2026-10-27 from a read-only UI/UX review of the live app (benchmarked against CredAluga) plus the founders' own review list. Items are not prioritized; the numbering below (1.1, 2.1, ...) is the only reference.
 
-Complexity was sized the same day by reading the code on `fix/agency-ui-polish` (none of the items was done on that branch or on `main`):
+Complexity was sized the same day by reading the code on `fix/agency-ui-polish` (items already shipped are moved to § Done):
 
 | Tag    | Meaning                                                                                   |
 | ------ | ----------------------------------------------------------------------------------------- |
@@ -11,7 +11,7 @@ Complexity was sized the same day by reading the code on `fix/agency-ui-polish` 
 | **G**  | 3 to 7 days; schema change, new backend flow, permissions, or several screens             |
 | **GG** | > 1 week, or depends on an external service, or blocked by an open product/legal decision |
 
-Summary: 4 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2, 7.1 and 7.3 were dropped after review; 6.1 is on hold.
+Summary of what is left: 1 P, 8 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2, 7.1 and 7.3 were dropped after review; 6.1 is on hold; 2.3 and 4.1 are done.
 
 ## 1. Dashboard (Painel)
 
@@ -28,8 +28,6 @@ Summary: 4 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2, 
   `convex/guarantees/useCases.ts:79-135` (throw at :127), `convex/guarantees/tenantIdentity.ts:8-34`
 - **2.2 [M] Contract detail: information and actions per status.** There is no "Ativar" button: `guarantees.mutations.activate` has no UI caller. The actions menu (edit, duplicate, archive) is fully disabled. Needs a status x action matrix from product. Depends on 2.1.
   `guarantee-summary-card.tsx:87-185`, `guarantee-actions-menu.tsx:30-33`, `convex/guarantees/mutations.ts:98`
-- **2.3 [P] Remove the "Valor locatício aprovado" card.** Nothing is computed: it echoes the rent typed in step 1 (`data.rentCents`), which step 4's review shows again. Drop the card and the `approvedValueLabel` key.
-  `wizard-step2.tsx:215-224`, `messages/pt-BR.json:920`
 - **2.4 [G] Resume a creation stopped at step 4.** The `drafted` status does not fit: it is born only on step 4 submit and means a priced proposal awaiting activation. Wizard state lives only in `useReducer`. Needs a wizard-draft table (with personal data), a resume screen and an LGPD retention decision.
   `guarantee-wizard.tsx:19-23`, `wizard-step4.tsx:47`, `convex/schema.ts:367-376`
 - **2.5 [M] Pending-action cards on top of the Guarantees list.** `getGuaranteeTabCounts` already returns drafts, upcoming expirations and arrears; pending documents and pending tenant approval need a new query. Depends on 2.2.
@@ -41,14 +39,6 @@ Summary: 4 P, 9 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2, 
 
 - **3.1 [GG] Pay / download boleto.** No boleto issuer exists: `payments.method = boleto` only records a settlement; the real providers are Etherfuse (Pix) and Stellar. Needs a bank/PSP integration with settlement webhook. **P stopgap:** point the dashboard button at the existing checkout (Pix/Stellar).
   `apps/agency/src/components/invoices/invoice-method-card.tsx:46-67`, `convex/payments/providers/domain.ts:18-21`, `docs/architecture/decisions/0006-invoice-settlement-split.md`
-
-## 4. Status and colors (all tables)
-
-- **4.1 [M] Status as a filled colored tag, one pattern for every table.** Splits into:
-  - 4.1a [P] Pill with background, no uppercase/mono. The shared `StatusTag` draws a dot + `Eyebrow`, and `Eyebrow` applies `font-mono uppercase`.
-  - 4.1b [P/M] Separate "Inadimplência verificada" from "Cobertura registrada" (colorblind issue): `default_verified` and `cover_committed` share the `caution` tone. Needs a new tone and an update to the OKLab ΔE test.
-    14 render sites in 10 files in agency, plus `apps/admin` (shared component, QA both).
-    `packages/ui/src/status-tag.tsx:41-53`, `packages/ui/src/eyebrow.tsx:41`, `packages/ui/src/guarantee-state-tag.tsx:31,57-65`, `apps/agency/src/components/guarantees/state-chart-palette.ts`, `apps/agency/src/app/globals.css:152-165`
 
 ## 5. Agency and account
 
@@ -80,10 +70,18 @@ Suggested order: 5.3, then 5.2 and 5.4. 5.1 is independent.
 
 ## Proposed plan
 
-1. **Quick wins (about 1 week):** 2.1, 1.2, 2.3, 4.1, and the 5.3 copy rename. 6.1 waits for a later round.
+1. **Quick wins (about 1 week):** 2.1, 1.2, and the 5.3 copy rename. 6.1 waits for a later round.
 2. **Dashboard and guarantees (1 to 2 weeks):** 1.1 (with the 3.1 stopgap on the button), 1.3, 2.2, 2.5, 7.2, 5.1. Needs decisions first: delinquency metric, "attention today" items, actions per status.
 3. **Team and agency profile (2 to 3 weeks):** 5.3, then 5.2 and 5.4.
 4. **Blocked on third parties (start the conversations now):** 3.1 (PSP), 6.2 (SMS), 6.3 (KYC vendor), 6.4 (counsel), 2.4 (LGPD), 2.6 (underwriting).
+
+## Done
+
+Shipped on `fix/agency-ui-polish` (PR #381):
+
+- **2.3** Removed the "Valor locatício aprovado" card from wizard step 2 (`8e9c13a`).
+- **4.1a** Status tag is a tinted pill with a plain label, no uppercase/mono; denser fill in dark mode (`8e9c13a`, `e462551`).
+- **4.1b** `cover_committed` gets its own ink swatch and `default_verified` uses the brand orange `#d4781a`, both clearing the OKLab/CVD floors (`8e9c13a`, `0b21960`).
 
 ## Decisions already made (do not reopen)
 
