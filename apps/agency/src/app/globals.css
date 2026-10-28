@@ -36,6 +36,7 @@
   --color-error: var(--error);
   --color-warning: var(--warning);
   --color-warning-strong: var(--warning-strong);
+  --color-escalated: var(--escalated);
   --color-warning-dim: var(--warning-dim);
 
   /* shadcn aliases mapped to MUTAV tokens — primitives keep working */
@@ -162,6 +163,10 @@
   --warning: #92400e;
   --warning-strong: #f97316;
   --warning-dim: #fff4e0;
+  /* escalated = violet "funds committed" (cover_committed). A hue, not another
+     orange step: the orange-to-red gap has no room for a swatch a colorblind
+     reader can separate from both neighbours. */
+  --escalated: #7c3aed;
   /* Override accent-foreground so amber CTAs render #1A1A1A (never white-on-amber) */
   --color-accent-foreground: #1a1a1a;
   --color-primary-foreground: #1a1a1a;
@@ -191,6 +196,7 @@
   --warning: #fbbf24;
   --warning-strong: #f97316;
   --warning-dim: #4a2c0a;
+  --escalated: #a78bfa;
   /* Restore canvas-on-accent for dark mode */
   --color-accent-foreground: var(--canvas);
   --color-primary-foreground: var(--canvas);

@@ -36,7 +36,7 @@
   },
   "commission": {
     "meta": {
-      "title": "Commission — MUTAV",
+      "title": "Commission",
       "description": "Track your agency's monthly commission balance and active guarantee history."
     },
     "heading": "Commission",
@@ -69,7 +69,7 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Delinquencies — MUTAV",
+      "title": "Delinquencies",
       "description": "Track and manage delinquency actions for your agency's guarantees."
     },
     "heading": "Delinquency Actions",
@@ -530,7 +530,7 @@
   },
   "guaranteeList": {
     "meta": {
-      "title": "Guarantees | Mutav",
+      "title": "Guarantees",
       "description": "Real estate agency guarantees list"
     },
     "heading": "Guarantees",
@@ -592,7 +592,7 @@
   },
   "invoiceList": {
     "meta": {
-      "title": "Invoices | Mutav",
+      "title": "Invoices",
       "description": "Monthly invoices for the agency"
     },
     "heading": "Invoices",
@@ -639,7 +639,7 @@
     },
     "picker": {
       "meta": {
-        "title": "Pay invoice {publicId} | Mutav",
+        "title": "Pay invoice {publicId}",
         "description": "Choose how to pay your Mutav invoice."
       },
       "heading": "How do you want to pay?",
@@ -661,13 +661,13 @@
     },
     "stellar": {
       "meta": {
-        "title": "Pay with Stellar — {publicId} | Mutav",
+        "title": "Pay with Stellar — {publicId}",
         "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
       }
     },
     "anchortest": {
       "meta": {
-        "title": "AnchorTest — {publicId} | Mutav",
+        "title": "AnchorTest — {publicId}",
         "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
       },
       "orderId": "Order",
@@ -708,7 +708,7 @@
     },
     "pix": {
       "meta": {
-        "title": "Pay with PIX — {publicId} | Mutav",
+        "title": "Pay with PIX — {publicId}",
         "description": "Pay your Mutav invoice via PIX."
       },
       "copyCode": "PIX copy & paste",
@@ -755,7 +755,7 @@
     },
     "pago": {
       "meta": {
-        "title": "Paid — {publicId} | Mutav",
+        "title": "Paid — {publicId}",
         "description": "Mutav payment receipt."
       },
       "badge": {
@@ -779,7 +779,7 @@
   },
   "invoiceDetails": {
     "meta": {
-      "title": "Invoice {id} | Mutav",
+      "title": "Invoice {id}",
       "description": "Invoice details"
     },
     "breadcrumb": "Invoice Details",
@@ -864,7 +864,7 @@
   },
   "guaranteeNew": {
     "meta": {
-      "title": "New Guarantee | Mutav"
+      "title": "New Guarantee"
     },
     "heading": "New Guarantee",
     "subheading": "Fill in the details to create a new guarantee",
@@ -917,7 +917,6 @@
     },
     "simulation": {
       "heading": "Simulation Result",
-      "approvedValueLabel": "Approved rental value",
       "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
       "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
       "closeButton": "Back to home",

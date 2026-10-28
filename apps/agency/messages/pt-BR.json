@@ -36,7 +36,7 @@
   },
   "commission": {
     "meta": {
-      "title": "Comissão — MUTAV",
+      "title": "Comissão",
       "description": "Acompanhe o saldo de comissão mensal e o histórico de garantias ativas."
     },
     "heading": "Comissão",
@@ -69,7 +69,7 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Inadimplências — MUTAV",
+      "title": "Inadimplências",
       "description": "Acompanhe e gerencie os acionamentos de inadimplência das garantias da sua imobiliária."
     },
     "heading": "Acionamentos de Inadimplência",
@@ -530,7 +530,7 @@
   },
   "guaranteeList": {
     "meta": {
-      "title": "Garantias | Mutav",
+      "title": "Garantias",
       "description": "Lista de garantias da imobiliária"
     },
     "heading": "Garantias",
@@ -592,7 +592,7 @@
   },
   "invoiceList": {
     "meta": {
-      "title": "Faturas | Mutav",
+      "title": "Faturas",
       "description": "Faturas mensais da imobiliária"
     },
     "heading": "Faturas",
@@ -639,7 +639,7 @@
     },
     "picker": {
       "meta": {
-        "title": "Pagar fatura {publicId} | Mutav",
+        "title": "Pagar fatura {publicId}",
         "description": "Escolha como pagar sua fatura Mutav."
       },
       "heading": "Como você quer pagar?",
@@ -661,13 +661,13 @@
     },
     "stellar": {
       "meta": {
-        "title": "Pagar com Stellar — {publicId} | Mutav",
+        "title": "Pagar com Stellar — {publicId}",
         "description": "Pague sua fatura Mutav via Stellar (XLM ou USDC)."
       }
     },
     "anchortest": {
       "meta": {
-        "title": "AnchorTest — {publicId} | Mutav",
+        "title": "AnchorTest — {publicId}",
         "description": "Pague via interface da anchor (SEP-24 — demo)."
       },
       "orderId": "Pedido",
@@ -708,7 +708,7 @@
     },
     "pix": {
       "meta": {
-        "title": "Pagar com PIX — {publicId} | Mutav",
+        "title": "Pagar com PIX — {publicId}",
         "description": "Pague sua fatura Mutav via PIX."
       },
       "copyCode": "PIX copia e cola",
@@ -755,7 +755,7 @@
     },
     "pago": {
       "meta": {
-        "title": "Pago — {publicId} | Mutav",
+        "title": "Pago — {publicId}",
         "description": "Comprovante de pagamento Mutav."
       },
       "badge": {
@@ -779,7 +779,7 @@
   },
   "invoiceDetails": {
     "meta": {
-      "title": "Fatura {id} | Mutav",
+      "title": "Fatura {id}",
       "description": "Detalhes da fatura"
     },
     "breadcrumb": "Detalhes da Fatura",
@@ -864,7 +864,7 @@
   },
   "guaranteeNew": {
     "meta": {
-      "title": "Nova Garantia | Mutav"
+      "title": "Nova Garantia"
     },
     "heading": "Nova Garantia",
     "subheading": "Preencha os dados para criar uma nova garantia",
@@ -917,7 +917,6 @@
     },
     "simulation": {
       "heading": "Resultado da Simulação",
-      "approvedValueLabel": "Valor locatício aprovado",
       "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
       "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
       "closeButton": "Voltar ao início",

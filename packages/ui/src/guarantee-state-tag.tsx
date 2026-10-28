@@ -21,12 +21,20 @@ export const GUARANTEE_STATE_NAMES = [
 export type GuaranteeStateName = (typeof GUARANTEE_STATE_NAMES)[number];
 
 /**
- * Semantic tone names, one layer above the five swatches `StatusTag` paints.
+ * Semantic tone names, one layer above the swatches `StatusTag` paints.
  * The extra names carry meaning the swatch does not: `accent` and `muted` both
  * resolve to the neutral gray today but say different things, so the palette
  * can grow a dedicated swatch for one without re-reading every call site.
  */
-export type Tone = "accent" | "success" | "error" | "neutral" | "muted" | "expiring" | "caution";
+export type Tone =
+  | "accent"
+  | "success"
+  | "error"
+  | "neutral"
+  | "muted"
+  | "expiring"
+  | "caution"
+  | "committed";
 
 export const TONE: Record<Tone, StatusTagTone> = {
   accent: "neutral",
@@ -36,6 +44,7 @@ export const TONE: Record<Tone, StatusTagTone> = {
   muted: "neutral",
   expiring: "warning",
   caution: "warning-strong",
+  committed: "escalated",
 };
 
 /**
@@ -59,7 +68,7 @@ export const GUARANTEE_STATE_TONE: Record<GuaranteeStateName, Tone> = {
   active: "success",
   in_arrears: "expiring",
   default_verified: "caution",
-  cover_committed: "caution",
+  cover_committed: "committed",
   in_eviction: "error",
   closed: "muted",
 };
