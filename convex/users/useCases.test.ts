@@ -73,7 +73,7 @@ describe("getOrCreateByIdentity", () => {
     { label: "false", emailVerified: false },
     { label: "absent", emailVerified: undefined },
   ])(
-    "records emailVerified false on an insert when the claim is $label",
+    "refuses a new email when the claim is $label — no row is created",
     async ({ emailVerified }) => {
       const t = convexTest(schema);
       const asAlice = t.withIdentity({
@@ -83,9 +83,48 @@ describe("getOrCreateByIdentity", () => {
       });
 
       const result = await asAlice.mutation(api.users.useCases.getOrCreateByIdentity, {});
-      if (!result.success) throw new Error(`expected success, got ${result.error.code}`);
 
-      const user = await t.run((ctx) => ctx.db.get(result.data.userId));
+      expect(result).toEqual({
+        success: false,
+        error: { code: "EMAIL_NOT_VERIFIED" },
+        message: "Email must be verified before an account is provisioned",
+      });
+      const all = await t.run((ctx) => ctx.db.query("users").collect());
+      expect(all).toHaveLength(0);
+    },
+  );
+
+  test.each([
+    { label: "false", emailVerified: false },
+    { label: "absent", emailVerified: undefined },
+  ])(
+    "returns the row already bound to this subject when the claim is $label",
+    async ({ emailVerified }) => {
+      const t = convexTest(schema);
+      const userId = await t.run((ctx) =>
+        ctx.db.insert("users", {
+          publicId: "alice",
+          subject: "auth0|alice",
+          name: "Alice",
+          email: "alice@test.br",
+          emailVerified: false,
+          createdAt: new Date().toISOString(),
+        }),
+      );
+      const asAlice = t.withIdentity({
+        subject: "auth0|alice",
+        email: "alice@test.br",
+        emailVerified,
+      });
+
+      const result = await asAlice.mutation(api.users.useCases.getOrCreateByIdentity, {});
+
+      expect(result).toEqual({
+        success: true,
+        data: { userId, created: false, linked: false },
+        message: "User already provisioned",
+      });
+      const user = await t.run((ctx) => ctx.db.get(userId));
       expect(user?.emailVerified).toBe(false);
     },
   );
@@ -203,7 +242,7 @@ describe("getOrCreateByIdentity", () => {
       expect(result).toEqual({
         success: false,
         error: { code: "EMAIL_NOT_VERIFIED" },
-        message: "Email must be verified before linking to an existing user",
+        message: "Email must be verified before an account is provisioned",
       });
 
       const all = await t.run((ctx) => ctx.db.query("users").collect());
@@ -298,24 +337,28 @@ describe("getOrCreateByIdentity", () => {
       },
     );
 
-    test("is not taken over by another unverified identity", async () => {
+    test.each([
+      { label: "false", emailVerified: false },
+      { label: "absent", emailVerified: undefined },
+    ])("is not taken over by an unverified identity (claim $label)", async ({ emailVerified }) => {
       const { t } = await seedSquatter({ emailVerified: false });
       const asChallenger = t.withIdentity({
         subject: "auth0|challenger",
         email: "alice@test.br",
-        emailVerified: false,
+        emailVerified,
       });
 
       const result = await asChallenger.mutation(api.users.useCases.getOrCreateByIdentity, {});
 
       expect(result).toEqual({
         success: false,
-        error: { code: "EMAIL_BOUND_TO_OTHER_IDENTITY" },
-        message: "Email is already bound to another identity",
+        error: { code: "EMAIL_NOT_VERIFIED" },
+        message: "Email must be verified before an account is provisioned",
       });
       const all = await t.run((ctx) => ctx.db.query("users").collect());
       expect(all).toHaveLength(1);
       expect(all[0]?.subject).toBe("auth0|squatter");
+      expect(all[0]?.emailVerified).toBe(false);
     });
   });
 

@@ -21,11 +21,24 @@ type CopyKey<TPrefix extends SessionErrorTone> =
   | `${TPrefix}.title`
   | `${TPrefix}.subtitle`;
 
+const RELOGIN_HREF = "/auth/login?returnTo=/";
+
+/**
+ * `retry` is a client-side link back to `/` that reuses the current session.
+ * `relogin` is a full navigation to Auth0 so the callback receives a fresh ID
+ * token: after the user confirms their email, only a new token carries
+ * `email_verified: true`, so retrying with the old one fails again.
+ */
+export type SessionErrorPrimaryAction =
+  | { kind: "retry"; href: "/"; labelKey: "tryAgain" }
+  | { kind: "relogin"; href: typeof RELOGIN_HREF; labelKey: "confirmedSignInAgain" };
+
 export type SessionErrorView = {
   tone: SessionErrorTone;
   eyebrowKey: CopyKey<SessionErrorTone>;
   titleKey: CopyKey<SessionErrorTone>;
   subtitleKey: CopyKey<SessionErrorTone>;
+  primaryAction: SessionErrorPrimaryAction;
 };
 
 const TONE_BY_REASON = {
@@ -60,5 +73,9 @@ export function resolveSessionErrorView(reason: SessionErrorReason): SessionErro
     eyebrowKey: `${tone}.eyebrow`,
     titleKey: `${tone}.title`,
     subtitleKey: `${tone}.subtitle`,
+    primaryAction:
+      reason === "email-not-verified"
+        ? { kind: "relogin", href: RELOGIN_HREF, labelKey: "confirmedSignInAgain" }
+        : { kind: "retry", href: "/", labelKey: "tryAgain" },
   };
 }

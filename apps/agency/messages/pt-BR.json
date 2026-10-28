@@ -1539,7 +1539,7 @@
     "emailNotVerified": {
       "eyebrow": "Confirme seu e-mail",
       "title": "Confirme seu e-mail para continuar",
-      "subtitle": "Enviamos um e-mail de verificação quando você criou sua conta. Abra a mensagem, clique no link de confirmação e tente novamente."
+      "subtitle": "Enviamos um link para a sua caixa de entrada (confira também o spam). Depois de confirmar, entre de novo."
     },
     "emailBound": {
       "eyebrow": "Conta já vinculada",
@@ -1547,6 +1547,7 @@
       "subtitle": "Entre da mesma forma que entrou antes ou fale com o nosso suporte para recuperar o acesso à sua conta."
     },
     "tryAgain": "Tentar novamente",
+    "confirmedSignInAgain": "Já confirmei — entrar de novo",
     "logOut": "Sair"
   }
 }

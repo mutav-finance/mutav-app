@@ -26,8 +26,12 @@ describe("sessionError messages", () => {
         }
       });
 
-      it("formats both action labels", () => {
+      it("formats every action label", () => {
+        for (const reason of REASONS) {
+          expect(t(resolveSessionErrorView(reason).primaryAction.labelKey)).not.toBe("");
+        }
         expect(t("tryAgain")).not.toBe("");
+        expect(t("confirmedSignInAgain")).not.toBe("");
         expect(t("logOut")).not.toBe("");
       });
     });

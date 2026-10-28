@@ -1539,7 +1539,7 @@
     "emailNotVerified": {
       "eyebrow": "Verify your email",
       "title": "Confirm your email to continue",
-      "subtitle": "We sent you a verification email when you signed up. Open it, click the confirmation link, then try again."
+      "subtitle": "We sent a link to your inbox (check spam). After confirming, sign in again."
     },
     "emailBound": {
       "eyebrow": "Account already linked",
@@ -1547,6 +1547,7 @@
       "subtitle": "Sign in the way you did before, or contact support so we can help you access your account."
     },
     "tryAgain": "Try again",
+    "confirmedSignInAgain": "I've confirmed — sign in again",
     "logOut": "Log out"
   }
 }

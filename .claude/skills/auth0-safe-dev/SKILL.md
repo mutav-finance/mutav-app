@@ -83,6 +83,8 @@ const result = await getFreshIdToken({ auth0, refreshWindowSeconds: getIdTokenRe
 
 **Convex side**: every public query or mutation goes through a wrapper (`queryWithAuth`, `*WithAgencyScope`, `mutationWithActiveAgency`, `*WithMutavStaff`, role-gated staff wrappers). See `docs/auth.md`. [S19]
 
+**Provisioning** (`getOrCreateByIdentity`): no account exists without `email_verified: true`. An unverified identity never creates, links or takes over a row; only a row already bound to its exact subject is returned. Don't loosen this (support table in `docs/auth0.md`).
+
 **SDK upgrades**: read the advisories page and the CHANGELOG between the current version and the target ([S5][S7]). Re-read `dist/server/auth-client.js` (the rolling-session branch of `handler`, `handleLogout`), `dist/server/cookies.js` (`addCacheControlHeadersForSession`) and `dist/utils/url-helpers.js` and `dist/utils/pathUtils.js` (returnTo). Check which headers the middleware sets now and whether cookie or transaction-cookie formats changed: 4.29 changed the transaction cookie format, which breaks logins in flight across a deploy. Then run the full verification.
 
 ## Verification (required for any auth change)

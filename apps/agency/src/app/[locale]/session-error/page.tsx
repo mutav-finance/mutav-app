@@ -29,8 +29,11 @@ const toneIcon: Record<SessionErrorTone, typeof CloudOffIcon> = {
  *
  * Loop-freedom: this page never calls `resolveUserDestination` and never
  * redirects. "Try again" is a user-initiated link back to `/`; sending these
- * failures to `/auth/login` instead would complete silently via SSO, fail the
- * same read again, and loop through Auth0.
+ * failures to `/auth/login` automatically would complete silently via SSO,
+ * fail the same read again, and loop through Auth0. The unverified-email
+ * reason is the one exception, and still only on a click: the user goes back
+ * through `/auth/login` because only a fresh ID token carries the newly
+ * confirmed `email_verified`.
  */
 export default async function SessionErrorPage({
   params,
@@ -65,7 +68,13 @@ export default async function SessionErrorPage({
 
         <div className="mt-8 flex flex-wrap gap-2">
           <Button asChild>
-            <Link href="/">{t("tryAgain")}</Link>
+            {view.primaryAction.kind === "relogin" ? (
+              // The Auth0 SDK mounts /auth/login at the root, outside [locale],
+              // and needs a full navigation — a plain <a>, never next/link.
+              <a href={view.primaryAction.href}>{t(view.primaryAction.labelKey)}</a>
+            ) : (
+              <Link href={view.primaryAction.href}>{t(view.primaryAction.labelKey)}</Link>
+            )}
           </Button>
           <Button asChild variant="outline">
             {/* The Auth0 SDK mounts /auth/logout at the root, outside [locale],

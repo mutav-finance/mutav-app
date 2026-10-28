@@ -29,6 +29,7 @@ describe("resolveSessionErrorView", () => {
       eyebrowKey: "notProvisioned.eyebrow",
       titleKey: "notProvisioned.title",
       subtitleKey: "notProvisioned.subtitle",
+      primaryAction: { kind: "retry", href: "/", labelKey: "tryAgain" },
     });
   });
 
@@ -38,15 +39,21 @@ describe("resolveSessionErrorView", () => {
       eyebrowKey: "backendUnavailable.eyebrow",
       titleKey: "backendUnavailable.title",
       subtitleKey: "backendUnavailable.subtitle",
+      primaryAction: { kind: "retry", href: "/", labelKey: "tryAgain" },
     });
   });
 
-  it("tells the user to verify the email for email-not-verified", () => {
+  it("tells the user to verify the email and sign in again for email-not-verified", () => {
     expect(resolveSessionErrorView("email-not-verified")).toEqual({
       tone: "emailNotVerified",
       eyebrowKey: "emailNotVerified.eyebrow",
       titleKey: "emailNotVerified.title",
       subtitleKey: "emailNotVerified.subtitle",
+      primaryAction: {
+        kind: "relogin",
+        href: "/auth/login?returnTo=/",
+        labelKey: "confirmedSignInAgain",
+      },
     });
   });
 
@@ -56,6 +63,7 @@ describe("resolveSessionErrorView", () => {
       eyebrowKey: "emailBound.eyebrow",
       titleKey: "emailBound.title",
       subtitleKey: "emailBound.subtitle",
+      primaryAction: { kind: "retry", href: "/", labelKey: "tryAgain" },
     });
   });
 });
