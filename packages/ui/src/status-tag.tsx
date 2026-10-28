@@ -29,14 +29,15 @@ const iconToneClass: Record<StatusTagTone, string> = {
 
 // The label stays in the foreground color: several swatches (orange, amber in
 // dark mode) fail text contrast on a light tint, so the tone lives in the fill
-// and the dot.
+// and the dot. Dark mode takes a denser fill because 15% vanishes on the
+// near-black canvas.
 const fillToneClass: Record<StatusTagTone, string> = {
-  neutral: "bg-text-3/15",
-  positive: "bg-success/15",
-  warning: "bg-warning/15",
-  "warning-strong": "bg-warning-strong/15",
-  escalated: "bg-escalated/15",
-  critical: "bg-error/15",
+  neutral: "bg-text-3/15 dark:bg-text-3/25",
+  positive: "bg-success/15 dark:bg-success/25",
+  warning: "bg-warning/15 dark:bg-warning/25",
+  "warning-strong": "bg-warning-strong/15 dark:bg-warning-strong/25",
+  escalated: "bg-escalated/15 dark:bg-escalated/25",
+  critical: "bg-error/15 dark:bg-error/25",
 };
 
 export type StatusTagProps = {
