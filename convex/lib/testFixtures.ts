@@ -412,7 +412,11 @@ export async function seedCoverNotice(
  */
 export async function seedSubmittedClaim(
   t: TestConvex<typeof schema>,
-  { noticePublicId, userId }: { noticePublicId: string; userId: UserId },
+  {
+    noticePublicId,
+    userId,
+    claimedAmountCents,
+  }: { noticePublicId: string; userId: UserId; claimedAmountCents?: number },
 ): Promise<void> {
   await t.run(async (ctx) => {
     const notice = await ctx.db
@@ -423,7 +427,7 @@ export async function seedSubmittedClaim(
     await ctx.db.patch(notice._id, {
       claim: {
         status: "submitted",
-        claimedAmountCents: notice.originalAmountCents,
+        claimedAmountCents: claimedAmountCents ?? notice.originalAmountCents,
         submittedAt: "2026-06-20T10:00:00.000Z",
         submittedByUserId: userId,
         declarationVersion: "test",

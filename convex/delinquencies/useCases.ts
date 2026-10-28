@@ -27,6 +27,7 @@ import {
   caseGroupOf,
   caseFilterValidator,
   claimableFromDate,
+  coverRequestCents,
   delinquencyStatusValidator,
   toAgencyCaseStatus,
   type AgencyCaseStatus,
@@ -199,6 +200,8 @@ export type DelinquencyAdminQueueRow = {
    */
   claimStatus: ClaimStatus | null;
   claimedAmountCents: number | null;
+  /** What recording cover would draw before capacity: see `coverRequestCents`. */
+  coverRequestCents: number;
   evidence: ClaimEvidenceRow[];
 };
 
@@ -387,6 +390,7 @@ async function shapeDelinquencyAdminQueueRow(
     openedAt: notice.openedAt,
     claimStatus: notice.claim?.status ?? null,
     claimedAmountCents: notice.claim?.claimedAmountCents ?? null,
+    coverRequestCents: coverRequestCents(notice),
     evidence: await listEvidenceForNotice(ctx, notice._id),
   };
 }

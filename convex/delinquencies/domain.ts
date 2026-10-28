@@ -10,6 +10,23 @@ export type DelinquencyNotice = Doc<"guaranteeDelinquencyNotices">;
 export type DelinquencyNoticeId = Id<"guaranteeDelinquencyNotices">;
 export type ClaimEvidenceId = Id<"claimEvidence">;
 
+/**
+ * What cover draws for a notice: the amount the agency claimed, never more
+ * than the notice says is owed. The agency lowers its claim for a partial
+ * payment, so drawing the notice's updated amount would pay past it. A notice
+ * with no claim (recorded before claims existed) falls back to the updated
+ * amount. Remaining guarantee capacity clamps the result further at draw time.
+ */
+export function coverRequestCents(notice: {
+  updatedAmountCents: number;
+  claim?: { claimedAmountCents: number };
+}): number {
+  const claimed = notice.claim?.claimedAmountCents;
+  return claimed === undefined
+    ? notice.updatedAmountCents
+    : Math.min(claimed, notice.updatedAmountCents);
+}
+
 export {
   DELINQUENCY_STATUS,
   DELINQUENCY_STATUSES,

@@ -1761,7 +1761,7 @@ describe("staffRecordCover — capacity draw", () => {
     ]);
   });
 
-  test("draws the UPDATED amount, not the original one", async () => {
+  test("a notice with no claim draws its UPDATED amount, not the original one", async () => {
     const t = setup();
     const fx = await makeFixture(t, "1", { status: "default_verified" });
     await insertNotice(t, fx, {
@@ -1780,6 +1780,34 @@ describe("staffRecordCover — capacity draw", () => {
     if (!result.success) return;
     expect(result.data.appliedCoverCents).toBe(260_000);
     expect((await readGuarantee(t, fx.guaranteeId)).capacity.reservedCents).toBe(260_000);
+  });
+
+  test("draws the CLAIMED amount when the agency lowered it for a partial payment", async () => {
+    const t = setup();
+    const fx = await makeFixture(t, "1", { status: "default_verified" });
+    await insertNotice(t, fx, {
+      publicId: "DN-draw-claimed",
+      status: "verified",
+      originalAmountCents: 420_000,
+      updatedAmountCents: 428_400,
+    });
+    await seedSubmittedClaim(t, {
+      noticePublicId: "DN-draw-claimed",
+      userId: fx.userId,
+      claimedAmountCents: 200_000,
+    });
+    await grantStaffRole(t, fx.userId, "compliance");
+    const asCompliance = t.withIdentity({ subject: fx.subject });
+
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-draw-claimed",
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.appliedCoverCents).toBe(200_000);
+    expect((await readGuarantee(t, fx.guaranteeId)).capacity.reservedCents).toBe(200_000);
+    const [operation] = await t.run((ctx) => ctx.db.query("coverOperations").collect());
+    expect(operation.requestedCents).toBe(200_000);
   });
 
   test("a notice worth more than the remaining ceiling is clamped to what is available", async () => {

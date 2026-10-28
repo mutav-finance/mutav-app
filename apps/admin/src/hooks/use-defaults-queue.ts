@@ -218,14 +218,14 @@ export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
   const singlePreview: CoverPreview | null =
     coverTargets.length === 1 && singleTarget
       ? coverPreview({
-          requestedCents: singleTarget.updatedAmountCents,
+          requestedCents: singleTarget.coverRequestCents,
           capacity: singleTarget.guaranteeCapacity,
         })
       : null;
   const totals: BatchCoverPreview = batchCoverPreview(
     coverTargets.map((row) => ({
       guaranteeId: row.guaranteeId,
-      requestedCents: row.updatedAmountCents,
+      requestedCents: row.coverRequestCents,
       capacity: row.guaranteeCapacity,
     })),
   );

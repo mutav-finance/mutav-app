@@ -23,6 +23,7 @@ import {
   NOTICE_NOT_VERIFIED_ERROR_CODE,
   NOTICE_RESOLUTION_KIND,
   assertTransition,
+  coverRequestCents,
   type DelinquencyNotice,
   type GuaranteeRefusedErrorCode,
   type NoticeNotVerifiedErrorCode,
@@ -229,11 +230,10 @@ async function commitCover(
   const guarantee = await loadGuarantee(ctx, notice.guaranteeId);
   const isFirstDraw = guarantee.status === GUARANTEE_STATE.DEFAULT_VERIFIED;
 
-  // Draw the UPDATED amount: what the tenant owes the landlord at cover time,
-  // original plus accrued juros and multa, is the figure Mutav pays out.
+  const requestedCents = coverRequestCents(notice);
   const reserved = await reserveCoverCapacity(ctx, {
     guarantee,
-    amountCents: notice.updatedAmountCents,
+    amountCents: requestedCents,
     actor,
   });
   if (!reserved.success) throw new Error(reserved.message);
@@ -257,7 +257,7 @@ async function commitCover(
     agencyId: notice.agencyId,
     coveragePeriod,
     batchId,
-    requestedCents: notice.updatedAmountCents,
+    requestedCents,
     appliedCents: reserved.data.appliedCents,
     payoutAccount,
     recordedAt,
@@ -310,7 +310,7 @@ async function commitCover(
       agencyId: notice.agencyId,
       coveragePeriod,
       batchId: batchId ?? null,
-      requestedCents: notice.updatedAmountCents,
+      requestedCents,
       appliedCents: reserved.data.appliedCents,
       recordedAt,
       note: note ?? null,
