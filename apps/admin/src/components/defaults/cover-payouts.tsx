@@ -82,6 +82,12 @@ export function CoverPayouts({
 
 const ACCOUNT_SUFFIX_LENGTH = 4;
 
+// Account numbers carry a check digit after a separator ("12345-6"); masking
+// raw characters would show "45-6" and make every "…00-0" look alike.
+function accountSuffix(account: string): string {
+  return account.replace(/\D/g, "").slice(-ACCOUNT_SUFFIX_LENGTH);
+}
+
 const ACCOUNT_TYPE_KEY = {
   corrente: "checking",
   poupanca: "savings",
@@ -101,7 +107,7 @@ function PayoutRow({ row, view }: { row: CoverPayoutRow; view: CoverPayoutsViewM
       <TableCell>{row.agencyName}</TableCell>
       <TableCell>
         {row.payoutAccount.bank} ·{" "}
-        {t("accountEnding", { last4: row.payoutAccount.account.slice(-ACCOUNT_SUFFIX_LENGTH) })}
+        {t("accountEnding", { last4: accountSuffix(row.payoutAccount.account) })}
       </TableCell>
       <TableCell>
         <Mono>{row.guaranteePublicId}</Mono>
