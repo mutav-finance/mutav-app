@@ -1,18 +1,5 @@
 # Agency app: UI/UX backlog
 
-Single consolidated backlog of fixes and improvements for the agency app (`apps/agency`, app.mutav.finance). Compiled 2026-10-27 from a read-only UI/UX review of the live app (benchmarked against CredAluga) plus the founders' own review list. Items are not prioritized; the numbering below (1.1, 2.1, ...) is the only reference.
-
-Complexity was sized the same day by reading the code on `fix/agency-ui-polish` (items already shipped are moved to § Done):
-
-| Tag    | Meaning                                                                                   |
-| ------ | ----------------------------------------------------------------------------------------- |
-| **P**  | < 1 day; frontend or copy only, no backend change                                         |
-| **M**  | 1 to 3 days; frontend + a simple Convex query/mutation change, no schema migration        |
-| **G**  | 3 to 7 days; schema change, new backend flow, permissions, or several screens             |
-| **GG** | > 1 week, or depends on an external service, or blocked by an open product/legal decision |
-
-Summary of what is left: 1 P, 8 M, 5 G, 4 GG (3.1 counted as GG; it has a P stopgap). 1.4, 3.2, 7.1 and 7.3 were dropped after review; 6.1 is on hold; 2.3 and 4.1 are done.
-
 ## 1. Dashboard (Painel)
 
 - **1.1 [M] Top KPIs.** "Próxima Fatura" gets a prominent button to Faturas; "Faturas em atraso" becomes "Inadimplência" = % of the agency's book delinquent in the last 30 days. The button alone is P. The Transparência rate is a protocol-wide point-in-time snapshot (`(default_verified + cover_committed) / in force`) with no 30-day window, so a new agency-scoped query replaying `guaranteeHistory` is needed (`getStateTimelineByPeriod` is a close precedent; no schema change). Open decisions: count vs value; "entered the window" vs "delinquent today"; variation vs the previous 30 days; whether `in_arrears` counts (Transparência excludes it). Becomes GG if these stay open. The label also collides with the Inadimplências page.
@@ -67,13 +54,6 @@ Suggested order: 5.3, then 5.2 and 5.4. 5.1 is independent.
 
 - **7.2 [M] Empty states that teach** (steps + CTA). No shared `EmptyState` component; about 5 screens (Garantias, Faturas, Inadimplências, Comissão, empty dashboard) plus detail cards.
   `guarantee-list-table.tsx:386-398`, `invoice-list-table.tsx:359`, `delinquency-page.tsx:305`, `commission-page.tsx:182`
-
-## Proposed plan
-
-1. **Quick wins (about 1 week):** 2.1, 1.2, and the 5.3 copy rename. 6.1 waits for a later round.
-2. **Dashboard and guarantees (1 to 2 weeks):** 1.1 (with the 3.1 stopgap on the button), 1.3, 2.2, 2.5, 7.2, 5.1. Needs decisions first: delinquency metric, "attention today" items, actions per status.
-3. **Team and agency profile (2 to 3 weeks):** 5.3, then 5.2 and 5.4.
-4. **Blocked on third parties (start the conversations now):** 3.1 (PSP), 6.2 (SMS), 6.3 (KYC vendor), 6.4 (counsel), 2.4 (LGPD), 2.6 (underwriting).
 
 ## Done
 
