@@ -6,12 +6,12 @@ import { useConvex, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { toast } from "sonner";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import {
   AGENCY_CASE_STATUS,
   CLAIM_EVIDENCE_KINDS,
   CLAIM_EVIDENCE_STATUS,
   brazilToday,
+  type ClaimEvidenceId,
   type ClaimEvidenceKind,
 } from "@convex/delinquencies/domain";
 import type { StorageId } from "@convex/lib/storage";
@@ -128,7 +128,7 @@ export function useClaimCasePanel({
   );
 
   const download = React.useCallback(
-    async (evidenceId: Id<"claimEvidence">) => {
+    async (evidenceId: ClaimEvidenceId) => {
       const url = await convex.query(api.delinquencies.claimEvidence.getClaimEvidenceUrl, {
         evidenceId,
       });
