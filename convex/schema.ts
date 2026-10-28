@@ -714,6 +714,10 @@ export default defineSchema(
       // remaining capacity actually let Mutav reserve.
       requestedCents: v.number(),
       appliedCents: v.number(),
+      // The agency's `bankingInfo` as it stood when cover was recorded. Mutav
+      // pays the agency, never the landlord; an agency editing its account
+      // afterwards must not redirect money already committed.
+      payoutAccount: bankingInfo,
       recordedAt: v.string(),
       recordedByUserId: v.id("users"),
       note: v.optional(v.string()),

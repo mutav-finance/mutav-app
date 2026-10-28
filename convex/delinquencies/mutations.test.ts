@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
 import {
+  TEST_PAYOUT_ACCOUNT,
   registerGuaranteeAggregateComponents,
   seedGuaranteeWithLease,
   seedSubmittedClaim,
@@ -65,6 +66,7 @@ async function makeFixture(
       name: `Fixture Agency ${suffix}`,
       cnpj: `0000000000000${suffix}`.slice(-14),
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: "2024-01-01T00:00:00-03:00",
     });

@@ -53,6 +53,7 @@ export function CoverPayouts({
                     <TableHead>{t("columns.batch")}</TableHead>
                     <TableHead>{t("columns.notice")}</TableHead>
                     <TableHead>{t("columns.agency")}</TableHead>
+                    <TableHead>{t("columns.payoutAccount")}</TableHead>
                     <TableHead>{t("columns.guarantee")}</TableHead>
                     <TableHead>{t("columns.period")}</TableHead>
                     <TableHead className="text-right">{t("columns.amount")}</TableHead>
@@ -79,6 +80,13 @@ export function CoverPayouts({
   );
 }
 
+const ACCOUNT_SUFFIX_LENGTH = 4;
+
+const ACCOUNT_TYPE_KEY = {
+  corrente: "checking",
+  poupanca: "savings",
+} as const satisfies Record<CoverPayoutRow["payoutAccount"]["accountType"], string>;
+
 function PayoutRow({ row, view }: { row: CoverPayoutRow; view: CoverPayoutsViewModel }) {
   const t = useTranslations("defaults.payouts");
   return (
@@ -91,6 +99,10 @@ function PayoutRow({ row, view }: { row: CoverPayoutRow; view: CoverPayoutsViewM
         <Mono>{row.noticePublicId}</Mono>
       </TableCell>
       <TableCell>{row.agencyName}</TableCell>
+      <TableCell>
+        {row.payoutAccount.bank} ·{" "}
+        {t("accountEnding", { last4: row.payoutAccount.account.slice(-ACCOUNT_SUFFIX_LENGTH) })}
+      </TableCell>
       <TableCell>
         <Mono>{row.guaranteePublicId}</Mono>
       </TableCell>
@@ -126,10 +138,13 @@ function ExecuteDialog({ view }: { view: CoverPayoutsViewModel }) {
         </AlertDialogHeader>
 
         {target && (
-          <div className="text-base-sm flex justify-between gap-4 font-medium">
-            <span>{t("payouts.execute.amount")}</span>
-            <span>{formatBRLCents(target.appliedCents)}</span>
-          </div>
+          <>
+            <div className="text-base-sm flex justify-between gap-4 font-medium">
+              <span>{t("payouts.execute.amount")}</span>
+              <span>{formatBRLCents(target.appliedCents)}</span>
+            </div>
+            <PayoutAccountDetails agencyName={target.agencyName} account={target.payoutAccount} />
+          </>
         )}
 
         <div className="flex flex-col gap-3">
@@ -161,5 +176,44 @@ function ExecuteDialog({ view }: { view: CoverPayoutsViewModel }) {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+/**
+ * The full account appears only here, at the moment compliance is about to
+ * send money; the table masks it to the last digits.
+ */
+function PayoutAccountDetails({
+  agencyName,
+  account,
+}: {
+  agencyName: string;
+  account: CoverPayoutRow["payoutAccount"];
+}) {
+  const t = useTranslations("defaults.payouts.execute.account");
+  const lines: Array<{ label: string; value: string }> = [
+    { label: t("bank"), value: account.bank },
+    ...(account.agency ? [{ label: t("branch"), value: account.agency }] : []),
+    {
+      label: t("number"),
+      value: `${account.account} · ${t(ACCOUNT_TYPE_KEY[account.accountType])}`,
+    },
+    ...(account.pixKey ? [{ label: t("pixKey"), value: account.pixKey }] : []),
+  ];
+
+  return (
+    <div className="bg-muted/50 text-base-sm flex flex-col gap-1 rounded-md p-3">
+      <span className="font-medium">{agencyName}</span>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+        {lines.map((line) => (
+          <div key={line.label} className="contents">
+            <dt className="text-muted-foreground">{line.label}</dt>
+            <dd>
+              <Mono>{line.value}</Mono>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }

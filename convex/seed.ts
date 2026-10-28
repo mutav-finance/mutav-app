@@ -158,6 +158,21 @@ function monthsAgo(months: number): string {
 const DEMO_PIX_BR_CODE = "00020126580014br.gov.bcb.pix013600000000-0000-0000-0000-000000000000";
 const DEMO_BOLETO_LINE = "00000.00000 00000.000000 00000.000000 0 00000000000000";
 
+/**
+ * A fictional payout account per seed agency. Bank 000 is not a COMPE code
+ * and the Pix keys are the agencies' own fake CNPJs, so nothing here can
+ * route real money.
+ */
+function demoBankingInfo(cnpj: string) {
+  return {
+    bank: "000 - Demo Bank",
+    agency: "0001",
+    account: `${cnpj.slice(-5)}-0`,
+    accountType: "corrente" as const,
+    pixKey: cnpj,
+  };
+}
+
 /** 32-char Pix end-to-end id with the all-zero ISPB, e.g. `E00000000202609091000DEMO0200001`. */
 function demoPixEndToEndId(month: string, suffix: string): string {
   return `E00000000${month.replace("-", "")}091000DEMO${suffix}001`;
@@ -195,6 +210,10 @@ async function insertSeedCoverOperation(
   ) {
     throw new Error(`Seed notice ${noticeId} is not a cover-resolved notice.`);
   }
+  const agency = await ctx.db.get(notice.agencyId);
+  if (!agency?.bankingInfo) {
+    throw new Error(`Seed agency ${notice.agencyId} has no payout account.`);
+  }
   const publicId = generateCoverOperationPublicId();
   const operationId = await ctx.db.insert("coverOperations", {
     publicId,
@@ -206,6 +225,7 @@ async function insertSeedCoverOperation(
     ...(batchId === undefined ? {} : { batchId }),
     requestedCents: notice.updatedAmountCents,
     appliedCents: resolution.appliedCoverCents,
+    payoutAccount: agency.bankingInfo,
     recordedAt: resolution.resolvedAt,
     recordedByUserId: resolution.resolvedByUserId,
     ...(resolution.note === undefined ? {} : { note: resolution.note }),
@@ -1108,6 +1128,7 @@ async function seedFictional(
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Paulista",
       cnpj: "00000000000100",
+      bankingInfo: demoBankingInfo("00000000000100"),
       onboardingState: "active",
       createdAt: d("2024-03-01T00:00:00-03:00"),
     });
@@ -1115,6 +1136,7 @@ async function seedFictional(
     const atlanticaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Atlântica",
       cnpj: "00000000000200",
+      bankingInfo: demoBankingInfo("00000000000200"),
       onboardingState: "active",
       createdAt: d("2024-06-15T00:00:00-03:00"),
     });
@@ -1122,6 +1144,7 @@ async function seedFictional(
     const horizonteId: AgencyId = await ctx.db.insert("agencies", {
       name: "Horizonte Imóveis",
       cnpj: "00000000000300",
+      bankingInfo: demoBankingInfo("00000000000300"),
       onboardingState: "active",
       createdAt: d("2025-01-10T00:00:00-03:00"),
     });
@@ -2728,6 +2751,7 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   const agencyId = await ctx.db.insert("agencies", {
     name: persona.agency.name,
     cnpj: persona.agency.cnpj,
+    bankingInfo: demoBankingInfo(persona.agency.cnpj),
     agencyType: "empresa",
     onboardingState: persona.agency.state,
     onboardingSubmittedAt: now,

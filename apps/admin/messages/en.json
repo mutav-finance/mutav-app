@@ -242,20 +242,23 @@
       "COVER_OPERATION_NOT_FOUND": "That cover operation no longer exists.",
       "COVER_ALREADY_EXECUTED": "This payout is already marked as executed.",
       "PAYMENT_REFERENCE_REQUIRED": "Enter the payment reference of the transfer.",
+      "PAYOUT_ACCOUNT_MISSING": "The agency has no payout account on file.",
       "inNotice": "Nothing was recorded. Refused at notice {notice}.",
       "CLAIM_NOT_SUBMITTED": "The agency has not filed the claim yet, or a request is still waiting on it."
     },
     "payouts": {
       "title": "Payouts awaiting execution",
-      "subtitle": "Cover recorded by compliance whose off-chain payment to the landlord has not been confirmed yet, oldest first.",
+      "subtitle": "Cover recorded by compliance whose off-chain payment to the agency has not been confirmed yet, oldest first.",
       "empty": "No payouts awaiting execution.",
       "moreAvailable": "More payouts are waiting — only the oldest page is shown.",
       "noBatch": "—",
+      "accountEnding": "ending {last4}",
       "columns": {
         "operation": "Operation",
         "batch": "Batch",
         "notice": "Notice",
         "agency": "Agency",
+        "payoutAccount": "Account",
         "guarantee": "Guarantee",
         "period": "Period",
         "amount": "Amount",
@@ -267,8 +270,16 @@
       },
       "execute": {
         "title": "Mark payout executed",
-        "description": "Confirms the payment to the landlord has left. Record the reference the bank or Pix returned so the ledger can be reconciled.",
+        "description": "Confirms the payment to the agency has left, to the account on file when cover was recorded. Record the reference the bank or Pix returned so the ledger can be reconciled.",
         "amount": "Amount paid",
+        "account": {
+          "bank": "Bank",
+          "branch": "Branch",
+          "number": "Account",
+          "pixKey": "Pix key",
+          "checking": "Checking",
+          "savings": "Savings"
+        },
         "referenceLabel": "Payment reference",
         "referencePlaceholder": "E2E id or transfer number",
         "noteLabel": "Note (optional)",

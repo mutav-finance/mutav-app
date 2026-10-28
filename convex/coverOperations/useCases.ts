@@ -1,19 +1,21 @@
 import { paginationOptsValidator } from "convex/server";
 import type { QueryCtx } from "../_generated/server";
 import { queryWithMutavRole } from "../lib/auth";
-import { COVER_OPERATION_STATUS, type CoverOperation } from "./domain";
+import { COVER_OPERATION_STATUS, type CoverOperation, type CoverPayoutAccount } from "./domain";
 
 /**
  * A payout compliance has recorded and nobody has yet confirmed as paid. The
  * joined references are what an operator matches against the bank statement;
- * the tenant is deliberately absent — the landlord is paid against the
- * guarantee, and the notice reference already leads to the rest.
+ * the tenant is deliberately absent — the agency is paid against the
+ * guarantee, and the notice reference already leads to the rest. The account
+ * is the snapshot taken at recording, never the agency's current one.
  */
 export type CoverPayoutRow = {
   publicId: string;
   batchId: string | null;
   noticePublicId: string;
   agencyName: string;
+  payoutAccount: CoverPayoutAccount;
   guaranteePublicId: string;
   coveragePeriod: string;
   requestedCents: number;
@@ -44,6 +46,7 @@ async function shapeCoverPayoutRow(
     batchId: operation.batchId ?? null,
     noticePublicId: notice.publicId,
     agencyName: agency.name,
+    payoutAccount: operation.payoutAccount,
     guaranteePublicId: guarantee.publicId,
     coveragePeriod: operation.coveragePeriod,
     requestedCents: operation.requestedCents,

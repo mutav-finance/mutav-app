@@ -94,6 +94,15 @@ export async function setupAuthenticatedUser(
 
 export type SeededUserId = Awaited<ReturnType<typeof seedAuthenticatedUser>>;
 
+/** Onboarding requires a payout account, so every active test agency carries one. */
+export const TEST_PAYOUT_ACCOUNT = {
+  bank: "000 - Test Bank",
+  agency: "0001",
+  account: "12345-6",
+  accountType: "corrente",
+  pixKey: "cover@test.br",
+} as const;
+
 export async function seedAgencyWithMembership(
   t: ReturnType<typeof convexTest>,
   userId: SeededUserId,
@@ -103,6 +112,7 @@ export async function seedAgencyWithMembership(
       name: "Mutav Test Agency",
       cnpj: "00000000000100",
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: new Date().toISOString(),
     });
@@ -122,6 +132,7 @@ export async function seedForeignAgency(t: ReturnType<typeof convexTest>) {
       name: "Foreign Agency",
       cnpj: "00000000000200",
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: new Date().toISOString(),
     }),
@@ -326,6 +337,7 @@ export async function seedCoverCandidate(
       name: `Cover Agency ${suffix}`,
       cnpj: `0000000000000${suffix}`.slice(-14),
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: "2024-01-01T00:00:00-03:00",
     });
