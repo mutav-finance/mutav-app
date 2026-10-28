@@ -1,6 +1,5 @@
 import type { convexTest, TestConvex } from "convex-test";
 import type schema from "../schema";
-import type { Id } from "../_generated/dataModel";
 import type { AgencyId } from "../agencies/domain";
 import {
   CLOSE_REASON,
@@ -20,6 +19,7 @@ import { insertGuaranteeAggregates } from "../guarantees/aggregateWrites";
 import { DEFAULT_PAYER, PROPERTY_KIND, type LeaseId } from "../leases/domain";
 import { DEFAULT_PRODUCT_SLUG, type ProductId } from "../products/domain";
 import type { TenantId } from "../tenants/domain";
+import type { UserId } from "../users/domain";
 import { hashPii } from "./pii";
 import aggregateComponentSchema from "../../node_modules/@convex-dev/aggregate/src/component/schema";
 import migrationsComponentSchema from "../../node_modules/@convex-dev/migrations/src/component/schema";
@@ -412,7 +412,7 @@ export async function seedCoverNotice(
  */
 export async function seedSubmittedClaim(
   t: TestConvex<typeof schema>,
-  { noticePublicId, userId }: { noticePublicId: string; userId: Id<"users"> },
+  { noticePublicId, userId }: { noticePublicId: string; userId: UserId },
 ): Promise<void> {
   await t.run(async (ctx) => {
     const notice = await ctx.db
