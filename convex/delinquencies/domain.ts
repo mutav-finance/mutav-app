@@ -209,3 +209,24 @@ function resolvedCaseStatus(
  */
 export const agencyCanAct = (status: DelinquencyStatus): boolean =>
   status === DELINQUENCY_STATUS.OPEN;
+
+// ---- reporting late rent ---------------------------------------------------
+
+const BRAZIL_UTC_OFFSET_MS = -3 * 60 * 60 * 1000;
+
+/**
+ * Today's date (`YYYY-MM-DD`) on the Brazilian calendar the leases are written
+ * against. Brazil has kept UTC-3 since dropping daylight saving in 2019; a
+ * UTC date would roll over at 21:00 local time and call rent late a few hours
+ * early.
+ */
+export function brazilToday(nowMs: number): string {
+  return new Date(nowMs + BRAZIL_UTC_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Rent is late from the day after it falls due, so a notice for a due date of
+ * today or later is premature.
+ */
+export const isRentOverdue = ({ rentDueDate, today }: { rentDueDate: string; today: string }) =>
+  rentDueDate < today;

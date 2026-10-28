@@ -175,6 +175,7 @@ function leaseDoc(spec: LeaseSpec): NewLease {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     },
     payer: "tenant",
     openGuaranteeId: null,
@@ -766,6 +767,7 @@ describe("schema conformance — strict harness", () => {
             condoCents: 80_000,
             otherFeesCents: 20_000,
             totalRentCents: 600_000,
+            dueDay: 5,
           },
         });
         const eventId = await ctx.db.insert("guaranteeHistory", {
@@ -792,6 +794,7 @@ describe("schema conformance — strict harness", () => {
         condoCents: 80_000,
         otherFeesCents: 20_000,
         totalRentCents: 600_000,
+        dueDay: 5,
       });
       expect(event?.tenantSnapshot).toEqual({
         entityType: "pj",
@@ -1143,6 +1146,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
           condoCents: 30_000,
           otherFeesCents: 5_000,
           totalRentCents: 135_000,
+          dueDay: 5,
         },
       });
       const lease = await getLease(ctx, leaseId);
@@ -2399,6 +2403,7 @@ describe("index reads — leases, products, guaranteeHistory", () => {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     });
     expect(lease?.payer).toBe("tenant");
     expect(lease?.propertyKind).toBe("residential");
@@ -2957,7 +2962,7 @@ describe("contractApplications untouched by guarantee writes", () => {
         },
         tag: "",
         description: "",
-        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0 },
+        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
       },
       plan: "basic",
       tenant: {

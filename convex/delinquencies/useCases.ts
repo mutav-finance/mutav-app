@@ -5,11 +5,21 @@ import { internalQuery, query, type QueryCtx } from "../_generated/server";
 import { assertAgencyAccess, queryWithAgencyScope, queryWithMutavRole } from "../lib/auth";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
-import type { GuaranteeCapacity, GuaranteeId, GuaranteeState } from "../guarantees/domain";
+import {
+  GUARANTEE_STATE,
+  INSURED_STATES,
+  isInsured,
+  type GuaranteeCapacity,
+  type GuaranteeId,
+  type GuaranteeState,
+} from "../guarantees/domain";
+import { agencySubmittedTenant } from "../guarantees/tenantIdentity";
+import { latestDueDateOnOrBefore } from "../leases/domain";
 import type { CoverOperation, CoverOperationStatus } from "../coverOperations/domain";
 import {
   DELINQUENCY_STATUS,
   agencyCanAct,
+  brazilToday,
   delinquencyStatusValidator,
   toAgencyCaseStatus,
   type AgencyCaseStatus,
@@ -601,3 +611,108 @@ export const getByPublicIdInternal = internalQuery({
       .unique();
   },
 });
+
+// ---- reporting late rent: guarantee picker ----------------------------------
+
+/**
+ * One row of the "which guarantee?" picker an agency sees when it reports late
+ * rent from the claims list. People pick by tenant and address, so those lead;
+ * the public id rides along only so the chosen row can be submitted.
+ */
+export type ReportableGuaranteeRow = {
+  guaranteePublicId: string;
+  guaranteeState: GuaranteeState;
+  /** False for drafts: they match the search but cannot take a notice. */
+  eligible: boolean;
+  /** Blank when the agency's own submission is missing (never the registry's). */
+  tenantName: string;
+  streetAndNumber: string;
+  complement: string;
+  cityUF: string;
+  totalRentCents: number;
+  dueDay: number;
+  activatedAt: string | null;
+  /** The most recent due date that has passed; null for drafts. */
+  lastDueDate: string | null;
+  /** `YYYY-MM` months that already have an open or staff-verified notice. */
+  outstandingMonths: string[];
+};
+
+const REPORTABLE_PER_STATE_LIMIT = 500;
+
+/**
+ * Every guarantee the agency could report late rent on, plus its drafts flagged
+ * ineligible so a search for a tenant whose guarantee is not yet in force
+ * explains itself instead of returning nothing. Sorted by the due date that
+ * passed most recently — the rent that just came due is the likely one.
+ *
+ * One `by_agency_status` read per state: the insured states are not
+ * contiguous in the index, and an agency's book is dozens of rows, so the
+ * text match runs on the client.
+ */
+export const listReportableGuarantees = queryWithAgencyScope({
+  args: {},
+  handler: async (ctx): Promise<ReportableGuaranteeRow[]> => {
+    const today = brazilToday(Date.now());
+    const states: readonly GuaranteeState[] = [...INSURED_STATES, GUARANTEE_STATE.DRAFTED];
+    const guarantees = (
+      await Promise.all(
+        states.map((status) =>
+          ctx.db
+            .query("guarantees")
+            .withIndex("by_agency_status", (q) =>
+              q.eq("agencyId", ctx.agencyId).eq("status", status),
+            )
+            .take(REPORTABLE_PER_STATE_LIMIT),
+        ),
+      )
+    ).flat();
+
+    const rows = await Promise.all(
+      guarantees.map(async (guarantee): Promise<ReportableGuaranteeRow> => {
+        const lease = await ctx.db.get(guarantee.leaseId);
+        if (!lease) {
+          throw new Error(`Guarantee ${guarantee.publicId} references a missing leases row`);
+        }
+        const tenant = await agencySubmittedTenant(ctx, guarantee);
+        const eligible = isInsured(guarantee);
+        const notices = await ctx.db
+          .query("guaranteeDelinquencyNotices")
+          .withIndex("by_guarantee_dueDate", (q) => q.eq("guaranteeId", guarantee._id))
+          .take(GUARANTEE_NOTICE_HISTORY_LIMIT);
+        return {
+          guaranteePublicId: guarantee.publicId,
+          guaranteeState: guarantee.status,
+          eligible,
+          tenantName: tenant?.fullName ?? "",
+          streetAndNumber: lease.property.streetAndNumber,
+          complement: lease.property.complement,
+          cityUF: lease.property.cityUF,
+          totalRentCents: lease.rent.totalRentCents,
+          dueDay: lease.rent.dueDay,
+          activatedAt: guarantee.activatedAt,
+          lastDueDate: eligible
+            ? latestDueDateOnOrBefore({ isoDate: today, dueDay: lease.rent.dueDay })
+            : null,
+          outstandingMonths: notices
+            .filter(
+              (notice) =>
+                notice.status === DELINQUENCY_STATUS.OPEN ||
+                notice.status === DELINQUENCY_STATUS.VERIFIED,
+            )
+            .map((notice) => notice.rentDueDate.slice(0, 7)),
+        };
+      }),
+    );
+
+    return rows.sort(compareReportable);
+  },
+});
+
+/** Eligible first, then the most recently passed due date, then tenant name. */
+function compareReportable(a: ReportableGuaranteeRow, b: ReportableGuaranteeRow): number {
+  if (a.eligible !== b.eligible) return a.eligible ? -1 : 1;
+  const byDueDate = (b.lastDueDate ?? "").localeCompare(a.lastDueDate ?? "");
+  if (byDueDate !== 0) return byDueDate;
+  return a.tenantName.localeCompare(b.tenantName, "pt-BR");
+}

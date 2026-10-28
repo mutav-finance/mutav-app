@@ -752,7 +752,7 @@ describe("create (lease + drafted guarantee)", () => {
         },
         tag: "",
         description: "",
-        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0 },
+        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
       },
       plan: "basic" as const,
       tenant: {
@@ -836,7 +836,13 @@ describe("create (lease + drafted guarantee)", () => {
       agencyId,
       publicId: result.data.leasePublicId,
       propertyKind: "residential",
-      rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0, totalRentCents: 300000 },
+      rent: {
+        rentCents: 300000,
+        condoCents: 0,
+        otherFeesCents: 0,
+        totalRentCents: 300000,
+        dueDay: 5,
+      },
       payer: "tenant",
       openGuaranteeId: guarantee._id,
     });
@@ -901,7 +907,7 @@ describe("create (lease + drafted guarantee)", () => {
     const result = await asUser.mutation(api.guarantees.useCases.create, {
       agencyId,
       ...args,
-      lease: { ...args.lease, rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0 } },
+      lease: { ...args.lease, rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, dueDay: 5 } },
     });
 
     expect(result.success).toBe(false);

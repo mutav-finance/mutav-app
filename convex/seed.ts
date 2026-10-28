@@ -55,6 +55,7 @@ import {
 import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
 import {
   buildLeaseRent,
+  latestDueDateOnOrBefore,
   DEFAULT_PAYER,
   PROPERTY_KIND,
   type LeaseId,
@@ -107,6 +108,24 @@ function daysAgo(days: number, utcTime = "13:00"): string {
 /** Calendar date (`YYYY-MM-DD`) `days` before now; negative days look ahead. */
 function dateDaysAgo(days: number): string {
   return new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
+}
+
+const SEED_DUE_DAYS = [5, 10, 15, 20, 28] as const;
+
+/**
+ * A seeded lease's rent due day, spread over common contract days and fixed
+ * by the guarantee's public id so a reseed lands on the same day and the
+ * seeded notices for that lease can be dated to match it.
+ */
+function seedDueDay(guaranteePublicId: string): number {
+  const hash = [...guaranteePublicId].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return SEED_DUE_DAYS[hash % SEED_DUE_DAYS.length];
+}
+
+function dueDateOnOrBefore(isoDate: string, dueDay: number): string {
+  const dueDate = latestDueDateOnOrBefore({ isoDate, dueDay });
+  if (!dueDate) throw new Error(`Seed due day ${dueDay} is out of range`);
+  return dueDate;
 }
 
 /**
@@ -372,7 +391,8 @@ type SeedLeaseSpec = {
     property: LeaseProperty;
     tag: string;
     description: string;
-    rent: LeaseRentInput;
+    /** `dueDay` defaults to `seedDueDay(publicId)`. */
+    rent: Omit<LeaseRentInput, "dueDay"> & { dueDay?: number };
   };
   guarantee: {
     state: GuaranteeState;
@@ -434,7 +454,10 @@ async function insertSeedLeaseAndGuarantee(
     property: lease.property,
     tag: lease.tag,
     description: lease.description,
-    rent: buildLeaseRent(lease.rent),
+    rent: buildLeaseRent({
+      ...lease.rent,
+      dueDay: lease.rent.dueDay ?? seedDueDay(spec.publicId),
+    }),
     payer: DEFAULT_PAYER,
     openGuaranteeId: null,
   });
@@ -2185,7 +2208,7 @@ async function seedFictional(
       },
     });
 
-    const horizonteCoverRentDue = dateDaysAgo(52);
+    const horizonteCoverRentDue = dueDateOnOrBefore(dateDaysAgo(52), seedDueDay(h2.publicId));
     const horizonteCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${h2.publicId}-${horizonteCoverRentDue}`,
       guaranteeId: h2.guaranteeId,
@@ -2252,7 +2275,10 @@ async function seedFictional(
         score: 690,
       },
     });
-    const paulistaDefaultRentDue = dateDaysAgo(22);
+    const paulistaDefaultRentDue = dueDateOnOrBefore(
+      dateDaysAgo(22),
+      seedDueDay(paulistaDefault.publicId),
+    );
     await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${paulistaDefault.publicId}-${paulistaDefaultRentDue}`,
       guaranteeId: paulistaDefault.guaranteeId,
@@ -2306,7 +2332,10 @@ async function seedFictional(
         score: 710,
       },
     });
-    const atlanticaCoverRentDue = dateDaysAgo(33);
+    const atlanticaCoverRentDue = dueDateOnOrBefore(
+      dateDaysAgo(33),
+      seedDueDay(atlanticaCovered.publicId),
+    );
     const atlanticaCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${atlanticaCovered.publicId}-${atlanticaCoverRentDue}`,
       guaranteeId: atlanticaCovered.guaranteeId,
@@ -3363,7 +3392,10 @@ async function populateAprovadaBook(
 
   for (const notice of notices) {
     const row = insertedAt(notice.n);
-    const rentDueDate = dateDaysAgo(notice.rentDueDaysAgo);
+    const rentDueDate = dueDateOnOrBefore(
+      dateDaysAgo(notice.rentDueDaysAgo),
+      seedDueDay(row.publicId),
+    );
     const originalAmountCents = row.lease.rentCents;
     const resolution = notice.resolution;
     const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
