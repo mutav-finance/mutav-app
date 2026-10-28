@@ -152,10 +152,10 @@ export type CoverPreview = {
 
 /**
  * Restates the clamp `reserveCoverCapacity` performs server-side so the
- * operator sees the number that will land BEFORE submitting. The server is
+ * staff member sees the number that will land BEFORE submitting. The server is
  * still the authority — this is a preview, not a second implementation of the
  * rule — but a cover that silently pays less than the claim is exactly the
- * surprise a reserve operator must never get from a confirmation dialog.
+ * surprise a staff member must never get from a confirmation dialog.
  */
 export function coverPreview({
   requestedCents,

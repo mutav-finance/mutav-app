@@ -121,25 +121,25 @@ Swap `agency` for `pay`, `fund`, or `admin` to target a different app.
 
 ### Per-app Vercel deploy gating
 
-Each of the four Vercel projects has its
+Only `mutav-app-fund` sets an
 [**Ignored Build Step**](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step)
-(Settings → Build and Deployment → Ignored Build Step → **Custom**)
-set to a one-line `git diff` that returns exit `0` (skip) when none of
-this app's relevant paths changed since the parent commit, and exit
-`1` (proceed) otherwise:
+(Settings → Build and Deployment → Ignored Build Step → **Custom**). The
+other three projects build on every push. The command returns exit `0`
+(skip) when none of the app's relevant paths changed since the parent
+commit, and exit `1` (proceed) otherwise:
 
-| Project           | Ignored Build Step command                                      |
-| ----------------- | --------------------------------------------------------------- |
-| `mutav-app`       | `git diff --quiet HEAD^ HEAD -- apps/agency/ convex/ packages/` |
-| `mutav-app-pay`   | `git diff --quiet HEAD^ HEAD -- apps/pay/ convex/ packages/`    |
-| `mutav-app-fund`  | `git diff --quiet HEAD^ HEAD -- apps/fund/ convex/ packages/`   |
-| `mutav-app-admin` | `git diff --quiet HEAD^ HEAD -- apps/admin/ convex/ packages/`  |
+| Project          | Ignored Build Step command                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------- |
+| `mutav-app-fund` | `git diff --quiet HEAD^ HEAD -- :/apps/fund/ :/convex/ :/packages/ :/package.json :/bun.lock` |
 
-`convex/` and `packages/` are in every app's path list because they are
-shared dependencies — a change to either triggers a rebuild of all four
-apps (single Convex deployment, single audit log; PR 6 packages
-consumed via `transpilePackages`). This replaces the deprecated
-`npx turbo-ignore` package referenced in some older docs.
+Vercel runs the command from the project's Root Directory (`apps/fund`),
+and git resolves plain pathspecs relative to the current directory, so
+every path needs the `:/` (repo-root) prefix. Without it the diff matches
+nothing and every build is skipped. `package.json` and `bun.lock` are in
+the list because third-party deps are pinned once at the root: a
+root-only dependency bump (e.g. a Next.js security release) must
+rebuild the app. To add the same gating to another app, copy the command
+and swap `apps/fund/` for that app's directory.
 
 ### Per-app CI gating
 
