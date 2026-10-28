@@ -275,6 +275,41 @@
         "notePlaceholder": "O que a trilha de auditoria deve registrar",
         "confirm": "Marcar executado"
       }
+    },
+    "claimReview": {
+      "trigger": "Ver acionamento",
+      "title": "Acionamento {notice}",
+      "summary": "{tenant} · {amount} · vencimento {due}",
+      "kind": {
+        "nonPaymentProof": "Comprovante de não pagamento",
+        "tenantNotice": "Notificação ao inquilino"
+      },
+      "status": {
+        "pending_review": "Enviado",
+        "accepted": "Aceito",
+        "rejected": "Recusado",
+        "superseded": "Substituído"
+      },
+      "noFile": "Nenhum arquivo",
+      "askAgain": "Pedir de novo",
+      "reasonPlaceholder": "O que está faltando ou errado",
+      "reasonFor": "Motivo para {item}",
+      "dueAt": "Prazo para a imobiliária responder",
+      "locked": "Só é possível pedir informação em um acionamento enviado e ainda não confirmado.",
+      "close": "Fechar",
+      "send": "Pedir informação",
+      "sent": "Pendência enviada à imobiliária.",
+      "fileMissing": "Arquivo não encontrado.",
+      "errors": {
+        "NOTICE_NOT_FOUND": "Acionamento não encontrado.",
+        "CLAIM_NOT_SUBMITTED": "Este acionamento não está aguardando análise.",
+        "NO_REQUESTS": "Escolha ao menos um arquivo.",
+        "REASON_REQUIRED": "Informe o motivo de cada arquivo.",
+        "REASON_TOO_LONG": "Um dos motivos é longo demais.",
+        "INVALID_DUE_DATE": "O prazo precisa ser uma data futura.",
+        "FORBIDDEN": "Seu papel não permite esta ação.",
+        "unexpected": "Não foi possível enviar. Tente novamente."
+      }
     }
   },
   "shellSwitcher": {

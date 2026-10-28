@@ -1053,3 +1053,100 @@ describe("listReportableGuarantees", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// listCases — the agency's claims queue
+// ---------------------------------------------------------------------------
+
+describe("listCases", () => {
+  test("partitions cases by who acts next and counts every group", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-ready", rentDueDate: "2026-06-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-review",
+      status: "verified",
+      rentDueDate: "2026-07-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-cured",
+      status: "resolved",
+      rentDueDate: "2026-05-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-withdrawn",
+      status: "canceled",
+      rentDueDate: "2026-04-05",
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const needsYou = await asUser.query(api.delinquencies.useCases.listCases, {
+      agencyId: fx.agencyId,
+      group: "needs_you",
+    });
+    expect(needsYou.counts).toEqual({ needs_you: 1, with_mutav: 1, closed: 2 });
+    expect(needsYou.rows.map((row) => [row.publicId, row.caseStatus])).toEqual([
+      ["DN-ready", "ready_to_claim"],
+    ]);
+    // The fixture writes no creation-history snapshot, and the queue never
+    // falls back to the shared tenant registry (LGPD-26), so the name is blank.
+    expect(needsYou.rows[0].tenantName).toBe("");
+    expect(needsYou.rows[0].streetAndNumber).toBe("Rua Teste, 1");
+
+    const closed = await asUser.query(api.delinquencies.useCases.listCases, {
+      agencyId: fx.agencyId,
+      group: "closed",
+    });
+    expect(closed.rows.map((row) => row.caseStatus).sort()).toEqual(["cured", "withdrawn"]);
+  });
+
+  test("an information request surfaces its deadline", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-pending", rentDueDate: "2026-06-05" });
+    await t.run(async (ctx) => {
+      const notice = await ctx.db
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_publicId", (q) => q.eq("publicId", "DN-pending"))
+        .unique();
+      if (!notice) throw new Error("notice missing");
+      await ctx.db.patch(notice._id, {
+        claim: {
+          status: "info_requested",
+          claimedAmountCents: 300_000,
+          submittedAt: "2026-06-20T10:00:00.000Z",
+          submittedByUserId: fx.userId,
+          declarationVersion: "test",
+          requests: [
+            {
+              id: "r1",
+              evidenceKind: "tenantNotice",
+              reason: "Ilegível",
+              dueAt: "2026-07-02",
+              requestedAt: "2026-06-25T10:00:00.000Z",
+              requestedByUserId: fx.userId,
+            },
+          ],
+        },
+      });
+    });
+    const { rows } = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listCases, { agencyId: fx.agencyId, group: "needs_you" });
+    expect(rows.map((row) => [row.caseStatus, row.requestDueAt, row.updatedAt])).toEqual([
+      ["info_requested", "2026-07-02", "2026-06-25T10:00:00.000Z"],
+    ]);
+  });
+
+  test("another agency's cases never appear", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1");
+    const b = await makeFixture(t, "2");
+    await insertNotice(t, b, { publicId: "DN-b", rentDueDate: "2026-06-05" });
+    const result = await t
+      .withIdentity({ subject: a.subject })
+      .query(api.delinquencies.useCases.listCases, { agencyId: a.agencyId, group: "needs_you" });
+    expect(result.rows).toEqual([]);
+    expect(result.counts).toEqual({ needs_you: 0, with_mutav: 0, closed: 0 });
+  });
+});

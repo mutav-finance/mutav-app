@@ -37,6 +37,7 @@ import {
 } from "@/hooks/use-defaults-queue";
 import { daysOpen } from "@/components/defaults/view-model";
 import { CoverPayouts } from "@/components/defaults/cover-payouts";
+import { ClaimReviewDialog } from "@/components/defaults/claim-review-dialog";
 
 export function DefaultsQueue({
   preloaded,
@@ -182,6 +183,7 @@ function QueueRow({ row, view }: { row: DefaultsQueueRow; view: DefaultsQueueVie
           >
             {t("actions.cover")}
           </Button>
+          <ClaimReviewDialog row={row} />
           <Button
             size="sm"
             variant="destructive"
