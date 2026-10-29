@@ -349,7 +349,6 @@
       "createGuarantee": "Criar Garantia",
       "dashboard": "Painel",
       "guarantees": "Garantias",
-      "invoices": "Faturas",
       "delinquencies": "Acionamentos",
       "transparency": "Transparência"
     },
@@ -362,6 +361,7 @@
     "agency": {
       "groupLabel": "Agência",
       "members": "Membros",
+      "invoices": "Faturas",
       "commission": "Comissão",
       "agencySettings": "Configurações da Agência"
     },

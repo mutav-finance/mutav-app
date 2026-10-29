@@ -4,7 +4,6 @@ import {
   LayoutDashboardIcon,
   FileTextIcon,
   ShieldCheckIcon,
-  ReceiptIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -26,7 +25,6 @@ export function AgencyNav() {
   const navMain = [
     { title: tMain("dashboard"), href: "/", icon: <LayoutDashboardIcon /> },
     { title: tMain("guarantees"), href: "/guarantees", icon: <FileTextIcon /> },
-    { title: tMain("invoices"), href: "/invoices", icon: <ReceiptIcon /> },
     {
       title: tMain("delinquencies"),
       href: "/claims",

@@ -349,7 +349,6 @@
       "createGuarantee": "Create Guarantee",
       "dashboard": "Dashboard",
       "guarantees": "Guarantees",
-      "invoices": "Invoices",
       "delinquencies": "Claims",
       "transparency": "Transparency"
     },
@@ -362,6 +361,7 @@
     "agency": {
       "groupLabel": "Agency",
       "members": "Members",
+      "invoices": "Invoices",
       "commission": "Commission",
       "agencySettings": "Agency Settings"
     },
