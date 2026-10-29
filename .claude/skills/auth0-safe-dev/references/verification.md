@@ -54,6 +54,13 @@ Keep the existing cases as well: the session cookie keeps every attribute (asser
 ```bash
 # from packages/app-shell — the root test:file script only covers convex/ and tests/
 bun run test src/proxy-headers.test.ts src/auth-redirect.test.ts --maxWorkers=2
+# the refresh and callback factories
+bun run test src/auth-proxy.test.ts src/convex-token-route.test.ts src/fresh-id-token.test.ts src/auth-callback.test.ts src/id-token.test.ts --maxWorkers=2
+# from apps/agency and apps/admin — the failure classification
+bun run test src/lib/user-destination.test.ts --maxWorkers=2   # agency
+bun run test src/lib/staff-gate.test.ts --maxWorkers=2         # admin
+# from the repo root — provisioning and the tenant cut
+bun run test:file convex/users/useCases.test.ts --maxWorkers=2
 ```
 
 ## 2. Browser check (local or preview)
@@ -96,6 +103,23 @@ Then the flow:
 - Log back in: Auth0, then `/auth/callback`, then the original locale and page. There must be no second Auth0 round trip, no `InvalidStateError`, and no stray `__txn_*` cookies piling up.
 - For admin, also sign in as a non-staff persona: you should land on `/access-denied` (fail closed), not get a session loop.
 
-## 3. After deploy
+## 3. Refresh path (preview)
+
+ID tokens normally live for hours, so force the refresh: on a preview, **temporarily** set `AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS` above the tenant's ID-token lifetime, redeploy, log in, and navigate. This is a test-only setting and must be reverted (last bullet).
+
+- The page response carries a new `__session` Set-Cookie that still has `HttpOnly`, `SameSite=Lax` and `Secure` (check flags only, as in section 2).
+- `GET /api/auth/convex-token` answers with `cache-control: private, no-store`, on a 200 and on a 401 alike.
+- The same-request render sees the refreshed token. Let the ID token expire (or wait until it is inside the skew margin), then make one in-app navigation: the page renders, with no bounce to `/auth/login` and no second Auth0 round trip. A bounce means `x-middleware-set-cookie` is not reaching the render, so the Server Component read the expired token the browser sent.
+- Server logs show no `[auth-proxy] id token refresh failed`. If they do, check the tenant settings in `docs/auth0.md` (Refresh Token grant, rotation overlap).
+- **Revert the window env afterwards and redeploy.** Left high, every request refreshes, and every concurrent request (RSC prefetches included) spends the refresh token at once.
+
+## 4. No login loop
+
+On a preview or locally, point `NEXT_PUBLIC_CONVEX_URL` at an unreachable host, rebuild (the value is inlined at build time), and sign in.
+
+- Agency lands on `/session-error?reason=backend-unavailable`; admin lands on `/unavailable`.
+- The network log shows at most one Auth0 round trip (the login itself). A second trip to the Auth0 domain means a server-side failure is being mapped to login.
+
+## 5. After deploy
 
 Repeat section 2 against `https://app.mutav.finance` and `https://admin.mutav.finance`. Here `secure` must be true everywhere. Report each check as pass or fail with names and flags. If the run stopped at the Auth0 redirect, say so plainly.

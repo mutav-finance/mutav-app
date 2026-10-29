@@ -1524,5 +1524,30 @@
     "default_verified": "Inadimplência verificada",
     "cover_paid": "Cobertura registrada",
     "closed": "Encerradas"
+  },
+  "sessionError": {
+    "notProvisioned": {
+      "eyebrow": "Configuração da conta",
+      "title": "Não conseguimos concluir a configuração da sua conta",
+      "subtitle": "Você entrou normalmente, mas algo deu errado ao preparar sua conta. Tente novamente em alguns instantes. Se o problema continuar, saia e entre de novo."
+    },
+    "backendUnavailable": {
+      "eyebrow": "Serviço indisponível",
+      "title": "O serviço está temporariamente indisponível",
+      "subtitle": "Não conseguimos carregar seus dados agora. Sua sessão continua ativa; tente novamente em alguns instantes."
+    },
+    "emailNotVerified": {
+      "eyebrow": "Confirme seu e-mail",
+      "title": "Confirme seu e-mail para continuar",
+      "subtitle": "Enviamos um link para a sua caixa de entrada (confira também o spam). Depois de confirmar, entre de novo."
+    },
+    "emailBound": {
+      "eyebrow": "Conta já vinculada",
+      "title": "Este e-mail já está vinculado a outra forma de acesso",
+      "subtitle": "Entre da mesma forma que entrou antes ou fale com o nosso suporte para recuperar o acesso à sua conta."
+    },
+    "tryAgain": "Tentar novamente",
+    "confirmedSignInAgain": "Já confirmei — entrar de novo",
+    "logOut": "Sair"
   }
 }

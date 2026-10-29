@@ -2708,8 +2708,9 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   let userId;
   if (byEmail) {
     userId = byEmail._id;
-    const patch: { subject?: string } = {};
+    const patch: { subject?: string; emailVerified?: boolean } = {};
     if (!byEmail.subject) patch.subject = persona.subject;
+    if (byEmail.emailVerified !== true) patch.emailVerified = true;
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(userId, patch);
     }
@@ -2719,6 +2720,8 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
       subject: persona.subject,
       name: persona.name,
       email: persona.email,
+      // Every persona is `email_verified` on the dev tenant (docs/test-personas.md).
+      emailVerified: true,
       createdAt: now,
     });
   }

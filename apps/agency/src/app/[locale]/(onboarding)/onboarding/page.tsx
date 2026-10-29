@@ -1,6 +1,7 @@
 import { WelcomeScreen } from "@/components/onboarding/welcome-screen";
 import { redirect } from "@mutav/i18n/navigation";
 import { resolveUserDestination } from "@/lib/user-destination";
+import { redirectOnSessionFailure } from "@/lib/session-failure-redirect";
 
 export default async function OnboardingWelcomePage({
   params,
@@ -9,6 +10,7 @@ export default async function OnboardingWelcomePage({
 }) {
   const { locale } = await params;
   const dest = await resolveUserDestination();
+  redirectOnSessionFailure({ destination: dest, locale, returnHref: "/onboarding" });
 
   if (dest.kind === "dashboard") {
     redirect({ href: "/", locale });

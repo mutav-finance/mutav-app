@@ -821,6 +821,7 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
           return {
             email,
             subject: user.subject ?? null,
+            emailVerified: user.emailVerified ?? null,
             staffRoleCount: staffRoles.length,
             agencyStates,
           };
@@ -829,6 +830,9 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     });
 
     const byEmail = new Map(personas.map((p) => [p.email, p]));
+    // Personas are verified on the dev tenant; a persona row left unverified
+    // could be taken over by any verified login with the same email.
+    expect(personas.map((p) => p.emailVerified)).toEqual(personas.map(() => true));
 
     const systemadmin = byEmail.get("systemadmin@mutav.finance");
     expect(systemadmin?.subject).toBe("auth0|6a150df6a100fbf318f393c0");

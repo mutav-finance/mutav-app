@@ -313,6 +313,10 @@ export default defineSchema(
       subject: v.optional(v.string()),
       name: v.string(),
       email: v.string(),
+      // Whether the identity bound to this row had a verified email when it
+      // last logged in. A verified identity may take over an email bound by an
+      // unverified one (`getOrCreateByIdentity`); absent reads as unverified.
+      emailVerified: v.optional(v.boolean()),
       createdAt: v.string(),
       // DEPRECATED — superseded by the `mutavStaff` table (one row per staff
       // role, aud-bound at the Convex boundary). No code reads or writes this

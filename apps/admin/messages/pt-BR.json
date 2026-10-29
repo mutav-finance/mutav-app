@@ -51,6 +51,9 @@
     "staffEyebrow": "Acesso liberado",
     "staffTitle": "Você tem acesso ao painel administrativo",
     "staffSubtitle": "Sua conta faz parte da equipe Mutav. Esta página é exibida a quem não tem acesso.",
+    "unavailableEyebrow": "Serviço indisponível",
+    "unavailableTitle": "Não foi possível verificar seu acesso",
+    "unavailableSubtitle": "Sua sessão está ativa, mas não conseguimos consultar a equipe Mutav agora. Tente novamente em alguns instantes.",
     "goToAgency": "Ir para Imobiliárias",
     "goToAdmin": "Voltar ao painel administrativo",
     "signIn": "Entrar",
@@ -522,5 +525,12 @@
       "FORBIDDEN": "Seu perfil na equipe não permite esta ação.",
       "unexpected": "Algo deu errado. Tente novamente."
     }
+  },
+  "unavailable": {
+    "eyebrow": "Serviço indisponível",
+    "title": "Não foi possível verificar seu acesso",
+    "subtitle": "O serviço está temporariamente indisponível. Sua sessão continua ativa; tente novamente em alguns instantes.",
+    "tryAgain": "Tentar novamente",
+    "logOut": "Sair"
   }
 }

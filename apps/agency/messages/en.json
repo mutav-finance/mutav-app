@@ -1524,5 +1524,30 @@
     "default_verified": "Default verified",
     "cover_paid": "Cover committed",
     "closed": "Closed"
+  },
+  "sessionError": {
+    "notProvisioned": {
+      "eyebrow": "Account setup",
+      "title": "We couldn't finish setting up your account",
+      "subtitle": "You signed in successfully, but something went wrong while preparing your account. Try again in a moment. If the problem persists, log out and sign in again."
+    },
+    "backendUnavailable": {
+      "eyebrow": "Service unavailable",
+      "title": "The service is temporarily unavailable",
+      "subtitle": "We couldn't load your data right now. Your session is still active; try again in a moment."
+    },
+    "emailNotVerified": {
+      "eyebrow": "Verify your email",
+      "title": "Confirm your email to continue",
+      "subtitle": "We sent a link to your inbox (check spam). After confirming, sign in again."
+    },
+    "emailBound": {
+      "eyebrow": "Account already linked",
+      "title": "This email is already linked to another sign-in method",
+      "subtitle": "Sign in the way you did before, or contact support so we can help you access your account."
+    },
+    "tryAgain": "Try again",
+    "confirmedSignInAgain": "I've confirmed — sign in again",
+    "logOut": "Log out"
   }
 }
