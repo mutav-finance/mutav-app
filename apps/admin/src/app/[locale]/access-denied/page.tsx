@@ -1,4 +1,4 @@
-import { LockIcon, LogInIcon, ShieldCheckIcon } from "lucide-react";
+import { CloudOffIcon, LockIcon, LogInIcon, ShieldCheckIcon } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
@@ -16,6 +16,7 @@ const toneIcon: Record<AccessDeniedTone, typeof LockIcon> = {
   denied: LockIcon,
   signedOut: LogInIcon,
   granted: ShieldCheckIcon,
+  unavailable: CloudOffIcon,
 };
 
 /**
@@ -23,8 +24,9 @@ const toneIcon: Record<AccessDeniedTone, typeof LockIcon> = {
  *
  * Lives OUTSIDE the `(admin)` route group on purpose: that group's layout is
  * the staff gate, and a gate must not re-gate its own redirect target. Being
- * outside the gate also makes the route publicly reachable, so all three
- * session states are handled rather than assuming the non-staff one.
+ * outside the gate also makes the route publicly reachable, so every gate
+ * result is handled rather than assuming the non-staff one. `unavailable`
+ * renders a retry link, never a redirect.
  *
  * Loop-freedom: a `staff` visitor is offered a link back to the console, never
  * a redirect. Redirecting would put this page and the `(admin)` gate in a

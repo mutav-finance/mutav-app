@@ -1,9 +1,9 @@
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
-import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
-import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
+import { formatBRLCents, formatDateBR, formatMonthYear } from "@mutav/i18n/brazil";
+import { utcTodayDate } from "@/lib/invoices/format";
 import { derivedStatus, type ResolvedInvoice } from "@convex/invoices/domain";
 import { InvoiceStatusTag } from "./invoice-status-tag";
 
@@ -11,6 +11,7 @@ export function InvoiceSummaryCard({ payment }: { payment: ResolvedInvoice }) {
   const t = useTranslations("invoiceDetails.summary");
   const tState = useTranslations("invoiceDetails.state");
   const tMethod = useTranslations("invoiceDetails.method");
+  const locale = useLocale();
   const status = derivedStatus(payment, utcTodayDate());
 
   return (
@@ -37,7 +38,9 @@ export function InvoiceSummaryCard({ payment }: { payment: ResolvedInvoice }) {
           <div className="flex items-center gap-3">
             <dt className="text-muted-foreground">{t("period")}</dt>
             <dd>
-              <Mono className="font-medium">{formatPeriodMonth(payment.periodMonth)}</Mono>
+              <Mono className="font-medium">
+                {formatMonthYear(payment.periodMonth, locale, { month: "long", capitalize: true })}
+              </Mono>
             </dd>
           </div>
           <div className="flex items-center gap-3">

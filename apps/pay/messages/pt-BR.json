@@ -19,7 +19,8 @@
       "dueDate": "Vence em",
       "back": "Voltar",
       "backToCheckout": "Voltar ao checkout",
-      "trust": "Pagamentos liquidados via Stellar e anchors regulados. Fatura"
+      "trust": "Pagamentos liquidados via Stellar e anchors regulados. Fatura",
+      "progressLabel": "Etapas do pagamento"
     },
     "picker": {
       "meta": {
@@ -137,7 +138,8 @@
         "NO_BANK_ACCOUNT": "Cadastre uma conta para pagar via PIX antes de continuar.",
         "RATE_LIMITED": "Muitas tentativas neste link de pagamento. Aguarde um minuto e tente novamente.",
         "INTERNAL": "Erro interno. Tente novamente."
-      }
+      },
+      "qrCodeAlt": "QR code do Pix"
     },
     "pago": {
       "meta": {

@@ -9,6 +9,8 @@ const ERROR = {
   ACCOUNT_TYPE_REQUIRED: "accountType",
 } as const;
 
+export type BankingErrorKey = (typeof ERROR)[keyof typeof ERROR];
+
 export const BANK_ACCOUNT_TYPE = ["corrente", "poupanca"] as const;
 export type BankAccountType = (typeof BANK_ACCOUNT_TYPE)[number];
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@mutav/ui/cn";
 
 export type CheckoutStepState = "pending" | "active" | "done";
@@ -22,8 +23,9 @@ interface CheckoutStep {
  * parent owns phase derivation and CTA wiring.
  */
 export function CheckoutSteps({ steps }: { steps: CheckoutStep[] }) {
+  const t = useTranslations("checkout.common");
   return (
-    <ol className="flex flex-col gap-3" aria-label="Checkout progress">
+    <ol className="flex flex-col gap-3" aria-label={t("progressLabel")}>
       {steps.map((step, index) => (
         <li key={index} className="flex items-start gap-3">
           <StepMarker index={index + 1} state={step.state} />

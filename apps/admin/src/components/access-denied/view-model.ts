@@ -2,14 +2,14 @@ import { buildCrossAppUrl } from "@mutav/i18n/cross-app";
 import { routing } from "@mutav/i18n/routing";
 import type { StaffGateResult } from "@/lib/auth";
 
-type TitleKey = "title" | "anonymousTitle" | "staffTitle";
-type SubtitleKey = "subtitle" | "anonymousSubtitle" | "staffSubtitle";
-type EyebrowKey = "eyebrow" | "anonymousEyebrow" | "staffEyebrow";
+type TitleKey = "title" | "anonymousTitle" | "staffTitle" | "unavailableTitle";
+type SubtitleKey = "subtitle" | "anonymousSubtitle" | "staffSubtitle" | "unavailableSubtitle";
+type EyebrowKey = "eyebrow" | "anonymousEyebrow" | "staffEyebrow" | "unavailableEyebrow";
 type PrimaryLabelKey = "goToAgency" | "goToAdmin";
 type SecondaryLabelKey = "signIn" | "signOut";
 
 /** Drives the marker icon. The page owns the icon components; this stays pure. */
-export type AccessDeniedTone = "denied" | "signedOut" | "granted";
+export type AccessDeniedTone = "denied" | "signedOut" | "granted" | "unavailable";
 
 export type AccessDeniedView = {
   tone: AccessDeniedTone;
@@ -56,12 +56,28 @@ export function resolveAccessDeniedView({
     };
   }
 
+  // Mirrors `buildCrossAppUrl`'s rule for a same-origin root: `as-needed`
+  // prefixing leaves the default locale unprefixed.
+  const adminRootHref = locale === routing.defaultLocale ? "/" : `/${locale}`;
+
+  if (gate.kind === "unavailable") {
+    // The staff read failed, so neither a denial nor a grant is established.
+    // Offer a retry as a link, never a redirect: redirecting to the gate from
+    // here would cycle while the backend is down.
+    return {
+      tone: "unavailable",
+      eyebrowKey: "unavailableEyebrow",
+      titleKey: "unavailableTitle",
+      subtitleKey: "unavailableSubtitle",
+      primary: { href: adminRootHref, labelKey: "goToAdmin" },
+      secondary: signOut,
+      email: "",
+    };
+  }
+
   const email = gate.session.user.email?.trim() ?? "";
 
   if (gate.kind === "staff") {
-    // Mirrors `buildCrossAppUrl`'s rule for a same-origin root: `as-needed`
-    // prefixing leaves the default locale unprefixed.
-    const adminRootHref = locale === routing.defaultLocale ? "/" : `/${locale}`;
     return {
       tone: "granted",
       eyebrowKey: "staffEyebrow",

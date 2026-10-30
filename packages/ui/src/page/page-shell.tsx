@@ -4,8 +4,8 @@ import { cn } from "../cn";
 /**
  * Outermost page wrapper. Provides the project's vertical rhythm
  * (`gap-4 md:gap-6`, `py-4 md:py-6`) and `@container/main` at the
- * mid-level wrapper — required for `data-table.tsx` (`@4xl/main:`)
- * and `section-cards.tsx` (`@xl/main:`, `@5xl/main:`) responsive queries.
+ * mid-level wrapper — required for `section-cards.tsx` (`@xl/main:`,
+ * `@5xl/main:`) responsive queries.
  *
  * Always wraps the entire page; pair with <PageHeader /> and <PageContent />.
  */

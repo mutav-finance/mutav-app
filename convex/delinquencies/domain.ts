@@ -8,6 +8,24 @@ import type { Doc, Id } from "../_generated/dataModel";
 
 export type DelinquencyNotice = Doc<"guaranteeDelinquencyNotices">;
 export type DelinquencyNoticeId = Id<"guaranteeDelinquencyNotices">;
+export type ClaimEvidenceId = Id<"claimEvidence">;
+
+/**
+ * What cover draws for a notice: the amount the agency claimed, never more
+ * than the notice says is owed. The agency lowers its claim for a partial
+ * payment, so drawing the notice's updated amount would pay past it. A notice
+ * with no claim (recorded before claims existed) falls back to the updated
+ * amount. Remaining guarantee capacity clamps the result further at draw time.
+ */
+export function coverRequestCents(notice: {
+  updatedAmountCents: number;
+  claim?: { claimedAmountCents: number };
+}): number {
+  const claimed = notice.claim?.claimedAmountCents;
+  return claimed === undefined
+    ? notice.updatedAmountCents
+    : Math.min(claimed, notice.updatedAmountCents);
+}
 
 export {
   DELINQUENCY_STATUS,
@@ -20,6 +38,13 @@ export {
 export type { DelinquencyStatus, TransitionError, TransitionSuccess } from "./machine";
 
 import { DELINQUENCY_STATUS, type DelinquencyStatus } from "./machine";
+import { COVER_OPERATION_STATUS, type CoverOperation } from "../coverOperations/domain";
+import {
+  DOCUMENT_KEY,
+  GUARANTEE_DOCUMENT_STATUS,
+  isSignedContractApproved,
+  type GuaranteeDocument,
+} from "../guarantees/domain";
 
 /**
  * A cover draw is only legal against a default compliance has actually
@@ -135,3 +160,357 @@ export const isResolved = (status: DelinquencyStatus): boolean =>
 
 export const isCanceled = (status: DelinquencyStatus): boolean =>
   status === DELINQUENCY_STATUS.CANCELED;
+
+// ---- agency case status ----------------------------------------------------
+
+/**
+ * The one status an agency sees for a notice. Staff work happens in two
+ * tables (the notice and its cover operation), so the agency's view is a
+ * function of both: a cover resolution is only `paid` once the payout row is
+ * `executed`; before that Mutav owes the money and the case is `approved`.
+ */
+export const AGENCY_CASE_STATUS = {
+  REPORTED: "reported",
+  READY_TO_CLAIM: "ready_to_claim",
+  UNDER_REVIEW: "under_review",
+  INFO_REQUESTED: "info_requested",
+  APPROVED: "approved",
+  PAID: "paid",
+  CURED: "cured",
+  WITHDRAWN: "withdrawn",
+  REFUSED: "refused",
+  EXPIRED: "expired",
+} as const;
+
+export type AgencyCaseStatus = (typeof AGENCY_CASE_STATUS)[keyof typeof AGENCY_CASE_STATUS];
+
+export const AGENCY_CASE_STATUSES: readonly AgencyCaseStatus[] = Object.values(AGENCY_CASE_STATUS);
+
+type CaseStatusInput = {
+  notice: {
+    status: DelinquencyStatus;
+    resolution?: { kind: NoticeResolutionKind };
+    cancellation?: { reason: NoticeCancellationReason };
+    claim?: { status: ClaimStatus };
+  };
+  coverOperation: Pick<CoverOperation, "status"> | null;
+  /**
+   * When the claim may be filed, and today's date. Together they split an
+   * unclaimed notice into `reported` (still in the grace period) and
+   * `ready_to_claim`; without them an unclaimed notice reads `reported`.
+   */
+  claimableFrom?: string | null;
+  today?: string;
+};
+
+export function toAgencyCaseStatus({
+  notice,
+  coverOperation,
+  claimableFrom,
+  today,
+}: CaseStatusInput): AgencyCaseStatus {
+  switch (notice.status) {
+    case DELINQUENCY_STATUS.OPEN:
+      return openCaseStatus({ claim: notice.claim, claimableFrom, today });
+    case DELINQUENCY_STATUS.VERIFIED:
+      return AGENCY_CASE_STATUS.UNDER_REVIEW;
+    case DELINQUENCY_STATUS.CANCELED:
+      return notice.cancellation?.reason === NOTICE_CANCELLATION_REASON.STAFF_DISMISSED
+        ? AGENCY_CASE_STATUS.REFUSED
+        : AGENCY_CASE_STATUS.WITHDRAWN;
+    case DELINQUENCY_STATUS.RESOLVED:
+      return resolvedCaseStatus(notice.resolution?.kind, coverOperation);
+  }
+}
+
+function openCaseStatus({
+  claim,
+  claimableFrom,
+  today,
+}: {
+  claim: { status: ClaimStatus } | undefined;
+  claimableFrom: string | null | undefined;
+  today: string | undefined;
+}): AgencyCaseStatus {
+  if (claim?.status === CLAIM_STATUS.INFO_REQUESTED) return AGENCY_CASE_STATUS.INFO_REQUESTED;
+  if (claim?.status === CLAIM_STATUS.SUBMITTED) return AGENCY_CASE_STATUS.UNDER_REVIEW;
+  if (claimableFrom && today && today >= claimableFrom) return AGENCY_CASE_STATUS.READY_TO_CLAIM;
+  return AGENCY_CASE_STATUS.REPORTED;
+}
+
+function resolvedCaseStatus(
+  kind: NoticeResolutionKind | undefined,
+  coverOperation: Pick<CoverOperation, "status"> | null,
+): AgencyCaseStatus {
+  switch (kind) {
+    case NOTICE_RESOLUTION_KIND.COVER_COMMITTED:
+      return coverOperation?.status === COVER_OPERATION_STATUS.EXECUTED
+        ? AGENCY_CASE_STATUS.PAID
+        : AGENCY_CASE_STATUS.APPROVED;
+    case NOTICE_RESOLUTION_KIND.TENANT_CURED:
+      return AGENCY_CASE_STATUS.CURED;
+    case NOTICE_RESOLUTION_KIND.STAFF_DISPUTE:
+      return AGENCY_CASE_STATUS.REFUSED;
+    case NOTICE_RESOLUTION_KIND.STALE:
+    case undefined:
+      return AGENCY_CASE_STATUS.EXPIRED;
+  }
+}
+
+/**
+ * The agency's own dispositions (`markResolved`, `markCanceled`) are refused
+ * once staff verify the default, so the UI offers them on `open` only.
+ */
+export const agencyCanAct = (status: DelinquencyStatus): boolean =>
+  status === DELINQUENCY_STATUS.OPEN;
+
+// ---- reporting late rent ---------------------------------------------------
+
+const BRAZIL_UTC_OFFSET_MS = -3 * 60 * 60 * 1000;
+
+/**
+ * Today's date (`YYYY-MM-DD`) on the Brazilian calendar the leases are written
+ * against. Brazil has kept UTC-3 since dropping daylight saving in 2019; a
+ * UTC date would roll over at 21:00 local time and call rent late a few hours
+ * early.
+ */
+export function brazilToday(nowMs: number): string {
+  return new Date(nowMs + BRAZIL_UTC_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Rent is late from the day after it falls due, so a notice for a due date of
+ * today or later is premature.
+ */
+export const isRentOverdue = ({ rentDueDate, today }: { rentDueDate: string; today: string }) =>
+  rentDueDate < today;
+
+// ---- claims (acionamento) --------------------------------------------------
+
+/**
+ * Where the agency's request for cover stands while the notice is still open.
+ * `submitted` waits on staff; `info_requested` waits on the agency. Once staff
+ * verify, the notice's own status takes over and the claim stays `submitted`.
+ */
+export const CLAIM_STATUS = {
+  SUBMITTED: "submitted",
+  INFO_REQUESTED: "info_requested",
+} as const;
+
+export type ClaimStatus = (typeof CLAIM_STATUS)[keyof typeof CLAIM_STATUS];
+
+export const claimStatusValidator = v.union(
+  v.literal(CLAIM_STATUS.SUBMITTED),
+  v.literal(CLAIM_STATUS.INFO_REQUESTED),
+);
+
+/** The two files every claim carries. */
+export const CLAIM_EVIDENCE_KIND = {
+  NON_PAYMENT_PROOF: "nonPaymentProof",
+  TENANT_NOTICE: "tenantNotice",
+} as const;
+
+export type ClaimEvidenceKind = (typeof CLAIM_EVIDENCE_KIND)[keyof typeof CLAIM_EVIDENCE_KIND];
+
+export const CLAIM_EVIDENCE_KINDS: readonly ClaimEvidenceKind[] =
+  Object.values(CLAIM_EVIDENCE_KIND);
+
+export const claimEvidenceKindValidator = v.union(
+  v.literal(CLAIM_EVIDENCE_KIND.NON_PAYMENT_PROOF),
+  v.literal(CLAIM_EVIDENCE_KIND.TENANT_NOTICE),
+);
+
+/**
+ * `accepted` is set when staff verify the default; `rejected` when they ask
+ * for that file again; `superseded` when the agency replaced a pending file.
+ */
+export const CLAIM_EVIDENCE_STATUS = {
+  PENDING_REVIEW: "pending_review",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  SUPERSEDED: "superseded",
+} as const;
+
+export type ClaimEvidenceStatus =
+  (typeof CLAIM_EVIDENCE_STATUS)[keyof typeof CLAIM_EVIDENCE_STATUS];
+
+/**
+ * Placeholder values until the product decision is made: a claim opens
+ * `graceDays` after the rent fell due and stays fileable for
+ * `filingWindowDays`. A product's own `claimRules` overrides both.
+ */
+export const CLAIM_GRACE_DAYS_DEFAULT = 10;
+export const CLAIM_FILING_WINDOW_DAYS_DEFAULT = 90;
+
+export type ClaimRules = { graceDays: number; filingWindowDays: number };
+
+export const CLAIM_RULES_DEFAULT: ClaimRules = {
+  graceDays: CLAIM_GRACE_DAYS_DEFAULT,
+  filingWindowDays: CLAIM_FILING_WINDOW_DAYS_DEFAULT,
+};
+
+/** Bumped whenever the attestation text the agency accepts changes. */
+export const CLAIM_DECLARATION_VERSION = "2026-10-26";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function addDays(isoDate: string, days: number): string {
+  return new Date(Date.parse(`${isoDate}T00:00:00Z`) + days * MS_PER_DAY)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/** The first day the claim for a rent due on `rentDueDate` may be filed. */
+export function claimableFromDate({
+  rentDueDate,
+  rules,
+}: {
+  rentDueDate: string;
+  rules: ClaimRules;
+}): string {
+  return addDays(rentDueDate, rules.graceDays);
+}
+
+export type ClaimRequirement = ClaimEvidenceKind | "signedContract";
+
+/**
+ * What still stands between this notice and a fileable claim. Evidence counts
+ * while its newest live file is pending review or accepted; a rejected file
+ * must be replaced. The signed rental contract is a precondition on the
+ * guarantee, not a claim upload, but it gates the claim the same way.
+ */
+export function missingClaimRequirements({
+  evidence,
+  signedContractApproved,
+}: {
+  evidence: readonly { kind: ClaimEvidenceKind; status: ClaimEvidenceStatus }[];
+  signedContractApproved: boolean;
+}): ClaimRequirement[] {
+  const usable = new Set(
+    evidence
+      .filter(
+        (file) =>
+          file.status === CLAIM_EVIDENCE_STATUS.PENDING_REVIEW ||
+          file.status === CLAIM_EVIDENCE_STATUS.ACCEPTED,
+      )
+      .map((file) => file.kind),
+  );
+  const missing: ClaimRequirement[] = CLAIM_EVIDENCE_KINDS.filter((kind) => !usable.has(kind));
+  return signedContractApproved ? missing : ["signedContract", ...missing];
+}
+
+export const SIGNED_CONTRACT_STATE = {
+  NOT_UPLOADED: "not_uploaded",
+  IN_REVIEW: "in_review",
+  REJECTED: "rejected",
+  APPROVED: "approved",
+} as const;
+export type SignedContractState =
+  (typeof SIGNED_CONTRACT_STATE)[keyof typeof SIGNED_CONTRACT_STATE];
+
+/**
+ * Where the guarantee's signed rental contract stands, so the claim screen can
+ * say what to do about the precondition. Approval follows
+ * `isSignedContractApproved` (one approved file is enough); otherwise the
+ * newest live upload decides between in review and rejected.
+ */
+export function signedContractState(
+  documents: readonly Pick<GuaranteeDocument, "key" | "status" | "uploadedAt">[],
+): SignedContractState {
+  if (isSignedContractApproved(documents)) return SIGNED_CONTRACT_STATE.APPROVED;
+  const newest = documents
+    .filter(
+      (document) =>
+        document.key === DOCUMENT_KEY.RENTAL_CONTRACT &&
+        document.status !== GUARANTEE_DOCUMENT_STATUS.SUPERSEDED,
+    )
+    .reduce<
+      (typeof documents)[number] | null
+    >((latest, document) => (latest === null || Date.parse(document.uploadedAt) > Date.parse(latest.uploadedAt) ? document : latest), null);
+  if (newest === null) return SIGNED_CONTRACT_STATE.NOT_UPLOADED;
+  return newest.status === GUARANTEE_DOCUMENT_STATUS.REJECTED
+    ? SIGNED_CONTRACT_STATE.REJECTED
+    : SIGNED_CONTRACT_STATE.IN_REVIEW;
+}
+
+// ---- the agency's claims queue ---------------------------------------------
+
+/**
+ * The queue groups cases by who has to act next, not by raw status: the
+ * agency's first tab is the work only it can move.
+ */
+export const CASE_GROUP = {
+  NEEDS_YOU: "needs_you",
+  WITH_MUTAV: "with_mutav",
+  CLOSED: "closed",
+} as const;
+
+export type CaseGroup = (typeof CASE_GROUP)[keyof typeof CASE_GROUP];
+
+export const caseGroupValidator = v.union(
+  v.literal(CASE_GROUP.NEEDS_YOU),
+  v.literal(CASE_GROUP.WITH_MUTAV),
+  v.literal(CASE_GROUP.CLOSED),
+);
+
+/** The claims queue's filters: one group, or every case at once. */
+export const CASE_FILTER_ALL = "all";
+export type CaseFilter = CaseGroup | typeof CASE_FILTER_ALL;
+export const caseFilterValidator = v.union(caseGroupValidator, v.literal(CASE_FILTER_ALL));
+
+const CASE_GROUP_BY_STATUS: Record<AgencyCaseStatus, CaseGroup> = {
+  reported: CASE_GROUP.NEEDS_YOU,
+  ready_to_claim: CASE_GROUP.NEEDS_YOU,
+  info_requested: CASE_GROUP.NEEDS_YOU,
+  under_review: CASE_GROUP.WITH_MUTAV,
+  approved: CASE_GROUP.WITH_MUTAV,
+  paid: CASE_GROUP.CLOSED,
+  cured: CASE_GROUP.CLOSED,
+  withdrawn: CASE_GROUP.CLOSED,
+  refused: CASE_GROUP.CLOSED,
+  expired: CASE_GROUP.CLOSED,
+};
+
+export function caseGroupOf(status: AgencyCaseStatus): CaseGroup {
+  return CASE_GROUP_BY_STATUS[status];
+}
+
+// ---- expiry ----------------------------------------------------------------
+
+export const CLAIM_EXPIRY_REASON = {
+  FILING_WINDOW: "filing_window",
+  REQUEST_DEADLINE: "request_deadline",
+} as const;
+
+export type ClaimExpiryReason = (typeof CLAIM_EXPIRY_REASON)[keyof typeof CLAIM_EXPIRY_REASON];
+
+/**
+ * Why an open notice has lapsed, or null while it is still live: no claim
+ * filed within the product's filing window after the rent fell due, or a
+ * staff request left unanswered past its deadline. A submitted claim waiting
+ * on staff never lapses — the delay is Mutav's, not the agency's.
+ */
+export function claimExpiryReason({
+  notice,
+  rules,
+  today,
+}: {
+  notice: {
+    status: DelinquencyStatus;
+    rentDueDate: string;
+    claim?: { status: ClaimStatus; requests: readonly { dueAt: string; resolvedAt?: string }[] };
+  };
+  rules: ClaimRules;
+  today: string;
+}): ClaimExpiryReason | null {
+  if (notice.status !== DELINQUENCY_STATUS.OPEN) return null;
+  if (notice.claim === undefined) {
+    const deadline = addDays(notice.rentDueDate, rules.filingWindowDays);
+    return today > deadline ? CLAIM_EXPIRY_REASON.FILING_WINDOW : null;
+  }
+  if (notice.claim.status !== CLAIM_STATUS.INFO_REQUESTED) return null;
+  const overdue = notice.claim.requests.some(
+    (request) => request.resolvedAt === undefined && today > request.dueAt,
+  );
+  return overdue ? CLAIM_EXPIRY_REASON.REQUEST_DEADLINE : null;
+}

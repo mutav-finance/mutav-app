@@ -22,6 +22,7 @@ import type { api } from "@convex/_generated/api";
 import { GuaranteeDocumentsCard } from "./guarantee-documents-card";
 import { GuaranteeHistoryCard } from "./guarantee-history-card";
 import { GuaranteeLeaseCard } from "./guarantee-lease-card";
+import { RentAndClaimsCard } from "@/components/claims/rent-and-claims-card";
 import { GuaranteeSummaryCard } from "./guarantee-summary-card";
 import { GuaranteeTermsCard } from "./guarantee-terms-card";
 import { GuaranteeTenantCard } from "./guarantee-tenant-card";
@@ -34,7 +35,6 @@ export function GuaranteeDetailsPage({
   const guarantee = usePreloadedQuery(preloaded);
   const t = useTranslations("guaranteeDetails");
   const tNav = useTranslations("nav.main");
-  const tState = useTranslations("guaranteeDetails.state");
 
   if (guarantee === null) {
     notFound();
@@ -55,6 +55,12 @@ export function GuaranteeDetailsPage({
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/guarantees">{tNav("guarantees")}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
                 <BreadcrumbPage>
                   <Mono>#{guarantee.id}</Mono>
                 </BreadcrumbPage>
@@ -62,14 +68,19 @@ export function GuaranteeDetailsPage({
             </Eyebrow>
           </Breadcrumb>
         }
-        title={t("heroTitle", { state: tState(guarantee.status) })}
+        title={t(`heroTitle.${guarantee.status}`)}
       />
       <PageContent variant="narrow">
         <GuaranteeSummaryCard guarantee={guarantee} />
+        <RentAndClaimsCard guarantee={guarantee} />
         <GuaranteeTenantCard tenant={guarantee.tenant} />
         <GuaranteeLeaseCard lease={guarantee.lease} />
         <GuaranteeTermsCard terms={guarantee.terms} />
-        <GuaranteeDocumentsCard documents={guarantee.documents} />
+        <GuaranteeDocumentsCard
+          publicId={guarantee.id}
+          agencyId={guarantee.agencyId}
+          guaranteeStatus={guarantee.status}
+        />
         <GuaranteeHistoryCard history={guarantee.history} />
       </PageContent>
     </PageShell>

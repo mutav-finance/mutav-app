@@ -33,11 +33,12 @@
       "overview": "Visão geral",
       "agencies": "Imobiliárias",
       "compliance": "Compliance",
-      "defaults": "Solicitações de inadimplência",
+      "defaults": "Acionamentos",
       "treasury": "Tesouraria",
       "observability": "Observabilidade",
       "nav": "NAV",
-      "staff": "Equipe"
+      "staff": "Equipe",
+      "documents": "Documentos"
     }
   },
   "accessDenied": {
@@ -50,6 +51,9 @@
     "staffEyebrow": "Acesso liberado",
     "staffTitle": "Você tem acesso ao painel administrativo",
     "staffSubtitle": "Sua conta faz parte da equipe Mutav. Esta página é exibida a quem não tem acesso.",
+    "unavailableEyebrow": "Serviço indisponível",
+    "unavailableTitle": "Não foi possível verificar seu acesso",
+    "unavailableSubtitle": "Sua sessão está ativa, mas não conseguimos consultar a equipe Mutav agora. Tente novamente em alguns instantes.",
     "goToAgency": "Ir para Imobiliárias",
     "goToAdmin": "Voltar ao painel administrativo",
     "signIn": "Entrar",
@@ -144,7 +148,7 @@
     }
   },
   "defaults": {
-    "title": "Acionamentos de inadimplência",
+    "title": "Acionamentos",
     "subtitle": "Acionamentos aguardando decisão de compliance, dos mais antigos aos mais recentes.",
     "empty": "Nenhum acionamento em aberto.",
     "moreAvailable": "Há mais acionamentos na fila — apenas a página mais antiga é exibida.",
@@ -153,17 +157,17 @@
     "daysOpen": "{days, plural, =0 {hoje} one {# dia} other {# dias}}",
     "columns": {
       "notice": "Acionamento",
-      "agency": "Imobiliária",
-      "tenant": "Inquilino",
+      "tenant": "Inquilino e imobiliária",
       "guarantee": "Garantia",
       "outstanding": "Em aberto",
-      "openFor": "Aberto há",
       "actions": "Ações",
       "select": "Selecionar"
     },
-    "noticeStatus": {
-      "open": "Informado",
-      "verified": "Inadimplência confirmada"
+    "caseStatus": {
+      "awaiting_claim": "Aguardando acionamento",
+      "awaiting_review": "Aguardando análise",
+      "info_requested": "Pendência com a imobiliária",
+      "awaiting_cover": "Inadimplência confirmada"
     },
     "guaranteeState": {
       "drafted": "Rascunho",
@@ -180,7 +184,8 @@
       "dismiss": "Descartar",
       "cancel": "Cancelar",
       "coverSelected": "Registrar cobertura ({count})",
-      "clearSelection": "Limpar seleção"
+      "clearSelection": "Limpar seleção",
+      "more": "Mais ações"
     },
     "cover": {
       "title": "Registrar cobertura",
@@ -236,19 +241,23 @@
       "COVER_OPERATION_NOT_FOUND": "Esta operação de cobertura não existe mais.",
       "COVER_ALREADY_EXECUTED": "Este pagamento já está marcado como executado.",
       "PAYMENT_REFERENCE_REQUIRED": "Informe a referência de pagamento da transferência.",
-      "inNotice": "Nada foi registrado. Recusado no acionamento {notice}."
+      "PAYOUT_ACCOUNT_MISSING": "A imobiliária não tem conta de recebimento cadastrada.",
+      "inNotice": "Nada foi registrado. Recusado no acionamento {notice}.",
+      "CLAIM_NOT_SUBMITTED": "A imobiliária ainda não acionou a garantia, ou há uma pendência aberta com ela."
     },
     "payouts": {
       "title": "Pagamentos aguardando execução",
-      "subtitle": "Coberturas registradas pelo compliance cujo pagamento ao locador ainda não foi confirmado, dos mais antigos aos mais recentes.",
+      "subtitle": "Coberturas registradas pelo compliance cujo pagamento à imobiliária ainda não foi confirmado, dos mais antigos aos mais recentes.",
       "empty": "Nenhum pagamento aguardando execução.",
       "moreAvailable": "Há mais pagamentos aguardando — apenas a página mais antiga é exibida.",
       "noBatch": "—",
+      "accountEnding": "final {last4}",
       "columns": {
         "operation": "Operação",
         "batch": "Lote",
         "notice": "Acionamento",
         "agency": "Imobiliária",
+        "payoutAccount": "Conta",
         "guarantee": "Garantia",
         "period": "Referência",
         "amount": "Valor",
@@ -256,17 +265,89 @@
         "actions": "Ações"
       },
       "actions": {
-        "markExecuted": "Marcar pagamento executado"
+        "markExecuted": "Marcar pago"
       },
       "execute": {
         "title": "Marcar pagamento executado",
-        "description": "Confirma que o pagamento ao locador foi feito. Registre a referência devolvida pelo banco ou Pix para permitir a conciliação.",
+        "description": "Confirma que o pagamento à imobiliária foi feito, na conta registrada no momento da cobertura. Registre a referência devolvida pelo banco ou Pix para permitir a conciliação.",
         "amount": "Valor pago",
+        "account": {
+          "bank": "Banco",
+          "branch": "Agência",
+          "number": "Conta",
+          "pixKey": "Chave Pix",
+          "checking": "Conta corrente",
+          "savings": "Poupança"
+        },
         "referenceLabel": "Referência do pagamento",
         "referencePlaceholder": "ID E2E ou número da transferência",
         "noteLabel": "Observação (opcional)",
         "notePlaceholder": "O que a trilha de auditoria deve registrar",
         "confirm": "Marcar executado"
+      }
+    },
+    "claimReview": {
+      "trigger": "Ver acionamento",
+      "title": "Acionamento {notice}",
+      "summary": "{tenant} · {amount} · vencimento {due}",
+      "kind": {
+        "nonPaymentProof": "Comprovante de não pagamento",
+        "tenantNotice": "Notificação ao inquilino"
+      },
+      "status": {
+        "pending_review": "Enviado",
+        "accepted": "Aceito",
+        "rejected": "Recusado",
+        "superseded": "Substituído"
+      },
+      "noFile": "Nenhum arquivo",
+      "askAgain": "Pedir de novo",
+      "reasonPlaceholder": "O que está faltando ou errado",
+      "reasonFor": "Motivo para {item}",
+      "dueAt": "Prazo para a imobiliária responder",
+      "locked": "Só é possível pedir informação em um acionamento enviado e ainda não confirmado.",
+      "close": "Fechar",
+      "send": "Pedir informação",
+      "sent": "Pendência enviada à imobiliária.",
+      "fileMissing": "Arquivo não encontrado.",
+      "errors": {
+        "NOTICE_NOT_FOUND": "Acionamento não encontrado.",
+        "CLAIM_NOT_SUBMITTED": "Este acionamento não está aguardando análise.",
+        "NO_REQUESTS": "Escolha ao menos um arquivo.",
+        "REASON_REQUIRED": "Informe o motivo de cada arquivo.",
+        "REASON_TOO_LONG": "Um dos motivos é longo demais.",
+        "INVALID_DUE_DATE": "O prazo precisa ser uma data futura.",
+        "FORBIDDEN": "Seu papel não permite esta ação.",
+        "unexpected": "Não foi possível enviar. Tente novamente."
+      },
+      "verify": "Confirmar inadimplência"
+    },
+    "arrearsWithoutClaim": {
+      "title": "Atrasos sem acionamento",
+      "subtitle": "Garantias ainda em atraso sem nenhum caso aberto — em geral, o acionamento expirou. Decida se o atraso terminou.",
+      "loading": "Carregando…",
+      "empty": "Nenhuma garantia em atraso sem acionamento.",
+      "columns": {
+        "tenant": "Inquilino · garantia",
+        "agency": "Imobiliária",
+        "lastRent": "Último aluguel informado",
+        "closedAt": "Caso encerrado em",
+        "actions": "Ações"
+      },
+      "returnToActive": "Voltar para Ativa",
+      "dialogTitle": "Encerrar o atraso desta garantia?",
+      "dialogDescription": "A garantia volta para Ativa. Use quando a imobiliária confirmou que o atraso terminou ou não vai acionar.",
+      "notePlaceholder": "Motivo (fica na trilha de auditoria)",
+      "back": "Voltar",
+      "confirm": "Voltar para Ativa",
+      "returned": "Garantia de volta a Ativa.",
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
+        "NOT_IN_ARREARS": "A garantia não está mais em atraso.",
+        "NOTICE_OUTSTANDING": "Há um caso em aberto; encerre-o primeiro.",
+        "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode voltar para Ativa agora.",
+        "FORBIDDEN": "Seu papel não permite esta ação.",
+        "unexpected": "Não foi possível concluir. Tente novamente."
       }
     }
   },
@@ -363,5 +444,93 @@
     "actions": {
       "retry": "Tentar novamente"
     }
+  },
+  "guaranteeDocuments": {
+    "queue": {
+      "title": "Documentos de garantias",
+      "subtitle": "Arquivos anexados às garantias por imobiliárias e pela equipe, aguardando decisão de compliance, do mais antigo ao mais recente.",
+      "empty": "Nenhum documento aguardando análise.",
+      "moreAvailable": "Há mais documentos na fila — apenas a página mais antiga é exibida."
+    },
+    "panel": {
+      "heading": "Documentos",
+      "upload": "Enviar",
+      "uploading": "Enviando…",
+      "chooseFile": "Escolher arquivo para {document}",
+      "loading": "Carregando…",
+      "empty": "Nenhum arquivo enviado.",
+      "notFound": "Garantia não encontrada."
+    },
+    "columns": {
+      "document": "Documento",
+      "agency": "Imobiliária",
+      "guarantee": "Garantia",
+      "file": "Arquivo",
+      "uploaded": "Enviado",
+      "actions": "Ações"
+    },
+    "labels": {
+      "rentalContract": "Contrato de locação assinado",
+      "inspection": "Vistoria",
+      "policy": "Apólice"
+    },
+    "status": {
+      "pending_review": "Em análise",
+      "approved": "Aprovado",
+      "rejected": "Recusado",
+      "superseded": "Substituído"
+    },
+    "uploaderKind": {
+      "agency_user": "Imobiliária · {name}",
+      "staff": "Mutav · {name}"
+    },
+    "uploadedBy": {
+      "agency_user": "Enviado por {name} (imobiliária) em {date} · {size}",
+      "staff": "Enviado por {name} (Mutav) em {date} · {size}"
+    },
+    "reviewedBy": "Analisado por {name} em {date}",
+    "rejectionReason": "Motivo da recusa: {reason}",
+    "unknownUser": "usuário removido",
+    "notAvailable": "—",
+    "actions": {
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "cancel": "Cancelar"
+    },
+    "reject": {
+      "title": "Recusar documento",
+      "description": "Recusando “{file}”. A imobiliária vê o motivo na página da garantia e o recebe por e-mail.",
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "ex.: falta a assinatura do locador na página 3"
+    },
+    "toast": {
+      "approved": "Documento aprovado.",
+      "rejected": "Documento recusado; a imobiliária foi notificada.",
+      "uploaded": "Documento anexado e enviado para análise."
+    },
+    "errors": {
+      "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
+      "GUARANTEE_CLOSED": "Esta garantia está encerrada e não aceita novos documentos.",
+      "FILE_NOT_FOUND": "O arquivo enviado não foi encontrado. Tente novamente.",
+      "FILE_ALREADY_ATTACHED": "Este arquivo já foi anexado.",
+      "UNSUPPORTED_CONTENT_TYPE": "Formato não aceito. Envie PDF, JPG ou PNG.",
+      "FILE_TOO_LARGE": "Arquivo maior que 15 MB.",
+      "FILE_EMPTY": "O arquivo está vazio.",
+      "INVALID_FILE_NAME": "Nome de arquivo inválido.",
+      "DOCUMENT_NOT_FOUND": "Documento não encontrado.",
+      "NOT_PENDING_REVIEW": "Este documento já foi analisado ou substituído.",
+      "REJECTION_REASON_REQUIRED": "Informe o motivo da recusa.",
+      "REJECTION_REASON_TOO_LONG": "O motivo da recusa é longo demais.",
+      "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente.",
+      "FORBIDDEN": "Seu perfil na equipe não permite esta ação.",
+      "unexpected": "Algo deu errado. Tente novamente."
+    }
+  },
+  "unavailable": {
+    "eyebrow": "Serviço indisponível",
+    "title": "Não foi possível verificar seu acesso",
+    "subtitle": "O serviço está temporariamente indisponível. Sua sessão continua ativa; tente novamente em alguns instantes.",
+    "tryAgain": "Tentar novamente",
+    "logOut": "Sair"
   }
 }

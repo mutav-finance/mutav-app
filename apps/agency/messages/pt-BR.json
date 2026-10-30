@@ -69,134 +69,276 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Inadimplências — MUTAV",
-      "description": "Acompanhe e gerencie os acionamentos de inadimplência das garantias da sua imobiliária."
+      "title": "Acionamentos — MUTAV",
+      "description": "Acompanhe os aluguéis em atraso e os pedidos de cobertura das garantias da sua imobiliária."
     },
-    "heading": "Acionamentos de Inadimplência",
-    "subheading": "Acompanhe e gerencie as inadimplências das suas garantias",
-    "actions": {
-      "report": "Gerar relatório",
-      "statement": "Extrato de pagamento",
-      "openNotice": "Abrir acionamento"
-    },
-    "status": {
-      "open": "Pendência Aberta",
-      "resolved": "Entregue",
-      "canceled": "Cancelado"
-    },
-    "evidenceSource": {
-      "agency_reported": "Reportado pela imobiliária",
-      "bank_attested": "Atestado pelo banco",
-      "onchain_observed": "Observado onchain",
-      "system_scheduled": "Agendado pelo sistema"
-    },
-    "filter": {
-      "status": "Status",
-      "statusAll": "Todos",
-      "order": "Ordem",
-      "orderDate": "Data",
-      "orderAmount": "Valor",
-      "orderStatus": "Status",
-      "dateFrom": "Data aviso — de",
-      "dateTo": "Data aviso — até",
-      "amountFrom": "Valor inadimplência — de",
-      "amountTo": "Valor inadimplência — até",
-      "search": "Pesquisar",
-      "clear": "Limpar",
-      "guarantee": "Garantia {id}",
-      "clearGuarantee": "Remover o filtro da garantia {id}"
-    },
-    "table": {
-      "heading": "Resultados",
-      "empty": "Nenhum acionamento encontrado.",
-      "loading": "Carregando…",
-      "noAgency": "Selecione uma imobiliária.",
-      "view": "Ver inadimplência",
-      "col": {
-        "notice": "Acionamento",
-        "status": "Status",
-        "noticeAt": "Data Aviso",
-        "amount": "Valor Inadimplência",
-        "updatedAmount": "Valor Atualizado",
-        "action": "Ação"
-      }
+    "heading": "Acionamentos",
+    "subheading": "Aluguéis em atraso e pedidos de cobertura",
+    "caseStatus": {
+      "reported": "Atraso informado",
+      "ready_to_claim": "Pronto para acionar",
+      "under_review": "Em análise",
+      "info_requested": "Pendência",
+      "approved": "Aprovado",
+      "paid": "Pago",
+      "cured": "Regularizado",
+      "withdrawn": "Retirado",
+      "refused": "Recusado",
+      "expired": "Expirado"
     },
     "openNoticeSheet": {
-      "title": "Abrir acionamento de inadimplência",
-      "description": "Registra um aviso de inadimplência para um aluguel vencido.",
+      "pickTitle": "Informar atraso",
+      "pickDescription": "Qual garantia? Busque pelo nome do inquilino ou pelo endereço.",
+      "searchPlaceholder": "Nome do inquilino ou endereço",
+      "loading": "Carregando…",
+      "noMatches": "Nenhuma garantia encontrada.",
+      "recentDue": "Vencimento recente",
+      "unnamedTenant": "Inquilino sem nome",
+      "dueDay": "vence dia {day}",
+      "outstanding": "Já informado: {months}",
+      "outOfReach": "Fora do alcance",
+      "notInForce": "ainda não está em vigor",
+      "change": "Trocar",
+      "title": "Aluguel não pago",
+      "description": "Registra um aluguel não pago. Nada é pago ainda: a MUTAV analisa o caso antes de cobrir.",
       "fields": {
-        "guaranteePublicId": "Garantia",
-        "guaranteePublicIdPlaceholder": "ID da garantia (ex.: 1000001)",
-        "rentDueDate": "Data de vencimento do aluguel",
-        "originalAmount": "Valor original da inadimplência"
+        "month": "Mês de referência",
+        "monthPlaceholder": "Selecione o mês",
+        "originalAmount": "Valor em aberto"
+      },
+      "dueOn": "Vencimento: {date}",
+      "alreadyReported": "O aluguel de {month} já foi informado para esta garantia.",
+      "amountHint": "Aluguel e encargos do contrato. Reduza se houve pagamento parcial.",
+      "whatHappens": {
+        "heading": "O que acontece agora",
+        "arrears": "A garantia passa a Em atraso. Nada é pago ainda.",
+        "review": "A MUTAV analisa o caso e você acompanha em Acionamentos.",
+        "cure": "Se o inquilino pagar, marque “Inquilino pagou”."
       },
       "cancel": "Cancelar",
-      "submit": "Abrir acionamento",
-      "submitting": "Abrindo…",
-      "success": "Acionamento {publicId} aberto.",
+      "submit": "Informar atraso",
+      "submitting": "Informando…",
+      "success": "Atraso de {month} informado.",
       "errors": {
-        "MISSING_GUARANTEE": "Informe a garantia.",
-        "MISSING_DATE": "Informe a data de vencimento.",
         "INVALID_AMOUNT": "Informe um valor válido maior que zero.",
         "GUARANTEE_NOT_FOUND": "Garantia não encontrada nesta imobiliária.",
         "GUARANTEE_NOT_INSURED": "A garantia informada não está em vigor.",
-        "DUPLICATE_NOTICE": "Já existe um acionamento aberto para essa garantia nessa data.",
+        "DUPLICATE_NOTICE": "Já existe um atraso informado para essa garantia nessa data.",
         "INVALID_EVIDENCE_SOURCE": "Fonte de evidência inválida.",
-        "INVALID_RENT_DUE_DATE": "Data de vencimento inválida (use AAAA-MM-DD).",
-        "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode entrar em inadimplência a partir do estado atual.",
-        "UNEXPECTED": "Não foi possível abrir o acionamento. Tente novamente."
+        "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode entrar em atraso a partir do estado atual.",
+        "UNEXPECTED": "Não foi possível informar o atraso. Tente novamente.",
+        "MISSING_MONTH": "Selecione o mês do aluguel.",
+        "INVALID_REFERENCE_MONTH": "Mês inválido.",
+        "RENT_NOT_YET_DUE": "Esse aluguel ainda não venceu.",
+        "RENT_DUE_BEFORE_ACTIVATION": "Esse aluguel venceu antes de a garantia entrar em vigor.",
+        "AMOUNT_ABOVE_MONTHLY_RENT": "O valor passa do total mensal do contrato."
       }
     },
     "detailSheet": {
-      "title": "Detalhes do acionamento",
-      "loading": "Carregando…",
-      "notFound": "Acionamento não encontrado.",
-      "close": "Fechar",
-      "fields": {
-        "status": "Status",
-        "rentDueDate": "Vencimento",
-        "openedAt": "Aberto em",
-        "originalAmount": "Valor original",
-        "updatedAmount": "Valor atualizado",
-        "evidenceSource": "Fonte"
-      },
-      "resolution": {
-        "heading": "Resolução",
-        "kind": {
-          "tenant_cured": "Inquilino quitou a dívida",
-          "cover_committed": "Coberto pela reserva",
-          "stale": "Encerrado por prescrição",
-          "staff_dispute": "Contestação Mutav"
-        }
-      },
       "cancellation": {
-        "heading": "Cancelamento",
         "reason": {
           "agency_withdrew": "Retirado pela imobiliária",
           "duplicate": "Registro duplicado",
           "data_error": "Erro de dados",
-          "staff_dismissed": "Rejeitado pela Mutav"
+          "staff_dismissed": "Recusado pela MUTAV"
+        }
+      }
+    }
+  },
+  "claims": {
+    "errors": {
+      "title": "Não foi possível carregar os acionamentos",
+      "body": "Tente novamente em instantes.",
+      "retry": "Tentar de novo",
+      "backToDashboard": "Voltar ao início"
+    },
+    "sheet": {
+      "title": "Acionamento",
+      "description": "Detalhes do caso de aluguel em atraso."
+    },
+    "queue": {
+      "tabs": {
+        "needs_you": "Precisa de você",
+        "with_mutav": "Com a MUTAV",
+        "closed": "Encerrados",
+        "all": "Todos"
+      },
+      "reportLateRent": "Informar atraso",
+      "col": {
+        "case": "Inquilino · imóvel",
+        "month": "Mês",
+        "amount": "Valor",
+        "status": "Situação",
+        "next": "Próximo passo",
+        "updated": "Atualizado"
+      },
+      "noAgency": "Selecione uma imobiliária.",
+      "loading": "Carregando…",
+      "empty": {
+        "needs_you": "Nada esperando por você.",
+        "with_mutav": "Nenhum caso em análise na MUTAV.",
+        "closed": "Nenhum caso encerrado.",
+        "all": "Nenhum caso de atraso ainda."
+      },
+      "unnamedTenant": "Inquilino sem nome",
+      "next": {
+        "waitUntil": "Acionar a partir de {date}",
+        "fileClaim": "Acionar garantia",
+        "answerRequest": "Responder pendência",
+        "answerRequestBy": "Responder pendência até {date}",
+        "mutavReviewing": "MUTAV analisando",
+        "awaitingPayment": "Aguardando pagamento",
+        "none": "—"
+      }
+    },
+    "card": {
+      "heading": "Aluguel e acionamentos",
+      "report": "Informar atraso",
+      "reportAnother": "Informar atraso de outro mês",
+      "loading": "Carregando…",
+      "rentOf": "Aluguel de {month}",
+      "openCase": "Abrir acionamento",
+      "upToDate": "Nenhum atraso em aberto.",
+      "notInForce": "Disponível apenas para garantias em vigor.",
+      "history": "Atrasos informados",
+      "view": "Ver"
+    },
+    "panel": {
+      "loading": "Carregando…",
+      "notFound": "Acionamento não encontrado.",
+      "unnamedTenant": "Inquilino sem nome",
+      "eyebrow": "Aluguel de {month}",
+      "progress": "Etapas do acionamento",
+      "stepDone": " (concluída)",
+      "stepCurrent": " (atual)",
+      "steps": {
+        "late": "Atraso",
+        "claim": "Acionamento",
+        "review": "Análise",
+        "approved": "Aprovado",
+        "paid": "Pago"
+      },
+      "uploaded": "Arquivo enviado.",
+      "submitted": "Garantia acionada.",
+      "resubmitted": "Acionamento reenviado para análise.",
+      "cured": "Caso regularizado.",
+      "withdrawn": "Acionamento retirado.",
+      "errors": {
+        "UPLOAD_FAILED": "Não foi possível concluir. Tente novamente.",
+        "NOTICE_NOT_FOUND": "Acionamento não encontrado.",
+        "NOTICE_NOT_OPEN": "Este caso já foi encerrado.",
+        "CLAIM_UNDER_REVIEW": "O acionamento está em análise; os arquivos estão travados.",
+        "FILE_NOT_FOUND": "Arquivo não encontrado.",
+        "FILE_ALREADY_ATTACHED": "Este arquivo já foi enviado.",
+        "UNSUPPORTED_CONTENT_TYPE": "Envie PDF, JPG ou PNG.",
+        "FILE_TOO_LARGE": "O arquivo passa do limite de tamanho.",
+        "FILE_EMPTY": "O arquivo está vazio.",
+        "INVALID_FILE_NAME": "Nome de arquivo inválido.",
+        "CLAIM_ALREADY_SUBMITTED": "Este caso já foi acionado.",
+        "CLAIM_NOT_YET_OPEN": "O acionamento ainda não está liberado para este aluguel.",
+        "CLAIM_REQUIREMENTS_MISSING": "Ainda faltam itens para acionar.",
+        "INVALID_AMOUNT": "O valor deve ser positivo e no máximo o valor informado.",
+        "NO_INFO_REQUESTED": "Não há pendência aberta.",
+        "REQUESTS_UNRESOLVED": "Responda todas as pendências antes de reenviar.",
+        "NOTICE_VERIFIED": "A MUTAV já confirmou este atraso; fale com a MUTAV para encerrá-lo.",
+        "SELF_TRANSITION": "O caso já está nesta situação.",
+        "TERMINAL_STATE": "O caso já foi encerrado.",
+        "ILLEGAL_TRANSITION": "Mudança não permitida a partir da situação atual.",
+        "GUARANTEE_TRANSITION_REFUSED": "A garantia não pode mudar de situação agora."
+      },
+      "precondition": {
+        "title": "Antes de acionar",
+        "signedContract": {
+          "not_uploaded": "O contrato de locação assinado ainda não foi enviado. Envie-o nos documentos da garantia; você pode enviar as provas agora, e o acionamento libera quando a MUTAV aprovar o contrato.",
+          "in_review": "O contrato assinado ainda não foi aprovado pela MUTAV. Você pode enviar as provas agora; o acionamento libera quando o contrato for aprovado.",
+          "rejected": "A MUTAV recusou o contrato assinado enviado. Envie um novo arquivo nos documentos da garantia; o acionamento libera quando o contrato for aprovado."
+        },
+        "openDocuments": "Ver documentos da garantia"
+      },
+      "evidence": {
+        "heading": "Provas",
+        "kind": {
+          "nonPaymentProof": "Comprovante de não pagamento",
+          "tenantNotice": "Notificação ao inquilino"
+        },
+        "hint": {
+          "nonPaymentProof": "Boleto vencido ou extrato da cobrança",
+          "tenantNotice": "Mensagem ou carta com data, cobrando o valor"
+        },
+        "status": {
+          "pending_review": "Enviado",
+          "accepted": "Aceito",
+          "rejected": "Recusado",
+          "superseded": "Substituído"
+        },
+        "upload": "Enviar arquivo",
+        "replace": "Trocar",
+        "uploading": "Enviando…"
+      },
+      "amount": {
+        "label": "Valor a cobrir",
+        "hint": "Valor informado no atraso. Reduza se houve pagamento parcial."
+      },
+      "declaration": "Declaro que o aluguel não foi pago e que as informações são verdadeiras.",
+      "submit": "Acionar garantia",
+      "missing": "Falta: {items}",
+      "requirement": {
+        "nonPaymentProof": "comprovante de não pagamento",
+        "tenantNotice": "notificação ao inquilino",
+        "declaration": "declaração",
+        "signedContract": "contrato assinado aprovado"
+      },
+      "resubmit": "Reenviar para análise",
+      "money": {
+        "requested": "Solicitado",
+        "approved": "Aprovado",
+        "paid": "Pago",
+        "paidOn": "Pago em {date}",
+        "reference": "Referência do pagamento"
+      },
+      "history": {
+        "heading": "Histórico",
+        "reported": "Atraso informado",
+        "claimed": "Garantia acionada",
+        "infoRequested": "Pendência da MUTAV",
+        "verified": "Atraso confirmado pela MUTAV",
+        "covered": "Cobertura aprovada",
+        "paid": "Pagamento enviado",
+        "closed": "Caso encerrado"
+      },
+      "code": "Código",
+      "whatNow": {
+        "reported": "O inquilino ainda pode pagar. A garantia pode ser acionada a partir de {date}; já dá para enviar as provas.",
+        "readyToClaim": "A garantia já pode ser acionada. Envie as provas abaixo.",
+        "underReview": "A MUTAV está analisando o acionamento.",
+        "verified": "A MUTAV confirmou o atraso e está aprovando a cobertura.",
+        "infoRequested": "A MUTAV precisa de:",
+        "requestLine": "{item}: “{reason}” — até {date}",
+        "approved": "Cobertura aprovada. O pagamento está a caminho.",
+        "paid": "Pagamento do aluguel de {month} enviado.",
+        "kind": {
+          "nonPaymentProof": "Comprovante de não pagamento",
+          "tenantNotice": "Notificação ao inquilino"
+        },
+        "ended": {
+          "cured": "O inquilino pagou. Caso encerrado.",
+          "withdrawn": "Acionamento retirado pela imobiliária.",
+          "refused": "A MUTAV recusou este acionamento. Fale com a MUTAV para entender o motivo.",
+          "expired": "O prazo para acionar este aluguel terminou."
         }
       },
-      "cancel": {
-        "trigger": "Cancelar acionamento",
-        "dialogTitle": "Cancelar acionamento?",
-        "dialogDescription": "Cancela o acionamento aberto. Essa ação não pode ser desfeita.",
-        "reasonLabel": "Motivo",
-        "noteLabel": "Observação (opcional)",
-        "notePlaceholder": "Detalhes internos sobre o cancelamento",
+      "exits": {
+        "cure": "Inquilino pagou",
+        "withdraw": "Retirar",
+        "cureTitle": "O inquilino pagou?",
+        "withdrawTitle": "Retirar este acionamento?",
+        "cureDescription": "Encerra o caso como regularizado. A garantia volta para Ativa se não houver outro atraso em aberto.",
+        "withdrawDescription": "Use quando o atraso foi informado por engano.",
+        "curePlaceholder": "Observação (opcional), ex.: pagou em 12/10 por Pix",
+        "reason": "Motivo",
         "back": "Voltar",
-        "confirm": "Cancelar acionamento",
-        "submitting": "Cancelando…",
-        "success": "Acionamento cancelado.",
-        "errors": {
-          "NOTICE_NOT_FOUND": "Acionamento não encontrado.",
-          "SELF_TRANSITION": "O acionamento já está nesse estado.",
-          "TERMINAL_STATE": "O acionamento já foi encerrado.",
-          "ILLEGAL_TRANSITION": "Transição inválida para o estado atual.",
-          "NOTICE_VERIFIED": "A Mutav já confirmou essa inadimplência; só a Mutav pode encerrá-la.",
-          "UNEXPECTED": "Não foi possível cancelar o acionamento. Tente novamente."
-        }
+        "cureConfirm": "Confirmar pagamento",
+        "withdrawConfirm": "Retirar"
       }
     }
   },
@@ -207,8 +349,7 @@
       "createGuarantee": "Criar Garantia",
       "dashboard": "Painel",
       "guarantees": "Garantias",
-      "invoices": "Faturas",
-      "delinquencies": "Inadimplências",
+      "delinquencies": "Acionamentos",
       "transparency": "Transparência"
     },
     "cadastros": {
@@ -220,6 +361,7 @@
     "agency": {
       "groupLabel": "Agência",
       "members": "Membros",
+      "invoices": "Faturas",
       "commission": "Comissão",
       "agencySettings": "Configurações da Agência"
     },
@@ -361,20 +503,25 @@
     }
   },
   "guaranteeDetails": {
-    "heroTitle": "Garantia {state}",
+    "heroTitle": {
+      "drafted": "Garantia em rascunho",
+      "active": "Garantia ativa",
+      "in_arrears": "Garantia em atraso",
+      "default_verified": "Garantia com inadimplência verificada",
+      "cover_committed": "Garantia com cobertura registrada",
+      "in_eviction": "Garantia em despejo",
+      "closed": "Garantia encerrada"
+    },
     "summary": {
       "heading": "Solicitação",
       "currentStatus": "Situação atual:",
       "closureReason": "Motivo do encerramento:",
       "nextRenewal": "Próxima Renovação estimada:",
       "availableGuarantee": "Fiança disponível:",
-      "guaranteeTooltip": "Este valor considera todas as inadimplências abertas, em análise, provisionadas e pagas.",
-      "openDelinquency": "Abrir inadimplência",
-      "trackDelinquencies": "Acompanhar inadimplências",
+      "guaranteeTooltip": "Este valor já desconta as coberturas aprovadas e pagas desta garantia.",
       "cancelProposal": "Cancelar proposta",
       "idLabel": "ID da garantia",
       "guaranteeTooltipLabel": "Detalhes da fiança disponível",
-      "cancelProposalHint": "Disponível apenas para garantias em rascunho",
       "cancelDialog": {
         "title": "Cancelar proposta?",
         "description": "A garantia será marcada como cancelada. O histórico será preservado.",
@@ -387,10 +534,6 @@
         "NOT_DRAFTED": "Apenas garantias em rascunho podem ser canceladas.",
         "UNEXPECTED": "Erro inesperado. Tente novamente."
       },
-      "openDelinquencyHint": "Registrar nova inadimplência",
-      "trackDelinquenciesHint": "Ver inadimplências desta garantia",
-      "openDelinquencyDisabledHint": "Disponível apenas para garantias em vigor",
-      "trackDelinquenciesDisabledHint": "Esta garantia nunca esteve em vigor, portanto não tem inadimplências",
       "actionsMenu": "Ações da garantia",
       "ofCeiling": "de {ceiling}"
     },
@@ -439,7 +582,9 @@
         "cityUF": "Cidade/UF",
         "complement": "Complemento",
         "tag": "Tag",
-        "description": "Descrição"
+        "description": "Descrição",
+        "dueDay": "Vencimento do aluguel",
+        "dueDayValue": "Todo dia {day}"
       },
       "propertyKind": {
         "residential": "Residencial",
@@ -477,17 +622,40 @@
     "documents": {
       "heading": "Documentos",
       "send": "Enviar",
-      "sendDisabled": "Disponível em breve",
+      "uploading": "Enviando…",
       "downloadTemplate": "Baixar modelo padrão",
+      "chooseFile": "Escolher arquivo para {document}",
+      "loading": "Carregando…",
+      "empty": "Nenhum arquivo enviado.",
+      "uploaded": "Documento enviado para análise da Mutav.",
+      "acceptedFormats": "PDF, JPG ou PNG, até 15 MB. Cada arquivo é analisado pela equipe Mutav.",
+      "closedGuarantee": "Garantia encerrada — não aceita novos documentos.",
+      "uploadedBy": "Enviado por {name} em {date}",
+      "uploadedByMutav": "Mutav",
+      "unknownUser": "usuário removido",
+      "rejectionReason": "Motivo da recusa: {reason}",
       "labels": {
-        "rentalContract": "Contrato de locação",
+        "rentalContract": "Contrato de locação assinado",
         "inspection": "Vistoria",
         "policy": "Apólice"
       },
       "status": {
-        "pendente": "Pendente",
-        "enviado": "Enviado",
-        "aprovado": "Aprovado"
+        "pending_review": "Em análise",
+        "approved": "Aprovado",
+        "rejected": "Recusado",
+        "superseded": "Substituído"
+      },
+      "errors": {
+        "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
+        "GUARANTEE_CLOSED": "Esta garantia está encerrada e não aceita novos documentos.",
+        "FILE_NOT_FOUND": "O arquivo enviado não foi encontrado. Tente novamente.",
+        "FILE_ALREADY_ATTACHED": "Este arquivo já foi anexado.",
+        "UNSUPPORTED_CONTENT_TYPE": "Formato não aceito. Envie PDF, JPG ou PNG.",
+        "FILE_TOO_LARGE": "Arquivo maior que 15 MB.",
+        "FILE_EMPTY": "O arquivo está vazio.",
+        "INVALID_FILE_NAME": "Nome de arquivo inválido.",
+        "DOCUMENT_NOT_FOUND": "Documento não encontrado.",
+        "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente."
       }
     },
     "history": {
@@ -814,7 +982,11 @@
         "activation": "Ativação"
       },
       "total": "Total",
-      "empty": "Sem itens."
+      "empty": "Sem itens.",
+      "description": {
+        "recurring": "Mensalidade — garantia {id}",
+        "activation": "Taxa de ativação — garantia {id}"
+      }
     },
     "methodCard": {
       "heading": "Forma de Pagamento",
@@ -893,7 +1065,11 @@
       "rent": "Aluguel mensal",
       "condo": "Condomínio",
       "otherFees": "Outras taxas",
-      "total": "Total"
+      "total": "Total",
+      "dueDay": "Dia do vencimento do aluguel",
+      "dueDayHint": "Como está no contrato. Nos meses mais curtos, dias 29–31 vencem no último dia do mês.",
+      "dueDayPlaceholder": "Selecione o dia",
+      "dueDayOption": "Todo dia {day}"
     },
     "tenant": {
       "fullName": "Nome completo",
@@ -998,7 +1174,8 @@
       "birthDateFuture": "Data de nascimento não pode ser futura",
       "birthDateInvalid": "Data inválida",
       "emailInvalid": "E-mail inválido",
-      "phoneInvalid": "Telefone inválido"
+      "phoneInvalid": "Telefone inválido",
+      "dueDayRequired": "Informe o dia do vencimento do aluguel."
     }
   },
   "paymentFlow": {
@@ -1265,7 +1442,8 @@
         "cpf": "CPF inválido.",
         "cnpj": "CNPJ inválido.",
         "representanteName": "Nome do responsável obrigatório.",
-        "representanteCpf": "CPF do responsável inválido."
+        "representanteCpf": "CPF do responsável inválido.",
+        "alreadyRegistered": "Já cadastrado na Mutav."
       }
     }
   },
@@ -1351,5 +1529,30 @@
     "default_verified": "Inadimplência verificada",
     "cover_paid": "Cobertura registrada",
     "closed": "Encerradas"
+  },
+  "sessionError": {
+    "notProvisioned": {
+      "eyebrow": "Configuração da conta",
+      "title": "Não conseguimos concluir a configuração da sua conta",
+      "subtitle": "Você entrou normalmente, mas algo deu errado ao preparar sua conta. Tente novamente em alguns instantes. Se o problema continuar, saia e entre de novo."
+    },
+    "backendUnavailable": {
+      "eyebrow": "Serviço indisponível",
+      "title": "O serviço está temporariamente indisponível",
+      "subtitle": "Não conseguimos carregar seus dados agora. Sua sessão continua ativa; tente novamente em alguns instantes."
+    },
+    "emailNotVerified": {
+      "eyebrow": "Confirme seu e-mail",
+      "title": "Confirme seu e-mail para continuar",
+      "subtitle": "Enviamos um link para a sua caixa de entrada (confira também o spam). Depois de confirmar, entre de novo."
+    },
+    "emailBound": {
+      "eyebrow": "Conta já vinculada",
+      "title": "Este e-mail já está vinculado a outra forma de acesso",
+      "subtitle": "Entre da mesma forma que entrou antes ou fale com o nosso suporte para recuperar o acesso à sua conta."
+    },
+    "tryAgain": "Tentar novamente",
+    "confirmedSignInAgain": "Já confirmei — entrar de novo",
+    "logOut": "Sair"
   }
 }

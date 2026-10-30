@@ -1,4 +1,4 @@
-import { Account, MuxedAccount } from "@stellar/stellar-base";
+import { Account, MuxedAccount } from "@stellar/stellar-sdk/minimal";
 import { getMutavSourceAccount } from "../../lib/env";
 
 let cachedBase: { sourceG: string; account: Account } | null = null;

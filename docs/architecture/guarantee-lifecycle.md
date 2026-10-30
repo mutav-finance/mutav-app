@@ -152,6 +152,14 @@ A cover is refused, before any write, when the notice is missing, is not itself 
 
 Statuses `open, verified, resolved, canceled` (`:18-23`); terminal = `resolved, canceled` (`:39-42`); edges `open → verified | resolved | canceled`, `verified → resolved | canceled` (`:53-60`); the same three error codes as the guarantee machine (`:62-65`). Value objects in [`delinquencies/domain.ts`](../../convex/delinquencies/domain.ts): resolution kinds `tenant_cured, cover_committed, staff_dispute, stale`; cancellation reasons `agency_withdrew, staff_dismissed, duplicate, data_error`; evidence sources `agency_reported, tenant_confirmed, bank_attested, onchain_observed, system_scheduled` (only `agency_reported` is accepted by `openNotice` today, `mutations.ts:184-192`).
 
+### 6.5 Guarantee documents — `convex/guarantees/documents.ts`, `staffDocuments.ts`
+
+Files attached to a guarantee live in the `guaranteeDocuments` table, one row per uploaded file (slot `key` ∈ `rentalContract` — the signed rental contract — `inspection`, `policy`). They do not move the guarantee's state.
+
+- **Upload.** The agency (`attachGuaranteeDocument`, `mutationWithActiveAgency`) or staff on its behalf (`staffAttachGuaranteeDocument`, `support`+) record a file already POSTed to File Storage. The file is judged by the `_storage` system row, not the client: PDF/JPEG/PNG only, 1 byte – 15 MB (`checkUploadedFile` in `guarantees/domain.ts`). Refused on a `closed` guarantee and when the blob is already attached anywhere. Audit `guarantee.document_attached`.
+- **Review statuses** — `pending_review → approved | rejected`, decided only by `compliance`+ (`approveGuaranteeDocument`, `rejectGuaranteeDocument`; a reason is required and is emailed to the agency). A new upload marks earlier `pending_review` files of the same slot `superseded`; approved and rejected rows are final and stay as history. Audit `guarantee.document_approved` / `guarantee.document_rejected` (the reason stays on the row, out of the chain).
+- **Activation gate.** `isSignedContractApproved(docs)` (pure, `guarantees/domain.ts`) and `hasApprovedSignedContract(ctx, guaranteeId)` (`guarantees/documents.ts`) answer "has staff approved a signed rental contract?" — one approved `rentalContract` row is enough, and a later upload does not revoke it.
+
 ## 7. Capacity policy
 
 Policy **C** ([ADR 0007 § 6](decisions/0007-lease-guarantee-split.md)). The design weighed three capacity policies: A burns capacity permanently on cover, B restores it when the tenant repays, and C reserves it on cover, releases it on repayment and burns it only on write-off. The code implements C's reserve half, plus an exact release when a verified default is reversed. Row shape `guarantees.capacity { ceilingCents, availableCents, reservedCents }` — [`schema.ts:472-476`](../../convex/schema.ts).

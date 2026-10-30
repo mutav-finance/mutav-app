@@ -5,10 +5,12 @@ export type CoverOperation = Doc<"coverOperations">;
 export type CoverOperationId = Id<"coverOperations">;
 export type CoverOperationExecution = NonNullable<CoverOperation["execution"]>;
 
+export type CoverPayoutAccount = CoverOperation["payoutAccount"];
+
 /**
  * Two phases, one direction. `recorded` = compliance committed cover against
  * a verified default and capacity is reserved; `executed` = the off-chain
- * payout to the landlord has left and carries its payment reference. There is
+ * payout to the agency has left and carries its payment reference. There is
  * no way back from `executed`: a payout that has left is undone by a new
  * receivable, not by rewriting this row.
  */
@@ -33,6 +35,7 @@ export const COVER_OPERATION_ERROR_CODE = {
   COVER_OPERATION_NOT_FOUND: "COVER_OPERATION_NOT_FOUND",
   COVER_ALREADY_EXECUTED: "COVER_ALREADY_EXECUTED",
   PAYMENT_REFERENCE_REQUIRED: "PAYMENT_REFERENCE_REQUIRED",
+  PAYOUT_ACCOUNT_MISSING: "PAYOUT_ACCOUNT_MISSING",
 } as const satisfies Record<string, string>;
 
 /**

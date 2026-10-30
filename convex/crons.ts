@@ -53,6 +53,20 @@ crons.interval(
 crons.cron("daily audit anchor", "10 0 * * *", internal.audit.actions.submitDailyAnchor, {});
 
 /**
+ * Daily at 00:30 in Brazil (03:30 UTC), just after the Brazilian date the
+ * deadlines are written in has turned over. Closes late-rent cases whose
+ * claim lapsed — no claim within the product's filing window, or a staff
+ * request left unanswered past its deadline. See
+ * `convex/delinquencies/expiry.ts`.
+ */
+crons.cron(
+  "daily claim expiry",
+  "30 3 * * *",
+  internal.delinquencies.expiry.expireLapsedClaims,
+  {},
+);
+
+/**
  * Every 15 minutes. Reads the reserve vault's approved-asset balances over
  * Soroban RPC and writes a `reserveSnapshots` row. On read failure it writes
  * nothing, so the dashboard keeps the last good (timestamped) figure.
