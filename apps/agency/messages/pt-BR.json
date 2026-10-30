@@ -1148,8 +1148,8 @@
     },
     "success": {
       "heading": "PROPOSTA DE GARANTIA CRIADA",
-      "subtitle": "A proposta foi enviada com sucesso e aguarda ativação pelo inquilino.",
-      "description": "A garantia será efetivada mediante o aceite dos termos e o pagamento da taxa de ativação pelo inquilino. A proposta foi enviada por e-mail e WhatsApp para o inquilino.",
+      "subtitle": "A garantia foi registrada e aguarda o contrato assinado.",
+      "description": "Colete com o inquilino o contrato de garantia assinado, envie o PDF na página da garantia e então ative a garantia. O inquilino recebeu um aviso informativo de que a garantia foi registrada e que a imobiliária entrará em contato para a assinatura.",
       "viewGuarantee": "Ver garantia",
       "createAnother": "Criar outra garantia"
     },

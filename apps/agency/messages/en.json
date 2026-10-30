@@ -1148,8 +1148,8 @@
     },
     "success": {
       "heading": "GUARANTEE PROPOSAL CREATED",
-      "subtitle": "The proposal has been successfully sent and is awaiting activation by the tenant.",
-      "description": "The guarantee will be activated upon the tenant's acceptance of the terms and payment of the activation fee. The proposal has been sent to the tenant via email and WhatsApp.",
+      "subtitle": "The guarantee is registered and awaits the signed contract.",
+      "description": "Collect the signed guarantee contract from the tenant, upload the PDF on the guarantee page, then activate the guarantee. The tenant received an informational notice that the guarantee was registered and that the agency will contact them to sign.",
       "viewGuarantee": "View guarantee",
       "createAnother": "Create another guarantee"
     },

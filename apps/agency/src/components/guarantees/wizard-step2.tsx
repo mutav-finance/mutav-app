@@ -19,7 +19,8 @@ import {
 } from "@/lib/guarantees/wizard";
 import { formatBRLCents } from "@mutav/i18n/brazil";
 import { GUARANTEE_PLAN, type ScoreTier } from "@convex/guarantees/domain";
-import { priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
+import { isPlanOffered, priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
+import { PRESTAMISTA_ENABLED } from "@convex/guarantees/flags";
 import type { ProductTerms, PublicProduct } from "@convex/products/domain";
 
 type Props = {
@@ -64,7 +65,8 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
 
   // No plan is pre-selected; Step 2's Next stays blocked until the broker picks
   // one. "plus" adds the prestamista premium to the monthly fee (priceGuarantee).
-  const selectedPlan = data.plan;
+  // A draft still holding a plan that is no longer offered counts as unpicked.
+  const selectedPlan = data.plan && isPlanOffered(data.plan) ? data.plan : null;
 
   const scoreResult = useQuery(
     api.guarantees.useCases.getCachedCreditScore,
@@ -135,12 +137,12 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
   // the same function the server uses. The stored `terms` snapshot is whatever
   // `guarantees.create` prices at submit time.
   const preview =
-    product && priceableTier && data.rentCents > 0 && data.plan
+    product && priceableTier && data.rentCents > 0 && selectedPlan
       ? priceGuarantee(
           {
             rentCents: data.rentCents,
             tier: priceableTier,
-            plan: data.plan,
+            plan: selectedPlan,
             productSlug: product.slug,
             appliedAt: new Date().toISOString(),
           },
@@ -227,7 +229,8 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
         )}
       </section>
 
-      {/* Coverage plans — two selectable cards; "+" carries a subtle premium accent */}
+      {/* Coverage plans — selectable cards; "+" carries a subtle premium accent
+          and is only offered while prestamista is enabled */}
       {isScored && priceableTier && product && (
         <div
           role="radiogroup"
@@ -241,15 +244,17 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
             selected={selectedPlan === GUARANTEE_PLAN.BASIC}
             onSelect={() => onChange({ plan: GUARANTEE_PLAN.BASIC })}
           />
-          <CoveragePlanCard
-            planName={t("coverage.planPlus")}
-            terms={product.terms}
-            feeRatePct={product.terms.tierRate[priceableTier] * 100}
-            selected={selectedPlan === GUARANTEE_PLAN.PLUS}
-            emphasized
-            includesPrestamista
-            onSelect={() => onChange({ plan: GUARANTEE_PLAN.PLUS })}
-          />
+          {PRESTAMISTA_ENABLED && (
+            <CoveragePlanCard
+              planName={t("coverage.planPlus")}
+              terms={product.terms}
+              feeRatePct={product.terms.tierRate[priceableTier] * 100}
+              selected={selectedPlan === GUARANTEE_PLAN.PLUS}
+              emphasized
+              includesPrestamista
+              onSelect={() => onChange({ plan: GUARANTEE_PLAN.PLUS })}
+            />
+          )}
         </div>
       )}
 
@@ -290,7 +295,7 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
         ) : hasNoApplication ? (
           <Button onClick={onBack}>{t("simulation.noApplicationAction")}</Button>
         ) : (
-          <Button onClick={onNext} disabled={isLoading || score === null || !data.plan}>
+          <Button onClick={onNext} disabled={isLoading || score === null || !selectedPlan}>
             {t("nav.nextStep3")}
           </Button>
         )}

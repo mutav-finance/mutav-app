@@ -30,9 +30,9 @@ function setup() {
 
 type T = ReturnType<typeof setup>;
 
-// Rent 300_000 × the default 30× multiplier. Spelled out so a pricing change
+// Rent 300_000 × the default 15× multiplier. Spelled out so a pricing change
 // fails loudly here instead of silently agreeing.
-const CEILING_CENTS = 9_000_000;
+const CEILING_CENTS = 4_500_000;
 const RENT_CENTS = 300_000;
 const SMALL_CEILING_CENTS = 350_000;
 

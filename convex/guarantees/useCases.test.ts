@@ -694,9 +694,9 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
     const byId = new Map(page.page.map((row) => [row.id, row]));
     expect(byId.get("U5")?.status).toBe(GUARANTEE_STATE.CLOSED);
     expect(byId.get("U5")?.availableCapacityCents).toBe(0);
-    // Default seed: R$ 1.000,00 rent x 30 = R$ 30.000,00 ceiling, untouched.
-    expect(byId.get("U1")?.availableCapacityCents).toBe(3_000_000);
-    expect(byId.get("U4")?.availableCapacityCents).toBe(3_000_000);
+    // Default seed: R$ 1.000,00 rent x 15 = R$ 15.000,00 ceiling, untouched.
+    expect(byId.get("U1")?.availableCapacityCents).toBe(1_500_000);
+    expect(byId.get("U4")?.availableCapacityCents).toBe(1_500_000);
 
     const closedRow = await t.run((ctx) =>
       ctx.db
@@ -705,8 +705,8 @@ describe("listByAgency / getGuaranteeTabCounts (urgency)", () => {
         .unique(),
     );
     expect(closedRow?.capacity).toEqual({
-      ceilingCents: 3_000_000,
-      availableCents: 3_000_000,
+      ceilingCents: 1_500_000,
+      availableCents: 1_500_000,
       reservedCents: 0,
     });
   });
@@ -877,7 +877,7 @@ describe("create (lease + drafted guarantee)", () => {
     expect(audit.map((entry) => entry.action)).toEqual(["lease.created", "guarantee.created"]);
   });
 
-  test("persists the chosen plan in the terms snapshot", async () => {
+  test("prestamista off: a plus request is stored as basic with no premium in the fee", async () => {
     const t = convexTest(schema);
     const { asUser, agencyId } = await setup(t);
     await seedFreshCreditAssessment(t, { agencyId, document: VALID_CPF, score: 750 });
@@ -895,8 +895,11 @@ describe("create (lease + drafted guarantee)", () => {
         .withIndex("by_publicId", (q) => q.eq("publicId", result.data.publicId))
         .unique(),
     );
-    expect(guarantee?.terms.plan).toBe("plus");
-    expect(guarantee?.terms.prestamistaFeeCents).toBe(1_280);
+    // Prestamista is off for the pilot: the server prices a Plus request as
+    // Basic, so the placeholder premium never reaches the fee.
+    expect(guarantee?.terms.plan).toBe("basic");
+    expect(guarantee?.terms.prestamistaFeeCents).toBe(0);
+    expect(guarantee?.terms.feeCents).toBe(guarantee?.terms.taxaFeeCents);
   });
 
   test("rejects a non-positive rent before any write", async () => {
@@ -1228,9 +1231,10 @@ describe("listForCommissionByMonth", () => {
     const basicRow = rows.find((r) => r.guaranteeId === "guarantee-basic");
     const plusRow = rows.find((r) => r.guaranteeId === "guarantee-plus");
     if (!basicRow || !plusRow) throw new Error("expected both rows present");
-    // basic: taxa 27_000 x 1.5% = 405. plus: taxa 45_000 x 1.5% = 675 + 1_280 x 25% = 320.
+    // basic: taxa 27_000 x 1.5% = 405. plus request with prestamista off: taxa 45_000 x 1.5% = 675,
+    // no premium commission.
     expect(basicRow.commissionCents).toBe(405);
-    expect(plusRow.commissionCents).toBe(995);
+    expect(plusRow.commissionCents).toBe(675);
     expect(basicRow.installment).toBe("1/12");
   });
 });

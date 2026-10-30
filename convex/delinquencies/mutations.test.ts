@@ -1382,11 +1382,11 @@ describe("staffMarkCanceledByDismissal", () => {
 // Every case below asserts BOTH rows the transaction touches — the notice and
 // the guarantee it belongs to — plus what the guarantee timeline and the audit
 // log recorded. The fixture's 300_000-cent rent under the seeded default
-// product (30x ceiling multiplier) gives a 9_000_000-cent ceiling; the
+// product (15x ceiling multiplier) gives a 4_500_000-cent ceiling; the
 // capacity literals are written out from that, never read back from pricing.
 // ---------------------------------------------------------------------------
 
-const CEILING_CENTS = 9_000_000;
+const CEILING_CENTS = 4_500_000;
 
 async function readGuarantee(t: T, guaranteeId: GuaranteeId) {
   return orThrow(await t.run((ctx) => ctx.db.get(guaranteeId)), "guarantee row");
@@ -1746,7 +1746,7 @@ describe("staffRecordCover — capacity draw", () => {
     expect(guarantee.status).toBe("cover_committed");
     expect(guarantee.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
-      availableCents: 8_750_000,
+      availableCents: 4_250_000,
       reservedCents: 250_000,
     });
 
@@ -1947,7 +1947,7 @@ describe("staffRecordCover — capacity draw", () => {
     expect(guarantee.status).toBe("cover_committed");
     expect(guarantee.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
-      availableCents: 8_650_000,
+      availableCents: 4_150_000,
       reservedCents: 350_000,
     });
     // Each notice records its own applied figure so a reversal gives back
@@ -2185,7 +2185,7 @@ describe("markCanceled — return to active", () => {
     const t = setup();
     const fx = await makeFixture(t, "1", {
       status: "in_arrears",
-      availableCents: 8_700_000,
+      availableCents: 4_200_000,
     });
     await insertNotice(t, fx, { publicId: "DN-cancel-capacity" });
     const asUser = t.withIdentity({ subject: fx.subject });
@@ -2200,7 +2200,7 @@ describe("markCanceled — return to active", () => {
     expect(guarantee.status).toBe("active");
     expect(guarantee.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
-      availableCents: 8_700_000,
+      availableCents: 4_200_000,
       reservedCents: 300_000,
     });
   });
@@ -2316,7 +2316,7 @@ describe("return to active — who may leave which state", () => {
     const t = setup();
     const fx = await makeFixture(t, "1", {
       status: "cover_committed",
-      availableCents: 8_700_000,
+      availableCents: 4_200_000,
     });
     await insertNotice(t, fx, { publicId: "DN-dismiss-covered", status: "verified" });
     await grantStaffRole(t, fx.userId, "compliance");
@@ -2334,7 +2334,7 @@ describe("return to active — who may leave which state", () => {
     expect(guarantee.status).toBe("cover_committed");
     expect(guarantee.capacity).toEqual({
       ceilingCents: CEILING_CENTS,
-      availableCents: 8_700_000,
+      availableCents: 4_200_000,
       reservedCents: 300_000,
     });
   });
