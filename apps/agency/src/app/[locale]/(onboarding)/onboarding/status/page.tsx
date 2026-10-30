@@ -15,7 +15,7 @@ type Props = {
 export default async function OnboardingStatusPage({ searchParams, params }: Props) {
   const { locale } = await params;
   const dest = await resolveUserDestination();
-  redirectOnSessionFailure({ destination: dest, locale, returnHref: "/onboarding/status" });
+  await redirectOnSessionFailure({ destination: dest, locale, returnHref: "/onboarding/status" });
 
   if (dest.kind === "dashboard") {
     redirect({ href: "/", locale });

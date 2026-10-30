@@ -21,7 +21,7 @@ type CopyKey<TPrefix extends SessionErrorTone> =
   | `${TPrefix}.title`
   | `${TPrefix}.subtitle`;
 
-const RELOGIN_HREF = "/auth/login?returnTo=/";
+type ReloginHref = `/auth/login?returnTo=${string}`;
 
 /**
  * `retry` is a client-side link back to `/` that reuses the current session.
@@ -31,7 +31,7 @@ const RELOGIN_HREF = "/auth/login?returnTo=/";
  */
 export type SessionErrorPrimaryAction =
   | { kind: "retry"; href: "/"; labelKey: "tryAgain" }
-  | { kind: "relogin"; href: typeof RELOGIN_HREF; labelKey: "confirmedSignInAgain" };
+  | { kind: "relogin"; href: ReloginHref; labelKey: "confirmedSignInAgain" };
 
 export type SessionErrorView = {
   tone: SessionErrorTone;
@@ -65,8 +65,16 @@ export function parseSessionErrorReason(raw: string | string[] | undefined): Ses
 /**
  * Maps a reason to what the session-error page renders. Pure on purpose: the
  * page is a server component with no DOM test harness in this repo.
+ * `localeRoot` is the active locale's `/` as next-intl builds it, so a
+ * re-login lands back in the user's language.
  */
-export function resolveSessionErrorView(reason: SessionErrorReason): SessionErrorView {
+export function resolveSessionErrorView({
+  reason,
+  localeRoot,
+}: {
+  reason: SessionErrorReason;
+  localeRoot: string;
+}): SessionErrorView {
   const tone = TONE_BY_REASON[reason];
   return {
     tone,
@@ -75,7 +83,11 @@ export function resolveSessionErrorView(reason: SessionErrorReason): SessionErro
     subtitleKey: `${tone}.subtitle`,
     primaryAction:
       reason === "email-not-verified"
-        ? { kind: "relogin", href: RELOGIN_HREF, labelKey: "confirmedSignInAgain" }
+        ? {
+            kind: "relogin",
+            href: `/auth/login?returnTo=${encodeURIComponent(localeRoot)}`,
+            labelKey: "confirmedSignInAgain",
+          }
         : { kind: "retry", href: "/", labelKey: "tryAgain" },
   };
 }

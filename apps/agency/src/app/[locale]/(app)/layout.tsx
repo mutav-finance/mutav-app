@@ -17,8 +17,8 @@ import { getAdminUrl } from "@/lib/env";
  *
  * Only `session-expired` goes to login; a missing user row or a backend
  * failure goes to `/session-error` (see `redirectOnSessionFailure`). The
- * login `returnTo` is the locale root: a layout has no cheap access to the
- * current path.
+ * login `returnTo` is the requested page, which the proxy forwards in a
+ * request header; the locale root when that header is absent.
  */
 export default async function AppLayout({
   children,
@@ -31,7 +31,7 @@ export default async function AppLayout({
   const tA11y = await getTranslations({ locale, namespace: "common.a11y" });
 
   const dest = await resolveUserDestination();
-  redirectOnSessionFailure({ destination: dest, locale, returnHref: "/" });
+  await redirectOnSessionFailure({ destination: dest, locale, returnHref: "/" });
   if (dest.kind === "staff") {
     // Cross-origin jump to the admin app — built from a trusted env base,
     // so `next/navigation` redirect with an absolute URL, NOT the

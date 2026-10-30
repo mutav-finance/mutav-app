@@ -982,7 +982,11 @@
         "activation": "Activation"
       },
       "total": "Total",
-      "empty": "No items."
+      "empty": "No items.",
+      "description": {
+        "recurring": "Monthly fee — guarantee {id}",
+        "activation": "Activation fee — guarantee {id}"
+      }
     },
     "methodCard": {
       "heading": "Payment Method",
@@ -1438,7 +1442,8 @@
         "cpf": "Invalid CPF.",
         "cnpj": "Invalid CNPJ.",
         "representanteName": "Representative name is required.",
-        "representanteCpf": "Invalid representative CPF."
+        "representanteCpf": "Invalid representative CPF.",
+        "alreadyRegistered": "Already registered with Mutav."
       }
     }
   },

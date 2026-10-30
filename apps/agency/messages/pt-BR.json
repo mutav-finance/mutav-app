@@ -982,7 +982,11 @@
         "activation": "Ativação"
       },
       "total": "Total",
-      "empty": "Sem itens."
+      "empty": "Sem itens.",
+      "description": {
+        "recurring": "Mensalidade — garantia {id}",
+        "activation": "Taxa de ativação — garantia {id}"
+      }
     },
     "methodCard": {
       "heading": "Forma de Pagamento",
@@ -1438,7 +1442,8 @@
         "cpf": "CPF inválido.",
         "cnpj": "CNPJ inválido.",
         "representanteName": "Nome do responsável obrigatório.",
-        "representanteCpf": "CPF do responsável inválido."
+        "representanteCpf": "CPF do responsável inválido.",
+        "alreadyRegistered": "Já cadastrado na Mutav."
       }
     }
   },

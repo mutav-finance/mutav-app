@@ -10,7 +10,7 @@ export default async function OnboardingWelcomePage({
 }) {
   const { locale } = await params;
   const dest = await resolveUserDestination();
-  redirectOnSessionFailure({ destination: dest, locale, returnHref: "/onboarding" });
+  await redirectOnSessionFailure({ destination: dest, locale, returnHref: "/onboarding" });
 
   if (dest.kind === "dashboard") {
     redirect({ href: "/", locale });
