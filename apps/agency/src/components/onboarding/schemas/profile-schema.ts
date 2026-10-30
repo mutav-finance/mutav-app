@@ -16,6 +16,8 @@ const ERROR = {
   REPRESENTANTE_CPF_INVALID: "representanteCpf",
 } as const;
 
+export type ProfileErrorKey = (typeof ERROR)[keyof typeof ERROR];
+
 // Input shape — RHF works with this. Empty agencyType is the initial state.
 const profileInputSchema = z.object({
   agencyType: z.enum(["", "autonomo", "empresa"]),

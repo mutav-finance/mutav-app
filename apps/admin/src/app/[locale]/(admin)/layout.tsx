@@ -3,7 +3,8 @@ import { getTranslations } from "next-intl/server";
 import { AdminHeaderActions } from "@/components/admin-header-actions";
 import { AdminNav } from "@/components/admin-nav";
 import { AdminSidebarHeader } from "@/components/admin-sidebar-header";
-import { redirect as localeRedirect } from "@mutav/i18n/navigation";
+import { readReturnToHeader } from "@mutav/app-shell/return-to-header";
+import { getPathname, redirect as localeRedirect } from "@mutav/i18n/navigation";
 import { NavUser } from "@mutav/ui/nav-user";
 import { AppShell } from "@mutav/ui/shell/app-shell";
 import { getStaffMember } from "@/lib/auth";
@@ -14,8 +15,9 @@ import { getStaffMember } from "@/lib/auth";
  * Server-side auth check via `getStaffMember()`, routing its four-way
  * result (loop-free by construction):
  *
- * - `anonymous` → Auth0 Universal Login (same-origin), `returnTo` back at
- *   admin so the user lands here after authentication.
+ * - `anonymous` → Auth0 Universal Login (same-origin), `returnTo` the page
+ *   the proxy forwarded for this request, else the locale root, so the user
+ *   lands back here after authentication.
  * - `not-staff` → `/access-denied` on THIS origin, which explains the denial
  *   and offers the agency app as a link. It sits outside this route group, so
  *   it is not re-gated, and it never redirects back here — no guard pair
@@ -42,7 +44,8 @@ export default async function AdminLayout({
 
   const result = await getStaffMember();
   if (result.kind === "anonymous") {
-    redirect(`/auth/login?returnTo=/${locale}`);
+    const returnTo = (await readReturnToHeader()) ?? getPathname({ href: "/", locale });
+    redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
   if (result.kind === "not-staff") {
     // next-intl's redirect, not `next/navigation`'s: `localePrefix: "as-needed"`

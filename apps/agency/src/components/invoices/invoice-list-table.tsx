@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
 import {
   flexRender,
@@ -50,8 +50,8 @@ import {
 } from "@mutav/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@mutav/ui/tabs";
-import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
-import { formatPeriodMonth, utcTodayDate } from "@/lib/invoices/format";
+import { formatBRLCents, formatDateBR, formatMonthYear } from "@mutav/i18n/brazil";
+import { utcTodayDate } from "@/lib/invoices/format";
 import { InvoiceStatusTag } from "@/components/invoices/invoice-status-tag";
 
 type StateTab = "all" | InvoiceDisplayStatus;
@@ -74,11 +74,17 @@ type InvoiceListItem = {
   lineItemCount: number;
 };
 
-function buildColumns(
-  t: ReturnType<typeof useTranslations<"invoiceList">>,
-  tState: ReturnType<typeof useTranslations<"invoiceDetails.state">>,
-  tMethod: ReturnType<typeof useTranslations<"invoiceDetails.method">>,
-): ColumnDef<InvoiceListItem>[] {
+function buildColumns({
+  t,
+  tState,
+  tMethod,
+  locale,
+}: {
+  t: ReturnType<typeof useTranslations<"invoiceList">>;
+  tState: ReturnType<typeof useTranslations<"invoiceDetails.state">>;
+  tMethod: ReturnType<typeof useTranslations<"invoiceDetails.method">>;
+  locale: string;
+}): ColumnDef<InvoiceListItem>[] {
   return [
     {
       id: "publicId",
@@ -97,7 +103,8 @@ function buildColumns(
       id: "period",
       accessorKey: "periodMonth",
       header: t("columns.period"),
-      cell: ({ row }) => formatPeriodMonth(row.original.periodMonth),
+      cell: ({ row }) =>
+        formatMonthYear(row.original.periodMonth, locale, { month: "long", capitalize: true }),
     },
     {
       id: "dueDate",
@@ -156,6 +163,7 @@ export function InvoiceListTable() {
   const t = useTranslations("invoiceList");
   const tState = useTranslations("invoiceDetails.state");
   const tMethod = useTranslations("invoiceDetails.method");
+  const locale = useLocale();
 
   const { selectedAgency, isLoading: workspaceLoading } = useWorkspace();
   const agencyId = selectedAgency?._id;
@@ -181,7 +189,10 @@ export function InvoiceListTable() {
   }, [result]);
   const isLoading = workspaceLoading || (agencyId !== undefined && result === undefined);
 
-  const columns = React.useMemo(() => buildColumns(t, tState, tMethod), [t, tState, tMethod]);
+  const columns = React.useMemo(
+    () => buildColumns({ t, tState, tMethod, locale }),
+    [t, tState, tMethod, locale],
+  );
 
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);

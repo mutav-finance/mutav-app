@@ -35,7 +35,7 @@ export function InvoiceDetailsPage({
   }
 
   const t = useTranslations("invoiceDetails");
-  const tNav = useTranslations("nav.main");
+  const tNav = useTranslations("nav.agency");
   const tState = useTranslations("invoiceDetails.state");
 
   return (

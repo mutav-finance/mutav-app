@@ -15,7 +15,9 @@
     "./auth-callback": "./src/auth-callback.ts",
     "./convex-token-route": "./src/convex-token-route.ts",
     "./auth-proxy": "./src/auth-proxy.ts",
-    "./convex-error-kind": "./src/convex-error-kind.ts"
+    "./convex-error-kind": "./src/convex-error-kind.ts",
+    "./return-to": "./src/return-to.ts",
+    "./return-to-header": "./src/return-to-header.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

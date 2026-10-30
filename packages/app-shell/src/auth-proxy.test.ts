@@ -11,6 +11,7 @@ import {
   type MockInstance,
 } from "vitest";
 import { createAuthProxy, type AuthProxyAuth } from "./auth-proxy";
+import { RETURN_TO_HEADER } from "./return-to";
 import type { SessionLike } from "./fresh-id-token";
 import { idTokenExpiringAt } from "./jwt-fixture";
 
@@ -189,6 +190,23 @@ describe("createAuthProxy", () => {
     const auth0 = fakeAuth0({ session });
     await proxyWith({ auth0 })(new NextRequest(`${BASE}/`));
     expect(auth0.getAccessToken).not.toHaveBeenCalled();
+  });
+
+  test("the intl handler sees the requested path and query as the return-to header", async () => {
+    const auth0 = fakeAuth0({ session: sessionExpiringAt(NOW + 3600) });
+    const intl = vi.fn<(request: NextRequest) => NextResponse>(() => NextResponse.next());
+    await proxyWith({ auth0, intl })(new NextRequest(`${BASE}/en/invoices?status=open`));
+    expect(intl.mock.calls[0]?.[0].headers.get(RETURN_TO_HEADER)).toBe("/en/invoices?status=open");
+  });
+
+  test("a client-sent return-to header is overwritten", async () => {
+    const auth0 = fakeAuth0({ session: sessionExpiringAt(NOW + 3600) });
+    const intl = vi.fn<(request: NextRequest) => NextResponse>(() => NextResponse.next());
+    const request = new NextRequest(`${BASE}/invoices`, {
+      headers: { [RETURN_TO_HEADER]: "//evil.example" },
+    });
+    await proxyWith({ auth0, intl })(request);
+    expect(intl.mock.calls[0]?.[0].headers.get(RETURN_TO_HEADER)).toBe("/invoices");
   });
 
   test("x-middleware-next is never carried onto an intl redirect", async () => {

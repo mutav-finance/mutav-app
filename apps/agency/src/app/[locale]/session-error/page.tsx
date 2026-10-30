@@ -1,6 +1,6 @@
 import { CloudOffIcon, Link2OffIcon, MailWarningIcon, UserRoundXIcon } from "lucide-react";
 import { getTranslations } from "next-intl/server";
-import { Link } from "@mutav/i18n/navigation";
+import { getPathname, Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { BareShell } from "@mutav/ui/shell/bare-shell";
@@ -46,7 +46,10 @@ export default async function SessionErrorPage({
   const { reason } = await searchParams;
   const t = await getTranslations({ locale, namespace: "sessionError" });
 
-  const view = resolveSessionErrorView(parseSessionErrorReason(reason));
+  const view = resolveSessionErrorView({
+    reason: parseSessionErrorReason(reason),
+    localeRoot: getPathname({ href: "/", locale }),
+  });
   const ToneIcon = toneIcon[view.tone];
 
   return (

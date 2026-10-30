@@ -1,8 +1,9 @@
-import type { NextRequest, NextResponse } from "next/server";
+import { NextRequest, type NextResponse } from "next/server";
 import { errorCode, errorCodeOrName, errorName } from "./error-fields";
 import { nowInSeconds, type SessionLike } from "./fresh-id-token";
 import { idTokenExpiresAt } from "./id-token";
 import { carryAuthHeaders } from "./proxy-headers";
+import { RETURN_TO_HEADER } from "./return-to";
 
 export interface AuthProxyAuth {
   middleware(request: NextRequest): Promise<NextResponse>;
@@ -32,6 +33,9 @@ function isAuthOrApiPath(pathname: string): boolean {
  * this request): Next merges that header into the cookies the same request's
  * Server Components read, so the render sees the refreshed session rather than
  * the one the browser sent. `x-middleware-next` is never carried.
+ *
+ * next-intl forwards the request headers it is given to the render, which is
+ * how `RETURN_TO_HEADER` reaches a layout's login redirect.
  */
 export function createAuthProxy({
   auth0,
@@ -49,8 +53,14 @@ export function createAuthProxy({
     if (isAuthOrApiPath(request.nextUrl.pathname)) return authRes;
 
     await refreshNearExpiry({ auth0, request, authRes, getRefreshWindowSeconds, now });
-    return carryAuthHeaders({ from: authRes, to: handleI18nRouting(request) });
+    return carryAuthHeaders({ from: authRes, to: handleI18nRouting(withReturnTo(request)) });
   };
+}
+
+function withReturnTo(request: NextRequest): NextRequest {
+  const headers = new Headers(request.headers);
+  headers.set(RETURN_TO_HEADER, request.nextUrl.pathname + request.nextUrl.search);
+  return new NextRequest(request, { headers });
 }
 
 async function refreshNearExpiry({

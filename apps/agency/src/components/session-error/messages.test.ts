@@ -19,7 +19,7 @@ describe("sessionError messages", () => {
 
       it("formats every key the view model can emit", () => {
         for (const reason of REASONS) {
-          const view = resolveSessionErrorView(reason);
+          const view = resolveSessionErrorView({ reason, localeRoot: "/" });
           for (const key of [view.eyebrowKey, view.titleKey, view.subtitleKey]) {
             expect(t(key)).not.toBe("");
           }
@@ -28,7 +28,9 @@ describe("sessionError messages", () => {
 
       it("formats every action label", () => {
         for (const reason of REASONS) {
-          expect(t(resolveSessionErrorView(reason).primaryAction.labelKey)).not.toBe("");
+          expect(
+            t(resolveSessionErrorView({ reason, localeRoot: "/" }).primaryAction.labelKey),
+          ).not.toBe("");
         }
         expect(t("tryAgain")).not.toBe("");
         expect(t("confirmedSignInAgain")).not.toBe("");
