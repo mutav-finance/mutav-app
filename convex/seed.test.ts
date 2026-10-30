@@ -87,7 +87,11 @@ async function tenantCount(t: ReturnType<typeof setup>): Promise<number> {
   });
 }
 
-describe("seedReset", () => {
+// A full reseed is one large transaction (~1–3 s locally). Under CI's parallel
+// turbo test jobs the first, cold run can pass the 5 s default.
+const SEED_TEST_TIMEOUT_MS = 30_000;
+
+describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
   test("agencyowner's agency (Imobiliária Aprovada) has guarantees — the partial-seed regression guard", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
@@ -817,6 +821,7 @@ describe("seedReset", () => {
           return {
             email,
             subject: user.subject ?? null,
+            emailVerified: user.emailVerified ?? null,
             staffRoleCount: staffRoles.length,
             agencyStates,
           };
@@ -825,6 +830,9 @@ describe("seedReset", () => {
     });
 
     const byEmail = new Map(personas.map((p) => [p.email, p]));
+    // Personas are verified on the dev tenant; a persona row left unverified
+    // could be taken over by any verified login with the same email.
+    expect(personas.map((p) => p.emailVerified)).toEqual(personas.map(() => true));
 
     const systemadmin = byEmail.get("systemadmin@mutav.finance");
     expect(systemadmin?.subject).toBe("auth0|6a150df6a100fbf318f393c0");
@@ -1184,5 +1192,66 @@ describe("seedReset", () => {
       async (ctx) => (await ctx.db.query("mutavAuditLog").collect()).length,
     );
     expect(auditRows).toBe(0);
+  });
+});
+
+describe("lockForRealData", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
+  test("clears the demo dataset, drops the seeded staff grants and keeps the default product", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+
+    const result = await t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" });
+
+    expect(result.staffGrantsRemoved).toBe(1);
+    expect(result.product).toBe("mutav-fianca");
+    const remaining = await t.run(async (ctx) => ({
+      agencies: (await ctx.db.query("agencies").collect()).length,
+      users: (await ctx.db.query("users").collect()).length,
+      guarantees: (await ctx.db.query("guarantees").collect()).length,
+      staff: (await ctx.db.query("mutavStaff").collect()).length,
+      products: (await ctx.db.query("products").collect()).length,
+      locks: (await ctx.db.query("deploymentLocks").collect()).length,
+    }));
+    expect(remaining).toEqual({
+      agencies: 0,
+      users: 0,
+      guarantees: 0,
+      staff: 0,
+      products: 1,
+      locks: 1,
+    });
+  });
+
+  test("keeps the waitlist and writes an audit entry", async () => {
+    const t = setup();
+    await t.run((ctx) =>
+      ctx.db.insert("waitlist", {
+        email: "lead@example.com",
+        audience: "imobiliaria",
+        ts: Date.parse(SEED_NOW),
+      }),
+    );
+
+    await t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" });
+
+    const { waitlist, audit } = await t.run(async (ctx) => ({
+      waitlist: await ctx.db.query("waitlist").collect(),
+      audit: await ctx.db.query("mutavAuditLog").collect(),
+    }));
+    expect(waitlist).toHaveLength(1);
+    expect(audit.map((entry) => entry.action)).toContain("deployment.locked_for_real_data");
+  });
+
+  test("makes every seed entrypoint refuse afterwards, including a second lock", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" });
+
+    await expect(t.mutation(internal.seed.seedReset, {})).rejects.toThrow(/locked for real data/);
+    await expect(t.mutation(internal.seed.seedTestPersonas, {})).rejects.toThrow(
+      /locked for real data/,
+    );
+    await expect(t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" })).rejects.toThrow(
+      /locked for real data/,
+    );
   });
 });

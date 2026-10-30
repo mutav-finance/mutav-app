@@ -1,31 +1,20 @@
-import { getTranslations } from "next-intl/server";
-import { PageContent } from "@mutav/ui/page/page-content";
-import { PageHeader } from "@mutav/ui/page/page-header";
-import { PageShell } from "@mutav/ui/page/page-shell";
-import {
-  DelinquencyPage,
-  DelinquencyPageActions,
-} from "@/components/delinquencies/delinquency-page";
+import { redirect } from "@mutav/i18n/navigation";
+import { CLAIMS_PATH } from "@/lib/guarantees/delinquency-actions";
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+/** The claims queue moved to `/claims`; old links and bookmarks land there. */
+export default async function DelinquenciesRedirect({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "delinquencies.meta" });
-  return { title: t("title"), description: t("description") };
-}
-
-export default async function DelinquenciesRoutePage() {
-  const t = await getTranslations("delinquencies");
-
-  return (
-    <PageShell>
-      <PageHeader
-        title={t("heading")}
-        subtitle={t("subheading")}
-        actions={<DelinquencyPageActions />}
-      />
-      <PageContent variant="full">
-        <DelinquencyPage />
-      </PageContent>
-    </PageShell>
-  );
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === "string") query.set(key, value);
+  }
+  const notice = query.get("notice");
+  const target = notice ? `${CLAIMS_PATH}?case=${encodeURIComponent(notice)}` : CLAIMS_PATH;
+  redirect({ href: target, locale });
 }

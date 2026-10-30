@@ -1,4 +1,7 @@
+import type { ClaimStatus } from "@convex/delinquencies/domain";
+import type { OutstandingNoticeStatus } from "@convex/delinquencies/useCases";
 import type { GuaranteeCapacity } from "@convex/guarantees/domain";
+import type { ClaimStatusName } from "@mutav/ui/claim-status-tag";
 
 /**
  * The staff actions this screen offers. `cover` is one action whether it
@@ -39,6 +42,7 @@ export type DefaultAction = (typeof DEFAULT_ACTION)[keyof typeof DEFAULT_ACTION]
 export const DEFAULTS_ERROR_CODES = [
   "NOTICE_NOT_FOUND",
   "NOTICE_NOT_VERIFIED",
+  "CLAIM_NOT_SUBMITTED",
   "SELF_TRANSITION",
   "TERMINAL_STATE",
   "ILLEGAL_TRANSITION",
@@ -222,3 +226,38 @@ export function daysOpen({ openedAt, now }: { openedAt: string; now: number }): 
   if (Number.isNaN(opened)) return 0;
   return Math.max(0, Math.floor((now - opened) / MS_PER_DAY));
 }
+
+export const STAFF_CASE_STATUSES = [
+  "awaiting_claim",
+  "awaiting_review",
+  "info_requested",
+  "awaiting_cover",
+] as const;
+
+export type StaffCaseStatus = (typeof STAFF_CASE_STATUSES)[number];
+
+/**
+ * The one state staff read for a queue row, derived from the notice status
+ * and its claim together. Reading either alone mislabels the row: an `open`
+ * notice may already carry a filed claim waiting on staff, and a `verified`
+ * one is past review, only waiting on cover.
+ */
+export function staffCaseStatus({
+  status,
+  claimStatus,
+}: {
+  status: OutstandingNoticeStatus;
+  claimStatus: ClaimStatus | null;
+}): StaffCaseStatus {
+  if (status === "verified") return "awaiting_cover";
+  if (claimStatus === "submitted") return "awaiting_review";
+  if (claimStatus === "info_requested") return "info_requested";
+  return "awaiting_claim";
+}
+
+export const STAFF_CASE_STATUS_TONE: Record<StaffCaseStatus, ClaimStatusName> = {
+  awaiting_claim: "reported",
+  awaiting_review: "under_review",
+  info_requested: "info_requested",
+  awaiting_cover: "under_review",
+};

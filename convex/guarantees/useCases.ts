@@ -24,8 +24,6 @@ import { applyGuaranteeTransition } from "./transitions";
 import {
   CLOSE_REASON,
   CONTRACT_APPLICATION_VALIDITY_MS,
-  DOCUMENT_KEY,
-  DOCUMENT_STATUS,
   GUARANTEE_ERROR_CODE,
   GUARANTEE_EVENT,
   GUARANTEE_STATE,
@@ -64,7 +62,7 @@ import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import {
   assertAgencyAccess,
-  mutationWithAgencyScope,
+  mutationWithActiveAgency,
   queryWithAgencyScope,
   queryWithAuth,
 } from "../lib/auth";
@@ -264,8 +262,8 @@ export const listByAgency = queryWithAgencyScope({
 });
 
 /**
- * Lightweight summary of a guarantee for list views — drops the `terms`,
- * `documents` and lease join and carries only the tenant's display name.
+ * Lightweight summary of a guarantee for list views — drops the `terms` and the
+ * lease join and carries only the tenant's display name.
  * Use `shapeGuarantee` for the detail view.
  *
  * `availableCapacityCents` is a projection, not the row: the row keeps
@@ -817,7 +815,7 @@ type OpenContractApplicationErrorResult = { code: typeof GUARANTEE_ERROR_CODE.IN
  * member who declared it, and the only thing that authorises a bureau
  * consultation on the subject.
  */
-export const openContractApplication = mutationWithAgencyScope({
+export const openContractApplication = mutationWithActiveAgency({
   args: {
     document: v.string(),
     entityType: tenantEntityTypeValidator,
@@ -857,7 +855,7 @@ export const openContractApplication = mutationWithAgencyScope({
   },
 });
 
-export const requestCreditScore = mutationWithAgencyScope({
+export const requestCreditScore = mutationWithActiveAgency({
   args: { document: v.string() },
   handler: async (ctx, { document }) => {
     const digits = document.replace(/\D/g, "");
@@ -926,7 +924,7 @@ type CreateGuaranteeErrorResult = {
  * (`tenantSnapshot`, the as-signed mitigation). Every error Result happens
  * before any write.
  */
-export const create = mutationWithAgencyScope({
+export const create = mutationWithActiveAgency({
   args: {
     lease: v.object({
       propertyKind: propertyKindValidator,
@@ -1077,11 +1075,6 @@ export const create = mutationWithAgencyScope({
       tenantApproval: { status: TENANT_APPROVAL_STATUS.PENDENTE, termApprovedAt: null },
       terms: priced.terms,
       capacity: priced.capacity,
-      documents: [
-        { key: DOCUMENT_KEY.RENTAL_CONTRACT, status: DOCUMENT_STATUS.PENDENTE },
-        { key: DOCUMENT_KEY.INSPECTION, status: DOCUMENT_STATUS.PENDENTE },
-        { key: DOCUMENT_KEY.POLICY, status: DOCUMENT_STATUS.PENDENTE },
-      ],
     });
 
     const doc = await ctx.db.get(guaranteeId);
@@ -1156,7 +1149,7 @@ type CancelDraftErrorResult = {
  * lifecycle mechanics belong to the shared helper, so there is still exactly
  * one implementation of the transition.
  */
-export const cancelDraft = mutationWithAgencyScope({
+export const cancelDraft = mutationWithActiveAgency({
   args: { publicId: v.string() },
   handler: async (ctx, args): Promise<Result<CancelDraftSuccessResult, CancelDraftErrorResult>> => {
     const candidates = await ctx.db
@@ -1257,7 +1250,6 @@ function shapeGuarantee({
     underwriting: guarantee.underwriting,
     terms: guarantee.terms,
     capacity: guarantee.capacity,
-    documents: guarantee.documents,
     lease: shapeLease(lease),
     tenant: shapeGuaranteeTenant(guarantee, identity),
     history: history.map((h) => ({

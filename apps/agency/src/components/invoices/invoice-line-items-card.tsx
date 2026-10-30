@@ -55,7 +55,7 @@ export function InvoiceLineItemsCard({ payment }: { payment: Invoice }) {
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {item.description}
+                    {t(`description.${item.kind}`, { id: item.guaranteePublicId })}
                   </TableCell>
                   <TableCell className="text-right">
                     <Mono className="text-sm">{formatBRLCents(item.amountCents)}</Mono>

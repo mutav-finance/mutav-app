@@ -249,7 +249,7 @@ describe("schema walk", () => {
     const leases = schemaFieldsForTable(schema, "leases").map((field) => field.fieldPath);
     expect(leases).toContain("property.cep");
     const guarantees = schemaFieldsForTable(schema, "guarantees").map((field) => field.fieldPath);
-    expect(guarantees).toContain("documents[].key");
+    expect(guarantees).toContain("terms.rentCents");
     expect(guarantees).toContain("underwriting.score");
 
     const assessments = schemaFieldsForTable(schema, "creditAnalysisAssessments").map(
@@ -287,18 +287,27 @@ describe("tier assignments agree with POL-SEC-004 §4.2", () => {
     "anchorAccounts.data.encryptedSecret.iv",
     "anchorWebhookEvents.payload",
     "bearerAccessAttempts.key",
+    "claimEvidence.storageId",
     "coverOperations.appliedCents",
     "coverOperations.coveragePeriod",
+    "coverOperations.payoutAccount.account",
+    "coverOperations.payoutAccount.accountType",
+    "coverOperations.payoutAccount.agency",
+    "coverOperations.payoutAccount.bank",
+    "coverOperations.payoutAccount.pixKey",
     "coverOperations.requestedCents",
     "creditAnalysisAssessments.score",
     "creditAnalysisAssessments.tier",
     "creditAnalysisSignals.normalized.score",
+    "guaranteeDelinquencyNotices.claim.claimedAmountCents",
+    "guaranteeDelinquencyNotices.claim.status",
     "guaranteeDelinquencyNotices.originalAmountCents",
     "guaranteeDelinquencyNotices.rentDueDate",
     "guaranteeDelinquencyNotices.resolution.appliedCoverCents",
     "guaranteeDelinquencyNotices.resolution.kind",
     "guaranteeDelinquencyNotices.status",
     "guaranteeDelinquencyNotices.updatedAmountCents",
+    "guaranteeDocuments.storageId",
     "guaranteeHistory.tenantSnapshot.contactCpf",
     "guaranteeHistory.tenantSnapshot.taxId",
     "guarantees.underwriting.score",

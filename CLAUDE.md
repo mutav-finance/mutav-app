@@ -2,6 +2,11 @@
 
 # Mutav — Agent Context
 
+> **Everything written in code is English.** Identifiers, string literal values, i18n
+> **keys**, code comments, docstrings, test names, docs, commit messages and PR
+> descriptions. Portuguese lives only in `messages/pt-BR.json` **values**. Sanctioned
+> exceptions and the deferral list: § Code style → English-only code identifiers.
+
 ## Project
 
 Mutav — the web surface for the MUTAV protocol. Agency dashboard, tenant payment, investor portal, Mutav-internal admin, and the **Mutav API** (Convex backend) that orchestrates everything off-chain. Settles guarantees on Stellar via the `Fund` contract published by [`mutav-finance/mutav-stellar`](https://github.com/mutav-finance/mutav-stellar).
@@ -256,6 +261,8 @@ The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outs
 - `convex/migrations.ts` stays a **no-op runner** (`runAll = [noop]`); leave the migration infrastructure in place but empty. Operational backfills (aggregate rebuild, Resend audience sync, reserve snapshot clear) are **not** migrations and stay out of the runner.
 - `schemaValidation: false` is intentional for this window — a deploy tolerates older data at rest until a developer reseeds (`bun run seed`). Don't flip it to `true` yet.
 - Deploy runbook: `convex deploy` → `bun run seed`. Never assume in-place data preservation.
+
+**The switch is `seed:lockForRealData`** (`bunx convex run --prod seed:lockForRealData '{"confirm":"LOCK"}'`): run once on production before the first real agency signs up. It clears the demo dataset, drops the staff grants the wipe orphaned (the seeded `systemadmin` admin role), keeps the default product, and writes a `deploymentLocks` row after which `seedReset` / `seedTestPersonas` throw.
 
 **This inverts once the first real (non-seed) data reaches the app.** From that point: switch to in-place migrations (widen → migrate → narrow, two PRs — the `schemaValidation` toggle pattern), add each `internal.migrations.<name>` to `runAll` (auto-run by `scripts/run-migrations.sh` on deploy), and re-enable strict `schemaValidation`. The full policy note lives at the top of `convex/migrations.ts`.
 
@@ -574,6 +581,7 @@ Non-obvious trigger → skill mappings:
 - Writing Convex queries/mutations/actions — pure-vs-impure separation, immutable updates, `Result<T>` returns → `convex-functional-programming`
 - Building React page or feature components — pure rendering separated from logic via view model hooks → `react-component-view-model-pattern`
 - Creating data fetching hooks — single-purpose hooks with no side effects → `react-hook-composition`
+- Touching anything on the login path — `proxy.ts`, `lib/auth0.ts`, `@mutav/app-shell/proxy-headers` or `auth-redirect`, `/auth/*` links, the convex-token route, an `@auth0/nextjs-auth0` upgrade — or debugging a login loop → `auth0-safe-dev`
 
 Plus the official Convex plugin skills (`convex-quickstart`, `convex-setup-auth`, `convex-create-component`, `convex-migration-helper`, `convex-performance-audit`) and Next.js skills (`next-best-practices`, `next-cache-components`, `next-upgrade`).
 

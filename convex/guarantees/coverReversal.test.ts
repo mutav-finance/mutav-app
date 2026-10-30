@@ -2,7 +2,12 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import {
+  TEST_PAYOUT_ACCOUNT,
+  registerGuaranteeAggregateComponents,
+  seedGuaranteeWithLease,
+  seedSubmittedClaim,
+} from "../lib/testFixtures";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import type { AgencyId } from "../agencies/domain";
 import type { UserId } from "../users/domain";
@@ -29,6 +34,7 @@ type T = ReturnType<typeof setup>;
 // fails loudly here instead of silently agreeing.
 const CEILING_CENTS = 9_000_000;
 const RENT_CENTS = 300_000;
+const SMALL_CEILING_CENTS = 350_000;
 
 type Fixture = {
   subject: string;
@@ -61,6 +67,7 @@ async function makeFixture(
       name: `Reversal Agency ${suffix}`,
       cnpj: `0000000000000${suffix}`.slice(-14),
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: "2024-01-01T00:00:00-03:00",
     });
@@ -128,16 +135,17 @@ async function releaseEntries(t: T, guaranteePublicId: string) {
 async function fileAndVerify(
   t: T,
   fx: Fixture,
-  { rentDueDate, amountCents }: { rentDueDate: string; amountCents: number },
+  { referenceMonth, amountCents }: { referenceMonth: string; amountCents: number },
 ): Promise<string> {
   const asUser = t.withIdentity({ subject: fx.subject });
   const opened = await asUser.mutation(api.delinquencies.mutations.openNotice, {
     agencyId: fx.agencyId,
     guaranteePublicId: fx.guaranteePublicId,
-    rentDueDate,
+    referenceMonth,
     originalAmountCents: amountCents,
   });
   if (!opened.success) throw new Error(opened.message);
+  await seedSubmittedClaim(t, { noticePublicId: opened.data.publicId, userId: fx.userId });
   const verified = await asUser.mutation(api.delinquencies.mutations.staffVerifyDefault, {
     noticePublicId: opened.data.publicId,
   });
@@ -149,7 +157,7 @@ async function fileAndVerify(
 async function coverOneRent(
   t: T,
   fx: Fixture,
-  rent: { rentDueDate: string; amountCents: number },
+  rent: { referenceMonth: string; amountCents: number },
 ): Promise<number> {
   const noticePublicId = await fileAndVerify(t, fx, rent);
   const covered = await t
@@ -174,7 +182,7 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
   test("cover → reversal restores the full ceiling to available, with release, transition and history rows", async () => {
     const t = setup();
     const fx = await makeFixture(t, "1");
-    await coverOneRent(t, fx, { rentDueDate: "2026-06-05", amountCents: 250_000 });
+    await coverOneRent(t, fx, { referenceMonth: "2026-06", amountCents: 250_000 });
 
     const covered = await readGuarantee(t, fx.guaranteeId);
     expect(covered.status).toBe("cover_committed");
@@ -231,9 +239,9 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
   test("several covered rents of one episode are all released", async () => {
     const t = setup();
     const fx = await makeFixture(t, "2");
-    await coverOneRent(t, fx, { rentDueDate: "2026-06-05", amountCents: 250_000 });
-    await coverOneRent(t, fx, { rentDueDate: "2026-07-05", amountCents: 310_000 });
-    expect((await readGuarantee(t, fx.guaranteeId)).capacity.reservedCents).toBe(560_000);
+    await coverOneRent(t, fx, { referenceMonth: "2026-06", amountCents: 250_000 });
+    await coverOneRent(t, fx, { referenceMonth: "2026-07", amountCents: 290_000 });
+    expect((await readGuarantee(t, fx.guaranteeId)).capacity.reservedCents).toBe(540_000);
 
     const asStaff = t.withIdentity({ subject: fx.subject });
     const result = await asStaff.mutation(api.guarantees.mutations.close, {
@@ -254,19 +262,19 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
   test("rents covered together in one batch are all released by the reversal", async () => {
     const t = setup();
     const fx = await makeFixture(t, "7");
-    const first = await fileAndVerify(t, fx, { rentDueDate: "2026-06-05", amountCents: 250_000 });
-    const second = await fileAndVerify(t, fx, { rentDueDate: "2026-07-05", amountCents: 310_000 });
+    const first = await fileAndVerify(t, fx, { referenceMonth: "2026-06", amountCents: 250_000 });
+    const second = await fileAndVerify(t, fx, { referenceMonth: "2026-07", amountCents: 290_000 });
 
     const asStaff = t.withIdentity({ subject: fx.subject });
     const batch = await asStaff.mutation(api.coverOperations.mutations.staffRecordCoverBatch, {
       noticePublicIds: [first, second],
     });
     if (!batch.success) throw new Error(batch.message);
-    expect(batch.data.operations.map((op) => op.appliedCoverCents)).toEqual([250_000, 310_000]);
+    expect(batch.data.operations.map((op) => op.appliedCoverCents)).toEqual([250_000, 290_000]);
 
     const covered = await readGuarantee(t, fx.guaranteeId);
     expect(covered.status).toBe("cover_committed");
-    expect(covered.capacity.reservedCents).toBe(560_000);
+    expect(covered.capacity.reservedCents).toBe(540_000);
 
     const result = await asStaff.mutation(api.guarantees.mutations.close, {
       publicId: fx.guaranteePublicId,
@@ -284,10 +292,20 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
   test("a clamped draw releases the applied figure, never the notice's face amount", async () => {
     const t = setup();
     const fx = await makeFixture(t, "3");
-    // The first rent eats all but 100_000 of the ceiling, so the second is
-    // clamped: it is worth 250_000 but can only reserve what is left.
-    await coverOneRent(t, fx, { rentDueDate: "2026-06-05", amountCents: CEILING_CENTS - 100_000 });
-    const applied = await coverOneRent(t, fx, { rentDueDate: "2026-07-05", amountCents: 250_000 });
+    // A month's notice is capped at the lease's rent, so a small ceiling is
+    // what makes two rents run out of capacity: the first takes 250_000 of
+    // 350_000, and the second, worth 250_000, can only reserve what is left.
+    await t.run((ctx) =>
+      ctx.db.patch(fx.guaranteeId, {
+        capacity: {
+          ceilingCents: SMALL_CEILING_CENTS,
+          availableCents: SMALL_CEILING_CENTS,
+          reservedCents: 0,
+        },
+      }),
+    );
+    await coverOneRent(t, fx, { referenceMonth: "2026-06", amountCents: 250_000 });
+    const applied = await coverOneRent(t, fx, { referenceMonth: "2026-07", amountCents: 250_000 });
     expect(applied).toBe(100_000);
 
     const asStaff = t.withIdentity({ subject: fx.subject });
@@ -300,8 +318,8 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
     // Releasing the face amounts would ask for 150_000 more than was ever
     // reserved; the applied figures give back exactly the ceiling.
     expect((await readGuarantee(t, fx.guaranteeId)).capacity).toEqual({
-      ceilingCents: CEILING_CENTS,
-      availableCents: CEILING_CENTS,
+      ceilingCents: SMALL_CEILING_CENTS,
+      availableCents: SMALL_CEILING_CENTS,
       reservedCents: 0,
     });
     expect((await releaseEntries(t, fx.guaranteePublicId)).length).toBe(1);
@@ -324,7 +342,7 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
   test("closing a covered guarantee for any other reason keeps the cents reserved (paid out, not reversed)", async () => {
     const t = setup();
     const fx = await makeFixture(t, "5");
-    await coverOneRent(t, fx, { rentDueDate: "2026-06-05", amountCents: 250_000 });
+    await coverOneRent(t, fx, { referenceMonth: "2026-06", amountCents: 250_000 });
 
     const asStaff = t.withIdentity({ subject: fx.subject });
     const result = await asStaff.mutation(api.guarantees.mutations.close, {
@@ -339,7 +357,7 @@ describe("close(dispute_reversal) after cover releases the reserved capacity", (
   test("a reserved figure the covered notices cannot account for is refused and nothing is written", async () => {
     const t = setup();
     const fx = await makeFixture(t, "6");
-    await coverOneRent(t, fx, { rentDueDate: "2026-06-05", amountCents: 250_000 });
+    await coverOneRent(t, fx, { referenceMonth: "2026-06", amountCents: 250_000 });
     // Reserved says 400_000 but the only covered notice applied 250_000.
     await setCapacity(t, fx.guaranteeId, {
       ceilingCents: CEILING_CENTS,

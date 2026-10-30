@@ -89,12 +89,6 @@ const FULL_CAPACITY: GuaranteeCapacity = {
   reservedCents: 0,
 };
 
-const PENDING_DOCUMENTS: Guarantee["documents"] = [
-  { key: "rentalContract", status: "pendente" },
-  { key: "inspection", status: "pendente" },
-  { key: "policy", status: "pendente" },
-];
-
 const NO_ELIGIBILITY_RESTRICTION: Product["eligibility"] = {
   agencyIds: null,
   regionUFs: null,
@@ -181,6 +175,7 @@ function leaseDoc(spec: LeaseSpec): NewLease {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     },
     payer: "tenant",
     openGuaranteeId: null,
@@ -220,7 +215,6 @@ function guaranteeDoc(spec: RawGuaranteeSpec): NewGuarantee {
     tenantApproval: spec.tenantApproval ?? { status: "pendente", termApprovedAt: null },
     terms: spec.terms ?? { ...BASIC_BOM_TERMS },
     capacity: spec.capacity ?? { ...FULL_CAPACITY },
-    documents: [...PENDING_DOCUMENTS],
   };
 }
 
@@ -547,7 +541,6 @@ describe("schema conformance — strict harness", () => {
           "agencyId",
           "capacity",
           ...(state === "closed" ? ["closure"] : []),
-          "documents",
           "leaseId",
           "nextRenewalDate",
           "productId",
@@ -659,7 +652,7 @@ describe("schema conformance — strict harness", () => {
       },
     );
 
-    test("round-trips tenantApproval and document status literals through a validated partial patch", async () => {
+    test("round-trips tenantApproval status literals through a validated partial patch", async () => {
       const t = setupStrict();
       const agencyId = await seedAgency(t, "Agency A", "00000000000101");
       const { guaranteeId } = await seedGuaranteeWithLease(
@@ -670,28 +663,18 @@ describe("schema conformance — strict harness", () => {
 
       const row = await t.run(async (ctx) => {
         await ctx.db.patch(guaranteeId, {
-          documents: [
-            { key: "rentalContract", status: "aprovado" },
-            { key: "inspection", status: "enviado" },
-            { key: "policy", status: "pendente" },
-          ],
           tenantApproval: { status: "aprovado", termApprovedAt: "2026-02-01T00:00:00.000Z" },
         });
         return getGuarantee(ctx, guaranteeId);
       });
 
-      expect(row.documents).toEqual([
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "enviado" },
-        { key: "policy", status: "pendente" },
-      ]);
       expect(row.tenantApproval).toEqual({
         status: "aprovado",
         termApprovedAt: "2026-02-01T00:00:00.000Z",
       });
     });
 
-    test("a patch with an English document status literal is refused by the validator", async () => {
+    test("a patch carrying the removed embedded documents field is refused by the validator", async () => {
       const t = setupStrict();
       const agencyId = await seedAgency(t, "Agency A", "00000000000101");
       const { guaranteeId } = await seedGuaranteeWithLease(
@@ -784,6 +767,7 @@ describe("schema conformance — strict harness", () => {
             condoCents: 80_000,
             otherFeesCents: 20_000,
             totalRentCents: 600_000,
+            dueDay: 5,
           },
         });
         const eventId = await ctx.db.insert("guaranteeHistory", {
@@ -810,6 +794,7 @@ describe("schema conformance — strict harness", () => {
         condoCents: 80_000,
         otherFeesCents: 20_000,
         totalRentCents: 600_000,
+        dueDay: 5,
       });
       expect(event?.tenantSnapshot).toEqual({
         entityType: "pj",
@@ -869,11 +854,6 @@ describe("schema conformance — strict harness", () => {
         table: "guarantees",
         label: "guarantees.closure.reason expired",
         overrides: { status: "closed", closure: { reason: "expired", closedAt: CLOSED_AT } },
-      },
-      {
-        table: "guarantees",
-        label: "guarantees.documents[].status approved",
-        overrides: { documents: [{ key: "rentalContract", status: "approved" }] },
       },
       {
         table: "guarantees",
@@ -1166,6 +1146,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
           condoCents: 30_000,
           otherFeesCents: 5_000,
           totalRentCents: 135_000,
+          dueDay: 5,
         },
       });
       const lease = await getLease(ctx, leaseId);
@@ -2422,6 +2403,7 @@ describe("index reads — leases, products, guaranteeHistory", () => {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     });
     expect(lease?.payer).toBe("tenant");
     expect(lease?.propertyKind).toBe("residential");
@@ -2980,7 +2962,7 @@ describe("contractApplications untouched by guarantee writes", () => {
         },
         tag: "",
         description: "",
-        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0 },
+        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
       },
       plan: "basic",
       tenant: {

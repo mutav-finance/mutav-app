@@ -9,7 +9,7 @@ import {
   SidebarMenuItem,
 } from "@mutav/ui/sidebar";
 import { SidebarRoadmapItem } from "@/components/sidebar-roadmap-item";
-import { UsersIcon, BuildingIcon, BadgeDollarSignIcon } from "lucide-react";
+import { UsersIcon, BuildingIcon, BadgeDollarSignIcon, ReceiptIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@mutav/i18n/navigation";
 
@@ -23,6 +23,18 @@ export function NavAgency() {
       <SidebarGroupContent>
         <SidebarMenu>
           <SidebarRoadmapItem icon={<UsersIcon />} label={t("members")} />
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip={t("invoices")}
+              isActive={pathname === "/invoices" || pathname.startsWith("/invoices/")}
+            >
+              <Link href="/invoices">
+                <ReceiptIcon />
+                <span>{t("invoices")}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
