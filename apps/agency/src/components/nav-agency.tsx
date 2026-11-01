@@ -22,7 +22,14 @@ export function NavAgency() {
       <SidebarGroupLabel>{t("groupLabel")}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          <SidebarRoadmapItem icon={<UsersIcon />} label={t("members")} />
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip={t("members")} isActive={pathname === "/members"}>
+              <Link href="/members">
+                <UsersIcon />
+                <span>{t("members")}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
