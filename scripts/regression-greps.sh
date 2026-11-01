@@ -261,7 +261,8 @@ for app in agency admin fund pay; do
     fail "$globals is missing @source \"../../../../packages/ui/src\" — @mutav/ui classes compile to nothing"
     ui_wiring_violations=$((ui_wiring_violations + 1))
   fi
-  if ! rg -q 'transpilePackages:.*"@mutav/ui"' "$config" 2>/dev/null; then
+  # Multiline: prettier wraps the array once it outgrows the line.
+  if ! rg -U -q 'transpilePackages:\s*\[[^\]]*"@mutav/ui"' "$config" 2>/dev/null; then
     fail "$config does not list \"@mutav/ui\" in transpilePackages — the package ships TSX source"
     ui_wiring_violations=$((ui_wiring_violations + 1))
   fi

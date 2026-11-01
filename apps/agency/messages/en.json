@@ -4,7 +4,8 @@
   },
   "meta": {
     "title": "Mutav — Registered Guarantee System",
-    "description": "Dashboard for managing rental guarantees registered onchain."
+    "description": "Dashboard for managing rental guarantees registered onchain.",
+    "descriptor": "Rental guarantee"
   },
   "paymentStatus": {
     "pending": "Pending",
@@ -343,7 +344,6 @@
     }
   },
   "nav": {
-    "brandEyebrow": "MUTAV Guarantees",
     "roadmapBadge": "soon",
     "main": {
       "createGuarantee": "Create Guarantee",
@@ -1246,8 +1246,14 @@
       "warningTitle": "Important for agencies:",
       "warningBody": "registration must be completed by a partner holding 25% or more equity, or by an administrator authorized to open accounts on the company's behalf. Have the articles of incorporation ready to verify.",
       "checklistTitle": "What you will need",
+      "typeQuestion": "How do you work?",
+      "proofPoints": {
+        "onchainReserve": "Guarantee reserve auditable onchain.",
+        "noGuarantor": "Leases without a guarantor for your clients."
+      },
       "autonomo": {
         "title": "Independent broker",
+        "description": "You work under an individual CRECI.",
         "items": [
           {
             "label": "CPF"
@@ -1266,6 +1272,7 @@
       },
       "empresa": {
         "title": "Real estate agency",
+        "description": "Register the company, with its CNPJ and agency CRECI.",
         "items": [
           {
             "label": "CNPJ"

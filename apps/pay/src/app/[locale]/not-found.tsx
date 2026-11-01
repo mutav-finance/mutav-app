@@ -4,7 +4,7 @@ import { NotFoundContent } from "@/components/not-found-content";
 
 export default function NotFound() {
   return (
-    <BareShell brand={<Wordmark variant="display" size="md" />} dataFront="imobiliarias">
+    <BareShell brand={<Wordmark size="md" />} dataFront="imobiliarias">
       <NotFoundContent />
     </BareShell>
   );

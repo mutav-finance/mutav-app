@@ -33,7 +33,7 @@ export default async function CheckoutLayout({
 
   return (
     <FlowShell
-      brand={<Wordmark variant="display" size="md" />}
+      brand={<Wordmark size="md" />}
       context={documentNumber ? <InvoiceChip documentNumber={documentNumber} /> : null}
       footer={<PublicFooter />}
       dataFront="imobiliarias"

@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@mutav/app-shell": "workspace:*",
+    "@mutav/brand": "workspace:*",
     "@mutav/i18n": "workspace:*",
     "@mutav/ui": "workspace:*"
   },
