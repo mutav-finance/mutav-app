@@ -18,7 +18,7 @@ import {
   type DraftWizardData,
 } from "@/lib/guarantees/wizard";
 import { formatBRLCents } from "@mutav/i18n/brazil";
-import { GUARANTEE_PLAN, type ScoreTier } from "@convex/guarantees/domain";
+import { GUARANTEE_PLAN, type GuaranteeTerms, type ScoreTier } from "@convex/guarantees/domain";
 import { isPlanOffered, priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
 import { PRESTAMISTA_ENABLED } from "@convex/guarantees/flags";
 import type { ProductTerms, PublicProduct } from "@convex/products/domain";
@@ -63,10 +63,19 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
     status: CreditScoreRequestStatus;
   } | null>(null);
 
-  // No plan is pre-selected; Step 2's Next stays blocked until the broker picks
-  // one. "plus" adds the prestamista premium to the monthly fee (priceGuarantee).
-  // A draft still holding a plan that is no longer offered counts as unpicked.
-  const selectedPlan = data.plan && isPlanOffered(data.plan) ? data.plan : null;
+  // With prestamista off there is nothing to choose: Basic is the plan and the
+  // step shows a report. With it on, no plan is pre-selected and Next stays
+  // blocked until the broker picks one; a stale unoffered plan counts as unpicked.
+  const selectedPlan = !PRESTAMISTA_ENABLED
+    ? GUARANTEE_PLAN.BASIC
+    : data.plan && isPlanOffered(data.plan)
+      ? data.plan
+      : null;
+
+  const handleNext = () => {
+    if (selectedPlan && data.plan !== selectedPlan) onChange({ plan: selectedPlan });
+    onNext();
+  };
 
   const scoreResult = useQuery(
     api.guarantees.useCases.getCachedCreditScore,
@@ -215,13 +224,13 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
               </p>
             </div>
 
-            {!isNegado && data.rentCents > 0 && (
+            {!isNegado && preview && (
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <span className="text-muted-foreground text-xs">
                   {t("simulation.approvedValueLabel")}
                 </span>
                 <span className="font-mono text-2xl font-bold">
-                  {formatBRLCents(data.rentCents)}
+                  {formatBRLCents(preview.coverageCeilingCents)}
                 </span>
               </div>
             )}
@@ -229,9 +238,13 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
         )}
       </section>
 
+      {isScored && preview && priceableTier && product && !PRESTAMISTA_ENABLED && (
+        <CoverageReport terms={preview} feeRate={product.terms.tierRate[priceableTier]} />
+      )}
+
       {/* Coverage plans — selectable cards; "+" carries a subtle premium accent
           and is only offered while prestamista is enabled */}
-      {isScored && priceableTier && product && (
+      {isScored && priceableTier && product && PRESTAMISTA_ENABLED && (
         <div
           role="radiogroup"
           aria-label={t("coverage.planLabel")}
@@ -295,12 +308,42 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
         ) : hasNoApplication ? (
           <Button onClick={onBack}>{t("simulation.noApplicationAction")}</Button>
         ) : (
-          <Button onClick={onNext} disabled={isLoading || score === null || !selectedPlan}>
+          <Button onClick={handleNext} disabled={isLoading || score === null || !selectedPlan}>
             {t("nav.nextStep3")}
           </Button>
         )}
       </div>
     </div>
+  );
+}
+
+function CoverageReport({ terms, feeRate }: { terms: GuaranteeTerms; feeRate: number }) {
+  const t = useTranslations("guaranteeNew.coverage");
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border p-4 md:p-6">
+      <h2 className="text-base font-semibold">{t("reportHeading")}</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <PlanRow
+          label={t("rentMultiplierLabel")}
+          value={formatBRLCents(terms.coverageCeilingCents)}
+          note={t("timesRent", { multiplier: terms.coverageCeilingMultiplier })}
+        />
+        <PlanRow
+          label={t("exitCostLabel")}
+          value={formatBRLCents(terms.exitCostCapCents)}
+          note={t("timesRent", { multiplier: terms.exitCostMultiplier })}
+        />
+        <PlanRow
+          label={t("feeRate")}
+          value={formatBRLCents(terms.feeCents)}
+          note={`${(feeRate * 100).toFixed(0)}%`}
+        />
+        <PlanRow
+          label={t("preview.activationFee")}
+          value={formatBRLCents(terms.oneTimeActivationFeeCents)}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -410,10 +453,12 @@ function PrestamistaInfo() {
 function PlanRow({
   label,
   value,
+  note,
   emphasized = false,
 }: {
   label: string;
   value: string;
+  note?: string;
   emphasized?: boolean;
 }) {
   return (
@@ -427,6 +472,7 @@ function PlanRow({
       <span className={cn("font-mono font-semibold", emphasized ? "text-base" : "text-sm")}>
         {value}
       </span>
+      {note && <span className="text-muted-foreground text-xs">{note}</span>}
     </div>
   );
 }

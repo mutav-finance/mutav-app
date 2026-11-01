@@ -1087,7 +1087,7 @@
     },
     "simulation": {
       "heading": "Simulation Result",
-      "approvedValueLabel": "Approved rental value",
+      "approvedValueLabel": "Approved rent coverage",
       "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
       "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
       "closeButton": "Back to home",
@@ -1118,7 +1118,9 @@
         "fee": "Fee value",
         "commission": "Commission (1.5%)",
         "guarantee": "Guarantee value"
-      }
+      },
+      "reportHeading": "Approved coverage",
+      "timesRent": "{multiplier}× the rent"
     },
     "complementary": {
       "tenantSection": "Tenant Details",

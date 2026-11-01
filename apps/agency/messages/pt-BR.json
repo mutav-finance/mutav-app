@@ -1087,7 +1087,7 @@
     },
     "simulation": {
       "heading": "Resultado da Simulação",
-      "approvedValueLabel": "Valor locatício aprovado",
+      "approvedValueLabel": "Cobertura de aluguel aprovada",
       "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
       "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
       "closeButton": "Voltar ao início",
@@ -1118,7 +1118,9 @@
         "fee": "Valor da taxa",
         "commission": "Comissão (1,5%)",
         "guarantee": "Valor da garantia"
-      }
+      },
+      "reportHeading": "Cobertura aprovada",
+      "timesRent": "{multiplier}× o aluguel"
     },
     "complementary": {
       "tenantSection": "Dados do Inquilino",
