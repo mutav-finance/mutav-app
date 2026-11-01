@@ -15,6 +15,7 @@ import {
   PROFILE_FORM_DEFAULTS,
   profileSchema,
   type ProfileFormInput,
+  type ProfileErrorKey,
   type ProfileFormValues,
 } from "@/components/onboarding/schemas/profile-schema";
 
@@ -25,18 +26,27 @@ type Props = {
   isSubmitting: boolean;
 };
 
+type ProfileFieldErrorKey = ProfileErrorKey | "alreadyRegistered";
+
 // Server error codes that map to a specific form field, so the user
 // retries on the same input rather than seeing a generic banner.
-const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof ProfileFormInput>> = {
-  CPF_INVALID: "cpf",
-  CPF_REQUIRED: "cpf",
-  CNPJ_INVALID: "cnpj",
-  CNPJ_REQUIRED: "cnpj",
-  REPRESENTANTE_CPF_INVALID: "representanteCpf",
-  REPRESENTANTE_CPF_REQUIRED: "representanteCpf",
-  REPRESENTANTE_NAME_REQUIRED: "representanteName",
-  ALREADY_REGISTERED: "cpf",
-};
+const SERVER_ERROR_FIELD_MAP = {
+  CPF_INVALID: { field: "cpf", messageKey: "cpf" },
+  CPF_REQUIRED: { field: "cpf", messageKey: "cpf" },
+  CNPJ_INVALID: { field: "cnpj", messageKey: "cnpj" },
+  CNPJ_REQUIRED: { field: "cnpj", messageKey: "cnpj" },
+  REPRESENTANTE_CPF_INVALID: { field: "representanteCpf", messageKey: "representanteCpf" },
+  REPRESENTANTE_CPF_REQUIRED: { field: "representanteCpf", messageKey: "representanteCpf" },
+  REPRESENTANTE_NAME_REQUIRED: { field: "representanteName", messageKey: "representanteName" },
+  ALREADY_REGISTERED: { field: "cpf", messageKey: "alreadyRegistered" },
+} as const satisfies Record<
+  string,
+  { field: keyof ProfileFormInput; messageKey: ProfileFieldErrorKey }
+>;
+
+function isFieldServerErrorCode(code: string): code is keyof typeof SERVER_ERROR_FIELD_MAP {
+  return Object.hasOwn(SERVER_ERROR_FIELD_MAP, code);
+}
 
 export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmitting }: Props) {
   const t = useTranslations("onboarding.profile");
@@ -55,11 +65,9 @@ export function StepProfile({ initialValues, serverErrorCode, onSubmit, isSubmit
   const errors = formState.errors;
 
   React.useEffect(() => {
-    if (!serverErrorCode) return;
-    const field = SERVER_ERROR_FIELD_MAP[serverErrorCode];
-    if (field) {
-      setError(field, { type: "server", message: serverErrorCode });
-    }
+    if (!serverErrorCode || !isFieldServerErrorCode(serverErrorCode)) return;
+    const { field, messageKey } = SERVER_ERROR_FIELD_MAP[serverErrorCode];
+    setError(field, { type: "server", message: messageKey });
   }, [serverErrorCode, setError]);
 
   const fieldError = (key: keyof ProfileFormInput): string | undefined => {

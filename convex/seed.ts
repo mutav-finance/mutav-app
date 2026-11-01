@@ -26,8 +26,11 @@ import type { AgencyId } from "./agencies/domain";
 import {
   DELINQUENCY_STATUS,
   NOTICE_CANCELLATION_REASON,
+  CLAIM_DECLARATION_VERSION,
+  CLAIM_STATUS,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
+  coverRequestCents,
   type DelinquencyNotice,
   type DelinquencyNoticeId,
   type NoticeCancellationReason,
@@ -67,6 +70,7 @@ import {
 import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
 import {
   buildLeaseRent,
+  latestDueDateOnOrBefore,
   DEFAULT_PAYER,
   PROPERTY_KIND,
   type LeaseId,
@@ -121,6 +125,24 @@ function dateDaysAgo(days: number): string {
   return new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
 }
 
+const SEED_DUE_DAYS = [5, 10, 15, 20, 28] as const;
+
+/**
+ * A seeded lease's rent due day, spread over common contract days and fixed
+ * by the guarantee's public id so a reseed lands on the same day and the
+ * seeded notices for that lease can be dated to match it.
+ */
+function seedDueDay(guaranteePublicId: string): number {
+  const hash = [...guaranteePublicId].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return SEED_DUE_DAYS[hash % SEED_DUE_DAYS.length];
+}
+
+function dueDateOnOrBefore(isoDate: string, dueDay: number): string {
+  const dueDate = latestDueDateOnOrBefore({ isoDate, dueDay });
+  if (!dueDate) throw new Error(`Seed due day ${dueDay} is out of range`);
+  return dueDate;
+}
+
 /**
  * Due date for a seeded billing month: the 10th, except the current month is
  * never due sooner than a week from the reseed — an invoice issued this month
@@ -148,6 +170,21 @@ function monthsAgo(months: number): string {
 // screen recording reads as someone's actual account.
 const DEMO_PIX_BR_CODE = "00020126580014br.gov.bcb.pix013600000000-0000-0000-0000-000000000000";
 const DEMO_BOLETO_LINE = "00000.00000 00000.000000 00000.000000 0 00000000000000";
+
+/**
+ * A fictional payout account per seed agency. Bank 000 is not a COMPE code
+ * and the Pix keys are the agencies' own fake CNPJs, so nothing here can
+ * route real money.
+ */
+function demoBankingInfo(cnpj: string) {
+  return {
+    bank: "000 - Demo Bank",
+    agency: "0001",
+    account: `${cnpj.slice(-5)}-0`,
+    accountType: "corrente" as const,
+    pixKey: cnpj,
+  };
+}
 
 /** 32-char Pix end-to-end id with the all-zero ISPB, e.g. `E00000000202609091000DEMO0200001`. */
 function demoPixEndToEndId(month: string, suffix: string): string {
@@ -181,9 +218,14 @@ async function insertSeedCoverOperation(
     !resolution ||
     resolution.kind !== NOTICE_RESOLUTION_KIND.COVER_COMMITTED ||
     resolution.appliedCoverCents === undefined ||
+    resolution.resolvedByUserId === undefined ||
     coveragePeriod === null
   ) {
     throw new Error(`Seed notice ${noticeId} is not a cover-resolved notice.`);
+  }
+  const agency = await ctx.db.get(notice.agencyId);
+  if (!agency?.bankingInfo) {
+    throw new Error(`Seed agency ${notice.agencyId} has no payout account.`);
   }
   const publicId = generateCoverOperationPublicId();
   const operationId = await ctx.db.insert("coverOperations", {
@@ -194,8 +236,9 @@ async function insertSeedCoverOperation(
     agencyId: notice.agencyId,
     coveragePeriod,
     ...(batchId === undefined ? {} : { batchId }),
-    requestedCents: notice.updatedAmountCents,
+    requestedCents: coverRequestCents(notice),
     appliedCents: resolution.appliedCoverCents,
+    payoutAccount: agency.bankingInfo,
     recordedAt: resolution.resolvedAt,
     recordedByUserId: resolution.resolvedByUserId,
     ...(resolution.note === undefined ? {} : { note: resolution.note }),
@@ -288,6 +331,9 @@ const DEMO_TABLES = [
   // Cover operations and notices point at each other; the ledger rows go
   // first so no `resolution.coverOperationId` outlives its row for long.
   "coverOperations",
+  // Claim evidence FK-references notices; its blobs are deleted by
+  // `deleteClaimEvidenceBlobs` before the rows go.
+  "claimEvidence",
   // Notices FK-reference guarantees + users. Wipe before guarantees so we
   // don't leave dangling guaranteeId pointers mid-wipe.
   "guaranteeDelinquencyNotices",
@@ -318,8 +364,16 @@ async function deleteGuaranteeDocumentBlobs(ctx: MutationCtx) {
   }
 }
 
+async function deleteClaimEvidenceBlobs(ctx: MutationCtx) {
+  for await (const evidence of ctx.db.query("claimEvidence")) {
+    const blob = await ctx.db.system.get(evidence.storageId);
+    if (blob) await ctx.storage.delete(evidence.storageId);
+  }
+}
+
 async function wipeDemoTables(ctx: MutationCtx) {
   await deleteGuaranteeDocumentBlobs(ctx);
+  await deleteClaimEvidenceBlobs(ctx);
   for (const table of DEMO_TABLES) {
     let rows = await ctx.db.query(table).take(200);
     while (rows.length > 0) {
@@ -387,7 +441,8 @@ type SeedLeaseSpec = {
     property: LeaseProperty;
     tag: string;
     description: string;
-    rent: LeaseRentInput;
+    /** `dueDay` defaults to `seedDueDay(publicId)`. */
+    rent: Omit<LeaseRentInput, "dueDay"> & { dueDay?: number };
   };
   guarantee: {
     state: GuaranteeState;
@@ -449,7 +504,10 @@ async function insertSeedLeaseAndGuarantee(
     property: lease.property,
     tag: lease.tag,
     description: lease.description,
-    rent: buildLeaseRent(lease.rent),
+    rent: buildLeaseRent({
+      ...lease.rent,
+      dueDay: lease.rent.dueDay ?? seedDueDay(spec.publicId),
+    }),
     payer: DEFAULT_PAYER,
     openGuaranteeId: null,
   });
@@ -1296,6 +1354,7 @@ async function seedFictional(
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Paulista",
       cnpj: "00000000000100",
+      bankingInfo: demoBankingInfo("00000000000100"),
       onboardingState: "active",
       createdAt: d("2024-03-01T00:00:00-03:00"),
     });
@@ -1303,6 +1362,7 @@ async function seedFictional(
     const atlanticaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Atlântica",
       cnpj: "00000000000200",
+      bankingInfo: demoBankingInfo("00000000000200"),
       onboardingState: "active",
       createdAt: d("2024-06-15T00:00:00-03:00"),
     });
@@ -1310,6 +1370,7 @@ async function seedFictional(
     const horizonteId: AgencyId = await ctx.db.insert("agencies", {
       name: "Horizonte Imóveis",
       cnpj: "00000000000300",
+      bankingInfo: demoBankingInfo("00000000000300"),
       onboardingState: "active",
       createdAt: d("2025-01-10T00:00:00-03:00"),
     });
@@ -2410,7 +2471,7 @@ async function seedFictional(
       },
     });
 
-    const horizonteCoverRentDue = dateDaysAgo(52);
+    const horizonteCoverRentDue = dueDateOnOrBefore(dateDaysAgo(52), seedDueDay(h2.publicId));
     const horizonteCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${h2.publicId}-${horizonteCoverRentDue}`,
       guaranteeId: h2.guaranteeId,
@@ -2477,7 +2538,10 @@ async function seedFictional(
         score: 690,
       },
     });
-    const paulistaDefaultRentDue = dateDaysAgo(22);
+    const paulistaDefaultRentDue = dueDateOnOrBefore(
+      dateDaysAgo(22),
+      seedDueDay(paulistaDefault.publicId),
+    );
     await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${paulistaDefault.publicId}-${paulistaDefaultRentDue}`,
       guaranteeId: paulistaDefault.guaranteeId,
@@ -2531,7 +2595,10 @@ async function seedFictional(
         score: 710,
       },
     });
-    const atlanticaCoverRentDue = dateDaysAgo(33);
+    const atlanticaCoverRentDue = dueDateOnOrBefore(
+      dateDaysAgo(33),
+      seedDueDay(atlanticaCovered.publicId),
+    );
     const atlanticaCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${atlanticaCovered.publicId}-${atlanticaCoverRentDue}`,
       guaranteeId: atlanticaCovered.guaranteeId,
@@ -2866,8 +2933,9 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   let userId;
   if (byEmail) {
     userId = byEmail._id;
-    const patch: { subject?: string } = {};
+    const patch: { subject?: string; emailVerified?: boolean } = {};
     if (!byEmail.subject) patch.subject = persona.subject;
+    if (byEmail.emailVerified !== true) patch.emailVerified = true;
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(userId, patch);
     }
@@ -2877,6 +2945,8 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
       subject: persona.subject,
       name: persona.name,
       email: persona.email,
+      // Every persona is `email_verified` on the dev tenant (docs/test-personas.md).
+      emailVerified: true,
       createdAt: now,
     });
   }
@@ -2910,6 +2980,7 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   const agencyId = await ctx.db.insert("agencies", {
     name: persona.agency.name,
     cnpj: persona.agency.cnpj,
+    bankingInfo: demoBankingInfo(persona.agency.cnpj),
     agencyType: "empresa",
     onboardingState: persona.agency.state,
     onboardingSubmittedAt: now,
@@ -3753,7 +3824,10 @@ async function populateAprovadaBook(
 
   for (const notice of notices) {
     const row = insertedAt(notice.n);
-    const rentDueDate = dateDaysAgo(notice.rentDueDaysAgo);
+    const rentDueDate = dueDateOnOrBefore(
+      dateDaysAgo(notice.rentDueDaysAgo),
+      seedDueDay(row.publicId),
+    );
     const originalAmountCents = row.lease.rentCents;
     const resolution = notice.resolution;
     const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
@@ -3776,6 +3850,19 @@ async function populateAprovadaBook(
       evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
       openedAt: notice.openedAt,
       openedByUserId,
+      // Staff verify only a filed claim, so every verified notice carries one.
+      ...(notice.verification
+        ? {
+            claim: {
+              status: CLAIM_STATUS.SUBMITTED,
+              claimedAmountCents: originalAmountCents,
+              submittedAt: notice.openedAt,
+              submittedByUserId: openedByUserId,
+              declarationVersion: CLAIM_DECLARATION_VERSION,
+              requests: [],
+            },
+          }
+        : {}),
       ...(notice.verification
         ? {
             verification: {

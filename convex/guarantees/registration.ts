@@ -320,15 +320,16 @@ export const sendForSignatureWithHold = internalMutationWithMutavRole({ minRole:
     });
 
     const tenant = await agencySubmittedTenant(ctx, guarantee);
-    if (tenant) {
+    if (tenant && agency) {
       await ctx.scheduler.runAfter(0, internal.guarantees.actions.sendProposalNotifications, {
         publicId: guarantee.publicId,
         tenantName: tenant.fullName,
         tenantEmail: tenant.email,
         tenantPhone: tenant.phone,
+        agencyName: agency.name,
         rentCents: guarantee.terms.rentCents,
-        availableGuaranteeCents: guarantee.capacity.availableCents,
         feeCents: guarantee.terms.feeCents,
+        coverageCents: guarantee.capacity.availableCents,
       });
     }
 

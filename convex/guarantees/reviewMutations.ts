@@ -281,6 +281,7 @@ export const updateDraft = mutationWithActiveAgency({
           rentCents,
           condoCents: lease.rent.condoCents,
           otherFeesCents: lease.rent.otherFeesCents,
+          dueDay: lease.rent.dueDay,
         }),
       });
     }

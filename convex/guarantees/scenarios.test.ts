@@ -177,6 +177,7 @@ function leaseDoc(spec: LeaseSpec): NewLease {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     },
     payer: "tenant",
     openGuaranteeId: null,
@@ -781,6 +782,7 @@ describe("schema conformance — strict harness", () => {
             condoCents: 80_000,
             otherFeesCents: 20_000,
             totalRentCents: 600_000,
+            dueDay: 5,
           },
         });
         const eventId = await ctx.db.insert("guaranteeHistory", {
@@ -807,6 +809,7 @@ describe("schema conformance — strict harness", () => {
         condoCents: 80_000,
         otherFeesCents: 20_000,
         totalRentCents: 600_000,
+        dueDay: 5,
       });
       expect(event?.tenantSnapshot).toEqual({
         entityType: "pj",
@@ -1018,7 +1021,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     expect(row.nextRenewalDate).toBe("2026-12-31");
   });
 
-  test("persists the plus plan with the prestamista premium folded into feeCents and capacity unmoved", async () => {
+  test("prestamista off: a plus request persists as basic with no premium and capacity unmoved", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId } = await seedGuaranteeWithLease(
@@ -1029,10 +1032,10 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     const row = await t.run((ctx) => getGuarantee(ctx, guaranteeId));
 
-    expect(row.terms.plan).toBe("plus");
+    expect(row.terms.plan).toBe("basic");
     expect(row.terms.taxaFeeCents).toBe(9_000);
-    expect(row.terms.prestamistaFeeCents).toBe(1_280);
-    expect(row.terms.feeCents).toBe(10_280);
+    expect(row.terms.prestamistaFeeCents).toBe(0);
+    expect(row.terms.feeCents).toBe(9_000);
     expect(row.capacity).toEqual({
       ceilingCents: 3_000_000,
       availableCents: 3_000_000,
@@ -1040,7 +1043,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     });
   });
 
-  test("stores the ruim/plus snapshot for rent 250_000 with capacity ceiling 7_500_000", async () => {
+  test("stores the ruim snapshot of a plus request (prestamista off) for rent 250_000 with capacity ceiling 7_500_000", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId } = await seedGuaranteeWithLease(
@@ -1053,11 +1056,11 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     expect(row.terms).toEqual({
       productSlug: "mutav-fianca",
-      plan: "plus",
+      plan: "basic",
       rentCents: 250_000,
-      feeCents: 38_780,
+      feeCents: 37_500,
       taxaFeeCents: 37_500,
-      prestamistaFeeCents: 1_280,
+      prestamistaFeeCents: 0,
       oneTimeActivationFeeCents: 15_000,
       commissionRate: 0.015,
       prestamistaCommissionRate: 0.25,
@@ -1165,6 +1168,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
           condoCents: 30_000,
           otherFeesCents: 5_000,
           totalRentCents: 135_000,
+          dueDay: 5,
         },
       });
       const lease = await getLease(ctx, leaseId);
@@ -2423,6 +2427,7 @@ describe("index reads — leases, products, guaranteeHistory", () => {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     });
     expect(lease?.payer).toBe("tenant");
     expect(lease?.propertyKind).toBe("residential");
@@ -2981,7 +2986,7 @@ describe("contractApplications untouched by guarantee writes", () => {
         },
         tag: "",
         description: "",
-        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0 },
+        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
       },
       plan: "basic",
       tenant: {

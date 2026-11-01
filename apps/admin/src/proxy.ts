@@ -1,39 +1,23 @@
 import createMiddleware from "next-intl/middleware";
 import type { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
+import { getIdTokenRefreshWindowSeconds } from "@/lib/env";
 import { routing } from "@mutav/i18n/routing";
+import { createAuthProxy } from "@mutav/app-shell/auth-proxy";
 
-const handleI18nRouting = createMiddleware(routing);
+const authProxy = createAuthProxy({
+  auth0,
+  handleI18nRouting: createMiddleware(routing),
+  getRefreshWindowSeconds: getIdTokenRefreshWindowSeconds,
+});
 
 /**
- * Composite proxy: Auth0 SDK middleware (handles `/auth/login`,
- * `/auth/logout`, `/auth/callback`, session refresh) layered on top of
- * the next-intl locale middleware.
- *
- * Order matters — Auth0 runs first so the session cookie is on the
- * response before the locale middleware can override headers. Cookies
- * from the Auth0 response are folded into the i18n response when the
- * request doesn't hit an auth route.
- *
  * The matcher excludes `/api/auth/convex-token` because that route reads
  * the session via `auth0.getSession()` directly and doesn't need the
  * proxy redirect logic to run first.
  */
 export async function proxy(request: NextRequest) {
-  const authRes = await auth0.middleware(request);
-
-  const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/auth/") || pathname.startsWith("/api/")) {
-    return authRes;
-  }
-
-  const intlRes = handleI18nRouting(request);
-
-  for (const cookie of authRes.cookies.getAll()) {
-    intlRes.cookies.set(cookie.name, cookie.value);
-  }
-
-  return intlRes;
+  return authProxy(request);
 }
 
 // Excludes real asset extensions, NOT every dotted path — see the same comment

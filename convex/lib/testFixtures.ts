@@ -20,6 +20,7 @@ import { insertGuaranteeAggregates } from "../guarantees/aggregateWrites";
 import { DEFAULT_PAYER, PROPERTY_KIND, type LeaseId } from "../leases/domain";
 import { DEFAULT_PRODUCT_SLUG, type ProductId } from "../products/domain";
 import type { TenantId } from "../tenants/domain";
+import type { UserId } from "../users/domain";
 import { hashPii } from "./pii";
 import aggregateComponentSchema from "../../node_modules/@convex-dev/aggregate/src/component/schema";
 import migrationsComponentSchema from "../../node_modules/@convex-dev/migrations/src/component/schema";
@@ -94,6 +95,15 @@ export async function setupAuthenticatedUser(
 
 export type SeededUserId = Awaited<ReturnType<typeof seedAuthenticatedUser>>;
 
+/** Onboarding requires a payout account, so every active test agency carries one. */
+export const TEST_PAYOUT_ACCOUNT = {
+  bank: "000 - Test Bank",
+  agency: "0001",
+  account: "12345-6",
+  accountType: "corrente",
+  pixKey: "cover@test.br",
+} as const;
+
 export async function seedAgencyWithMembership(
   t: ReturnType<typeof convexTest>,
   userId: SeededUserId,
@@ -103,6 +113,7 @@ export async function seedAgencyWithMembership(
       name: "Mutav Test Agency",
       cnpj: "00000000000100",
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: new Date().toISOString(),
     });
@@ -122,6 +133,7 @@ export async function seedForeignAgency(t: ReturnType<typeof convexTest>) {
       name: "Foreign Agency",
       cnpj: "00000000000200",
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: new Date().toISOString(),
     }),
@@ -244,7 +256,7 @@ export async function seedGuaranteeWithLease(
       },
       tag: "",
       description: "",
-      rent: { rentCents, condoCents: 0, otherFeesCents: 0, totalRentCents: rentCents },
+      rent: { rentCents, condoCents: 0, otherFeesCents: 0, totalRentCents: rentCents, dueDay: 5 },
       payer: DEFAULT_PAYER,
       openGuaranteeId: null,
     });
@@ -334,6 +346,7 @@ export async function seedCoverCandidate(
       name: `Cover Agency ${suffix}`,
       cnpj: `0000000000000${suffix}`.slice(-14),
       agencyType: "empresa",
+      bankingInfo: TEST_PAYOUT_ACCOUNT,
       onboardingState: "active",
       createdAt: "2024-01-01T00:00:00-03:00",
     });
@@ -399,4 +412,36 @@ export async function seedCoverNotice(
         : {}),
     }),
   );
+}
+
+/**
+ * Files a claim on a notice without the evidence uploads, for tests about what
+ * staff do after a claim arrives (`staffVerifyDefault` refuses a notice that
+ * carries none). The claim path itself is covered in `delinquencies/claims`.
+ */
+export async function seedSubmittedClaim(
+  t: TestConvex<typeof schema>,
+  {
+    noticePublicId,
+    userId,
+    claimedAmountCents,
+  }: { noticePublicId: string; userId: UserId; claimedAmountCents?: number },
+): Promise<void> {
+  await t.run(async (ctx) => {
+    const notice = await ctx.db
+      .query("guaranteeDelinquencyNotices")
+      .withIndex("by_publicId", (q) => q.eq("publicId", noticePublicId))
+      .unique();
+    if (!notice) throw new Error(`seedSubmittedClaim: no notice '${noticePublicId}'`);
+    await ctx.db.patch(notice._id, {
+      claim: {
+        status: "submitted",
+        claimedAmountCents: claimedAmountCents ?? notice.originalAmountCents,
+        submittedAt: "2026-06-20T10:00:00.000Z",
+        submittedByUserId: userId,
+        declarationVersion: "test",
+        requests: [],
+      },
+    });
+  });
 }

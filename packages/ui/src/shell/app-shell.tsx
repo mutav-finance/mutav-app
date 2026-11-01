@@ -63,13 +63,14 @@ export function AppShell({
               {headerEnd}
             </div>
           </header>
-          <main
+          {/* SidebarInset is already the <main> landmark; a second <main> nests two. */}
+          <div
             id="main-content"
             data-front={dataFront}
             className="@container/main flex min-h-0 flex-1 flex-col overflow-y-auto"
           >
             {children}
-          </main>
+          </div>
         </SidebarInset>
         <Toaster />
       </SidebarProvider>

@@ -152,3 +152,25 @@ export function formatWallClockDateTimeBR(value: string): string {
     timeZone: "UTC",
   }).format(date);
 }
+
+/**
+ * The month of a `YYYY-MM…` date as words — `"out. de 26"` (short) or
+ * `"outubro de 2026"` (long). Intl lower-cases pt-BR month names; `capitalize`
+ * upper-cases only the first letter, for labels that open a cell or heading.
+ * CSS `text-transform: capitalize` must not be used on the result: it would
+ * also capitalize the "de" connective.
+ */
+export function formatMonthYear(
+  isoDate: string,
+  locale: string,
+  options: { month: "short" | "long"; capitalize?: boolean },
+): string {
+  const date = new Date(`${isoDate.slice(0, 7)}-01T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  const label = new Intl.DateTimeFormat(locale, {
+    month: options.month,
+    year: options.month === "short" ? "2-digit" : "numeric",
+    timeZone: "UTC",
+  }).format(date);
+  return options.capitalize ? label.charAt(0).toLocaleUpperCase(locale) + label.slice(1) : label;
+}

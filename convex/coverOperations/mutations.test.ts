@@ -51,6 +51,10 @@ async function readOperations(t: T) {
   return t.run((ctx) => ctx.db.query("coverOperations").collect());
 }
 
+async function clearPayoutAccount(t: T, candidate: CoverCandidate) {
+  await t.run((ctx) => ctx.db.patch(candidate.agencyId, { bankingInfo: undefined }));
+}
+
 async function readAuditActions(t: T) {
   const entries = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
   return entries.map((entry) => entry.action);
@@ -151,6 +155,53 @@ describe("staffRecordCover", () => {
     expect(opAudit.map((entry) => entry.action)).toEqual(["cover_operation.recorded"]);
     expect(opAudit[0].actor).toEqual({ kind: "user", userId: a.userId });
     expect(await readAuditActions(t)).toContain("delinquency.resolved_by_cover");
+  });
+
+  test("snapshots the agency's payout account, unaffected by a later edit", async () => {
+    const t = setup();
+    const a = await seedCoverCandidate(t, { suffix: "1" });
+    await seedCoverNotice(t, a, { publicId: "DN-payout-snapshot" });
+    const asCompliance = await grantStaffRole(t, a, "compliance");
+
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-payout-snapshot",
+    });
+    expect(result.success).toBe(true);
+
+    await t.run((ctx) =>
+      ctx.db.patch(a.agencyId, {
+        bankingInfo: { bank: "999 - Other Bank", account: "99999-9", accountType: "poupanca" },
+      }),
+    );
+
+    const [operation] = await readOperations(t);
+    expect(operation.payoutAccount).toEqual({
+      bank: "000 - Test Bank",
+      agency: "0001",
+      account: "12345-6",
+      accountType: "corrente",
+      pixKey: "cover@test.br",
+    });
+  });
+
+  test("an agency without a payout account → PAYOUT_ACCOUNT_MISSING, nothing written", async () => {
+    const t = setup();
+    const a = await seedCoverCandidate(t, { suffix: "1" });
+    const noticeId = await seedCoverNotice(t, a, { publicId: "DN-no-account" });
+    await clearPayoutAccount(t, a);
+    const asCompliance = await grantStaffRole(t, a, "compliance");
+
+    const result = await asCompliance.mutation(api.coverOperations.mutations.staffRecordCover, {
+      noticePublicId: "DN-no-account",
+    });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("PAYOUT_ACCOUNT_MISSING");
+    expect(await readOperations(t)).toEqual([]);
+    expect((await readNotice(t, noticeId)).status).toBe("verified");
+    const guarantee = await readGuarantee(t, a.guaranteeId);
+    expect(guarantee.status).toBe("default_verified");
+    expect(guarantee.capacity.reservedCents).toBe(0);
   });
 
   test("a second notice for the same guarantee and billing month → COVER_ALREADY_RECORDED", async () => {
@@ -445,6 +496,27 @@ describe("staffRecordCoverBatch", () => {
     if (result.success) return;
     expect(result.error.code).toBe("GUARANTEE_TRANSITION_REFUSED");
     expect(result.error.noticePublicId).toBe("DN-still-active");
+    expect((await readGuarantee(t, a.guaranteeId)).capacity.reservedCents).toBe(0);
+    expect(await readOperations(t)).toEqual([]);
+  });
+
+  test("atomic: an agency without a payout account refuses the batch before any capacity moves", async () => {
+    const t = setup();
+    const a = await seedCoverCandidate(t, { suffix: "1" });
+    const b = await seedCoverCandidate(t, { suffix: "2" });
+    await seedCoverNotice(t, a, { publicId: "DN-has-account" });
+    await seedCoverNotice(t, b, { publicId: "DN-lacks-account" });
+    await clearPayoutAccount(t, b);
+    const asCompliance = await grantStaffRole(t, a, "compliance");
+
+    const result = await asCompliance.mutation(
+      api.coverOperations.mutations.staffRecordCoverBatch,
+      { noticePublicIds: ["DN-has-account", "DN-lacks-account"] },
+    );
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("PAYOUT_ACCOUNT_MISSING");
+    expect(result.error.noticePublicId).toBe("DN-lacks-account");
     expect((await readGuarantee(t, a.guaranteeId)).capacity.reservedCents).toBe(0);
     expect(await readOperations(t)).toEqual([]);
   });

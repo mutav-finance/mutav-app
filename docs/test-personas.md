@@ -9,22 +9,20 @@ Pre-provisioned Auth0 accounts for testing each Mutav user state without going t
 
 All four personas share the password **`MutavDev2026!`**.
 
-| Persona                       | Email                       | Auth0 subject                     | Convex seeded state              | Expected landing on login                                                        |
-| ----------------------------- | --------------------------- | --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------- |
-| **System admin (Mutav team)** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | `users.isStaff: true`, no agency | `/onboarding` today — gap: no `(admin)` shell yet (tracked in #121 cascade PR-6) |
-| **Agency owner**              | `agencyowner@mutav.finance` | `auth0\|6a150df7def07da7a5297480` | active agency                    | `/` (dashboard)                                                                  |
-| **Pending user**              | `pendinguser@mutav.finance` | `auth0\|6a150df8d2051b0ac866a3b6` | under_review agency              | `/onboarding/status?state=under_review`                                          |
-| **New user**                  | `newuser@mutav.finance`     | `auth0\|6a150df9a100fbf318f393c3` | none                             | `/onboarding`                                                                    |
+| Persona                       | Email                       | Auth0 subject                     | Convex seeded state                  | Expected landing on login                                                  |
+| ----------------------------- | --------------------------- | --------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| **System admin (Mutav team)** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | `mutavStaff` role `admin`, no agency | agency app routes to the admin app; admin console on `admin.mutav.finance` |
+| **Agency owner**              | `agencyowner@mutav.finance` | `auth0\|6a150df7def07da7a5297480` | active agency                        | `/` (dashboard)                                                            |
+| **Pending user**              | `pendinguser@mutav.finance` | `auth0\|6a150df8d2051b0ac866a3b6` | under_review agency                  | `/onboarding/status?state=under_review`                                    |
+| **New user**                  | `newuser@mutav.finance`     | `auth0\|6a150df9a100fbf318f393c3` | none                                 | `/onboarding`                                                              |
 
 All four are marked `email_verified: true` on Auth0 — no verification step on first login.
 
-### How `isStaff` is set
+##### How staff roles are set
 
-The `seedTestPersonas` mutation patches `users.isStaff: true` onto the systemadmin row at seed time. The `PERSONAS` map in `convex/seed.ts` is the source of truth for who gets the flag — currently only `systemadmin`. To grant staff to additional users post-seed, flip `isStaff: true` via the Convex dashboard on their `users` row.
+Staff roles live in the `mutavStaff` table, one row per (user, role). `seedTestPersonas` inserts a row for each entry in a persona's `staffRoles` in the `PERSONAS` map in `convex/seed.ts`; currently only `systemadmin` gets `admin`. To grant a role after seeding, an existing admin uses the Staff page in the admin app (`createStaffRole`). See [`docs/auth.md`](auth.md) for the staff wrappers.
 
-Staff identity isn't enforced anywhere yet — the `(admin)` route group + `queryWithStaff`/`mutationWithStaff` wrappers ship in PR-6 of the Auth0 Orgs cascade.
-
-## How the seeded state attaches to the Auth0 user
+How the seeded state attaches to the Auth0 user
 
 `convex/seed.ts:seedTestPersonas` writes the Convex `users` row with the Auth0 `subject` **baked in** — the binding is explicit, not derivative. No email-link dance on first login. The persona-to-subject map lives in the `PERSONAS` constant in `convex/seed.ts` and must stay in sync with this doc and the Auth0 tenant; updating the dev tenant means updating both.
 

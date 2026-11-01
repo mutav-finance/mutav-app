@@ -188,6 +188,7 @@ describe("guarantee state labels", () => {
       if (catalog === undefined) throw new Error(`no catalog for ${locale}`);
       return [
         ...nonEmptyLabels(catalog, ["guaranteeDetails", "state"], GUARANTEE_STATES, locale),
+        ...nonEmptyLabels(catalog, ["guaranteeDetails", "heroTitle"], GUARANTEE_STATES, locale),
         ...nonEmptyLabels(catalog, ["guaranteeDetails", "closeReason"], CLOSE_REASONS, locale),
         ...nonEmptyLabels(
           catalog,
