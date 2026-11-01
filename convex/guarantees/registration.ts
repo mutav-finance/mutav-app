@@ -319,7 +319,9 @@ export const sendForSignatureWithHold = internalMutationWithMutavRole({ minRole:
       },
     });
 
-    const tenant = await agencySubmittedTenant(ctx, guarantee);
+    // The tenant notice goes out once, on the first send (decision 1, #376):
+    // a re-send after a lapsed hold renews the hold, not the tenant's notice.
+    const tenant = resent ? null : await agencySubmittedTenant(ctx, guarantee);
     if (tenant && agency) {
       await ctx.scheduler.runAfter(0, internal.guarantees.actions.sendProposalNotifications, {
         publicId: guarantee.publicId,

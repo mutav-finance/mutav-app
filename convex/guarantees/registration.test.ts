@@ -271,6 +271,32 @@ async function historyMessages(t: T, fx: Fixture, publicId: string): Promise<str
   return rows.map((row) => row.message);
 }
 
+/** The creation event that carries the agency-submitted tenant, as `create` writes it. */
+async function insertCreationEvent(t: T, fx: Fixture, publicId: string): Promise<void> {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("guaranteeHistory", {
+      agencyId: fx.agencyId,
+      guaranteePublicId: publicId,
+      at: "2026-10-01T00:00:00.000Z",
+      username: "ana",
+      message: "Garantia criada",
+      tenantSnapshot: {
+        entityType: "pf",
+        taxId: "11144477735",
+        fullName: "Maria Silva",
+        email: "maria@example.com",
+        phone: "11900000001",
+        birthDate: "1990-01-01",
+      },
+    });
+  });
+}
+
+async function scheduledNames(t: T): Promise<string[]> {
+  const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+  return jobs.map((job) => job.name);
+}
+
 // ---------------------------------------------------------------------------
 
 describe("guarantees.registration.sendForSignature", () => {
@@ -294,6 +320,7 @@ describe("guarantees.registration.sendForSignature", () => {
 
   test("accepted → awaiting_signature, holding cover × c for the default 7 days", async () => {
     const { guaranteeId } = await seedDraft(t, fx, "SND1", { review: "accepted" });
+    await insertCreationEvent(t, fx, "SND1");
     setCapacity(HOLD_AMOUNT);
     const before = Date.now();
 
@@ -321,6 +348,7 @@ describe("guarantees.registration.sendForSignature", () => {
     expect(hold?.expiresAt).toBeGreaterThanOrEqual(before + 7 * DAY_MS);
     expect(hold?.releasedAt).toBeUndefined();
     expect(await historyMessages(t, fx, "SND1")).toContain("Contrato enviado para assinatura");
+    expect(await scheduledNames(t)).toContain("guarantees/actions:sendProposalNotifications");
     const sent = (await auditRows(t, "SND1")).find(
       (row) => row.action === "guarantee.sent_for_signature",
     );
@@ -440,6 +468,7 @@ describe("guarantees.registration.sendForSignature", () => {
 
   test("a re-send after the hold lapsed re-runs the preflight and replaces the hold", async () => {
     const { guaranteeId } = await seedDraft(t, fx, "RS2", { review: "awaiting_signature" });
+    await insertCreationEvent(t, fx, "RS2");
     const lapsedId = await insertHold(t, { fx, guaranteeId, expiresInMs: -1 });
     setCapacity(HOLD_AMOUNT);
 
@@ -451,6 +480,8 @@ describe("guarantees.registration.sendForSignature", () => {
     expect(holds.find((hold) => hold._id === lapsedId)).toMatchObject({ releaseReason: "resent" });
     expect(holds.find((hold) => hold._id !== lapsedId)?.releasedAt).toBeUndefined();
     expect(await historyMessages(t, fx, "RS2")).toContain("Contrato reenviado para assinatura");
+    // The tenant was notified on the first send; a re-send does not notify again.
+    expect(await scheduledNames(t)).not.toContain("guarantees/actions:sendProposalNotifications");
   });
 
   test("a re-send that no longer fits keeps the review and the lapsed hold untouched", async () => {
