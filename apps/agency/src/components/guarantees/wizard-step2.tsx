@@ -353,6 +353,10 @@ function EvaluatedItem({
   );
 }
 
+/**
+ * Read-only estimate while prestamista is off. The band rate is provisional:
+ * MUTAV fixes the real rate when it accepts the draft (ADR 0011).
+ */
 function CoverageReport({ terms, feeRate }: { terms: GuaranteeTerms; feeRate: number }) {
   const t = useTranslations("guaranteeNew.coverage");
   return (
@@ -372,7 +376,7 @@ function CoverageReport({ terms, feeRate }: { terms: GuaranteeTerms; feeRate: nu
         <PlanRow
           label={t("feeRate")}
           value={formatBRLCents(terms.feeCents)}
-          note={`${(feeRate * 100).toFixed(0)}%`}
+          note={t("provisionalRate", { rate: (feeRate * 100).toFixed(0) })}
         />
         <PlanRow
           label={t("preview.activationFee")}

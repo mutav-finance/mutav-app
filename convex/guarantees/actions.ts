@@ -9,10 +9,15 @@ import {
   getResendFromEmail,
   getWhatsAppApiUrl,
   getWhatsAppApiKey,
-  getOptionalResendApiKey,
+  isEmailConfigured,
 } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
-import { buildProposalEmail, buildProposalWhatsApp, type ProposalNotice } from "./notifications";
+import {
+  buildProposalEmail,
+  buildProposalWhatsApp,
+  escapeHtml,
+  type ProposalNotice,
+} from "./notifications";
 
 // ─── Review decision → agency ─────────────────────────────────────────────────
 
@@ -22,7 +27,7 @@ const BASIS_POINTS_PER_PERCENT = 100;
  * Tells the agency Mutav decided its draft. Scheduled by `acceptAnalysis` /
  * `refuseAnalysis` after the decision is committed, so a delivery failure
  * never rolls the decision back. Skipped, with a warning, when Resend is not
- * configured. The email carries no score and no tenant identity — only the
+ * configured (`isEmailConfigured`). The email carries no score and no tenant identity — only the
  * guarantee id, the outcome and what the agency needs to act on it.
  */
 export const sendReviewDecisionNotification = internalAction({
@@ -35,9 +40,8 @@ export const sendReviewDecisionNotification = internalAction({
     ),
   },
   handler: async (_ctx, args) => {
-    const apiKey = getOptionalResendApiKey();
-    if (!apiKey) {
-      logWarn("[notifications] RESEND_API_KEY not set, skipping review decision email");
+    if (!isEmailConfigured()) {
+      logWarn("[notifications] email not configured, skipping review decision email");
       return;
     }
     if (args.recipients.length === 0) {
@@ -54,7 +58,7 @@ export const sendReviewDecisionNotification = internalAction({
         ? `<p>A Mutav aprovou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong> com taxa de ${(args.decision.feeRateBps / BASIS_POINTS_PER_PERCENT).toFixed(2)}% do aluguel.</p><p>O próximo passo é o envio do contrato ao inquilino para assinatura.</p>`
         : `<p>A Mutav recusou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong>.</p><p>Motivo: ${escapeHtml(args.decision.reason)}</p><p>A proposta foi encerrada. Você pode iniciar uma nova proposta a qualquer momento.</p>`;
     try {
-      await new Resend(apiKey).emails.send({
+      await new Resend(getResendApiKey()).emails.send({
         from: getResendFromEmail(),
         to: args.recipients,
         subject,
@@ -94,8 +98,8 @@ export const sendProposalNotifications = internalAction({
 });
 
 async function sendEmail({ to, notice }: { to: string; notice: ProposalNotice }): Promise<void> {
-  if (!process.env.RESEND_API_KEY) {
-    logWarn("[notifications] RESEND_API_KEY not set, skipping email");
+  if (!isEmailConfigured()) {
+    logWarn("[notifications] email not configured, skipping proposal email");
     return;
   }
   const resend = new Resend(getResendApiKey());
@@ -133,18 +137,6 @@ const DOCUMENT_LABEL_PT: Record<"rentalContract" | "inspection" | "policy", stri
   policy: "Apólice",
 };
 
-const HTML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (character) => HTML_ESCAPES[character] ?? character);
-}
-
 /**
  * Tells the agency a document attached to one of its guarantees was rejected,
  * with the reviewer's reason, so it can upload a corrected file. Skips when
@@ -159,8 +151,8 @@ export const sendDocumentRejectedEmail = internalAction({
     rejectionReason: v.string(),
   },
   handler: async (_ctx, args) => {
-    if (!process.env.RESEND_API_KEY) {
-      logWarn("[notifications] RESEND_API_KEY not set, skipping document rejection email");
+    if (!isEmailConfigured()) {
+      logWarn("[notifications] email not configured, skipping document rejection email");
       return;
     }
     const resend = new Resend(getResendApiKey());
