@@ -3,11 +3,16 @@ import { internalMutation } from "../_generated/server";
 import { mutationWithMutavRole, queryWithAuth, queryWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
-import { agencyDocumentKindValidator } from "../agencies/domain";
+import { agencyDocumentKindValidator, onboardingDecisionValidator } from "../agencies/domain";
 import {
   applyOnboardingReview,
+  applyStartOnboardingReview,
   collectPendingReviews,
   resolveDocumentDownloadUrl,
+} from "../agencies/adminUseCases";
+import type {
+  ReviewOnboardingResult,
+  StartOnboardingReviewResult,
 } from "../agencies/adminUseCases";
 import type { Result } from "../lib/result";
 import type { MutavStaff, MutavStaffId, MutavStaffRole } from "./domain";
@@ -286,14 +291,39 @@ export const deleteStaffRole = mutationWithMutavRole({ minRole: "admin" })({
   },
 });
 
-/** Approve/reject an onboarding submission. Admin only; writes a hash-chained audit entry. */
+/**
+ * Pick a submission up: `submitted → under_review`, so the agency's status
+ * page shows a person is on it. Compliance and above — the same role that
+ * reads the queue. Idempotent; only a real transition is audited.
+ */
+export const startOnboardingReview = mutationWithMutavRole({ minRole: "compliance" })({
+  args: { agencyId: v.id("agencies") },
+  handler: async (ctx, { agencyId }): Promise<StartOnboardingReviewResult> => {
+    const result = await applyStartOnboardingReview(ctx, { agencyId });
+    if (result.success && !result.data.alreadyUnderReview) {
+      await ctx.appendStaffAudit({
+        action: AUDIT_ACTION.ONBOARDING_REVIEW_STARTED,
+        resourceType: "agency",
+        resourceId: agencyId,
+        payload: { from: "submitted", to: "under_review" },
+      });
+    }
+    return result;
+  },
+});
+
+/**
+ * Approve/reject an onboarding submission (from `submitted` or
+ * `under_review`). Admin only; writes a hash-chained audit entry and
+ * schedules the decision email to the agency.
+ */
 export const reviewOnboarding = mutationWithMutavRole({ minRole: "admin" })({
   args: {
     agencyId: v.id("agencies"),
-    decision: v.union(v.literal("approved"), v.literal("rejected")),
+    decision: onboardingDecisionValidator,
     rejectionReason: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ReviewOnboardingResult> => {
     const result = await applyOnboardingReview(ctx, args);
     if (result.success) {
       await ctx.appendStaffAudit({
