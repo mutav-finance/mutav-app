@@ -1088,7 +1088,7 @@
     "simulation": {
       "heading": "Resultado da Simulação",
       "approvedValueLabel": "Cobertura de aluguel aprovada",
-      "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
+      "approvedMessage": "Análise aprovada para este locatário e imóvel. Confira a cobertura abaixo e continue.",
       "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
       "closeButton": "Voltar ao início",
       "noApplicationTitle": "Consulta de crédito não liberada",

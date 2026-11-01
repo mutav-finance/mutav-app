@@ -176,19 +176,9 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
           scoreTier ? TIER_CARD_STYLE[scoreTier] : "border-border",
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="text-base font-semibold">{t("simulation.heading")}</h2>
-          <div className="flex flex-col items-end gap-0.5 text-right">
-            <span className="text-muted-foreground font-mono text-xs">
-              {data.entityType === "pj" ? data.cnpj || "—" : data.cpf || "—"}
-            </span>
-            {data.fullName ? (
-              <span className="text-sm font-medium">{data.fullName}</span>
-            ) : (
-              <span className="text-muted-foreground/50 text-sm select-none">—</span>
-            )}
-          </div>
-        </div>
+        <h2 className="text-base font-semibold">{t("simulation.heading")}</h2>
+
+        <EvaluatedSubject data={data} />
 
         {isLoading ? (
           <div className="flex items-start justify-between gap-4">
@@ -313,6 +303,54 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+function EvaluatedSubject({ data }: { data: DraftWizardData }) {
+  const t = useTranslations("guaranteeNew");
+  const isPJ = data.entityType === "pj";
+  const rentParts = [
+    formatBRLCents(data.rentCents),
+    data.condoCents > 0 && `${t("rent.condo")} ${formatBRLCents(data.condoCents)}`,
+    data.otherFeesCents > 0 && `${t("rent.otherFees")} ${formatBRLCents(data.otherFeesCents)}`,
+  ].filter(Boolean);
+  const propertyKind =
+    data.propertyKind === "commercial" ? t("property.commercial") : t("property.residential");
+
+  return (
+    <dl className="border-border/60 grid grid-cols-1 gap-x-6 gap-y-3 border-y py-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <EvaluatedItem
+        label={isPJ ? t("tenant.companyName") : t("tenant.fullName")}
+        value={data.fullName || "—"}
+      />
+      <EvaluatedItem
+        label={isPJ ? "CNPJ" : "CPF"}
+        value={(isPJ ? data.cnpj : data.cpf) || "—"}
+        mono
+      />
+      <EvaluatedItem
+        label={t("property.kindLabel")}
+        value={`${propertyKind} · ${t("property.cep")} ${data.cep || "—"}`}
+      />
+      <EvaluatedItem label={t("rent.rent")} value={rentParts.join(" + ")} mono />
+    </dl>
+  );
+}
+
+function EvaluatedItem({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className={cn("truncate font-medium", mono && "font-mono")}>{value}</dd>
     </div>
   );
 }

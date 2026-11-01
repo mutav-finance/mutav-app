@@ -1088,7 +1088,7 @@
     "simulation": {
       "heading": "Simulation Result",
       "approvedValueLabel": "Approved rent coverage",
-      "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
+      "approvedMessage": "Analysis approved for this tenant and property. Review the coverage below and continue.",
       "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
       "closeButton": "Back to home",
       "noApplicationTitle": "Credit check not released",
