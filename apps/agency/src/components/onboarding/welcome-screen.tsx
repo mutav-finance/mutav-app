@@ -5,6 +5,7 @@ import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { ToggleGroup, ToggleGroupItem } from "@mutav/ui/toggle-group";
+import { PendingInvites } from "@/components/onboarding/pending-invites";
 import { useWelcomeScreen } from "@/components/onboarding/use-welcome-screen";
 
 export function WelcomeScreen() {
@@ -23,6 +24,8 @@ export function WelcomeScreen() {
           <span className="text-text-2 block font-normal">{t("titleLine2")}</span>
         </h1>
       </div>
+
+      <PendingInvites />
 
       {/* Aviso sócio majoritário — relevante apenas para empresa */}
       {vm.selectedType === "empresa" && (
