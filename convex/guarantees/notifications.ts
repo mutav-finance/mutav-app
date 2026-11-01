@@ -43,7 +43,7 @@ function escapeHtml(text: string): string {
 export function buildProposalWhatsApp(notice: ProposalNotice): string {
   return `Olá, *${notice.tenantName}*!
 
-A imobiliária *${notice.agencyName}* registrou uma *Garantia Locatícia MUTAV* para a sua locação (garantia ${notice.publicId}).
+A imobiliária *${notice.agencyName}* solicitou uma *Garantia Locatícia MUTAV* para a sua locação (garantia ${notice.publicId}).
 
 • Aluguel: ${formatCents(notice.rentCents)}
 • Taxa mensal da garantia: ${formatCents(notice.feeCents)}
@@ -64,7 +64,7 @@ export function buildProposalEmail(notice: ProposalNotice): ProposalEmail {
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><title>Garantia locatícia registrada — MUTAV</title></head>
+<head><meta charset="utf-8"><title>Garantia locatícia solicitada — MUTAV</title></head>
 <body style="margin:0;padding:0;background-color:#ffffff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
     <tr><td align="center">
@@ -80,7 +80,7 @@ export function buildProposalEmail(notice: ProposalNotice): ProposalEmail {
           <td style="font-size:15px;color:#1a1a1a;line-height:1.75;">
             <p style="margin:0 0 16px;">Olá, ${tenantName}!</p>
             <p style="margin:0 0 16px;">
-              A imobiliária <strong>${agencyName}</strong> registrou uma
+              A imobiliária <strong>${agencyName}</strong> solicitou uma
               <strong>Garantia Locatícia MUTAV</strong> para a sua locação.
               Estes são os dados principais:
             </p>
@@ -99,7 +99,7 @@ export function buildProposalEmail(notice: ProposalNotice): ProposalEmail {
             <p style="margin:0 0 16px;">
               Você não precisa fazer nada agora. A imobiliária vai entrar em contato
               para a assinatura do contrato de garantia, e a garantia entra em vigor
-              depois que o contrato assinado for registrado.
+              depois que o contrato assinado for aprovado e a garantia registrada pela MUTAV.
             </p>
             <p style="margin:0;">
               Qualquer dúvida sobre a garantia ou a sua locação, fale com a imobiliária.
@@ -122,7 +122,7 @@ export function buildProposalEmail(notice: ProposalNotice): ProposalEmail {
 </html>`;
 
   return {
-    subject: `Garantia locatícia registrada pela ${notice.agencyName} — ${notice.publicId}`,
+    subject: `Garantia locatícia solicitada pela ${notice.agencyName} — ${notice.publicId}`,
     html,
   };
 }

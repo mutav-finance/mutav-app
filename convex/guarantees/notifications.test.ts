@@ -23,7 +23,7 @@ describe("buildProposalEmail", () => {
   });
 
   test("names the agency and the guarantee in the subject", () => {
-    expect(email.subject).toBe("Garantia locatícia registrada pela Imobiliária Centro — 1000042");
+    expect(email.subject).toBe("Garantia locatícia solicitada pela Imobiliária Centro — 1000042");
   });
 
   test("carries the key data formatted as BRL", () => {

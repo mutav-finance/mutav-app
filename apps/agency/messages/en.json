@@ -1148,8 +1148,8 @@
     },
     "success": {
       "heading": "GUARANTEE PROPOSAL CREATED",
-      "subtitle": "The guarantee is registered and awaits the signed contract.",
-      "description": "Collect the signed guarantee contract from the tenant, upload the PDF on the guarantee page, then activate the guarantee. The tenant received an informational notice that the guarantee was registered and that the agency will contact them to sign.",
+      "subtitle": "The guarantee is created and awaits the signed contract.",
+      "description": "Collect the signed guarantee contract from the tenant and upload the PDF on the guarantee page. MUTAV reviews the contract and registers the guarantee with the reserve; it becomes active once the registration is confirmed. The tenant received an informational notice that the agency will contact them to sign.",
       "viewGuarantee": "View guarantee",
       "createAnother": "Create another guarantee"
     },

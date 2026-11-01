@@ -1148,8 +1148,8 @@
     },
     "success": {
       "heading": "PROPOSTA DE GARANTIA CRIADA",
-      "subtitle": "A garantia foi registrada e aguarda o contrato assinado.",
-      "description": "Colete com o inquilino o contrato de garantia assinado, envie o PDF na página da garantia e então ative a garantia. O inquilino recebeu um aviso informativo de que a garantia foi registrada e que a imobiliária entrará em contato para a assinatura.",
+      "subtitle": "A garantia foi criada e aguarda o contrato assinado.",
+      "description": "Colete com o inquilino o contrato de garantia assinado e envie o PDF na página da garantia. A MUTAV revisa o contrato e registra a garantia na reserva; ela fica ativa quando o registro é confirmado. O inquilino recebeu um aviso informativo de que a imobiliária entrará em contato para a assinatura.",
       "viewGuarantee": "Ver garantia",
       "createAnother": "Criar outra garantia"
     },
