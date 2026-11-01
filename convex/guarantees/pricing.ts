@@ -24,7 +24,7 @@ export type PricingTable = ProductTerms;
 
 export const DEFAULT_PRICING_TABLE: PricingTable = {
   tierRate: { bom: 0.09, regular: 0.12, ruim: 0.15 },
-  coverageCeilingMultiplier: 15,
+  coverageCeilingMultiplier: 30,
   exitCostMultiplier: 6,
   activationFeeCents: 15_000,
   commissionRate: 0.015,
