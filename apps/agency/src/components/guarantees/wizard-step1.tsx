@@ -75,6 +75,7 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
       if (!isValidCPF(data.cpf)) errs.doc = t("validation.cpfInvalid");
     }
 
+    if (!data.fullName.trim()) errs.fullName = t("validation.required");
     if (data.cep.replace(/\D/g, "").length !== 8) errs.cep = t("validation.cepInvalid");
     if (data.rentCents <= 0) errs.rentCents = t("validation.rentRequired");
     if (data.dueDay === null) errs.dueDay = t("validation.dueDayRequired");
@@ -124,6 +125,7 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
                 entityType: v,
                 cpf: "",
                 cnpj: "",
+                fullName: "",
                 score: null,
                 scoreTier: null,
               });
@@ -161,6 +163,17 @@ export function WizardStep1({ data, agencyId, onChange, onNext }: Props) {
             />
           </Field>
         )}
+
+        <Field
+          label={data.entityType === "pj" ? t("tenant.companyName") : t("tenant.fullName")}
+          error={errors.fullName}
+        >
+          <Input
+            value={data.fullName}
+            autoComplete="off"
+            onChange={(e) => onChange({ fullName: e.target.value })}
+          />
+        </Field>
 
         {/* 3. Tipo de imóvel */}
         <div className="flex flex-col gap-2">

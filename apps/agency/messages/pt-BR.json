@@ -1087,8 +1087,8 @@
     },
     "simulation": {
       "heading": "Resultado da Simulação",
-      "approvedValueLabel": "Valor locatício aprovado",
-      "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
+      "approvedValueLabel": "Cobertura de aluguel aprovada",
+      "approvedMessage": "Análise aprovada para este locatário e imóvel. Confira a cobertura abaixo e continue.",
       "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
       "closeButton": "Voltar ao início",
       "noApplicationTitle": "Consulta de crédito não liberada",
@@ -1118,7 +1118,9 @@
         "fee": "Valor da taxa",
         "commission": "Comissão (1,5%)",
         "guarantee": "Valor da garantia"
-      }
+      },
+      "reportHeading": "Cobertura aprovada",
+      "timesRent": "{multiplier}× o aluguel"
     },
     "complementary": {
       "tenantSection": "Dados do Inquilino",
@@ -1148,8 +1150,8 @@
     },
     "success": {
       "heading": "PROPOSTA DE GARANTIA CRIADA",
-      "subtitle": "A proposta foi enviada com sucesso e aguarda ativação pelo inquilino.",
-      "description": "A garantia será efetivada mediante o aceite dos termos e o pagamento da taxa de ativação pelo inquilino. A proposta foi enviada por e-mail e WhatsApp para o inquilino.",
+      "subtitle": "A garantia foi criada e aguarda o contrato assinado.",
+      "description": "Colete com o inquilino o contrato de garantia assinado e envie o PDF na página da garantia. A MUTAV revisa o contrato e registra a garantia na reserva; ela fica ativa quando o registro é confirmado. O inquilino recebeu um aviso informativo de que a imobiliária entrará em contato para a assinatura.",
       "viewGuarantee": "Ver garantia",
       "createAnother": "Criar outra garantia"
     },

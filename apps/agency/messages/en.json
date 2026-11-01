@@ -1087,8 +1087,8 @@
     },
     "simulation": {
       "heading": "Simulation Result",
-      "approvedValueLabel": "Approved rental value",
-      "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
+      "approvedValueLabel": "Approved rent coverage",
+      "approvedMessage": "Analysis approved for this tenant and property. Review the coverage below and continue.",
       "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
       "closeButton": "Back to home",
       "noApplicationTitle": "Credit check not released",
@@ -1118,7 +1118,9 @@
         "fee": "Fee value",
         "commission": "Commission (1.5%)",
         "guarantee": "Guarantee value"
-      }
+      },
+      "reportHeading": "Approved coverage",
+      "timesRent": "{multiplier}× the rent"
     },
     "complementary": {
       "tenantSection": "Tenant Details",
@@ -1148,8 +1150,8 @@
     },
     "success": {
       "heading": "GUARANTEE PROPOSAL CREATED",
-      "subtitle": "The proposal has been successfully sent and is awaiting activation by the tenant.",
-      "description": "The guarantee will be activated upon the tenant's acceptance of the terms and payment of the activation fee. The proposal has been sent to the tenant via email and WhatsApp.",
+      "subtitle": "The guarantee is created and awaits the signed contract.",
+      "description": "Collect the signed guarantee contract from the tenant and upload the PDF on the guarantee page. MUTAV reviews the contract and registers the guarantee with the reserve; it becomes active once the registration is confirmed. The tenant received an informational notice that the agency will contact them to sign.",
       "viewGuarantee": "View guarantee",
       "createAnother": "Create another guarantee"
     },
