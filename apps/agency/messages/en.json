@@ -1140,13 +1140,13 @@
       "scoreNegado": "Denied"
     },
     "simulation": {
-      "heading": "Simulation Result",
+      "heading": "Estimate — subject to MUTAV's analysis",
       "approvedValueLabel": "Rent coverage",
       "noApplicationTitle": "Credit check not released",
       "noApplicationMessage": "The bureau is only consulted after the agency records that it intends to rent to this CPF/CNPJ. Go back to step 1, check the CPF/CNPJ, the property and the rent, and continue again to record it.",
       "noApplicationAction": "Back to step 1",
-      "inputMessage": "The score is one input to Mutav's analysis. Select the coverage to continue; Mutav confirms the fee rate when it accepts.",
-      "lowScoreMessage": "Low bureau score. You can still submit the proposal: Mutav decides with the score as one input. The rate shown is provisional."
+      "inputMessage": "Estimated figures. The score is one input to MUTAV's analysis, which sets the final fee rate when it accepts the proposal.",
+      "lowScoreMessage": "Bureau score below the priced bands. This is not a refusal: the estimate uses the Poor band rate, and MUTAV decides in its analysis, with the score as one input."
     },
     "coverage": {
       "exitCoverage": "Exit coverage",
@@ -1172,8 +1172,9 @@
         "commission": "Commission (1.5%)",
         "guarantee": "Guarantee value"
       },
-      "reportHeading": "Proposed coverage",
-      "timesRent": "{multiplier}× the rent"
+      "reportHeading": "Estimated coverage",
+      "timesRent": "{multiplier}× the rent",
+      "provisionalRate": "{rate}% · provisional rate"
     },
     "complementary": {
       "tenantSection": "Tenant Details",
@@ -1203,7 +1204,7 @@
     "success": {
       "heading": "GUARANTEE DRAFT CREATED",
       "subtitle": "The draft is saved. Mutav analyses it before anything goes to the tenant.",
-      "description": "Request Mutav's analysis now, or open the guarantee to review it first. If Mutav accepts, it sets the fee rate and the contract is sent to the tenant for signature. Then upload the signed contract PDF on the guarantee page: MUTAV reviews it and registers the guarantee with the reserve, and it becomes active once the registration is confirmed.",
+      "description": "Next step: request MUTAV's analysis, now or after reviewing the draft on the guarantee page. If MUTAV accepts the proposal, it sets the final fee rate and the contract goes out for signature; the guarantee page shows each step after that.",
       "viewGuarantee": "View guarantee",
       "createAnother": "Create another guarantee",
       "requestedDescription": "Analysis requested. You will be notified by email when Mutav decides.",
