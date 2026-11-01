@@ -64,6 +64,19 @@ export function maskPhone(raw: string): string {
   return d;
 }
 
+/**
+ * Mask a BRL amount as the user types it: dots group the thousands and a single
+ * comma opens at most two decimals (`1000000,5` → `1.000.000,5`). Typed dots are
+ * dropped — in pt-BR they are thousands separators, and every amount parser
+ * strips them anyway.
+ */
+export function maskBRLAmount(raw: string): string {
+  const [integerRaw = "", ...decimals] = raw.replace(/[^\d,]/g, "").split(",");
+  const integer = integerRaw.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (decimals.length === 0) return integer;
+  return `${integer},${decimals.join("").slice(0, 2)}`;
+}
+
 /** Format an integer-cents BRL value as a localized currency string. */
 export function formatBRLCents(cents: number): string {
   return new Intl.NumberFormat("pt-BR", {

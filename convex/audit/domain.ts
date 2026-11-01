@@ -76,6 +76,10 @@ export const AUDIT_ACTION = {
   INVOICE_ACCESS_ROTATED: "invoice.access_rotated",
   // mutavStaff/ (admin onboarding review — emitted by convex/mutavStaff/useCases.ts).
   ONBOARDING_REVIEWED: "onboarding.reviewed",
+  // mutavStaff/ (a staff member picks a submission up — submitted → under_review).
+  ONBOARDING_REVIEW_STARTED: "onboarding.review_started",
+  // agencies/ (the owner reopens a rejected submission to fix and resubmit).
+  ONBOARDING_REOPENED: "onboarding.reopened",
   // mutavStaff/ (admin staff-role provisioning — emitted by convex/mutavStaff/useCases.ts).
   STAFF_CREATED: "staff.created",
   STAFF_DELETED: "staff.deleted",
@@ -105,6 +109,12 @@ export const AUDIT_ACTION = {
   // convex/coverOperations/mutations.ts).
   COVER_OPERATION_RECORDED: "cover_operation.recorded",
   COVER_OPERATION_EXECUTED: "cover_operation.executed",
+  // agencies/ (member management — emitted by convex/agencies/members.ts).
+  MEMBERSHIP_INVITED: "membership.invited",
+  MEMBERSHIP_INVITE_REVOKED: "membership.invite_revoked",
+  MEMBERSHIP_INVITE_ACCEPTED: "membership.invite_accepted",
+  MEMBERSHIP_ROLE_CHANGED: "membership.role_changed",
+  MEMBERSHIP_REMOVED: "membership.removed",
 } as const satisfies Record<string, string>;
 
 export type AuditActionKey = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -139,6 +149,8 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.INVOICE_ACCESS_REVOKED),
   v.literal(AUDIT_ACTION.INVOICE_ACCESS_ROTATED),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
+  v.literal(AUDIT_ACTION.ONBOARDING_REVIEW_STARTED),
+  v.literal(AUDIT_ACTION.ONBOARDING_REOPENED),
   v.literal(AUDIT_ACTION.STAFF_CREATED),
   v.literal(AUDIT_ACTION.STAFF_DELETED),
   v.literal(AUDIT_ACTION.STAFF_BOOTSTRAP),
@@ -159,6 +171,11 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.GUARANTEE_ARREARS_CLEARED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_RECORDED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_EXECUTED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_INVITED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_INVITE_REVOKED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_INVITE_ACCEPTED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_ROLE_CHANGED),
+  v.literal(AUDIT_ACTION.MEMBERSHIP_REMOVED),
 );
 
 /**

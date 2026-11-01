@@ -359,11 +359,11 @@
       "propertyOwners": "Locadores"
     },
     "agency": {
-      "groupLabel": "Agência",
+      "groupLabel": "Imobiliária",
       "members": "Membros",
       "invoices": "Faturas",
       "commission": "Comissão",
-      "agencySettings": "Configurações da Agência"
+      "agencySettings": "Configurações da Imobiliária"
     },
     "agencySwitcher": {
       "workspacesLabel": "Espaços de trabalho",
@@ -372,7 +372,8 @@
         "admin": "Administrador",
         "member": "Membro"
       }
-    }
+    },
+    "support": "Suporte"
   },
   "chart": {
     "title": "Carteira vigente",
@@ -766,7 +767,8 @@
       "tenant": "Locatário",
       "availableGuarantee": "Garantia disponível",
       "nextRenewalDate": "Próxima renovação",
-      "creationTime": "Criado em"
+      "creationTime": "Criado em",
+      "open": "Abrir"
     },
     "urgency": {
       "overdue": "Vencido",
@@ -799,7 +801,8 @@
       "previousPage": "Página anterior",
       "nextPage": "Próxima página",
       "lastPage": "Última página"
-    }
+    },
+    "openAria": "Abrir {id}"
   },
   "invoiceList": {
     "meta": {
@@ -821,7 +824,8 @@
       "dueDate": "Vencimento",
       "total": "Total",
       "state": "Status",
-      "guarantees": "Garantias"
+      "guarantees": "Garantias",
+      "open": "Abrir"
     },
     "search": {
       "placeholder": "Buscar por ID ou competência"
@@ -836,7 +840,8 @@
       "previousPage": "Página anterior",
       "nextPage": "Próxima página",
       "lastPage": "Última página"
-    }
+    },
+    "openAria": "Abrir {id}"
   },
   "checkout": {
     "common": {
@@ -1160,14 +1165,20 @@
       },
       "summary": {
         "heading": "Resumo",
+        "coverageCeiling": "Cobertura",
+        "coverageCeilingValue": "até {count} aluguéis",
         "exitCost": "Custo de saída",
-        "fee": "Valor da taxa",
         "commission": "Comissão (1,5%)",
-        "guarantee": "Valor da garantia"
+        "guarantee": "Valor da garantia (mensal)"
       },
-      "reportHeading": "Cobertura estimada",
+      "reportHeading": "Estimativa de cobertura e custos",
       "timesRent": "{multiplier}× o aluguel",
-      "provisionalRate": "{rate}% · taxa provisória"
+      "provisionalRate": "{rate} · taxa provisória",
+      "groupCoverage": "Cobertura",
+      "groupMonthly": "Custos mensais",
+      "agencyCommission": "Comissão da imobiliária",
+      "monthlyTotal": "Total mensal",
+      "oneTime": "cobrada uma vez"
     },
     "complementary": {
       "tenantSection": "Dados do Inquilino",
@@ -1282,7 +1293,6 @@
       "tag": "Programa de parceiros",
       "title": "Garantia locatícia sem fiador.",
       "titleLine2": "Feita pra quem tem muito o que fazer.",
-      "subtitle": "Capital segregado. Auditável em tempo real, por qualquer pessoa, a qualquer momento.",
       "warningTitle": "Atenção para imobiliárias:",
       "warningBody": "o cadastro precisa ser feito pelo sócio com participação igual ou superior a 25%, ou por um administrador com poderes para abrir contas em nome da empresa. Tenha o contrato social em mãos para comprovar.",
       "checklistTitle": "O que você vai precisar",
@@ -1333,7 +1343,38 @@
         ]
       },
       "ctaButton": "Começar cadastro",
-      "ctaNoteReview": "análise em até 2 dias úteis"
+      "ctaNoteReview": "análise em até 2 dias úteis",
+      "invites": {
+        "title": "Você recebeu um convite",
+        "description": "Aceite um convite para entrar em uma imobiliária existente em vez de cadastrar uma nova.",
+        "invitedBy": "Convidado por {name}",
+        "roleLabel": "como {role}",
+        "roles": {
+          "admin": "administrador",
+          "member": "membro"
+        },
+        "expires": "Expira em {date}",
+        "accept": "Aceitar convite",
+        "accepting": "Entrando…",
+        "accepted": "Boas-vindas à {agency}!",
+        "or": "Ou cadastre uma nova imobiliária abaixo.",
+        "errors": {
+          "INVALID_EMAIL": "Informe um e-mail válido.",
+          "INVITE_ALREADY_PENDING": "Já existe um convite em aberto para este e-mail.",
+          "ALREADY_MEMBER": "Esta pessoa já faz parte da imobiliária.",
+          "INVITE_NOT_FOUND": "Convite não encontrado.",
+          "INVITE_NOT_PENDING": "Este convite não está mais pendente.",
+          "INVITE_EXPIRED": "Este convite expirou. Peça um novo.",
+          "INVITE_EMAIL_MISMATCH": "Este convite foi enviado para outro e-mail.",
+          "EMAIL_NOT_VERIFIED": "Confirme seu e-mail antes de aceitar o convite.",
+          "MEMBERSHIP_NOT_FOUND": "Membro não encontrado.",
+          "CANNOT_CHANGE_OWN_ROLE": "Você não pode alterar o seu próprio papel.",
+          "CANNOT_REMOVE_SELF": "Você não pode remover a si mesmo.",
+          "INSUFFICIENT_ROLE": "Seu papel não permite esta alteração.",
+          "LAST_OWNER": "A imobiliária precisa manter ao menos um proprietário.",
+          "UNEXPECTED": "Algo deu errado. Tente novamente."
+        }
+      }
     },
     "status": {
       "title": "Cadastro em análise",
@@ -1351,7 +1392,15 @@
       "noReason": "Nenhum motivo informado.",
       "contactLabel": "Tem dúvidas ou deseja recorrer?",
       "contactLink": "Fale conosco",
-      "homeButton": "Voltar"
+      "resubmitHint": "Seus dados continuam salvos. Corrija o que for necessário e reenvie o cadastro para uma nova análise.",
+      "resubmitButton": "Corrigir e reenviar",
+      "resubmitting": "Reabrindo cadastro…",
+      "errors": {
+        "NOT_FOUND": "Não encontramos o seu cadastro. Recarregue a página.",
+        "NOT_OWNER": "Apenas o responsável pelo cadastro pode reenviá-lo.",
+        "NOT_REJECTED": "Este cadastro não está mais reprovado. Recarregue a página.",
+        "unknown": "Algo deu errado. Tente novamente."
+      }
     },
     "loading": "Carregando…",
     "steps": {
@@ -1451,7 +1500,7 @@
       "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
       "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
       "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
-      "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte.",
+      "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte: contato@mutav.finance.",
       "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
       "AGENCY_TYPE_REQUIRED": "Selecione o tipo de cadastro para continuar.",
       "BANKING_INFO_REQUIRED": "Preencha os dados bancários antes de finalizar.",
@@ -1496,7 +1545,8 @@
         "representanteName": "Nome do responsável obrigatório.",
         "representanteCpf": "CPF do responsável inválido.",
         "alreadyRegistered": "Já cadastrado na Mutav."
-      }
+      },
+      "backButton": "Voltar"
     }
   },
   "transparency": {
@@ -1581,6 +1631,95 @@
     "default_verified": "Inadimplência verificada",
     "cover_paid": "Cobertura registrada",
     "closed": "Encerradas"
+  },
+  "members": {
+    "meta": {
+      "title": "Membros — MUTAV",
+      "description": "Gerencie quem tem acesso à sua imobiliária e o papel de cada pessoa."
+    },
+    "heading": "Membros",
+    "subheading": "Quem acessa esta imobiliária e o que cada pessoa pode fazer.",
+    "roles": {
+      "owner": "Proprietário",
+      "admin": "Administrador",
+      "member": "Membro"
+    },
+    "table": {
+      "heading": "Equipe",
+      "name": "Nome",
+      "email": "E-mail",
+      "role": "Papel",
+      "joined": "Entrou em",
+      "actions": "Ações",
+      "you": "você",
+      "empty": "Nenhum membro ainda.",
+      "loading": "Carregando membros…"
+    },
+    "actions": {
+      "invite": "Convidar membro",
+      "remove": "Remover",
+      "changeRoleLabel": "Alterar papel de {name}"
+    },
+    "removeDialog": {
+      "title": "Remover membro?",
+      "description": "{name} perderá o acesso a esta imobiliária imediatamente.",
+      "cancel": "Cancelar",
+      "confirm": "Remover"
+    },
+    "inviteSheet": {
+      "title": "Convidar membro",
+      "description": "Enviaremos um convite por e-mail. Ele expira em 7 dias.",
+      "email": "E-mail",
+      "emailPlaceholder": "nome@imobiliaria.com.br",
+      "role": "Papel",
+      "cancel": "Cancelar",
+      "submit": "Enviar convite",
+      "submitting": "Enviando…",
+      "sent": {
+        "title": "Convite criado",
+        "emailed": "Enviamos um e-mail para {email}. Você também pode compartilhar o link abaixo.",
+        "notEmailed": "O e-mail ainda não está configurado, então {email} não recebeu mensagem. Compartilhe o link abaixo.",
+        "linkLabel": "Link de acesso",
+        "copy": "Copiar",
+        "linkCopied": "Link copiado.",
+        "linkHint": "{email} entra com esse endereço e aceita o convite na tela inicial. O convite vale por 7 dias.",
+        "done": "Concluir"
+      }
+    },
+    "invites": {
+      "heading": "Convites pendentes",
+      "empty": "Nenhum convite pendente.",
+      "email": "E-mail",
+      "role": "Papel",
+      "invitedBy": "Convidado por",
+      "expires": "Expira em",
+      "revoke": "Revogar",
+      "copyLink": "Copiar link",
+      "linkCopied": "Link copiado."
+    },
+    "toasts": {
+      "invited": "Convite enviado para {email}.",
+      "roleChanged": "Papel atualizado.",
+      "removed": "Membro removido.",
+      "revoked": "Convite revogado.",
+      "inviteCreated": "Convite criado para {email}. O e-mail ainda não está configurado — compartilhe o link."
+    },
+    "errors": {
+      "INVALID_EMAIL": "Informe um e-mail válido.",
+      "INVITE_ALREADY_PENDING": "Já existe um convite em aberto para este e-mail.",
+      "ALREADY_MEMBER": "Esta pessoa já faz parte da imobiliária.",
+      "INVITE_NOT_FOUND": "Convite não encontrado.",
+      "INVITE_NOT_PENDING": "Este convite não está mais pendente.",
+      "INVITE_EXPIRED": "Este convite expirou. Peça um novo.",
+      "INVITE_EMAIL_MISMATCH": "Este convite foi enviado para outro e-mail.",
+      "EMAIL_NOT_VERIFIED": "Confirme seu e-mail antes de aceitar o convite.",
+      "MEMBERSHIP_NOT_FOUND": "Membro não encontrado.",
+      "CANNOT_CHANGE_OWN_ROLE": "Você não pode alterar o seu próprio papel.",
+      "CANNOT_REMOVE_SELF": "Você não pode remover a si mesmo.",
+      "INSUFFICIENT_ROLE": "Seu papel não permite esta alteração.",
+      "LAST_OWNER": "A imobiliária precisa manter ao menos um proprietário.",
+      "UNEXPECTED": "Algo deu errado. Tente novamente."
+    }
   },
   "sessionError": {
     "notProvisioned": {

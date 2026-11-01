@@ -10,10 +10,9 @@ type Tone = (typeof GUARANTEE_STATE_TONE)[GuaranteeState];
  * a state that changed colour between two places on the same screen would
  * read as two different things.
  *
- * Two tones collapse here exactly as they do on the tags: `default_verified`
- * and `cover_committed` share `warning-strong`, `drafted` and `closed` share
- * the neutral. That is the shipped tag palette, and the label beside each
- * swatch is what tells them apart.
+ * Two tones collapse here exactly as they do on the tags: `drafted` and
+ * `closed` share the neutral. That is the shipped tag palette, and the label
+ * beside each swatch is what tells them apart.
  */
 const TONE_SWATCH_COLOR: Record<Tone, string> = {
   accent: "var(--color-text-3)",
@@ -23,6 +22,7 @@ const TONE_SWATCH_COLOR: Record<Tone, string> = {
   muted: "var(--color-text-3)",
   expiring: "var(--color-warning)",
   caution: "var(--color-warning-strong)",
+  committed: "var(--color-escalated)",
 };
 
 export const GUARANTEE_STATE_SWATCH_COLOR: Record<GuaranteeState, string> = {
