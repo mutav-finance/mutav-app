@@ -101,11 +101,14 @@ describe("sendOnboardingDecisionEmail", () => {
 
   beforeEach(() => {
     delete process.env.RESEND_API_KEY; // hook-ok: test fixture — direct env mutation is the only way to unset a secret for convex-test
+    delete process.env.RESEND_FROM_EMAIL; // hook-ok: test fixture — unset the sender for convex-test
     warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
     warn.mockRestore();
+    delete process.env.RESEND_API_KEY; // hook-ok: test fixture — reset env between tests
+    delete process.env.RESEND_FROM_EMAIL; // hook-ok: test fixture — reset env between tests
   });
 
   test("reaches the vendor-config guard and skips without a Resend key", async () => {
@@ -119,7 +122,22 @@ describe("sendOnboardingDecisionEmail", () => {
       }),
     ).resolves.toBeNull();
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("RESEND_API_KEY not set"));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("email not configured"));
+  });
+
+  test("skips without throwing when the key is set but the sender address is missing", async () => {
+    process.env.RESEND_API_KEY = "re_test_key"; // hook-ok: test fixture — key present, sender absent
+    const t = convexTest(schema);
+    const agencyId = await seedAgency(t, { state: "rejected", email: AGENCY_EMAIL });
+
+    await expect(
+      t.action(internal.agencies.actions.sendOnboardingDecisionEmail, {
+        agencyId,
+        decision: "rejected",
+      }),
+    ).resolves.toBeNull();
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("email not configured"));
   });
 
   test("skips when the agency moved on before the email ran", async () => {
@@ -132,7 +150,7 @@ describe("sendOnboardingDecisionEmail", () => {
     });
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("state changed"), expect.anything());
-    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("RESEND_API_KEY not set"));
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("email not configured"));
   });
 
   test("no-ops on an agency erased before execution", async () => {

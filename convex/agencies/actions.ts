@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { Resend } from "resend";
 import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
-import { getAppUrl, getResendApiKey, getResendFromEmail, isResendConfigured } from "../lib/env";
+import { getAppUrl, getResendApiKey, getResendFromEmail, isEmailConfigured } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
 import { ONBOARDING_STATE, onboardingDecisionValidator } from "./domain";
 import type { OnboardingDecision, OnboardingState } from "./domain";
@@ -24,7 +24,7 @@ const REJECTED_PAGE_PATH = "/onboarding/rejected";
 // Failure modes (all logged, none re-thrown):
 //   - agency deleted, or no contact email at all → skip
 //   - state moved on before execution (e.g. owner already reopened) → skip
-//   - RESEND_API_KEY missing → skip (local dev without secrets)
+//   - RESEND_API_KEY or RESEND_FROM_EMAIL missing → skip (unconfigured deployment)
 //   - Resend API rejects → log
 export const sendOnboardingDecisionEmail = internalAction({
   args: {
@@ -49,8 +49,8 @@ export const sendOnboardingDecisionEmail = internalAction({
       return;
     }
 
-    if (!isResendConfigured()) {
-      logWarn("[onboarding] RESEND_API_KEY not set, skipping decision email");
+    if (!isEmailConfigured()) {
+      logWarn("[onboarding] email not configured (Resend key or sender), skipping decision email");
       return;
     }
 
