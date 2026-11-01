@@ -276,6 +276,7 @@ export const updateDraft = mutationWithActiveAgency({
           rentCents,
           condoCents: lease.rent.condoCents,
           otherFeesCents: lease.rent.otherFeesCents,
+          dueDay: lease.rent.dueDay,
         }),
       });
     }
@@ -689,15 +690,17 @@ export const markSentForSignature = mutationWithMutavRole({ minRole: "compliance
     });
 
     const tenant = await agencySubmittedTenant(ctx, guarantee);
-    if (tenant) {
+    const agency = await ctx.db.get(guarantee.agencyId);
+    if (tenant && agency) {
       await ctx.scheduler.runAfter(0, internal.guarantees.actions.sendProposalNotifications, {
         publicId: guarantee.publicId,
         tenantName: tenant.fullName,
         tenantEmail: tenant.email,
         tenantPhone: tenant.phone,
+        agencyName: agency.name,
         rentCents: guarantee.terms.rentCents,
-        availableGuaranteeCents: guarantee.capacity.availableCents,
         feeCents: guarantee.terms.feeCents,
+        coverageCents: guarantee.capacity.availableCents,
       });
     }
 

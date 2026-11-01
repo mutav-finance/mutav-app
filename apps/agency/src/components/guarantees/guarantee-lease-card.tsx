@@ -44,6 +44,10 @@ export function GuaranteeLeaseCard({ lease }: { lease: GuaranteeLease }) {
             value={formatBRLCents(lease.rent.totalRentCents)}
             mono
           />
+          <FieldRow
+            label={tFields("dueDay")}
+            value={tFields("dueDayValue", { day: String(lease.rent.dueDay).padStart(2, "0") })}
+          />
           <FieldRow label={tFields("payer")} value={tPayer(lease.payer)} />
 
           <FieldGroupHeader>{tGroups("property")}</FieldGroupHeader>

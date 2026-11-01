@@ -23,6 +23,7 @@ export function AdminNav() {
     { title: tMain("compliance"), href: "/compliance", icon: <ShieldCheckIcon /> },
     { title: tMain("underwriting"), href: "/underwriting", icon: <FileCheckIcon /> },
     { title: tMain("defaults"), href: "/defaults", icon: <AlertOctagonIcon /> },
+    { title: tMain("documents"), href: "/documents", icon: <FileCheckIcon /> },
     { title: tMain("treasury"), href: "/treasury", icon: <CoinsIcon /> },
     { title: tMain("observability"), href: "/observability", icon: <ActivityIcon /> },
     { title: tMain("nav"), href: "/nav", icon: <ScaleIcon /> },

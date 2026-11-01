@@ -4,6 +4,8 @@ import { PageContent } from "@mutav/ui/page/page-content";
 import { Button } from "@mutav/ui/button";
 import { StatusTag } from "@mutav/ui/status-tag";
 import { resolveUserDestination } from "@/lib/user-destination";
+import { PARTNER_SUPPORT_EMAIL } from "@/lib/support";
+import { redirectOnSessionFailure } from "@/lib/session-failure-redirect";
 
 type Props = {
   searchParams: Promise<{ reason?: string }>;
@@ -13,6 +15,7 @@ type Props = {
 export default async function OnboardingRejectedPage({ searchParams, params }: Props) {
   const { locale } = await params;
   const dest = await resolveUserDestination();
+  await redirectOnSessionFailure({ destination: dest, locale, returnHref: "/onboarding/rejected" });
 
   if (dest.kind === "dashboard") {
     redirect({ href: "/", locale });
@@ -54,7 +57,7 @@ export default async function OnboardingRejectedPage({ searchParams, params }: P
 
           <p className="text-text-3 text-sm">
             {t("contactLabel")}{" "}
-            <Link href="mailto:parceiros@mutav.com.br" className="text-accent underline">
+            <Link href={`mailto:${PARTNER_SUPPORT_EMAIL}`} className="text-accent underline">
               {t("contactLink")}
             </Link>
           </p>

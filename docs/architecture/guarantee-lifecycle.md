@@ -140,6 +140,8 @@ Between creation and activation a draft goes through Mutav's underwriting review
 
 Every review mutation refuses a non-draft with `NOT_DRAFTED` and writes a `guaranteeHistory` row without `transition` (except the refusal's close row). A `reprice` of an accepted draft keeps the compliance rate ([`mutations.ts:348-352`](../../convex/guarantees/mutations.ts)). The staff reads — `listAnalysisQueue` (index `by_review_status_requestedAt` = `underwriting.review, status, underwriting.analysisRequest.requestedAt`, pinned to `drafted`, oldest request first), `listAwaitingDispatch` and `getAnalysisDetail` — are gated at `compliance` ([`reviewQueries.ts:83, 111, 131`](../../convex/guarantees/reviewQueries.ts)). Proof: [`reviewMutations.test.ts`](../../convex/guarantees/reviewMutations.test.ts).
 
+> **Decided, not yet built — [ADR 0010](decisions/0010-activation-is-onchain-registration.md).** The agency `activate` above is the code on `main` today. The decided rule replaces it: `drafted → active` happens only when the guarantee's `register_guarantee` is confirmed on-chain, after compliance approves the signed contract (`signed → pending_registration → active`). No agency or staff Activate click; billing starts at `active`. Sending for signature holds the offer's required coverage (cover × `c`) for the offer's hold period (platform default 7 days, overridable per product, per agency and per contract) against the reserve's free capital. **That off-chain hold is sound only while MUTAV's operator is the sole caller of `register_guarantee`**; a second operator or registrant moves the hold on-chain (ADR 0010, revisit trigger).
+
 ### 6.2 Notice mutations — `convex/delinquencies/mutations.ts`
 
 Each row is one mutation that moves the **notice** and, in the same transaction, may move the **guarantee**.
@@ -175,6 +177,14 @@ A cover is refused, before any write, when the notice is missing, is not itself 
 ### 6.4 Notice state machine — `convex/delinquencies/machine.ts`
 
 Statuses `open, verified, resolved, canceled` (`:18-23`); terminal = `resolved, canceled` (`:39-42`); edges `open → verified | resolved | canceled`, `verified → resolved | canceled` (`:53-60`); the same three error codes as the guarantee machine (`:62-65`). Value objects in [`delinquencies/domain.ts`](../../convex/delinquencies/domain.ts): resolution kinds `tenant_cured, cover_committed, staff_dispute, stale`; cancellation reasons `agency_withdrew, staff_dismissed, duplicate, data_error`; evidence sources `agency_reported, tenant_confirmed, bank_attested, onchain_observed, system_scheduled` (only `agency_reported` is accepted by `openNotice` today, `mutations.ts:184-192`).
+
+### 6.5 Guarantee documents — `convex/guarantees/documents.ts`, `staffDocuments.ts`
+
+Files attached to a guarantee live in the `guaranteeDocuments` table, one row per uploaded file (slot `key` ∈ `rentalContract` — the signed rental contract — `inspection`, `policy`). They do not move the guarantee's state.
+
+- **Upload.** The agency (`attachGuaranteeDocument`, `mutationWithActiveAgency`) or staff on its behalf (`staffAttachGuaranteeDocument`, `support`+) record a file already POSTed to File Storage. The file is judged by the `_storage` system row, not the client: PDF/JPEG/PNG only, 1 byte – 15 MB (`checkUploadedFile` in `guarantees/domain.ts`). Refused on a `closed` guarantee and when the blob is already attached anywhere. Audit `guarantee.document_attached`.
+- **Review statuses** — `pending_review → approved | rejected`, decided only by `compliance`+ (`approveGuaranteeDocument`, `rejectGuaranteeDocument`; a reason is required and is emailed to the agency). A new upload marks earlier `pending_review` files of the same slot `superseded`; approved and rejected rows are final and stay as history. Audit `guarantee.document_approved` / `guarantee.document_rejected` (the reason stays on the row, out of the chain).
+- **Activation gate.** `isSignedContractApproved(docs)` (pure, `guarantees/domain.ts`) and `hasApprovedSignedContract(ctx, guaranteeId)` (`guarantees/documents.ts`) answer "has staff approved a signed rental contract?" — one approved `rentalContract` row is enough, and a later upload does not revoke it.
 
 ## 7. Capacity policy
 

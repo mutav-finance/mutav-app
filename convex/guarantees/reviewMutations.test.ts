@@ -127,7 +127,7 @@ function createArgs(cpf = VALID_CPF) {
       },
       tag: "",
       description: "",
-      rent: { rentCents: RENT_CENTS, condoCents: 50_000, otherFeesCents: 0 },
+      rent: { rentCents: RENT_CENTS, condoCents: 50_000, otherFeesCents: 0, dueDay: 5 },
     },
     plan: "basic" as const,
     tenant: {
@@ -231,7 +231,9 @@ describe("guarantees.reviewMutations.updateDraft", () => {
     const row = await readByPublicId(w.t, publicId);
     expect(row.terms.rentCents).toBe(400_000);
     expect(row.terms.taxaFeeCents).toBe(48_000);
-    expect(row.terms.prestamistaFeeCents).toBe(1_280);
+    // Prestamista is off for the pilot, so a Plus request is priced and stored as Basic.
+    expect(row.terms.plan).toBe("basic");
+    expect(row.terms.prestamistaFeeCents).toBe(0);
     expect(row.capacity).toEqual({
       ceilingCents: 12_000_000,
       availableCents: 12_000_000,
@@ -242,6 +244,7 @@ describe("guarantees.reviewMutations.updateDraft", () => {
       rentCents: 400_000,
       condoCents: 50_000,
       otherFeesCents: 0,
+      dueDay: 5,
       totalRentCents: 450_000,
     });
     expect(await auditActions(w.t, publicId)).toContain("guarantee.draft_updated");

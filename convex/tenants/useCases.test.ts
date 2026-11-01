@@ -399,7 +399,7 @@ describe("lookupTenantByTaxId (relationship-gated)", () => {
         },
         tag: "",
         description: "",
-        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0 },
+        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
       },
       plan: "basic" as const,
       tenant: {
@@ -525,7 +525,7 @@ describe("cross-agency tenant identity", () => {
         },
         tag: "",
         description: "",
-        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0 },
+        rent: { rentCents: 300000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
       },
       plan: "basic" as const,
       tenant: {

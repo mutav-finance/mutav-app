@@ -25,7 +25,7 @@
  * the Etherfuse sandbox and prints results. Safe to run repeatedly.
  */
 
-import { Account, MuxedAccount } from "@stellar/stellar-base";
+import { Account, MuxedAccount } from "@stellar/stellar-sdk";
 
 const API_KEY = process.env.ETHERFUSE_API_KEY;
 const BASE_URL = process.env.ETHERFUSE_BASE_URL ?? "https://api.sand.etherfuse.com";

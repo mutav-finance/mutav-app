@@ -1,7 +1,6 @@
 import type { AgencyId } from "@convex/agencies/domain";
 import type {
   DocumentKey,
-  DocumentStatus,
   GuaranteeCapacity,
   GuaranteeClosure,
   GuaranteeState,
@@ -16,7 +15,6 @@ import type { LeaseProperty, LeaseRent, Payer, PropertyKind } from "@convex/leas
 // restated here: a state the server adds or renames must break this
 // compilation, not silently reach a branch that no longer exists.
 export type {
-  DocumentStatus,
   GuaranteeCapacity,
   GuaranteeClosure,
   GuaranteeState,
@@ -30,11 +28,6 @@ export type {
 };
 
 export type GuaranteeDocumentKey = DocumentKey;
-
-export type GuaranteeDocument = {
-  key: GuaranteeDocumentKey;
-  status: DocumentStatus;
-};
 
 export type GuaranteeHistoryEntry = {
   at: string;
@@ -87,7 +80,6 @@ export type Guarantee = {
   review: GuaranteeReviewView;
   terms: GuaranteeTerms;
   capacity: GuaranteeCapacity;
-  documents: GuaranteeDocument[];
   lease: GuaranteeLease;
   tenant: GuaranteeTenant;
   history: GuaranteeHistoryEntry[];
