@@ -1605,7 +1605,17 @@
       "role": "Role",
       "cancel": "Cancel",
       "submit": "Send invite",
-      "submitting": "Sending…"
+      "submitting": "Sending…",
+      "sent": {
+        "title": "Invite created",
+        "emailed": "We emailed {email}. You can also share the link below.",
+        "notEmailed": "Email is not set up yet, so {email} was not emailed. Share the link below yourself.",
+        "linkLabel": "Sign-in link",
+        "copy": "Copy",
+        "linkCopied": "Link copied.",
+        "linkHint": "{email} signs in with that address and accepts the invite on the welcome screen. The invite expires in 7 days.",
+        "done": "Done"
+      }
     },
     "invites": {
       "heading": "Pending invites",
@@ -1614,13 +1624,16 @@
       "role": "Role",
       "invitedBy": "Invited by",
       "expires": "Expires",
-      "revoke": "Revoke"
+      "revoke": "Revoke",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied."
     },
     "toasts": {
       "invited": "Invite sent to {email}.",
       "roleChanged": "Role updated.",
       "removed": "Member removed.",
-      "revoked": "Invite revoked."
+      "revoked": "Invite revoked.",
+      "inviteCreated": "Invite created for {email}. Email is not set up yet — share the link."
     },
     "errors": {
       "INVALID_EMAIL": "Enter a valid email address.",

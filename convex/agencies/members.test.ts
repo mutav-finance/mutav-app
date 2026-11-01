@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { api } from "../_generated/api";
 import schema from "../schema";
 import type { UserId } from "../users/domain";
@@ -174,6 +174,50 @@ describe("inviteMember", () => {
     expect(await auditActions(t)).toEqual([
       { action: "membership.invited", resourceId: result.data.inviteId },
     ]);
+  });
+
+  describe("email delivery", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    async function scheduledCount(t: T) {
+      const rows = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+      return rows.length;
+    }
+
+    test("skips the send and reports emailQueued false when email is not configured", async () => {
+      vi.stubEnv("RESEND_API_KEY", "re_test");
+      vi.stubEnv("RESEND_FROM_EMAIL", "");
+      const { t, agencyId } = await setupTeam();
+      const result = await as(t, "owner").mutation(api.agencies.members.inviteMember, {
+        agencyId,
+        email: "manual@example.com",
+        role: "member",
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.emailQueued).toBe(false);
+      expect(await scheduledCount(t)).toBe(0);
+      expect(await t.run((ctx) => ctx.db.get(result.data.inviteId))).toMatchObject({
+        status: "pending",
+      });
+    });
+
+    test("queues the invite email when key and sender are both set", async () => {
+      vi.stubEnv("RESEND_API_KEY", "re_test");
+      vi.stubEnv("RESEND_FROM_EMAIL", "MUTAV <noreply@mutav.finance>");
+      const { t, agencyId } = await setupTeam();
+      const result = await as(t, "owner").mutation(api.agencies.members.inviteMember, {
+        agencyId,
+        email: "queued@example.com",
+        role: "member",
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.emailQueued).toBe(true);
+      expect(await scheduledCount(t)).toBe(1);
+    });
   });
 
   test("rejects a malformed email", async () => {

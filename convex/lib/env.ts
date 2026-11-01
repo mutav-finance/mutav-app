@@ -72,9 +72,9 @@ export function getResendApiKey(): string {
   return key;
 }
 
-/** `null` when Resend is not provisioned — callers skip the send instead of failing. */
-export function getOptionalResendApiKey(): string | null {
-  return process.env.RESEND_API_KEY || null;
+/** Email sends only when both the Resend key and the sender address are set. */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
 }
 
 export function getResendFromEmail(): string {

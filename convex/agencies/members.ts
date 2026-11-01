@@ -11,6 +11,8 @@ import {
   queryWithAgencyScope,
   queryWithAuth,
 } from "../lib/auth";
+import { isEmailConfigured } from "../lib/env";
+import { logWarn } from "../lib/logger";
 import type { Result } from "../lib/result";
 import type { User, UserId } from "../users/domain";
 import {
@@ -48,7 +50,16 @@ const AUDIT_RESOURCE = {
 
 // ─── Result types ─────────────────────────────────────────────────────────────
 
-type InviteMemberSuccessResult = { inviteId: AgencyInviteId; expiresAt: string };
+/**
+ * `emailQueued` is false when email is not configured on this deployment: the
+ * invite still exists and the invitee sees it on the welcome screen after
+ * signing in, so the UI tells the inviter to share the sign-in link by hand.
+ */
+type InviteMemberSuccessResult = {
+  inviteId: AgencyInviteId;
+  expiresAt: string;
+  emailQueued: boolean;
+};
 type InviteMemberErrorResult = {
   code:
     | typeof MEMBERSHIP_ERROR_CODE.INVALID_EMAIL
@@ -318,6 +329,15 @@ export const inviteMember = mutationWithActiveAgencyRole({ minRole: MEMBER_ROLE.
       payload: { agencyId: ctx.agencyId, email, role: args.role, expiresAt },
     });
 
+    if (!isEmailConfigured()) {
+      logWarn("[invites] email not configured, invite created without sending", { inviteId });
+      return {
+        success: true,
+        data: { inviteId, expiresAt, emailQueued: false },
+        message: "Invite created; email is not configured, share the link manually",
+      };
+    }
+
     const agency = await ctx.db.get(ctx.agencyId);
     await ctx.scheduler.runAfter(0, internal.agencies.actions.sendInviteEmail, {
       email,
@@ -327,7 +347,11 @@ export const inviteMember = mutationWithActiveAgencyRole({ minRole: MEMBER_ROLE.
       expiresAt,
     });
 
-    return { success: true, data: { inviteId, expiresAt }, message: "Invite sent" };
+    return {
+      success: true,
+      data: { inviteId, expiresAt, emailQueued: true },
+      message: "Invite sent",
+    };
   },
 });
 

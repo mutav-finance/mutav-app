@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { MailPlusIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CopyIcon, MailPlusIcon, Trash2Icon, XIcon } from "lucide-react";
 import type { MemberRole } from "@convex/agencies/domain";
 import {
   AlertDialog,
@@ -20,7 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { formatDateBR } from "@mutav/i18n/brazil";
 import { InviteMemberSheet } from "@/components/members/invite-member-sheet";
+import { inviteAcceptLink } from "@/components/members/use-invite-member-sheet";
 import { useMembersPage } from "@/components/members/use-members-page";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 
 const ROLE_VALUES = {
   owner: "owner",
@@ -35,6 +37,7 @@ function isMemberRole(value: string): value is MemberRole {
 export function MembersPage() {
   const t = useTranslations("members");
   const vm = useMembersPage();
+  const { copy: copyInviteLink } = useCopyToClipboard(t("invites.linkCopied"));
 
   return (
     <div className="flex flex-col gap-8 px-4 py-4 lg:px-6">
@@ -176,6 +179,14 @@ export function MembersPage() {
                       {formatDateBR(invite.expiresAt)}
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyInviteLink(inviteAcceptLink(window.location.origin))}
+                      >
+                        <CopyIcon className="size-4" strokeWidth={1.5} />
+                        {t("invites.copyLink")}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

@@ -8,6 +8,17 @@ import { api } from "@convex/_generated/api";
 import type { AgencyId, InvitableRole } from "@convex/agencies/domain";
 import { INVITABLE_ROLE } from "@convex/agencies/domain";
 
+/**
+ * Where an invitee signs in to accept. Invites are matched by email on the
+ * welcome screen, so the link is the same for every invite; it is shown after
+ * every invite so the inviter can share it when email is not configured.
+ */
+export function inviteAcceptLink(origin: string): string {
+  return `${origin}/onboarding`;
+}
+
+export type SentInvite = { email: string; emailQueued: boolean; link: string };
+
 export const INVITABLE_ROLES: readonly InvitableRole[] = [
   INVITABLE_ROLE.MEMBER,
   INVITABLE_ROLE.ADMIN,
@@ -31,8 +42,10 @@ export function useInviteMemberSheet({
   const [role, setRole] = React.useState<InvitableRole>(INVITABLE_ROLE.MEMBER);
   const [emailError, setEmailError] = React.useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = React.useState(false);
+  const [sent, setSent] = React.useState<SentInvite | null>(null);
 
   function close() {
+    setSent(null);
     setEmail("");
     setRole(INVITABLE_ROLE.MEMBER);
     setEmailError(undefined);
@@ -48,8 +61,15 @@ export function useInviteMemberSheet({
     try {
       const result = await inviteMember({ agencyId, email, role });
       if (result.success) {
-        toast.success(t("toasts.invited", { email: email.trim() }));
-        close();
+        const invitedEmail = email.trim();
+        const { emailQueued } = result.data;
+        if (emailQueued) toast.success(t("toasts.invited", { email: invitedEmail }));
+        else toast.success(t("toasts.inviteCreated", { email: invitedEmail }));
+        setSent({
+          email: invitedEmail,
+          emailQueued,
+          link: inviteAcceptLink(window.location.origin),
+        });
         return;
       }
       if (result.error.code === "INVALID_EMAIL") {
@@ -77,6 +97,7 @@ export function useInviteMemberSheet({
     roles: INVITABLE_ROLES,
     emailError,
     submitting,
+    sent,
     submit,
     close,
   };

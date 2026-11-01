@@ -1605,7 +1605,17 @@
       "role": "Papel",
       "cancel": "Cancelar",
       "submit": "Enviar convite",
-      "submitting": "Enviando…"
+      "submitting": "Enviando…",
+      "sent": {
+        "title": "Convite criado",
+        "emailed": "Enviamos um e-mail para {email}. Você também pode compartilhar o link abaixo.",
+        "notEmailed": "O e-mail ainda não está configurado, então {email} não recebeu mensagem. Compartilhe o link abaixo.",
+        "linkLabel": "Link de acesso",
+        "copy": "Copiar",
+        "linkCopied": "Link copiado.",
+        "linkHint": "{email} entra com esse endereço e aceita o convite na tela inicial. O convite vale por 7 dias.",
+        "done": "Concluir"
+      }
     },
     "invites": {
       "heading": "Convites pendentes",
@@ -1614,13 +1624,16 @@
       "role": "Papel",
       "invitedBy": "Convidado por",
       "expires": "Expira em",
-      "revoke": "Revogar"
+      "revoke": "Revogar",
+      "copyLink": "Copiar link",
+      "linkCopied": "Link copiado."
     },
     "toasts": {
       "invited": "Convite enviado para {email}.",
       "roleChanged": "Papel atualizado.",
       "removed": "Membro removido.",
-      "revoked": "Convite revogado."
+      "revoked": "Convite revogado.",
+      "inviteCreated": "Convite criado para {email}. O e-mail ainda não está configurado — compartilhe o link."
     },
     "errors": {
       "INVALID_EMAIL": "Informe um e-mail válido.",

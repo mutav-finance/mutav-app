@@ -3,7 +3,7 @@
 import { v } from "convex/values";
 import { Resend } from "resend";
 import { internalAction } from "../_generated/server";
-import { getAppUrl, getOptionalResendApiKey, getResendFromEmail } from "../lib/env";
+import { getAppUrl, getResendApiKey, getResendFromEmail, isEmailConfigured } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
 import { INVITABLE_ROLE, invitableRoleValidator } from "./domain";
 import type { InvitableRole } from "./domain";
@@ -24,7 +24,8 @@ type InviteEmailArgs = {
 /**
  * Delivers an agency invitation. Scheduled by `inviteMember`; the invite row is
  * already committed, so a delivery failure is logged and never rolls it back —
- * the invitee still sees it on the welcome screen after signing in.
+ * the invitee still sees it on the welcome screen after signing in. Skips the
+ * send when email is not configured; `inviteMember` does not schedule it then.
  */
 export const sendInviteEmail = internalAction({
   args: {
@@ -35,13 +36,12 @@ export const sendInviteEmail = internalAction({
     expiresAt: v.string(),
   },
   handler: async (_ctx, args) => {
-    const apiKey = getOptionalResendApiKey();
-    if (!apiKey) {
-      logWarn("[invites] RESEND_API_KEY not set, skipping email");
+    if (!isEmailConfigured()) {
+      logWarn("[invites] email not configured (RESEND_API_KEY/RESEND_FROM_EMAIL), skipping send");
       return;
     }
     try {
-      const resend = new Resend(apiKey);
+      const resend = new Resend(getResendApiKey());
       await resend.emails.send({
         from: getResendFromEmail(),
         to: args.email,
