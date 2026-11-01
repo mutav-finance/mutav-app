@@ -1140,13 +1140,13 @@
       "scoreNegado": "Negado"
     },
     "simulation": {
-      "heading": "Resultado da Simulação",
+      "heading": "Estimativa — sujeita à análise da MUTAV",
       "approvedValueLabel": "Cobertura de aluguel",
       "noApplicationTitle": "Consulta de crédito não liberada",
       "noApplicationMessage": "A consulta ao birô só é liberada depois que a imobiliária registra a intenção de locação para este CPF/CNPJ. Volte à etapa 1, confira o CPF/CNPJ, o imóvel e o valor do aluguel e avance de novo para registrar.",
       "noApplicationAction": "Voltar para a etapa 1",
-      "inputMessage": "O score é um dos insumos da análise Mutav. Selecione a cobertura para continuar; a Mutav confirma a taxa ao aprovar.",
-      "lowScoreMessage": "Score do bureau baixo. Você ainda pode enviar a proposta: a Mutav decide considerando o score como um dos insumos. A taxa exibida é provisória."
+      "inputMessage": "Valores estimados. O score é um dos insumos da análise da MUTAV, que define a taxa final ao aceitar a proposta.",
+      "lowScoreMessage": "Score do birô abaixo das faixas de preço. Isso não é uma recusa: a estimativa usa a taxa da faixa Ruim, e a MUTAV decide na análise, com o score como um dos insumos."
     },
     "coverage": {
       "exitCoverage": "Cobertura de saída",
@@ -1172,8 +1172,9 @@
         "commission": "Comissão (1,5%)",
         "guarantee": "Valor da garantia"
       },
-      "reportHeading": "Cobertura proposta",
-      "timesRent": "{multiplier}× o aluguel"
+      "reportHeading": "Cobertura estimada",
+      "timesRent": "{multiplier}× o aluguel",
+      "provisionalRate": "{rate}% · taxa provisória"
     },
     "complementary": {
       "tenantSection": "Dados do Inquilino",
@@ -1203,7 +1204,7 @@
     "success": {
       "heading": "RASCUNHO DE GARANTIA CRIADO",
       "subtitle": "O rascunho foi salvo. A Mutav analisa a proposta antes de qualquer envio ao inquilino.",
-      "description": "Solicite agora a análise da Mutav ou abra a garantia para revisá-la antes. Se a Mutav aprovar, ela define a taxa e o contrato é enviado ao inquilino para assinatura. Depois, envie o PDF do contrato assinado na página da garantia: a MUTAV revisa o contrato e registra a garantia na reserva, e ela fica ativa quando o registro é confirmado.",
+      "description": "Próximo passo: solicite a análise da MUTAV, agora ou depois de revisar o rascunho na página da garantia. Se a MUTAV aceitar a proposta, ela define a taxa final e o contrato segue para assinatura; a página da garantia mostra cada etapa seguinte.",
       "viewGuarantee": "Ver garantia",
       "createAnother": "Criar outra garantia",
       "requestedDescription": "Análise solicitada. Você será avisado por e-mail quando a Mutav decidir.",
