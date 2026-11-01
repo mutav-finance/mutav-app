@@ -89,12 +89,6 @@ const FULL_CAPACITY: GuaranteeCapacity = {
   reservedCents: 0,
 };
 
-const PENDING_DOCUMENTS: Guarantee["documents"] = [
-  { key: "rentalContract", status: "pendente" },
-  { key: "inspection", status: "pendente" },
-  { key: "policy", status: "pendente" },
-];
-
 const NO_ELIGIBILITY_RESTRICTION: Product["eligibility"] = {
   agencyIds: null,
   regionUFs: null,
@@ -181,6 +175,7 @@ function leaseDoc(spec: LeaseSpec): NewLease {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     },
     payer: "tenant",
     openGuaranteeId: null,
@@ -220,7 +215,6 @@ function guaranteeDoc(spec: RawGuaranteeSpec): NewGuarantee {
     tenantApproval: spec.tenantApproval ?? { status: "pendente", termApprovedAt: null },
     terms: spec.terms ?? { ...BASIC_BOM_TERMS },
     capacity: spec.capacity ?? { ...FULL_CAPACITY },
-    documents: [...PENDING_DOCUMENTS],
   };
 }
 
@@ -547,7 +541,6 @@ describe("schema conformance — strict harness", () => {
           "agencyId",
           "capacity",
           ...(state === "closed" ? ["closure"] : []),
-          "documents",
           "leaseId",
           "nextRenewalDate",
           "productId",
@@ -659,7 +652,7 @@ describe("schema conformance — strict harness", () => {
       },
     );
 
-    test("round-trips tenantApproval and document status literals through a validated partial patch", async () => {
+    test("round-trips tenantApproval status literals through a validated partial patch", async () => {
       const t = setupStrict();
       const agencyId = await seedAgency(t, "Agency A", "00000000000101");
       const { guaranteeId } = await seedGuaranteeWithLease(
@@ -670,28 +663,18 @@ describe("schema conformance — strict harness", () => {
 
       const row = await t.run(async (ctx) => {
         await ctx.db.patch(guaranteeId, {
-          documents: [
-            { key: "rentalContract", status: "aprovado" },
-            { key: "inspection", status: "enviado" },
-            { key: "policy", status: "pendente" },
-          ],
           tenantApproval: { status: "aprovado", termApprovedAt: "2026-02-01T00:00:00.000Z" },
         });
         return getGuarantee(ctx, guaranteeId);
       });
 
-      expect(row.documents).toEqual([
-        { key: "rentalContract", status: "aprovado" },
-        { key: "inspection", status: "enviado" },
-        { key: "policy", status: "pendente" },
-      ]);
       expect(row.tenantApproval).toEqual({
         status: "aprovado",
         termApprovedAt: "2026-02-01T00:00:00.000Z",
       });
     });
 
-    test("a patch with an English document status literal is refused by the validator", async () => {
+    test("a patch carrying the removed embedded documents field is refused by the validator", async () => {
       const t = setupStrict();
       const agencyId = await seedAgency(t, "Agency A", "00000000000101");
       const { guaranteeId } = await seedGuaranteeWithLease(
@@ -784,6 +767,7 @@ describe("schema conformance — strict harness", () => {
             condoCents: 80_000,
             otherFeesCents: 20_000,
             totalRentCents: 600_000,
+            dueDay: 5,
           },
         });
         const eventId = await ctx.db.insert("guaranteeHistory", {
@@ -810,6 +794,7 @@ describe("schema conformance — strict harness", () => {
         condoCents: 80_000,
         otherFeesCents: 20_000,
         totalRentCents: 600_000,
+        dueDay: 5,
       });
       expect(event?.tenantSnapshot).toEqual({
         entityType: "pj",
@@ -869,11 +854,6 @@ describe("schema conformance — strict harness", () => {
         table: "guarantees",
         label: "guarantees.closure.reason expired",
         overrides: { status: "closed", closure: { reason: "expired", closedAt: CLOSED_AT } },
-      },
-      {
-        table: "guarantees",
-        label: "guarantees.documents[].status approved",
-        overrides: { documents: [{ key: "rentalContract", status: "approved" }] },
       },
       {
         table: "guarantees",
@@ -1025,7 +1005,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     expect(row.nextRenewalDate).toBe("2026-12-31");
   });
 
-  test("persists the plus plan with the prestamista premium folded into feeCents and capacity unmoved", async () => {
+  test("prestamista off: a plus request persists as basic with no premium and capacity unmoved", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId } = await seedGuaranteeWithLease(
@@ -1036,10 +1016,10 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     const row = await t.run((ctx) => getGuarantee(ctx, guaranteeId));
 
-    expect(row.terms.plan).toBe("plus");
+    expect(row.terms.plan).toBe("basic");
     expect(row.terms.taxaFeeCents).toBe(9_000);
-    expect(row.terms.prestamistaFeeCents).toBe(1_280);
-    expect(row.terms.feeCents).toBe(10_280);
+    expect(row.terms.prestamistaFeeCents).toBe(0);
+    expect(row.terms.feeCents).toBe(9_000);
     expect(row.capacity).toEqual({
       ceilingCents: 3_000_000,
       availableCents: 3_000_000,
@@ -1047,7 +1027,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     });
   });
 
-  test("stores the ruim/plus snapshot for rent 250_000 with capacity ceiling 7_500_000", async () => {
+  test("stores the ruim snapshot of a plus request (prestamista off) for rent 250_000 with capacity ceiling 7_500_000", async () => {
     const t = setup();
     const agencyId = await seedAgency(t, "Agency A", "00000000000101");
     const { guaranteeId } = await seedGuaranteeWithLease(
@@ -1060,11 +1040,11 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
 
     expect(row.terms).toEqual({
       productSlug: "mutav-fianca",
-      plan: "plus",
+      plan: "basic",
       rentCents: 250_000,
-      feeCents: 38_780,
+      feeCents: 37_500,
       taxaFeeCents: 37_500,
-      prestamistaFeeCents: 1_280,
+      prestamistaFeeCents: 0,
       oneTimeActivationFeeCents: 15_000,
       commissionRate: 0.015,
       prestamistaCommissionRate: 0.25,
@@ -1166,6 +1146,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
           condoCents: 30_000,
           otherFeesCents: 5_000,
           totalRentCents: 135_000,
+          dueDay: 5,
         },
       });
       const lease = await getLease(ctx, leaseId);
@@ -2422,6 +2403,7 @@ describe("index reads — leases, products, guaranteeHistory", () => {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     });
     expect(lease?.payer).toBe("tenant");
     expect(lease?.propertyKind).toBe("residential");
@@ -2980,7 +2962,7 @@ describe("contractApplications untouched by guarantee writes", () => {
         },
         tag: "",
         description: "",
-        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0 },
+        rent: { rentCents: 300_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
       },
       plan: "basic",
       tenant: {

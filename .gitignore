@@ -86,3 +86,8 @@ docs/superpowers/
 
 # Session handoff docs — local boot prompts for a fresh session, never tracked
 .claude/notes/*-handoff.md
+
+# Playwright
+e2e/.auth/
+e2e/test-results/
+e2e/playwright-report/

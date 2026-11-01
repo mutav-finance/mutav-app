@@ -7,6 +7,7 @@ import {
   DEFAULTS_ERROR_CODES,
   DEFAULT_ACTION,
   FORBIDDEN_MESSAGE_KEY,
+  STAFF_CASE_STATUSES,
   UNEXPECTED_MESSAGE_KEY,
   batchCoverPreview,
   coverPreview,
@@ -14,6 +15,7 @@ import {
   errorMessageKey,
   outcomeForResult,
   outcomeForThrown,
+  staffCaseStatus,
 } from "./view-model";
 
 const MESSAGES_DIR = join(
@@ -271,5 +273,23 @@ describe("daysOpen", () => {
 
   it("returns zero rather than NaN on an unparsable timestamp", () => {
     expect(daysOpen({ openedAt: "not a date", now: NOW })).toBe(0);
+  });
+});
+
+describe("staffCaseStatus", () => {
+  it.each([
+    ["open", null, "awaiting_claim"],
+    ["open", "submitted", "awaiting_review"],
+    ["open", "info_requested", "info_requested"],
+    ["verified", "submitted", "awaiting_cover"],
+  ] as const)("%s notice with %s claim reads %s", (status, claimStatus, expected) => {
+    expect(staffCaseStatus({ status, claimStatus })).toBe(expected);
+  });
+
+  it.each(LOCALES)("every status has a %s label", (locale) => {
+    const catalog = defaultsCatalog(locale);
+    for (const status of STAFF_CASE_STATUSES) {
+      expect(typeof lookup(catalog, `caseStatus.${status}`)).toBe("string");
+    }
   });
 });

@@ -22,6 +22,10 @@
     },
     "format:check": {
       "outputs": []
+    },
+    "//#dev:convex": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

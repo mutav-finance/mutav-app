@@ -25,8 +25,11 @@ import {
 import {
   DELINQUENCY_STATUS,
   NOTICE_CANCELLATION_REASON,
+  CLAIM_DECLARATION_VERSION,
+  CLAIM_STATUS,
   NOTICE_EVIDENCE_SOURCE,
   NOTICE_RESOLUTION_KIND,
+  coverRequestCents,
   type DelinquencyNotice,
   type DelinquencyNoticeId,
   type NoticeCancellationReason,
@@ -38,7 +41,6 @@ import {
   assertTransition,
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
-  DOCUMENT_STATUS,
   GUARANTEE_STATE,
   isInsured,
   SCORE_TIER,
@@ -62,6 +64,7 @@ import {
 import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
 import {
   buildLeaseRent,
+  latestDueDateOnOrBefore,
   DEFAULT_PAYER,
   PROPERTY_KIND,
   type LeaseId,
@@ -116,6 +119,24 @@ function dateDaysAgo(days: number): string {
   return new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
 }
 
+const SEED_DUE_DAYS = [5, 10, 15, 20, 28] as const;
+
+/**
+ * A seeded lease's rent due day, spread over common contract days and fixed
+ * by the guarantee's public id so a reseed lands on the same day and the
+ * seeded notices for that lease can be dated to match it.
+ */
+function seedDueDay(guaranteePublicId: string): number {
+  const hash = [...guaranteePublicId].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return SEED_DUE_DAYS[hash % SEED_DUE_DAYS.length];
+}
+
+function dueDateOnOrBefore(isoDate: string, dueDay: number): string {
+  const dueDate = latestDueDateOnOrBefore({ isoDate, dueDay });
+  if (!dueDate) throw new Error(`Seed due day ${dueDay} is out of range`);
+  return dueDate;
+}
+
 /**
  * Due date for a seeded billing month: the 10th, except the current month is
  * never due sooner than a week from the reseed — an invoice issued this month
@@ -143,6 +164,21 @@ function monthsAgo(months: number): string {
 // screen recording reads as someone's actual account.
 const DEMO_PIX_BR_CODE = "00020126580014br.gov.bcb.pix013600000000-0000-0000-0000-000000000000";
 const DEMO_BOLETO_LINE = "00000.00000 00000.000000 00000.000000 0 00000000000000";
+
+/**
+ * A fictional payout account per seed agency. Bank 000 is not a COMPE code
+ * and the Pix keys are the agencies' own fake CNPJs, so nothing here can
+ * route real money.
+ */
+function demoBankingInfo(cnpj: string) {
+  return {
+    bank: "000 - Demo Bank",
+    agency: "0001",
+    account: `${cnpj.slice(-5)}-0`,
+    accountType: "corrente" as const,
+    pixKey: cnpj,
+  };
+}
 
 /** 32-char Pix end-to-end id with the all-zero ISPB, e.g. `E00000000202609091000DEMO0200001`. */
 function demoPixEndToEndId(month: string, suffix: string): string {
@@ -176,9 +212,14 @@ async function insertSeedCoverOperation(
     !resolution ||
     resolution.kind !== NOTICE_RESOLUTION_KIND.COVER_COMMITTED ||
     resolution.appliedCoverCents === undefined ||
+    resolution.resolvedByUserId === undefined ||
     coveragePeriod === null
   ) {
     throw new Error(`Seed notice ${noticeId} is not a cover-resolved notice.`);
+  }
+  const agency = await ctx.db.get(notice.agencyId);
+  if (!agency?.bankingInfo) {
+    throw new Error(`Seed agency ${notice.agencyId} has no payout account.`);
   }
   const publicId = generateCoverOperationPublicId();
   const operationId = await ctx.db.insert("coverOperations", {
@@ -189,8 +230,9 @@ async function insertSeedCoverOperation(
     agencyId: notice.agencyId,
     coveragePeriod,
     ...(batchId === undefined ? {} : { batchId }),
-    requestedCents: notice.updatedAmountCents,
+    requestedCents: coverRequestCents(notice),
     appliedCents: resolution.appliedCoverCents,
+    payoutAccount: agency.bankingInfo,
     recordedAt: resolution.resolvedAt,
     recordedByUserId: resolution.resolvedByUserId,
     ...(resolution.note === undefined ? {} : { note: resolution.note }),
@@ -283,9 +325,15 @@ const DEMO_TABLES = [
   // Cover operations and notices point at each other; the ledger rows go
   // first so no `resolution.coverOperationId` outlives its row for long.
   "coverOperations",
+  // Claim evidence FK-references notices; its blobs are deleted by
+  // `deleteClaimEvidenceBlobs` before the rows go.
+  "claimEvidence",
   // Notices FK-reference guarantees + users. Wipe before guarantees so we
   // don't leave dangling guaranteeId pointers mid-wipe.
   "guaranteeDelinquencyNotices",
+  // Guarantee documents FK-reference guarantees; their storage blobs are
+  // deleted by `deleteGuaranteeDocumentBlobs` before the rows go.
+  "guaranteeDocuments",
   "guaranteeHistory",
   // guarantees ↔ leases point at each other (`leaseId` / `openGuaranteeId`);
   // guarantees go first so no lease pointer outlives its target, and the
@@ -302,7 +350,23 @@ const DEMO_TABLES = [
   "agencies",
 ] as const;
 
+async function deleteGuaranteeDocumentBlobs(ctx: MutationCtx) {
+  for await (const document of ctx.db.query("guaranteeDocuments")) {
+    const blob = await ctx.db.system.get(document.storageId);
+    if (blob) await ctx.storage.delete(document.storageId);
+  }
+}
+
+async function deleteClaimEvidenceBlobs(ctx: MutationCtx) {
+  for await (const evidence of ctx.db.query("claimEvidence")) {
+    const blob = await ctx.db.system.get(evidence.storageId);
+    if (blob) await ctx.storage.delete(evidence.storageId);
+  }
+}
+
 async function wipeDemoTables(ctx: MutationCtx) {
+  await deleteGuaranteeDocumentBlobs(ctx);
+  await deleteClaimEvidenceBlobs(ctx);
   for (const table of DEMO_TABLES) {
     let rows = await ctx.db.query(table).take(200);
     while (rows.length > 0) {
@@ -370,7 +434,8 @@ type SeedLeaseSpec = {
     property: LeaseProperty;
     tag: string;
     description: string;
-    rent: LeaseRentInput;
+    /** `dueDay` defaults to `seedDueDay(publicId)`. */
+    rent: Omit<LeaseRentInput, "dueDay"> & { dueDay?: number };
   };
   guarantee: {
     state: GuaranteeState;
@@ -380,7 +445,6 @@ type SeedLeaseSpec = {
     plan?: GuaranteePlan;
     /** Capacity reserved against committed cover; `available = ceiling - reserved`. */
     reservedCents?: number;
-    documents: Guarantee["documents"];
   };
   tenant: SeedTenantBlock;
 };
@@ -433,7 +497,10 @@ async function insertSeedLeaseAndGuarantee(
     property: lease.property,
     tag: lease.tag,
     description: lease.description,
-    rent: buildLeaseRent(lease.rent),
+    rent: buildLeaseRent({
+      ...lease.rent,
+      dueDay: lease.rent.dueDay ?? seedDueDay(spec.publicId),
+    }),
     payer: DEFAULT_PAYER,
     openGuaranteeId: null,
   });
@@ -549,7 +616,6 @@ async function insertSeedGuarantee(
       availableCents: priced.capacity.ceilingCents - reservedCents,
       reservedCents,
     },
-    documents: guarantee.documents,
   });
 
   if (guarantee.state !== GUARANTEE_STATE.CLOSED) {
@@ -685,12 +751,6 @@ function externalRefForSettlement(method: SettlementMethod): string | undefined 
       return method.txId ?? undefined;
   }
 }
-
-const APPROVED_DOCUMENTS: Guarantee["documents"] = [
-  { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-  { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-  { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-];
 
 /**
  * A checksum-valid CPF from nine base digits — `getOrCreateTenant` rejects any
@@ -1018,7 +1078,6 @@ function performingFillerSpec({
       state: GUARANTEE_STATE.ACTIVE,
       activatedAt,
       nextRenewalDate: `${renewalYear}${filler.activatedMonth.slice(4)}-12`,
-      documents: APPROVED_DOCUMENTS,
     },
     tenant: {
       approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1078,6 +1137,7 @@ async function seedFictional(
     const paulistaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Paulista",
       cnpj: "00000000000100",
+      bankingInfo: demoBankingInfo("00000000000100"),
       onboardingState: "active",
       createdAt: d("2024-03-01T00:00:00-03:00"),
     });
@@ -1085,6 +1145,7 @@ async function seedFictional(
     const atlanticaId: AgencyId = await ctx.db.insert("agencies", {
       name: "Imobiliária Atlântica",
       cnpj: "00000000000200",
+      bankingInfo: demoBankingInfo("00000000000200"),
       onboardingState: "active",
       createdAt: d("2024-06-15T00:00:00-03:00"),
     });
@@ -1092,6 +1153,7 @@ async function seedFictional(
     const horizonteId: AgencyId = await ctx.db.insert("agencies", {
       name: "Horizonte Imóveis",
       cnpj: "00000000000300",
+      bankingInfo: demoBankingInfo("00000000000300"),
       onboardingState: "active",
       createdAt: d("2025-01-10T00:00:00-03:00"),
     });
@@ -1196,11 +1258,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-06-03T10:00:00-03:00"),
         nextRenewalDate: "2027-03-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1234,11 +1291,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-07-08T10:00:00-03:00"),
         nextRenewalDate: "2027-04-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1272,11 +1324,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-08-12T10:00:00-03:00"),
         nextRenewalDate: "2027-05-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1311,11 +1358,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-09-05T10:00:00-03:00"),
         nextRenewalDate: "2026-11-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1349,11 +1391,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-02-22T10:00:00-03:00"),
         nextRenewalDate: "2027-01-20",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1388,11 +1425,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-01-10T10:00:00-03:00"),
         nextRenewalDate: "2027-02-10",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1426,11 +1458,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-12-28T10:00:00-03:00"),
         nextRenewalDate: dateDaysAgo(-30),
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1464,11 +1491,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-05T10:00:00-03:00"),
         nextRenewalDate: dateDaysAgo(-45),
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1502,11 +1524,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-04-18T10:00:00-03:00"),
         nextRenewalDate: "2027-06-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1540,11 +1557,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-03-25T10:00:00-03:00"),
         nextRenewalDate: "2026-12-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1579,11 +1591,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-03-15T10:00:00-03:00"),
         nextRenewalDate: "2027-07-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1617,11 +1624,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-15T10:00:00-03:00"),
         nextRenewalDate: "2026-10-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1655,11 +1657,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-08-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -1693,11 +1690,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-09-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -1733,11 +1725,6 @@ async function seedFictional(
         closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-03-10T18:00:00-03:00") },
         activatedAt: d("2024-08-01T10:00:00-03:00"),
         nextRenewalDate: "2025-02-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1774,11 +1761,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-06-15T10:00:00-03:00"),
         nextRenewalDate: "2027-03-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1812,11 +1794,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-07-22T10:00:00-03:00"),
         nextRenewalDate: "2027-05-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1851,11 +1828,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-03-05T10:00:00-03:00"),
         nextRenewalDate: "2026-11-20",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1889,11 +1861,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-01-20T10:00:00-03:00"),
         nextRenewalDate: "2027-01-10",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1927,11 +1894,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-12-15T10:00:00-03:00"),
         nextRenewalDate: "2026-08-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -1966,11 +1928,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-04-02T10:00:00-03:00"),
         nextRenewalDate: "2027-04-20",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2004,11 +1961,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-06-03T10:00:00-03:00"),
         nextRenewalDate: "2026-07-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2042,11 +1994,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2026-05-22T10:00:00-03:00"),
         nextRenewalDate: "2027-02-28",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2081,11 +2028,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-09-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -2119,11 +2061,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-10-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -2159,11 +2096,6 @@ async function seedFictional(
         closure: { reason: CLOSE_REASON.END_OF_LEASE, closedAt: d("2025-01-20T18:00:00-03:00") },
         activatedAt: d("2024-06-15T10:00:00-03:00"),
         nextRenewalDate: "2024-12-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2201,11 +2133,6 @@ async function seedFictional(
         },
         activatedAt: null,
         nextRenewalDate: "2026-06-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.REPROVADO,
@@ -2242,11 +2169,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.ACTIVE,
         activatedAt: d("2025-08-01T10:00:00-03:00"),
         nextRenewalDate: "2027-04-01",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2285,11 +2207,6 @@ async function seedFictional(
         activatedAt: d("2026-02-05T10:00:00-03:00"),
         reservedCents: HORIZONTE_COVER_APPLIED_CENTS,
         nextRenewalDate: "2026-10-15",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.APROVADO },
-          { key: "inspection", status: DOCUMENT_STATUS.APROVADO },
-          { key: "policy", status: DOCUMENT_STATUS.APROVADO },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2324,11 +2241,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DRAFTED,
         activatedAt: null,
         nextRenewalDate: "2027-08-10",
-        documents: [
-          { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-          { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-          { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-        ],
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.PENDENTE,
@@ -2342,7 +2254,7 @@ async function seedFictional(
       },
     });
 
-    const horizonteCoverRentDue = dateDaysAgo(52);
+    const horizonteCoverRentDue = dueDateOnOrBefore(dateDaysAgo(52), seedDueDay(h2.publicId));
     const horizonteCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${h2.publicId}-${horizonteCoverRentDue}`,
       guaranteeId: h2.guaranteeId,
@@ -2397,7 +2309,6 @@ async function seedFictional(
         state: GUARANTEE_STATE.DEFAULT_VERIFIED,
         activatedAt: d("2025-10-20T10:00:00-03:00"),
         nextRenewalDate: "2027-10-20",
-        documents: APPROVED_DOCUMENTS,
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2410,7 +2321,10 @@ async function seedFictional(
         score: 690,
       },
     });
-    const paulistaDefaultRentDue = dateDaysAgo(22);
+    const paulistaDefaultRentDue = dueDateOnOrBefore(
+      dateDaysAgo(22),
+      seedDueDay(paulistaDefault.publicId),
+    );
     await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${paulistaDefault.publicId}-${paulistaDefaultRentDue}`,
       guaranteeId: paulistaDefault.guaranteeId,
@@ -2452,7 +2366,6 @@ async function seedFictional(
         activatedAt: d("2025-11-18T10:00:00-03:00"),
         reservedCents: ATLANTICA_COVER_APPLIED_CENTS,
         nextRenewalDate: "2027-11-18",
-        documents: APPROVED_DOCUMENTS,
       },
       tenant: {
         approvalStatus: TENANT_APPROVAL_STATUS.APROVADO,
@@ -2465,7 +2378,10 @@ async function seedFictional(
         score: 710,
       },
     });
-    const atlanticaCoverRentDue = dateDaysAgo(33);
+    const atlanticaCoverRentDue = dueDateOnOrBefore(
+      dateDaysAgo(33),
+      seedDueDay(atlanticaCovered.publicId),
+    );
     const atlanticaCoveredNoticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
       publicId: `DN-${atlanticaCovered.publicId}-${atlanticaCoverRentDue}`,
       guaranteeId: atlanticaCovered.guaranteeId,
@@ -2800,8 +2716,9 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   let userId;
   if (byEmail) {
     userId = byEmail._id;
-    const patch: { subject?: string } = {};
+    const patch: { subject?: string; emailVerified?: boolean } = {};
     if (!byEmail.subject) patch.subject = persona.subject;
+    if (byEmail.emailVerified !== true) patch.emailVerified = true;
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(userId, patch);
     }
@@ -2811,6 +2728,8 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
       subject: persona.subject,
       name: persona.name,
       email: persona.email,
+      // Every persona is `email_verified` on the dev tenant (docs/test-personas.md).
+      emailVerified: true,
       createdAt: now,
     });
   }
@@ -2844,6 +2763,7 @@ async function seedPersona(ctx: import("./_generated/server").MutationCtx, key: 
   const agencyId = await ctx.db.insert("agencies", {
     name: persona.agency.name,
     cnpj: persona.agency.cnpj,
+    bankingInfo: demoBankingInfo(persona.agency.cnpj),
     agencyType: "empresa",
     onboardingState: persona.agency.state,
     onboardingSubmittedAt: now,
@@ -3270,13 +3190,6 @@ async function populateAprovadaBook(
       activatedAt: spec.activatedAt,
       nextRenewalDate: spec.nextRenewalDate,
       ...(spec.reservedCents === undefined ? {} : { reservedCents: spec.reservedCents }),
-      documents: isApproved
-        ? APPROVED_DOCUMENTS
-        : [
-            { key: "rentalContract", status: DOCUMENT_STATUS.ENVIADO },
-            { key: "inspection", status: DOCUMENT_STATUS.PENDENTE },
-            { key: "policy", status: DOCUMENT_STATUS.PENDENTE },
-          ],
     };
     const approval = {
       approvalStatus: isApproved
@@ -3529,7 +3442,10 @@ async function populateAprovadaBook(
 
   for (const notice of notices) {
     const row = insertedAt(notice.n);
-    const rentDueDate = dateDaysAgo(notice.rentDueDaysAgo);
+    const rentDueDate = dueDateOnOrBefore(
+      dateDaysAgo(notice.rentDueDaysAgo),
+      seedDueDay(row.publicId),
+    );
     const originalAmountCents = row.lease.rentCents;
     const resolution = notice.resolution;
     const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
@@ -3552,6 +3468,19 @@ async function populateAprovadaBook(
       evidenceSource: NOTICE_EVIDENCE_SOURCE.AGENCY_REPORTED,
       openedAt: notice.openedAt,
       openedByUserId,
+      // Staff verify only a filed claim, so every verified notice carries one.
+      ...(notice.verification
+        ? {
+            claim: {
+              status: CLAIM_STATUS.SUBMITTED,
+              claimedAmountCents: originalAmountCents,
+              submittedAt: notice.openedAt,
+              submittedByUserId: openedByUserId,
+              declarationVersion: CLAIM_DECLARATION_VERSION,
+              requests: [],
+            },
+          }
+        : {}),
       ...(notice.verification
         ? {
             verification: {

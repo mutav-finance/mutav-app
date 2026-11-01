@@ -1,8 +1,9 @@
 import { Auth0Client } from "@auth0/nextjs-auth0/server";
-import { ConvexHttpClient } from "convex/browser";
-import { NextResponse } from "next/server";
+import { createOnCallback } from "@mutav/app-shell/auth-callback";
 import { api } from "@convex/_generated/api";
 import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
+
+const TRANSACTION_COOKIE_MAX_AGE_SECONDS = 900;
 
 /**
  * Singleton Auth0 client for the Next.js side.
@@ -12,62 +13,35 @@ import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
  * `APP_BASE_URL`) so we don't pass them explicitly. See
  * [`docs/auth.md`](../../docs/auth.md) for the env-var inventory.
  *
- * The `onCallback` hook is the first-login provisioning point: when a
- * fresh OAuth callback completes, we issue a Convex `getOrCreateByIdentity`
- * mutation so the Convex `users` row exists before the user lands on
- * any authenticated route. Provisioning failures don't block the login —
- * the client provider observes `getMe` returning `null` and retries
- * provisioning client-side as a fallback. The result is no race window
- * where the user can land on a page that needs `ctx.user` to exist
- * before the row is in place.
- *
- * The hook must return a `NextResponse` — typically the SDK-default
- * redirect to the `returnTo` URL. We compose that redirect ourselves
- * after the side-effect.
+ * `onCallback` provisions the Convex `users` row on first login, so it
+ * exists before the user lands on any authenticated route. If that fails,
+ * `WorkspaceProvider` retries provisioning client-side when `getMe` returns
+ * null.
  */
 export const auth0 = new Auth0Client({
-  async onCallback(error, context, session) {
-    const baseUrl = getAppBaseUrl();
-
-    if (error) {
-      // `error` is `SdkError | null` per the SDK signature — `name`, `code`,
-      // `message`, `cause` are all on the prototype chain (SdkError extends
-      // Error). `cause` is `unknown` per Error.cause; narrow with a type
-      // guard before reading message.
-      const cause = error.cause;
-      const causeMsg =
-        cause instanceof Error
-          ? cause.message
-          : typeof cause === "object" && cause !== null && "message" in cause
-            ? String(cause.message)
-            : null;
-      console.error("[auth0.onCallback] error:", {
-        name: error.name,
-        message: error.message,
-        code: error.code,
-        cause,
-      });
-      return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
-      );
-    }
-
-    if (session) {
-      try {
-        const convexUrl = getConvexUrl();
-        const idToken = session.tokenSet.idToken;
-        if (convexUrl && idToken) {
-          const convex = new ConvexHttpClient(convexUrl);
-          convex.setAuth(idToken);
-          await convex.mutation(api.users.useCases.getOrCreateByIdentity, {});
-        }
-      } catch (err) {
-        // Log and continue — `WorkspaceProvider` retries provisioning
-        // client-side when `getMe` returns null after login.
-        console.error("[auth0.onCallback] Convex provisioning failed:", err);
-      }
-    }
-
-    return NextResponse.redirect(new URL(context.returnTo ?? "/", baseUrl));
+  // Nothing in the app reads tokens through /auth/access-token; left on, it
+  // hands the Auth0 access token to any same-origin script.
+  enableAccessTokenEndpoint: false,
+  onCallback: createOnCallback({
+    getAppBaseUrl,
+    getConvexUrl,
+    provisionMutation: api.users.useCases.getOrCreateByIdentity,
+  }),
+  // `secure` is left to the SDK: it is forced on when APP_BASE_URL is https,
+  // and pinning it would break local dev on http://localhost.
+  session: {
+    cookie: {
+      // Must be "lax", never "strict": the session cookie is set on the
+      // /auth/callback response that follows Auth0's cross-site redirect.
+      // Strict cookies are withheld on that follow-up navigation, the layout
+      // sees no session, redirects to /auth/login, and login loops.
+      sameSite: "lax",
+    },
+  },
+  transactionCookie: {
+    // Must be "lax": a strict transaction cookie never reaches the cross-site
+    // callback navigation, and the SDK throws InvalidStateError.
+    sameSite: "lax",
+    maxAge: TRANSACTION_COOKIE_MAX_AGE_SECONDS,
   },
 });

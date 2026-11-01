@@ -41,6 +41,15 @@ export function isCoverable(row: DelinquencyAdminQueueRow): boolean {
 }
 
 /**
+ * Staff confirm a default only on an open notice whose claim the agency has
+ * filed and is not still answering an information request — the same rule
+ * `staffVerifyDefault` enforces, so the button never offers a refusal.
+ */
+export function isVerifiable(row: DelinquencyAdminQueueRow): boolean {
+  return row.status === "open" && row.claimStatus === "submitted";
+}
+
+/**
  * Toast wiring for an outcome. Shared by the queue and the payouts panel so a
  * batch refusal names its notice the same way everywhere.
  */
@@ -88,11 +97,16 @@ export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
   const [coverTargets, setCoverTargets] = useState<readonly DelinquencyAdminQueueRow[]>([]);
   const [coverNote, setCoverNote] = useState("");
 
+  const [reviewId, setReviewId] = useState<string | null>(null);
+
   const [dismissTarget, setDismissTarget] = useState<DelinquencyAdminQueueRow | null>(null);
   const [dismissKind, setDismissKind] = useState<DismissalKind>("staff_dismissed");
   const [dismissNote, setDismissNote] = useState("");
 
   const rows = result.page;
+  // Looked up live rather than held as a snapshot, so the dialog reflects a
+  // row that changed under it and closes when the row leaves the queue.
+  const reviewTarget = rows.find((row) => row.publicId === reviewId) ?? null;
   // A row that left the queue (covered, dismissed, or resolved elsewhere)
   // drops out of the selection on the next render rather than lingering in it.
   const selectedRows = rows.filter((row) => selectedIds.has(row.publicId) && isCoverable(row));
@@ -115,20 +129,25 @@ export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
     );
   }
 
-  async function verify(row: DelinquencyAdminQueueRow) {
+  async function verify(row: DelinquencyAdminQueueRow): Promise<boolean> {
     setBusy(true);
     try {
-      report(
-        outcomeForResult({
-          action: DEFAULT_ACTION.VERIFY,
-          result: await verifyDefault({ noticePublicId: row.publicId }),
-        }),
-      );
+      const outcome = outcomeForResult({
+        action: DEFAULT_ACTION.VERIFY,
+        result: await verifyDefault({ noticePublicId: row.publicId }),
+      });
+      report(outcome);
+      return outcome.kind === "success";
     } catch (error) {
       report(outcomeForThrown(error));
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+
+  async function verifyFromReview(row: DelinquencyAdminQueueRow) {
+    if (await verify(row)) setReviewId(null);
   }
 
   function openCover(targets: readonly DelinquencyAdminQueueRow[]) {
@@ -199,14 +218,14 @@ export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
   const singlePreview: CoverPreview | null =
     coverTargets.length === 1 && singleTarget
       ? coverPreview({
-          requestedCents: singleTarget.updatedAmountCents,
+          requestedCents: singleTarget.coverRequestCents,
           capacity: singleTarget.guaranteeCapacity,
         })
       : null;
   const totals: BatchCoverPreview = batchCoverPreview(
     coverTargets.map((row) => ({
       guaranteeId: row.guaranteeId,
-      requestedCents: row.updatedAmountCents,
+      requestedCents: row.coverRequestCents,
       capacity: row.guaranteeCapacity,
     })),
   );
@@ -237,6 +256,12 @@ export function useDefaultsQueue({ preloaded }: UseDefaultsQueueArgs) {
       singlePreview,
       totals,
       confirm: confirmCover,
+    },
+    review: {
+      target: reviewTarget,
+      open: (row: DelinquencyAdminQueueRow) => setReviewId(row.publicId),
+      close: () => setReviewId(null),
+      verify: verifyFromReview,
     },
     dismiss: {
       target: dismissTarget,

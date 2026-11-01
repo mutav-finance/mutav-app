@@ -108,6 +108,7 @@ function leaseDoc(spec: LeaseSpec): NewLease {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     },
     payer: DEFAULT_PAYER,
     openGuaranteeId: null,
@@ -284,6 +285,7 @@ describe("schema conformance — leases table (strict harness)", () => {
             condoCents: 45_000,
             otherFeesCents: 12_000,
             totalRentCents: 307_000,
+            dueDay: 5,
           },
           payer: "tenant",
           openGuaranteeId: null,
@@ -307,6 +309,7 @@ describe("schema conformance — leases table (strict harness)", () => {
             condoCents: 300_000,
             otherFeesCents: 0,
             totalRentCents: 1_500_000,
+            dueDay: 5,
           },
           payer: "tenant",
           openGuaranteeId: null,
@@ -342,6 +345,7 @@ describe("schema conformance — leases table (strict harness)", () => {
         condoCents: 45_000,
         otherFeesCents: 12_000,
         totalRentCents: 307_000,
+        dueDay: 5,
       },
       payer: "tenant",
       openGuaranteeId: null,
@@ -367,6 +371,7 @@ describe("schema conformance — leases table (strict harness)", () => {
         condoCents: 300_000,
         otherFeesCents: 0,
         totalRentCents: 1_500_000,
+        dueDay: 5,
       },
       payer: "tenant",
       openGuaranteeId: null,
@@ -578,7 +583,9 @@ describe("schema conformance — leases table (strict harness)", () => {
       t.run((ctx) =>
         ctx.db.insert(
           "leases",
-          malformed(valid, { rent: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0 } }),
+          malformed(valid, {
+            rent: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 },
+          }),
         ),
       ),
     ).rejects.toThrow(/Missing required field `totalRentCents` in object/);
@@ -660,38 +667,55 @@ describe("rent bundle — totals as persisted", () => {
         agencyId,
         tenantId,
         publicId: "LSE-R1",
-        rent: buildLeaseRent({ rentCents: 250_000, condoCents: 45_000, otherFeesCents: 12_000 }),
+        rent: buildLeaseRent({
+          rentCents: 250_000,
+          condoCents: 45_000,
+          otherFeesCents: 12_000,
+          dueDay: 5,
+        }),
       });
       await insertLeaseRow(ctx, {
         agencyId,
         tenantId,
         publicId: "LSE-R2",
-        rent: buildLeaseRent({ rentCents: 100_000, condoCents: 0, otherFeesCents: 0 }),
+        rent: buildLeaseRent({ rentCents: 100_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 }),
       });
       await insertLeaseRow(ctx, {
         agencyId,
         tenantId,
         publicId: "LSE-R3",
-        rent: buildLeaseRent({ rentCents: 1, condoCents: 0, otherFeesCents: 0 }),
+        rent: buildLeaseRent({ rentCents: 1, condoCents: 0, otherFeesCents: 0, dueDay: 5 }),
       });
       await insertLeaseRow(ctx, {
         agencyId,
         tenantId,
         publicId: "LSE-R4",
-        rent: buildLeaseRent({ rentCents: 12_345_678, condoCents: 987_654, otherFeesCents: 321 }),
+        rent: buildLeaseRent({
+          rentCents: 12_345_678,
+          condoCents: 987_654,
+          otherFeesCents: 321,
+          dueDay: 5,
+        }),
       });
       return byPublicId(await leasesByAgency(ctx, agencyId)).map((row) => row.rent);
     });
 
     expect(rents).toEqual([
-      { rentCents: 250_000, condoCents: 45_000, otherFeesCents: 12_000, totalRentCents: 307_000 },
-      { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, totalRentCents: 100_000 },
-      { rentCents: 1, condoCents: 0, otherFeesCents: 0, totalRentCents: 1 },
+      {
+        rentCents: 250_000,
+        condoCents: 45_000,
+        otherFeesCents: 12_000,
+        totalRentCents: 307_000,
+        dueDay: 5,
+      },
+      { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, totalRentCents: 100_000, dueDay: 5 },
+      { rentCents: 1, condoCents: 0, otherFeesCents: 0, totalRentCents: 1, dueDay: 5 },
       {
         rentCents: 12_345_678,
         condoCents: 987_654,
         otherFeesCents: 321,
         totalRentCents: 13_333_653,
+        dueDay: 5,
       },
     ]);
   });
@@ -718,13 +742,18 @@ describe("rent bundle — totals as persisted", () => {
         agencyId: agencyA,
         tenantId,
         publicId: "LSE-H1",
-        rent: buildLeaseRent({ rentCents: 80_000, condoCents: 20_000, otherFeesCents: 5_000 }),
+        rent: buildLeaseRent({
+          rentCents: 80_000,
+          condoCents: 20_000,
+          otherFeesCents: 5_000,
+          dueDay: 5,
+        }),
       });
       await insertLeaseRow(ctx, {
         agencyId: agencyB,
         tenantId,
         publicId: "LSE-H2",
-        rent: buildLeaseRent({ rentCents: 300_000, condoCents: 0, otherFeesCents: 1 }),
+        rent: buildLeaseRent({ rentCents: 300_000, condoCents: 0, otherFeesCents: 1, dueDay: 5 }),
       });
       const rows = [
         ...(await leasesByAgency(ctx, agencyA)),
@@ -744,19 +773,31 @@ describe("rent bundle — totals as persisted", () => {
         agencyId: agencyA,
         tenantId,
         publicId: "LSE-FLOAT",
-        rent: { rentCents: 1000.5, condoCents: 0, otherFeesCents: 0, totalRentCents: 1000.5 },
+        rent: {
+          rentCents: 1000.5,
+          condoCents: 0,
+          otherFeesCents: 0,
+          totalRentCents: 1000.5,
+          dueDay: 5,
+        },
       });
       await insertLeaseRow(ctx, {
         agencyId: agencyA,
         tenantId,
         publicId: "LSE-ZERO",
-        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0 },
+        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0, dueDay: 5 },
       });
       await insertLeaseRow(ctx, {
         agencyId: agencyA,
         tenantId,
         publicId: "LSE-NEGFEES",
-        rent: { rentCents: 1000, condoCents: 0, otherFeesCents: -5, totalRentCents: 1000 },
+        rent: {
+          rentCents: 1000,
+          condoCents: 0,
+          otherFeesCents: -5,
+          totalRentCents: 1000,
+          dueDay: 5,
+        },
       });
       return {
         problemsA: rentProblems(await leasesByAgency(ctx, agencyA)),
@@ -784,7 +825,7 @@ describe("rent bundle — totals as persisted", () => {
         agencyId,
         tenantId,
         publicId: "LSE-STALE",
-        rent: buildLeaseRent({ rentCents: 100_000, condoCents: 0, otherFeesCents: 0 }),
+        rent: buildLeaseRent({ rentCents: 100_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 }),
       });
     });
 
@@ -795,6 +836,7 @@ describe("rent bundle — totals as persisted", () => {
           condoCents: 50_000,
           otherFeesCents: 0,
           totalRentCents: 100_000,
+          dueDay: 5,
         },
       });
       const lease = await getLease(ctx, leaseId);
@@ -808,7 +850,12 @@ describe("rent bundle — totals as persisted", () => {
 
     const rebuilt = await t.run(async (ctx) => {
       await ctx.db.patch(leaseId, {
-        rent: buildLeaseRent({ rentCents: 100_000, condoCents: 50_000, otherFeesCents: 0 }),
+        rent: buildLeaseRent({
+          rentCents: 100_000,
+          condoCents: 50_000,
+          otherFeesCents: 0,
+          dueDay: 5,
+        }),
       });
       const lease = await getLease(ctx, leaseId);
       return { rent: lease.rent, problems: rentProblems([lease]) };
@@ -819,6 +866,7 @@ describe("rent bundle — totals as persisted", () => {
       condoCents: 50_000,
       otherFeesCents: 0,
       totalRentCents: 150_000,
+      dueDay: 5,
     });
     expect(rebuilt.problems).toEqual([]);
   });
@@ -833,25 +881,37 @@ describe("rent bundle — totals as persisted", () => {
         agencyId,
         tenantId,
         publicId: "LSE-FLOAT",
-        rent: { rentCents: 1000.5, condoCents: 0, otherFeesCents: 0, totalRentCents: 1000.5 },
+        rent: {
+          rentCents: 1000.5,
+          condoCents: 0,
+          otherFeesCents: 0,
+          totalRentCents: 1000.5,
+          dueDay: 5,
+        },
       });
       await insertLeaseRow(ctx, {
         agencyId,
         tenantId,
         publicId: "LSE-NEG",
-        rent: { rentCents: -100, condoCents: 0, otherFeesCents: 0, totalRentCents: -100 },
+        rent: {
+          rentCents: -100,
+          condoCents: 0,
+          otherFeesCents: 0,
+          totalRentCents: -100,
+          dueDay: 5,
+        },
       });
       await insertLeaseRow(ctx, {
         agencyId,
         tenantId,
         publicId: "LSE-ZERO",
-        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0 },
+        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0, dueDay: 5 },
       });
       await insertLeaseRow(ctx, {
         agencyId,
         tenantId,
         publicId: "LSE-OK",
-        rent: buildLeaseRent({ rentCents: 1, condoCents: 0, otherFeesCents: 0 }),
+        rent: buildLeaseRent({ rentCents: 1, condoCents: 0, otherFeesCents: 0, dueDay: 5 }),
       });
       return byPublicId(await leasesByAgency(ctx, agencyId)).map((row) => ({
         publicId: row.publicId,
@@ -862,19 +922,31 @@ describe("rent bundle — totals as persisted", () => {
     expect(rents).toEqual([
       {
         publicId: "LSE-FLOAT",
-        rent: { rentCents: 1000.5, condoCents: 0, otherFeesCents: 0, totalRentCents: 1000.5 },
+        rent: {
+          rentCents: 1000.5,
+          condoCents: 0,
+          otherFeesCents: 0,
+          totalRentCents: 1000.5,
+          dueDay: 5,
+        },
       },
       {
         publicId: "LSE-NEG",
-        rent: { rentCents: -100, condoCents: 0, otherFeesCents: 0, totalRentCents: -100 },
+        rent: {
+          rentCents: -100,
+          condoCents: 0,
+          otherFeesCents: 0,
+          totalRentCents: -100,
+          dueDay: 5,
+        },
       },
       {
         publicId: "LSE-OK",
-        rent: { rentCents: 1, condoCents: 0, otherFeesCents: 0, totalRentCents: 1 },
+        rent: { rentCents: 1, condoCents: 0, otherFeesCents: 0, totalRentCents: 1, dueDay: 5 },
       },
       {
         publicId: "LSE-ZERO",
-        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0 },
+        rent: { rentCents: 0, condoCents: 0, otherFeesCents: 0, totalRentCents: 0, dueDay: 5 },
       },
     ]);
   });
@@ -1003,7 +1075,13 @@ describe("field mutability — patches in place", () => {
       },
       tag: "Cobertura",
       description: "Reformado em 2025",
-      rent: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, totalRentCents: 100_000 },
+      rent: {
+        rentCents: 100_000,
+        condoCents: 0,
+        otherFeesCents: 0,
+        totalRentCents: 100_000,
+        dueDay: 5,
+      },
       payer: "tenant",
       openGuaranteeId: guaranteeId,
     });
@@ -1032,7 +1110,10 @@ describe("field mutability — patches in place", () => {
         ctx.db.patch(
           leaseId,
           // hook-ok: deliberately incomplete rent bundle to exercise the validator on patch
-          malformed({}, { rent: { rentCents: 200_000, condoCents: 0, otherFeesCents: 0 } }),
+          malformed(
+            {},
+            { rent: { rentCents: 200_000, condoCents: 0, otherFeesCents: 0, dueDay: 5 } },
+          ),
         ),
       ),
     ).rejects.toThrow(/Missing required field `totalRentCents` in object/);
@@ -1050,6 +1131,7 @@ describe("field mutability — patches in place", () => {
       condoCents: 0,
       otherFeesCents: 0,
       totalRentCents: 100_000,
+      dueDay: 5,
     });
   });
 
@@ -1068,12 +1150,23 @@ describe("field mutability — patches in place", () => {
     });
     expect(before).toEqual({
       snapshot: 100_000,
-      living: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, totalRentCents: 100_000 },
+      living: {
+        rentCents: 100_000,
+        condoCents: 0,
+        otherFeesCents: 0,
+        totalRentCents: 100_000,
+        dueDay: 5,
+      },
     });
 
     const after = await t.run(async (ctx) => {
       await ctx.db.patch(leaseId, {
-        rent: buildLeaseRent({ rentCents: 110_000, condoCents: 30_000, otherFeesCents: 0 }),
+        rent: buildLeaseRent({
+          rentCents: 110_000,
+          condoCents: 30_000,
+          otherFeesCents: 0,
+          dueDay: 5,
+        }),
       });
       const guarantee = await ctx.db.get(guaranteeId);
       const lease = await getLease(ctx, leaseId);
@@ -1091,6 +1184,7 @@ describe("field mutability — patches in place", () => {
         condoCents: 30_000,
         otherFeesCents: 0,
         totalRentCents: 140_000,
+        dueDay: 5,
       },
       pointer: guaranteeId,
     });
@@ -1137,7 +1231,13 @@ describe("index reads — leases", () => {
       },
       tag: "",
       description: "",
-      rent: { rentCents: 100_000, condoCents: 0, otherFeesCents: 0, totalRentCents: 100_000 },
+      rent: {
+        rentCents: 100_000,
+        condoCents: 0,
+        otherFeesCents: 0,
+        totalRentCents: 100_000,
+        dueDay: 5,
+      },
       payer: "tenant",
       openGuaranteeId: null,
     });
