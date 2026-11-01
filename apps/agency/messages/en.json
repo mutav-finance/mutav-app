@@ -372,7 +372,8 @@
         "admin": "Admin",
         "member": "Member"
       }
-    }
+    },
+    "support": "Support"
   },
   "chart": {
     "title": "Book in force",
@@ -719,7 +720,8 @@
       "tenant": "Tenant",
       "availableGuarantee": "Available guarantee",
       "nextRenewalDate": "Next renewal",
-      "creationTime": "Created"
+      "creationTime": "Created",
+      "open": "Open"
     },
     "urgency": {
       "overdue": "Overdue",
@@ -752,7 +754,8 @@
       "previousPage": "Previous page",
       "nextPage": "Next page",
       "lastPage": "Last page"
-    }
+    },
+    "openAria": "Open {id}"
   },
   "invoiceList": {
     "meta": {
@@ -774,7 +777,8 @@
       "dueDate": "Due Date",
       "total": "Total",
       "state": "Status",
-      "guarantees": "Guarantees"
+      "guarantees": "Guarantees",
+      "open": "Open"
     },
     "search": {
       "placeholder": "Search by ID or period"
@@ -789,7 +793,8 @@
       "previousPage": "Previous page",
       "nextPage": "Next page",
       "lastPage": "Last page"
-    }
+    },
+    "openAria": "Open {id}"
   },
   "checkout": {
     "common": {
@@ -1114,13 +1119,19 @@
       },
       "summary": {
         "heading": "Summary",
+        "coverageCeiling": "Coverage",
+        "coverageCeilingValue": "up to {count} months of rent",
         "exitCost": "Exit cost",
-        "fee": "Fee value",
         "commission": "Commission (1.5%)",
-        "guarantee": "Guarantee value"
+        "guarantee": "Guarantee value (monthly)"
       },
-      "reportHeading": "Approved coverage",
-      "timesRent": "{multiplier}× the rent"
+      "reportHeading": "Coverage and costs",
+      "timesRent": "{multiplier}× the rent",
+      "groupCoverage": "Coverage",
+      "groupMonthly": "Monthly costs",
+      "agencyCommission": "Agency commission",
+      "monthlyTotal": "Monthly total",
+      "oneTime": "charged once"
     },
     "complementary": {
       "tenantSection": "Tenant Details",
@@ -1232,7 +1243,6 @@
       "tag": "Partner program",
       "title": "Rental guarantee without a guarantor.",
       "titleLine2": "Built for people with a lot to do.",
-      "subtitle": "Segregated capital. Auditable in real time, by anyone, at any time.",
       "warningTitle": "Important for agencies:",
       "warningBody": "registration must be completed by a partner holding 25% or more equity, or by an administrator authorized to open accounts on the company's behalf. Have the articles of incorporation ready to verify.",
       "checklistTitle": "What you will need",
@@ -1440,7 +1450,7 @@
       "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
       "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
       "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
-      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
+      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support: contato@mutav.finance.",
       "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
       "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
       "BANKING_INFO_REQUIRED": "Fill in your banking details before submitting.",
@@ -1485,7 +1495,8 @@
         "representanteName": "Representative name is required.",
         "representanteCpf": "Invalid representative CPF.",
         "alreadyRegistered": "Already registered with Mutav."
-      }
+      },
+      "backButton": "Back"
     }
   },
   "transparency": {

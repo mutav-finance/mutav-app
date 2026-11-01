@@ -8,6 +8,7 @@ import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
 import { Button } from "@mutav/ui/button";
 import { EditField } from "@mutav/ui/edit-field";
+import { formatCentsPlain, maskBRLAmount, maskPhone } from "@mutav/i18n/brazil";
 import { Input } from "@mutav/ui/input";
 import { LockedDisplay } from "@mutav/ui/locked-display";
 import { ReviewBlock } from "@mutav/ui/review-block";
@@ -321,29 +322,27 @@ export function WizardStep4({ data, agencyId, product, onChange, onComplete, onB
             <EditField label={t("rent.rent")}>
               <Input
                 placeholder="R$ 0,00"
-                defaultValue={
-                  data.rentCents ? (data.rentCents / 100).toFixed(2).replace(".", ",") : ""
-                }
+                inputMode="decimal"
+                defaultValue={data.rentCents ? formatCentsPlain(data.rentCents) : ""}
+                onInput={maskAmountInPlace}
                 onBlur={(e) => patchDraft({ rentCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
             <EditField label={t("rent.condo")}>
               <Input
                 placeholder="R$ 0,00"
-                defaultValue={
-                  data.condoCents ? (data.condoCents / 100).toFixed(2).replace(".", ",") : ""
-                }
+                inputMode="decimal"
+                defaultValue={data.condoCents ? formatCentsPlain(data.condoCents) : ""}
+                onInput={maskAmountInPlace}
                 onBlur={(e) => patchDraft({ condoCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
             <EditField label={t("rent.otherFees")}>
               <Input
                 placeholder="R$ 0,00"
-                defaultValue={
-                  data.otherFeesCents
-                    ? (data.otherFeesCents / 100).toFixed(2).replace(".", ",")
-                    : ""
-                }
+                inputMode="decimal"
+                defaultValue={data.otherFeesCents ? formatCentsPlain(data.otherFeesCents) : ""}
+                onInput={maskAmountInPlace}
                 onBlur={(e) => patchDraft({ otherFeesCents: parseBRLInput(e.target.value) })}
               />
             </EditField>
@@ -443,7 +442,9 @@ export function WizardStep4({ data, agencyId, product, onChange, onComplete, onB
             <EditField label={t("tenant.phone")}>
               <Input
                 value={editing.draft.phone}
-                onChange={(e) => patchDraft({ phone: e.target.value })}
+                inputMode="tel"
+                placeholder="(00) 00000-0000"
+                onChange={(e) => patchDraft({ phone: maskPhone(e.target.value) })}
               />
             </EditField>
           </div>
@@ -547,4 +548,9 @@ export function WizardStep4({ data, agencyId, product, onChange, onComplete, onB
       </div>
     </div>
   );
+}
+
+// The rental edit inputs are uncontrolled, so the mask rewrites the DOM value.
+function maskAmountInPlace(event: React.FormEvent<HTMLInputElement>) {
+  event.currentTarget.value = maskBRLAmount(event.currentTarget.value);
 }

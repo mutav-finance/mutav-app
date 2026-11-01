@@ -7,6 +7,7 @@ import { Button } from "@mutav/ui/button";
 import { Field } from "@mutav/ui/field";
 import { Input } from "@mutav/ui/input";
 import { LockedField } from "@mutav/ui/locked-field";
+import { maskPhone } from "@mutav/i18n/brazil";
 import { type DraftWizardData, type TenantFieldValidationCode } from "@/lib/guarantees/wizard";
 
 type Props = {
@@ -126,7 +127,12 @@ export function WizardStep3({ data, onChange, onNext, onBack }: Props) {
           </Field>
 
           <Field label={t("tenant.phone")} error={resolveError(errors.phone)}>
-            <Input value={data.phone} onChange={(e) => onChange({ phone: e.target.value })} />
+            <Input
+              value={data.phone}
+              inputMode="tel"
+              placeholder="(00) 00000-0000"
+              onChange={(e) => onChange({ phone: maskPhone(e.target.value) })}
+            />
           </Field>
         </div>
       </section>

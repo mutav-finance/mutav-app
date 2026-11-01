@@ -103,6 +103,7 @@ describe("state chart palette", () => {
     muted: "var(--color-text-3)",
     expiring: "var(--color-warning)",
     caution: "var(--color-warning-strong)",
+    committed: "var(--color-escalated)",
   };
 
   // One state, one colour, everywhere on the page: the count row under the
