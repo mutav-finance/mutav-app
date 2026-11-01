@@ -24,56 +24,18 @@ export function parseChecklistItems(value: unknown): ChecklistItem[] {
   return value.filter(isChecklistItem);
 }
 
-const NEXT_KEYS: readonly string[] = ["ArrowDown", "ArrowRight"];
-const PREVIOUS_KEYS: readonly string[] = ["ArrowUp", "ArrowLeft"];
-
-/** Arrow-key target inside the radiogroup, wrapping at both ends. */
-export function nextAgencyType({
-  current,
-  key,
-}: {
-  current: WelcomeScreenAgencyType | null;
-  key: string;
-}): WelcomeScreenAgencyType | null {
-  const step = NEXT_KEYS.includes(key) ? 1 : PREVIOUS_KEYS.includes(key) ? -1 : 0;
-  if (step === 0) return null;
-  const count = WELCOME_SCREEN_AGENCY_TYPES.length;
-  const index =
-    current === null ? (step === 1 ? -1 : 0) : WELCOME_SCREEN_AGENCY_TYPES.indexOf(current);
-  return WELCOME_SCREEN_AGENCY_TYPES[(index + step + count) % count] ?? null;
+export function isWelcomeScreenAgencyType(value: string): value is WelcomeScreenAgencyType {
+  return WELCOME_SCREEN_AGENCY_TYPES.some((type) => type === value);
 }
 
 export function useWelcomeScreen() {
   const t = useTranslations("onboarding.welcome");
   const [selectedType, setSelectedType] = React.useState<WelcomeScreenAgencyType | null>(null);
-  const optionRefs = React.useRef(new Map<WelcomeScreenAgencyType, HTMLButtonElement>());
 
-  const selectType = React.useCallback((type: WelcomeScreenAgencyType) => {
-    setSelectedType(type);
+  // The toggle group reports "" when the checked card is clicked again; keep the choice.
+  const selectType = React.useCallback((value: string) => {
+    if (isWelcomeScreenAgencyType(value)) setSelectedType(value);
   }, []);
-
-  const registerOption = React.useCallback(
-    (type: WelcomeScreenAgencyType) => (node: HTMLButtonElement | null) => {
-      if (node) optionRefs.current.set(type, node);
-      else optionRefs.current.delete(type);
-    },
-    [],
-  );
-
-  const handleOptionKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      const target = nextAgencyType({ current: selectedType, key: event.key });
-      if (!target) return;
-      event.preventDefault();
-      setSelectedType(target);
-      optionRefs.current.get(target)?.focus();
-    },
-    [selectedType],
-  );
-
-  /** Roving tabindex: the checked card, or the first one before any choice. */
-  const isTabStop = (type: WelcomeScreenAgencyType) =>
-    selectedType === null ? type === WELCOME_SCREEN_AGENCY_TYPES[0] : selectedType === type;
 
   const checklist = selectedType ? parseChecklistItems(t.raw(`${selectedType}.items`)) : [];
 
@@ -81,9 +43,6 @@ export function useWelcomeScreen() {
     agencyTypes: WELCOME_SCREEN_AGENCY_TYPES,
     selectedType,
     selectType,
-    registerOption,
-    handleOptionKeyDown,
-    isTabStop,
     checklist,
     showPartnerWarning: selectedType === "empresa",
     ctaHref: selectedType ? `/onboarding/agency?type=${selectedType}` : null,

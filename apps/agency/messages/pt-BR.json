@@ -1248,8 +1248,7 @@
       "checklistTitle": "O que você vai precisar",
       "typeQuestion": "Como você atua?",
       "proofPoints": {
-        "onchainReserve": "Reserva de garantia auditável on-chain.",
-        "review": "Análise do cadastro em até 2 dias úteis.",
+        "onchainReserve": "Reserva de garantia auditável onchain.",
         "noGuarantor": "Locação sem fiador para os seus clientes."
       },
       "autonomo": {

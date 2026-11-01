@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextAgencyType, parseChecklistItems } from "./use-welcome-screen";
+import { isWelcomeScreenAgencyType, parseChecklistItems } from "./use-welcome-screen";
 
 describe("parseChecklistItems", () => {
   it("keeps well-formed rows with and without a note", () => {
@@ -20,19 +20,12 @@ describe("parseChecklistItems", () => {
   });
 });
 
-describe("nextAgencyType", () => {
-  it.each([
-    { current: null, key: "ArrowDown", expected: "autonomo" },
-    { current: null, key: "ArrowUp", expected: "empresa" },
-    { current: "autonomo", key: "ArrowRight", expected: "empresa" },
-    { current: "empresa", key: "ArrowDown", expected: "autonomo" },
-    { current: "autonomo", key: "ArrowLeft", expected: "empresa" },
-    { current: "empresa", key: "ArrowUp", expected: "autonomo" },
-  ] as const)("$key from $current moves to $expected", ({ current, key, expected }) => {
-    expect(nextAgencyType({ current, key })).toBe(expected);
+describe("isWelcomeScreenAgencyType", () => {
+  it.each(["autonomo", "empresa"])("accepts %s", (value) => {
+    expect(isWelcomeScreenAgencyType(value)).toBe(true);
   });
 
-  it("ignores keys that are not arrows", () => {
-    expect(nextAgencyType({ current: "autonomo", key: "Tab" })).toBeNull();
+  it.each(["", "Empresa", "pj"])("rejects %j", (value) => {
+    expect(isWelcomeScreenAgencyType(value)).toBe(false);
   });
 });

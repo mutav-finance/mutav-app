@@ -1248,8 +1248,7 @@
       "checklistTitle": "What you will need",
       "typeQuestion": "How do you work?",
       "proofPoints": {
-        "onchainReserve": "Guarantee reserve auditable on-chain.",
-        "review": "Registration reviewed in up to 2 business days.",
+        "onchainReserve": "Guarantee reserve auditable onchain.",
         "noGuarantor": "Leases without a guarantor for your clients."
       },
       "autonomo": {
