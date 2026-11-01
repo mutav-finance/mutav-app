@@ -1125,8 +1125,13 @@
         "commission": "Comissão (1,5%)",
         "guarantee": "Valor da garantia (mensal)"
       },
-      "reportHeading": "Cobertura aprovada",
-      "timesRent": "{multiplier}× o aluguel"
+      "reportHeading": "Cobertura e custos",
+      "timesRent": "{multiplier}× o aluguel",
+      "groupCoverage": "Cobertura",
+      "groupMonthly": "Custos mensais",
+      "agencyCommission": "Comissão da imobiliária",
+      "monthlyTotal": "Total mensal",
+      "oneTime": "cobrada uma vez"
     },
     "complementary": {
       "tenantSection": "Dados do Inquilino",

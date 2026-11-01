@@ -1125,8 +1125,13 @@
         "commission": "Commission (1.5%)",
         "guarantee": "Guarantee value (monthly)"
       },
-      "reportHeading": "Approved coverage",
-      "timesRent": "{multiplier}× the rent"
+      "reportHeading": "Coverage and costs",
+      "timesRent": "{multiplier}× the rent",
+      "groupCoverage": "Coverage",
+      "groupMonthly": "Monthly costs",
+      "agencyCommission": "Agency commission",
+      "monthlyTotal": "Monthly total",
+      "oneTime": "charged once"
     },
     "complementary": {
       "tenantSection": "Tenant Details",
