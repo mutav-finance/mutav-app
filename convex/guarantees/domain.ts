@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { GUARANTEE_STATE, type GuaranteeState } from "./machine";
+import type { Result } from "../lib/result";
 
 export type Guarantee = Doc<"guarantees">;
 export type GuaranteeId = Id<"guarantees">;
@@ -13,8 +14,11 @@ export type GuaranteeHistoryId = Id<"guaranteeHistory">;
 export type ContractApplication = Doc<"contractApplications">;
 export type ContractApplicationId = Id<"contractApplications">;
 export type GuaranteePlan = GuaranteeTerms["plan"];
-export type DocumentKey = Guarantee["documents"][number]["key"];
-export type DocumentStatus = Guarantee["documents"][number]["status"];
+export type GuaranteeDocument = Doc<"guaranteeDocuments">;
+export type GuaranteeDocumentId = Id<"guaranteeDocuments">;
+export type DocumentKey = GuaranteeDocument["key"];
+export type GuaranteeDocumentStatus = GuaranteeDocument["status"];
+export type GuaranteeDocumentUploader = GuaranteeDocument["uploadedBy"];
 export type TenantApprovalStatus = Guarantee["tenantApproval"]["status"];
 
 // The lifecycle machine is the source of truth for states, close reasons and
@@ -204,11 +208,150 @@ export const DOCUMENT_KEY = {
   POLICY: "policy",
 } as const satisfies Record<string, DocumentKey>;
 
-export const DOCUMENT_STATUS = {
-  PENDENTE: "pendente",
-  ENVIADO: "enviado",
-  APROVADO: "aprovado",
-} as const satisfies Record<Uppercase<DocumentStatus>, DocumentStatus>;
+export const DOCUMENT_KEYS = [
+  DOCUMENT_KEY.RENTAL_CONTRACT,
+  DOCUMENT_KEY.INSPECTION,
+  DOCUMENT_KEY.POLICY,
+] as const satisfies readonly DocumentKey[];
+
+export const documentKeyValidator = v.union(
+  v.literal(DOCUMENT_KEY.RENTAL_CONTRACT),
+  v.literal(DOCUMENT_KEY.INSPECTION),
+  v.literal(DOCUMENT_KEY.POLICY),
+);
+
+/**
+ * Review lifecycle of one uploaded file. `superseded` is never set by a
+ * reviewer: it marks a `pending_review` file that a later upload for the same
+ * key replaced before anyone looked at it, so the staff queue only ever holds
+ * the newest file per slot. Approved and rejected rows are final and stay as
+ * history when a new file arrives.
+ */
+export const GUARANTEE_DOCUMENT_STATUS = {
+  PENDING_REVIEW: "pending_review",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  SUPERSEDED: "superseded",
+} as const satisfies Record<Uppercase<GuaranteeDocumentStatus>, GuaranteeDocumentStatus>;
+
+export const GUARANTEE_DOCUMENT_UPLOADER_KIND = {
+  AGENCY_USER: "agency_user",
+  STAFF: "staff",
+} as const satisfies Record<string, GuaranteeDocumentUploader["kind"]>;
+
+/** Upload ceiling for one guarantee document. A scanned multi-page contract fits well inside it. */
+export const GUARANTEE_DOCUMENT_MAX_SIZE_BYTES = 15 * 1024 * 1024;
+
+export const GUARANTEE_DOCUMENT_MAX_FILE_NAME_LENGTH = 255;
+
+export const GUARANTEE_DOCUMENT_MAX_REJECTION_REASON_LENGTH = 1000;
+
+export const GUARANTEE_DOCUMENT_CONTENT_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+] as const;
+
+export type GuaranteeDocumentContentType = (typeof GUARANTEE_DOCUMENT_CONTENT_TYPES)[number];
+
+export const GUARANTEE_DOCUMENT_ERROR_CODE = {
+  GUARANTEE_NOT_FOUND: "GUARANTEE_NOT_FOUND",
+  GUARANTEE_CLOSED: "GUARANTEE_CLOSED",
+  FILE_NOT_FOUND: "FILE_NOT_FOUND",
+  FILE_ALREADY_ATTACHED: "FILE_ALREADY_ATTACHED",
+  UNSUPPORTED_CONTENT_TYPE: "UNSUPPORTED_CONTENT_TYPE",
+  FILE_TOO_LARGE: "FILE_TOO_LARGE",
+  FILE_EMPTY: "FILE_EMPTY",
+  INVALID_FILE_NAME: "INVALID_FILE_NAME",
+  DOCUMENT_NOT_FOUND: "DOCUMENT_NOT_FOUND",
+  NOT_PENDING_REVIEW: "NOT_PENDING_REVIEW",
+  REJECTION_REASON_REQUIRED: "REJECTION_REASON_REQUIRED",
+  REJECTION_REASON_TOO_LONG: "REJECTION_REASON_TOO_LONG",
+} as const;
+
+export type GuaranteeDocumentErrorCode =
+  (typeof GUARANTEE_DOCUMENT_ERROR_CODE)[keyof typeof GUARANTEE_DOCUMENT_ERROR_CODE];
+
+function isAllowedContentType(contentType: string): contentType is GuaranteeDocumentContentType {
+  return GUARANTEE_DOCUMENT_CONTENT_TYPES.some((allowed) => allowed === contentType);
+}
+
+export type UploadedFileCheckError = {
+  code:
+    | typeof GUARANTEE_DOCUMENT_ERROR_CODE.UNSUPPORTED_CONTENT_TYPE
+    | typeof GUARANTEE_DOCUMENT_ERROR_CODE.FILE_TOO_LARGE
+    | typeof GUARANTEE_DOCUMENT_ERROR_CODE.FILE_EMPTY
+    | typeof GUARANTEE_DOCUMENT_ERROR_CODE.INVALID_FILE_NAME;
+};
+
+/**
+ * Judges an upload by what storage recorded, never by what the client said:
+ * `contentType` and `sizeBytes` come from the `_storage` system row, so a
+ * renamed executable or an oversized file is refused whatever the form sent.
+ */
+export function checkUploadedFile({
+  contentType,
+  sizeBytes,
+  fileName,
+}: {
+  contentType: string | undefined;
+  sizeBytes: number;
+  fileName: string;
+}): Result<
+  { contentType: GuaranteeDocumentContentType; fileName: string },
+  UploadedFileCheckError
+> {
+  const trimmedName = fileName.trim();
+  if (trimmedName.length === 0 || trimmedName.length > GUARANTEE_DOCUMENT_MAX_FILE_NAME_LENGTH) {
+    return {
+      success: false,
+      error: { code: GUARANTEE_DOCUMENT_ERROR_CODE.INVALID_FILE_NAME },
+      message: "File name is empty or too long",
+    };
+  }
+  if (contentType === undefined || !isAllowedContentType(contentType)) {
+    return {
+      success: false,
+      error: { code: GUARANTEE_DOCUMENT_ERROR_CODE.UNSUPPORTED_CONTENT_TYPE },
+      message: "Only PDF, JPEG and PNG files are accepted",
+    };
+  }
+  if (sizeBytes <= 0) {
+    return {
+      success: false,
+      error: { code: GUARANTEE_DOCUMENT_ERROR_CODE.FILE_EMPTY },
+      message: "File is empty",
+    };
+  }
+  if (sizeBytes > GUARANTEE_DOCUMENT_MAX_SIZE_BYTES) {
+    return {
+      success: false,
+      error: { code: GUARANTEE_DOCUMENT_ERROR_CODE.FILE_TOO_LARGE },
+      message: "File exceeds the upload size limit",
+    };
+  }
+  return {
+    success: true,
+    data: { contentType, fileName: trimmedName },
+    message: "File accepted",
+  };
+}
+
+/**
+ * True when staff approved at least one signed rental contract for the
+ * guarantee. The gate staff activation reads: a later upload for the same
+ * slot does not revoke an approval already given, and a rejection of a newer
+ * file does not either — only an approved file counts, and one is enough.
+ */
+export function isSignedContractApproved(
+  documents: readonly Pick<GuaranteeDocument, "key" | "status">[],
+): boolean {
+  return documents.some(
+    (document) =>
+      document.key === DOCUMENT_KEY.RENTAL_CONTRACT &&
+      document.status === GUARANTEE_DOCUMENT_STATUS.APPROVED,
+  );
+}
 
 export const TENANT_APPROVAL_STATUS = {
   APROVADO: "aprovado",
