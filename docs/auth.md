@@ -1,6 +1,8 @@
 # Auth — Convex Function Wrappers
 
-> Mutav uses custom Convex function wrappers from [convex-helpers](https://stack.convex.dev/custom-functions) to authenticate and agency-scope every public query and mutation. The wrappers resolve the calling user once, attach `user` / `membership` / `agencyId` to `ctx`, and fail closed on missing identity or membership. Identity is JWT-only via Auth0 — there is no dev-user fallback; a deployment without a real `AUTH0_DOMAIN` rejects every authenticated request. See [`src/lib/auth0.ts`](../src/lib/auth0.ts), [`src/providers/convex.tsx`](../src/providers/convex.tsx), and [`convex/auth.config.ts`](../convex/auth.config.ts) for the wiring.
+> Auth0 setup, env vars, tenants, rotation and troubleshooting live in [`auth0.md`](auth0.md). This doc covers the Convex-side wrappers and authorization model.
+
+> Mutav uses custom Convex function wrappers from [convex-helpers](https://stack.convex.dev/custom-functions) to authenticate and agency-scope every public query and mutation. The wrappers resolve the calling user once, attach `user` / `membership` / `agencyId` to `ctx`, and fail closed on missing identity or membership. Identity is JWT-only via Auth0 — there is no dev-user fallback; a deployment without a real `AUTH0_DOMAIN` rejects every authenticated request. See [`apps/agency/src/lib/auth0.ts`](../apps/agency/src/lib/auth0.ts) and [`apps/admin/src/lib/auth0.ts`](../apps/admin/src/lib/auth0.ts) (both built on [`@mutav/app-shell/auth-callback`](../packages/app-shell/src/auth-callback.ts)), [`packages/app-shell/src/convex-auth-provider.tsx`](../packages/app-shell/src/convex-auth-provider.tsx), and [`convex/auth.config.ts`](../convex/auth.config.ts) for the wiring.
 
 ## The four wrappers + one helper
 
@@ -116,34 +118,38 @@ async function resolveCurrentUser(ctx: DbCtx): Promise<User> {
 
 ### First-login provisioning
 
-`users.getOrCreateByIdentity` ([`convex/users/useCases.ts`](../convex/users/useCases.ts)) is the idempotent provisioning entry point. Three resolution paths:
+`users.getOrCreateByIdentity` ([`convex/users/useCases.ts`](../convex/users/useCases.ts)) is the idempotent provisioning entry point. It returns a `Result`. Resolution paths, in order:
 
-1. Existing row with matching `subject` → return.
-2. Existing row with matching `email` and no `subject` yet → link by patching the subject (covers users created by older flows before Auth0 was wired).
-3. No match → insert.
+1. Existing row with matching `subject` → return it.
+2. Existing row with matching `email` and no `subject` → link it by patching the subject on, **only when the ID token says `email_verified: true`**. Otherwise → `EMAIL_NOT_VERIFIED`. Subjectless rows are seeded or tenant-cut rows that already hold agency memberships, so linking on an unverified email would hand those memberships to whoever typed the address.
+3. Existing row with matching `email` and a different `subject` → `EMAIL_BOUND_TO_OTHER_IDENTITY`. No second row is inserted and nothing is merged.
+4. No match → insert.
+
+A JWT without an `email` claim is refused with `UnauthenticatedError`. Callers ignore the `Result` today: an error leaves `getMe` returning `null`, which the agency app shows as `/session-error?reason=not-provisioned`. The error codes live in `USER_ERROR_CODE` ([`convex/users/domain.ts`](../convex/users/domain.ts)); the tenant cut-over that relies on path 2 is in [`auth0.md`](auth0.md#119-tenant-cut-over-runbook).
 
 Identity comes from `ctx.auth.getUserIdentity()` — never from client args. Accepting `subject` from args would let any authenticated user impersonate any other.
 
 Two callsites:
 
-- **Server-side** — the Auth0 `onCallback` hook in [`src/lib/auth0.ts`](../src/lib/auth0.ts) calls it once per successful OAuth callback via `ConvexHttpClient`. This is the canonical first-login path; the row is in place before the user lands on any authenticated route.
-- **Client fallback** — [`src/providers/workspace.tsx`](../src/providers/workspace.tsx) watches `getMe` returning `null` despite a valid Auth0 session and fires the mutation as a recovery path. Covers transient `onCallback` failures (Convex offline at login time, network blip) where the user has a valid session but no row.
+- **Server-side** — the shared Auth0 `onCallback` hook ([`packages/app-shell/src/auth-callback.ts`](../packages/app-shell/src/auth-callback.ts), wired into each app's `src/lib/auth0.ts`) calls it once per successful OAuth callback via `ConvexHttpClient`. This is the canonical first-login path; the row is in place before the user lands on any authenticated route.
+- **Server fallback (agency)** — `resolveUserDestination` in [`apps/agency/src/lib/user-destination.ts`](../apps/agency/src/lib/user-destination.ts) makes one provisioning attempt when `getMe` returns `null`, then reads `getMe` again; still `null` → `/session-error?reason=not-provisioned`.
+- **Client fallback (agency)** — [`apps/agency/src/providers/workspace.tsx`](../apps/agency/src/providers/workspace.tsx) watches `getMe` returning `null` despite a valid Auth0 session and fires the mutation once per mount as a recovery path. Covers transient `onCallback` failures (Convex offline at login time, network blip) where the user has a valid session but no row.
 
 ### `users.getMe` vs. wrapped handlers
 
 `getMe` (bare `query` in [`convex/users/useCases.ts`](../convex/users/useCases.ts)) is the only Convex query that intentionally returns `null` on missing identity or missing row. The UI needs the null to distinguish "loading", "signed out", and "signed in but unprovisioned" — wrapped handlers don't, they fail closed.
 
-| Path                    | Returns                                                  |
-| ----------------------- | -------------------------------------------------------- |
-| JWT present, row found  | The user row                                             |
-| JWT present, no row     | `null` (client provider retries `getOrCreateByIdentity`) |
-| JWT absent (signed out) | `null` (UI renders signed-out state)                     |
+| Path                    | Returns                                         |
+| ----------------------- | ----------------------------------------------- |
+| JWT present, row found  | The user row                                    |
+| JWT present, no row     | `null` (agency retries `getOrCreateByIdentity`) |
+| JWT absent (signed out) | `null` (UI renders signed-out state)            |
 
 ### Wiring on the client
 
-[`src/providers/convex.tsx`](../src/providers/convex.tsx) decides at build time which Convex provider to render:
+[`packages/app-shell/src/convex-auth-provider.tsx`](../packages/app-shell/src/convex-auth-provider.tsx) decides which Convex provider to render, from the `auth0Domain` prop each app passes in from its `NEXT_PUBLIC_AUTH0_DOMAIN` (inlined at build time):
 
-- `NEXT_PUBLIC_AUTH0_DOMAIN` set → `<ConvexProviderWithAuth>` + `useAuthFromAuth0` hook that fetches the ID token from `/api/auth/convex-token` (which reads the encrypted session cookie via `auth0.getSession()`).
+- `NEXT_PUBLIC_AUTH0_DOMAIN` set → `<ConvexProviderWithAuth>` + `useAuthFromAuth0` hook that fetches the ID token from `/api/auth/convex-token` with `cache: "no-store"`. The route reads the encrypted session cookie and refreshes the ID token first when it is near expiry (see [`auth0.md`](auth0.md#id-token-refresh)).
 - Unset → bare `<ConvexProvider>`. The Convex backend sees no JWT; every wrapped handler throws `UnauthenticatedError`.
 
 Both halves are gated on the same env presence, so a mismatched config can't silently downgrade auth.
@@ -161,24 +167,24 @@ Worth noting in this doc because the Auth0 swap PR is the natural moment to comm
 
 ## Auth0 Organizations — agency identity model
 
-Each **imobiliária maps to one Auth0 Organization**, mirrored 1:1 to one Convex `agencies` row; each **corretor is one Auth0 user** mirrored to one `users` row. **Membership is canonical in Auth0** (the Org's member list + Org role `owner`/`admin`/`member`); the Convex `memberships` row is a **cached projection** synced at login/provisioning. Mutav-internal staff are Auth0 users with **no Organization** + `users.isStaff: true`.
+Each **imobiliária maps to one Auth0 Organization**, mirrored 1:1 to one Convex `agencies` row; each **corretor is one Auth0 user** mirrored to one `users` row. **Membership is canonical in Auth0** (the Org's member list + Org role `owner`/`admin`/`member`); the Convex `memberships` row is a **cached projection** synced at login/provisioning. Mutav-internal staff are Auth0 users with **no Organization** and one or more `mutavStaff` rows.
 
 | Concept     | Auth0                 | Convex (projection)        |
 | ----------- | --------------------- | -------------------------- |
 | Imobiliária | Organization          | `agencies` row             |
 | Corretor    | User                  | `users` row                |
 | Membership  | Org member + Org role | `memberships` row (cached) |
-| Mutav staff | User, no Org          | `users.isStaff: true`      |
+| Mutav staff | User, no Org          | `mutavStaff` rows          |
 
 **Org naming (no PII).** Auth0 Org `name = ag-<convex agency _id>` (globally unique, stable across renames, carries no PII); `display_name = agencies.name`; `metadata = { cnpj_hmac, agency_type, created_at }`, where `cnpj_hmac` uses the same HMAC pepper as `claimedDocuments` / `hashPii`. Never put the CNPJ or agency name in the Org `name`.
 
 **JWT claim shape.** An Auth0 Post-Login Action injects `https://mutav.com/orgs` = `[{ id, display_name, role }]` (the user's agencies + role). When the user logs in scoped to exactly one Org (`?organization=…`), the native `org_id` claim is also present. **Wrappers prefer the custom `…/orgs` claim and fall back to native `org_id`.**
 
-**Staff identity = Option C (Convex flag), for now.** Staff authority is a `users.isStaff` boolean checked by `queryWithStaff` / `mutationWithStaff`; granted by flipping the flag (no Auth0 change). **Graduate to Auth0 Roles (Option B)** when any of these holds: staff count exceeds ~10; granular per-permission roles are needed (auditor / regional-admin); or an external auditor / compliance officer needs scoped, time-limited access. Estimated 12–18 months out.
+**Staff identity lives in Convex, not in Auth0.** Staff authority is the `mutavStaff` table (`userId`, `role`, `createdAt`, optional `addedBy`; indexes `by_user`, `by_user_role`, `by_role`), one row per (user, role). See [Admin authorization model](#admin-authorization-model) below for the wrappers, the identity reads and how rows are granted. **Graduate to Auth0 Roles** when any of these holds: staff count exceeds ~10; granular per-permission roles are needed (auditor / regional-admin); or an external auditor / compliance officer needs scoped, time-limited access.
 
-**Migration tolerance (no breaking moment).** `queryWithAgencyScope` / `mutationWithAgencyScope` MUST tolerate both shapes during rollout: `agencies.auth0OrgId === undefined` (legacy agency → fall back to the Convex `memberships` projection) and `auth0OrgId === "org_…"` (prefer the JWT Org claim). Schema has landed: `agencies.auth0OrgId` + `by_auth0OrgId` index, `users.isStaff`.
+**Migration tolerance (no breaking moment).** `queryWithAgencyScope` / `mutationWithAgencyScope` MUST tolerate both shapes during rollout: `agencies.auth0OrgId === undefined` (legacy agency → fall back to the Convex `memberships` projection) and `auth0OrgId === "org_…"` (prefer the JWT Org claim). Schema has landed: `agencies.auth0OrgId` + `by_auth0OrgId` index. `users.isStaff` is deprecated: nothing reads or writes it, and it stays optional in the schema only until a clear-then-narrow migration removes it.
 
-> Decision origin (Option C staff flag + Org-name-no-PII): this section is the durable record (the brainstorm spec was transient and is no longer tracked).
+> Decision origin (Org-name-no-PII; the original `users.isStaff` flag was superseded by the `mutavStaff` table): this section is the durable record (the brainstorm spec was transient and is no longer tracked).
 
 ## Strict compliance — the rule
 
@@ -227,8 +233,9 @@ The dated per-handler migration log was retired (it lives in git history); the l
 
 Admin authority is split cleanly between identity and authorization:
 
-- **Auth0 proves identity.** All four persona apps share the same Auth0 Application. The admin console does not pin an Auth0 Organization; the app-level gate is "signed in, staff row present". A successful login gives you an ID token — nothing more.
-- **Convex enforces authorization** via the `mutavStaff` table combined with the staff wrappers in [`convex/lib/auth.ts`](../convex/lib/auth.ts) (`queryWithMutavStaff`, `mutationWithMutavStaff`, `queryWithMutavRole`, `mutationWithMutavRole`). These wrappers verify the caller has a `mutavStaff` row before running the handler and expose `ctx.staffUser`. They do NOT bind to a specific Auth0 Application audience — Convex's identity system does not surface the JWT `aud` claim (see [`convex/lib/auth.ts:148-155`](../convex/lib/auth.ts#L148-L155) for the note). If tighter admin-app provenance is needed later, add a custom claim from an admin Auth0 Post-Login Action (tracked in [#206](https://github.com/mutav-finance/mutav-app/issues/206)). One row per (user, role). No admin capability exists off this table.
+- **Auth0 proves identity.** Only `apps/agency` and `apps/admin` use Auth0, and they share the same Auth0 Application (`apps/pay` is publicId-bearer, `apps/fund` is wallet-as-identity). The admin console does not pin an Auth0 Organization; the app-level gate is "signed in, staff row present". A successful login gives you an ID token — nothing more.
+- **Convex enforces authorization** via the `mutavStaff` table combined with the staff wrappers in [`convex/lib/auth.ts`](../convex/lib/auth.ts) (`queryWithMutavStaff`, `mutationWithMutavStaff`, `queryWithMutavRole`, `mutationWithMutavRole`). These wrappers verify the caller has a `mutavStaff` row before running the handler and inject `ctx.user` (the resolved `users` row) and `ctx.mutavStaffRoles`; the mutation variants also inject `ctx.appendStaffAudit`. They never inject `ctx.agencyId` and don't combine with the agency wrappers. They do NOT bind to a specific Auth0 Application audience — Convex's identity system does not surface the JWT `aud` claim (see the "Mutav staff wrappers" comment in [`convex/lib/auth.ts`](../convex/lib/auth.ts)). If tighter admin-app provenance is needed later, add a custom claim from an admin Auth0 Post-Login Action (tracked in [#206](https://github.com/mutav-finance/mutav-app/issues/206)). One row per (user, role). No admin capability exists off this table.
+- **Identity reads, not capabilities:** [`convex/mutavStaff/useCases.ts`](../convex/mutavStaff/useCases.ts) exports `getMyStaff` (the caller's roles, or `null`; used by the admin staff gate) and `amIStaff` (a boolean; used by the agency destination resolver and shell switcher). Both are `queryWithAuth`, keyed on the caller's `users` row, and grant nothing. The admin gate treats a failed `getMyStaff` read as `unavailable`, never as `not-staff` or `anonymous`.
 - **Roles ladder:** `support` < `compliance` < `admin`, checked by `meetsMinRole`. `treasury` is off the ladder (see [`convex/mutavStaff/domain.ts`](../convex/mutavStaff/domain.ts)) — an orthogonal custody capability that never satisfies an operational `minRole` gate.
 
 **Provisioning:** admins grant capabilities through the `/staff` page in `apps/admin/`, which calls `mutavStaff.createStaffRole({ auth0Sub, role })`. The target must have signed in at least once (a `users` row keyed on `subject` must exist) — we never invent user rows from admin input. Each grant writes a `staff.created` entry to the hash-chained audit log. The very first admin (genesis) is granted via the internal-only `bootstrapFirstAdmin` mutation, invoked once per deployment through `bunx convex run mutavStaff:useCases:bootstrapFirstAdmin`; it refuses once any admin row exists and writes a `staff.bootstrap` audit entry attributed to the `system` actor. There is no claim-based auto-provisioning from the JWT — every staff row is either an explicit admin grant or the genesis bootstrap.

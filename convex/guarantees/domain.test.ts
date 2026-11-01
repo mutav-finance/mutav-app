@@ -1,5 +1,7 @@
 import { describe, expect, it, test } from "vitest";
 import {
+  checkUploadedFile,
+  isSignedContractApproved,
   expiringRenewalBounds,
   getUrgencyTier,
   GUARANTEE_STATE,
@@ -165,5 +167,69 @@ describe("tierForScore", () => {
     [399, "negado"],
   ] as const)("score %i → %s", (score, tier) => {
     expect(tierForScore(score)).toBe(tier);
+  });
+});
+
+describe("checkUploadedFile", () => {
+  const MAX = 15 * 1024 * 1024;
+
+  test.each(["application/pdf", "image/jpeg", "image/png"])("accepts %s", (contentType) => {
+    expect(checkUploadedFile({ contentType, sizeBytes: 1024, fileName: " a.pdf " })).toEqual({
+      success: true,
+      data: { contentType, fileName: "a.pdf" },
+      message: "File accepted",
+    });
+  });
+
+  test("accepts exactly the size limit", () => {
+    expect(
+      checkUploadedFile({ contentType: "application/pdf", sizeBytes: MAX, fileName: "a.pdf" })
+        .success,
+    ).toBe(true);
+  });
+
+  test.each([
+    [{ contentType: "text/html", sizeBytes: 10, fileName: "a.pdf" }, "UNSUPPORTED_CONTENT_TYPE"],
+    [{ contentType: undefined, sizeBytes: 10, fileName: "a.pdf" }, "UNSUPPORTED_CONTENT_TYPE"],
+    [{ contentType: "application/pdf", sizeBytes: MAX + 1, fileName: "a.pdf" }, "FILE_TOO_LARGE"],
+    [{ contentType: "application/pdf", sizeBytes: 0, fileName: "a.pdf" }, "FILE_EMPTY"],
+    [{ contentType: "application/pdf", sizeBytes: 10, fileName: "  " }, "INVALID_FILE_NAME"],
+    [
+      { contentType: "application/pdf", sizeBytes: 10, fileName: "x".repeat(256) },
+      "INVALID_FILE_NAME",
+    ],
+  ] as const)("refuses %o with %s", (input, code) => {
+    expect(checkUploadedFile(input)).toMatchObject({ success: false, error: { code } });
+  });
+});
+
+describe("isSignedContractApproved", () => {
+  test("false with no documents", () => {
+    expect(isSignedContractApproved([])).toBe(false);
+  });
+
+  test.each(["pending_review", "rejected", "superseded"] as const)(
+    "false when the rental contract is only %s",
+    (status) => {
+      expect(isSignedContractApproved([{ key: "rentalContract", status }])).toBe(false);
+    },
+  );
+
+  test("false when only another key is approved", () => {
+    expect(
+      isSignedContractApproved([
+        { key: "inspection", status: "approved" },
+        { key: "policy", status: "approved" },
+      ]),
+    ).toBe(false);
+  });
+
+  test("true once any rental contract is approved, even beside a newer pending one", () => {
+    expect(
+      isSignedContractApproved([
+        { key: "rentalContract", status: "pending_review" },
+        { key: "rentalContract", status: "approved" },
+      ]),
+    ).toBe(true);
   });
 });

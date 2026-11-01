@@ -28,7 +28,7 @@ import {
   LanguagesIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useLocale, useTranslations } from "next-intl";
+import { hasLocale, useLocale, useTranslations } from "next-intl";
 import { useRouter, usePathname } from "@mutav/i18n/navigation";
 import { routing } from "@mutav/i18n/routing";
 
@@ -79,8 +79,10 @@ export function NavUser({ user, logoutHref = "/auth/logout" }: NavUserProps) {
     // Defence in depth — the radio group only emits routing.locales, but
     // future callers could drive this from URL state. An invalid locale
     // would otherwise route silently to a 404 on next-intl's side.
-    if (!(routing.locales as readonly string[]).includes(next)) return;
-    router.replace(pathname, { locale: next as (typeof routing.locales)[number] });
+    if (!hasLocale(routing.locales, next)) return;
+    // Read at click time, not via useSearchParams: that hook would force the
+    // shell up to the nearest Suspense boundary to render client-side.
+    router.replace(`${pathname}${window.location.search}`, { locale: next });
   };
 
   // Auth0 can return `name: ""` (truthy-but-empty) so `??` is not enough —

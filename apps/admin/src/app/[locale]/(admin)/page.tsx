@@ -17,8 +17,7 @@ export default async function AdminReviewQueuePage() {
   const gate = await getStaffMember();
   if (gate.kind !== "staff") return null;
 
-  const token = gate.session.tokenSet.idToken;
-  if (!token) return null;
+  const { token } = gate;
 
   const preloaded = await preloadQuery(api.mutavStaff.useCases.listPendingReviews, {}, { token });
 

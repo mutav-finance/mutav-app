@@ -46,6 +46,11 @@ export const AUDIT_ACTION = {
   GUARANTEE_REPRICED: "guarantee.repriced",
   GUARANTEE_CAPACITY_RESERVED: "guarantee.capacity_reserved",
   GUARANTEE_CAPACITY_RELEASED: "guarantee.capacity_released",
+  // guarantees/ documents (emitted by convex/guarantees/documents.ts and
+  // convex/guarantees/staffDocuments.ts).
+  GUARANTEE_DOCUMENT_ATTACHED: "guarantee.document_attached",
+  GUARANTEE_DOCUMENT_APPROVED: "guarantee.document_approved",
+  GUARANTEE_DOCUMENT_REJECTED: "guarantee.document_rejected",
   // leases/ (current — emitted alongside guarantee creation).
   LEASE_CREATED: "lease.created",
   // payments/ (frozen wire values — historical rows only; never emitted by
@@ -87,6 +92,12 @@ export const AUDIT_ACTION = {
   DELINQUENCY_RESOLVED_BY_COVER: "delinquency.resolved_by_cover",
   DELINQUENCY_DISMISSED: "delinquency.dismissed",
   DELINQUENCY_DISPUTED: "delinquency.disputed",
+  DELINQUENCY_EVIDENCE_ATTACHED: "delinquency.evidence_attached",
+  DELINQUENCY_CLAIM_SUBMITTED: "delinquency.claim_submitted",
+  DELINQUENCY_CLAIM_INFO_REQUESTED: "delinquency.claim_info_requested",
+  DELINQUENCY_CLAIM_RESUBMITTED: "delinquency.claim_resubmitted",
+  DELINQUENCY_EXPIRED: "delinquency.expired",
+  GUARANTEE_ARREARS_CLEARED: "guarantee.arrears_cleared",
   // coverOperations/ (the cover-payout ledger — emitted by
   // convex/coverOperations/mutations.ts).
   COVER_OPERATION_RECORDED: "cover_operation.recorded",
@@ -104,6 +115,9 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.GUARANTEE_REPRICED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RESERVED),
   v.literal(AUDIT_ACTION.GUARANTEE_CAPACITY_RELEASED),
+  v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_ATTACHED),
+  v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_APPROVED),
+  v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_REJECTED),
   v.literal(AUDIT_ACTION.LEASE_CREATED),
   v.literal(AUDIT_ACTION.PAYMENT_BATCH_GENERATED),
   v.literal(AUDIT_ACTION.PAYMENT_MARKED_OVERDUE),
@@ -131,6 +145,12 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.DELINQUENCY_RESOLVED_BY_COVER),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISMISSED),
   v.literal(AUDIT_ACTION.DELINQUENCY_DISPUTED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_EVIDENCE_ATTACHED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_CLAIM_SUBMITTED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_CLAIM_INFO_REQUESTED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_CLAIM_RESUBMITTED),
+  v.literal(AUDIT_ACTION.DELINQUENCY_EXPIRED),
+  v.literal(AUDIT_ACTION.GUARANTEE_ARREARS_CLEARED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_RECORDED),
   v.literal(AUDIT_ACTION.COVER_OPERATION_EXECUTED),
 );

@@ -102,6 +102,36 @@ export function getAppBaseUrl(): string {
   return requireUrlInProduction(process.env.APP_BASE_URL, "APP_BASE_URL", "http://localhost:3000");
 }
 
+const ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT = 600;
+const POSITIVE_INTEGER = /^[1-9]\d*$/;
+
+/**
+ * How long before the ID token's `exp` the proxy and the Convex token route
+ * refresh it. Server-only (`AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS`). Anything
+ * but a positive integer falls back to the default, so a typo can't turn
+ * refresh off or make it run on every request.
+ */
+export function getIdTokenRefreshWindowSeconds(): number {
+  const raw = process.env.AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS;
+  if (!raw) return ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT;
+  if (!POSITIVE_INTEGER.test(raw)) {
+    warnInvalidRefreshWindowOnce();
+    return ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT;
+  }
+  return Number(raw);
+}
+
+let invalidRefreshWindowWarned = false;
+
+/** Once per process: the getter runs on every proxied request. Names the var, never its value. */
+function warnInvalidRefreshWindowOnce(): void {
+  if (invalidRefreshWindowWarned) return;
+  invalidRefreshWindowWarned = true;
+  console.warn(
+    `[env] AUTH0_ID_TOKEN_REFRESH_WINDOW_SECONDS is not a positive integer; using ${ID_TOKEN_REFRESH_WINDOW_SECONDS_DEFAULT}`,
+  );
+}
+
 /**
  * Convex deployment URL. Public because the browser bundle needs it to
  * construct the `ConvexReactClient`. Returns null when unset so callers
