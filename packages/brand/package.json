@@ -1,0 +1,22 @@
+{
+  "name": "@mutav/brand",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./logo-mark": "./src/logo-mark.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@mutav/tsconfig": "workspace:*",
+    "@types/react": "^19",
+    "typescript": "^5"
+  }
+}

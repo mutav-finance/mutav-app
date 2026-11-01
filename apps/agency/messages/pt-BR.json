@@ -1246,8 +1246,15 @@
       "warningTitle": "Atenção para imobiliárias:",
       "warningBody": "o cadastro precisa ser feito pelo sócio com participação igual ou superior a 25%, ou por um administrador com poderes para abrir contas em nome da empresa. Tenha o contrato social em mãos para comprovar.",
       "checklistTitle": "O que você vai precisar",
+      "typeQuestion": "Como você atua?",
+      "proofPoints": {
+        "onchainReserve": "Reserva de garantia auditável on-chain.",
+        "review": "Análise do cadastro em até 2 dias úteis.",
+        "noGuarantor": "Locação sem fiador para os seus clientes."
+      },
       "autonomo": {
         "title": "Corretor autônomo",
+        "description": "Você atua com CRECI de pessoa física.",
         "items": [
           {
             "label": "CPF"
@@ -1266,6 +1273,7 @@
       },
       "empresa": {
         "title": "Imobiliária",
+        "description": "Cadastro da empresa, com CNPJ e CRECI jurídico.",
         "items": [
           {
             "label": "CNPJ"

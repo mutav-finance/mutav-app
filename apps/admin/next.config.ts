@@ -100,7 +100,13 @@ const nextConfig: NextConfig = {
   turbopack: { root: resolve(__dirname, "../..") },
   // Workspace packages ship TypeScript / TSX source; Next.js must transpile
   // them through SWC on the way into the build.
-  transpilePackages: ["@mutav/app-shell", "@mutav/i18n", "@mutav/ui", "@mutav/wallet"],
+  transpilePackages: [
+    "@mutav/app-shell",
+    "@mutav/brand",
+    "@mutav/i18n",
+    "@mutav/ui",
+    "@mutav/wallet",
+  ],
   async headers() {
     return [
       {

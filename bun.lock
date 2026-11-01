@@ -78,6 +78,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@mutav/app-shell": "workspace:*",
+        "@mutav/brand": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
@@ -126,6 +127,18 @@
         "react-dom": "^19.0.0",
       },
     },
+    "packages/brand": {
+      "name": "@mutav/brand",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@mutav/tsconfig": "workspace:*",
+        "@types/react": "^19",
+        "typescript": "^5",
+      },
+      "peerDependencies": {
+        "react": "^19.0.0",
+      },
+    },
     "packages/i18n": {
       "name": "@mutav/i18n",
       "version": "0.1.0",
@@ -151,6 +164,7 @@
       "name": "@mutav/ui",
       "version": "0.1.0",
       "dependencies": {
+        "@mutav/brand": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
@@ -521,6 +535,8 @@
     "@mutav/agency": ["@mutav/agency@workspace:apps/agency"],
 
     "@mutav/app-shell": ["@mutav/app-shell@workspace:packages/app-shell"],
+
+    "@mutav/brand": ["@mutav/brand@workspace:packages/brand"],
 
     "@mutav/fund": ["@mutav/fund@workspace:apps/fund"],
 
