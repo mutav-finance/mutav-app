@@ -13,6 +13,7 @@ import {
   BANK_ACCOUNT_TYPE,
   BANKING_FORM_DEFAULTS,
   bankingSchema,
+  type BankingErrorKey,
   type BankingFormInput,
   type BankingFormValues,
 } from "@/components/onboarding/schemas/banking-schema";
@@ -26,12 +27,16 @@ type Props = {
   isSubmitting: boolean;
 };
 
-const SERVER_ERROR_FIELD_MAP: Partial<Record<string, keyof BankingFormInput>> = {
-  BANK_REQUIRED: "bankName",
-  BRANCH_REQUIRED: "bankBranch",
-  ACCOUNT_REQUIRED: "bankAccount",
-  ACCOUNT_TYPE_REQUIRED: "bankAccountType",
-};
+const SERVER_ERROR_FIELD_MAP = {
+  BANK_REQUIRED: { field: "bankName", messageKey: "bank" },
+  BRANCH_REQUIRED: { field: "bankBranch", messageKey: "branch" },
+  ACCOUNT_REQUIRED: { field: "bankAccount", messageKey: "account" },
+  ACCOUNT_TYPE_REQUIRED: { field: "bankAccountType", messageKey: "accountType" },
+} as const satisfies Record<string, { field: keyof BankingFormInput; messageKey: BankingErrorKey }>;
+
+function isFieldServerErrorCode(code: string): code is keyof typeof SERVER_ERROR_FIELD_MAP {
+  return Object.hasOwn(SERVER_ERROR_FIELD_MAP, code);
+}
 
 export function StepBanking({
   initialValues,
@@ -55,9 +60,9 @@ export function StepBanking({
   const errors = formState.errors;
 
   React.useEffect(() => {
-    if (!serverErrorCode) return;
-    const field = SERVER_ERROR_FIELD_MAP[serverErrorCode];
-    if (field) setError(field, { type: "server", message: serverErrorCode });
+    if (!serverErrorCode || !isFieldServerErrorCode(serverErrorCode)) return;
+    const { field, messageKey } = SERVER_ERROR_FIELD_MAP[serverErrorCode];
+    setError(field, { type: "server", message: messageKey });
   }, [serverErrorCode, setError]);
 
   const fieldError = (key: keyof BankingFormInput): string | undefined => {

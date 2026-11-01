@@ -19,7 +19,7 @@ import { Input } from "@mutav/ui/input";
 import { Mono } from "@mutav/ui/mono";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
-import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
+import { formatBRLCents, formatDateBR, formatMonthYear } from "@mutav/i18n/brazil";
 import { useWorkspace } from "@/providers/workspace";
 
 function toPeriodMonth(date: Date): string {
@@ -33,11 +33,6 @@ export function CommissionPage() {
   const agencyId = selectedAgency?._id;
   const [month, setMonth] = React.useState(() => new Date());
   const [search, setSearch] = React.useState("");
-
-  const monthFormatter = React.useMemo(
-    () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }),
-    [locale],
-  );
 
   const rows = useQuery(
     api.guarantees.useCases.listForCommissionByMonth,
@@ -74,8 +69,8 @@ export function CommissionPage() {
         <Button variant="outline" size="icon-sm" onClick={prevMonth} aria-label={t("prevMonth")}>
           <ChevronLeftIcon className="size-4" strokeWidth={1.5} />
         </Button>
-        <span className="text-base-sm min-w-40 text-center font-mono font-medium capitalize">
-          {monthFormatter.format(month)}
+        <span className="text-base-sm min-w-40 text-center font-mono font-medium">
+          {formatMonthYear(toPeriodMonth(month), locale, { month: "long", capitalize: true })}
         </span>
         <Button
           variant="outline"

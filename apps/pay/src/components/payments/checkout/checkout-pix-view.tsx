@@ -429,10 +429,11 @@ function PaymentQrCode({ value }: { value: string }) {
 }
 
 function PaymentQrImage({ promise }: { promise: Promise<string | null> }) {
+  const t = useTranslations("checkout.pix");
   const dataUrl = use(promise);
   if (!dataUrl) return <div className="bg-muted size-[240px] animate-pulse" />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={dataUrl} alt="Pix QR" width={240} height={240} />;
+  return <img src={dataUrl} alt={t("qrCodeAlt")} width={240} height={240} />;
 }
 
 function CopyField({ label, value }: { label: string; value: string }) {

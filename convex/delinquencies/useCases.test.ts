@@ -2,7 +2,11 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
-import { registerGuaranteeAggregateComponents, seedGuaranteeWithLease } from "../lib/testFixtures";
+import {
+  TEST_PAYOUT_ACCOUNT,
+  registerGuaranteeAggregateComponents,
+  seedGuaranteeWithLease,
+} from "../lib/testFixtures";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
 import type { AgencyId } from "../agencies/domain";
@@ -270,12 +274,12 @@ describe("listByAgency", () => {
     expect(result.page.map((r) => r.publicId)).toEqual(["DN-mid"]);
   });
 
-  test("amountFromCents / amountToCents narrows to the in-range subset", async () => {
+  test("amountFromCents / amountToCents narrows on the reported amount", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    await insertNotice(t, fx, { publicId: "DN-cheap", updatedAmountCents: 100_000 });
-    await insertNotice(t, fx, { publicId: "DN-mid", updatedAmountCents: 300_000 });
-    await insertNotice(t, fx, { publicId: "DN-expensive", updatedAmountCents: 500_000 });
+    await insertNotice(t, fx, { publicId: "DN-cheap", originalAmountCents: 100_000 });
+    await insertNotice(t, fx, { publicId: "DN-mid", originalAmountCents: 300_000 });
+    await insertNotice(t, fx, { publicId: "DN-expensive", originalAmountCents: 500_000 });
 
     const asUser = t.withIdentity({ subject: fx.subject });
     const result = await asUser.query(api.delinquencies.useCases.listByAgency, {
@@ -479,6 +483,122 @@ describe("getByPublicId", () => {
     });
     expect(result).toBeNull();
   });
+
+  test("an open notice inside the grace period reads as reported and the agency may act", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const today = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await insertNotice(t, fx, { publicId: "DN-reported", rentDueDate: today });
+
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-reported" });
+    expect(result?.caseStatus).toBe("reported");
+    expect(result?.canAct).toBe(true);
+    expect(result?.claim).toBeNull();
+    expect(result?.cover).toBeNull();
+  });
+
+  test("an open notice past the grace period reads as ready to claim, listing what is missing", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-ready", rentDueDate: "2026-06-05" });
+
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-ready" });
+    expect(result?.caseStatus).toBe("ready_to_claim");
+    expect(result?.claimableFrom).toBe("2026-06-15");
+    expect(result?.missingRequirements).toEqual([
+      "signedContract",
+      "nonPaymentProof",
+      "tenantNotice",
+    ]);
+    expect(result?.signedContract).toBe("not_uploaded");
+  });
+
+  test("a staff-verified notice reads as under review and locks agency actions", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-review", status: "verified" });
+
+    const result = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-review" });
+    expect(result?.status).toBe("verified");
+    expect(result?.caseStatus).toBe("under_review");
+    expect(result?.canAct).toBe(false);
+  });
+
+  test.each([
+    ["recorded", undefined, "approved", null, null],
+    [
+      "executed",
+      {
+        executedAt: "2026-06-20T10:00:00.000Z",
+        paymentReference: "E00000000202606201000abc",
+      },
+      "paid",
+      "2026-06-20T10:00:00.000Z",
+      "E00000000202606201000abc",
+    ],
+  ] as const)(
+    "a cover resolution whose payout is %s reads as %s",
+    async (coverStatus, execution, expectedCase, expectedExecutedAt, expectedReference) => {
+      const t = setup();
+      const fx = await makeFixture(t);
+      await t.run(async (ctx) => {
+        const noticeId = await ctx.db.insert("guaranteeDelinquencyNotices", {
+          publicId: "DN-covered",
+          guaranteeId: fx.guaranteeId,
+          agencyId: fx.agencyId,
+          status: "resolved",
+          rentDueDate: "2026-06-05",
+          originalAmountCents: 300_000,
+          updatedAmountCents: 300_000,
+          evidenceSource: "agency_reported",
+          openedAt: "2026-06-10T09:00:00-03:00",
+          openedByUserId: fx.userId,
+        });
+        const coverOperationId = await ctx.db.insert("coverOperations", {
+          publicId: "CO-covered",
+          status: coverStatus,
+          noticeId,
+          guaranteeId: fx.guaranteeId,
+          agencyId: fx.agencyId,
+          coveragePeriod: "2026-06",
+          requestedCents: 300_000,
+          appliedCents: 250_000,
+          payoutAccount: TEST_PAYOUT_ACCOUNT,
+          recordedAt: "2026-06-18T10:00:00.000Z",
+          recordedByUserId: fx.userId,
+          ...(execution ? { execution: { ...execution, executedByUserId: fx.userId } } : {}),
+        });
+        await ctx.db.patch(noticeId, {
+          resolution: {
+            kind: "cover_committed",
+            resolvedAt: "2026-06-18T10:00:00.000Z",
+            resolvedByUserId: fx.userId,
+            coverOperationId,
+            coverOperationPublicId: "CO-covered",
+            appliedCoverCents: 250_000,
+          },
+        });
+      });
+
+      const result = await t
+        .withIdentity({ subject: fx.subject })
+        .query(api.delinquencies.useCases.getByPublicId, { publicId: "DN-covered" });
+      expect(result?.caseStatus).toBe(expectedCase);
+      expect(result?.cover).toEqual({
+        status: coverStatus,
+        requestedCents: 300_000,
+        appliedCents: 250_000,
+        executedAt: expectedExecutedAt,
+        paymentReference: expectedReference,
+      });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -834,5 +954,217 @@ describe("getByPublicIdInternal", () => {
       publicId: "DN-internal-miss",
     });
     expect(miss).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listReportableGuarantees — the "which guarantee?" picker
+// ---------------------------------------------------------------------------
+
+describe("listReportableGuarantees", () => {
+  async function setLeaseDueDay(t: T, guaranteeId: GuaranteeId, dueDay: number) {
+    await t.run(async (ctx) => {
+      const guarantee = await ctx.db.get(guaranteeId);
+      if (!guarantee) throw new Error("fixture guarantee missing");
+      const lease = await ctx.db.get(guarantee.leaseId);
+      if (!lease) throw new Error("fixture lease missing");
+      await ctx.db.patch(lease._id, { rent: { ...lease.rent, dueDay } });
+    });
+  }
+
+  test("unauthenticated → throws", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await expect(
+      t.query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId }),
+    ).rejects.toThrow();
+  });
+
+  test("lists only the caller's agency", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1");
+    await makeFixture(t, "2");
+    const rows = await t
+      .withIdentity({ subject: a.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: a.agencyId });
+    expect(rows.map((row) => row.guaranteePublicId)).toEqual(["CT-1"]);
+  });
+
+  test("drafts are listed last and flagged ineligible", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await seedGuaranteeWithLease(
+      t,
+      { agencyId: fx.agencyId, status: "drafted", activatedAt: null, tenantTaxId: "52998224725" },
+      "CT-draft",
+    );
+    const rows = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId });
+    expect(
+      rows.map((row) => [row.guaranteePublicId, row.eligible, row.lastDueDate === null]),
+    ).toEqual([
+      ["CT-1", true, false],
+      ["CT-draft", false, true],
+    ]);
+  });
+
+  test("months with an open or verified notice are reported as outstanding", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-open", rentDueDate: "2026-08-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-verified",
+      status: "verified",
+      rentDueDate: "2026-09-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-cured",
+      status: "resolved",
+      rentDueDate: "2026-07-05",
+    });
+    const [row] = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId });
+    expect([...row.outstandingMonths].sort()).toEqual(["2026-08", "2026-09"]);
+  });
+
+  test("sorts by the due date that passed most recently", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    const second = await seedGuaranteeWithLease(
+      t,
+      {
+        agencyId: fx.agencyId,
+        status: "active",
+        activatedAt: "2024-06-01T00:00:00.000Z",
+        tenantTaxId: "52998224725",
+      },
+      "CT-recent",
+    );
+    // Pinned relative to today: the fixture lease falls due on the 1st and the
+    // second on today's day of the month, so the second passed more recently
+    // (on the 1st itself the two tie).
+    const today = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayDay = Number(today.slice(8, 10));
+    await setLeaseDueDay(t, fx.guaranteeId, 1);
+    await setLeaseDueDay(t, second.guaranteeId, todayDay === 1 ? 1 : todayDay);
+    const rows = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listReportableGuarantees, { agencyId: fx.agencyId });
+    if (todayDay === 1) {
+      expect(rows[0].lastDueDate).toBe(rows[1].lastDueDate);
+    } else {
+      expect(rows.map((row) => row.guaranteePublicId)).toEqual(["CT-recent", "CT-1"]);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listCases — the agency's claims queue
+// ---------------------------------------------------------------------------
+
+describe("listCases", () => {
+  test("partitions cases by who acts next and counts every group", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-ready", rentDueDate: "2026-06-05" });
+    await insertNotice(t, fx, {
+      publicId: "DN-review",
+      status: "verified",
+      rentDueDate: "2026-07-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-cured",
+      status: "resolved",
+      rentDueDate: "2026-05-05",
+    });
+    await insertNotice(t, fx, {
+      publicId: "DN-withdrawn",
+      status: "canceled",
+      rentDueDate: "2026-04-05",
+    });
+
+    const asUser = t.withIdentity({ subject: fx.subject });
+    const needsYou = await asUser.query(api.delinquencies.useCases.listCases, {
+      agencyId: fx.agencyId,
+      group: "needs_you",
+    });
+    expect(needsYou.counts).toEqual({ needs_you: 1, with_mutav: 1, closed: 2 });
+    expect(needsYou.rows.map((row) => [row.publicId, row.caseStatus])).toEqual([
+      ["DN-ready", "ready_to_claim"],
+    ]);
+    // The fixture writes no creation-history snapshot, and the queue never
+    // falls back to the shared tenant registry (LGPD-26), so the name is blank.
+    expect(needsYou.rows[0].tenantName).toBe("");
+    expect(needsYou.rows[0].streetAndNumber).toBe("Rua Teste, 1");
+
+    const closed = await asUser.query(api.delinquencies.useCases.listCases, {
+      agencyId: fx.agencyId,
+      group: "closed",
+    });
+    expect(closed.rows.map((row) => row.caseStatus).sort()).toEqual(["cured", "withdrawn"]);
+
+    const all = await asUser.query(api.delinquencies.useCases.listCases, {
+      agencyId: fx.agencyId,
+      group: "all",
+    });
+    expect(all.counts).toEqual(needsYou.counts);
+    expect(all.rows.map((row) => row.publicId).sort()).toEqual([
+      "DN-cured",
+      "DN-ready",
+      "DN-review",
+      "DN-withdrawn",
+    ]);
+  });
+
+  test("an information request surfaces its deadline", async () => {
+    const t = setup();
+    const fx = await makeFixture(t);
+    await insertNotice(t, fx, { publicId: "DN-pending", rentDueDate: "2026-06-05" });
+    await t.run(async (ctx) => {
+      const notice = await ctx.db
+        .query("guaranteeDelinquencyNotices")
+        .withIndex("by_publicId", (q) => q.eq("publicId", "DN-pending"))
+        .unique();
+      if (!notice) throw new Error("notice missing");
+      await ctx.db.patch(notice._id, {
+        claim: {
+          status: "info_requested",
+          claimedAmountCents: 300_000,
+          submittedAt: "2026-06-20T10:00:00.000Z",
+          submittedByUserId: fx.userId,
+          declarationVersion: "test",
+          requests: [
+            {
+              id: "r1",
+              evidenceKind: "tenantNotice",
+              reason: "Ilegível",
+              dueAt: "2026-07-02",
+              requestedAt: "2026-06-25T10:00:00.000Z",
+              requestedByUserId: fx.userId,
+            },
+          ],
+        },
+      });
+    });
+    const { rows } = await t
+      .withIdentity({ subject: fx.subject })
+      .query(api.delinquencies.useCases.listCases, { agencyId: fx.agencyId, group: "needs_you" });
+    expect(rows.map((row) => [row.caseStatus, row.requestDueAt, row.updatedAt])).toEqual([
+      ["info_requested", "2026-07-02", "2026-06-25T10:00:00.000Z"],
+    ]);
+  });
+
+  test("another agency's cases never appear", async () => {
+    const t = setup();
+    const a = await makeFixture(t, "1");
+    const b = await makeFixture(t, "2");
+    await insertNotice(t, b, { publicId: "DN-b", rentDueDate: "2026-06-05" });
+    const result = await t
+      .withIdentity({ subject: a.subject })
+      .query(api.delinquencies.useCases.listCases, { agencyId: a.agencyId, group: "needs_you" });
+    expect(result.rows).toEqual([]);
+    expect(result.counts).toEqual({ needs_you: 0, with_mutav: 0, closed: 0 });
   });
 });

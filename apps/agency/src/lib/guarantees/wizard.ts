@@ -6,7 +6,7 @@ import {
   type ScoreTier,
   type TenantEntityType,
 } from "@convex/guarantees/domain";
-import { PROPERTY_KIND, type PropertyKind } from "@convex/leases/domain";
+import { PROPERTY_KIND, isValidDueDay, type PropertyKind } from "@convex/leases/domain";
 import { isValidCPF, isValidCNPJ } from "@mutav/i18n/brazil";
 import type { Result } from "@/lib/result";
 
@@ -25,6 +25,7 @@ export type DraftWizardData = {
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
+  dueDay: number | null;
   plan: GuaranteePlan | null;
   fullName: string;
   birthDate: string;
@@ -65,6 +66,7 @@ export type ValidatedWizardData = {
   rentCents: number;
   condoCents: number;
   otherFeesCents: number;
+  dueDay: number;
   plan: GuaranteePlan;
   tenant: ValidatedWizardTenant;
   scoreTier: ScoreTier;
@@ -82,6 +84,7 @@ export const WIZARD_VALIDATION_CODES = [
   "cnpjInvalid",
   "cepInvalid",
   "rentRequired",
+  "dueDayRequired",
   "scoreRequired",
   "planRequired",
   "emailInvalid",
@@ -151,6 +154,9 @@ export function validateWizard(
 
   if (draft.rentCents <= 0) errors.push({ code: "rentRequired", field: "rentCents" });
 
+  const dueDay = draft.dueDay !== null && isValidDueDay(draft.dueDay) ? draft.dueDay : null;
+  if (dueDay === null) errors.push({ code: "dueDayRequired", field: "dueDay" });
+
   const score = draft.score;
   const scoreTier = draft.scoreTier;
   if (score === null || scoreTier === null) errors.push({ code: "scoreRequired", field: "score" });
@@ -193,7 +199,8 @@ export function validateWizard(
     propertyKind === null ||
     tenant === null ||
     scoreTier === null ||
-    plan === null
+    plan === null ||
+    dueDay === null
   ) {
     return { success: false, error: errors, message: "Wizard draft failed validation" };
   }
@@ -212,6 +219,7 @@ export function validateWizard(
       rentCents: draft.rentCents,
       condoCents: draft.condoCents,
       otherFeesCents: draft.otherFeesCents,
+      dueDay,
       plan,
       tenant,
       scoreTier,
@@ -280,6 +288,7 @@ export const INITIAL_WIZARD_DATA: DraftWizardData = {
   rentCents: 0,
   condoCents: 0,
   otherFeesCents: 0,
+  dueDay: null,
   plan: null,
   fullName: "",
   birthDate: "",

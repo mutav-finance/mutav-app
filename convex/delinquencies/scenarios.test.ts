@@ -2640,8 +2640,9 @@ describe(
         if (verification) {
           expect(await t.run((ctx) => ctx.db.get(verification.verifiedByUserId))).not.toBeNull();
         }
-        if (resolution) {
-          expect(await t.run((ctx) => ctx.db.get(resolution.resolvedByUserId))).not.toBeNull();
+        const resolvedBy = resolution?.resolvedByUserId;
+        if (resolvedBy) {
+          expect(await t.run((ctx) => ctx.db.get(resolvedBy))).not.toBeNull();
         }
         if (cancellation) {
           expect(await t.run((ctx) => ctx.db.get(cancellation.canceledByUserId))).not.toBeNull();

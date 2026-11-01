@@ -19,7 +19,8 @@
       "dueDate": "Due on",
       "back": "Back",
       "backToCheckout": "Back to checkout",
-      "trust": "Payments settled via Stellar and regulated anchors. Invoice"
+      "trust": "Payments settled via Stellar and regulated anchors. Invoice",
+      "progressLabel": "Checkout progress"
     },
     "picker": {
       "meta": {
@@ -137,7 +138,8 @@
         "NO_BANK_ACCOUNT": "Register a bank account to pay via PIX before continuing.",
         "RATE_LIMITED": "Too many attempts on this payment link. Please wait a minute and try again.",
         "INTERNAL": "Internal error. Please try again."
-      }
+      },
+      "qrCodeAlt": "Pix QR code"
     },
     "pago": {
       "meta": {

@@ -28,6 +28,7 @@ const VALID_PF_DRAFT: DraftWizardData = {
   rentCents: 250_000,
   condoCents: 30_000,
   otherFeesCents: 0,
+  dueDay: 5,
   plan: "plus",
   fullName: "João Pereira",
   birthDate: "1991-03-04",
@@ -93,6 +94,19 @@ describe("validateWizard", () => {
     expect(result.success).toBe(false);
     if (result.success) throw new Error("expected failure");
     expect(result.error).toContainEqual({ code: "rentRequired", field: "rentCents" });
+  });
+
+  test.each([null, 0, 32, 5.5])("rejects a due day of %s", (dueDay) => {
+    const result = validateWizard({ ...VALID_PF_DRAFT, dueDay });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("expected failure");
+    expect(result.error).toContainEqual({ code: "dueDayRequired", field: "dueDay" });
+  });
+
+  test("passes the due day through to the validated data", () => {
+    const result = validateWizard({ ...VALID_PF_DRAFT, dueDay: 31 });
+    if (!result.success) throw new Error("expected success");
+    expect(result.data.dueDay).toBe(31);
   });
 
   test("catches a step-4 edit that corrupts a previously valid cpf", () => {
