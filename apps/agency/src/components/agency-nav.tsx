@@ -13,6 +13,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { NavAgency } from "@/components/nav-agency";
 import { NavCadastros } from "@/components/nav-cadastros";
 import { NavMain } from "@/components/nav-main";
+import { NavSupport } from "@/components/nav-support";
 
 export function AgencyNav() {
   const tMain = useTranslations("nav.main");
@@ -39,6 +40,7 @@ export function AgencyNav() {
       <NavMain items={navMain} />
       <NavAgency />
       <NavCadastros />
+      <NavSupport />
     </>
   );
 }

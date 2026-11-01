@@ -1,6 +1,7 @@
 import { redirect } from "@mutav/i18n/navigation";
 import { PageContent } from "@mutav/ui/page/page-content";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
+import { fetchMyOnboardingDraft } from "@/lib/onboarding";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -16,9 +17,11 @@ export default async function OnboardingAgencyPage({ params, searchParams }: Pro
     redirect({ href: "/onboarding", locale });
   }
 
+  const initialDraft = await fetchMyOnboardingDraft();
+
   return (
     <PageContent variant="narrow" className="py-8 md:py-12">
-      <OnboardingFlow initialType={initialType} />
+      <OnboardingFlow initialType={initialType} initialDraft={initialDraft} />
     </PageContent>
   );
 }

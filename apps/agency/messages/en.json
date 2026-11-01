@@ -372,7 +372,8 @@
         "admin": "Admin",
         "member": "Member"
       }
-    }
+    },
+    "support": "Support"
   },
   "chart": {
     "title": "Book in force",
@@ -773,7 +774,8 @@
       "tenant": "Tenant",
       "availableGuarantee": "Available guarantee",
       "nextRenewalDate": "Next renewal",
-      "creationTime": "Created"
+      "creationTime": "Created",
+      "open": "Open"
     },
     "urgency": {
       "overdue": "Overdue",
@@ -806,7 +808,8 @@
       "previousPage": "Previous page",
       "nextPage": "Next page",
       "lastPage": "Last page"
-    }
+    },
+    "openAria": "Open {id}"
   },
   "invoiceList": {
     "meta": {
@@ -828,7 +831,8 @@
       "dueDate": "Due Date",
       "total": "Total",
       "state": "Status",
-      "guarantees": "Guarantees"
+      "guarantees": "Guarantees",
+      "open": "Open"
     },
     "search": {
       "placeholder": "Search by ID or period"
@@ -843,7 +847,8 @@
       "previousPage": "Previous page",
       "nextPage": "Next page",
       "lastPage": "Last page"
-    }
+    },
+    "openAria": "Open {id}"
   },
   "checkout": {
     "common": {
@@ -1167,14 +1172,20 @@
       },
       "summary": {
         "heading": "Summary",
+        "coverageCeiling": "Coverage",
+        "coverageCeilingValue": "up to {count} months of rent",
         "exitCost": "Exit cost",
-        "fee": "Fee value",
         "commission": "Commission (1.5%)",
-        "guarantee": "Guarantee value"
+        "guarantee": "Guarantee value (monthly)"
       },
-      "reportHeading": "Estimated coverage",
+      "reportHeading": "Estimated coverage and costs",
       "timesRent": "{multiplier}× the rent",
-      "provisionalRate": "{rate}% · provisional rate"
+      "provisionalRate": "{rate} · provisional rate",
+      "groupCoverage": "Coverage",
+      "groupMonthly": "Monthly costs",
+      "agencyCommission": "Agency commission",
+      "monthlyTotal": "Monthly total",
+      "oneTime": "charged once"
     },
     "complementary": {
       "tenantSection": "Tenant Details",
@@ -1289,7 +1300,6 @@
       "tag": "Partner program",
       "title": "Rental guarantee without a guarantor.",
       "titleLine2": "Built for people with a lot to do.",
-      "subtitle": "Segregated capital. Auditable in real time, by anyone, at any time.",
       "warningTitle": "Important for agencies:",
       "warningBody": "registration must be completed by a partner holding 25% or more equity, or by an administrator authorized to open accounts on the company's behalf. Have the articles of incorporation ready to verify.",
       "checklistTitle": "What you will need",
@@ -1340,7 +1350,38 @@
         ]
       },
       "ctaButton": "Start registration",
-      "ctaNoteReview": "reviewed in up to 2 business days"
+      "ctaNoteReview": "reviewed in up to 2 business days",
+      "invites": {
+        "title": "You've been invited",
+        "description": "Accept an invite to join an existing agency instead of registering a new one.",
+        "invitedBy": "Invited by {name}",
+        "roleLabel": "as {role}",
+        "roles": {
+          "admin": "admin",
+          "member": "member"
+        },
+        "expires": "Expires {date}",
+        "accept": "Accept invite",
+        "accepting": "Joining…",
+        "accepted": "Welcome to {agency}!",
+        "or": "Or register a new agency below.",
+        "errors": {
+          "INVALID_EMAIL": "Enter a valid email address.",
+          "INVITE_ALREADY_PENDING": "There is already an open invite for this email.",
+          "ALREADY_MEMBER": "This person is already a member of the agency.",
+          "INVITE_NOT_FOUND": "Invite not found.",
+          "INVITE_NOT_PENDING": "This invite is no longer pending.",
+          "INVITE_EXPIRED": "This invite has expired. Ask for a new one.",
+          "INVITE_EMAIL_MISMATCH": "This invite was sent to a different email address.",
+          "EMAIL_NOT_VERIFIED": "Verify your email address before accepting the invite.",
+          "MEMBERSHIP_NOT_FOUND": "Member not found.",
+          "CANNOT_CHANGE_OWN_ROLE": "You cannot change your own role.",
+          "CANNOT_REMOVE_SELF": "You cannot remove yourself.",
+          "INSUFFICIENT_ROLE": "Your role does not allow this change.",
+          "LAST_OWNER": "The agency must keep at least one owner.",
+          "UNEXPECTED": "Something went wrong. Please try again."
+        }
+      }
     },
     "status": {
       "title": "Application under review",
@@ -1358,7 +1399,15 @@
       "noReason": "No reason provided.",
       "contactLabel": "Have questions or want to appeal?",
       "contactLink": "Contact us",
-      "homeButton": "Back"
+      "resubmitHint": "Your data is still saved. Fix what is needed and resubmit your application for a new review.",
+      "resubmitButton": "Fix and resubmit",
+      "resubmitting": "Reopening application…",
+      "errors": {
+        "NOT_FOUND": "We couldn't find your application. Reload the page.",
+        "NOT_OWNER": "Only the account owner can resubmit this application.",
+        "NOT_REJECTED": "This application is no longer rejected. Reload the page.",
+        "unknown": "Something went wrong. Please try again."
+      }
     },
     "loading": "Loading…",
     "steps": {
@@ -1458,7 +1507,7 @@
       "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
       "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
       "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
-      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support.",
+      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support: contato@mutav.finance.",
       "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
       "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
       "BANKING_INFO_REQUIRED": "Fill in your banking details before submitting.",
@@ -1503,7 +1552,8 @@
         "representanteName": "Representative name is required.",
         "representanteCpf": "Invalid representative CPF.",
         "alreadyRegistered": "Already registered with Mutav."
-      }
+      },
+      "backButton": "Back"
     }
   },
   "transparency": {
@@ -1588,6 +1638,95 @@
     "default_verified": "Default verified",
     "cover_paid": "Cover committed",
     "closed": "Closed"
+  },
+  "members": {
+    "meta": {
+      "title": "Members — MUTAV",
+      "description": "Manage who has access to your agency and their roles."
+    },
+    "heading": "Members",
+    "subheading": "Who can access this agency, and what each person can do.",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "table": {
+      "heading": "Team",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "joined": "Joined",
+      "actions": "Actions",
+      "you": "you",
+      "empty": "No members yet.",
+      "loading": "Loading members…"
+    },
+    "actions": {
+      "invite": "Invite member",
+      "remove": "Remove",
+      "changeRoleLabel": "Change role for {name}"
+    },
+    "removeDialog": {
+      "title": "Remove member?",
+      "description": "{name} will lose access to this agency immediately.",
+      "cancel": "Cancel",
+      "confirm": "Remove"
+    },
+    "inviteSheet": {
+      "title": "Invite member",
+      "description": "We'll email an invite. It expires in 7 days.",
+      "email": "Email",
+      "emailPlaceholder": "name@agency.com",
+      "role": "Role",
+      "cancel": "Cancel",
+      "submit": "Send invite",
+      "submitting": "Sending…",
+      "sent": {
+        "title": "Invite created",
+        "emailed": "We emailed {email}. You can also share the link below.",
+        "notEmailed": "Email is not set up yet, so {email} was not emailed. Share the link below yourself.",
+        "linkLabel": "Sign-in link",
+        "copy": "Copy",
+        "linkCopied": "Link copied.",
+        "linkHint": "{email} signs in with that address and accepts the invite on the welcome screen. The invite expires in 7 days.",
+        "done": "Done"
+      }
+    },
+    "invites": {
+      "heading": "Pending invites",
+      "empty": "No pending invites.",
+      "email": "Email",
+      "role": "Role",
+      "invitedBy": "Invited by",
+      "expires": "Expires",
+      "revoke": "Revoke",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied."
+    },
+    "toasts": {
+      "invited": "Invite sent to {email}.",
+      "roleChanged": "Role updated.",
+      "removed": "Member removed.",
+      "revoked": "Invite revoked.",
+      "inviteCreated": "Invite created for {email}. Email is not set up yet — share the link."
+    },
+    "errors": {
+      "INVALID_EMAIL": "Enter a valid email address.",
+      "INVITE_ALREADY_PENDING": "There is already an open invite for this email.",
+      "ALREADY_MEMBER": "This person is already a member of the agency.",
+      "INVITE_NOT_FOUND": "Invite not found.",
+      "INVITE_NOT_PENDING": "This invite is no longer pending.",
+      "INVITE_EXPIRED": "This invite has expired. Ask for a new one.",
+      "INVITE_EMAIL_MISMATCH": "This invite was sent to a different email address.",
+      "EMAIL_NOT_VERIFIED": "Verify your email address before accepting the invite.",
+      "MEMBERSHIP_NOT_FOUND": "Member not found.",
+      "CANNOT_CHANGE_OWN_ROLE": "You cannot change your own role.",
+      "CANNOT_REMOVE_SELF": "You cannot remove yourself.",
+      "INSUFFICIENT_ROLE": "Your role does not allow this change.",
+      "LAST_OWNER": "The agency must keep at least one owner.",
+      "UNEXPECTED": "Something went wrong. Please try again."
+    }
   },
   "sessionError": {
     "notProvisioned": {

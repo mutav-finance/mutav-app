@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
@@ -19,7 +19,12 @@ import {
 import { formatBRLCents } from "@mutav/i18n/brazil";
 import { GUARANTEE_PLAN, type GuaranteeTerms, type ScoreTier } from "@convex/guarantees/domain";
 import { provisionalPricingTier } from "@convex/guarantees/review";
-import { isPlanOffered, priceGuarantee, splitCommission } from "@convex/guarantees/pricing";
+import {
+  isPlanOffered,
+  priceGuarantee,
+  splitCommission,
+  type CommissionSplit,
+} from "@convex/guarantees/pricing";
 import { PRESTAMISTA_ENABLED } from "@convex/guarantees/flags";
 import type { ProductTerms, PublicProduct } from "@convex/products/domain";
 
@@ -230,8 +235,12 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
         )}
       </section>
 
-      {isScored && preview && priceableTier && product && !PRESTAMISTA_ENABLED && (
-        <CoverageReport terms={preview} feeRate={product.terms.tierRate[priceableTier]} />
+      {isScored && preview && commission && priceableTier && product && !PRESTAMISTA_ENABLED && (
+        <CoverageReport
+          terms={preview}
+          feeRate={product.terms.tierRate[priceableTier]}
+          commission={commission}
+        />
       )}
 
       {/* Coverage plans — selectable cards; "+" carries a subtle premium accent
@@ -263,18 +272,24 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
         </div>
       )}
 
-      {/* Summary block */}
-      {isScored && (
+      {/* Summary block — the coverage report already carries these figures when prestamista is off */}
+      {isScored && PRESTAMISTA_ENABLED && (
         <section className="flex flex-col gap-3 rounded-lg border p-4 md:p-6">
           <h2 className="text-base font-semibold">{t("coverage.summary.heading")}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <SummaryRow
-              label={t("coverage.summary.exitCost")}
-              value={preview ? formatBRLCents(preview.exitCostCapCents) : null}
+              label={t("coverage.summary.coverageCeiling")}
+              value={
+                preview
+                  ? t("coverage.summary.coverageCeilingValue", {
+                      count: preview.coverageCeilingMultiplier,
+                    })
+                  : null
+              }
             />
             <SummaryRow
-              label={t("coverage.summary.fee")}
-              value={preview ? formatBRLCents(preview.feeCents) : null}
+              label={t("coverage.summary.exitCost")}
+              value={preview ? formatBRLCents(preview.exitCostCapCents) : null}
             />
             <SummaryRow
               label={t("coverage.summary.commission")}
@@ -317,7 +332,7 @@ function EvaluatedSubject({ data }: { data: DraftWizardData }) {
     data.propertyKind === "commercial" ? t("property.commercial") : t("property.residential");
 
   return (
-    <dl className="border-border/60 grid grid-cols-1 gap-x-6 gap-y-3 border-y py-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+    <dl className="border-border/60 grid grid-cols-1 gap-x-6 gap-y-3 border-y py-3 text-sm sm:grid-cols-2 2xl:grid-cols-4">
       <EvaluatedItem
         label={isPJ ? t("tenant.companyName") : t("tenant.fullName")}
         value={data.fullName || "—"}
@@ -348,7 +363,7 @@ function EvaluatedItem({
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className={cn("truncate font-medium", mono && "font-mono")}>{value}</dd>
+      <dd className={cn("font-medium break-words", mono && "font-mono")}>{value}</dd>
     </div>
   );
 }
@@ -357,30 +372,69 @@ function EvaluatedItem({
  * Read-only estimate while prestamista is off. The band rate is provisional:
  * MUTAV fixes the real rate when it accepts the draft (ADR 0011).
  */
-function CoverageReport({ terms, feeRate }: { terms: GuaranteeTerms; feeRate: number }) {
+function CoverageReport({
+  terms,
+  feeRate,
+  commission,
+}: {
+  terms: GuaranteeTerms;
+  feeRate: number;
+  commission: CommissionSplit;
+}) {
   const t = useTranslations("guaranteeNew.coverage");
+  const locale = useLocale();
+  const formatPercent = (rate: number) =>
+    new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 1 }).format(rate);
   return (
-    <section className="flex flex-col gap-3 rounded-lg border p-4 md:p-6">
+    <section className="flex flex-col gap-5 rounded-lg border p-4 md:p-6">
       <h2 className="text-base font-semibold">{t("reportHeading")}</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <PlanRow
-          label={t("rentMultiplierLabel")}
-          value={formatBRLCents(terms.coverageCeilingCents)}
-          note={t("timesRent", { multiplier: terms.coverageCeilingMultiplier })}
-        />
-        <PlanRow
-          label={t("exitCostLabel")}
-          value={formatBRLCents(terms.exitCostCapCents)}
-          note={t("timesRent", { multiplier: terms.exitCostMultiplier })}
-        />
-        <PlanRow
-          label={t("feeRate")}
-          value={formatBRLCents(terms.feeCents)}
-          note={t("provisionalRate", { rate: (feeRate * 100).toFixed(0) })}
-        />
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          {t("groupCoverage")}
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <PlanRow
+            label={t("rentMultiplierLabel")}
+            value={formatBRLCents(terms.coverageCeilingCents)}
+            note={t("timesRent", { multiplier: terms.coverageCeilingMultiplier })}
+          />
+          <PlanRow
+            label={t("exitCostLabel")}
+            value={formatBRLCents(terms.exitCostCapCents)}
+            note={t("timesRent", { multiplier: terms.exitCostMultiplier })}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          {t("groupMonthly")}
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <PlanRow
+            label={t("feeRate")}
+            value={formatBRLCents(terms.feeCents)}
+            note={t("provisionalRate", { rate: formatPercent(feeRate) })}
+          />
+          <PlanRow
+            label={t("agencyCommission")}
+            value={formatBRLCents(commission.commissionCents)}
+            note={formatPercent(terms.commissionRate)}
+          />
+          <PlanRow
+            label={t("monthlyTotal")}
+            value={formatBRLCents(commission.totalCents)}
+            highlight
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <PlanRow
           label={t("preview.activationFee")}
           value={formatBRLCents(terms.oneTimeActivationFeeCents)}
+          note={t("oneTime")}
         />
       </div>
     </section>
@@ -495,21 +549,30 @@ function PlanRow({
   value,
   note,
   emphasized = false,
+  highlight = false,
 }: {
   label: string;
   value: string;
   note?: string;
   emphasized?: boolean;
+  highlight?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "bg-muted/50 flex flex-col gap-1 rounded-md p-3",
+        "flex flex-col gap-1 rounded-md p-3",
+        highlight ? "bg-primary/8" : "bg-muted/50",
         emphasized && "items-end text-right",
       )}
     >
       <span className="text-muted-foreground text-xs">{label}</span>
-      <span className={cn("font-mono font-semibold", emphasized ? "text-base" : "text-sm")}>
+      <span
+        className={cn(
+          "font-mono font-semibold",
+          emphasized || highlight ? "text-base" : "text-sm",
+          highlight && "text-primary",
+        )}
+      >
         {value}
       </span>
       {note && <span className="text-muted-foreground text-xs">{note}</span>}

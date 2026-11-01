@@ -144,6 +144,11 @@ describe("guarantee state tones", () => {
     expect(drafted).toBe("neutral");
   });
 
+  it("paints default verified and cover committed on different swatches", () => {
+    expect(TONE[GUARANTEE_STATE_TONE.default_verified]).toBe("warning-strong");
+    expect(TONE[GUARANTEE_STATE_TONE.cover_committed]).toBe("escalated");
+  });
+
   /**
    * `@mutav/ui` carries no Convex dependency, so its state list is a literal.
    * apps/admin paints its defaults queue from that literal — a state added to

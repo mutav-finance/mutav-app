@@ -6,6 +6,8 @@ import {
   queryWithAgencyScope,
   queryWithAuth,
 } from "../lib/auth";
+import { AUDIT_ACTION } from "../audit/domain";
+import { appendAuditEntry } from "../audit/useCases";
 import { hashPii } from "../lib/pii";
 import type { Result } from "../lib/result";
 import {
@@ -13,13 +15,14 @@ import {
   MEMBER_ROLE,
   ONBOARDING_STATE,
   EMPRESA_REQUIRED_DOCS,
+  canTransitionOnboarding,
   agencyTypeValidator,
   bankingInfoValidator,
   agencyDocumentKindValidator,
   isValidCPF,
   isValidCNPJ,
 } from "./domain";
-import type { AgencyId, AgencyDocumentKind } from "./domain";
+import type { AgencyId, AgencyDocumentKind, AgencyType } from "./domain";
 
 // ─── Result types for mutations ───────────────────────────────────────────────
 
@@ -58,6 +61,9 @@ type SubmitOnboardingErrorResult =
         | "ALREADY_REGISTERED";
     }
   | { code: "MISSING_DOCUMENTS"; missing: readonly AgencyDocumentKind[] };
+
+type ReopenOnboardingSuccessResult = { agencyId: AgencyId; agencyType: AgencyType | null };
+type ReopenOnboardingErrorResult = { code: "NOT_FOUND" | "NOT_OWNER" | "NOT_REJECTED" };
 
 // ─── Agency queries ───────────────────────────────────────────────────────────
 
@@ -147,6 +153,41 @@ export const getMyOnboardingStatus = queryWithAuth({
       agencyId: agency._id,
       rejectionReason: agency.onboardingRejectionReason ?? null,
     };
+  },
+});
+
+/**
+ * The caller's in-progress onboarding as wizard prefill, or null. After a
+ * rejection is reopened the agency's data is still on the row; this lets the
+ * wizard start from it instead of an empty form. Scoped to the caller's own
+ * memberships — identity comes from the wrapper, never from args.
+ */
+export const getMyOnboardingDraft = queryWithAuth({
+  args: {},
+  handler: async (ctx) => {
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+      .collect();
+
+    for (const membership of memberships) {
+      const agency = await ctx.db.get(membership.agencyId);
+      if (agency?.onboardingState !== ONBOARDING_STATE.IN_PROGRESS || !agency.agencyType) continue;
+      return {
+        agencyId: agency._id,
+        agencyType: agency.agencyType,
+        name: agency.name,
+        email: agency.email ?? "",
+        phone: agency.phone ?? "",
+        creci: agency.creci ?? "",
+        cpf: agency.cpf ?? "",
+        cnpj: agency.cnpj ?? "",
+        representanteName: agency.representanteName ?? "",
+        representanteCpf: agency.representanteCpf ?? "",
+        bankingInfo: agency.bankingInfo ?? null,
+      };
+    }
+    return null;
   },
 });
 
@@ -550,6 +591,65 @@ export const submitOnboarding = mutationWithAgencyScope({
       success: true,
       data: { agencyId, submittedAt },
       message: "Onboarding submitted for review",
+    };
+  },
+});
+
+/**
+ * Reopen a rejected submission so the owner can fix it and resubmit.
+ * `rejected → in_progress`: the agency's data and documents stay, the
+ * rejection reason is cleared, and the wizard's writes (banking, documents,
+ * submit) are editable again. `submitOnboarding` re-claims the CPF/CNPJ the
+ * rejection released. Owner only — an admin or member of the agency cannot
+ * restart its KYB.
+ */
+export const reopenOnboarding = mutationWithAgencyScope({
+  args: {},
+  handler: async (
+    ctx,
+  ): Promise<Result<ReopenOnboardingSuccessResult, ReopenOnboardingErrorResult>> => {
+    if (ctx.membership.role !== MEMBER_ROLE.OWNER) {
+      return {
+        success: false,
+        error: { code: "NOT_OWNER" },
+        message: "Only the agency owner can reopen the onboarding",
+      };
+    }
+
+    const agency = await ctx.db.get(ctx.agencyId);
+    if (!agency) {
+      return { success: false, error: { code: "NOT_FOUND" }, message: "Agency not found" };
+    }
+
+    const from = agency.onboardingState ?? ONBOARDING_STATE.NOT_STARTED;
+    if (
+      from !== ONBOARDING_STATE.REJECTED ||
+      !canTransitionOnboarding({ from, to: ONBOARDING_STATE.IN_PROGRESS })
+    ) {
+      return {
+        success: false,
+        error: { code: "NOT_REJECTED" },
+        message: `Only a rejected onboarding can be reopened (current: '${from}')`,
+      };
+    }
+
+    await ctx.db.patch(ctx.agencyId, {
+      onboardingState: ONBOARDING_STATE.IN_PROGRESS,
+      onboardingRejectionReason: undefined,
+    });
+
+    await appendAuditEntry(ctx, {
+      actor: { kind: "user", userId: ctx.user._id },
+      action: AUDIT_ACTION.ONBOARDING_REOPENED,
+      resourceType: "agency",
+      resourceId: ctx.agencyId,
+      payload: { previousRejectionReason: agency.onboardingRejectionReason ?? null },
+    });
+
+    return {
+      success: true,
+      data: { agencyId: ctx.agencyId, agencyType: agency.agencyType ?? null },
+      message: "Onboarding reopened for resubmission",
     };
   },
 });

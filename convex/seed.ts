@@ -22,7 +22,13 @@ import {
   generateInvoiceAccessToken,
 } from "./lib/randomId";
 import { SettlementMethods, type SettlementMethod } from "./payments/domain";
-import type { AgencyId } from "./agencies/domain";
+import {
+  INVITABLE_ROLE,
+  INVITE_STATUS,
+  MEMBER_ROLE,
+  computeInviteExpiry,
+  type AgencyId,
+} from "./agencies/domain";
 import {
   DELINQUENCY_STATUS,
   NOTICE_CANCELLATION_REASON,
@@ -352,6 +358,8 @@ const DEMO_TABLES = [
   "products",
   // tenants after leases — leases FK-reference tenants via tenantId.
   "tenants",
+  // Invites FK-reference agencies + users; wipe before either.
+  "agencyInvites",
   "memberships",
   "users",
   "agencies",
@@ -4314,12 +4322,51 @@ export const seedReset = internalMutation({
         })
       : null;
 
+    const team = owner?.agencyId
+      ? await seedAprovadaTeam(ctx, { agencyId: owner.agencyId, ownerId: owner.userId })
+      : null;
+
     await attachTenantSnapshots(ctx);
     const transitionRows = await attachGuaranteeTransitionHistory(ctx);
 
-    return { product: product.slug, fictional, personas, aprovada, transitionRows };
+    return { product: product.slug, fictional, personas, aprovada, team, transitionRows };
   },
 });
+
+/**
+ * Gives the `agencyowner` persona's agency a team so the members page is not a
+ * list of one: a fictional broker as `member`, and an open `admin` invite to a
+ * fictional address. Neither belongs to an Auth0 account — they exist to be
+ * rendered, role-changed, removed and revoked. Called only by `seedReset`.
+ */
+async function seedAprovadaTeam(
+  ctx: MutationCtx,
+  { agencyId, ownerId }: { agencyId: AgencyId; ownerId: UserId },
+) {
+  const now = new Date().toISOString();
+  const memberUserId = await ctx.db.insert("users", {
+    publicId: "user-aprovada-broker",
+    name: "Carla Mendes",
+    email: "carla.mendes@aprovada.example.com",
+    createdAt: now,
+  });
+  const membershipId = await ctx.db.insert("memberships", {
+    userId: memberUserId,
+    agencyId,
+    role: MEMBER_ROLE.MEMBER,
+    joinedAt: now,
+  });
+  const inviteId = await ctx.db.insert("agencyInvites", {
+    agencyId,
+    email: "rafael.souza@aprovada.example.com",
+    role: INVITABLE_ROLE.ADMIN,
+    status: INVITE_STATUS.PENDING,
+    invitedBy: ownerId,
+    createdAt: now,
+    expiresAt: computeInviteExpiry(now),
+  });
+  return { membershipId, inviteId };
+}
 
 async function assertDeploymentUnlocked(ctx: MutationCtx): Promise<void> {
   const lock = await ctx.db.query("deploymentLocks").first();
