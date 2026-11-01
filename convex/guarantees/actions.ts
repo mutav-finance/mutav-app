@@ -79,9 +79,8 @@ export const sendReviewDecisionNotification = internalAction({
 export const sendGuaranteeActivatedNotification = internalAction({
   args: { publicId: v.string(), recipients: v.array(v.string()) },
   handler: async (_ctx, args) => {
-    const apiKey = getOptionalResendApiKey();
-    if (!apiKey) {
-      logWarn("[notifications] RESEND_API_KEY not set, skipping activation email");
+    if (!isEmailConfigured()) {
+      logWarn("[notifications] email not configured, skipping activation email");
       return;
     }
     if (args.recipients.length === 0) {
@@ -91,7 +90,7 @@ export const sendGuaranteeActivatedNotification = internalAction({
     const link = `${getAppUrl()}/guarantees/${encodeURIComponent(args.publicId)}`;
     const publicId = escapeHtml(args.publicId);
     try {
-      await new Resend(apiKey).emails.send({
+      await new Resend(getResendApiKey()).emails.send({
         from: getResendFromEmail(),
         to: args.recipients,
         subject: `Garantia ativada — ${args.publicId}`,
