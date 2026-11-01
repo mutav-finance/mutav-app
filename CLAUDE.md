@@ -138,7 +138,7 @@ When the in-repo docs and skills aren't enough, consult:
 - Turborepo monorepo — persona apps under `apps/*`, shared code under `packages/*`, Convex backend at the repo root in `convex/` (see [§ Monorepo layout](#monorepo-layout))
 - Next.js 16 (App Router, `src/` directory **per app**, e.g. `apps/agency/src/app/`)
 - Tailwind CSS 4 — workspace packages need `@source` (see [Tailwind 4 + workspace packages](#tailwind-4--workspace-packages))
-- shadcn/ui (radix-nova style, neutral base color, MUTAV tokens in each app's `src/app/globals.css`)
+- shadcn/ui (radix-nova style, neutral base color, MUTAV tokens in `packages/ui/src/styles/mutav-tokens.css`, imported by each app's `src/app/globals.css`)
 - Convex — backend (functions in `convex/`, root-level, shared by every app)
 - Railway / Vercel — deployment (one project per app)
 
@@ -281,7 +281,7 @@ Every page wraps content in three composable primitives from `@mutav/ui/page/*` 
   - `narrow` — `max-w-(--page-content-max-width)` (4xl, 56rem) with `px-4 lg:px-6`. For cards, forms, prose, detail pages.
   - `wide` — `max-w-(--page-wide-max-width)` (screen-2xl, 96rem) with `px-4 lg:px-6`. For wide tables that should still cap on ultra-wide screens.
 
-Width tokens live in each app's `src/app/globals.css`:
+Width tokens live in `packages/ui/src/styles/mutav-tokens.css` (shared by every app):
 
 ```css
 --page-content-max-width: 56rem; /* 4xl — narrow content */

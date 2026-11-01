@@ -62,6 +62,7 @@
     "./transparency/types": "./src/transparency/types.ts",
     "./use-mobile": "./src/use-mobile.ts",
     "./wordmark": "./src/wordmark.tsx",
+    "./styles/mutav-tokens.css": "./src/styles/mutav-tokens.css",
     "./styles/shadcn-tailwind.css": "./src/styles/shadcn-tailwind.css"
   },
   "scripts": {
