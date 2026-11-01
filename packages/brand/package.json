@@ -6,7 +6,9 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    "./logo-mark": "./src/logo-mark.tsx"
+    "./logo-mark": "./src/logo-mark.tsx",
+    "./link-preview-card": "./src/link-preview-card.tsx",
+    "./logo-mark-image": "./src/logo-mark-image.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

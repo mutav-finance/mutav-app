@@ -1,7 +1,6 @@
 import { LogoMark } from "@mutav/brand/logo-mark";
 import { cn } from "./cn";
 
-export type WordmarkVariant = "mark" | "display";
 export type WordmarkSize = "sm" | "md";
 
 const MARK_ICON_CLASS: Record<WordmarkSize, string> = {
@@ -14,13 +13,7 @@ const MARK_TEXT_CLASS: Record<WordmarkSize, string> = {
   md: "text-lg",
 };
 
-const DISPLAY_TEXT_CLASS: Record<WordmarkSize, string> = {
-  sm: "text-sm",
-  md: "text-base",
-};
-
 export type WordmarkProps = {
-  variant?: WordmarkVariant;
   size?: WordmarkSize;
   className?: string;
 };
@@ -28,24 +21,10 @@ export type WordmarkProps = {
 /**
  * The brand text is hardcoded, not read from messages — brand names are not
  * localized. The visible text is the accessible name, so there is no
- * `aria-label` and the `mark` variant's M-mark is decorative (`aria-hidden`);
+ * `aria-label` and the M-mark is decorative (`aria-hidden`);
  * where the lockup is a link, the app owns the wrapper and names it.
  */
-export function Wordmark({ variant = "mark", size = "sm", className }: WordmarkProps) {
-  if (variant === "display") {
-    return (
-      <span
-        className={cn(
-          "font-display text-accent font-bold tracking-tight",
-          DISPLAY_TEXT_CLASS[size],
-          className,
-        )}
-      >
-        mutav
-      </span>
-    );
-  }
-
+export function Wordmark({ size = "sm", className }: WordmarkProps) {
   return (
     <span className={cn("text-text flex items-center gap-2", className)}>
       <LogoMark className={cn("w-auto shrink-0", MARK_ICON_CLASS[size])} />

@@ -4,7 +4,8 @@
   },
   "meta": {
     "title": "Mutav — Registered Guarantee System",
-    "description": "Dashboard for managing rental guarantees registered onchain."
+    "description": "Dashboard for managing rental guarantees registered onchain.",
+    "descriptor": "Rental guarantee"
   },
   "paymentStatus": {
     "pending": "Pending",
@@ -343,7 +344,6 @@
     }
   },
   "nav": {
-    "brandEyebrow": "MUTAV Guarantees",
     "roadmapBadge": "soon",
     "main": {
       "createGuarantee": "Create Guarantee",

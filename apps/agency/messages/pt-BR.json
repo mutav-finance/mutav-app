@@ -4,7 +4,8 @@
   },
   "meta": {
     "title": "Mutav — Sistema de Garantia Registrada",
-    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
+    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain.",
+    "descriptor": "Garantia locatícia"
   },
   "paymentStatus": {
     "pending": "Pendente",
@@ -343,7 +344,6 @@
     }
   },
   "nav": {
-    "brandEyebrow": "MUTAV Garantias",
     "roadmapBadge": "em breve",
     "main": {
       "createGuarantee": "Criar Garantia",

@@ -1,7 +1,8 @@
 {
   "meta": {
     "title": "Mutav — Sistema de Garantia Registrada",
-    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
+    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain.",
+    "descriptor": "Garantia locatícia"
   },
   "common": {
     "a11y": {

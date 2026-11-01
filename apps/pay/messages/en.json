@@ -1,7 +1,8 @@
 {
   "meta": {
     "title": "Mutav — Registered Guarantee System",
-    "description": "Dashboard for managing rental guarantees registered onchain."
+    "description": "Dashboard for managing rental guarantees registered onchain.",
+    "descriptor": "Rental guarantee"
   },
   "common": {
     "a11y": {

@@ -1,28 +1,19 @@
-"use client";
-
-import { ShieldCheckIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@mutav/ui/sidebar";
+import { Eyebrow } from "@mutav/ui/eyebrow";
+import { Wordmark } from "@mutav/ui/wordmark";
 
+/**
+ * Brand block — non-interactive, intentionally not a link. Agency renders an
+ * AgencySwitcher under its wordmark; staff have no workspace to switch, so the
+ * eyebrow is what tells the console apart.
+ */
 export function AdminSidebarHeader() {
   const t = useTranslations("nav.brand");
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        {/* Brand block — non-interactive label, intentionally not a link.
-            Agency renders an AgencySwitcher here; staff have no analogous
-            workspace to switch between. */}
-        <SidebarMenuButton size="lg" className="pointer-events-none">
-          <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-            <ShieldCheckIcon className="size-4" />
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">{t("title")}</span>
-            <span className="text-muted-foreground truncate text-xs">{t("subtitle")}</span>
-          </div>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <div className="flex items-center gap-2 px-2 pt-2 pb-1">
+      <Wordmark size="sm" />
+      <Eyebrow>{t("eyebrow")}</Eyebrow>
+    </div>
   );
 }

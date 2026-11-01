@@ -26,8 +26,7 @@
   },
   "nav": {
     "brand": {
-      "title": "Mutav Admin",
-      "subtitle": "Staff console"
+      "eyebrow": "Admin"
     },
     "main": {
       "overview": "Overview",

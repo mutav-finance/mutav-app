@@ -65,6 +65,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@mutav/app-shell": "workspace:*",
+        "@mutav/brand": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
         "@mutav/wallet": "workspace:*",
@@ -91,6 +92,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@mutav/app-shell": "workspace:*",
+        "@mutav/brand": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
@@ -103,6 +105,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@mutav/app-shell": "workspace:*",
+        "@mutav/brand": "workspace:*",
         "@mutav/i18n": "workspace:*",
         "@mutav/ui": "workspace:*",
       },
