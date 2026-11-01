@@ -581,6 +581,7 @@ Non-obvious trigger → skill mappings:
 - Writing Convex queries/mutations/actions — pure-vs-impure separation, immutable updates, `Result<T>` returns → `convex-functional-programming`
 - Building React page or feature components — pure rendering separated from logic via view model hooks → `react-component-view-model-pattern`
 - Creating data fetching hooks — single-purpose hooks with no side effects → `react-hook-composition`
+- Touching anything on the login path — `proxy.ts`, `lib/auth0.ts`, `@mutav/app-shell/proxy-headers` or `auth-redirect`, `/auth/*` links, the convex-token route, an `@auth0/nextjs-auth0` upgrade — or debugging a login loop → `auth0-safe-dev`
 
 Plus the official Convex plugin skills (`convex-quickstart`, `convex-setup-auth`, `convex-create-component`, `convex-migration-helper`, `convex-performance-audit`) and Next.js skills (`next-best-practices`, `next-cache-components`, `next-upgrade`).
 

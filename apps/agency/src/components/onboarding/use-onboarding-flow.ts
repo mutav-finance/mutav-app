@@ -152,11 +152,68 @@ function isOnboardingErrorCode(code: string): code is OnboardingErrorCode {
   return (ONBOARDING_ERROR_CODES as readonly string[]).includes(code);
 }
 
-function buildInitialState(initialType: "autonomo" | "empresa" | undefined): OnboardingState {
+type AgencyTypeChoice = "autonomo" | "empresa";
+
+/**
+ * Prefill from the caller's in-progress agency (e.g. a rejected submission the
+ * owner just reopened), so resubmitting doesn't mean retyping everything.
+ */
+export type OnboardingDraft = {
+  agencyId: AgencyId;
+  agencyType: AgencyTypeChoice;
+  name: string;
+  email: string;
+  phone: string;
+  creci: string;
+  cpf: string;
+  cnpj: string;
+  representanteName: string;
+  representanteCpf: string;
+  bankingInfo: {
+    bank: string;
+    agency?: string;
+    account: string;
+    accountType: "corrente" | "poupanca";
+    pixKey?: string;
+  } | null;
+};
+
+export function buildInitialState({
+  initialType,
+  initialDraft,
+}: {
+  initialType?: AgencyTypeChoice;
+  initialDraft?: OnboardingDraft | null;
+}): OnboardingState {
+  const draft = initialDraft && initialDraft.agencyType === initialType ? initialDraft : null;
+  if (!draft) {
+    return {
+      step: 1,
+      agencyId: null,
+      snapshot: { ...INITIAL_SNAPSHOT, agencyType: initialType ?? "" },
+      submitState: "idle",
+      errorCode: null,
+    };
+  }
   return {
     step: 1,
-    agencyId: null,
-    snapshot: { ...INITIAL_SNAPSHOT, agencyType: initialType ?? "" },
+    agencyId: draft.agencyId,
+    snapshot: {
+      agencyType: draft.agencyType,
+      name: draft.name,
+      email: draft.email,
+      phone: draft.phone,
+      creci: draft.creci,
+      cpf: draft.cpf,
+      cnpj: draft.cnpj,
+      representanteName: draft.representanteName,
+      representanteCpf: draft.representanteCpf,
+      bankName: draft.bankingInfo?.bank ?? "",
+      bankBranch: draft.bankingInfo?.agency ?? "",
+      bankAccount: draft.bankingInfo?.account ?? "",
+      bankAccountType: draft.bankingInfo?.accountType ?? "",
+      bankPixKey: draft.bankingInfo?.pixKey ?? "",
+    },
     submitState: "idle",
     errorCode: null,
   };
@@ -164,10 +221,20 @@ function buildInitialState(initialType: "autonomo" | "empresa" | undefined): Onb
 
 // ─── View model hook ──────────────────────────────────────────────────────────
 
-export function useOnboardingFlow({ initialType }: { initialType?: "autonomo" | "empresa" }) {
+export function useOnboardingFlow({
+  initialType,
+  initialDraft,
+}: {
+  initialType?: AgencyTypeChoice;
+  initialDraft?: OnboardingDraft | null;
+}) {
   const t = useTranslations("onboarding");
 
-  const [state, dispatch] = React.useReducer(onboardingReducer, initialType, buildInitialState);
+  const [state, dispatch] = React.useReducer(
+    onboardingReducer,
+    { initialType, initialDraft },
+    buildInitialState,
+  );
 
   // Strip ?type= from the URL once mounted — refresh without the param triggers
   // the server redirect in flow/page.tsx that sends the user back to /onboarding.

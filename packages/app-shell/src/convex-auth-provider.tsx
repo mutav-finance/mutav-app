@@ -3,6 +3,7 @@
 import { useUser } from "@auth0/nextjs-auth0";
 import { ConvexProvider, ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { useCallback, useMemo } from "react";
+import { fetchConvexToken } from "./convex-token-fetch";
 
 /**
  * Bridges Auth0's session cookie to the Convex client. Convex calls
@@ -12,29 +13,13 @@ import { useCallback, useMemo } from "react";
  * deployment trusts that ID token because `auth.config.ts` registers
  * the same Auth0 tenant + client ID as the JWT issuer.
  *
- * `forceRefreshToken: true` is passed by Convex when the previous token
- * was rejected (typically 401 on a Convex request). The route handler
- * itself doesn't cache, so the cache hint mostly matters when the
- * browser's HTTP cache might otherwise serve a stale response.
+ * Always `no-store`: a cached response would hand Convex a token the route
+ * has since refreshed, so Convex's `forceRefreshToken` hint is not needed.
  */
 function useAuthFromAuth0() {
   const { user, isLoading } = useUser();
 
-  const fetchAccessToken = useCallback(
-    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      try {
-        const response = await fetch("/api/auth/convex-token", {
-          cache: forceRefreshToken ? "no-store" : "default",
-        });
-        if (!response.ok) return null;
-        const data = (await response.json()) as { token?: string };
-        return data.token ?? null;
-      } catch {
-        return null;
-      }
-    },
-    [],
-  );
+  const fetchAccessToken = useCallback(() => fetchConvexToken(), []);
 
   return useMemo(
     () => ({

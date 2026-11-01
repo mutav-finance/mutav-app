@@ -1123,14 +1123,17 @@ export const create = mutationWithActiveAgency({
       },
     });
 
+    const agency = await ctx.db.get(ctx.agencyId);
+    if (!agency) throw new Error("Agency row vanished mid-transaction");
     await ctx.scheduler.runAfter(0, internal.guarantees.actions.sendProposalNotifications, {
       publicId,
       tenantName: args.tenant.fullName,
       tenantEmail: args.tenant.email,
       tenantPhone: args.tenant.phone,
+      agencyName: agency.name,
       rentCents: args.lease.rent.rentCents,
-      availableGuaranteeCents: priced.capacity.availableCents,
       feeCents: priced.terms.feeCents,
+      coverageCents: priced.capacity.availableCents,
     });
 
     return { success: true, data: { publicId, leasePublicId }, message: "Guarantee created" };

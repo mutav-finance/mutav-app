@@ -481,6 +481,14 @@ export const PII_FIELD_REGISTRY = {
       legalNormRef: null,
       note: "Plaintext-indexed `by_email`.",
     },
+    emailVerified: {
+      ...COUNSEL_PENDING,
+      tier: TIER.T3,
+      dataClass: CLASS.OPERATIONAL_REFERENCE,
+      subjectType: SUBJECT.PLATFORM_USER,
+      legalNormRef: null,
+      note: "Auth0 `email_verified` at the last provisioning; gates account linking.",
+    },
     createdAt: {
       ...COUNSEL_PENDING,
       tier: TIER.T3,

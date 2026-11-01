@@ -1,3 +1,4 @@
+import { splitCookiesString } from "next/dist/server/web/utils";
 import { NextResponse } from "next/server";
 import { describe, expect, test } from "vitest";
 import { carryAuthHeaders } from "./proxy-headers";
@@ -65,10 +66,63 @@ describe("carryAuthHeaders", () => {
     expect(merged.status).toBe(307);
   });
 
+  describe("x-middleware-set-cookie (same-request render)", () => {
+    const INTERNAL = "x-middleware-set-cookie";
+
+    test("carries the source's cookies onto a pass-through response", () => {
+      const merged = carryAuthHeaders({ from: authResponse(), to: NextResponse.next() });
+
+      expect(splitCookiesString(merged.headers.get(INTERNAL) ?? "")).toEqual([
+        "__session=session-value; Path=/; Expires=Tue, 01 Jan 2030 00:00:00 GMT; Secure; HttpOnly; SameSite=lax",
+        "__session__1=; Path=/; Max-Age=0",
+      ]);
+    });
+
+    test("keeps the intl cookie and lets the source win on a shared name", () => {
+      const intl = NextResponse.next();
+      intl.cookies.set("NEXT_LOCALE", "pt-BR", { path: "/", sameSite: "lax" });
+      intl.cookies.set("__session", "stale", { path: "/" });
+
+      const merged = carryAuthHeaders({ from: authResponse(), to: intl });
+
+      expect(splitCookiesString(merged.headers.get(INTERNAL) ?? "")).toEqual([
+        "NEXT_LOCALE=pt-BR; Path=/; SameSite=lax",
+        "__session=session-value; Path=/; Expires=Tue, 01 Jan 2030 00:00:00 GMT; Secure; HttpOnly; SameSite=lax",
+        "__session__1=; Path=/; Max-Age=0",
+      ]);
+    });
+
+    test("carries it onto a rewrite, which still renders this request", () => {
+      const rewrite = NextResponse.rewrite("https://app.example.test/pt-BR/claims");
+
+      const merged = carryAuthHeaders({ from: authResponse(), to: rewrite });
+
+      expect(merged.headers.get(INTERNAL)).toContain("__session=session-value");
+    });
+
+    test("is never carried onto a redirect", () => {
+      const redirect = NextResponse.redirect("https://app.example.test/en/claims");
+
+      const merged = carryAuthHeaders({ from: authResponse(), to: redirect });
+
+      expect(merged.headers.get(INTERNAL)).toBeNull();
+    });
+
+    test("leaves the target's own value alone when the source set none", () => {
+      const intl = NextResponse.next();
+      intl.cookies.set("NEXT_LOCALE", "pt-BR", { path: "/", sameSite: "lax" });
+
+      const merged = carryAuthHeaders({ from: NextResponse.next(), to: intl });
+
+      expect(merged.headers.get(INTERNAL)).toBe("NEXT_LOCALE=pt-BR; Path=/; SameSite=lax");
+    });
+  });
+
   test("adds nothing when the source set nothing", () => {
     const merged = carryAuthHeaders({ from: NextResponse.next(), to: NextResponse.next() });
 
     expect(merged.headers.getSetCookie()).toEqual([]);
     expect(merged.headers.get("cache-control")).toBeNull();
+    expect(merged.headers.get("x-middleware-set-cookie")).toBeNull();
   });
 });

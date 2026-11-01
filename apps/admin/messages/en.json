@@ -51,6 +51,9 @@
     "staffEyebrow": "Access granted",
     "staffTitle": "You have access to the admin console",
     "staffSubtitle": "Your account is part of the Mutav team. This page is shown to people without access.",
+    "unavailableEyebrow": "Service unavailable",
+    "unavailableTitle": "We couldn't check your access",
+    "unavailableSubtitle": "Your session is active, but we couldn't reach the Mutav team records right now. Try again in a moment.",
     "goToAgency": "Go to Agencies",
     "goToAdmin": "Back to the admin console",
     "signIn": "Sign in",
@@ -123,12 +126,40 @@
     "approve": "Approve",
     "reject": "Reject",
     "rejectDialogTitle": "Reject submission",
-    "rejectDialogDescription": "Provide a reason for rejection (optional but recommended).",
+    "rejectDialogDescription": "Provide a reason for rejection. The agency sees it on its onboarding page and in the email, and can fix and resubmit.",
     "rejectReasonPlaceholder": "Rejection reason",
     "confirmReject": "Confirm rejection",
     "cancel": "Cancel",
     "approved": "Submission approved.",
     "rejected": "Submission rejected.",
+    "startReview": "Start review",
+    "startReviewHint": "The agency will see its application as \"under review\". Approve and reject become available next.",
+    "reviewStarted": "Review started.",
+    "noDocuments": "No documents uploaded.",
+    "fields": {
+      "agencyType": "Type",
+      "agencyTypes": {
+        "autonomo": "Independent broker",
+        "empresa": "Agency (company)"
+      },
+      "cnpj": "CNPJ",
+      "cpf": "CPF",
+      "creci": "CRECI",
+      "representativeName": "Representative",
+      "representativeCpf": "Representative CPF",
+      "email": "Email",
+      "phone": "Phone",
+      "bank": "Bank",
+      "branch": "Branch",
+      "account": "Account",
+      "accountType": "Account type",
+      "accountTypes": {
+        "corrente": "Checking",
+        "poupanca": "Savings"
+      },
+      "pixKey": "Pix key",
+      "bankingMissing": "Banking details missing"
+    },
     "state": {
       "submitted": "Submitted",
       "under_review": "Under review"
@@ -140,6 +171,7 @@
     "errors": {
       "NOT_FOUND": "Agency not found.",
       "NOT_REVIEWABLE": "Submission is not in a reviewable state.",
+      "REJECTION_REASON_REQUIRED": "Enter a rejection reason.",
       "documentUnavailable": "Document unavailable.",
       "unexpected": "Something went wrong. Please try again."
     }
@@ -522,5 +554,12 @@
       "FORBIDDEN": "Your staff role cannot perform this action.",
       "unexpected": "Something went wrong. Please try again."
     }
+  },
+  "unavailable": {
+    "eyebrow": "Service unavailable",
+    "title": "We couldn't check your access",
+    "subtitle": "The service is temporarily unavailable. Your session is still active; try again in a moment.",
+    "tryAgain": "Try again",
+    "logOut": "Log out"
   }
 }

@@ -349,7 +349,6 @@
       "createGuarantee": "Create Guarantee",
       "dashboard": "Dashboard",
       "guarantees": "Guarantees",
-      "invoices": "Invoices",
       "delinquencies": "Claims",
       "transparency": "Transparency"
     },
@@ -362,6 +361,7 @@
     "agency": {
       "groupLabel": "Agency",
       "members": "Members",
+      "invoices": "Invoices",
       "commission": "Commission",
       "agencySettings": "Agency Settings"
     },
@@ -987,7 +987,11 @@
         "activation": "Activation"
       },
       "total": "Total",
-      "empty": "No items."
+      "empty": "No items.",
+      "description": {
+        "recurring": "Monthly fee — guarantee {id}",
+        "activation": "Activation fee — guarantee {id}"
+      }
     },
     "methodCard": {
       "heading": "Payment Method",
@@ -1088,7 +1092,8 @@
     },
     "simulation": {
       "heading": "Simulation Result",
-      "approvedMessage": "Analysis approved. Select the desired coverage to continue.",
+      "approvedValueLabel": "Approved rent coverage",
+      "approvedMessage": "Analysis approved for this tenant and property. Review the coverage below and continue.",
       "deniedMessage": "Unfortunately the profile does not meet the minimum criteria for this guarantee. The score obtained is below the accepted threshold.",
       "closeButton": "Back to home",
       "noApplicationTitle": "Credit check not released",
@@ -1119,7 +1124,9 @@
         "exitCost": "Exit cost",
         "commission": "Commission (1.5%)",
         "guarantee": "Guarantee value (monthly)"
-      }
+      },
+      "reportHeading": "Approved coverage",
+      "timesRent": "{multiplier}× the rent"
     },
     "complementary": {
       "tenantSection": "Tenant Details",
@@ -1149,8 +1156,8 @@
     },
     "success": {
       "heading": "GUARANTEE PROPOSAL CREATED",
-      "subtitle": "The proposal has been successfully sent and is awaiting activation by the tenant.",
-      "description": "The guarantee will be activated upon the tenant's acceptance of the terms and payment of the activation fee. The proposal has been sent to the tenant via email and WhatsApp.",
+      "subtitle": "The guarantee is created and awaits the signed contract.",
+      "description": "Collect the signed guarantee contract from the tenant and upload the PDF on the guarantee page. MUTAV reviews the contract and registers the guarantee with the reserve; it becomes active once the registration is confirmed. The tenant received an informational notice that the agency will contact them to sign.",
       "viewGuarantee": "View guarantee",
       "createAnother": "Create another guarantee"
     },
@@ -1299,7 +1306,15 @@
       "noReason": "No reason provided.",
       "contactLabel": "Have questions or want to appeal?",
       "contactLink": "Contact us",
-      "homeButton": "Back"
+      "resubmitHint": "Your data is still saved. Fix what is needed and resubmit your application for a new review.",
+      "resubmitButton": "Fix and resubmit",
+      "resubmitting": "Reopening application…",
+      "errors": {
+        "NOT_FOUND": "We couldn't find your application. Reload the page.",
+        "NOT_OWNER": "Only the account owner can resubmit this application.",
+        "NOT_REJECTED": "This application is no longer rejected. Reload the page.",
+        "unknown": "Something went wrong. Please try again."
+      }
     },
     "loading": "Loading…",
     "steps": {
@@ -1399,7 +1414,7 @@
       "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
       "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
       "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
-      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support: parceiros@mutav.finance.",
+      "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support: contato@mutav.finance.",
       "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
       "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
       "BANKING_INFO_REQUIRED": "Fill in your banking details before submitting.",
@@ -1442,7 +1457,8 @@
         "cpf": "Invalid CPF.",
         "cnpj": "Invalid CNPJ.",
         "representanteName": "Representative name is required.",
-        "representanteCpf": "Invalid representative CPF."
+        "representanteCpf": "Invalid representative CPF.",
+        "alreadyRegistered": "Already registered with Mutav."
       },
       "backButton": "Back"
     }
@@ -1529,5 +1545,30 @@
     "default_verified": "Default verified",
     "cover_paid": "Cover committed",
     "closed": "Closed"
+  },
+  "sessionError": {
+    "notProvisioned": {
+      "eyebrow": "Account setup",
+      "title": "We couldn't finish setting up your account",
+      "subtitle": "You signed in successfully, but something went wrong while preparing your account. Try again in a moment. If the problem persists, log out and sign in again."
+    },
+    "backendUnavailable": {
+      "eyebrow": "Service unavailable",
+      "title": "The service is temporarily unavailable",
+      "subtitle": "We couldn't load your data right now. Your session is still active; try again in a moment."
+    },
+    "emailNotVerified": {
+      "eyebrow": "Verify your email",
+      "title": "Confirm your email to continue",
+      "subtitle": "We sent a link to your inbox (check spam). After confirming, sign in again."
+    },
+    "emailBound": {
+      "eyebrow": "Account already linked",
+      "title": "This email is already linked to another sign-in method",
+      "subtitle": "Sign in the way you did before, or contact support so we can help you access your account."
+    },
+    "tryAgain": "Try again",
+    "confirmedSignInAgain": "I've confirmed — sign in again",
+    "logOut": "Log out"
   }
 }

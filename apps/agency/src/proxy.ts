@@ -1,10 +1,15 @@
 import createMiddleware from "next-intl/middleware";
 import type { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
+import { getIdTokenRefreshWindowSeconds } from "@/lib/env";
 import { routing } from "@mutav/i18n/routing";
-import { carryAuthHeaders } from "@mutav/app-shell/proxy-headers";
+import { createAuthProxy } from "@mutav/app-shell/auth-proxy";
 
-const handleI18nRouting = createMiddleware(routing);
+const authProxy = createAuthProxy({
+  auth0,
+  handleI18nRouting: createMiddleware(routing),
+  getRefreshWindowSeconds: getIdTokenRefreshWindowSeconds,
+});
 
 /**
  * The matcher excludes `/api/auth/convex-token` because that route reads
@@ -12,19 +17,7 @@ const handleI18nRouting = createMiddleware(routing);
  * proxy redirect logic to run first.
  */
 export async function proxy(request: NextRequest) {
-  const authRes = await auth0.middleware(request);
-
-  if (request.nextUrl.pathname.startsWith("/auth/")) {
-    return authRes;
-  }
-
-  if (request.nextUrl.pathname.startsWith("/api/")) {
-    return authRes;
-  }
-
-  const intlRes = handleI18nRouting(request);
-
-  return carryAuthHeaders({ from: authRes, to: intlRes });
+  return authProxy(request);
 }
 
 // Excludes real asset extensions, NOT every dotted path. A blanket `.*\..*`

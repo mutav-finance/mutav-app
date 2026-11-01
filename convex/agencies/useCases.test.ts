@@ -3,7 +3,11 @@ import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
 import { hashPii } from "../lib/pii";
-import { setupAuthenticatedUser, type SeededUserId } from "../lib/testFixtures";
+import {
+  seedAuthenticatedUser,
+  setupAuthenticatedUser,
+  type SeededUserId,
+} from "../lib/testFixtures";
 import schema from "../schema";
 
 // PII crypto keys must be present before any handler calls hashPii.
@@ -672,5 +676,213 @@ describe("auth0OrgId index", () => {
     );
 
     expect(found).toBeNull();
+  });
+});
+
+async function seedRejectedAutonomoAgency(
+  t: ReturnType<typeof convexTest>,
+  asUser: ReturnType<ReturnType<typeof convexTest>["withIdentity"]>,
+  userId: SeededUserId,
+) {
+  const agencyId = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency R");
+  const submit = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+  expect(submit.success).toBe(true);
+  const reject = await t.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
+    agencyId,
+    decision: "rejected",
+    rejectionReason: "CRECI ilegível",
+  });
+  expect(reject.success).toBe(true);
+  return agencyId;
+}
+
+describe("reopenOnboarding", () => {
+  test("owner moves rejected → in_progress, keeps the data and clears the reason", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+
+    const result = await asUser.mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+
+    expect(result).toEqual({
+      success: true,
+      data: { agencyId, agencyType: "autonomo" },
+      message: "Onboarding reopened for resubmission",
+    });
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.onboardingState).toBe("in_progress");
+    expect(agency?.onboardingRejectionReason).toBeUndefined();
+    expect(agency?.cpf).toBe(VALID_CPF);
+    expect(agency?.bankingInfo?.bank).toBe("Test");
+  });
+
+  test("writes one onboarding.reopened audit entry attributed to the owner", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+
+    await asUser.mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+
+    const entries = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+    const reopened = entries.filter((entry) => entry.action === "onboarding.reopened");
+    expect(reopened).toHaveLength(1);
+    expect(reopened[0].actor).toEqual({ kind: "user", userId });
+    expect(reopened[0].resourceType).toBe("agency");
+    expect(reopened[0].resourceId).toBe(agencyId);
+  });
+
+  test("NOT_OWNER — an admin member of the agency cannot reopen", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+    const adminUserId = await seedAuthenticatedUser(t, {
+      subject: "auth0|agency-admin",
+      email: "admin@test.br",
+    });
+    await t.run((ctx) =>
+      ctx.db.insert("memberships", {
+        userId: adminUserId,
+        agencyId,
+        role: "admin",
+        joinedAt: new Date().toISOString(),
+      }),
+    );
+
+    const result = await t
+      .withIdentity({ subject: "auth0|agency-admin" })
+      .mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOT_OWNER");
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.onboardingState).toBe("rejected");
+  });
+
+  test.each(["in_progress", "submitted", "under_review", "active"] as const)(
+    "NOT_REJECTED — cannot reopen from %s",
+    async (state) => {
+      const t = convexTest(schema);
+      const { asUser, userId } = await setupAuthenticatedUser(t);
+      const agencyId = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency S");
+      await t.run((ctx) => ctx.db.patch(agencyId, { onboardingState: state }));
+
+      const result = await asUser.mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.code).toBe("NOT_REJECTED");
+      const entries = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
+      expect(entries).toHaveLength(0);
+    },
+  );
+
+  test("NOT_FOUND — membership survives but the agency row is gone", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency G");
+    await t.run((ctx) => ctx.db.delete(agencyId));
+
+    const result = await asUser.mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOT_FOUND");
+  });
+
+  test("a non-member is refused by the agency-scope wrapper", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+    await seedAuthenticatedUser(t, { subject: "auth0|outsider", email: "out@test.br" });
+
+    await expect(
+      t
+        .withIdentity({ subject: "auth0|outsider" })
+        .mutation(api.agencies.useCases.reopenOnboarding, { agencyId }),
+    ).rejects.toThrow();
+  });
+
+  test("resubmitting after a reopen re-claims the CPF the rejection released", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+    const claimsAfterReject = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(claimsAfterReject).toHaveLength(0);
+
+    await asUser.mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+    const resubmit = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+
+    expect(resubmit.success).toBe(true);
+    const claims = await t.run((ctx) => ctx.db.query("claimedDocuments").collect());
+    expect(claims).toHaveLength(1);
+    expect(claims[0].agencyId).toBe(agencyId);
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.onboardingState).toBe("submitted");
+  });
+
+  test("resubmit is refused when another agency claimed the CPF in the meantime", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+    const otherAgency = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency Other");
+    const otherSubmit = await asUser.mutation(api.agencies.useCases.submitOnboarding, {
+      agencyId: otherAgency,
+    });
+    expect(otherSubmit.success).toBe(true);
+
+    await asUser.mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+    const resubmit = await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId });
+
+    expect(resubmit.success).toBe(false);
+    if (resubmit.success) return;
+    expect(resubmit.error.code).toBe("ALREADY_REGISTERED");
+  });
+});
+
+describe("getMyOnboardingDraft", () => {
+  test("returns the reopened agency's data as wizard prefill", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+    await asUser.mutation(api.agencies.useCases.reopenOnboarding, { agencyId });
+
+    const draft = await asUser.query(api.agencies.useCases.getMyOnboardingDraft, {});
+
+    expect(draft).toEqual({
+      agencyId,
+      agencyType: "autonomo",
+      name: "Agency R",
+      email: "agencyr@test.br",
+      phone: "11999999999",
+      creci: "CRECI-F 12345",
+      cpf: VALID_CPF,
+      cnpj: "",
+      representanteName: "",
+      representanteCpf: "",
+      bankingInfo: { bank: "Test", agency: "0001", account: "12345-6", accountType: "corrente" },
+    });
+  });
+
+  test("returns null when the caller has no in-progress agency", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    await seedRejectedAutonomoAgency(t, asUser, userId);
+
+    const draft = await asUser.query(api.agencies.useCases.getMyOnboardingDraft, {});
+
+    expect(draft).toBeNull();
+  });
+});
+
+describe("getMyOnboardingStatus — rejection reason", () => {
+  test("exposes the staff-written reason to the rejected agency's member", async () => {
+    const t = convexTest(schema);
+    const { asUser, userId } = await setupAuthenticatedUser(t);
+    const agencyId = await seedRejectedAutonomoAgency(t, asUser, userId);
+
+    const status = await asUser.query(api.agencies.useCases.getMyOnboardingStatus, {});
+
+    expect(status).toEqual({ state: "rejected", agencyId, rejectionReason: "CRECI ilegível" });
   });
 });

@@ -349,7 +349,6 @@
       "createGuarantee": "Criar Garantia",
       "dashboard": "Painel",
       "guarantees": "Garantias",
-      "invoices": "Faturas",
       "delinquencies": "Acionamentos",
       "transparency": "Transparência"
     },
@@ -362,6 +361,7 @@
     "agency": {
       "groupLabel": "Imobiliária",
       "members": "Membros",
+      "invoices": "Faturas",
       "commission": "Comissão",
       "agencySettings": "Configurações da Imobiliária"
     },
@@ -987,7 +987,11 @@
         "activation": "Ativação"
       },
       "total": "Total",
-      "empty": "Sem itens."
+      "empty": "Sem itens.",
+      "description": {
+        "recurring": "Mensalidade — garantia {id}",
+        "activation": "Taxa de ativação — garantia {id}"
+      }
     },
     "methodCard": {
       "heading": "Forma de Pagamento",
@@ -1088,7 +1092,8 @@
     },
     "simulation": {
       "heading": "Resultado da Simulação",
-      "approvedMessage": "Análise aprovada. Selecione a cobertura desejada para continuar.",
+      "approvedValueLabel": "Cobertura de aluguel aprovada",
+      "approvedMessage": "Análise aprovada para este locatário e imóvel. Confira a cobertura abaixo e continue.",
       "deniedMessage": "Infelizmente o perfil não atende aos critérios mínimos para esta garantia. O score obtido está abaixo do limite aceito.",
       "closeButton": "Voltar ao início",
       "noApplicationTitle": "Consulta de crédito não liberada",
@@ -1119,7 +1124,9 @@
         "exitCost": "Custo de saída",
         "commission": "Comissão (1,5%)",
         "guarantee": "Valor da garantia (mensal)"
-      }
+      },
+      "reportHeading": "Cobertura aprovada",
+      "timesRent": "{multiplier}× o aluguel"
     },
     "complementary": {
       "tenantSection": "Dados do Inquilino",
@@ -1149,8 +1156,8 @@
     },
     "success": {
       "heading": "PROPOSTA DE GARANTIA CRIADA",
-      "subtitle": "A proposta foi enviada com sucesso e aguarda ativação pelo inquilino.",
-      "description": "A garantia será efetivada mediante o aceite dos termos e o pagamento da taxa de ativação pelo inquilino. A proposta foi enviada por e-mail e WhatsApp para o inquilino.",
+      "subtitle": "A garantia foi criada e aguarda o contrato assinado.",
+      "description": "Colete com o inquilino o contrato de garantia assinado e envie o PDF na página da garantia. A MUTAV revisa o contrato e registra a garantia na reserva; ela fica ativa quando o registro é confirmado. O inquilino recebeu um aviso informativo de que a imobiliária entrará em contato para a assinatura.",
       "viewGuarantee": "Ver garantia",
       "createAnother": "Criar outra garantia"
     },
@@ -1299,7 +1306,15 @@
       "noReason": "Nenhum motivo informado.",
       "contactLabel": "Tem dúvidas ou deseja recorrer?",
       "contactLink": "Fale conosco",
-      "homeButton": "Voltar"
+      "resubmitHint": "Seus dados continuam salvos. Corrija o que for necessário e reenvie o cadastro para uma nova análise.",
+      "resubmitButton": "Corrigir e reenviar",
+      "resubmitting": "Reabrindo cadastro…",
+      "errors": {
+        "NOT_FOUND": "Não encontramos o seu cadastro. Recarregue a página.",
+        "NOT_OWNER": "Apenas o responsável pelo cadastro pode reenviá-lo.",
+        "NOT_REJECTED": "Este cadastro não está mais reprovado. Recarregue a página.",
+        "unknown": "Algo deu errado. Tente novamente."
+      }
     },
     "loading": "Carregando…",
     "steps": {
@@ -1399,7 +1414,7 @@
       "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
       "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
       "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
-      "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte: parceiros@mutav.finance.",
+      "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte: contato@mutav.finance.",
       "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
       "AGENCY_TYPE_REQUIRED": "Selecione o tipo de cadastro para continuar.",
       "BANKING_INFO_REQUIRED": "Preencha os dados bancários antes de finalizar.",
@@ -1442,7 +1457,8 @@
         "cpf": "CPF inválido.",
         "cnpj": "CNPJ inválido.",
         "representanteName": "Nome do responsável obrigatório.",
-        "representanteCpf": "CPF do responsável inválido."
+        "representanteCpf": "CPF do responsável inválido.",
+        "alreadyRegistered": "Já cadastrado na Mutav."
       },
       "backButton": "Voltar"
     }
@@ -1529,5 +1545,30 @@
     "default_verified": "Inadimplência verificada",
     "cover_paid": "Cobertura registrada",
     "closed": "Encerradas"
+  },
+  "sessionError": {
+    "notProvisioned": {
+      "eyebrow": "Configuração da conta",
+      "title": "Não conseguimos concluir a configuração da sua conta",
+      "subtitle": "Você entrou normalmente, mas algo deu errado ao preparar sua conta. Tente novamente em alguns instantes. Se o problema continuar, saia e entre de novo."
+    },
+    "backendUnavailable": {
+      "eyebrow": "Serviço indisponível",
+      "title": "O serviço está temporariamente indisponível",
+      "subtitle": "Não conseguimos carregar seus dados agora. Sua sessão continua ativa; tente novamente em alguns instantes."
+    },
+    "emailNotVerified": {
+      "eyebrow": "Confirme seu e-mail",
+      "title": "Confirme seu e-mail para continuar",
+      "subtitle": "Enviamos um link para a sua caixa de entrada (confira também o spam). Depois de confirmar, entre de novo."
+    },
+    "emailBound": {
+      "eyebrow": "Conta já vinculada",
+      "title": "Este e-mail já está vinculado a outra forma de acesso",
+      "subtitle": "Entre da mesma forma que entrou antes ou fale com o nosso suporte para recuperar o acesso à sua conta."
+    },
+    "tryAgain": "Tentar novamente",
+    "confirmedSignInAgain": "Já confirmei — entrar de novo",
+    "logOut": "Sair"
   }
 }

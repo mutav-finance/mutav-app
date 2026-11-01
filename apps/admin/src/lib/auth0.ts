@@ -1,9 +1,9 @@
 import { Auth0Client } from "@auth0/nextjs-auth0/server";
-import { ConvexHttpClient } from "convex/browser";
-import { NextResponse } from "next/server";
-import { sameOriginRedirectUrl } from "@mutav/app-shell/auth-redirect";
+import { createOnCallback } from "@mutav/app-shell/auth-callback";
 import { api } from "@convex/_generated/api";
 import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
+
+const TRANSACTION_COOKIE_MAX_AGE_SECONDS = 900;
 
 /**
  * Singleton Auth0 client for apps/admin.
@@ -19,9 +19,11 @@ import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
  * fail-closed at `getStaffMember()` in `apps/admin/src/lib/auth.ts` — a
  * user without a staff row is redirected off the admin origin. Any Auth0
  * identity that reaches the callback without a matching staff row simply
- * bounces at the gate; provisioning them a `users` row here is harmless.
+ * bounces at the gate; provisioning them a `users` row in `onCallback` is
+ * harmless. Staff rows are granted separately (`createStaffRole`, or
+ * `bootstrapFirstAdmin` for the genesis case), never from JWT claims.
  *
- * Two load-bearing pieces that distinguish this client from agency's:
+ * What distinguishes this client from agency's:
  *
  * 1. **Shorter session lifetime.** 12h absolute + 30min inactivity for
  *    staff sessions. SDK enforces these on session-cookie save / rolling
@@ -33,73 +35,16 @@ import { getAppBaseUrl, getConvexUrl } from "@/lib/env";
  *    the exact origin (`admin.mutav.finance`). The explicit `sameSite`
  *    + `secure` settings here lock down the rest of the load-bearing
  *    cookie posture.
- *
- * The `onCallback` hook is the first-login provisioning point, mirroring
- * apps/agency's client: it provisions the Convex `users` row
- * (`getOrCreateByIdentity`) and that's it. Staff rows are granted separately
- * — either through the admin panel's `createStaffRole` mutation, or via the
- * internal-only `bootstrapFirstAdmin` for the genesis case. There is no
- * claim-based auto-provisioning from the JWT.
- *
- * Fails OPEN — provisioning errors are caught and logged, login still
- * completes — because the real staff gate is downstream in `getStaffMember()`
- * (`lib/auth.ts`), which reads the `mutavStaff` row and redirects non-staff
- * users off the admin origin.
  */
 export const auth0 = new Auth0Client({
   // Nothing in the app reads tokens through /auth/access-token; left on, it
   // hands the Auth0 access token to any same-origin script.
   enableAccessTokenEndpoint: false,
-  async onCallback(error, context, session) {
-    const baseUrl = getAppBaseUrl();
-
-    if (error) {
-      // `error` is `SdkError | null` per the SDK signature — `name`, `code`,
-      // `message`, `cause` are all on the prototype chain (SdkError extends
-      // Error). `cause` is `unknown` per Error.cause; narrow with a type
-      // guard before reading message.
-      const cause = error.cause;
-      const causeMsg =
-        cause instanceof Error
-          ? cause.message
-          : typeof cause === "object" && cause !== null && "message" in cause
-            ? String(cause.message)
-            : null;
-      console.error("[auth0.onCallback] error:", {
-        name: error.name,
-        message: error.message,
-        code: error.code,
-        cause,
-      });
-      // Redirect errors to /auth/logout, NOT /auth/login: Auth0 SDK v4 will
-      // immediately re-enter the login flow on /auth/login and, if the
-      // upstream failure is deterministic (e.g. invalid state, misconfigured
-      // callback URL), loop indefinitely. /auth/logout clears the transaction
-      // cookie and lands the user on a terminal state.
-      return NextResponse.redirect(
-        new URL(`/auth/logout?error=${encodeURIComponent(causeMsg ?? error.message)}`, baseUrl),
-      );
-    }
-
-    if (session) {
-      try {
-        const convexUrl = getConvexUrl();
-        const idToken = session.tokenSet.idToken;
-        if (convexUrl && idToken) {
-          const convex = new ConvexHttpClient(convexUrl);
-          convex.setAuth(idToken);
-          await convex.mutation(api.users.useCases.getOrCreateByIdentity, {});
-        }
-      } catch (err) {
-        // Fail OPEN: log and continue. The staff gate in `getStaffMember()`
-        // (`lib/auth.ts`) is the real defense — it reads the `mutavStaff`
-        // row and redirects non-staff users.
-        console.error("[auth0.onCallback] Convex provisioning failed:", err);
-      }
-    }
-
-    return NextResponse.redirect(sameOriginRedirectUrl({ returnTo: context.returnTo, baseUrl }));
-  },
+  onCallback: createOnCallback({
+    getAppBaseUrl,
+    getConvexUrl,
+    provisionMutation: api.users.useCases.getOrCreateByIdentity,
+  }),
   session: {
     rolling: true,
     absoluteDuration: 60 * 60 * 12,
@@ -130,5 +75,6 @@ export const auth0 = new Auth0Client({
     // handler — the SDK then throws InvalidStateError.
     sameSite: "lax",
     secure: true,
+    maxAge: TRANSACTION_COOKIE_MAX_AGE_SECONDS,
   },
 });

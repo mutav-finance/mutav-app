@@ -51,6 +51,9 @@
     "staffEyebrow": "Acesso liberado",
     "staffTitle": "Você tem acesso ao painel administrativo",
     "staffSubtitle": "Sua conta faz parte da equipe Mutav. Esta página é exibida a quem não tem acesso.",
+    "unavailableEyebrow": "Serviço indisponível",
+    "unavailableTitle": "Não foi possível verificar seu acesso",
+    "unavailableSubtitle": "Sua sessão está ativa, mas não conseguimos consultar a equipe Mutav agora. Tente novamente em alguns instantes.",
     "goToAgency": "Ir para Imobiliárias",
     "goToAdmin": "Voltar ao painel administrativo",
     "signIn": "Entrar",
@@ -123,12 +126,40 @@
     "approve": "Aprovar",
     "reject": "Rejeitar",
     "rejectDialogTitle": "Rejeitar submissão",
-    "rejectDialogDescription": "Informe o motivo da rejeição (opcional, mas recomendado).",
+    "rejectDialogDescription": "Informe o motivo da rejeição. A imobiliária verá esse texto na página de cadastro e no e-mail, e poderá corrigir e reenviar.",
     "rejectReasonPlaceholder": "Motivo da rejeição",
     "confirmReject": "Confirmar rejeição",
     "cancel": "Cancelar",
     "approved": "Submissão aprovada.",
     "rejected": "Submissão rejeitada.",
+    "startReview": "Iniciar análise",
+    "startReviewHint": "A imobiliária passa a ver o cadastro como \"em análise\". Aprovar e rejeitar ficam disponíveis em seguida.",
+    "reviewStarted": "Análise iniciada.",
+    "noDocuments": "Nenhum documento enviado.",
+    "fields": {
+      "agencyType": "Tipo",
+      "agencyTypes": {
+        "autonomo": "Corretor autônomo",
+        "empresa": "Imobiliária (empresa)"
+      },
+      "cnpj": "CNPJ",
+      "cpf": "CPF",
+      "creci": "CRECI",
+      "representativeName": "Representante",
+      "representativeCpf": "CPF do representante",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "bank": "Banco",
+      "branch": "Agência",
+      "account": "Conta",
+      "accountType": "Tipo de conta",
+      "accountTypes": {
+        "corrente": "Corrente",
+        "poupanca": "Poupança"
+      },
+      "pixKey": "Chave Pix",
+      "bankingMissing": "Dados bancários não informados"
+    },
     "state": {
       "submitted": "Enviado",
       "under_review": "Em análise"
@@ -140,6 +171,7 @@
     "errors": {
       "NOT_FOUND": "Imobiliária não encontrada.",
       "NOT_REVIEWABLE": "Submissão não está em estado revisável.",
+      "REJECTION_REASON_REQUIRED": "Informe o motivo da rejeição.",
       "documentUnavailable": "Documento indisponível.",
       "unexpected": "Algo deu errado. Tente novamente."
     }
@@ -522,5 +554,12 @@
       "FORBIDDEN": "Seu perfil na equipe não permite esta ação.",
       "unexpected": "Algo deu errado. Tente novamente."
     }
+  },
+  "unavailable": {
+    "eyebrow": "Serviço indisponível",
+    "title": "Não foi possível verificar seu acesso",
+    "subtitle": "O serviço está temporariamente indisponível. Sua sessão continua ativa; tente novamente em alguns instantes.",
+    "tryAgain": "Tentar novamente",
+    "logOut": "Sair"
   }
 }
