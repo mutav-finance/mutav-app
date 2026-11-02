@@ -539,8 +539,8 @@
       "ofCeiling": "de {ceiling}"
     },
     "review": {
-      "heading": "Análise Mutav",
-      "progressLabel": "Progresso da análise Mutav",
+      "heading": "Análise MUTAV",
+      "progressLabel": "Progresso da análise MUTAV",
       "doneSuffix": " (concluída)",
       "currentSuffix": " (atual)",
       "steps": {
@@ -560,26 +560,26 @@
       },
       "acceptedAt": "Aprovada com taxa de {rate}",
       "description": {
-        "editing": "Revise o rascunho e solicite a análise da Mutav quando estiver pronto. A Mutav decide se assume este contrato e com qual taxa.",
-        "analysis_requested": "A Mutav está analisando o inquilino. Você será avisado por e-mail quando houver uma decisão.",
-        "accepted": "A Mutav aprovou este contrato. O contrato será enviado ao inquilino para assinatura.",
-        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Após a assinatura, a Mutav registra o documento e ativa a garantia.",
-        "signed": "O contrato está assinado. A Mutav ativa a garantia após registrar o documento.",
-        "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada."
+        "editing": "Revise o rascunho e solicite a análise da MUTAV quando estiver pronto. A MUTAV decide se assume este contrato e com qual taxa.",
+        "analysis_requested": "A MUTAV está analisando o inquilino. Você será avisado por e-mail quando houver uma decisão.",
+        "accepted": "A MUTAV aprovou este contrato. O contrato será enviado ao inquilino para assinatura.",
+        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Após a assinatura, a MUTAV registra o documento e ativa a garantia.",
+        "signed": "O contrato está assinado. A MUTAV ativa a garantia após registrar o documento.",
+        "refused": "A MUTAV não aceitou este contrato e a proposta foi encerrada."
       },
       "requestedOn": "Solicitada em {date}",
-      "refusalReason": "Motivo informado pela Mutav",
+      "refusalReason": "Motivo informado pela MUTAV",
       "refusedNextStep": "Você pode iniciar uma nova proposta para este inquilino a qualquer momento.",
       "scoreLabel": "Score do bureau",
-      "scoreHint": "Insumo da análise Mutav — não é uma decisão",
-      "staffRateLabel": "Taxa definida pela Mutav",
-      "requestAnalysis": "Solicitar análise Mutav",
+      "scoreHint": "Insumo da análise MUTAV — não é uma decisão",
+      "staffRateLabel": "Taxa definida pela MUTAV",
+      "requestAnalysis": "Solicitar análise MUTAV",
       "requesting": "Solicitando…",
-      "toastRequested": "Análise solicitada. A Mutav vai avaliar esta proposta.",
+      "toastRequested": "Análise solicitada. A MUTAV vai avaliar esta proposta.",
       "errors": {
         "NOT_FOUND": "Proposta não encontrada.",
         "NOT_DRAFTED": "Esta proposta não é mais um rascunho.",
-        "NOT_EDITING": "A análise da Mutav já foi solicitada para esta proposta.",
+        "NOT_EDITING": "A análise da MUTAV já foi solicitada para esta proposta.",
         "CREDIT_ASSESSMENT_REQUIRED": "A consulta de crédito do inquilino expirou. Refaça a consulta em uma nova proposta antes de solicitar a análise.",
         "UNEXPECTED": "Erro inesperado. Tente novamente."
       }
@@ -600,7 +600,7 @@
       "eviction": "Despejo",
       "dispute_reversal": "Contestação revertida",
       "canceled_pre_activation": "Cancelada antes da ativação",
-      "underwriting_refused": "Recusada na análise Mutav",
+      "underwriting_refused": "Recusada na análise MUTAV",
       "death": "Falecimento"
     },
     "actions": {
@@ -1207,14 +1207,14 @@
     },
     "success": {
       "heading": "RASCUNHO DE GARANTIA CRIADO",
-      "subtitle": "O rascunho foi salvo. A Mutav analisa a proposta antes de qualquer envio ao inquilino.",
+      "subtitle": "O rascunho foi salvo. A MUTAV analisa a proposta antes de qualquer envio ao inquilino.",
       "description": "Próximo passo: solicite a análise da MUTAV, agora ou depois de revisar o rascunho na página da garantia. Se a MUTAV aceitar a proposta, ela define a taxa final e o contrato segue para assinatura; a página da garantia mostra cada etapa seguinte.",
       "viewGuarantee": "Ver garantia",
       "createAnother": "Criar outra garantia",
-      "requestedDescription": "Análise solicitada. Você será avisado por e-mail quando a Mutav decidir.",
-      "requestAnalysis": "Solicitar análise Mutav",
+      "requestedDescription": "Análise solicitada. Você será avisado por e-mail quando a MUTAV decidir.",
+      "requestAnalysis": "Solicitar análise MUTAV",
       "requesting": "Solicitando…",
-      "requested": "Análise solicitada. A Mutav vai avaliar esta proposta."
+      "requested": "Análise solicitada. A MUTAV vai avaliar esta proposta."
     },
     "nav": {
       "back": "Voltar",
