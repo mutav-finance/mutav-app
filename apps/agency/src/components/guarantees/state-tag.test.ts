@@ -95,12 +95,19 @@ function cvdDeltaE(first: string, second: string): number {
   return Math.min(deltaE(first, second, "protan"), deltaE(first, second, "deutan"));
 }
 
+// The brand tokens live in the shared @mutav/ui file each app's globals.css imports.
 const GLOBALS_CSS = join(
   fileURLToPath(new URL(".", import.meta.url)),
   "..",
   "..",
-  "app",
-  "globals.css",
+  "..",
+  "..",
+  "..",
+  "packages",
+  "ui",
+  "src",
+  "styles",
+  "mutav-tokens.css",
 );
 
 /**

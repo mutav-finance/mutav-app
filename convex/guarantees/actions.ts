@@ -13,11 +13,13 @@ import {
 } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
 import {
+  buildDocumentRejectedEmail,
   buildProposalEmail,
   buildProposalWhatsApp,
-  escapeHtml,
   type ProposalNotice,
 } from "./notifications";
+import { escapeHtml } from "../lib/email/escape";
+import { EMAIL_PARAGRAPH_STYLE, renderEmailButton, renderEmailLayout } from "../lib/email/layout";
 
 // ─── Review decision → agency ─────────────────────────────────────────────────
 
@@ -55,14 +57,21 @@ export const sendReviewDecisionNotification = internalAction({
       : `Análise Mutav recusada — garantia ${args.publicId}`;
     const body =
       args.decision.outcome === "accepted"
-        ? `<p>A Mutav aprovou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong> com taxa de ${(args.decision.feeRateBps / BASIS_POINTS_PER_PERCENT).toFixed(2)}% do aluguel.</p><p>O próximo passo é o envio do contrato ao inquilino para assinatura.</p>`
-        : `<p>A Mutav recusou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong>.</p><p>Motivo: ${escapeHtml(args.decision.reason)}</p><p>A proposta foi encerrada. Você pode iniciar uma nova proposta a qualquer momento.</p>`;
+        ? `<p style="${EMAIL_PARAGRAPH_STYLE}">A Mutav aprovou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong> com taxa de ${(args.decision.feeRateBps / BASIS_POINTS_PER_PERCENT).toFixed(2)}% do aluguel.</p><p style="${EMAIL_PARAGRAPH_STYLE}">O próximo passo é o envio do contrato ao inquilino para assinatura.</p>`
+        : `<p style="${EMAIL_PARAGRAPH_STYLE}">A Mutav recusou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong>.</p><p style="${EMAIL_PARAGRAPH_STYLE}">Motivo: ${escapeHtml(args.decision.reason)}</p><p style="${EMAIL_PARAGRAPH_STYLE}">A proposta foi encerrada. Você pode iniciar uma nova proposta a qualquer momento.</p>`;
+    const html = renderEmailLayout({
+      appUrl: getAppUrl(),
+      title: subject,
+      preheader: subject,
+      bodyHtml: `${body}${renderEmailButton({ label: "Ver garantia", url: link })}`,
+      reason: "a sua imobiliária pediu uma análise de garantia à MUTAV.",
+    });
     try {
       await new Resend(getResendApiKey()).emails.send({
         from: getResendFromEmail(),
         to: args.recipients,
         subject,
-        html: `<!DOCTYPE html><html lang="pt-BR"><body style="font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.6;">${body}<p><a href="${link}">Ver garantia</a></p><p style="color:#9e9c98;font-size:12px;">MUTAV · e-mail automático.</p></body></html>`,
+        html,
       });
     } catch (error) {
       logError("[notifications] review decision email rejected", { reason: error });
@@ -103,7 +112,7 @@ async function sendEmail({ to, notice }: { to: string; notice: ProposalNotice })
     return;
   }
   const resend = new Resend(getResendApiKey());
-  const { subject, html } = buildProposalEmail(notice);
+  const { subject, html } = buildProposalEmail(notice, { appUrl: getAppUrl() });
   await resend.emails.send({ from: getResendFromEmail(), to, subject, html });
 }
 
@@ -131,12 +140,6 @@ async function sendWhatsApp({
 
 // ─── Guarantee document review ────────────────────────────────────────────────
 
-const DOCUMENT_LABEL_PT: Record<"rentalContract" | "inspection" | "policy", string> = {
-  rentalContract: "Contrato de locação assinado",
-  inspection: "Vistoria",
-  policy: "Apólice",
-};
-
 /**
  * Tells the agency a document attached to one of its guarantees was rejected,
  * with the reviewer's reason, so it can upload a corrected file. Skips when
@@ -156,27 +159,16 @@ export const sendDocumentRejectedEmail = internalAction({
       return;
     }
     const resend = new Resend(getResendApiKey());
-    const guaranteeLink = `${getAppUrl()}/guarantees/${encodeURIComponent(args.guaranteePublicId)}`;
-    const label = DOCUMENT_LABEL_PT[args.documentKey];
+    const { subject, html } = buildDocumentRejectedEmail(
+      {
+        guaranteePublicId: args.guaranteePublicId,
+        documentKey: args.documentKey,
+        rejectionReason: args.rejectionReason,
+      },
+      { appUrl: getAppUrl() },
+    );
     try {
-      await resend.emails.send({
-        from: getResendFromEmail(),
-        to: args.to,
-        subject: `Documento recusado — garantia ${args.guaranteePublicId}`,
-        html: `<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><title>Documento recusado — MUTAV</title></head>
-<body style="margin:0;padding:24px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1a1a1a;">
-  <p style="font-size:15px;font-weight:700;letter-spacing:0.1em;">MUTAV</p>
-  <p>O documento <strong>${escapeHtml(label)}</strong> enviado para a garantia
-  <strong>${escapeHtml(args.guaranteePublicId)}</strong> foi recusado pela equipe Mutav.</p>
-  <p><strong>Motivo:</strong> ${escapeHtml(args.rejectionReason)}</p>
-  <p>Envie um novo arquivo pela página da garantia:
-  <a href="${escapeHtml(guaranteeLink)}">${escapeHtml(guaranteeLink)}</a></p>
-  <p style="font-size:12px;color:#9e9c98;">Este é um e-mail automático, não responda diretamente a esta mensagem.</p>
-</body>
-</html>`,
-      });
+      await resend.emails.send({ from: getResendFromEmail(), to: args.to, subject, html });
     } catch (error) {
       logError("[notifications] document rejection email failed", { reason: error });
     }

@@ -3,8 +3,9 @@
     "toAdmin": "Console da equipe"
   },
   "meta": {
-    "title": "Mutav — Sistema de Garantia Registrada",
-    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
+    "title": "MUTAV — Garantia locatícia",
+    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain.",
+    "descriptor": "Garantia locatícia"
   },
   "paymentStatus": {
     "pending": "Pendente",
@@ -36,7 +37,7 @@
   },
   "commission": {
     "meta": {
-      "title": "Comissão — MUTAV",
+      "title": "Comissão · MUTAV",
       "description": "Acompanhe o saldo de comissão mensal e o histórico de garantias ativas."
     },
     "heading": "Comissão",
@@ -69,7 +70,7 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Acionamentos — MUTAV",
+      "title": "Acionamentos · MUTAV",
       "description": "Acompanhe os aluguéis em atraso e os pedidos de cobertura das garantias da sua imobiliária."
     },
     "heading": "Acionamentos",
@@ -343,7 +344,6 @@
     }
   },
   "nav": {
-    "brandEyebrow": "MUTAV Garantias",
     "roadmapBadge": "em breve",
     "main": {
       "createGuarantee": "Criar Garantia",
@@ -411,8 +411,8 @@
     },
     "overdueInvoices": {
       "label": "Faturas em atraso",
-      "footerNone": "Todas as faturas Mutav estão em dia",
-      "footerSome": "{count, plural, one {# fatura Mutav em atraso} other {# faturas Mutav em atraso}}"
+      "footerNone": "Todas as faturas MUTAV estão em dia",
+      "footerSome": "{count, plural, one {# fatura MUTAV em atraso} other {# faturas MUTAV em atraso}}"
     }
   },
   "dataTable": {
@@ -663,8 +663,8 @@
         "exitCostCap": "Limite do custo de saída"
       },
       "plan": {
-        "basic": "Mutav Fiança",
-        "plus": "Mutav Fiança +"
+        "basic": "MUTAV Fiança",
+        "plus": "MUTAV Fiança +"
       }
     },
     "documents": {
@@ -675,11 +675,11 @@
       "chooseFile": "Escolher arquivo para {document}",
       "loading": "Carregando…",
       "empty": "Nenhum arquivo enviado.",
-      "uploaded": "Documento enviado para análise da Mutav.",
-      "acceptedFormats": "PDF, JPG ou PNG, até 15 MB. Cada arquivo é analisado pela equipe Mutav.",
+      "uploaded": "Documento enviado para análise da MUTAV.",
+      "acceptedFormats": "PDF, JPG ou PNG, até 15 MB. Cada arquivo é analisado pela equipe MUTAV.",
       "closedGuarantee": "Garantia encerrada — não aceita novos documentos.",
       "uploadedBy": "Enviado por {name} em {date}",
-      "uploadedByMutav": "Mutav",
+      "uploadedByMutav": "MUTAV",
       "unknownUser": "usuário removido",
       "rejectionReason": "Motivo da recusa: {reason}",
       "labels": {
@@ -744,7 +744,7 @@
   },
   "guaranteeList": {
     "meta": {
-      "title": "Garantias | Mutav",
+      "title": "Garantias · MUTAV",
       "description": "Lista de garantias da imobiliária"
     },
     "heading": "Garantias",
@@ -806,7 +806,7 @@
   },
   "invoiceList": {
     "meta": {
-      "title": "Faturas | Mutav",
+      "title": "Faturas · MUTAV",
       "description": "Faturas mensais da imobiliária"
     },
     "heading": "Faturas",
@@ -853,8 +853,8 @@
     },
     "picker": {
       "meta": {
-        "title": "Pagar fatura {publicId} | Mutav",
-        "description": "Escolha como pagar sua fatura Mutav."
+        "title": "Pagar fatura {publicId} · MUTAV",
+        "description": "Escolha como pagar sua fatura MUTAV."
       },
       "heading": "Como você quer pagar?",
       "pix": {
@@ -875,13 +875,13 @@
     },
     "stellar": {
       "meta": {
-        "title": "Pagar com Stellar — {publicId} | Mutav",
-        "description": "Pague sua fatura Mutav via Stellar (XLM ou USDC)."
+        "title": "Pagar com Stellar — {publicId} · MUTAV",
+        "description": "Pague sua fatura MUTAV via Stellar (XLM ou USDC)."
       }
     },
     "anchortest": {
       "meta": {
-        "title": "AnchorTest — {publicId} | Mutav",
+        "title": "AnchorTest — {publicId} · MUTAV",
         "description": "Pague via interface da anchor (SEP-24 — demo)."
       },
       "orderId": "Pedido",
@@ -922,8 +922,8 @@
     },
     "pix": {
       "meta": {
-        "title": "Pagar com PIX — {publicId} | Mutav",
-        "description": "Pague sua fatura Mutav via PIX."
+        "title": "Pagar com PIX — {publicId} · MUTAV",
+        "description": "Pague sua fatura MUTAV via PIX."
       },
       "copyCode": "PIX copia e cola",
       "orderId": "Pedido",
@@ -969,8 +969,8 @@
     },
     "pago": {
       "meta": {
-        "title": "Pago — {publicId} | Mutav",
-        "description": "Comprovante de pagamento Mutav."
+        "title": "Pago — {publicId} · MUTAV",
+        "description": "Comprovante de pagamento MUTAV."
       },
       "badge": {
         "paid": "Pago",
@@ -993,7 +993,7 @@
   },
   "invoiceDetails": {
     "meta": {
-      "title": "Fatura {id} | Mutav",
+      "title": "Fatura {id} · MUTAV",
       "description": "Detalhes da fatura"
     },
     "breadcrumb": "Detalhes da Fatura",
@@ -1082,7 +1082,7 @@
   },
   "guaranteeNew": {
     "meta": {
-      "title": "Nova Garantia | Mutav"
+      "title": "Nova Garantia · MUTAV"
     },
     "heading": "Nova Garantia",
     "subheading": "Preencha os dados para criar uma nova garantia",
@@ -1150,8 +1150,8 @@
       "exitCoverage": "Cobertura de saída",
       "feeRate": "Taxa mensal",
       "planLabel": "Plano de Cobertura",
-      "planBasic": "Mutav Fiança",
-      "planPlus": "Mutav Fiança +",
+      "planBasic": "MUTAV Fiança",
+      "planPlus": "MUTAV Fiança +",
       "rentCoverageFull": "Cobertura de aluguel Completa",
       "rentCoverageIncludes": "Incluso água, luz, condomínio, IPTU e taxa de lixo",
       "prestamistaLabel": "Seguro Prestamista",
@@ -1198,7 +1198,7 @@
         "INVALID_TAX_ID": "Documento do inquilino inválido (CPF/CNPJ). Verifique o número e tente novamente.",
         "INVALID_RENT": "Valores inválidos. O aluguel deve ser maior que zero.",
         "CREDIT_ASSESSMENT_REQUIRED": "A análise de crédito deste inquilino expirou. Refaça a consulta antes de criar a garantia.",
-        "PRODUCT_UNAVAILABLE": "Nenhum produto de garantia disponível para esta imobiliária. Fale com a Mutav."
+        "PRODUCT_UNAVAILABLE": "Nenhum produto de garantia disponível para esta imobiliária. Fale com a MUTAV."
       },
       "missingFields": "Preencha todos os campos obrigatórios antes de confirmar.",
       "editBlock": "Editar dados",
@@ -1244,12 +1244,12 @@
   "paymentFlow": {
     "meta": {
       "title": "Pagar com Stellar — {publicId}",
-      "description": "Pague a fatura Mutav via rede Stellar."
+      "description": "Pague a fatura MUTAV via rede Stellar."
     },
     "shell": {
       "brand": "mutav",
       "paymentLabel": "Fatura",
-      "footerBrand": "Mutav · Protocolo de Garantia de Aluguel"
+      "footerBrand": "MUTAV · Garantia locatícia"
     },
     "summary": {
       "dueLabel": "Vence em",
@@ -1296,8 +1296,14 @@
       "warningTitle": "Atenção para imobiliárias:",
       "warningBody": "o cadastro precisa ser feito pelo sócio com participação igual ou superior a 25%, ou por um administrador com poderes para abrir contas em nome da empresa. Tenha o contrato social em mãos para comprovar.",
       "checklistTitle": "O que você vai precisar",
+      "typeQuestion": "Como você atua?",
+      "proofPoints": {
+        "onchainReserve": "Reserva de garantia auditável onchain.",
+        "noGuarantor": "Locação sem fiador para os seus clientes."
+      },
       "autonomo": {
         "title": "Corretor autônomo",
+        "description": "Você atua com CRECI de pessoa física.",
         "items": [
           {
             "label": "CPF"
@@ -1316,6 +1322,7 @@
       },
       "empresa": {
         "title": "Imobiliária",
+        "description": "Cadastro da empresa, com CNPJ e CRECI jurídico.",
         "items": [
           {
             "label": "CNPJ"
@@ -1380,7 +1387,7 @@
       "title": "Cadastro em análise",
       "subtitle": "Nossa equipe está analisando suas informações. Você receberá um e-mail com o resultado em até 2 dias úteis.",
       "stateSubmitted": "Enviado — aguardando análise",
-      "stateUnderReview": "Em análise pela equipe Mutav",
+      "stateUnderReview": "Em análise pela equipe MUTAV",
       "backLabel": "Tem dúvidas?",
       "backLink": "Fale conosco",
       "homeButton": "Voltar"
@@ -1499,7 +1506,7 @@
       "REPRESENTANTE_NAME_REQUIRED": "Nome do responsável obrigatório para imobiliária.",
       "REPRESENTANTE_CPF_REQUIRED": "CPF do responsável obrigatório para imobiliária.",
       "REPRESENTANTE_CPF_INVALID": "CPF do responsável inválido.",
-      "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na Mutav.",
+      "ALREADY_REGISTERED": "Este CNPJ ou CPF já está cadastrado na MUTAV.",
       "AGENCY_TYPE_CONFLICT": "Você já tem um cadastro em andamento com outro tipo. Conclua ou entre em contato com o suporte: contato@mutav.finance.",
       "INCOMPLETE_PROFILE": "Dados do perfil incompletos. Volte ao passo 1 e preencha todos os campos.",
       "AGENCY_TYPE_REQUIRED": "Selecione o tipo de cadastro para continuar.",
@@ -1544,7 +1551,7 @@
         "cnpj": "CNPJ inválido.",
         "representanteName": "Nome do responsável obrigatório.",
         "representanteCpf": "CPF do responsável inválido.",
-        "alreadyRegistered": "Já cadastrado na Mutav."
+        "alreadyRegistered": "Já cadastrado na MUTAV."
       },
       "backButton": "Voltar"
     }
@@ -1552,7 +1559,7 @@
   "transparency": {
     "meta": {
       "title": "Transparência",
-      "description": "Posição de risco e treasury onchain da Mutav."
+      "description": "Posição de risco e treasury onchain da MUTAV."
     },
     "heading": "Transparência",
     "subheading": "Transparência da posição de risco e treasury onchain.",
@@ -1634,7 +1641,7 @@
   },
   "members": {
     "meta": {
-      "title": "Membros — MUTAV",
+      "title": "Membros · MUTAV",
       "description": "Gerencie quem tem acesso à sua imobiliária e o papel de cada pessoa."
     },
     "heading": "Membros",

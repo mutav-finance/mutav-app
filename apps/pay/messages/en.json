@@ -1,7 +1,8 @@
 {
   "meta": {
-    "title": "Mutav — Registered Guarantee System",
-    "description": "Dashboard for managing rental guarantees registered onchain."
+    "title": "MUTAV — Rental guarantee",
+    "description": "Dashboard for managing rental guarantees registered onchain.",
+    "descriptor": "Rental guarantee"
   },
   "common": {
     "a11y": {
@@ -24,8 +25,8 @@
     },
     "picker": {
       "meta": {
-        "title": "Pay invoice {publicId} | Mutav",
-        "description": "Choose how to pay your Mutav invoice."
+        "title": "Pay invoice {publicId} · MUTAV",
+        "description": "Choose how to pay your MUTAV invoice."
       },
       "heading": "How do you want to pay?",
       "pix": {
@@ -46,13 +47,13 @@
     },
     "stellar": {
       "meta": {
-        "title": "Pay with Stellar — {publicId} | Mutav",
-        "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
+        "title": "Pay with Stellar — {publicId} · MUTAV",
+        "description": "Pay your MUTAV invoice via Stellar (XLM or USDC)."
       }
     },
     "anchortest": {
       "meta": {
-        "title": "AnchorTest — {publicId} | Mutav",
+        "title": "AnchorTest — {publicId} · MUTAV",
         "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
       },
       "orderId": "Order",
@@ -94,8 +95,8 @@
     },
     "pix": {
       "meta": {
-        "title": "Pay with PIX — {publicId} | Mutav",
-        "description": "Pay your Mutav invoice via PIX."
+        "title": "Pay with PIX — {publicId} · MUTAV",
+        "description": "Pay your MUTAV invoice via PIX."
       },
       "copyCode": "PIX copy & paste",
       "orderId": "Order",
@@ -143,8 +144,8 @@
     },
     "pago": {
       "meta": {
-        "title": "Paid — {publicId} | Mutav",
-        "description": "Mutav payment receipt."
+        "title": "Paid — {publicId} · MUTAV",
+        "description": "MUTAV payment receipt."
       },
       "badge": {
         "paid": "Paid",
@@ -167,7 +168,7 @@
   },
   "paymentDetails": {
     "meta": {
-      "title": "Invoice {id} | Mutav",
+      "title": "Invoice {id} · MUTAV",
       "description": "Invoice details"
     },
     "breadcrumb": "Invoice Details",
@@ -245,11 +246,11 @@
   "paymentFlow": {
     "meta": {
       "title": "Pay with Stellar — {publicId}",
-      "description": "Pay your Mutav invoice via the Stellar network."
+      "description": "Pay your MUTAV invoice via the Stellar network."
     },
     "shell": {
       "paymentLabel": "Invoice",
-      "footerBrand": "Mutav · Rental Guarantee Protocol"
+      "footerBrand": "MUTAV · Rental guarantee"
     },
     "summary": {
       "dueLabel": "Due",

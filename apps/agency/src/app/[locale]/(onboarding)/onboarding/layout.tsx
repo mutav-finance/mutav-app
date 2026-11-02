@@ -13,7 +13,7 @@ export default async function OnboardingLayout({ children }: { children: React.R
   return (
     <FlowShell
       brand={
-        <Link href="/onboarding" aria-label="MUTAV">
+        <Link href="/onboarding">
           <Wordmark size="sm" />
         </Link>
       }
