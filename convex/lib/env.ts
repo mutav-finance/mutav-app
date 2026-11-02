@@ -72,11 +72,6 @@ export function getResendApiKey(): string {
   return key;
 }
 
-/** Delivery guard for best-effort email actions: false in local dev without secrets. */
-export function isResendConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY);
-}
-
 /** Email sends only when both the Resend key and the sender address are set. */
 export function isEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);

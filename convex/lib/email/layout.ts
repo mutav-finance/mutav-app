@@ -25,8 +25,7 @@ const COLOR = {
   rule: "#d9d7d2",
 } as const;
 
-const FONT_STACK =
-  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const FONT_STACK = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 export type EmailCta = { label: string; url: string };
 

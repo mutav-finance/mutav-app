@@ -11,7 +11,7 @@ import {
 } from "./machine";
 
 describe("CLOSE_REASON constants", () => {
-  test("exposes all seven close reasons", () => {
+  test("exposes all eight close reasons", () => {
     expect(CLOSE_REASONS).toEqual([
       "end_of_lease",
       "rescission",
@@ -19,6 +19,7 @@ describe("CLOSE_REASON constants", () => {
       "eviction",
       "dispute_reversal",
       "canceled_pre_activation",
+      "underwriting_refused",
       "death",
     ]);
   });
@@ -30,6 +31,7 @@ describe("CLOSE_REASON constants", () => {
     expect(CLOSE_REASON.EVICTION).toBe("eviction");
     expect(CLOSE_REASON.DISPUTE_REVERSAL).toBe("dispute_reversal");
     expect(CLOSE_REASON.CANCELED_PRE_ACTIVATION).toBe("canceled_pre_activation");
+    expect(CLOSE_REASON.UNDERWRITING_REFUSED).toBe("underwriting_refused");
     expect(CLOSE_REASON.DEATH).toBe("death");
   });
 
@@ -41,6 +43,7 @@ describe("CLOSE_REASON constants", () => {
 describe("assertClose — full (from, reason) matrix", () => {
   const allowedPairs: Array<[GuaranteeState, CloseReason]> = [
     ["drafted", "canceled_pre_activation"],
+    ["drafted", "underwriting_refused"],
 
     ["active", "end_of_lease"],
     ["active", "rescission"],
@@ -82,19 +85,24 @@ describe("assertClose — full (from, reason) matrix", () => {
     ["active", "eviction", "REASON_NOT_ALLOWED_FROM_STATE"],
     ["active", "dispute_reversal", "REASON_NOT_ALLOWED_FROM_STATE"],
     ["active", "canceled_pre_activation", "REASON_NOT_ALLOWED_FROM_STATE"],
+    ["active", "underwriting_refused", "REASON_NOT_ALLOWED_FROM_STATE"],
 
     ["in_arrears", "eviction", "REASON_NOT_ALLOWED_FROM_STATE"],
     ["in_arrears", "dispute_reversal", "REASON_NOT_ALLOWED_FROM_STATE"],
     ["in_arrears", "canceled_pre_activation", "REASON_NOT_ALLOWED_FROM_STATE"],
+    ["in_arrears", "underwriting_refused", "REASON_NOT_ALLOWED_FROM_STATE"],
 
     ["default_verified", "eviction", "REASON_NOT_ALLOWED_FROM_STATE"],
     ["default_verified", "canceled_pre_activation", "REASON_NOT_ALLOWED_FROM_STATE"],
+    ["default_verified", "underwriting_refused", "REASON_NOT_ALLOWED_FROM_STATE"],
 
     ["cover_committed", "eviction", "REASON_NOT_ALLOWED_FROM_STATE"],
     ["cover_committed", "canceled_pre_activation", "REASON_NOT_ALLOWED_FROM_STATE"],
+    ["cover_committed", "underwriting_refused", "REASON_NOT_ALLOWED_FROM_STATE"],
 
     ["in_eviction", "dispute_reversal", "REASON_NOT_ALLOWED_FROM_STATE"],
     ["in_eviction", "canceled_pre_activation", "REASON_NOT_ALLOWED_FROM_STATE"],
+    ["in_eviction", "underwriting_refused", "REASON_NOT_ALLOWED_FROM_STATE"],
   ];
 
   test.each(allowedPairs)("close from %s with reason %s is allowed", (from, reason) => {

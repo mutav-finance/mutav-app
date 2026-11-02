@@ -33,6 +33,9 @@ export const LEGAL_BASIS = { ART_7_X: "art7_x" } as const satisfies Record<strin
 export const legalBasisValidator = v.union(v.literal(LEGAL_BASIS.ART_7_X));
 
 export const POLICY_VERSION = { CREDIT_ANALYSIS: "credit_analysis_v1" } as const;
+
+/** Provider name of the synthetic-score provider. A score from it is not a bureau verdict. */
+export const MOCK_CREDIT_PROVIDER = "mock";
 export const DEFAULT_CREDIT_SCALE = 1000;
 
 export type SignalStatus = "ok" | "error";

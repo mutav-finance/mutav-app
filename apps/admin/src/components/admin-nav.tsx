@@ -21,6 +21,7 @@ export function AdminNav() {
     { title: tMain("overview"), href: "/", icon: <LayoutDashboardIcon /> },
     { title: tMain("agencies"), href: "/agencies", icon: <BuildingIcon /> },
     { title: tMain("compliance"), href: "/compliance", icon: <ShieldCheckIcon /> },
+    { title: tMain("underwriting"), href: "/underwriting", icon: <FileCheckIcon /> },
     { title: tMain("defaults"), href: "/defaults", icon: <AlertOctagonIcon /> },
     { title: tMain("documents"), href: "/documents", icon: <FileCheckIcon /> },
     { title: tMain("treasury"), href: "/treasury", icon: <CoinsIcon /> },

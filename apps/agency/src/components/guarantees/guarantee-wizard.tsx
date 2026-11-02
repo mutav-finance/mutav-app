@@ -93,7 +93,11 @@ export function GuaranteeWizard() {
       )}
 
       {state.step === 5 && state.publicId && (
-        <WizardStep5 publicId={state.publicId} onReset={() => dispatch({ type: "RESET" })} />
+        <WizardStep5
+          publicId={state.publicId}
+          agencyId={agencyId}
+          onReset={() => dispatch({ type: "RESET" })}
+        />
       )}
     </div>
   );

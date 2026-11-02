@@ -1,9 +1,11 @@
 /**
- * Tenant-facing proposal notices, sent once when an agency registers a
- * guarantee. Informational only: the agency collects the signed contract
- * offline, uploads it and activates the guarantee, so there is no step the
- * tenant takes in the app — and no link, since every guarantee page lives in
- * the login-gated agency app. A tenant-facing page arrives with #57.
+ * Tenant-facing proposal notices, sent once, when MUTAV has accepted the draft
+ * and the contract is sent for signature (`markSentForSignature`) — never at
+ * draft creation, when nothing has been decided yet. Informational only: the
+ * guarantee becomes active when its on-chain registration is confirmed (ADR
+ * 0010), so there is no step the tenant takes in the app — and no link, since
+ * every guarantee page lives in the login-gated agency app. A tenant-facing
+ * page arrives with #57.
  *
  * Pure builders (no `"use node"`) so the copy is testable outside the action.
  */

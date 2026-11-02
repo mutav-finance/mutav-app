@@ -9,6 +9,7 @@ import {
   getResendFromEmail,
   getWhatsAppApiUrl,
   getWhatsAppApiKey,
+  isEmailConfigured,
 } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
 import {
@@ -17,6 +18,66 @@ import {
   buildProposalWhatsApp,
   type ProposalNotice,
 } from "./notifications";
+import { escapeHtml } from "../lib/email/escape";
+import { EMAIL_PARAGRAPH_STYLE, renderEmailButton, renderEmailLayout } from "../lib/email/layout";
+
+// ─── Review decision → agency ─────────────────────────────────────────────────
+
+const BASIS_POINTS_PER_PERCENT = 100;
+
+/**
+ * Tells the agency Mutav decided its draft. Scheduled by `acceptAnalysis` /
+ * `refuseAnalysis` after the decision is committed, so a delivery failure
+ * never rolls the decision back. Skipped, with a warning, when Resend is not
+ * configured (`isEmailConfigured`). The email carries no score and no tenant identity — only the
+ * guarantee id, the outcome and what the agency needs to act on it.
+ */
+export const sendReviewDecisionNotification = internalAction({
+  args: {
+    publicId: v.string(),
+    recipients: v.array(v.string()),
+    decision: v.union(
+      v.object({ outcome: v.literal("accepted"), feeRateBps: v.number() }),
+      v.object({ outcome: v.literal("refused"), reason: v.string() }),
+    ),
+  },
+  handler: async (_ctx, args) => {
+    if (!isEmailConfigured()) {
+      logWarn("[notifications] email not configured, skipping review decision email");
+      return;
+    }
+    if (args.recipients.length === 0) {
+      logWarn("[notifications] review decision has no recipient", { publicId: args.publicId });
+      return;
+    }
+    const link = `${getAppUrl()}/guarantees/${args.publicId}`;
+    const accepted = args.decision.outcome === "accepted";
+    const subject = accepted
+      ? `Análise MUTAV aprovada — garantia ${args.publicId}`
+      : `Análise MUTAV recusada — garantia ${args.publicId}`;
+    const body =
+      args.decision.outcome === "accepted"
+        ? `<p style="${EMAIL_PARAGRAPH_STYLE}">A MUTAV aprovou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong> com taxa de ${(args.decision.feeRateBps / BASIS_POINTS_PER_PERCENT).toFixed(2)}% do aluguel.</p><p style="${EMAIL_PARAGRAPH_STYLE}">O próximo passo é o envio do contrato ao inquilino para assinatura.</p>`
+        : `<p style="${EMAIL_PARAGRAPH_STYLE}">A MUTAV recusou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong>.</p><p style="${EMAIL_PARAGRAPH_STYLE}">Motivo: ${escapeHtml(args.decision.reason)}</p><p style="${EMAIL_PARAGRAPH_STYLE}">A proposta foi encerrada. Você pode iniciar uma nova proposta a qualquer momento.</p>`;
+    const html = renderEmailLayout({
+      appUrl: getAppUrl(),
+      title: subject,
+      preheader: subject,
+      bodyHtml: `${body}${renderEmailButton({ label: "Ver garantia", url: link })}`,
+      reason: "a sua imobiliária pediu uma análise de garantia à MUTAV.",
+    });
+    try {
+      await new Resend(getResendApiKey()).emails.send({
+        from: getResendFromEmail(),
+        to: args.recipients,
+        subject,
+        html,
+      });
+    } catch (error) {
+      logError("[notifications] review decision email rejected", { reason: error });
+    }
+  },
+});
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
@@ -46,8 +107,8 @@ export const sendProposalNotifications = internalAction({
 });
 
 async function sendEmail({ to, notice }: { to: string; notice: ProposalNotice }): Promise<void> {
-  if (!process.env.RESEND_API_KEY) {
-    logWarn("[notifications] RESEND_API_KEY not set, skipping email");
+  if (!isEmailConfigured()) {
+    logWarn("[notifications] email not configured, skipping proposal email");
     return;
   }
   const resend = new Resend(getResendApiKey());
@@ -93,8 +154,8 @@ export const sendDocumentRejectedEmail = internalAction({
     rejectionReason: v.string(),
   },
   handler: async (_ctx, args) => {
-    if (!process.env.RESEND_API_KEY) {
-      logWarn("[notifications] RESEND_API_KEY not set, skipping document rejection email");
+    if (!isEmailConfigured()) {
+      logWarn("[notifications] email not configured, skipping document rejection email");
       return;
     }
     const resend = new Resend(getResendApiKey());

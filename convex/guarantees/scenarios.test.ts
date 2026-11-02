@@ -80,6 +80,7 @@ const BASIC_BOM_TERMS: GuaranteeTerms = {
   exitCostMultiplier: 6,
   coverageCeilingCents: 3_000_000,
   exitCostCapCents: 600_000,
+  feeRateBps: 900,
   appliedAt: AT,
 };
 
@@ -113,6 +114,7 @@ const ALL_CLOSE_REASONS = [
   "eviction",
   "dispute_reversal",
   "canceled_pre_activation",
+  "underwriting_refused",
   "death",
 ] as const;
 
@@ -211,7 +213,7 @@ function guaranteeDoc(spec: RawGuaranteeSpec): NewGuarantee {
     ...(spec.closure ? { closure: spec.closure } : {}),
     activatedAt: spec.activatedAt ?? null,
     nextRenewalDate: spec.nextRenewalDate ?? "2026-12-31",
-    underwriting: spec.underwriting ?? { score: 750, tier: "bom" },
+    underwriting: spec.underwriting ?? { score: 750, tier: "bom", review: "editing" },
     tenantApproval: spec.tenantApproval ?? { status: "pendente", termApprovedAt: null },
     terms: spec.terms ?? { ...BASIC_BOM_TERMS },
     capacity: spec.capacity ?? { ...FULL_CAPACITY },
@@ -474,7 +476,7 @@ describe("schema conformance — strict harness", () => {
       expect(declared).toEqual([...GUARANTEE_STATES]);
     });
 
-    test("declares the seven close reasons in lockstep with CLOSE_REASONS", () => {
+    test("declares the eight close reasons in lockstep with CLOSE_REASONS", () => {
       const declared = schema.tables.guarantees.validator.fields.closure.fields.reason.members.map(
         (m) => m.value,
       );
@@ -486,12 +488,13 @@ describe("schema conformance — strict harness", () => {
         "eviction",
         "dispute_reversal",
         "canceled_pre_activation",
+        "underwriting_refused",
         "death",
       ]);
       expect(declared).toEqual([...CLOSE_REASONS]);
     });
 
-    test("declares exactly the six guarantee indexes with their field lists", () => {
+    test("declares exactly the seven guarantee indexes with their field lists", () => {
       const indexes = schema.tables.guarantees[" indexes"]();
 
       expect(indexes).toEqual([
@@ -504,6 +507,10 @@ describe("schema conformance — strict harness", () => {
         },
         { indexDescriptor: "by_lease", fields: ["leaseId"] },
         { indexDescriptor: "by_product", fields: ["productId"] },
+        {
+          indexDescriptor: "by_review_status_requestedAt",
+          fields: ["underwriting.review", "status", "underwriting.analysisRequest.requestedAt"],
+        },
       ]);
     });
 
@@ -589,8 +596,8 @@ describe("schema conformance — strict harness", () => {
         const agencyId = await seedAgency(t, "Agency A", "00000000000101");
         const productId = await seedDefaultProduct(t);
 
-        // A denied tenant never prices, so `negado` only ever lands on a row
-        // that was canceled before activation.
+        // `negado` lands on a row like any other tier; this one exercises it on
+        // a draft canceled before activation.
         const denied = tier === "negado";
         const underwriting = await t.run(async (ctx) => {
           const tenantId = await insertTenantRow(ctx);
@@ -608,12 +615,16 @@ describe("schema conformance — strict harness", () => {
             ...(denied
               ? { closure: { reason: "canceled_pre_activation" as const, closedAt: CLOSED_AT } }
               : {}),
-            underwriting: { score: denied ? 300 : 750, tier },
+            underwriting: { score: denied ? 300 : 750, tier, review: "editing" as const },
           });
           return (await getGuarantee(ctx, guaranteeId)).underwriting;
         });
 
-        expect(underwriting).toEqual({ score: denied ? 300 : 750, tier });
+        expect(underwriting).toEqual({
+          score: denied ? 300 : 750,
+          tier,
+          review: "editing" as const,
+        });
       },
     );
 
@@ -722,7 +733,7 @@ describe("schema conformance — strict harness", () => {
           productId,
           publicId: "U1",
           status: "drafted",
-          underwriting: { score: 650, tier: "regular", assessmentId },
+          underwriting: { score: 650, tier: "regular", assessmentId, review: "editing" },
         });
         const withoutIdRow = await insertGuaranteeRow(ctx, {
           agencyId,
@@ -738,8 +749,8 @@ describe("schema conformance — strict harness", () => {
         };
       });
 
-      expect(withId).toEqual({ score: 650, tier: "regular", assessmentId });
-      expect(withoutId).toEqual({ score: 750, tier: "bom" });
+      expect(withId).toEqual({ score: 650, tier: "regular", assessmentId, review: "editing" });
+      expect(withoutId).toEqual({ score: 750, tier: "bom", review: "editing" });
     });
   });
 
@@ -863,7 +874,7 @@ describe("schema conformance — strict harness", () => {
       {
         table: "guarantees",
         label: "guarantees.underwriting.tier excelente",
-        overrides: { underwriting: { score: 900, tier: "excelente" } },
+        overrides: { underwriting: { score: 900, tier: "excelente", review: "editing" } },
       },
       { table: "leases", label: "leases.payer landlord", overrides: { payer: "landlord" } },
       {
@@ -996,10 +1007,11 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       exitCostMultiplier: 6,
       coverageCeilingCents: 3_000_000,
       exitCostCapCents: 600_000,
+      feeRateBps: 900,
       appliedAt: "2026-01-01T00:00:00.000Z",
     });
     expect(row.productId).toBe(productId);
-    expect(row.underwriting).toEqual({ score: 750, tier: "bom" });
+    expect(row.underwriting).toEqual({ score: 750, tier: "bom", review: "editing" });
     expect(row.status).toBe("drafted");
     expect(row.activatedAt).toBe(null);
     expect(row.nextRenewalDate).toBe("2026-12-31");
@@ -1052,6 +1064,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       exitCostMultiplier: 6,
       coverageCeilingCents: 7_500_000,
       exitCostCapCents: 1_500_000,
+      feeRateBps: 1_500,
       appliedAt: "2026-01-01T00:00:00.000Z",
     });
     expect(row.capacity).toEqual({
@@ -1059,7 +1072,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       availableCents: 7_500_000,
       reservedCents: 0,
     });
-    expect(row.underwriting).toEqual({ score: 750, tier: "ruim" });
+    expect(row.underwriting).toEqual({ score: 750, tier: "ruim", review: "editing" });
   });
 
   test("persists regular and ruim underwriting with their own priced ceilings and keeps assessmentId across a patch", async () => {
@@ -1092,7 +1105,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
         },
       );
       await ctx.db.patch(regular.guaranteeId, {
-        underwriting: { score: 650, tier: "regular", assessmentId },
+        underwriting: { score: 650, tier: "regular", assessmentId, review: "editing" },
       });
       const { guard } = await transitionRow(ctx, regular.guaranteeId, "active", {
         activatedAt: "2026-02-01T00:00:00.000Z",
@@ -1106,7 +1119,12 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
     });
 
     expect(regularRow.status).toBe("active");
-    expect(regularRow.underwriting).toEqual({ score: 650, tier: "regular", assessmentId });
+    expect(regularRow.underwriting).toEqual({
+      score: 650,
+      tier: "regular",
+      assessmentId,
+      review: "editing",
+    });
     expect(regularRow.terms.taxaFeeCents).toBe(24_000);
     expect(regularRow.terms.feeCents).toBe(24_000);
     expect(regularRow.terms.coverageCeilingCents).toBe(6_000_000);
@@ -1117,7 +1135,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       reservedCents: 0,
     });
 
-    expect(ruimRow.underwriting).toEqual({ score: 750, tier: "ruim" });
+    expect(ruimRow.underwriting).toEqual({ score: 750, tier: "ruim", review: "editing" });
     expect(ruimRow.terms.taxaFeeCents).toBe(45_000);
     expect(ruimRow.terms.coverageCeilingCents).toBe(9_000_000);
     expect(ruimRow.terms.exitCostCapCents).toBe(1_800_000);
@@ -1330,6 +1348,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       exitCostMultiplier: 3,
       coverageCeilingCents: 2_400_000,
       exitCostCapCents: 300_000,
+      feeRateBps: 2_000,
       appliedAt: "2026-03-01T00:00:00.000Z",
     });
     expect(newRow.capacity.ceilingCents).toBe(2_400_000);
@@ -1409,6 +1428,7 @@ describe("pricing snapshot — terms and capacity as persisted", () => {
       exitCostMultiplier: 6,
       coverageCeilingCents: 3_600_000,
       exitCostCapCents: 720_000,
+      feeRateBps: 900,
       appliedAt: "2027-01-01T00:00:00.000Z",
     });
     expect(row.capacity).toEqual({
