@@ -32,12 +32,14 @@
       "overview": "Overview",
       "agencies": "Agencies",
       "compliance": "Compliance",
+      "underwriting": "Underwriting",
       "defaults": "Claims",
       "treasury": "Treasury",
       "observability": "Observability",
       "nav": "NAV",
       "staff": "Staff",
-      "documents": "Documents"
+      "documents": "Documents",
+      "guarantees": "Guarantees"
     }
   },
   "accessDenied": {
@@ -379,6 +381,170 @@
       }
     }
   },
+  "underwriting": {
+    "title": "Underwriting",
+    "subtitle": "Drafts whose agency asked MUTAV to analyse the tenant. Accept with a fee rate, or refuse with a reason.",
+    "notAvailable": "—",
+    "mockScore": "Mock score",
+    "daysWaiting": "{days, plural, =0 {today} one {# day} other {# days}}",
+    "queue": {
+      "heading": "Awaiting decision",
+      "empty": "No draft is waiting for MUTAV's analysis.",
+      "moreAvailable": "More requests are waiting beyond this page."
+    },
+    "dispatch": {
+      "heading": "Accepted — contract to send",
+      "subtitle": "Send the contract to the tenant, then mark it sent here.",
+      "empty": "No accepted draft is waiting for its contract."
+    },
+    "columns": {
+      "guarantee": "Guarantee",
+      "agency": "Agency",
+      "tenant": "Tenant",
+      "rent": "Rent",
+      "score": "Bureau score",
+      "bureau": "Bureau",
+      "waiting": "Waiting",
+      "actions": "Actions"
+    },
+    "tier": {
+      "bom": "Good",
+      "regular": "Fair",
+      "ruim": "Poor",
+      "negado": "Below catalog"
+    },
+    "reviewStatus": {
+      "editing": "Draft",
+      "analysis_requested": "Analysis requested",
+      "accepted": "Accepted",
+      "awaiting_signature": "Awaiting signature",
+      "signed": "Signed",
+      "awaiting_capacity": "Waiting for reserve capacity",
+      "refused": "Refused"
+    },
+    "guaranteeState": {
+      "drafted": "Drafted",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "signalStatus": {
+      "ok": "ok",
+      "error": "error"
+    },
+    "propertyKind": {
+      "residential": "Residential",
+      "commercial": "Commercial"
+    },
+    "plan": {
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
+    },
+    "actions": {
+      "open": "Open",
+      "accept": "Accept",
+      "refuse": "Refuse",
+      "markSent": "Send for signature",
+      "cancel": "Cancel",
+      "retry": "Try again",
+      "openGuarantee": "Open guarantee",
+      "resend": "Re-send for signature"
+    },
+    "detail": {
+      "title": "Guarantee {id}",
+      "back": "← Underwriting queue",
+      "notFound": "Guarantee not found",
+      "decision": "Decision",
+      "credit": "Credit analysis",
+      "tenant": "Tenant",
+      "lease": "Lease",
+      "terms": "Terms on the table",
+      "history": "History",
+      "signals": "Bureau signals",
+      "scoreIsInput": "The bureau score is an input to this decision, not the decision.",
+      "sendHint": "Sending checks the reserve's free capital and holds this offer's coverage for the hold period. There is no e-signature integration yet: send the contract to the tenant yourself.",
+      "fields": {
+        "name": "Name",
+        "taxId": "CPF / CNPJ",
+        "email": "Email",
+        "phone": "Phone",
+        "propertyKind": "Property",
+        "address": "Address",
+        "rent": "Rent",
+        "totalRent": "Rent + charges",
+        "requestedAt": "Requested on",
+        "staffRate": "Rate set by MUTAV",
+        "note": "Internal note",
+        "refusalReason": "Refusal reason",
+        "decidedBy": "Decided by",
+        "sentAt": "Contract sent on",
+        "provider": "Provider",
+        "assessedAt": "Assessed on",
+        "policyVersion": "Policy",
+        "product": "Product",
+        "plan": "Plan",
+        "feeRate": "Fee rate",
+        "fee": "Monthly fee",
+        "coverageCeiling": "Coverage ceiling",
+        "exitCostCap": "Exit-cost cap",
+        "activationFee": "Activation fee"
+      },
+      "resendHint": "The previous hold lapsed. Re-sending re-runs the reserve preflight and holds capital again."
+    },
+    "accept": {
+      "title": "Accept this contract?",
+      "description": "MUTAV takes this guarantee at the rate below. The terms are re-priced at that rate and the agency is notified.",
+      "rateLabel": "Fee rate (% of monthly rent)",
+      "rateHint": "Between {min}% and {max}%, up to two decimals.",
+      "noteLabel": "Internal note (optional)",
+      "notePlaceholder": "Not shown to the agency",
+      "confirm": "Accept"
+    },
+    "refuse": {
+      "title": "Refuse this contract?",
+      "description": "The draft is closed for good and the agency is notified with the reason. The agency may start a new proposal.",
+      "reasonLabel": "Reason (shown to the agency)",
+      "reasonPlaceholder": "Why MUTAV will not take this contract",
+      "confirm": "Refuse"
+    },
+    "toast": {
+      "accepted": "Contract accepted. The agency was notified.",
+      "refused": "Contract refused. The draft is closed.",
+      "sent": "Sent for signature. Reserve capital is held for this offer."
+    },
+    "errors": {
+      "NOT_FOUND": "That guarantee no longer exists.",
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures do not add up. Escalate before deciding.",
+      "INVALID_FEE_RATE": "The rate must be between 1% and 30%.",
+      "TEXT_TOO_LONG": "The text is too long.",
+      "REFUSAL_REASON_REQUIRED": "Enter the reason for the refusal.",
+      "PRODUCT_UNAVAILABLE": "No product can price this draft. Check the catalog.",
+      "REVIEW_SELF_TRANSITION": "This decision was already recorded.",
+      "REVIEW_TERMINAL": "The review is already finished for this draft.",
+      "REVIEW_ILLEGAL_TRANSITION": "That step is not available at the draft's current review stage. Reload the page.",
+      "SELF_TRANSITION": "The guarantee is already in that state.",
+      "TERMINAL_STATE": "The guarantee is closed.",
+      "ILLEGAL_TRANSITION": "The guarantee's lifecycle refuses this move.",
+      "REASON_NOT_ALLOWED_FROM_STATE": "This close reason is not allowed from the guarantee's state.",
+      "CLOSURE_REQUIRED": "Closing a guarantee needs a close reason.",
+      "CLOSURE_NOT_ALLOWED": "A close reason was supplied for a move that does not close the guarantee.",
+      "INVALID_HOLD_DAYS": "The hold period must be a whole number of days between 1 and 90.",
+      "INSUFFICIENT_FREE_CAPITAL": "The reserve's free capital, after required coverage and the offers already holding it, does not cover this offer. Nothing was sent.",
+      "TOO_MANY_OPEN_HOLDS": "Too many offers are holding reserve capital to check this one safely. Escalate.",
+      "OFFER_STILL_HELD": "This offer still holds reserve capital; re-send once the hold lapses.",
+      "RESERVE_BALANCE_UNAVAILABLE": "No recent reserve balance is available, so the offer cannot be checked. Nothing was sent.",
+      "FORBIDDEN": "Your staff role cannot perform this action.",
+      "unexpected": "Something went wrong. Please try again."
+    },
+    "send": {
+      "holdDaysLabel": "Hold period (days)",
+      "holdDaysPlaceholder": "Default"
+    }
+  },
   "shellSwitcher": {
     "backToAgency": "Back to agencies"
   },
@@ -523,7 +689,8 @@
     "actions": {
       "approve": "Approve",
       "reject": "Reject",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "openGuarantee": "Open guarantee"
     },
     "reject": {
       "title": "Reject document",
@@ -534,7 +701,10 @@
     "toast": {
       "approved": "Document approved.",
       "rejected": "Document rejected; the agency was notified.",
-      "uploaded": "Document attached and queued for review."
+      "uploaded": "Document attached and queued for review.",
+      "approvedAndSigned": "Signed contract approved. The guarantee could not be activated yet — open it to see why.",
+      "approvedAndActivated": "Signed contract approved. The reserve had room: the guarantee is active and the agency was notified.",
+      "approvedAndWaiting": "Signed contract approved. The guarantee is waiting for reserve capacity."
     },
     "errors": {
       "GUARANTEE_NOT_FOUND": "Guarantee not found.",
@@ -552,6 +722,178 @@
       "UPLOAD_FAILED": "The file could not be uploaded. Please try again.",
       "FORBIDDEN": "Your staff role cannot perform this action.",
       "unexpected": "Something went wrong. Please try again."
+    }
+  },
+  "staffGuarantees": {
+    "title": "Guarantees",
+    "subtitle": "Drafts on the road to activation. A guarantee becomes active when MUTAV approves its signed contract and the reserve has room for it — gated by required coverage. Nobody clicks Activate.",
+    "notAvailable": "—",
+    "moreAvailable": "More guarantees are waiting beyond this page.",
+    "tabs": {
+      "awaiting_capacity": "Waiting for reserve capacity",
+      "awaiting_signature": "Awaiting signature"
+    },
+    "empty": {
+      "awaiting_capacity": "No signed draft is waiting for reserve capacity.",
+      "awaiting_signature": "No contract is out for signature."
+    },
+    "columns": {
+      "guarantee": "Guarantee",
+      "agency": "Agency",
+      "tenant": "Tenant",
+      "rent": "Rent",
+      "rate": "Fee rate",
+      "review": "Review",
+      "signedContract": "Signed contract",
+      "actions": "Actions",
+      "reserve": "Reserve"
+    },
+    "reviewStatus": {
+      "editing": "Draft",
+      "analysis_requested": "Analysis requested",
+      "accepted": "Accepted",
+      "awaiting_signature": "Awaiting signature",
+      "signed": "Signed",
+      "awaiting_capacity": "Waiting for reserve capacity",
+      "refused": "Refused"
+    },
+    "signedContract": {
+      "approved": "Approved",
+      "pending_review": "Awaiting review",
+      "rejected": "Rejected",
+      "missing": "Not uploaded"
+    },
+    "guaranteeState": {
+      "drafted": "Drafted",
+      "active": "Active",
+      "in_arrears": "In arrears",
+      "default_verified": "Default verified",
+      "cover_committed": "Cover committed",
+      "in_eviction": "In eviction",
+      "closed": "Closed"
+    },
+    "propertyKind": {
+      "residential": "Residential",
+      "commercial": "Commercial"
+    },
+    "plan": {
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
+    },
+    "agencyInactive": "Agency not active",
+    "actions": {
+      "open": "Open",
+      "retry": "Try again",
+      "openUnderwriting": "Open underwriting case file",
+      "openGuarantee": "Open guarantee",
+      "retryActivation": "Retry activation"
+    },
+    "stepper": {
+      "progressLabel": "Road to activation",
+      "doneSuffix": " (done)",
+      "currentSuffix": " (current)",
+      "steps": {
+        "editing": "Draft",
+        "analysis_requested": "Analysis",
+        "accepted": "Accepted",
+        "awaiting_signature": "Out for signature",
+        "signed": "Signed",
+        "awaiting_capacity": "Waiting for reserve",
+        "active": "Active"
+      }
+    },
+    "detail": {
+      "title": "Guarantee {id}",
+      "back": "← Guarantees",
+      "notFound": "Guarantee not found",
+      "activation": "Activation",
+      "summary": "Summary",
+      "lease": "Lease",
+      "terms": "Terms",
+      "history": "History",
+      "blockedHeading": "This guarantee cannot be activated yet:",
+      "activatedOn": "Active since {date}",
+      "fields": {
+        "agency": "Agency",
+        "tenant": "Tenant",
+        "status": "Status",
+        "review": "Review",
+        "signedContract": "Signed contract",
+        "sentAt": "Contract sent on",
+        "propertyKind": "Property",
+        "address": "Address",
+        "rent": "Rent",
+        "totalRent": "Rent + charges",
+        "product": "Product",
+        "plan": "Plan",
+        "feeRate": "Fee rate",
+        "staffRate": "Rate set by MUTAV",
+        "fee": "Monthly fee",
+        "coverageCeiling": "Coverage ceiling",
+        "activationFee": "Activation fee"
+      }
+    },
+    "blockers": {
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "REVIEW_NOT_SIGNED": "The signed rental contract has not been approved yet — approve it once the contract is out for signature.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "No signed rental contract has been approved yet.",
+      "AGENCY_NOT_ACTIVE": "The agency's onboarding is not active."
+    },
+    "toast": {
+      "activated": "The guarantee is active and the agency was notified.",
+      "stillWaiting": "Still waiting for reserve capacity: {shortfall} short.",
+      "reserveUnavailable": "No recent reserve balance to check against. The guarantee keeps waiting."
+    },
+    "errors": {
+      "NOT_FOUND": "That guarantee no longer exists.",
+      "NOT_DRAFTED": "The guarantee is no longer a draft.",
+      "REVIEW_NOT_SIGNED": "The guarantee is not waiting for activation.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Approve the signed rental contract first.",
+      "AGENCY_NOT_ACTIVE": "The agency is not active; it cannot take a new guarantee.",
+      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures are inconsistent. Escalate before activating.",
+      "SELF_TRANSITION": "The guarantee is already in that state.",
+      "TERMINAL_STATE": "The guarantee is closed.",
+      "ILLEGAL_TRANSITION": "This guarantee cannot go active from its current state.",
+      "FORBIDDEN": "Retrying an activation needs the compliance role.",
+      "unexpected": "Something went wrong. Try again."
+    },
+    "activation": {
+      "explainer": "A guarantee goes active when the signed rental contract is approved and its required coverage (cover × c) fits the reserve's free capital. If it does not fit, it waits for reserve capacity and is retried whenever a new reserve balance arrives.",
+      "waitingHeading": "Waiting for reserve capacity",
+      "shortfall": "The reserve is {amount} short of this guarantee's required coverage.",
+      "reserveUnavailable": "No recent reserve balance was available, so capacity could not be checked.",
+      "waitingNextStep": "It is retried automatically with each new reserve balance. Retry now once the reserve has room, or cancel the draft.",
+      "retrying": "Checking the reserve…"
+    },
+    "capacity": {
+      "explainer": "The capacity check behind the latest activation attempt, gated by required coverage.",
+      "outcome": "Capacity check",
+      "outcomes": {
+        "passed": "Fits the reserve",
+        "insufficient_capacity": "Short of reserve capacity",
+        "reserve_unavailable": "Reserve balance unavailable"
+      },
+      "balance": "Reserve balance",
+      "requiredCoverage": "Required coverage (on-risk book)",
+      "activeHolds": "Held by other offers",
+      "freeCapital": "Free capital",
+      "ownRequirement": "This guarantee's required coverage",
+      "snapshotTakenAt": "Balance read at (BRT)",
+      "checkedAt": "Checked at (BRT)",
+      "shortfallTag": "Waiting for reserve capacity — {amount} short"
+    },
+    "offerHold": {
+      "label": "Offer hold",
+      "amount": "Capital held",
+      "period": "Hold period",
+      "periodValue": "{days} days, until {date}",
+      "lapsedHint": "The hold lapsed before the contract was signed. Re-send the offer from the underwriting case file — it re-runs the reserve preflight.",
+      "status": {
+        "none": "No hold",
+        "active": "Holding capital",
+        "lapsed": "Hold lapsed — re-send",
+        "released": "Released"
+      }
     }
   },
   "unavailable": {

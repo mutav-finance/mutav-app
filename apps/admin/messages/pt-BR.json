@@ -32,12 +32,14 @@
       "overview": "Visão geral",
       "agencies": "Imobiliárias",
       "compliance": "Compliance",
+      "underwriting": "Análise de crédito",
       "defaults": "Acionamentos",
       "treasury": "Tesouraria",
       "observability": "Observabilidade",
       "nav": "NAV",
       "staff": "Equipe",
-      "documents": "Documentos"
+      "documents": "Documentos",
+      "guarantees": "Garantias"
     }
   },
   "accessDenied": {
@@ -379,6 +381,170 @@
       }
     }
   },
+  "underwriting": {
+    "title": "Análise de crédito",
+    "subtitle": "Rascunhos cuja imobiliária pediu a análise da MUTAV. Aprove com uma taxa ou recuse com um motivo.",
+    "notAvailable": "—",
+    "mockScore": "Score simulado",
+    "daysWaiting": "{days, plural, =0 {hoje} one {# dia} other {# dias}}",
+    "queue": {
+      "heading": "Aguardando decisão",
+      "empty": "Nenhum rascunho aguardando a análise da MUTAV.",
+      "moreAvailable": "Há mais pedidos além desta página."
+    },
+    "dispatch": {
+      "heading": "Aprovadas — contrato a enviar",
+      "subtitle": "Envie o contrato ao inquilino e marque-o como enviado aqui.",
+      "empty": "Nenhum rascunho aprovado aguardando o contrato."
+    },
+    "columns": {
+      "guarantee": "Garantia",
+      "agency": "Imobiliária",
+      "tenant": "Inquilino",
+      "rent": "Aluguel",
+      "score": "Score do bureau",
+      "bureau": "Bureau",
+      "waiting": "Aguardando",
+      "actions": "Ações"
+    },
+    "tier": {
+      "bom": "Bom",
+      "regular": "Regular",
+      "ruim": "Ruim",
+      "negado": "Abaixo do catálogo"
+    },
+    "reviewStatus": {
+      "editing": "Rascunho",
+      "analysis_requested": "Análise solicitada",
+      "accepted": "Aprovada",
+      "awaiting_signature": "Aguardando assinatura",
+      "signed": "Assinada",
+      "awaiting_capacity": "Aguardando capacidade da reserva",
+      "refused": "Recusada"
+    },
+    "guaranteeState": {
+      "drafted": "Rascunho",
+      "active": "Ativa",
+      "in_arrears": "Em atraso",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura comprometida",
+      "in_eviction": "Em despejo",
+      "closed": "Encerrada"
+    },
+    "signalStatus": {
+      "ok": "ok",
+      "error": "erro"
+    },
+    "propertyKind": {
+      "residential": "Residencial",
+      "commercial": "Comercial"
+    },
+    "plan": {
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
+    },
+    "actions": {
+      "open": "Abrir",
+      "accept": "Aprovar",
+      "refuse": "Recusar",
+      "markSent": "Enviar para assinatura",
+      "cancel": "Cancelar",
+      "retry": "Tentar novamente",
+      "openGuarantee": "Abrir garantia",
+      "resend": "Reenviar para assinatura"
+    },
+    "detail": {
+      "title": "Garantia {id}",
+      "back": "← Fila de análise",
+      "notFound": "Garantia não encontrada",
+      "decision": "Decisão",
+      "credit": "Análise de crédito",
+      "tenant": "Inquilino",
+      "lease": "Locação",
+      "terms": "Condições propostas",
+      "history": "Histórico",
+      "signals": "Sinais do bureau",
+      "scoreIsInput": "O score do bureau é um insumo desta decisão, não a decisão.",
+      "sendHint": "O envio confere o capital livre da reserva e reserva a cobertura desta oferta pelo prazo definido. Ainda não há assinatura eletrônica: envie o contrato ao inquilino por conta própria.",
+      "fields": {
+        "name": "Nome",
+        "taxId": "CPF / CNPJ",
+        "email": "E-mail",
+        "phone": "Telefone",
+        "propertyKind": "Imóvel",
+        "address": "Endereço",
+        "rent": "Aluguel",
+        "totalRent": "Aluguel + encargos",
+        "requestedAt": "Solicitada em",
+        "staffRate": "Taxa definida pela MUTAV",
+        "note": "Nota interna",
+        "refusalReason": "Motivo da recusa",
+        "decidedBy": "Decidido por",
+        "sentAt": "Contrato enviado em",
+        "provider": "Provedor",
+        "assessedAt": "Avaliado em",
+        "policyVersion": "Política",
+        "product": "Produto",
+        "plan": "Plano",
+        "feeRate": "Taxa",
+        "fee": "Mensalidade",
+        "coverageCeiling": "Teto de cobertura",
+        "exitCostCap": "Teto de custo de saída",
+        "activationFee": "Taxa de ativação"
+      },
+      "resendHint": "A reserva anterior expirou. O reenvio refaz a checagem da reserva e reserva o capital de novo."
+    },
+    "accept": {
+      "title": "Aprovar este contrato?",
+      "description": "A MUTAV assume esta garantia com a taxa abaixo. As condições são reprecificadas com essa taxa e a imobiliária é avisada.",
+      "rateLabel": "Taxa (% do aluguel mensal)",
+      "rateHint": "Entre {min}% e {max}%, até duas casas decimais.",
+      "noteLabel": "Nota interna (opcional)",
+      "notePlaceholder": "Não é exibida à imobiliária",
+      "confirm": "Aprovar"
+    },
+    "refuse": {
+      "title": "Recusar este contrato?",
+      "description": "O rascunho é encerrado definitivamente e a imobiliária é avisada com o motivo. A imobiliária pode iniciar uma nova proposta.",
+      "reasonLabel": "Motivo (exibido à imobiliária)",
+      "reasonPlaceholder": "Por que a MUTAV não assume este contrato",
+      "confirm": "Recusar"
+    },
+    "toast": {
+      "accepted": "Contrato aprovado. A imobiliária foi avisada.",
+      "refused": "Contrato recusado. O rascunho foi encerrado.",
+      "sent": "Enviado para assinatura. O capital da reserva está reservado para esta oferta."
+    },
+    "errors": {
+      "NOT_FOUND": "Essa garantia não existe mais.",
+      "NOT_DRAFTED": "A garantia não é mais um rascunho.",
+      "CAPACITY_INVARIANT_BROKEN": "Os valores de cobertura da garantia não fecham. Escale antes de decidir.",
+      "INVALID_FEE_RATE": "A taxa deve ficar entre 1% e 30%.",
+      "TEXT_TOO_LONG": "O texto é longo demais.",
+      "REFUSAL_REASON_REQUIRED": "Informe o motivo da recusa.",
+      "PRODUCT_UNAVAILABLE": "Nenhum produto consegue precificar este rascunho. Verifique o catálogo.",
+      "REVIEW_SELF_TRANSITION": "Esta decisão já foi registrada.",
+      "REVIEW_TERMINAL": "A análise deste rascunho já terminou.",
+      "REVIEW_ILLEGAL_TRANSITION": "Essa etapa não está disponível na fase atual da análise. Recarregue a página.",
+      "SELF_TRANSITION": "A garantia já está nesse estado.",
+      "TERMINAL_STATE": "A garantia está encerrada.",
+      "ILLEGAL_TRANSITION": "O ciclo de vida da garantia não permite esta mudança.",
+      "REASON_NOT_ALLOWED_FROM_STATE": "Este motivo de encerramento não é permitido no estado da garantia.",
+      "CLOSURE_REQUIRED": "Encerrar uma garantia exige um motivo.",
+      "CLOSURE_NOT_ALLOWED": "Um motivo de encerramento foi informado para uma mudança que não encerra a garantia.",
+      "INVALID_HOLD_DAYS": "O prazo da reserva deve ser um número inteiro de dias entre 1 e 90.",
+      "INSUFFICIENT_FREE_CAPITAL": "O capital livre da reserva, descontadas a cobertura exigida e as ofertas que já o reservam, não cobre esta oferta. Nada foi enviado.",
+      "TOO_MANY_OPEN_HOLDS": "Há ofertas demais reservando capital para checar esta com segurança. Escale.",
+      "OFFER_STILL_HELD": "Esta oferta ainda reserva capital; reenvie quando a reserva expirar.",
+      "RESERVE_BALANCE_UNAVAILABLE": "Não há saldo recente da reserva, então a oferta não pode ser checada. Nada foi enviado.",
+      "FORBIDDEN": "Seu papel na equipe não permite esta ação.",
+      "unexpected": "Algo deu errado. Tente novamente."
+    },
+    "send": {
+      "holdDaysLabel": "Prazo da reserva (dias)",
+      "holdDaysPlaceholder": "Padrão"
+    }
+  },
   "shellSwitcher": {
     "backToAgency": "Voltar para Imobiliárias"
   },
@@ -523,7 +689,8 @@
     "actions": {
       "approve": "Aprovar",
       "reject": "Recusar",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "openGuarantee": "Abrir garantia"
     },
     "reject": {
       "title": "Recusar documento",
@@ -534,7 +701,10 @@
     "toast": {
       "approved": "Documento aprovado.",
       "rejected": "Documento recusado; a imobiliária foi notificada.",
-      "uploaded": "Documento anexado e enviado para análise."
+      "uploaded": "Documento anexado e enviado para análise.",
+      "approvedAndSigned": "Contrato assinado aprovado. A garantia ainda não pôde ser ativada — abra-a para ver o motivo.",
+      "approvedAndActivated": "Contrato assinado aprovado. A reserva tinha espaço: a garantia está ativa e a imobiliária foi avisada.",
+      "approvedAndWaiting": "Contrato assinado aprovado. A garantia está aguardando capacidade da reserva."
     },
     "errors": {
       "GUARANTEE_NOT_FOUND": "Garantia não encontrada.",
@@ -552,6 +722,178 @@
       "UPLOAD_FAILED": "Não foi possível enviar o arquivo. Tente novamente.",
       "FORBIDDEN": "Seu perfil na equipe não permite esta ação.",
       "unexpected": "Algo deu errado. Tente novamente."
+    }
+  },
+  "staffGuarantees": {
+    "title": "Garantias",
+    "subtitle": "Propostas a caminho da ativação. A garantia fica ativa quando a MUTAV aprova o contrato assinado e a reserva tem espaço para ela — limitada pela cobertura exigida. Ninguém clica em Ativar.",
+    "notAvailable": "—",
+    "moreAvailable": "Há mais garantias além desta página.",
+    "tabs": {
+      "awaiting_capacity": "Aguardando capacidade da reserva",
+      "awaiting_signature": "Aguardando assinatura"
+    },
+    "empty": {
+      "awaiting_capacity": "Nenhuma proposta assinada aguardando capacidade da reserva.",
+      "awaiting_signature": "Nenhum contrato enviado para assinatura."
+    },
+    "columns": {
+      "guarantee": "Garantia",
+      "agency": "Imobiliária",
+      "tenant": "Inquilino",
+      "rent": "Aluguel",
+      "rate": "Taxa",
+      "review": "Análise",
+      "signedContract": "Contrato assinado",
+      "actions": "Ações",
+      "reserve": "Reserva"
+    },
+    "reviewStatus": {
+      "editing": "Rascunho",
+      "analysis_requested": "Análise solicitada",
+      "accepted": "Aprovada",
+      "awaiting_signature": "Aguardando assinatura",
+      "signed": "Assinada",
+      "awaiting_capacity": "Aguardando capacidade da reserva",
+      "refused": "Recusada"
+    },
+    "signedContract": {
+      "approved": "Aprovado",
+      "pending_review": "Aguardando revisão",
+      "rejected": "Recusado",
+      "missing": "Não enviado"
+    },
+    "guaranteeState": {
+      "drafted": "Rascunho",
+      "active": "Ativa",
+      "in_arrears": "Em atraso",
+      "default_verified": "Inadimplência verificada",
+      "cover_committed": "Cobertura comprometida",
+      "in_eviction": "Em despejo",
+      "closed": "Encerrada"
+    },
+    "propertyKind": {
+      "residential": "Residencial",
+      "commercial": "Comercial"
+    },
+    "plan": {
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
+    },
+    "agencyInactive": "Imobiliária inativa",
+    "actions": {
+      "open": "Abrir",
+      "retry": "Tentar novamente",
+      "openUnderwriting": "Abrir dossiê da análise",
+      "openGuarantee": "Abrir garantia",
+      "retryActivation": "Tentar ativar de novo"
+    },
+    "stepper": {
+      "progressLabel": "Caminho até a ativação",
+      "doneSuffix": " (concluída)",
+      "currentSuffix": " (atual)",
+      "steps": {
+        "editing": "Rascunho",
+        "analysis_requested": "Análise",
+        "accepted": "Aprovada",
+        "awaiting_signature": "Em assinatura",
+        "signed": "Assinada",
+        "awaiting_capacity": "Aguardando reserva",
+        "active": "Ativa"
+      }
+    },
+    "detail": {
+      "title": "Garantia {id}",
+      "back": "← Garantias",
+      "notFound": "Garantia não encontrada",
+      "activation": "Ativação",
+      "summary": "Resumo",
+      "lease": "Locação",
+      "terms": "Condições",
+      "history": "Histórico",
+      "blockedHeading": "Ainda não é possível ativar esta garantia:",
+      "activatedOn": "Ativa desde {date}",
+      "fields": {
+        "agency": "Imobiliária",
+        "tenant": "Inquilino",
+        "status": "Situação",
+        "review": "Análise",
+        "signedContract": "Contrato assinado",
+        "sentAt": "Contrato enviado em",
+        "propertyKind": "Imóvel",
+        "address": "Endereço",
+        "rent": "Aluguel",
+        "totalRent": "Aluguel + encargos",
+        "product": "Produto",
+        "plan": "Plano",
+        "feeRate": "Taxa",
+        "staffRate": "Taxa definida pela MUTAV",
+        "fee": "Mensalidade",
+        "coverageCeiling": "Teto de cobertura",
+        "activationFee": "Taxa de ativação"
+      }
+    },
+    "blockers": {
+      "NOT_DRAFTED": "A garantia não é mais uma proposta.",
+      "REVIEW_NOT_SIGNED": "O contrato de locação assinado ainda não foi aprovado — aprove-o depois que o contrato for enviado para assinatura.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Nenhum contrato de locação assinado foi aprovado ainda.",
+      "AGENCY_NOT_ACTIVE": "O cadastro da imobiliária não está ativo."
+    },
+    "toast": {
+      "activated": "A garantia está ativa e a imobiliária foi avisada.",
+      "stillWaiting": "Ainda aguardando capacidade da reserva: faltam {shortfall}.",
+      "reserveUnavailable": "Não há saldo recente da reserva para checar. A garantia continua aguardando."
+    },
+    "errors": {
+      "NOT_FOUND": "Essa garantia não existe mais.",
+      "NOT_DRAFTED": "A garantia não é mais uma proposta.",
+      "REVIEW_NOT_SIGNED": "A garantia não está aguardando ativação.",
+      "SIGNED_CONTRACT_NOT_APPROVED": "Aprove primeiro o contrato de locação assinado.",
+      "AGENCY_NOT_ACTIVE": "A imobiliária não está ativa; não pode receber uma nova garantia.",
+      "CAPACITY_INVARIANT_BROKEN": "Os valores de cobertura da garantia estão inconsistentes. Escale antes de ativar.",
+      "SELF_TRANSITION": "A garantia já está nesse estado.",
+      "TERMINAL_STATE": "A garantia está encerrada.",
+      "ILLEGAL_TRANSITION": "Esta garantia não pode ficar ativa a partir do estado atual.",
+      "FORBIDDEN": "Tentar a ativação de novo exige o papel de compliance.",
+      "unexpected": "Algo deu errado. Tente de novo."
+    },
+    "activation": {
+      "explainer": "A garantia fica ativa quando o contrato de locação assinado é aprovado e a cobertura exigida dela (cobertura × c) cabe no capital livre da reserva. Se não couber, ela aguarda capacidade da reserva e é tentada de novo a cada novo saldo da reserva.",
+      "waitingHeading": "Aguardando capacidade da reserva",
+      "shortfall": "Faltam {amount} na reserva para a cobertura exigida desta garantia.",
+      "reserveUnavailable": "Não havia saldo recente da reserva, então a capacidade não pôde ser checada.",
+      "waitingNextStep": "Ela é tentada de novo automaticamente a cada novo saldo da reserva. Tente agora quando a reserva tiver espaço, ou cancele a proposta.",
+      "retrying": "Checando a reserva…"
+    },
+    "capacity": {
+      "explainer": "A checagem de capacidade da última tentativa de ativação, limitada pela cobertura exigida.",
+      "outcome": "Checagem de capacidade",
+      "outcomes": {
+        "passed": "Cabe na reserva",
+        "insufficient_capacity": "Falta capacidade na reserva",
+        "reserve_unavailable": "Saldo da reserva indisponível"
+      },
+      "balance": "Saldo da reserva",
+      "requiredCoverage": "Cobertura exigida (carteira em risco)",
+      "activeHolds": "Reservado por outras ofertas",
+      "freeCapital": "Capital livre",
+      "ownRequirement": "Cobertura exigida desta garantia",
+      "snapshotTakenAt": "Saldo lido em (BRT)",
+      "checkedAt": "Checado em (BRT)",
+      "shortfallTag": "Aguardando capacidade da reserva — faltam {amount}"
+    },
+    "offerHold": {
+      "label": "Reserva da oferta",
+      "amount": "Capital reservado",
+      "period": "Prazo da reserva",
+      "periodValue": "{days} dias, até {date}",
+      "lapsedHint": "A reserva expirou antes da assinatura. Reenvie a oferta pela ficha de análise — o envio refaz a checagem da reserva.",
+      "status": {
+        "none": "Sem reserva",
+        "active": "Capital reservado",
+        "lapsed": "Reserva expirada — reenviar",
+        "released": "Liberada"
+      }
     }
   },
   "unavailable": {

@@ -4,18 +4,19 @@ import type { Result } from "../lib/result";
 import { mutationWithActiveAgency, mutationWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
 import type { AgencyId } from "../agencies/domain";
+import type { UserId } from "../users/domain";
 import { ufFromCityUF } from "../leases/domain";
 import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { resolveProduct } from "../products/useCases";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import { priceGuarantee } from "./pricing";
+import { provisionalPricingTier } from "./review";
 import {
   CLOSE_REASON,
   closeReasonValidator,
   GUARANTEE_ERROR_CODE,
   GUARANTEE_STATE,
   guaranteePlanValidator,
-  SCORE_TIER,
   type Guarantee,
   type GuaranteeCapacity,
 } from "./domain";
@@ -33,10 +34,13 @@ import {
  * rewrite, the history row and the audit entry — no mutation in this file
  * patches `status` itself.
  *
- * Wrappers follow the authority model: an agency may activate the guarantee it
- * sold and close it when its lease ends; every other terminal or adversarial
- * move (an arbitrary close reason, eviction, a new price) is Mutav compliance
- * staff. `cancelDraft` stays in `useCases.ts` — the agency UI binds to it
+ * Wrappers follow the authority model: an agency may close the guarantee it
+ * sold when its lease ends; every other terminal or adversarial move (an
+ * arbitrary close reason, eviction, a new price) is Mutav compliance staff.
+ * Activation is not here at all: a guarantee goes on risk when compliance
+ * approves its signed contract and the reserve capacity check passes
+ * (`activation.ts`, phase-1 rule of issue #427).
+ * `cancelDraft` stays in `useCases.ts` — the agency UI binds to it
  * there — and composes the same helper.
  */
 
@@ -78,62 +82,6 @@ const notFound = (publicId: string) => ({
   success: false as const,
   error: { code: GUARANTEE_ERROR_CODE.NOT_FOUND },
   message: `Guarantee '${publicId}' not found`,
-});
-
-// ---------------------------------------------------------------------------
-// activate — drafted → active, agency
-// ---------------------------------------------------------------------------
-
-type ActivateSuccessResult = { publicId: string; capacity: GuaranteeCapacity };
-type ActivateErrorResult = {
-  code: typeof GUARANTEE_ERROR_CODE.NOT_FOUND | TransitionErrorCode;
-};
-
-/**
- * Put a sold guarantee on risk. Capacity is (re)initialized from the `terms`
- * snapshot at this moment — a draft can carry no reservation (nothing can
- * default before cover starts), so the full ceiling is available and the
- * ceiling the guarantee runs on is the one it was priced under.
- */
-export const activate = mutationWithActiveAgency({
-  args: { publicId: v.string() },
-  handler: async (ctx, args): Promise<Result<ActivateSuccessResult, ActivateErrorResult>> => {
-    const guarantee = await findAgencyGuarantee(ctx, {
-      publicId: args.publicId,
-      agencyId: ctx.agencyId,
-    });
-    if (!guarantee) return notFound(args.publicId);
-
-    // Nothing can have drawn cover before the guarantee went on risk, so a
-    // reservation on a draft is drift rather than history. Refuse it — writing
-    // the fresh capacity over it would silently destroy the reserved cents,
-    // the same drift `reserveCoverCapacity` refuses instead of repairing.
-    if (guarantee.capacity.reservedCents !== 0) {
-      return {
-        success: false,
-        error: { code: GUARANTEE_ERROR_CODE.CAPACITY_INVARIANT_BROKEN },
-        message: `Guarantee ${guarantee.publicId} carries ${guarantee.capacity.reservedCents} reserved cents before activation`,
-      };
-    }
-
-    const ceilingCents = guarantee.terms.coverageCeilingCents;
-    const applied = await applyGuaranteeTransition(ctx, {
-      guarantee,
-      to: GUARANTEE_STATE.ACTIVE,
-      capacity: { ceilingCents, availableCents: ceilingCents, reservedCents: 0 },
-      actor: actorFrom(ctx.user),
-      message: "Garantia ativada",
-    });
-    if (!applied.success) {
-      return { success: false, error: { code: applied.error.code }, message: applied.message };
-    }
-
-    return {
-      success: true,
-      data: { publicId: guarantee.publicId, capacity: applied.data.guarantee.capacity },
-      message: `Guarantee ${guarantee.publicId} activated`,
-    };
-  },
 });
 
 // ---------------------------------------------------------------------------
@@ -288,7 +236,6 @@ type RepriceErrorResult = {
     | typeof GUARANTEE_ERROR_CODE.GUARANTEE_CLOSED
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENT
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENEWAL_DATE
-    | typeof GUARANTEE_ERROR_CODE.TENANT_DENIED
     | typeof PRODUCT_ERROR_CODE.PRODUCT_UNAVAILABLE;
 };
 
@@ -307,8 +254,8 @@ function isCalendarDate(value: string): boolean {
  * Money rule: `capacity` is not touched at all. The coverage a guarantee runs
  * on is the one it was activated under, and a reajuste must not silently move
  * how much Mutav is on risk for on an in-force guarantee. The new ceiling lives
- * in `terms.coverageCeilingCents`; `activate` reads it from there, so a draft
- * repriced before it goes on risk still starts on the new figure.
+ * in `terms.coverageCeilingCents`; activation reads it from there, so a
+ * draft repriced before it goes on risk still starts on the new figure.
  */
 export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
   args: {
@@ -346,14 +293,11 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
       };
     }
 
-    const tier = guarantee.underwriting.tier;
-    if (tier === SCORE_TIER.NEGADO) {
-      return {
-        success: false,
-        error: { code: GUARANTEE_ERROR_CODE.TENANT_DENIED },
-        message: "A denied credit tier carries no rate and cannot be priced",
-      };
-    }
+    // A rate compliance set on acceptance survives the reajuste: it was a
+    // decision about this tenant, and the catalog's tier rate is not.
+    const tier = provisionalPricingTier(guarantee.underwriting.tier);
+    const decision = guarantee.underwriting.decision;
+    const staffFeeRateBps = decision?.outcome === "accepted" ? decision.feeRateBps : undefined;
 
     const lease = await ctx.db.get(guarantee.leaseId);
     if (!lease) throw new Error(`Guarantee ${guarantee.publicId} points at a missing lease`);
@@ -383,6 +327,7 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
         plan: args.plan ?? guarantee.terms.plan,
         productSlug: product.slug,
         appliedAt: at,
+        ...(staffFeeRateBps === undefined ? {} : { staffFeeRateBps }),
       },
       product.terms,
     );
@@ -432,6 +377,6 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
   },
 });
 
-function actorFrom(user: { _id: GuaranteeActor["userId"]; name: string }): GuaranteeActor {
+function actorFrom(user: { _id: UserId; name: string }): GuaranteeActor {
   return { userId: user._id, username: user.name };
 }

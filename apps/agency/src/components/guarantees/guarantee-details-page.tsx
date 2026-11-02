@@ -24,6 +24,8 @@ import { GuaranteeHistoryCard } from "./guarantee-history-card";
 import { GuaranteeLeaseCard } from "./guarantee-lease-card";
 import { RentAndClaimsCard } from "@/components/claims/rent-and-claims-card";
 import { GuaranteeSummaryCard } from "./guarantee-summary-card";
+import { GuaranteeReviewCard } from "./guarantee-review-card";
+import { showsReviewCard } from "@/lib/guarantees/review";
 import { GuaranteeTermsCard } from "./guarantee-terms-card";
 import { GuaranteeTenantCard } from "./guarantee-tenant-card";
 
@@ -72,6 +74,9 @@ export function GuaranteeDetailsPage({
       />
       <PageContent variant="narrow">
         <GuaranteeSummaryCard guarantee={guarantee} />
+        {showsReviewCard({ status: guarantee.status, review: guarantee.review.status }) && (
+          <GuaranteeReviewCard guarantee={guarantee} />
+        )}
         <RentAndClaimsCard guarantee={guarantee} />
         <GuaranteeTenantCard tenant={guarantee.tenant} />
         <GuaranteeLeaseCard lease={guarantee.lease} />

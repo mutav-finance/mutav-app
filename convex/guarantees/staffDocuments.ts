@@ -3,14 +3,16 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Result } from "../lib/result";
 import { mutationWithMutavRole, queryWithMutavRole } from "../lib/auth";
-import { AUDIT_ACTION } from "../audit/domain";
+import { AUDIT_ACTION, type AppendAuditEntryInput } from "../audit/domain";
 import type { AgencyId } from "../agencies/domain";
 import type { UserId } from "../users/domain";
 import {
+  DOCUMENT_KEY,
   GUARANTEE_DOCUMENT_ERROR_CODE,
   GUARANTEE_DOCUMENT_MAX_REJECTION_REASON_LENGTH,
   GUARANTEE_DOCUMENT_STATUS,
   GUARANTEE_DOCUMENT_UPLOADER_KIND,
+  GUARANTEE_STATE,
   documentKeyValidator,
   type Guarantee,
   type GuaranteeDocument,
@@ -26,6 +28,9 @@ import {
   type GenerateGuaranteeDocumentUploadUrlErrorResult,
   type GenerateGuaranteeDocumentUploadUrlSuccessResult,
 } from "./documents";
+import { assertReviewTransition, REVIEW_STATUS } from "./review";
+import { activateSignedDraft, type ActivationOutcome } from "./activation";
+import { pinOfferHoldOnSignature } from "../reserve/offerHolds";
 
 // Role split: `support` handles the paperwork (attaches and reads documents
 // for an agency that emailed them in); deciding whether a contract is
@@ -156,6 +161,8 @@ type ReviewGuaranteeDocumentSuccessResult = {
 type ReviewGuaranteeDocumentErrorCode =
   | typeof GUARANTEE_DOCUMENT_ERROR_CODE.DOCUMENT_NOT_FOUND
   | typeof GUARANTEE_DOCUMENT_ERROR_CODE.NOT_PENDING_REVIEW;
+type ApproveGuaranteeDocumentSuccessResult = ReviewGuaranteeDocumentSuccessResult &
+  ContractApprovalOutcome;
 type ApproveGuaranteeDocumentErrorResult = { code: ReviewGuaranteeDocumentErrorCode };
 type RejectGuaranteeDocumentErrorResult = {
   code:
@@ -200,12 +207,90 @@ async function loadReviewableDocument(
   return { success: true, data: { document, guarantee }, message: "Document reviewable" };
 }
 
+type StaffAuditAppender = (input: Omit<AppendAuditEntryInput, "actor">) => Promise<unknown>;
+
+type ContractApprovalOutcome =
+  | { reviewSigned: false; activation: null }
+  | { reviewSigned: true; activation: ActivationOutcome | null };
+
+/**
+ * Approving the signed rental contract is the moment Mutav registers the
+ * signature and — under the phase-1 rule (issue #427) — the moment the
+ * guarantee may go on risk. A draft that was `awaiting_signature` moves to
+ * `signed` (kept on `underwriting.signedAt`), its live offer hold is pinned,
+ * and the capacity check runs in the same transaction: pass → drafted →
+ * active; fail → `awaiting_capacity`, hold kept. From any other review status
+ * nothing moves: an approval while the review is still `accepted` is kept,
+ * and the draft activates later through `retryActivation`.
+ */
+async function activateOnContractApproval(
+  ctx: MutationCtx,
+  {
+    guarantee,
+    document,
+    user,
+    appendStaffAudit,
+  }: {
+    guarantee: Guarantee;
+    document: GuaranteeDocument;
+    user: { _id: UserId; name: string };
+    appendStaffAudit: StaffAuditAppender;
+  },
+): Promise<ContractApprovalOutcome> {
+  const untouched = { reviewSigned: false as const, activation: null };
+  if (document.key !== DOCUMENT_KEY.RENTAL_CONTRACT) return untouched;
+  if (guarantee.status !== GUARANTEE_STATE.DRAFTED) return untouched;
+  if (guarantee.underwriting.review !== REVIEW_STATUS.AWAITING_SIGNATURE) return untouched;
+  const signing = assertReviewTransition(guarantee.underwriting.review, REVIEW_STATUS.SIGNED);
+  if (!signing.success) return untouched;
+
+  const now = Date.now();
+  const at = new Date(now).toISOString();
+  await ctx.db.patch(guarantee._id, {
+    underwriting: { ...guarantee.underwriting, review: REVIEW_STATUS.SIGNED, signedAt: at },
+  });
+  const holdPinned = await pinOfferHoldOnSignature(ctx, { guaranteeId: guarantee._id, now });
+  await ctx.db.insert("guaranteeHistory", {
+    agencyId: guarantee.agencyId,
+    guaranteePublicId: guarantee.publicId,
+    at,
+    username: user.name,
+    message: "Contrato assinado registrado",
+  });
+  await appendStaffAudit({
+    action: AUDIT_ACTION.GUARANTEE_SIGNED,
+    resourceType: "guarantees",
+    resourceId: guarantee.publicId,
+    payload: {
+      guaranteeId: guarantee._id,
+      agencyId: guarantee.agencyId,
+      documentId: document._id,
+      holdPinned,
+      at,
+    },
+  });
+
+  const signed = await ctx.db.get(guarantee._id);
+  if (!signed) throw new Error("Guarantee row vanished mid-transaction");
+  const activation = await activateSignedDraft(ctx, {
+    guarantee: signed,
+    actor: { userId: user._id, username: user.name },
+    appendAudit: appendStaffAudit,
+  });
+  // A blocker (an inactive agency) leaves the draft `signed`; the admin app
+  // lists it and `retryActivation` activates once it clears. The approval
+  // itself still stands.
+  return { reviewSigned: true, activation: activation.success ? activation.data : null };
+}
+
 export const approveGuaranteeDocument = mutationWithMutavRole({ minRole: REVIEW_ROLE })({
   args: { documentId: v.id("guaranteeDocuments") },
   handler: async (
     ctx,
     args,
-  ): Promise<Result<ReviewGuaranteeDocumentSuccessResult, ApproveGuaranteeDocumentErrorResult>> => {
+  ): Promise<
+    Result<ApproveGuaranteeDocumentSuccessResult, ApproveGuaranteeDocumentErrorResult>
+  > => {
     const loaded = await loadReviewableDocument(ctx, args.documentId);
     if (!loaded.success) return loaded;
     const { document, guarantee } = loaded.data;
@@ -222,9 +307,20 @@ export const approveGuaranteeDocument = mutationWithMutavRole({ minRole: REVIEW_
       payload: { documentId: document._id, key: document.key },
     });
 
+    const approval = await activateOnContractApproval(ctx, {
+      guarantee,
+      document,
+      user: ctx.user,
+      appendStaffAudit: ctx.appendStaffAudit,
+    });
+
     return {
       success: true,
-      data: { documentId: document._id, status: GUARANTEE_DOCUMENT_STATUS.APPROVED },
+      data: {
+        documentId: document._id,
+        status: GUARANTEE_DOCUMENT_STATUS.APPROVED,
+        ...approval,
+      },
       message: "Document approved",
     };
   },

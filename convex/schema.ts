@@ -28,14 +28,35 @@ const closeReason = v.union(
   v.literal("eviction"),
   v.literal("dispute_reversal"),
   v.literal("canceled_pre_activation"),
+  v.literal("underwriting_refused"),
   v.literal("death"),
 );
 
 // Canonical `SCORE_TIER` lives in `convex/guarantees/domain.ts`. `negado` is
-// deliberately absent from the priceable set: a denied tenant is rejected
-// before pricing, so no product carries a rate for it.
+// deliberately absent from the priceable set: no product carries a rate for
+// it — a `negado` draft is quoted provisionally and priced by compliance.
 const priceableTier = v.union(v.literal("bom"), v.literal("regular"), v.literal("ruim"));
 const scoreTier = v.union(priceableTier, v.literal("negado"));
+
+// Canonical `REVIEW_STATUS` lives in `convex/guarantees/review.ts`.
+const reviewStatus = v.union(
+  v.literal("editing"),
+  v.literal("analysis_requested"),
+  v.literal("accepted"),
+  v.literal("awaiting_signature"),
+  v.literal("signed"),
+  v.literal("awaiting_capacity"),
+  v.literal("refused"),
+);
+
+// Canonical `OFFER_HOLD_RELEASE_REASON` lives in `convex/reserve/capacity.ts`.
+const offerHoldReleaseReason = v.union(
+  v.literal("activated"),
+  v.literal("expired"),
+  v.literal("canceled"),
+  v.literal("refused"),
+  v.literal("resent"),
+);
 
 // Canonical `GUARANTEE_DOCUMENT_STATUS` / `DOCUMENT_KEY` live in
 // `convex/guarantees/domain.ts`; inlined here to avoid the entity-file →
@@ -309,6 +330,9 @@ export default defineSchema(
       // publish in a field the customer cannot avoid reading.
       invoiceRef: v.optional(v.string()),
       nextInvoiceSequence: v.optional(v.number()),
+      // Agency override of the offer hold period (ADR 0010): wins over the
+      // product and platform settings, loses to a per-contract value.
+      offerHoldDays: v.optional(v.number()),
     })
       .index("by_cnpj", ["cnpj"])
       .index("by_cpf", ["cpf"])
@@ -499,13 +523,76 @@ export default defineSchema(
       ),
       activatedAt: v.union(v.string(), v.null()),
       nextRenewalDate: v.string(),
-      // Creation-time underwriting snapshot. The living score is the
-      // creditAnalysis domain's, keyed by document.
+      // Creation-time underwriting snapshot plus Mutav's review of the draft.
+      // The living score is the creditAnalysis domain's, keyed by document;
+      // the score here is an INPUT to the review, not its verdict. `review`
+      // is a sub-status inside `drafted` (canonical value object and moves:
+      // `convex/guarantees/review.ts`, ADR 0011).
       underwriting: v.object({
         score: v.number(),
         tier: scoreTier,
         assessmentId: v.optional(v.id("creditAnalysisAssessments")),
+        review: reviewStatus,
+        analysisRequest: v.optional(
+          v.object({
+            requestedAt: v.string(),
+            requestedBy: v.id("users"),
+          }),
+        ),
+        decision: v.optional(
+          v.union(
+            v.object({
+              outcome: v.literal("accepted"),
+              // The guarantee-fee rate compliance set, in basis points of
+              // monthly rent. Also snapshotted as `terms.feeRateBps`.
+              feeRateBps: v.number(),
+              note: v.optional(v.string()),
+              decidedAt: v.string(),
+              decidedBy: v.id("users"),
+            }),
+            v.object({
+              outcome: v.literal("refused"),
+              reason: v.string(),
+              decidedAt: v.string(),
+              decidedBy: v.id("users"),
+            }),
+          ),
+        ),
+        signatureRequest: v.optional(
+          v.object({
+            sentAt: v.string(),
+            sentBy: v.id("users"),
+          }),
+        ),
+        // When compliance approved the signed rental contract — the moment
+        // the review became `signed` and the capacity check first ran.
+        signedAt: v.optional(v.string()),
       }),
+      // The latest reserve capacity check of the activation (phase-1 rule,
+      // issue #427): every figure it used, in BRL cents, so staff see why a
+      // draft went active or is waiting for reserve capacity. Canonical shape:
+      // `convex/guarantees/activation.ts`.
+      activationCheck: v.optional(
+        v.union(
+          v.object({
+            outcome: v.union(v.literal("passed"), v.literal("insufficient_capacity")),
+            checkedAt: v.string(),
+            snapshotTakenAt: v.number(),
+            balanceCents: v.number(),
+            coverageRatioBps: v.number(),
+            requiredCoverageCents: v.number(),
+            activeHoldsCents: v.number(),
+            freeCapitalCents: v.number(),
+            ownRequirementCents: v.number(),
+            shortfallCents: v.number(),
+          }),
+          // No fresh vault balance to measure against: the gate failed closed.
+          v.object({
+            outcome: v.literal("reserve_unavailable"),
+            checkedAt: v.string(),
+          }),
+        ),
+      ),
       // Per-guarantee relationship state — approval belongs to a guarantee,
       // not to the person.
       tenantApproval: v.object({
@@ -529,6 +616,9 @@ export default defineSchema(
         exitCostMultiplier: v.number(),
         coverageCeilingCents: v.number(),
         exitCostCapCents: v.number(),
+        // The rate `taxaFeeCents` was priced at, in basis points of rent: the
+        // product's tier rate on a draft, the compliance-set rate once accepted.
+        feeRateBps: v.number(),
         appliedAt: v.string(),
       }),
       capacity: v.object({
@@ -536,13 +626,38 @@ export default defineSchema(
         availableCents: v.number(),
         reservedCents: v.number(),
       }),
+      // The one-time activation fee's billing marker. Activation sets it
+      // `pending`; the first monthly billing run after activation puts the fee
+      // on that invoice and flips it to `invoiced`, so the fee is billed once
+      // whatever day of the month the guarantee went on risk. Absent on a
+      // draft and on rows the seed inserts already active.
+      activationFee: v.optional(
+        v.union(
+          v.object({ status: v.literal("pending") }),
+          v.object({
+            status: v.literal("invoiced"),
+            invoiceId: v.id("invoices"),
+            invoicedAt: v.string(),
+          }),
+        ),
+      ),
     })
       .index("by_publicId", ["publicId"])
       .index("by_status", ["status"])
       .index("by_agency_status", ["agencyId", "status"])
+      // Monthly billing: one agency's guarantees whose activation fee is
+      // still to be invoiced.
+      .index("by_agency_activationFeeStatus", ["agencyId", "activationFee.status"])
       .index("by_agency_status_nextRenewalDate", ["agencyId", "status", "nextRenewalDate"])
       .index("by_lease", ["leaseId"])
-      .index("by_product", ["productId"]),
+      .index("by_product", ["productId"])
+      // Mutav's underwriting queue: drafts awaiting a decision, oldest request
+      // first. `status` is in the key so a draft canceled mid-review drops out.
+      .index("by_review_status_requestedAt", [
+        "underwriting.review",
+        "status",
+        "underwriting.analysisRequest.requestedAt",
+      ]),
 
     // Guarantee products — pricing parameters as data: they vary by agency /
     // region / tenant score and become admin-adjustable. Each guarantee
@@ -569,6 +684,8 @@ export default defineSchema(
         commissionRate: v.number(),
         prestamistaPremiumCents: v.number(),
         prestamistaCommissionRate: v.number(),
+        // Product override of the offer hold period (ADR 0010).
+        offerHoldDays: v.optional(v.number()),
       }),
       // When an agency may file a claim on late rent under this product.
       // Optional while the values are undecided: absent means the defaults in
@@ -1117,6 +1234,50 @@ export default defineSchema(
     })
       .index("by_status", ["status", "anchoredAt"])
       .index("by_periodEnd", ["periodEnd"]),
+
+    // Off-chain hold of reserve free capital for an offer out for signature
+    // (ADR 0010, phase-1 rule of issue #427). Sending a contract for signature
+    // holds cover × c for the hold period fixed here; free capital is the
+    // vault balance minus required coverage minus every active hold. Valid
+    // while Convex is the only platform putting guarantees on risk against
+    // the reserve. Amounts are BRL cents (BRS is 1:1 BRL).
+    offerHolds: defineTable({
+      guaranteeId: v.id("guarantees"),
+      agencyId: v.id("agencies"),
+      amountCents: v.number(),
+      holdDays: v.number(),
+      createdAt: v.number(),
+      expiresAt: v.number(),
+      // Set when the signed contract is approved within the period: the held
+      // capital then belongs to the guarantee and no longer lapses.
+      signedAt: v.optional(v.number()),
+      releasedAt: v.optional(v.number()),
+      releaseReason: v.optional(offerHoldReleaseReason),
+    })
+      .index("by_guarantee", ["guaranteeId"])
+      // Every unreleased hold, soonest expiry first: the preflight sum and the sweep.
+      .index("by_releasedAt_expiresAt", ["releasedAt", "expiresAt"]),
+
+    // Singleton platform-wide settings. Absent row = every default applies.
+    platformSettings: defineTable({
+      key: v.literal("platform"),
+      // Platform default of the offer hold period (ADR 0010); falls back to
+      // `OFFER_HOLD_DAYS_DEFAULT` when unset.
+      offerHoldDays: v.optional(v.number()),
+      // The coverage ratio `c` in basis points (issue #427); falls back to
+      // `COVERAGE_RATIO_BPS_DEFAULT` (2500, the pilot 25%) when unset.
+      coverageRatioBps: v.optional(v.number()),
+    }).index("by_key", ["key"]),
+
+    // Cached readings of the phase-1 reserve: the Squads vault's BRS balance in
+    // BRL cents (issue #428). Written by `reserve/balance:recordReserveBalance`
+    // from the 15-minute reserve cron; activation reads the newest row and
+    // fails closed when it is older than `RESERVE_BALANCE_MAX_AGE_MS`.
+    reserveBalanceSnapshots: defineTable({
+      balanceCents: v.number(),
+      takenAt: v.number(),
+      source: v.literal("squads_vault"),
+    }).index("by_takenAt", ["takenAt"]),
 
     // The asset object mirrors reserveAssetValidator in convex/reserve/domain.ts (including valueCents) — kept inline here because importing an entity file into schema.ts would create a circular dependency through _generated/dataModel (same reason as agencyDocumentKind above).
     reserveSnapshots: defineTable({

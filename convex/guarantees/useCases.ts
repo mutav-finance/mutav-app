@@ -21,16 +21,17 @@ import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { guaranteesByState, countByStatePlatform, sumInsuredExposure } from "./aggregate";
 import { insertGuaranteeAggregates } from "./aggregateWrites";
 import { applyGuaranteeTransition } from "./transitions";
+import { provisionalPricingTier, REVIEW_STATUS } from "./review";
 import {
   CLOSE_REASON,
   CONTRACT_APPLICATION_VALIDITY_MS,
+  CREDIT_ASSESSMENT_FRESHNESS_MS,
   GUARANTEE_ERROR_CODE,
   GUARANTEE_EVENT,
   GUARANTEE_STATE,
   GUARANTEE_STATES,
   guaranteePlanValidator,
   guaranteeStateValidator,
-  SCORE_TIER,
   TENANT_APPROVAL_STATUS,
   tierForScore,
   getUrgencyTier,
@@ -280,6 +281,7 @@ function shapeGuaranteeSummary(doc: Guarantee, tenantName: string, referenceDate
     id: doc.publicId,
     agencyId: doc.agencyId,
     status: doc.status,
+    reviewStatus: doc.underwriting.review,
     closure: doc.closure ?? null,
     nextRenewalDate: doc.nextRenewalDate,
     availableCapacityCents: doc.status === GUARANTEE_STATE.CLOSED ? 0 : doc.capacity.availableCents,
@@ -742,8 +744,6 @@ export const listForCommissionByMonth = queryWithAgencyScope({
   },
 });
 
-const CREDIT_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
 function isSupportedTaxIdLength(digits: string): boolean {
   return digits.length === 11 || digits.length === 14;
 }
@@ -793,7 +793,7 @@ export const getCachedCreditScore = queryWithAgencyScope({
     const assessment = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
       subjectHash,
-      notBefore: now - CREDIT_CACHE_TTL_MS,
+      notBefore: now - CREDIT_ASSESSMENT_FRESHNESS_MS,
     });
     if (
       !assessment ||
@@ -880,7 +880,7 @@ export const requestCreditScore = mutationWithActiveAgency({
     const fresh = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
       subjectHash,
-      notBefore: now - CREDIT_CACHE_TTL_MS,
+      notBefore: now - CREDIT_ASSESSMENT_FRESHNESS_MS,
     });
     // Any fresh assessment gates re-scheduling — including an `unavailable`
     // one. Re-running the pull re-charges the provider, so a transient outage
@@ -903,7 +903,6 @@ type CreateGuaranteeSuccessResult = { publicId: string; leasePublicId: string };
 type CreateGuaranteeErrorResult = {
   code:
     | typeof TENANT_ERROR_CODE.INVALID_TAX_ID
-    | typeof GUARANTEE_ERROR_CODE.TENANT_DENIED
     | typeof GUARANTEE_ERROR_CODE.INVALID_RENT
     | typeof GUARANTEE_ERROR_CODE.CREDIT_ASSESSMENT_REQUIRED
     | typeof PRODUCT_ERROR_CODE.PRODUCT_UNAVAILABLE;
@@ -923,6 +922,12 @@ type CreateGuaranteeErrorResult = {
  * registry fields are also captured on the creation history event
  * (`tenantSnapshot`, the as-signed mitigation). Every error Result happens
  * before any write.
+ *
+ * The draft starts Mutav's review at `editing`. The bureau score is recorded
+ * as an input to that review, not a verdict: a `negado` score no longer
+ * refuses the draft — compliance accepts with a rate or refuses it
+ * (`reviewMutations.ts`, ADR 0011). Nothing goes to the tenant yet; the
+ * contract is sent only once Mutav has accepted.
  */
 export const create = mutationWithActiveAgency({
   args: {
@@ -971,15 +976,15 @@ export const create = mutationWithActiveAgency({
     }
 
     // The score is re-read from the assessment this agency actually pulled —
-    // it is never accepted from the caller. It sets the price and decides the
-    // denial, so a client-supplied value would let the browser buy itself a
-    // better tier or walk past a `negado`. It is also the input to an
-    // automated decision about a person, which has to be traceable to a
-    // recorded provenance rather than to a request body.
+    // it is never accepted from the caller. It sets the provisional price and
+    // is what compliance reviews, so a client-supplied value would let the
+    // browser buy itself a better tier. It is also an input to a decision
+    // about a person, which has to be traceable to a recorded provenance
+    // rather than to a request body.
     const assessment = await findFreshAssessment(ctx, {
       agencyId: ctx.agencyId,
       subjectHash: await hashPii(registryInput.taxId),
-      notBefore: Date.now() - CREDIT_CACHE_TTL_MS,
+      notBefore: Date.now() - CREDIT_ASSESSMENT_FRESHNESS_MS,
     });
     if (!assessment || assessment.status !== "ok" || assessment.score == null) {
       return {
@@ -990,17 +995,8 @@ export const create = mutationWithActiveAgency({
     }
     const score = assessment.score;
 
-    // A denied credit tier cannot be priced (no product carries a rate for
-    // `negado`) and must never become a guarantee. Reject before any write;
-    // the narrowed `tier` below is what makes `priceGuarantee` type-check.
     const tier = tierForScore(score);
-    if (tier === SCORE_TIER.NEGADO) {
-      return {
-        success: false,
-        error: { code: GUARANTEE_ERROR_CODE.TENANT_DENIED },
-        message: "Tenant credit tier is denied",
-      };
-    }
+    const pricingTier = provisionalPricingTier(tier);
 
     const now = new Date();
     const nowISO = now.toISOString();
@@ -1008,7 +1004,7 @@ export const create = mutationWithActiveAgency({
     const productResult = await resolveProduct(ctx, {
       agencyId: ctx.agencyId,
       uf: ufFromCityUF(args.lease.property.cityUF),
-      tier,
+      tier: pricingTier,
       propertyKind: args.lease.propertyKind,
       requestedSlug: args.productSlug,
       at: nowISO,
@@ -1052,7 +1048,7 @@ export const create = mutationWithActiveAgency({
     const priced = priceGuarantee(
       {
         rentCents: args.lease.rent.rentCents,
-        tier,
+        tier: pricingTier,
         plan: args.plan,
         productSlug: product.slug,
         appliedAt: nowISO,
@@ -1071,7 +1067,12 @@ export const create = mutationWithActiveAgency({
       status: GUARANTEE_STATE.DRAFTED,
       activatedAt: null,
       nextRenewalDate,
-      underwriting: { score, tier, assessmentId: assessment._id },
+      underwriting: {
+        score,
+        tier,
+        assessmentId: assessment._id,
+        review: REVIEW_STATUS.EDITING,
+      },
       tenantApproval: { status: TENANT_APPROVAL_STATUS.PENDENTE, termApprovedAt: null },
       terms: priced.terms,
       capacity: priced.capacity,
@@ -1121,19 +1122,6 @@ export const create = mutationWithActiveAgency({
         terms: priced.terms,
         capacity: priced.capacity,
       },
-    });
-
-    const agency = await ctx.db.get(ctx.agencyId);
-    if (!agency) throw new Error("Agency row vanished mid-transaction");
-    await ctx.scheduler.runAfter(0, internal.guarantees.actions.sendProposalNotifications, {
-      publicId,
-      tenantName: args.tenant.fullName,
-      tenantEmail: args.tenant.email,
-      tenantPhone: args.tenant.phone,
-      agencyName: agency.name,
-      rentCents: args.lease.rent.rentCents,
-      feeCents: priced.terms.feeCents,
-      coverageCents: priced.capacity.availableCents,
     });
 
     return { success: true, data: { publicId, leasePublicId }, message: "Guarantee created" };
@@ -1228,6 +1216,27 @@ function shapeLease(lease: Lease) {
 }
 
 /**
+ * The agency's view of Mutav's review. Staff identities stay server-side, and
+ * so does the acceptance note — it is compliance's working note, not a
+ * message to the agency. The refusal reason is shown: the agency is the one
+ * that has to tell the tenant why.
+ */
+export function shapeGuaranteeReview({ underwriting }: Pick<Guarantee, "underwriting">) {
+  const decision = underwriting.decision;
+  return {
+    status: underwriting.review,
+    requestedAt: underwriting.analysisRequest?.requestedAt ?? null,
+    decidedAt: decision?.decidedAt ?? null,
+    acceptedFeeRateBps: decision?.outcome === "accepted" ? decision.feeRateBps : null,
+    refusalReason: decision?.outcome === "refused" ? decision.reason : null,
+    sentForSignatureAt: underwriting.signatureRequest?.sentAt ?? null,
+    signedAt: underwriting.signedAt ?? null,
+  };
+}
+
+export type GuaranteeReviewView = ReturnType<typeof shapeGuaranteeReview>;
+
+/**
  * Reshape a `guarantees` doc + its lease + resolved tenant identity + history
  * into the UI detail type. Strips system fields (`_id`, `_creationTime`);
  * renames publicId → id.
@@ -1250,7 +1259,8 @@ function shapeGuarantee({
     closure: guarantee.closure ?? null,
     activatedAt: guarantee.activatedAt,
     nextRenewalDate: guarantee.nextRenewalDate,
-    underwriting: guarantee.underwriting,
+    underwriting: { score: guarantee.underwriting.score, tier: guarantee.underwriting.tier },
+    review: shapeGuaranteeReview(guarantee),
     terms: guarantee.terms,
     capacity: guarantee.capacity,
     lease: shapeLease(lease),

@@ -41,7 +41,7 @@ const SEED_NOW = "2026-09-28T15:00:00.000Z";
 
 // Worst-case exposure over the in-force book and its verified-default slice,
 // in BRL centavos: available rent-coverage + exit-cost cap per guarantee.
-const SUM_INSURED_CENTS = 689_806_900;
+const SUM_INSURED_CENTS = 698_662_900;
 const VERIFIED_DEFAULT_EXPOSURE_CENTS = 72_078_600;
 
 beforeEach(() => {
@@ -149,18 +149,20 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     });
 
     // active: 21 fictional + 26 filler + Aprovada's performing and renewed
-    // lives. default_verified: Aprovada ×2 + Paulista. cover_committed:
-    // Aprovada ×2 + Atlântica. in_eviction: Horizonte + Aprovada. drafted:
-    // 5 pendente + 1 Aprovada. closed: 2 encerrado + Aprovada's first term →
+    // lives + the one activated through its review. default_verified:
+    // Aprovada ×2 + Paulista. cover_committed: Aprovada ×2 + Atlântica.
+    // in_eviction: Horizonte + Aprovada. drafted: 5 pendente + 4 Aprovada
+    // (editing, analysis_requested, awaiting_signature, awaiting_capacity).
+    // closed: 2 encerrado + Aprovada's first term →
     // end_of_lease, 1 cancelado → canceled_pre_activation, and Aprovada's
     // reversed cover → dispute_reversal.
     expect(byState.counts).toEqual({
-      active: 49,
+      active: 50,
       in_arrears: 1,
       default_verified: 3,
       cover_committed: 3,
       in_eviction: 2,
-      drafted: 6,
+      drafted: 9,
       closed: 5,
     });
     expect(byState.closedReasons).toEqual([
@@ -339,7 +341,11 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     });
 
     expect(probe.offProduct).toBe(0);
-    expect(probe.sample.underwriting).toEqual({ score: 750, tier: "regular" });
+    expect(probe.sample.underwriting).toEqual({
+      score: 750,
+      tier: "regular",
+      review: "signed",
+    });
     expect(probe.leaseRentCents).toBe(320_000);
     // Literal expectations: the product's parameters applied to a R$ 3.200,00
     // rent at the regular tier on the basic plan — no prestamista premium.
@@ -357,6 +363,7 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       exitCostMultiplier: 6,
       coverageCeilingCents: 9_600_000,
       exitCostCapCents: 1_920_000,
+      feeRateBps: 1_200,
       // The snapshot is dated at activation, not at the tenant's term approval.
       // Seed timestamps are normalized to UTC so they compare against the
       // `Z`-form strings the runtime writes.
@@ -417,11 +424,11 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       };
     });
 
-    expect(audit.total).toBe(69);
+    expect(audit.total).toBe(73);
     expect(audit.activatedWithoutTimestamp).toEqual([]);
     expect(audit.neverActivatedWithTimestamp).toEqual([]);
-    // 6 drafts + the one canceled_pre_activation.
-    expect(audit.neverActivatedCount).toBe(7);
+    // 9 drafts + the one canceled_pre_activation.
+    expect(audit.neverActivatedCount).toBe(10);
   });
 
   test("capacity holds available + reserved = ceiling on every row, and the reserved leg matches the cover applied on the guarantee's resolved notice", async () => {
@@ -643,12 +650,12 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       return { total: leases.length, leasesWithOpen, violations };
     });
 
-    // One lease per seeded guarantee (58 fictional + 11 Aprovada) except the
+    // One lease per seeded guarantee (58 fictional + 15 Aprovada) except the
     // renewed Aprovada lease, which carries two. Four closed guarantees leave
     // their lease with a null pointer; the fifth's lease points at its
     // successor.
-    expect(audit.total).toBe(68);
-    expect(audit.leasesWithOpen).toBe(64);
+    expect(audit.total).toBe(72);
+    expect(audit.leasesWithOpen).toBe(68);
     expect(audit.violations).toEqual([]);
   });
 
@@ -690,6 +697,164 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
         renewalAfterClose: true,
       },
     ]);
+  });
+
+  test("the agencyowner book walks drafts from Mutav's queue to activation or reserve capacity; every other draft is editing", async () => {
+    const t = setup();
+    await t.mutation(internal.seed.seedReset, {});
+    const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
+
+    const drafts = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) =>
+          q.eq("agencyId", aprovadaId).eq("status", GUARANTEE_STATE.DRAFTED),
+        )
+        .collect();
+      return rows
+        .map((row) => ({
+          publicId: row.publicId,
+          review: row.underwriting.review,
+          tier: row.underwriting.tier,
+          requested: row.underwriting.analysisRequest !== undefined,
+          decision: row.underwriting.decision?.outcome ?? null,
+          feeRateBps: row.terms.feeRateBps,
+          sent: row.underwriting.signatureRequest !== undefined,
+        }))
+        .sort((a, b) => a.publicId.localeCompare(b.publicId));
+    });
+
+    expect(drafts).toEqual([
+      {
+        publicId: "1000035",
+        review: "editing",
+        tier: "regular",
+        requested: false,
+        decision: null,
+        feeRateBps: 1_200,
+        sent: false,
+      },
+      {
+        publicId: "1000042",
+        review: "analysis_requested",
+        tier: "negado",
+        requested: true,
+        decision: null,
+        feeRateBps: 1_500,
+        sent: false,
+      },
+      {
+        publicId: "1000043",
+        review: "awaiting_signature",
+        tier: "ruim",
+        requested: true,
+        decision: "accepted",
+        feeRateBps: 1_300,
+        sent: true,
+      },
+      {
+        publicId: "1000045",
+        review: "awaiting_capacity",
+        tier: "regular",
+        requested: true,
+        decision: "accepted",
+        feeRateBps: 1_400,
+        sent: true,
+      },
+    ]);
+
+    const offers = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("guarantees")
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovadaId))
+        .collect();
+      const offered = rows.filter((row) => row.underwriting.signatureRequest !== undefined);
+      return Promise.all(
+        offered.map(async (row) => {
+          const holds = await ctx.db
+            .query("offerHolds")
+            .withIndex("by_guarantee", (q) => q.eq("guaranteeId", row._id))
+            .collect();
+          return {
+            publicId: row.publicId,
+            status: row.status,
+            review: row.underwriting.review,
+            holds: holds.map((hold) => ({
+              holdDays: hold.holdDays,
+              pinned: hold.signedAt !== undefined,
+              releaseReason: hold.releaseReason ?? null,
+            })),
+            signed: row.underwriting.signedAt !== undefined,
+            check: row.activationCheck?.outcome ?? null,
+            activationFee: row.activationFee?.status ?? null,
+          };
+        }),
+      );
+    });
+    expect(offers.sort((a, b) => a.publicId.localeCompare(b.publicId))).toEqual([
+      {
+        publicId: "1000043",
+        status: "drafted",
+        review: "awaiting_signature",
+        holds: [{ holdDays: 7, pinned: false, releaseReason: null }],
+        signed: false,
+        check: null,
+        activationFee: null,
+      },
+      {
+        publicId: "1000044",
+        status: "active",
+        review: "signed",
+        holds: [{ holdDays: 7, pinned: true, releaseReason: "activated" }],
+        signed: true,
+        check: "passed",
+        activationFee: "pending",
+      },
+      {
+        publicId: "1000045",
+        status: "drafted",
+        review: "awaiting_capacity",
+        holds: [{ holdDays: 7, pinned: false, releaseReason: "expired" }],
+        signed: true,
+        check: "insufficient_capacity",
+        activationFee: null,
+      },
+    ]);
+
+    // A fresh vault balance sized so the demo plays out: the waiting one is
+    // short by half its requirement; the offer out for signature would fit.
+    const reserve = await t.run(async (ctx) => {
+      const snapshot = await ctx.db
+        .query("reserveBalanceSnapshots")
+        .withIndex("by_takenAt")
+        .order("desc")
+        .first();
+      const waiting = await ctx.db
+        .query("guarantees")
+        .withIndex("by_publicId", (q) => q.eq("publicId", "1000045"))
+        .unique();
+      return { snapshot, check: waiting?.activationCheck };
+    });
+    expect(reserve.snapshot?.source).toBe("squads_vault");
+    expect(Date.now() - (reserve.snapshot?.takenAt ?? 0)).toBeLessThan(60_000);
+    if (reserve.check?.outcome !== "insufficient_capacity") throw new Error("no capacity check");
+    expect(reserve.check.balanceCents).toBe(reserve.snapshot?.balanceCents);
+    expect(reserve.check.shortfallCents).toBe(
+      reserve.check.ownRequirementCents - reserve.check.freeCapitalCents,
+    );
+    expect(reserve.check.shortfallCents).toBeGreaterThan(0);
+
+    const otherDrafts = await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query("guarantees")
+        .withIndex("by_status", (q) => q.eq("status", GUARANTEE_STATE.DRAFTED))
+        .collect();
+      return rows
+        .filter((row) => row.agencyId !== aprovadaId)
+        .map((row) => row.underwriting.review);
+    });
+    expect(otherDrafts.length).toBeGreaterThan(0);
+    expect(new Set(otherDrafts)).toEqual(new Set(["editing"]));
   });
 
   test("registers tenants and links every seeded lease by tenantId", async () => {
@@ -942,8 +1107,8 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
       guarantees: (await ctx.db.query("guarantees").collect()).length,
     }));
     expect(counts.products).toBe(1);
-    expect(counts.leases).toBe(68);
-    expect(counts.guarantees).toBe(69);
+    expect(counts.leases).toBe(72);
+    expect(counts.guarantees).toBe(73);
   });
 
   test("agencyowner's agency walks every one of the seven guarantee states", async () => {
@@ -1059,8 +1224,8 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     // Same formula as `getGuaranteeAggregates`: (default_verified +
     // cover_committed) / in-force.
     expect(figures.verifiedDefault).toBe(6);
-    expect(figures.insured).toBe(58);
-    expect(figures.verifiedDefault / figures.insured).toBeCloseTo(0.1034, 3);
+    expect(figures.insured).toBe(59);
+    expect(figures.verifiedDefault / figures.insured).toBeCloseTo(0.1017, 3);
     expect(figures.sumInsuredCents).toBe(SUM_INSURED_CENTS);
     expect(figures.verifiedDefaultExposureCents).toBe(VERIFIED_DEFAULT_EXPOSURE_CENTS);
   });

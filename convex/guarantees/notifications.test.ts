@@ -17,7 +17,6 @@ function expectBrandedShell(html: string) {
   expect(html).toContain("Você recebeu este e-mail porque");
 }
 
-
 const NOTICE: ProposalNotice = {
   publicId: "1000042",
   tenantName: "Ana <Souza>",

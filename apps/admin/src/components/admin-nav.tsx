@@ -10,6 +10,7 @@ import {
   ActivityIcon,
   ScaleIcon,
   UsersIcon,
+  BadgeCheckIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { NavMain } from "@/components/nav-main";
@@ -21,6 +22,8 @@ export function AdminNav() {
     { title: tMain("overview"), href: "/", icon: <LayoutDashboardIcon /> },
     { title: tMain("agencies"), href: "/agencies", icon: <BuildingIcon /> },
     { title: tMain("compliance"), href: "/compliance", icon: <ShieldCheckIcon /> },
+    { title: tMain("underwriting"), href: "/underwriting", icon: <FileCheckIcon /> },
+    { title: tMain("guarantees"), href: "/guarantees", icon: <BadgeCheckIcon /> },
     { title: tMain("defaults"), href: "/defaults", icon: <AlertOctagonIcon /> },
     { title: tMain("documents"), href: "/documents", icon: <FileCheckIcon /> },
     { title: tMain("treasury"), href: "/treasury", icon: <CoinsIcon /> },

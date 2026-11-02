@@ -15,6 +15,7 @@ import {
   type PriceableTier,
 } from "../guarantees/domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee } from "../guarantees/pricing";
+import { reviewStatusForInsertedState, type ReviewStatus } from "../guarantees/review";
 import { insertGuaranteeAggregates } from "../guarantees/aggregateWrites";
 import { DEFAULT_PAYER, PROPERTY_KIND, type LeaseId } from "../leases/domain";
 import { DEFAULT_PRODUCT_SLUG, type ProductId } from "../products/domain";
@@ -203,6 +204,8 @@ export type SeedGuaranteeSpec = {
   closeReason?: CloseReason;
   nextRenewalDate?: string;
   tenantTaxId?: string;
+  /** Overrides the review sub-status `reviewStatusForInsertedState` derives. */
+  review?: ReviewStatus;
   /** `false` leaves the row out of the aggregates (backfill / dual-write tests). */
   indexInAggregates?: boolean;
 };
@@ -284,7 +287,13 @@ export async function seedGuaranteeWithLease(
       ...(closure ? { closure } : {}),
       activatedAt: spec.activatedAt ?? null,
       nextRenewalDate: spec.nextRenewalDate ?? "2026-12-31",
-      underwriting: { score: 750, tier },
+      underwriting: {
+        score: 750,
+        tier,
+        review:
+          spec.review ??
+          reviewStatusForInsertedState({ state: spec.status, closeReason: closure?.reason }),
+      },
       tenantApproval: { status: TENANT_APPROVAL_STATUS.PENDENTE, termApprovedAt: null },
       terms: priced.terms,
       capacity: {

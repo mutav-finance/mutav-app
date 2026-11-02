@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api } from "@convex/_generated/api";
 import type { GuaranteeDocumentId } from "@convex/guarantees/domain";
 import {
+  approvalMessageKey,
   canSubmitRejection,
   errorMessageKey,
   thrownMessageKey,
@@ -33,8 +34,8 @@ export function useDocumentReview() {
     setBusy(true);
     try {
       const result = await approveMutation({ documentId: target.id });
-      if (result.success) toast.success(t("toast.approved"));
-      else toast.error(t(errorMessageKey(result.error.code)));
+      if (!result.success) toast.error(t(errorMessageKey(result.error.code)));
+      else toast.success(t(approvalMessageKey(result.data)));
     } catch (error) {
       toast.error(t(thrownMessageKey(error)));
     } finally {

@@ -5,9 +5,10 @@ import type {
   GuaranteeClosure,
   GuaranteeState,
   GuaranteeTerms,
-  GuaranteeUnderwriting,
+  ScoreTier,
   TenantApprovalStatus,
 } from "@convex/guarantees/domain";
+import type { GuaranteeReviewView } from "@convex/guarantees/useCases";
 import type { LeaseProperty, LeaseRent, Payer, PropertyKind } from "@convex/leases/domain";
 
 // Value-object types come from the backend domain modules rather than being
@@ -17,8 +18,8 @@ export type {
   GuaranteeCapacity,
   GuaranteeClosure,
   GuaranteeState,
+  GuaranteeReviewView,
   GuaranteeTerms,
-  GuaranteeUnderwriting,
   LeaseProperty,
   LeaseRent,
   Payer,
@@ -74,7 +75,9 @@ export type Guarantee = {
   closure: GuaranteeClosure | null;
   activatedAt: string | null;
   nextRenewalDate: string;
-  underwriting: GuaranteeUnderwriting;
+  /** The bureau score Mutav's review takes as input — not a verdict. */
+  underwriting: { score: number; tier: ScoreTier };
+  review: GuaranteeReviewView;
   terms: GuaranteeTerms;
   capacity: GuaranteeCapacity;
   lease: GuaranteeLease;

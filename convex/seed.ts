@@ -1,5 +1,16 @@
 import { v } from "convex/values";
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import { internalAction, internalMutation, type MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import {
+  COVERAGE_RATIO_BPS_DEFAULT,
+  checkReserveCapacity,
+  coverRequirementCents,
+  freeCapitalCents,
+  offerHoldExpiresAt,
+  OFFER_HOLD_DAYS_DEFAULT,
+  OFFER_HOLD_RELEASE_REASON,
+  requiredCoverageCents,
+} from "./reserve/capacity";
 import { AUDIT_ACTION } from "./audit/domain";
 import { appendAuditEntry } from "./audit/useCases";
 import {
@@ -37,13 +48,14 @@ import {
 } from "./delinquencies/domain";
 import { COVER_OPERATION_STATUS, coveragePeriodOf } from "./coverOperations/domain";
 import {
+  ACTIVATION_FEE_STATUS,
   assertClose,
   assertTransition,
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
+  DOCUMENT_KEY,
   GUARANTEE_STATE,
   isInsured,
-  SCORE_TIER,
   TENANT_APPROVAL_STATUS,
   tierForScore,
   type CloseReason,
@@ -57,9 +69,15 @@ import {
 import type { UserId } from "./users/domain";
 import { DEFAULT_PRICING_TABLE, priceGuarantee } from "./guarantees/pricing";
 import {
+  provisionalPricingTier,
+  REVIEW_STATUS,
+  reviewStatusForInsertedState,
+} from "./guarantees/review";
+import {
   insuredCentsPlatform,
   guaranteesByState,
   guaranteesByStatePlatform,
+  sumInsuredExposure,
 } from "./guarantees/aggregate";
 import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
 import {
@@ -335,6 +353,9 @@ const DEMO_TABLES = [
   // deleted by `deleteGuaranteeDocumentBlobs` before the rows go.
   "guaranteeDocuments",
   "guaranteeHistory",
+  // Offer holds FK-reference guarantees (ADR 0010): reserve capital held for
+  // a seeded offer. Wiped with the drafts that hold it.
+  "offerHolds",
   // guarantees ↔ leases point at each other (`leaseId` / `openGuaranteeId`);
   // guarantees go first so no lease pointer outlives its target, and the
   // product a guarantee priced against goes after every guarantee.
@@ -555,6 +576,288 @@ async function insertSeedGuaranteeOnLease(
   });
 }
 
+type SeedOfferReview = {
+  requestedDaysAgo: number;
+  decidedDaysAgo: number;
+  sentDaysAgo: number;
+  feeRateBps: number;
+  note: string;
+};
+
+type SeedSignedReview = SeedOfferReview & { signedDaysAgo: number };
+
+type SeedReviewRow = {
+  guaranteeId: GuaranteeId;
+  publicId: string;
+  terms: GuaranteeTerms;
+  review:
+    | { status: typeof REVIEW_STATUS.ANALYSIS_REQUESTED; requestedDaysAgo: number }
+    | ({ status: typeof REVIEW_STATUS.AWAITING_SIGNATURE } & SeedOfferReview)
+    // Signed after its hold lapsed, then short of reserve capacity at approval.
+    | ({ status: typeof REVIEW_STATUS.AWAITING_CAPACITY } & SeedSignedReview)
+    // Signed, approved and activated in the same step (the spec is `active`).
+    | ({ status: typeof REVIEW_STATUS.SIGNED } & SeedSignedReview);
+};
+
+const SEED_COVERAGE_RATIO_BPS = COVERAGE_RATIO_BPS_DEFAULT;
+
+/**
+ * Walk seeded drafts through Mutav's review the way the review and activation
+ * mutations would: the agency asked, compliance decided (re-pricing at its
+ * own rate), sent the contract (holding reserve capital for the offer) and,
+ * for a signed one, approved the signed contract — which either activated it
+ * (hold released, activation fee pending) or left it waiting for reserve
+ * capacity (its hold had lapsed before the tenant signed). Each step leaves
+ * the history row the mutation writes. The capacity figures are written
+ * afterwards by `seedReserveCapacity`, once the whole book is in place.
+ */
+async function applyAprovadaReviews(
+  ctx: MutationCtx,
+  {
+    product,
+    ownerUserId,
+    staffUserId,
+    rows,
+  }: { product: Product; ownerUserId: UserId; staffUserId: UserId; rows: SeedReviewRow[] },
+): Promise<void> {
+  const owner = await ctx.db.get(ownerUserId);
+  const staff = await ctx.db.get(staffUserId);
+  if (!owner || !staff) throw new Error("Seed review needs the owner and staff personas");
+
+  for (const row of rows) {
+    const guarantee = await ctx.db.get(row.guaranteeId);
+    if (!guarantee) throw new Error(`Seed review targets missing guarantee ${row.publicId}`);
+    const requestedAt = daysAgo(row.review.requestedDaysAgo, "14:00");
+    const history = (at: string, username: string, message: string) =>
+      ctx.db.insert("guaranteeHistory", {
+        agencyId: guarantee.agencyId,
+        guaranteePublicId: guarantee.publicId,
+        at,
+        username,
+        message,
+      });
+
+    await history(requestedAt, owner.name, "Análise Mutav solicitada");
+    const analysisRequest = { requestedAt, requestedBy: ownerUserId };
+
+    if (row.review.status === REVIEW_STATUS.ANALYSIS_REQUESTED) {
+      await ctx.db.patch(guarantee._id, {
+        underwriting: { ...guarantee.underwriting, review: row.review.status, analysisRequest },
+      });
+      continue;
+    }
+
+    const review = row.review;
+    const decidedAt = daysAgo(review.decidedDaysAgo, "10:00");
+    const sentAt = daysAgo(review.sentDaysAgo, "11:00");
+    const repriced = priceGuarantee(
+      {
+        rentCents: row.terms.rentCents,
+        tier: provisionalPricingTier(guarantee.underwriting.tier),
+        plan: row.terms.plan,
+        productSlug: product.slug,
+        appliedAt: decidedAt,
+        staffFeeRateBps: review.feeRateBps,
+      },
+      product.terms,
+    );
+    const signedAt =
+      review.status === REVIEW_STATUS.AWAITING_SIGNATURE
+        ? null
+        : daysAgo(review.signedDaysAgo, "16:00");
+    // Only the fee moves with the rate; the ceiling and exit-cost cap the
+    // aggregates read are rent-driven, so no aggregate rewrite is needed.
+    await ctx.db.patch(guarantee._id, {
+      terms: repriced.terms,
+      underwriting: {
+        ...guarantee.underwriting,
+        review: review.status,
+        analysisRequest,
+        decision: {
+          outcome: "accepted",
+          feeRateBps: review.feeRateBps,
+          note: review.note,
+          decidedAt,
+          decidedBy: staffUserId,
+        },
+        signatureRequest: { sentAt, sentBy: staffUserId },
+        ...(signedAt === null ? {} : { signedAt }),
+      },
+      ...(review.status === REVIEW_STATUS.SIGNED && repriced.terms.oneTimeActivationFeeCents > 0
+        ? { activationFee: { status: ACTIVATION_FEE_STATUS.PENDING } }
+        : {}),
+    });
+    await history(decidedAt, staff.name, "Análise Mutav aprovada");
+    await history(sentAt, staff.name, "Contrato enviado para assinatura");
+
+    const sentAtMs = Date.parse(sentAt);
+    const expiresAt = offerHoldExpiresAt({ sentAt: sentAtMs, holdDays: OFFER_HOLD_DAYS_DEFAULT });
+    const amountCents = coverRequirementCents({
+      terms: repriced.terms,
+      coverageRatioBps: SEED_COVERAGE_RATIO_BPS,
+    });
+    const hold = { guaranteeId: guarantee._id, agencyId: guarantee.agencyId, amountCents };
+    const holdTiming = { holdDays: OFFER_HOLD_DAYS_DEFAULT, createdAt: sentAtMs, expiresAt };
+    if (review.status === REVIEW_STATUS.AWAITING_SIGNATURE) {
+      await ctx.db.insert("offerHolds", { ...hold, ...holdTiming });
+      continue;
+    }
+    if (signedAt === null) continue;
+    if (review.status === REVIEW_STATUS.AWAITING_CAPACITY) {
+      await ctx.db.insert("offerHolds", {
+        ...hold,
+        ...holdTiming,
+        releasedAt: expiresAt,
+        releaseReason: OFFER_HOLD_RELEASE_REASON.EXPIRED,
+      });
+      await history(signedAt, staff.name, "Contrato assinado registrado");
+      await history(signedAt, staff.name, "Aguardando capacidade da reserva");
+      continue;
+    }
+    const signedAtMs = Date.parse(signedAt);
+    await ctx.db.insert("offerHolds", {
+      ...hold,
+      ...holdTiming,
+      signedAt: signedAtMs,
+      releasedAt: signedAtMs,
+      releaseReason: OFFER_HOLD_RELEASE_REASON.ACTIVATED,
+    });
+    await history(signedAt, staff.name, "Contrato assinado registrado");
+    await history(signedAt, staff.name, "Garantia ativada");
+  }
+}
+
+/**
+ * Seed the reserve the Aprovada book is gated by: one fresh vault balance and
+ * the capacity checks behind the review rows. The balance is sized off the
+ * live book so the demo plays out — the awaiting-signature offer fits when
+ * its signed contract is approved (its own requirement plus half of the
+ * waiting guarantee's), and the waiting guarantee stays short by half its
+ * requirement. The balance row is fresh for `RESERVE_BALANCE_MAX_AGE_MS`
+ * after the seed; past that every check fails closed until the reserve
+ * reader (issue #428) or `reserve/balance:recordReserveBalance` writes one.
+ */
+async function seedReserveCapacity(
+  ctx: MutationCtx,
+  { rows }: { rows: SeedReviewRow[] },
+): Promise<void> {
+  const loaded = await Promise.all(
+    rows.map(async (row) => {
+      const guarantee = await ctx.db.get(row.guaranteeId);
+      if (!guarantee) throw new Error(`Seed capacity lost guarantee ${row.publicId}`);
+      return { status: row.review.status, guarantee };
+    }),
+  );
+  const coverageRatioBps = SEED_COVERAGE_RATIO_BPS;
+  const requirementOf = (status: SeedReviewRow["review"]["status"]) =>
+    loaded
+      .filter((row) => row.status === status)
+      .reduce(
+        (sum, row) => sum + coverRequirementCents({ terms: row.guarantee.terms, coverageRatioBps }),
+        0,
+      );
+  const offeredCents = requirementOf(REVIEW_STATUS.AWAITING_SIGNATURE);
+  const waitingCents = requirementOf(REVIEW_STATUS.AWAITING_CAPACITY);
+  const onRiskCoverCents = await sumInsuredExposure(ctx);
+  const required = requiredCoverageCents({ onRiskCoverCents, coverageRatioBps });
+  const balanceCents = required + offeredCents + Math.floor(waitingCents / 2);
+  const takenAt = Date.now();
+  await ctx.db.insert("reserveBalanceSnapshots", {
+    balanceCents,
+    takenAt,
+    source: "squads_vault",
+  });
+
+  for (const { status, guarantee } of loaded) {
+    if (status !== REVIEW_STATUS.AWAITING_CAPACITY && status !== REVIEW_STATUS.SIGNED) continue;
+    const ownRequirementCents = coverRequirementCents({ terms: guarantee.terms, coverageRatioBps });
+    const ownCoverCents = guarantee.terms.coverageCeilingCents + guarantee.terms.exitCostCapCents;
+    // An activated guarantee was measured before it joined the on-risk book.
+    const requiredAtCheck =
+      status === REVIEW_STATUS.SIGNED
+        ? requiredCoverageCents({
+            onRiskCoverCents: onRiskCoverCents - ownCoverCents,
+            coverageRatioBps,
+          })
+        : required;
+    const figures = {
+      snapshotTakenAt: takenAt,
+      balanceCents,
+      coverageRatioBps,
+      requiredCoverageCents: requiredAtCheck,
+      activeHoldsCents: offeredCents,
+      freeCapitalCents: freeCapitalCents({
+        balanceCents,
+        requiredCoverageCents: requiredAtCheck,
+        activeHoldsCents: offeredCents,
+      }),
+      ownRequirementCents,
+    };
+    const fits = checkReserveCapacity(figures);
+    const passed = status === REVIEW_STATUS.SIGNED;
+    if (fits.success !== passed) {
+      throw new Error(`Seed capacity for ${guarantee.publicId} does not tell the intended story`);
+    }
+    await ctx.db.patch(guarantee._id, {
+      activationCheck: {
+        outcome: passed ? "passed" : "insufficient_capacity",
+        checkedAt: new Date(takenAt).toISOString(),
+        ...figures,
+        shortfallCents: fits.success ? 0 : fits.error.shortfallCents,
+      },
+    });
+  }
+}
+
+/**
+ * Seeded signed guarantees carry the approved signed rental contract that
+ * put them there. A mutation cannot write file storage,
+ * so `seedReset` schedules this action to store a stand-in PDF per draft.
+ */
+export const attachSeedSignedContracts = internalAction({
+  args: {
+    contracts: v.array(
+      v.object({
+        guaranteeId: v.id("guarantees"),
+        agencyId: v.id("agencies"),
+        uploadedBy: v.id("users"),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    for (const contract of args.contracts) {
+      const storageId = await ctx.storage.store(
+        new Blob(["%PDF-1.4\n% Mutav seed — contrato assinado\n"], { type: "application/pdf" }),
+      );
+      await ctx.runMutation(internal.seed.insertSeedSignedContract, { ...contract, storageId });
+    }
+  },
+});
+
+export const insertSeedSignedContract = internalMutation({
+  args: {
+    guaranteeId: v.id("guarantees"),
+    agencyId: v.id("agencies"),
+    uploadedBy: v.id("users"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const blob = await ctx.db.system.get(args.storageId);
+    await ctx.db.insert("guaranteeDocuments", {
+      guaranteeId: args.guaranteeId,
+      agencyId: args.agencyId,
+      key: DOCUMENT_KEY.RENTAL_CONTRACT,
+      storageId: args.storageId,
+      fileName: "contrato-assinado.pdf",
+      contentType: "application/pdf",
+      sizeBytes: blob?.size ?? 0,
+      uploadedBy: { kind: "agency_user", userId: args.uploadedBy },
+      uploadedAt: new Date().toISOString(),
+      status: "approved",
+    });
+  },
+});
+
 async function insertSeedGuarantee(
   ctx: MutationCtx,
   {
@@ -576,14 +879,11 @@ async function insertSeedGuarantee(
   },
 ): Promise<SeededLeaseAndGuarantee> {
   const tier = tierForScore(tenant.score);
-  if (tier === SCORE_TIER.NEGADO) {
-    throw new Error(`Seed tenant for guarantee ${publicId} has a denied score`);
-  }
 
   const priced = priceGuarantee(
     {
       rentCents,
-      tier,
+      tier: provisionalPricingTier(tier),
       plan: guarantee.plan ?? DEFAULT_GUARANTEE_PLAN,
       productSlug: product.slug,
       // The terms snapshot is taken at activation; only drafts have nothing to date it.
@@ -605,7 +905,14 @@ async function insertSeedGuarantee(
     ...(guarantee.closure ? { closure: guarantee.closure } : {}),
     activatedAt: guarantee.activatedAt,
     nextRenewalDate: guarantee.nextRenewalDate,
-    underwriting: { score: tenant.score, tier },
+    underwriting: {
+      score: tenant.score,
+      tier,
+      review: reviewStatusForInsertedState({
+        state: guarantee.state,
+        closeReason: guarantee.closure?.reason,
+      }),
+    },
     tenantApproval: {
       status: tenant.approvalStatus,
       termApprovedAt: tenant.termApprovedAt,
@@ -2824,7 +3131,7 @@ type SeedPersonasResult = Array<{
  * awaiting it, one in eviction, one draft, and two closed lives — end of lease
  * and a dispute reversal that released its cover. Every notice, cover and
  * activation is dated back from the reseed, so the book always reads as
- * current. Distinct `publicId` range (1000031–1000041) so it doesn't collide
+ * current. Distinct `publicId` range (1000031–1000043) so it doesn't collide
  * with the fictional Paulista/Atlântica/Horizonte ids.
  *
  * Idempotent — if a guarantee in the seeded range already exists, the
@@ -2835,14 +3142,20 @@ async function populateAprovadaBook(
   ctx: MutationCtx,
   {
     agencyId,
+    ownerUserId,
     staffUserId,
     coverBatches,
-  }: { agencyId: AgencyId; staffUserId: UserId; coverBatches: SeedCoverBatches },
+  }: {
+    agencyId: AgencyId;
+    ownerUserId: UserId;
+    staffUserId: UserId;
+    coverBatches: SeedCoverBatches;
+  },
 ) {
   const FIRST_PID = 31;
 
   // Idempotency must be GLOBAL, not per-agency. publicId carries no
-  // DB-level uniqueness constraint; this range (1000031–1000041) is the
+  // DB-level uniqueness constraint; this range (1000031–1000043) is the
   // single canonical Aprovada starter book — if any guarantee already
   // claims it, abort regardless of which agency owns it. Earlier the
   // check filtered by agencyId, which let `seedAprovadaContracts`
@@ -2892,6 +3205,8 @@ async function populateAprovadaBook(
     lease: AprovadaLease | { renews: number };
     /** Underwriting of this life; defaults to the lease tenant's score. */
     score?: number;
+    /** Where Mutav's review of a draft stands; drafts without it stay `editing`. */
+    review?: SeedReviewRow["review"];
   };
 
   // The lease that outlives its first guarantee: the tenant renewed, the old
@@ -3171,6 +3486,141 @@ async function populateAprovadaBook(
       lease: { renews: 5 },
       score: 740,
     },
+    // Waiting in Mutav's underwriting queue. The bureau scored the tenant
+    // `negado`; the draft exists anyway because the score is an input to
+    // compliance's decision, not the decision (ADR 0011).
+    {
+      n: 11,
+      state: GUARANTEE_STATE.DRAFTED,
+      activatedAt: null,
+      nextRenewalDate: dateDaysAgo(-730),
+      review: { status: REVIEW_STATUS.ANALYSIS_REQUESTED, requestedDaysAgo: 1 },
+      lease: {
+        rentCents: 272_000,
+        condoCents: 34_000,
+        property: {
+          cep: "05433-000",
+          streetAndNumber: "Rua Fradique Coutinho, 712",
+          neighborhood: "Vila Madalena",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 33",
+        },
+        tenant: {
+          fullName: "Priscila Nogueira Duarte",
+          cpf: seedCpf(141),
+          birthDate: "1993-03-11",
+          phoneSuffix: "41",
+          emailLocal: "priscila.duarte",
+          score: 390,
+        },
+      },
+    },
+    // Accepted by compliance at its own rate and sent to the tenant to sign.
+    {
+      n: 12,
+      state: GUARANTEE_STATE.DRAFTED,
+      activatedAt: null,
+      nextRenewalDate: dateDaysAgo(-730),
+      review: {
+        status: REVIEW_STATUS.AWAITING_SIGNATURE,
+        requestedDaysAgo: 4,
+        decidedDaysAgo: 3,
+        sentDaysAgo: 2,
+        feeRateBps: 1_300,
+        note: "Renda comprovada acima de 3x o aluguel; taxa intermediária.",
+      },
+      lease: {
+        rentCents: 318_000,
+        condoCents: 41_000,
+        property: {
+          cep: "04038-001",
+          streetAndNumber: "Rua Domingos de Morais, 2200",
+          neighborhood: "Vila Mariana",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 104",
+        },
+        tenant: {
+          fullName: "Eduardo Matos Figueira",
+          cpf: seedCpf(142),
+          birthDate: "1987-06-27",
+          phoneSuffix: "42",
+          emailLocal: "eduardo.figueira",
+          score: 590,
+        },
+      },
+    },
+    // Signed and approved yesterday, and the reserve had room: approving the
+    // signed contract put it on risk (phase-1 rule, issue #427).
+    {
+      n: 13,
+      state: GUARANTEE_STATE.ACTIVE,
+      activatedAt: daysAgo(1, "16:00"),
+      nextRenewalDate: dateDaysAgo(-730),
+      review: {
+        status: REVIEW_STATUS.SIGNED,
+        requestedDaysAgo: 6,
+        decidedDaysAgo: 5,
+        sentDaysAgo: 4,
+        signedDaysAgo: 1,
+        feeRateBps: 1_100,
+        note: "Fiador anterior com histórico limpo; taxa reduzida.",
+      },
+      lease: {
+        rentCents: 246_000,
+        condoCents: 29_000,
+        property: {
+          cep: "05015-000",
+          streetAndNumber: "Rua Cardoso de Almeida, 1450",
+          neighborhood: "Perdizes",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 71",
+        },
+        tenant: {
+          fullName: "Larissa Prado Quintela",
+          cpf: seedCpf(143),
+          birthDate: "1991-01-14",
+          phoneSuffix: "43",
+          emailLocal: "larissa.quintela",
+          score: 720,
+        },
+      },
+    },
+    // The tenant signed after the offer's hold lapsed, and at approval the
+    // reserve was short: it waits for reserve capacity, still a draft.
+    {
+      n: 14,
+      state: GUARANTEE_STATE.DRAFTED,
+      activatedAt: null,
+      nextRenewalDate: dateDaysAgo(-730),
+      review: {
+        status: REVIEW_STATUS.AWAITING_CAPACITY,
+        requestedDaysAgo: 14,
+        decidedDaysAgo: 13,
+        sentDaysAgo: 12,
+        signedDaysAgo: 3,
+        feeRateBps: 1_400,
+        note: "Aluguel alto para a renda declarada; taxa acima da tabela.",
+      },
+      lease: {
+        rentCents: 498_000,
+        condoCents: 72_000,
+        property: {
+          cep: "01426-001",
+          streetAndNumber: "Alameda Lorena, 1820",
+          neighborhood: "Jardins",
+          cityUF: "São Paulo/SP",
+          complement: "Apto 152",
+        },
+        tenant: {
+          fullName: "Henrique Lacerda Bastos",
+          cpf: seedCpf(144),
+          birthDate: "1984-08-02",
+          phoneSuffix: "44",
+          emailLocal: "henrique.bastos",
+          score: 640,
+        },
+      },
+    },
   ];
 
   const inserted: Array<{ spec: AprovadaSpec; lease: AprovadaLease } & SeededLeaseAndGuarantee> =
@@ -3239,8 +3689,29 @@ async function populateAprovadaBook(
     inserted.push({ spec, lease, ...row });
   }
 
-  // Every in-force guarantee bills its fee, arrears or not.
-  const insuredRows = inserted.filter((r) => isInsured({ status: r.spec.state }));
+  const reviewRows = inserted.flatMap((row) =>
+    row.spec.review ? [{ ...row, review: row.spec.review }] : [],
+  );
+  await applyAprovadaReviews(ctx, { product, ownerUserId, staffUserId, rows: reviewRows });
+  await seedReserveCapacity(ctx, { rows: reviewRows });
+  const signedContracts = reviewRows.flatMap((row) =>
+    row.review.status === REVIEW_STATUS.SIGNED ||
+    row.review.status === REVIEW_STATUS.AWAITING_CAPACITY
+      ? [{ guaranteeId: row.guaranteeId, agencyId, uploadedBy: ownerUserId }]
+      : [],
+  );
+  if (signedContracts.length > 0) {
+    await ctx.scheduler.runAfter(0, internal.seed.attachSeedSignedContracts, {
+      contracts: signedContracts,
+    });
+  }
+
+  // Every in-force guarantee bills its fee, arrears or not — except the one
+  // activated yesterday through its review, whose first fee (and activation
+  // fee, marked pending) belongs to the next monthly run.
+  const insuredRows = inserted.filter(
+    (r) => isInsured({ status: r.spec.state }) && r.spec.review === undefined,
+  );
 
   // Two paid months and the current one due.
   const APROVADA_BILLING_MONTHS = 3;
@@ -3652,6 +4123,7 @@ const CLOSE_REASON_LABEL: Record<CloseReason, string> = {
   eviction: "despejo",
   dispute_reversal: "contestação revertida",
   canceled_pre_activation: "cancelada antes da ativação",
+  underwriting_refused: "recusada na análise Mutav",
   death: "falecimento",
 };
 
@@ -3921,16 +4393,19 @@ export const seedReset = internalMutation({
     };
     const fictional = await seedFictional(ctx, { ...args, staffUserId, coverBatches });
 
-    const aprovadaAgencyId = personas.find((p) => p.persona === "agencyowner")?.agencyId;
-    const aprovada = aprovadaAgencyId
-      ? await populateAprovadaBook(ctx, { agencyId: aprovadaAgencyId, staffUserId, coverBatches })
+    const owner = personas.find((p) => p.persona === "agencyowner");
+    const aprovada = owner?.agencyId
+      ? await populateAprovadaBook(ctx, {
+          agencyId: owner.agencyId,
+          ownerUserId: owner.userId,
+          staffUserId,
+          coverBatches,
+        })
       : null;
 
-    const aprovadaOwnerId = personas.find((p) => p.persona === "agencyowner")?.userId;
-    const team =
-      aprovadaAgencyId && aprovadaOwnerId
-        ? await seedAprovadaTeam(ctx, { agencyId: aprovadaAgencyId, ownerId: aprovadaOwnerId })
-        : null;
+    const team = owner?.agencyId
+      ? await seedAprovadaTeam(ctx, { agencyId: owner.agencyId, ownerId: owner.userId })
+      : null;
 
     await attachTenantSnapshots(ctx);
     const transitionRows = await attachGuaranteeTransitionHistory(ctx);

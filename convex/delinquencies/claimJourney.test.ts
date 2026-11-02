@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import schema from "../schema";
 import {
   registerGuaranteeAggregateComponents,
@@ -29,6 +29,8 @@ const VALID_CPF = "52998224725";
 const RENT_CENTS = 300_000;
 const DUE_DAY = 5;
 const STAFF_SUBJECT = "auth0|journey-compliance";
+const FEE_RATE_BPS = 1_200;
+const RESERVE_BALANCE_CENTS = 1_000_000_000_000;
 
 function brazilMonthsAgo(months: number): string {
   const today = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -88,7 +90,7 @@ describe("claim journey: late rent to payout", () => {
   test("every step hands off and the agency always sees the true status", async () => {
     const { t, agency, agencyId, staff } = await setup();
 
-    // 1. The agency writes the guarantee, due day included, and activates it.
+    // 1. The agency writes the guarantee, due day included, and Mutav activates it.
     const { publicId: guaranteePublicId } = unwrap(
       await agency.mutation(api.guarantees.useCases.create, {
         agencyId,
@@ -117,23 +119,36 @@ describe("claim journey: late rent to payout", () => {
         },
       }),
     );
+    // Mutav underwrites the draft, sends the offer against reserve capital and
+    // approves the signed contract; with room in the reserve that approval
+    // puts the guarantee on risk (phase-1 rule, issue #427). The vault balance
+    // the reserve reader would record is written directly.
     unwrap(
-      await agency.mutation(api.guarantees.mutations.activate, {
+      await agency.mutation(api.guarantees.reviewMutations.requestAnalysis, {
         agencyId,
         publicId: guaranteePublicId,
       }),
     );
-    // The guarantee has been in force for a while before the rent goes unpaid.
-    await t.run(async (ctx) => {
-      const guarantee = await ctx.db
-        .query("guarantees")
-        .withIndex("by_publicId", (q) => q.eq("publicId", guaranteePublicId))
-        .unique();
-      if (!guarantee) throw new Error("guarantee missing");
-      await ctx.db.patch(guarantee._id, { activatedAt: "2025-01-01T00:00:00.000Z" });
-    });
+    unwrap(
+      await staff.mutation(api.guarantees.reviewMutations.acceptAnalysis, {
+        publicId: guaranteePublicId,
+        feeRateBps: FEE_RATE_BPS,
+      }),
+    );
+    unwrap(
+      await t.mutation(internal.reserve.balance.recordReserveBalance, {
+        balanceCents: RESERVE_BALANCE_CENTS,
+        takenAt: Date.now(),
+      }),
+    );
+    unwrap(
+      await staff.mutation(api.guarantees.activation.sendForSignature, {
+        publicId: guaranteePublicId,
+      }),
+    );
 
-    // The signed contract is approved — the claim's one precondition on the guarantee.
+    // The signed contract is approved — the claim's one precondition on the
+    // guarantee, and the step that activates it.
     const contract = unwrap(
       await agency.mutation(api.guarantees.documents.attachGuaranteeDocument, {
         agencyId,
@@ -143,11 +158,24 @@ describe("claim journey: late rent to payout", () => {
         fileName: "contrato-assinado.pdf",
       }),
     );
-    unwrap(
+    const approval = unwrap(
       await staff.mutation(api.guarantees.staffDocuments.approveGuaranteeDocument, {
         documentId: contract.documentId,
       }),
     );
+    expect(approval).toMatchObject({
+      reviewSigned: true,
+      activation: { outcome: "activated" },
+    });
+    // The guarantee has been in force for a while before the rent goes unpaid.
+    await t.run(async (ctx) => {
+      const guarantee = await ctx.db
+        .query("guarantees")
+        .withIndex("by_publicId", (q) => q.eq("publicId", guaranteePublicId))
+        .unique();
+      if (!guarantee) throw new Error("guarantee missing");
+      await ctx.db.patch(guarantee._id, { activatedAt: "2025-01-01T00:00:00.000Z" });
+    });
 
     // 2. The picker finds it by tenant, and the agency reports a month that is
     // past the grace period.

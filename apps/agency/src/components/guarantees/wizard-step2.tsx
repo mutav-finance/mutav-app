@@ -5,7 +5,6 @@ import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
-import { Link } from "@mutav/i18n/navigation";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { cn } from "@mutav/ui/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@mutav/ui/tooltip";
@@ -19,6 +18,7 @@ import {
 } from "@/lib/guarantees/wizard";
 import { formatBRLCents } from "@mutav/i18n/brazil";
 import { GUARANTEE_PLAN, type GuaranteeTerms, type ScoreTier } from "@convex/guarantees/domain";
+import { provisionalPricingTier } from "@convex/guarantees/review";
 import {
   isPlanOffered,
   priceGuarantee,
@@ -134,7 +134,8 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
 
   const score = scoreResult?.score ?? null;
   const scoreTier = scoreResult?.tier ?? null;
-  const priceableTier = scoreTier && scoreTier !== "negado" ? scoreTier : null;
+  // A low score is quoted provisionally; Mutav sets the real rate on review.
+  const priceableTier = scoreTier ? provisionalPricingTier(scoreTier) : null;
 
   const panelState = resolveScorePanelState({
     documentDigits: docDigits,
@@ -143,9 +144,10 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
     requestedFor,
   });
   const isLoading = panelState === SCORE_PANEL_STATE.LOADING;
-  const isNegado = panelState === SCORE_PANEL_STATE.DENIED;
+  const isLowScore = panelState === SCORE_PANEL_STATE.LOW_SCORE;
   const hasNoApplication = panelState === SCORE_PANEL_STATE.NO_APPLICATION;
-  const isScored = panelState === SCORE_PANEL_STATE.SCORED;
+  const isScored =
+    panelState === SCORE_PANEL_STATE.SCORED || panelState === SCORE_PANEL_STATE.LOW_SCORE;
 
   // Client-side preview only: prices the loaded product's own terms through
   // the same function the server uses. The stored `terms` snapshot is whatever
@@ -215,11 +217,11 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
                 )}
               </div>
               <p className="text-muted-foreground text-sm">
-                {isNegado ? t("simulation.deniedMessage") : t("simulation.approvedMessage")}
+                {isLowScore ? t("simulation.lowScoreMessage") : t("simulation.inputMessage")}
               </p>
             </div>
 
-            {!isNegado && preview && (
+            {preview && (
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <span className="text-muted-foreground text-xs">
                   {t("simulation.approvedValueLabel")}
@@ -306,11 +308,7 @@ export function WizardStep2({ data, product, onChange, onNext, onBack }: Props) 
         <Button variant="outline" onClick={onBack}>
           {t("nav.back")}
         </Button>
-        {isNegado ? (
-          <Button variant="outline" asChild>
-            <Link href="/">{t("simulation.closeButton")}</Link>
-          </Button>
-        ) : hasNoApplication ? (
+        {hasNoApplication ? (
           <Button onClick={onBack}>{t("simulation.noApplicationAction")}</Button>
         ) : (
           <Button onClick={handleNext} disabled={isLoading || score === null || !selectedPlan}>
@@ -370,6 +368,10 @@ function EvaluatedItem({
   );
 }
 
+/**
+ * Read-only estimate while prestamista is off. The band rate is provisional:
+ * MUTAV fixes the real rate when it accepts the draft (ADR 0011).
+ */
 function CoverageReport({
   terms,
   feeRate,
@@ -413,7 +415,7 @@ function CoverageReport({
           <PlanRow
             label={t("feeRate")}
             value={formatBRLCents(terms.feeCents)}
-            note={formatPercent(feeRate)}
+            note={t("provisionalRate", { rate: formatPercent(feeRate) })}
           />
           <PlanRow
             label={t("agencyCommission")}
