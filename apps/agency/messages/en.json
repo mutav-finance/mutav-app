@@ -539,8 +539,8 @@
       "ofCeiling": "of {ceiling}"
     },
     "review": {
-      "heading": "Mutav analysis",
-      "progressLabel": "Mutav analysis progress",
+      "heading": "MUTAV analysis",
+      "progressLabel": "MUTAV analysis progress",
       "doneSuffix": " (done)",
       "currentSuffix": " (current)",
       "steps": {
@@ -564,29 +564,29 @@
       },
       "acceptedAt": "Accepted at {rate}",
       "description": {
-        "editing": "Review the draft and request Mutav's analysis when it is ready. Mutav decides whether it takes this contract and at which rate.",
-        "analysis_requested": "Mutav is analysing the tenant. You will be notified by email when there is a decision.",
-        "accepted": "Mutav accepted this contract. The contract will be sent to the tenant for signature.",
-        "awaiting_signature": "The contract was sent to the tenant for signature. Once Mutav approves the signed contract, the guarantee becomes active if Mutav's reserve has room for it.",
-        "signed": "The signed contract was approved by Mutav. The guarantee becomes active once its activation is confirmed.",
-        "awaiting_capacity": "The signed contract was approved. The guarantee becomes active as soon as Mutav's reserve has room for it.",
-        "refused": "Mutav did not accept this contract and the proposal was closed.",
+        "editing": "Review the draft and request MUTAV's analysis when it is ready. MUTAV decides whether it takes this contract and at which rate.",
+        "analysis_requested": "MUTAV is analysing the tenant. You will be notified by email when there is a decision.",
+        "accepted": "MUTAV accepted this contract. The contract will be sent to the tenant for signature.",
+        "awaiting_signature": "The contract was sent to the tenant for signature. Once MUTAV approves the signed contract, the guarantee becomes active if MUTAV's reserve has room for it.",
+        "signed": "The signed contract was approved by MUTAV. The guarantee becomes active once its activation is confirmed.",
+        "awaiting_capacity": "The signed contract was approved. The guarantee becomes active as soon as MUTAV's reserve has room for it.",
+        "refused": "MUTAV did not accept this contract and the proposal was closed.",
         "active": "This guarantee is in force. Its activation fee is billed on the next monthly invoice."
       },
       "requestedOn": "Requested on {date}",
-      "refusalReason": "Reason given by Mutav",
+      "refusalReason": "Reason given by MUTAV",
       "refusedNextStep": "You can start a new proposal for this tenant at any time.",
-      "waitingForReserveCapacity": "Waiting for reserve capacity: Mutav's reserve could not take this guarantee yet. It becomes active automatically as soon as capacity is available — nothing is needed from you.",
+      "waitingForReserveCapacity": "Waiting for reserve capacity: MUTAV's reserve could not take this guarantee yet. It becomes active automatically as soon as capacity is available — nothing is needed from you.",
       "scoreLabel": "Bureau score",
-      "scoreHint": "Input to Mutav's analysis — not a decision",
-      "staffRateLabel": "Fee rate set by Mutav",
-      "requestAnalysis": "Request Mutav analysis",
+      "scoreHint": "Input to MUTAV's analysis — not a decision",
+      "staffRateLabel": "Fee rate set by MUTAV",
+      "requestAnalysis": "Request MUTAV analysis",
       "requesting": "Requesting…",
-      "toastRequested": "Analysis requested. Mutav will review this proposal.",
+      "toastRequested": "Analysis requested. MUTAV will review this proposal.",
       "errors": {
         "NOT_FOUND": "Proposal not found.",
         "NOT_DRAFTED": "This proposal is no longer a draft.",
-        "NOT_EDITING": "Mutav's analysis was already requested for this proposal.",
+        "NOT_EDITING": "MUTAV's analysis was already requested for this proposal.",
         "CREDIT_ASSESSMENT_REQUIRED": "The tenant's credit check has expired. Run it again in a new proposal before requesting analysis.",
         "UNEXPECTED": "Unexpected error. Please try again."
       }
@@ -607,7 +607,7 @@
       "eviction": "Eviction",
       "dispute_reversal": "Dispute reversed",
       "canceled_pre_activation": "Canceled before activation",
-      "underwriting_refused": "Refused in Mutav's analysis",
+      "underwriting_refused": "Refused in MUTAV's analysis",
       "death": "Death"
     },
     "actions": {
@@ -1214,14 +1214,14 @@
     },
     "success": {
       "heading": "GUARANTEE DRAFT CREATED",
-      "subtitle": "The draft is saved. Mutav analyses it before anything goes to the tenant.",
+      "subtitle": "The draft is saved. MUTAV analyses it before anything goes to the tenant.",
       "description": "Next step: request MUTAV's analysis, now or after reviewing the draft on the guarantee page. If MUTAV accepts the proposal, it sets the final fee rate and the contract goes out for signature; the guarantee page shows each step after that.",
       "viewGuarantee": "View guarantee",
       "createAnother": "Create another guarantee",
-      "requestedDescription": "Analysis requested. You will be notified by email when Mutav decides.",
-      "requestAnalysis": "Request Mutav analysis",
+      "requestedDescription": "Analysis requested. You will be notified by email when MUTAV decides.",
+      "requestAnalysis": "Request MUTAV analysis",
       "requesting": "Requesting…",
-      "requested": "Analysis requested. Mutav will review this proposal."
+      "requested": "Analysis requested. MUTAV will review this proposal."
     },
     "nav": {
       "back": "Back",

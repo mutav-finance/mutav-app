@@ -53,12 +53,12 @@ export const sendReviewDecisionNotification = internalAction({
     const link = `${getAppUrl()}/guarantees/${args.publicId}`;
     const accepted = args.decision.outcome === "accepted";
     const subject = accepted
-      ? `Análise Mutav aprovada — garantia ${args.publicId}`
-      : `Análise Mutav recusada — garantia ${args.publicId}`;
+      ? `Análise MUTAV aprovada — garantia ${args.publicId}`
+      : `Análise MUTAV recusada — garantia ${args.publicId}`;
     const body =
       args.decision.outcome === "accepted"
-        ? `<p style="${EMAIL_PARAGRAPH_STYLE}">A Mutav aprovou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong> com taxa de ${(args.decision.feeRateBps / BASIS_POINTS_PER_PERCENT).toFixed(2)}% do aluguel.</p><p style="${EMAIL_PARAGRAPH_STYLE}">O próximo passo é o envio do contrato ao inquilino para assinatura.</p>`
-        : `<p style="${EMAIL_PARAGRAPH_STYLE}">A Mutav recusou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong>.</p><p style="${EMAIL_PARAGRAPH_STYLE}">Motivo: ${escapeHtml(args.decision.reason)}</p><p style="${EMAIL_PARAGRAPH_STYLE}">A proposta foi encerrada. Você pode iniciar uma nova proposta a qualquer momento.</p>`;
+        ? `<p style="${EMAIL_PARAGRAPH_STYLE}">A MUTAV aprovou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong> com taxa de ${(args.decision.feeRateBps / BASIS_POINTS_PER_PERCENT).toFixed(2)}% do aluguel.</p><p style="${EMAIL_PARAGRAPH_STYLE}">O próximo passo é o envio do contrato ao inquilino para assinatura.</p>`
+        : `<p style="${EMAIL_PARAGRAPH_STYLE}">A MUTAV recusou a análise da garantia <strong>${escapeHtml(args.publicId)}</strong>.</p><p style="${EMAIL_PARAGRAPH_STYLE}">Motivo: ${escapeHtml(args.decision.reason)}</p><p style="${EMAIL_PARAGRAPH_STYLE}">A proposta foi encerrada. Você pode iniciar uma nova proposta a qualquer momento.</p>`;
     const html = renderEmailLayout({
       appUrl: getAppUrl(),
       title: subject,
@@ -104,7 +104,7 @@ export const sendGuaranteeActivatedNotification = internalAction({
       appUrl: getAppUrl(),
       title: subject,
       preheader: subject,
-      bodyHtml: `<p style="${EMAIL_PARAGRAPH_STYLE}">A garantia <strong>${publicId}</strong> foi aprovada pela Mutav e está ativa.</p><p style="${EMAIL_PARAGRAPH_STYLE}">A garantia está em vigor a partir de hoje. A taxa de ativação entra na próxima fatura mensal.</p>${renderEmailButton({ label: "Ver garantia", url: link })}`,
+      bodyHtml: `<p style="${EMAIL_PARAGRAPH_STYLE}">A garantia <strong>${publicId}</strong> foi aprovada pela MUTAV e está ativa.</p><p style="${EMAIL_PARAGRAPH_STYLE}">A garantia está em vigor a partir de hoje. A taxa de ativação entra na próxima fatura mensal.</p>${renderEmailButton({ label: "Ver garantia", url: link })}`,
       reason: "a sua imobiliária tem uma garantia na MUTAV.",
     });
     try {

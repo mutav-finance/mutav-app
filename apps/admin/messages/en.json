@@ -383,13 +383,13 @@
   },
   "underwriting": {
     "title": "Underwriting",
-    "subtitle": "Drafts whose agency asked Mutav to analyse the tenant. Accept with a fee rate, or refuse with a reason.",
+    "subtitle": "Drafts whose agency asked MUTAV to analyse the tenant. Accept with a fee rate, or refuse with a reason.",
     "notAvailable": "—",
     "mockScore": "Mock score",
     "daysWaiting": "{days, plural, =0 {today} one {# day} other {# days}}",
     "queue": {
       "heading": "Awaiting decision",
-      "empty": "No draft is waiting for Mutav's analysis.",
+      "empty": "No draft is waiting for MUTAV's analysis.",
       "moreAvailable": "More requests are waiting beyond this page."
     },
     "dispatch": {
@@ -440,8 +440,8 @@
       "commercial": "Commercial"
     },
     "plan": {
-      "basic": "Mutav Fiança",
-      "plus": "Mutav Fiança +"
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
     },
     "actions": {
       "open": "Open",
@@ -476,7 +476,7 @@
         "rent": "Rent",
         "totalRent": "Rent + charges",
         "requestedAt": "Requested on",
-        "staffRate": "Rate set by Mutav",
+        "staffRate": "Rate set by MUTAV",
         "note": "Internal note",
         "refusalReason": "Refusal reason",
         "decidedBy": "Decided by",
@@ -496,7 +496,7 @@
     },
     "accept": {
       "title": "Accept this contract?",
-      "description": "Mutav takes this guarantee at the rate below. The terms are re-priced at that rate and the agency is notified.",
+      "description": "MUTAV takes this guarantee at the rate below. The terms are re-priced at that rate and the agency is notified.",
       "rateLabel": "Fee rate (% of monthly rent)",
       "rateHint": "Between {min}% and {max}%, up to two decimals.",
       "noteLabel": "Internal note (optional)",
@@ -507,7 +507,7 @@
       "title": "Refuse this contract?",
       "description": "The draft is closed for good and the agency is notified with the reason. The agency may start a new proposal.",
       "reasonLabel": "Reason (shown to the agency)",
-      "reasonPlaceholder": "Why Mutav will not take this contract",
+      "reasonPlaceholder": "Why MUTAV will not take this contract",
       "confirm": "Refuse"
     },
     "toast": {
@@ -726,7 +726,7 @@
   },
   "staffGuarantees": {
     "title": "Guarantees",
-    "subtitle": "Drafts on the road to activation. A guarantee becomes active when Mutav approves its signed contract and the reserve has room for it — gated by required coverage. Nobody clicks Activate.",
+    "subtitle": "Drafts on the road to activation. A guarantee becomes active when MUTAV approves its signed contract and the reserve has room for it — gated by required coverage. Nobody clicks Activate.",
     "notAvailable": "—",
     "moreAvailable": "More guarantees are waiting beyond this page.",
     "tabs": {
@@ -777,8 +777,8 @@
       "commercial": "Commercial"
     },
     "plan": {
-      "basic": "Mutav Fiança",
-      "plus": "Mutav Fiança +"
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
     },
     "agencyInactive": "Agency not active",
     "actions": {
@@ -827,7 +827,7 @@
         "product": "Product",
         "plan": "Plan",
         "feeRate": "Fee rate",
-        "staffRate": "Rate set by Mutav",
+        "staffRate": "Rate set by MUTAV",
         "fee": "Monthly fee",
         "coverageCeiling": "Coverage ceiling",
         "activationFee": "Activation fee"

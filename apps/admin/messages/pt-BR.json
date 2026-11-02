@@ -383,13 +383,13 @@
   },
   "underwriting": {
     "title": "Análise de crédito",
-    "subtitle": "Rascunhos cuja imobiliária pediu a análise da Mutav. Aprove com uma taxa ou recuse com um motivo.",
+    "subtitle": "Rascunhos cuja imobiliária pediu a análise da MUTAV. Aprove com uma taxa ou recuse com um motivo.",
     "notAvailable": "—",
     "mockScore": "Score simulado",
     "daysWaiting": "{days, plural, =0 {hoje} one {# dia} other {# dias}}",
     "queue": {
       "heading": "Aguardando decisão",
-      "empty": "Nenhum rascunho aguardando a análise da Mutav.",
+      "empty": "Nenhum rascunho aguardando a análise da MUTAV.",
       "moreAvailable": "Há mais pedidos além desta página."
     },
     "dispatch": {
@@ -440,8 +440,8 @@
       "commercial": "Comercial"
     },
     "plan": {
-      "basic": "Mutav Fiança",
-      "plus": "Mutav Fiança +"
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
     },
     "actions": {
       "open": "Abrir",
@@ -476,7 +476,7 @@
         "rent": "Aluguel",
         "totalRent": "Aluguel + encargos",
         "requestedAt": "Solicitada em",
-        "staffRate": "Taxa definida pela Mutav",
+        "staffRate": "Taxa definida pela MUTAV",
         "note": "Nota interna",
         "refusalReason": "Motivo da recusa",
         "decidedBy": "Decidido por",
@@ -496,7 +496,7 @@
     },
     "accept": {
       "title": "Aprovar este contrato?",
-      "description": "A Mutav assume esta garantia com a taxa abaixo. As condições são reprecificadas com essa taxa e a imobiliária é avisada.",
+      "description": "A MUTAV assume esta garantia com a taxa abaixo. As condições são reprecificadas com essa taxa e a imobiliária é avisada.",
       "rateLabel": "Taxa (% do aluguel mensal)",
       "rateHint": "Entre {min}% e {max}%, até duas casas decimais.",
       "noteLabel": "Nota interna (opcional)",
@@ -507,7 +507,7 @@
       "title": "Recusar este contrato?",
       "description": "O rascunho é encerrado definitivamente e a imobiliária é avisada com o motivo. A imobiliária pode iniciar uma nova proposta.",
       "reasonLabel": "Motivo (exibido à imobiliária)",
-      "reasonPlaceholder": "Por que a Mutav não assume este contrato",
+      "reasonPlaceholder": "Por que a MUTAV não assume este contrato",
       "confirm": "Recusar"
     },
     "toast": {
@@ -726,7 +726,7 @@
   },
   "staffGuarantees": {
     "title": "Garantias",
-    "subtitle": "Propostas a caminho da ativação. A garantia fica ativa quando a Mutav aprova o contrato assinado e a reserva tem espaço para ela — limitada pela cobertura exigida. Ninguém clica em Ativar.",
+    "subtitle": "Propostas a caminho da ativação. A garantia fica ativa quando a MUTAV aprova o contrato assinado e a reserva tem espaço para ela — limitada pela cobertura exigida. Ninguém clica em Ativar.",
     "notAvailable": "—",
     "moreAvailable": "Há mais garantias além desta página.",
     "tabs": {
@@ -777,8 +777,8 @@
       "commercial": "Comercial"
     },
     "plan": {
-      "basic": "Mutav Fiança",
-      "plus": "Mutav Fiança +"
+      "basic": "MUTAV Fiança",
+      "plus": "MUTAV Fiança +"
     },
     "agencyInactive": "Imobiliária inativa",
     "actions": {
@@ -827,7 +827,7 @@
         "product": "Produto",
         "plan": "Plano",
         "feeRate": "Taxa",
-        "staffRate": "Taxa definida pela Mutav",
+        "staffRate": "Taxa definida pela MUTAV",
         "fee": "Mensalidade",
         "coverageCeiling": "Teto de cobertura",
         "activationFee": "Taxa de ativação"
