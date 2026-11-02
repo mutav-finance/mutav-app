@@ -3,9 +3,20 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import schema from "../schema";
-import { buildApprovedHtml, buildRejectedHtml, escapeHtml } from "./actions";
+import { buildApprovedHtml, buildInviteEmailHtml, buildRejectedHtml } from "./actions";
 
 const AGENCY_EMAIL = "contato@imobiliaria.test";
+const APP_URL = "https://app.mutav.test";
+
+function expectBrandedShell(html: string) {
+  expect(html).toContain('src="https://app.mutav.test/email/mutav-logo.png"');
+  expect(html).toContain('alt="MUTAV"');
+  expect(html).toMatch(/>mutav<\/span>/);
+  expect(html).toContain("MUTAV · Garantia locatícia");
+  expect(html).toContain('href="mailto:contato@mutav.finance"');
+  expect(html).toContain("Você recebeu este e-mail porque");
+}
+
 const OWNER_EMAIL = "owner@imobiliaria.test";
 
 type T = ReturnType<typeof convexTest>;
@@ -185,38 +196,63 @@ describe("sendOnboardingDecisionEmail", () => {
 });
 
 describe("decision email templates", () => {
-  test("escapeHtml neutralises markup in free text", () => {
-    expect(escapeHtml(`<script>"x" & 'y'</script>`)).toBe(
-      "&lt;script&gt;&quot;x&quot; &amp; &#39;y&#39;&lt;/script&gt;",
-    );
-  });
-
-  test("approved email links to the agency app", () => {
+  test("approved email links to the agency app inside the branded shell", () => {
     const html = buildApprovedHtml({
+      appUrl: APP_URL,
       agencyName: "Imob <b>",
       signInLink: "https://app.mutav.test",
     });
+    expectBrandedShell(html);
     expect(html).toContain('href="https://app.mutav.test"');
+    expect(html).toContain("Entrar no painel");
     expect(html).toContain("Imob &lt;b&gt;");
     expect(html).not.toContain("Imob <b>");
   });
 
   test("rejected email carries the escaped reason and the resubmit link", () => {
     const html = buildRejectedHtml({
+      appUrl: APP_URL,
       agencyName: "Imob",
       reason: "CRECI <vencido>",
       resubmitLink: "https://app.mutav.test/onboarding/rejected",
     });
+    expectBrandedShell(html);
     expect(html).toContain("CRECI &lt;vencido&gt;");
     expect(html).toContain('href="https://app.mutav.test/onboarding/rejected"');
   });
 
   test("rejected email omits the reason block when there is none", () => {
     const html = buildRejectedHtml({
+      appUrl: APP_URL,
       agencyName: "Imob",
       reason: null,
       resubmitLink: "https://app.mutav.test/onboarding/rejected",
     });
     expect(html).not.toContain("Motivo informado");
+  });
+});
+
+describe("invite email template", () => {
+  const html = buildInviteEmailHtml({
+    appUrl: APP_URL,
+    acceptLink: "https://app.mutav.test/onboarding",
+    email: "convidado@imobiliaria.test",
+    agencyName: "Imob <Centro>",
+    inviterName: "Ana & Bia",
+    role: "member",
+    expiresAt: "2026-11-15T12:00:00.000Z",
+  });
+
+  test("renders inside the branded shell with the accept button", () => {
+    expectBrandedShell(html);
+    expect(html).toContain('href="https://app.mutav.test/onboarding"');
+    expect(html).toContain("Aceitar convite");
+    expect(html).toContain("15 de novembro de 2026");
+  });
+
+  test("escapes the agency and inviter names everywhere", () => {
+    expect(html).toContain("Imob &lt;Centro&gt;");
+    expect(html).toContain("Ana &amp; Bia");
+    expect(html).not.toContain("Imob <Centro>");
   });
 });
