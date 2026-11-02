@@ -1,5 +1,21 @@
 import { describe, expect, test } from "vitest";
-import { buildProposalEmail, buildProposalWhatsApp, type ProposalNotice } from "./notifications";
+import {
+  buildDocumentRejectedEmail,
+  buildProposalEmail,
+  buildProposalWhatsApp,
+  type ProposalNotice,
+} from "./notifications";
+
+const APP_URL = "https://app.mutav.test";
+
+function expectBrandedShell(html: string) {
+  expect(html).toContain('src="https://app.mutav.test/email/mutav-logo.png"');
+  expect(html).toContain('alt="MUTAV"');
+  expect(html).toMatch(/>mutav<\/span>/);
+  expect(html).toContain("MUTAV · Garantia locatícia");
+  expect(html).toContain('href="mailto:contato@mutav.finance"');
+  expect(html).toContain("Você recebeu este e-mail porque");
+}
 
 const NOTICE: ProposalNotice = {
   publicId: "1000042",
@@ -13,13 +29,17 @@ const NOTICE: ProposalNotice = {
 const NBSP = " ";
 
 describe("buildProposalEmail", () => {
-  const email = buildProposalEmail(NOTICE);
+  const email = buildProposalEmail(NOTICE, { appUrl: APP_URL });
 
-  test("links nowhere: no agency-app URL and no anchor at all", () => {
-    expect(email.html).not.toMatch(/<a\s/i);
-    expect(email.html).not.toMatch(/href=/i);
+  test("renders inside the branded shell", () => {
+    expectBrandedShell(email.html);
+  });
+
+  test("links nowhere but support: no agency-app page, no button", () => {
+    const hrefs = [...email.html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
+    expect(hrefs).toEqual(["mailto:contato@mutav.finance"]);
     expect(email.html).not.toContain("/guarantees/");
-    expect(email.html).not.toMatch(/https?:\/\//);
+    expect(email.html).not.toContain('bgcolor="#c47e10"');
   });
 
   test("names the agency and the guarantee in the subject", () => {
@@ -42,6 +62,34 @@ describe("buildProposalEmail", () => {
   test("escapes the tenant name", () => {
     expect(email.html).toContain("Ana &lt;Souza&gt;");
     expect(email.html).not.toContain("Ana <Souza>");
+  });
+});
+
+describe("buildDocumentRejectedEmail", () => {
+  const email = buildDocumentRejectedEmail(
+    {
+      guaranteePublicId: "1000042",
+      documentKey: "inspection",
+      rejectionReason: "Foto <ilegível>",
+    },
+    { appUrl: APP_URL },
+  );
+
+  test("renders inside the branded shell", () => {
+    expectBrandedShell(email.html);
+  });
+
+  test("names the document and guarantee, with the escaped reason", () => {
+    expect(email.subject).toBe("Documento recusado — garantia 1000042");
+    expect(email.html).toContain("<strong>Vistoria</strong>");
+    expect(email.html).toContain("recusado pela equipe MUTAV");
+    expect(email.html).toContain("Foto &lt;ilegível&gt;");
+    expect(email.html).not.toContain("Foto <ilegível>");
+  });
+
+  test("links to the guarantee page", () => {
+    expect(email.html).toContain('href="https://app.mutav.test/guarantees/1000042"');
+    expect(email.html).toContain("Abrir a garantia");
   });
 });
 

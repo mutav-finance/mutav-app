@@ -5,6 +5,13 @@ import { Resend } from "resend";
 import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
 import { getAppUrl, getResendApiKey, getResendFromEmail, isEmailConfigured } from "../lib/env";
+import { escapeHtml } from "../lib/email/escape";
+import {
+  EMAIL_NOTE_STYLE,
+  EMAIL_PARAGRAPH_STYLE,
+  EMAIL_QUOTE_STYLE,
+  renderEmailLayout,
+} from "../lib/email/layout";
 import { logError, logWarn } from "../lib/logger";
 import {
   INVITABLE_ROLE,
@@ -20,6 +27,8 @@ const DECISION_STATE = {
 } as const satisfies Record<OnboardingDecision, OnboardingState>;
 
 const REJECTED_PAGE_PATH = "/onboarding/rejected";
+
+const ONBOARDING_EMAIL_REASON = "a sua imobiliária se cadastrou na MUTAV.";
 
 // Best-effort decision email, scheduled fire-and-forget from
 // `applyOnboardingReview`. The review already committed; a delivery failure
@@ -64,11 +73,16 @@ export const sendOnboardingDecisionEmail = internalAction({
       decision === "approved"
         ? {
             subject: "Seu cadastro na MUTAV foi aprovado",
-            html: buildApprovedHtml({ agencyName: delivery.agencyName, signInLink: appUrl }),
+            html: buildApprovedHtml({
+              appUrl,
+              agencyName: delivery.agencyName,
+              signInLink: appUrl,
+            }),
           }
         : {
             subject: "Seu cadastro na MUTAV precisa de ajustes",
             html: buildRejectedHtml({
+              appUrl,
               agencyName: delivery.agencyName,
               reason: delivery.rejectionReason,
               resubmitLink: `${appUrl}${REJECTED_PAGE_PATH}`,
@@ -89,122 +103,65 @@ export const sendOnboardingDecisionEmail = internalAction({
   },
 });
 
-const HTML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-// Agency name and rejection reason are free text typed by people; never let
-// them inject markup into the email.
-export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
-}
-
-function buildLayout({ title, body }: { title: string; body: string }): string {
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><title>${title}</title></head>
-<body style="margin:0;padding:0;background-color:#ffffff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
-    <tr><td align="center">
-      <table width="540" cellpadding="0" cellspacing="0" style="max-width:540px;width:100%;">
-        <tr>
-          <td style="padding-bottom:36px;">
-            <span style="font-size:15px;font-weight:700;letter-spacing:0.1em;color:#1a1a1a;">MUTAV</span>
-          </td>
-        </tr>
-${body}
-        <tr>
-          <td style="border-top:1px solid #d9d7d2;padding-top:20px;">
-            <p style="margin:0;font-size:12px;color:#9e9c98;line-height:1.6;">
-              MUTAV · Este é um e-mail automático, não responda diretamente a esta mensagem.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-}
-
-function buildCta({ href, label }: { href: string; label: string }): string {
-  return `        <tr>
-          <td style="padding-bottom:32px;">
-            <table cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="background-color:#c47e10;">
-                  <a href="${href}"
-                     style="display:block;padding:14px 32px;color:#1a1a1a;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.02em;">
-                    ${label}
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>`;
-}
-
 export function buildApprovedHtml({
+  appUrl,
   agencyName,
   signInLink,
 }: {
+  appUrl: string;
   agencyName: string;
   signInLink: string;
 }): string {
-  return buildLayout({
+  return renderEmailLayout({
+    appUrl,
     title: "Cadastro aprovado — MUTAV",
-    body: `        <tr>
-          <td style="font-size:15px;color:#1a1a1a;line-height:1.75;">
-            <p style="margin:0 0 16px;">Olá, ${escapeHtml(agencyName)}!</p>
-            <p style="margin:0 0 16px;">
-              Boas notícias: o cadastro da sua imobiliária na <strong>MUTAV</strong> foi
-              analisado e aprovado pela nossa equipe.
-            </p>
-            <p style="margin:0 0 32px;">
-              A partir de agora você já pode entrar no painel e emitir as primeiras
-              garantias locatícias para os seus clientes.
-            </p>
-          </td>
-        </tr>
-${buildCta({ href: signInLink, label: "Entrar no painel" })}`,
+    preheader: "O cadastro da sua imobiliária na MUTAV foi aprovado.",
+    bodyHtml: `<p style="${EMAIL_PARAGRAPH_STYLE}">Olá, ${escapeHtml(agencyName)}!</p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  Boas notícias: o cadastro da sua imobiliária na <strong>MUTAV</strong> foi
+                  analisado e aprovado pela nossa equipe.
+                </p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  A partir de agora você já pode entrar no painel e emitir as primeiras
+                  garantias locatícias para os seus clientes.
+                </p>`,
+    cta: { label: "Entrar no painel", url: signInLink },
+    reason: ONBOARDING_EMAIL_REASON,
   });
 }
 
 export function buildRejectedHtml({
+  appUrl,
   agencyName,
   reason,
   resubmitLink,
 }: {
+  appUrl: string;
   agencyName: string;
   reason: string | null;
   resubmitLink: string;
 }): string {
   const reasonBlock = reason
-    ? `            <p style="margin:0 0 8px;font-size:13px;color:#6b6860;">Motivo informado pela nossa equipe:</p>
-            <p style="margin:0 0 24px;padding:12px 16px;border-left:2px solid #c47e10;background-color:#fff8ee;">${escapeHtml(reason)}</p>`
+    ? `<p style="${EMAIL_NOTE_STYLE}margin-bottom:8px;">Motivo informado pela nossa equipe:</p>
+                <p style="${EMAIL_QUOTE_STYLE}">${escapeHtml(reason)}</p>`
     : "";
 
-  return buildLayout({
+  return renderEmailLayout({
+    appUrl,
     title: "Cadastro não aprovado — MUTAV",
-    body: `        <tr>
-          <td style="font-size:15px;color:#1a1a1a;line-height:1.75;">
-            <p style="margin:0 0 16px;">Olá, ${escapeHtml(agencyName)}!</p>
-            <p style="margin:0 0 16px;">
-              Analisamos o cadastro da sua imobiliária na <strong>MUTAV</strong> e, por
-              enquanto, não conseguimos aprová-lo.
-            </p>
-${reasonBlock}
-            <p style="margin:0 0 32px;">
-              Seus dados continuam salvos. Basta acessar o link abaixo, corrigir o que
-              for necessário e reenviar o cadastro para uma nova análise.
-            </p>
-          </td>
-        </tr>
-${buildCta({ href: resubmitLink, label: "Corrigir e reenviar" })}`,
+    preheader: "O cadastro da sua imobiliária na MUTAV precisa de ajustes.",
+    bodyHtml: `<p style="${EMAIL_PARAGRAPH_STYLE}">Olá, ${escapeHtml(agencyName)}!</p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  Analisamos o cadastro da sua imobiliária na <strong>MUTAV</strong> e, por
+                  enquanto, não conseguimos aprová-lo.
+                </p>
+                ${reasonBlock}
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  Seus dados continuam salvos. Basta acessar o link abaixo, corrigir o que
+                  for necessário e reenviar o cadastro para uma nova análise.
+                </p>`,
+    cta: { label: "Corrigir e reenviar", url: resubmitLink },
+    reason: ONBOARDING_EMAIL_REASON,
   });
 }
 
@@ -243,12 +200,17 @@ export const sendInviteEmail = internalAction({
       return;
     }
     try {
+      const appUrl = getAppUrl();
       const resend = new Resend(getResendApiKey());
       await resend.emails.send({
         from: getResendFromEmail(),
         to: args.email,
         subject: `Convite para a equipe ${args.agencyName} na MUTAV`,
-        html: buildInviteEmailHtml({ ...args, acceptLink: `${getAppUrl()}/onboarding` }),
+        html: buildInviteEmailHtml({
+          ...args,
+          appUrl,
+          acceptLink: `${appUrl}/onboarding`,
+        }),
       });
     } catch (error) {
       logError("[invites] delivery rejected", { reason: error });
@@ -263,59 +225,27 @@ function formatExpiry(expiresAt: string): string {
   }).format(new Date(expiresAt));
 }
 
-function buildInviteEmailHtml(args: InviteEmailArgs & { acceptLink: string }): string {
-  const agencyName = escapeHtml(args.agencyName);
-  const inviterName = escapeHtml(args.inviterName);
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><title>Convite para ${agencyName} — MUTAV</title></head>
-<body style="margin:0;padding:0;background-color:#ffffff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
-    <tr><td align="center">
-      <table width="540" cellpadding="0" cellspacing="0" style="max-width:540px;width:100%;">
-        <tr>
-          <td style="padding-bottom:36px;">
-            <span style="font-size:15px;font-weight:700;letter-spacing:0.1em;color:#1a1a1a;">MUTAV</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="font-size:15px;color:#1a1a1a;line-height:1.75;">
-            <p style="margin:0 0 16px;">Olá!</p>
-            <p style="margin:0 0 16px;">
-              ${inviterName} convidou você para entrar na equipe da
-              <strong>${agencyName}</strong> na MUTAV como ${ROLE_LABEL_PT[args.role]}.
-            </p>
-            <p style="margin:0 0 32px;">
-              Entre com este endereço de e-mail (${escapeHtml(args.email)}) e aceite o convite
-              na tela inicial. Não é preciso cadastrar uma nova imobiliária.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding-bottom:32px;">
-            <table cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="background-color:#c47e10;">
-                  <a href="${args.acceptLink}"
-                     style="display:block;padding:14px 32px;color:#1a1a1a;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.02em;">
-                    Aceitar convite
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="font-size:13px;color:#6b6860;line-height:1.75;padding-bottom:40px;">
-            <p style="margin:0;">
-              Este convite vale até ${formatExpiry(args.expiresAt)}. Se você não esperava este
-              e-mail, pode ignorá-lo com segurança.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+export function buildInviteEmailHtml(
+  args: InviteEmailArgs & { appUrl: string; acceptLink: string },
+): string {
+  return renderEmailLayout({
+    appUrl: args.appUrl,
+    title: `Convite para ${args.agencyName} — MUTAV`,
+    preheader: `${args.inviterName} convidou você para a equipe ${args.agencyName} na MUTAV.`,
+    bodyHtml: `<p style="${EMAIL_PARAGRAPH_STYLE}">Olá!</p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  ${escapeHtml(args.inviterName)} convidou você para entrar na equipe da
+                  <strong>${escapeHtml(args.agencyName)}</strong> na MUTAV como ${ROLE_LABEL_PT[args.role]}.
+                </p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  Entre com este endereço de e-mail (${escapeHtml(args.email)}) e aceite o convite
+                  na tela inicial. Não é preciso cadastrar uma nova imobiliária.
+                </p>
+                <p style="${EMAIL_NOTE_STYLE}">
+                  Este convite vale até ${formatExpiry(args.expiresAt)}. Se você não esperava este
+                  e-mail, pode ignorá-lo com segurança.
+                </p>`,
+    cta: { label: "Aceitar convite", url: args.acceptLink },
+    reason: `alguém da equipe ${args.agencyName} convidou este endereço para a MUTAV.`,
+  });
 }

@@ -40,7 +40,7 @@ export default async function GlobalNotFound() {
           here must take its strings as props or extend this pick.
         */}
         <NextIntlClientProvider messages={{}}>
-          <BareShell brand={<Wordmark variant="display" size="md" />} dataFront="imobiliarias">
+          <BareShell brand={<Wordmark size="md" />} dataFront="imobiliarias">
             <NotFoundContent />
           </BareShell>
         </NextIntlClientProvider>

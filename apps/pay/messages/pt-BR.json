@@ -1,7 +1,8 @@
 {
   "meta": {
-    "title": "Mutav — Sistema de Garantia Registrada",
-    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain."
+    "title": "MUTAV — Garantia locatícia",
+    "description": "Dashboard para gerenciar garantias de aluguel registradas em blockchain.",
+    "descriptor": "Garantia locatícia"
   },
   "common": {
     "a11y": {
@@ -24,8 +25,8 @@
     },
     "picker": {
       "meta": {
-        "title": "Pagar fatura {publicId} | Mutav",
-        "description": "Escolha como pagar sua fatura Mutav."
+        "title": "Pagar fatura {publicId} · MUTAV",
+        "description": "Escolha como pagar sua fatura MUTAV."
       },
       "heading": "Como você quer pagar?",
       "pix": {
@@ -46,13 +47,13 @@
     },
     "stellar": {
       "meta": {
-        "title": "Pagar com Stellar — {publicId} | Mutav",
-        "description": "Pague sua fatura Mutav via Stellar (XLM ou USDC)."
+        "title": "Pagar com Stellar — {publicId} · MUTAV",
+        "description": "Pague sua fatura MUTAV via Stellar (XLM ou USDC)."
       }
     },
     "anchortest": {
       "meta": {
-        "title": "AnchorTest — {publicId} | Mutav",
+        "title": "AnchorTest — {publicId} · MUTAV",
         "description": "Pague via interface da anchor (SEP-24 — demo)."
       },
       "orderId": "Pedido",
@@ -94,8 +95,8 @@
     },
     "pix": {
       "meta": {
-        "title": "Pagar com PIX — {publicId} | Mutav",
-        "description": "Pague sua fatura Mutav via PIX."
+        "title": "Pagar com PIX — {publicId} · MUTAV",
+        "description": "Pague sua fatura MUTAV via PIX."
       },
       "copyCode": "PIX copia e cola",
       "orderId": "Pedido",
@@ -143,8 +144,8 @@
     },
     "pago": {
       "meta": {
-        "title": "Pago — {publicId} | Mutav",
-        "description": "Comprovante de pagamento Mutav."
+        "title": "Pago — {publicId} · MUTAV",
+        "description": "Comprovante de pagamento MUTAV."
       },
       "badge": {
         "paid": "Pago",
@@ -167,7 +168,7 @@
   },
   "paymentDetails": {
     "meta": {
-      "title": "Fatura {id} | Mutav",
+      "title": "Fatura {id} · MUTAV",
       "description": "Detalhes da fatura"
     },
     "breadcrumb": "Detalhes da Fatura",
@@ -245,11 +246,11 @@
   "paymentFlow": {
     "meta": {
       "title": "Pagar com Stellar — {publicId}",
-      "description": "Pague a fatura Mutav via rede Stellar."
+      "description": "Pague a fatura MUTAV via rede Stellar."
     },
     "shell": {
       "paymentLabel": "Fatura",
-      "footerBrand": "Mutav · Protocolo de Garantia de Aluguel"
+      "footerBrand": "MUTAV · Garantia locatícia"
     },
     "summary": {
       "dueLabel": "Vence em",

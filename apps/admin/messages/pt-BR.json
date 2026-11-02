@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Mutav Admin",
-    "description": "Console interno da equipe Mutav."
+    "title": "MUTAV Admin",
+    "description": "Console interno da equipe MUTAV."
   },
   "common": {
     "a11y": {
@@ -26,8 +26,7 @@
   },
   "nav": {
     "brand": {
-      "title": "Mutav Admin",
-      "subtitle": "Console da equipe"
+      "eyebrow": "Admin"
     },
     "main": {
       "overview": "Visão geral",
@@ -46,16 +45,16 @@
   "accessDenied": {
     "eyebrow": "Acesso restrito",
     "title": "Você não tem acesso ao painel administrativo",
-    "subtitle": "Sua conta está autenticada, mas não faz parte da equipe Mutav. Se você administra uma imobiliária, seu painel é o de Imobiliárias.",
+    "subtitle": "Sua conta está autenticada, mas não faz parte da equipe MUTAV. Se você administra uma imobiliária, seu painel é o de Imobiliárias.",
     "anonymousEyebrow": "Autenticação necessária",
     "anonymousTitle": "Entre para acessar o painel administrativo",
-    "anonymousSubtitle": "O painel administrativo é restrito à equipe Mutav. Entre para verificarmos seu acesso.",
+    "anonymousSubtitle": "O painel administrativo é restrito à equipe MUTAV. Entre para verificarmos seu acesso.",
     "staffEyebrow": "Acesso liberado",
     "staffTitle": "Você tem acesso ao painel administrativo",
-    "staffSubtitle": "Sua conta faz parte da equipe Mutav. Esta página é exibida a quem não tem acesso.",
+    "staffSubtitle": "Sua conta faz parte da equipe MUTAV. Esta página é exibida a quem não tem acesso.",
     "unavailableEyebrow": "Serviço indisponível",
     "unavailableTitle": "Não foi possível verificar seu acesso",
-    "unavailableSubtitle": "Sua sessão está ativa, mas não conseguimos consultar a equipe Mutav agora. Tente novamente em alguns instantes.",
+    "unavailableSubtitle": "Sua sessão está ativa, mas não conseguimos consultar a equipe MUTAV agora. Tente novamente em alguns instantes.",
     "goToAgency": "Ir para Imobiliárias",
     "goToAdmin": "Voltar ao painel administrativo",
     "signIn": "Entrar",
@@ -64,7 +63,7 @@
   },
   "staff": {
     "title": "Equipe",
-    "subtitle": "Conceda ou revogue capacidades internas da Mutav.",
+    "subtitle": "Conceda ou revogue capacidades internas da MUTAV.",
     "empty": "Nenhum membro da equipe ainda.",
     "columns": {
       "auth0Sub": "Identificador Auth0",
@@ -93,7 +92,7 @@
       "roleLabel": "Papel",
       "submit": "Conceder papel",
       "removeTitle": "Revogar papel de equipe",
-      "removeDescription": "A capacidade é removida imediatamente. O usuário mantém a identidade Auth0, mas perde este poder na Mutav."
+      "removeDescription": "A capacidade é removida imediatamente. O usuário mantém a identidade Auth0, mas perde este poder na MUTAV."
     },
     "toast": {
       "createSuccess": "Papel concedido.",
@@ -114,7 +113,7 @@
   },
   "adminShell": {
     "placeholder": {
-      "title": "Mutav admin",
+      "title": "MUTAV Admin",
       "subtitle": "Pilares A1–A6 pendentes — esta é a casca vazia do shell de staff.",
       "pillarPending": "Ainda não construído — em um milestone futuro."
     }
@@ -677,11 +676,11 @@
     },
     "uploaderKind": {
       "agency_user": "Imobiliária · {name}",
-      "staff": "Mutav · {name}"
+      "staff": "MUTAV · {name}"
     },
     "uploadedBy": {
       "agency_user": "Enviado por {name} (imobiliária) em {date} · {size}",
-      "staff": "Enviado por {name} (Mutav) em {date} · {size}"
+      "staff": "Enviado por {name} (MUTAV) em {date} · {size}"
     },
     "reviewedBy": "Analisado por {name} em {date}",
     "rejectionReason": "Motivo da recusa: {reason}",

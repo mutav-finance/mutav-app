@@ -261,7 +261,8 @@ for app in agency admin fund pay; do
     fail "$globals is missing @source \"../../../../packages/ui/src\" — @mutav/ui classes compile to nothing"
     ui_wiring_violations=$((ui_wiring_violations + 1))
   fi
-  if ! rg -q 'transpilePackages:.*"@mutav/ui"' "$config" 2>/dev/null; then
+  # Multiline: prettier wraps the array once it outgrows the line.
+  if ! rg -U -q 'transpilePackages:\s*\[[^\]]*"@mutav/ui"' "$config" 2>/dev/null; then
     fail "$config does not list \"@mutav/ui\" in transpilePackages — the package ships TSX source"
     ui_wiring_violations=$((ui_wiring_violations + 1))
   fi
@@ -343,6 +344,27 @@ if [[ -n "$pii_console_hits" ]]; then
   done <<< "$pii_console_hits"
 else
   pass "no console.* under convex/ carries a personal-data field"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11. Brand name casing in user-facing copy — every app under apps/
+#
+#     In prose, titles, aria-labels and emails the name is "MUTAV". The
+#     lowercase "mutav" is the logo lockup (Wordmark) and also appears in
+#     URLs and addresses (contato@mutav.finance); both are allowed. Title
+#     case "Mutav" is never correct in a message value. Keys are not checked
+#     (uploadedByMutav is a key, not copy).
+# ─────────────────────────────────────────────────────────────────────────────
+section "11. brand name casing in messages (MUTAV, never Mutav)"
+
+mutav_casing_hits=$(rg -n --with-filename --no-heading '":\s*"[^"]*\bMutav\b' apps/*/messages/*.json 2>/dev/null || true)
+
+if [[ -n "$mutav_casing_hits" ]]; then
+  while IFS= read -r line; do
+    fail "$line — write the name as MUTAV in copy (lowercase mutav is the Wordmark only)"
+  done <<< "$mutav_casing_hits"
+else
+  pass "no message value spells the brand as Mutav"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
