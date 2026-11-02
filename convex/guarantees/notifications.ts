@@ -8,6 +8,15 @@
  * Pure builders (no `"use node"`) so the copy is testable outside the action.
  */
 
+import { escapeHtml } from "../lib/email/escape";
+import {
+  EMAIL_NOTE_STYLE,
+  EMAIL_PARAGRAPH_STYLE,
+  EMAIL_QUOTE_STYLE,
+  renderEmailButton,
+  renderEmailLayout,
+} from "../lib/email/layout";
+
 export type ProposalNotice = {
   publicId: string;
   tenantName: string;
@@ -28,18 +37,6 @@ function formatCents(cents: number): string {
   return BRL.format(cents / 100);
 }
 
-const HTML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
-}
-
 export function buildProposalWhatsApp(notice: ProposalNotice): string {
   return `Olá, *${notice.tenantName}*!
 
@@ -52,77 +49,91 @@ A imobiliária *${notice.agencyName}* solicitou uma *Garantia Locatícia MUTAV* 
 Você não precisa fazer nada agora: a imobiliária vai entrar em contato para a assinatura do contrato. Qualquer dúvida, fale com ela.`;
 }
 
-export function buildProposalEmail(notice: ProposalNotice): ProposalEmail {
+export function buildProposalEmail(
+  notice: ProposalNotice,
+  { appUrl }: { appUrl: string },
+): ProposalEmail {
   const tenantName = escapeHtml(notice.tenantName);
   const agencyName = escapeHtml(notice.agencyName);
   const publicId = escapeHtml(notice.publicId);
   const row = (label: string, value: string) => `
-              <tr>
-                <td style="padding:6px 0;color:#6b6860;">${label}</td>
-                <td style="padding:6px 0;text-align:right;font-weight:600;">${value}</td>
-              </tr>`;
+                  <tr>
+                    <td style="padding:6px 0;color:#6b6860;">${label}</td>
+                    <td style="padding:6px 0;text-align:right;font-weight:600;">${value}</td>
+                  </tr>`;
 
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><title>Garantia locatícia solicitada — MUTAV</title></head>
-<body style="margin:0;padding:0;background-color:#ffffff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
-    <tr><td align="center">
-      <table width="540" cellpadding="0" cellspacing="0" style="max-width:540px;width:100%;">
-
-        <tr>
-          <td style="padding-bottom:36px;">
-            <span style="font-size:15px;font-weight:700;letter-spacing:0.1em;color:#1a1a1a;">MUTAV</span>
-          </td>
-        </tr>
-
-        <tr>
-          <td style="font-size:15px;color:#1a1a1a;line-height:1.75;">
-            <p style="margin:0 0 16px;">Olá, ${tenantName}!</p>
-            <p style="margin:0 0 16px;">
-              A imobiliária <strong>${agencyName}</strong> solicitou uma
-              <strong>Garantia Locatícia MUTAV</strong> para a sua locação.
-              Estes são os dados principais:
-            </p>
-          </td>
-        </tr>
-
-        <tr>
-          <td style="padding-bottom:24px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#1a1a1a;border-top:1px solid #d9d7d2;border-bottom:1px solid #d9d7d2;">${row("Garantia", publicId)}${row("Aluguel", formatCents(notice.rentCents))}${row("Taxa mensal da garantia", formatCents(notice.feeCents))}${row("Cobertura", `até ${formatCents(notice.coverageCents)}`)}
-            </table>
-          </td>
-        </tr>
-
-        <tr>
-          <td style="font-size:15px;color:#1a1a1a;line-height:1.75;padding-bottom:40px;">
-            <p style="margin:0 0 16px;">
-              Você não precisa fazer nada agora. A imobiliária vai entrar em contato
-              para a assinatura do contrato de garantia, e a garantia entra em vigor
-              depois que o contrato assinado for aprovado e a garantia registrada pela MUTAV.
-            </p>
-            <p style="margin:0;">
-              Qualquer dúvida sobre a garantia ou a sua locação, fale com a imobiliária.
-            </p>
-          </td>
-        </tr>
-
-        <tr>
-          <td style="border-top:1px solid #d9d7d2;padding-top:20px;">
-            <p style="margin:0;font-size:12px;color:#9e9c98;line-height:1.6;">
-              MUTAV · Este é um e-mail automático, não responda diretamente a esta mensagem.
-            </p>
-          </td>
-        </tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  const html = renderEmailLayout({
+    appUrl,
+    title: "Garantia locatícia solicitada — MUTAV",
+    preheader: `A imobiliária ${notice.agencyName} solicitou uma Garantia Locatícia MUTAV para a sua locação.`,
+    bodyHtml: `<p style="${EMAIL_PARAGRAPH_STYLE}">Olá, ${tenantName}!</p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  A imobiliária <strong>${agencyName}</strong> solicitou uma
+                  <strong>Garantia Locatícia MUTAV</strong> para a sua locação.
+                  Estes são os dados principais:
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px 0;font-size:14px;color:#1a1a1a;border-top:1px solid #d9d7d2;border-bottom:1px solid #d9d7d2;">${row("Garantia", publicId)}${row("Aluguel", formatCents(notice.rentCents))}${row("Taxa mensal da garantia", formatCents(notice.feeCents))}${row("Cobertura", `até ${formatCents(notice.coverageCents)}`)}
+                </table>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  Você não precisa fazer nada agora. A imobiliária vai entrar em contato
+                  para a assinatura do contrato de garantia, e a garantia entra em vigor
+                  depois que o contrato assinado for aprovado e a garantia registrada pela MUTAV.
+                </p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">
+                  Qualquer dúvida sobre a garantia ou a sua locação, fale com a imobiliária.
+                </p>`,
+    reason: `a imobiliária ${notice.agencyName} solicitou uma garantia locatícia MUTAV para a sua locação.`,
+  });
 
   return {
     subject: `Garantia locatícia solicitada pela ${notice.agencyName} — ${notice.publicId}`,
+    html,
+  };
+}
+
+// ─── Guarantee document review ────────────────────────────────────────────────
+
+export type RejectedDocumentKey = "rentalContract" | "inspection" | "policy";
+
+const DOCUMENT_LABEL_PT: Record<RejectedDocumentKey, string> = {
+  rentalContract: "Contrato de locação assinado",
+  inspection: "Vistoria",
+  policy: "Apólice",
+};
+
+export type DocumentRejectedNotice = {
+  guaranteePublicId: string;
+  documentKey: RejectedDocumentKey;
+  rejectionReason: string;
+};
+
+/** Agency-facing: a document on one of its guarantees was rejected by staff. */
+export function buildDocumentRejectedEmail(
+  notice: DocumentRejectedNotice,
+  { appUrl }: { appUrl: string },
+): ProposalEmail {
+  const guaranteeLink = `${appUrl}/guarantees/${encodeURIComponent(notice.guaranteePublicId)}`;
+  const label = DOCUMENT_LABEL_PT[notice.documentKey];
+  const html = renderEmailLayout({
+    appUrl,
+    title: "Documento recusado — MUTAV",
+    preheader: `${label} da garantia ${notice.guaranteePublicId} foi recusado.`,
+    bodyHtml: `<p style="${EMAIL_PARAGRAPH_STYLE}">
+                  O documento <strong>${escapeHtml(label)}</strong> enviado para a garantia
+                  <strong>${escapeHtml(notice.guaranteePublicId)}</strong> foi recusado pela equipe MUTAV.
+                </p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}margin-bottom:8px;"><strong>Motivo:</strong></p>
+                <p style="${EMAIL_QUOTE_STYLE}">${escapeHtml(notice.rejectionReason)}</p>
+                <p style="${EMAIL_PARAGRAPH_STYLE}">Envie um novo arquivo pela página da garantia.</p>
+                ${renderEmailButton({ label: "Abrir a garantia", url: guaranteeLink })}
+                <p style="${EMAIL_NOTE_STYLE}margin-top:24px;">
+                  Se o botão não abrir, copie este endereço:
+                  <a href="${escapeHtml(guaranteeLink)}" style="color:#6b6860;">${escapeHtml(guaranteeLink)}</a>
+                </p>`,
+    reason: "a sua imobiliária enviou um documento para uma garantia na MUTAV.",
+  });
+  return {
+    subject: `Documento recusado — garantia ${notice.guaranteePublicId}`,
     html,
   };
 }

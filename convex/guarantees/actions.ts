@@ -11,7 +11,12 @@ import {
   getWhatsAppApiKey,
 } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
-import { buildProposalEmail, buildProposalWhatsApp, type ProposalNotice } from "./notifications";
+import {
+  buildDocumentRejectedEmail,
+  buildProposalEmail,
+  buildProposalWhatsApp,
+  type ProposalNotice,
+} from "./notifications";
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
@@ -46,7 +51,7 @@ async function sendEmail({ to, notice }: { to: string; notice: ProposalNotice })
     return;
   }
   const resend = new Resend(getResendApiKey());
-  const { subject, html } = buildProposalEmail(notice);
+  const { subject, html } = buildProposalEmail(notice, { appUrl: getAppUrl() });
   await resend.emails.send({ from: getResendFromEmail(), to, subject, html });
 }
 
@@ -74,24 +79,6 @@ async function sendWhatsApp({
 
 // ─── Guarantee document review ────────────────────────────────────────────────
 
-const DOCUMENT_LABEL_PT: Record<"rentalContract" | "inspection" | "policy", string> = {
-  rentalContract: "Contrato de locação assinado",
-  inspection: "Vistoria",
-  policy: "Apólice",
-};
-
-const HTML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (character) => HTML_ESCAPES[character] ?? character);
-}
-
 /**
  * Tells the agency a document attached to one of its guarantees was rejected,
  * with the reviewer's reason, so it can upload a corrected file. Skips when
@@ -111,27 +98,16 @@ export const sendDocumentRejectedEmail = internalAction({
       return;
     }
     const resend = new Resend(getResendApiKey());
-    const guaranteeLink = `${getAppUrl()}/guarantees/${encodeURIComponent(args.guaranteePublicId)}`;
-    const label = DOCUMENT_LABEL_PT[args.documentKey];
+    const { subject, html } = buildDocumentRejectedEmail(
+      {
+        guaranteePublicId: args.guaranteePublicId,
+        documentKey: args.documentKey,
+        rejectionReason: args.rejectionReason,
+      },
+      { appUrl: getAppUrl() },
+    );
     try {
-      await resend.emails.send({
-        from: getResendFromEmail(),
-        to: args.to,
-        subject: `Documento recusado — garantia ${args.guaranteePublicId}`,
-        html: `<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><title>Documento recusado — MUTAV</title></head>
-<body style="margin:0;padding:24px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1a1a1a;">
-  <p style="font-size:15px;font-weight:700;letter-spacing:0.1em;">MUTAV</p>
-  <p>O documento <strong>${escapeHtml(label)}</strong> enviado para a garantia
-  <strong>${escapeHtml(args.guaranteePublicId)}</strong> foi recusado pela equipe Mutav.</p>
-  <p><strong>Motivo:</strong> ${escapeHtml(args.rejectionReason)}</p>
-  <p>Envie um novo arquivo pela página da garantia:
-  <a href="${escapeHtml(guaranteeLink)}">${escapeHtml(guaranteeLink)}</a></p>
-  <p style="font-size:12px;color:#9e9c98;">Este é um e-mail automático, não responda diretamente a esta mensagem.</p>
-</body>
-</html>`,
-      });
+      await resend.emails.send({ from: getResendFromEmail(), to: args.to, subject, html });
     } catch (error) {
       logError("[notifications] document rejection email failed", { reason: error });
     }

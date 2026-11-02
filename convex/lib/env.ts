@@ -103,6 +103,11 @@ export function getAppUrl(): string {
   return url;
 }
 
+/** Non-throwing variant for best-effort sends that must skip, not fail, without it. */
+export function getAppUrlOrNull(): string | null {
+  return process.env.APP_URL || null;
+}
+
 export function getWhatsAppApiUrl(): string | null {
   return process.env.WHATSAPP_API_URL ?? null;
 }

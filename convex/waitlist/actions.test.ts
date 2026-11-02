@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import schema from "../schema";
-import { addToResendAudience, sendWelcomeEmail } from "./actions";
+import { addToResendAudience, buildImobiliariaWelcomeHtml, sendWelcomeEmail } from "./actions";
 
 const SIGNUP_EMAIL = "joao.silva@example.com";
 
@@ -105,5 +105,28 @@ describe("delivery actions — resolve by row id", () => {
     await t.action(internal.waitlist.actions[name], { waitlistId });
 
     expect(JSON.stringify(warn.mock.calls)).not.toContain(SIGNUP_EMAIL);
+  });
+});
+
+describe("buildImobiliariaWelcomeHtml", () => {
+  const html = buildImobiliariaWelcomeHtml({ appUrl: "https://app.mutav.test" });
+
+  test("uses the shared branded header, not the old caps lockup", () => {
+    expect(html).toContain('src="https://app.mutav.test/email/mutav-logo.png"');
+    expect(html).toContain('alt="MUTAV"');
+    expect(html).toMatch(/>mutav<\/span>/);
+    expect(html).not.toContain("app.mutav.finance/email");
+  });
+
+  test("uses the shared footer: descriptor, support mailto and reason", () => {
+    expect(html).toContain("MUTAV · Garantia locatícia");
+    expect(html).toContain('href="mailto:contato@mutav.finance"');
+    expect(html).toContain("Você recebeu este e-mail porque você se cadastrou na lista de espera");
+  });
+
+  test("keeps the book-a-call button and the Instagram link", () => {
+    expect(html).toContain('href="https://calendar.app.google/41vSpkz8pMoK7Saw9"');
+    expect(html).toContain("Agendar uma conversa");
+    expect(html).toContain('href="https://www.instagram.com/mutav.br/"');
   });
 });
