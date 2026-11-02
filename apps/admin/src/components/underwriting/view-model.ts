@@ -40,13 +40,12 @@ export const UNDERWRITING_ERROR_CODES = [
   "REASON_NOT_ALLOWED_FROM_STATE",
   "CLOSURE_REQUIRED",
   "CLOSURE_NOT_ALLOWED",
-  // Sending for signature reads the reserve and holds capital (ADR 0010).
+  // Sending for signature measures the reserve and holds capital (issue #427).
   "INVALID_HOLD_DAYS",
   "INSUFFICIENT_FREE_CAPITAL",
   "TOO_MANY_OPEN_HOLDS",
   "OFFER_STILL_HELD",
-  "INVALID_RESERVE_READING",
-  "RESERVE_READER_UNAVAILABLE",
+  "RESERVE_BALANCE_UNAVAILABLE",
 ] as const;
 
 const TRANSLATED_CODES: ReadonlySet<string> = new Set(UNDERWRITING_ERROR_CODES);

@@ -10,7 +10,7 @@ import { StepIndicator } from "@mutav/ui/step-indicator";
 import { formatDateBR } from "@mutav/i18n/brazil";
 import type { ReviewStatus } from "@convex/guarantees/review";
 import type { Guarantee } from "@/lib/guarantees/types";
-import { ACTIVE_STEP, REVIEW_STEPS } from "@/lib/guarantees/review";
+import type { ACTIVE_STEP } from "@/lib/guarantees/review";
 import { useGuaranteeReviewCard } from "./use-guarantee-review-card";
 
 const REVIEW_TONE: Record<ReviewStatus | typeof ACTIVE_STEP, Tone> = {
@@ -19,7 +19,7 @@ const REVIEW_TONE: Record<ReviewStatus | typeof ACTIVE_STEP, Tone> = {
   accepted: "success",
   awaiting_signature: "success",
   signed: "success",
-  pending_registration: "expiring",
+  awaiting_capacity: "expiring",
   active: "success",
   refused: "error",
 };
@@ -68,7 +68,7 @@ export function GuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) {
         ) : (
           <StepIndicator
             current={view.currentStep}
-            labels={REVIEW_STEPS.map((step) => t(`steps.${step}`))}
+            labels={view.stepper.steps.map(({ step }) => t(`steps.${step}`))}
             progressLabel={t("progressLabel")}
             doneSuffix={t("doneSuffix")}
             currentSuffix={t("currentSuffix")}

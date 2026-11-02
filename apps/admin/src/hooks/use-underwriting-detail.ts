@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAction, useMutation, usePreloadedQuery, type Preloaded } from "convex/react";
+import { useMutation, usePreloadedQuery, type Preloaded } from "convex/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { api } from "@convex/_generated/api";
@@ -25,9 +25,9 @@ type UseUnderwritingDetailArgs = {
  * View model for one case file. Owns the accept / refuse dialogs, their form
  * state, the optional hold-period override, the in-flight flag and the
  * toasts; which actions are on offer follows the review status the server
- * reports, never local state. Sending reads the reserve and holds capital for
- * the offer (ADR 0010), so it is an action; a re-send is on offer only once
- * the previous hold has lapsed.
+ * reports, never local state. Sending measures the reserve and holds capital
+ * for the offer (ADR 0010, issue #427); a re-send is on offer only once the
+ * previous hold has lapsed.
  */
 export function useUnderwritingDetail({ preloaded }: UseUnderwritingDetailArgs) {
   const t = useTranslations("underwriting");
@@ -35,7 +35,7 @@ export function useUnderwritingDetail({ preloaded }: UseUnderwritingDetailArgs) 
 
   const acceptAnalysis = useMutation(api.guarantees.reviewMutations.acceptAnalysis);
   const refuseAnalysis = useMutation(api.guarantees.reviewMutations.refuseAnalysis);
-  const sendForSignature = useAction(api.guarantees.registration.sendForSignature);
+  const sendForSignature = useMutation(api.guarantees.activation.sendForSignature);
 
   const [busy, setBusy] = useState(false);
   const [acceptOpen, setAcceptOpen] = useState(false);

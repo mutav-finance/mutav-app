@@ -2,11 +2,15 @@ import { v } from "convex/values";
 import { internalAction, internalMutation, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
-  computeCovers,
-  holdAmountBaseUnits,
+  COVERAGE_RATIO_BPS_DEFAULT,
+  checkReserveCapacity,
+  coverRequirementCents,
+  freeCapitalCents,
   offerHoldExpiresAt,
   OFFER_HOLD_DAYS_DEFAULT,
-} from "./reserve/registration";
+  OFFER_HOLD_RELEASE_REASON,
+  requiredCoverageCents,
+} from "./reserve/capacity";
 import { AUDIT_ACTION } from "./audit/domain";
 import { appendAuditEntry } from "./audit/useCases";
 import {
@@ -44,6 +48,7 @@ import {
 } from "./delinquencies/domain";
 import { COVER_OPERATION_STATUS, coveragePeriodOf } from "./coverOperations/domain";
 import {
+  ACTIVATION_FEE_STATUS,
   assertClose,
   assertTransition,
   CLOSE_REASON,
@@ -72,6 +77,7 @@ import {
   insuredCentsPlatform,
   guaranteesByState,
   guaranteesByStatePlatform,
+  sumInsuredExposure,
 } from "./guarantees/aggregate";
 import { insertGuaranteeAggregates } from "./guarantees/aggregateWrites";
 import {
@@ -578,6 +584,8 @@ type SeedOfferReview = {
   note: string;
 };
 
+type SeedSignedReview = SeedOfferReview & { signedDaysAgo: number };
+
 type SeedReviewRow = {
   guaranteeId: GuaranteeId;
   publicId: string;
@@ -585,30 +593,23 @@ type SeedReviewRow = {
   review:
     | { status: typeof REVIEW_STATUS.ANALYSIS_REQUESTED; requestedDaysAgo: number }
     | ({ status: typeof REVIEW_STATUS.AWAITING_SIGNATURE } & SeedOfferReview)
-    | ({
-        status: typeof REVIEW_STATUS.PENDING_REGISTRATION;
-        signedDaysAgo: number;
-        /** The reserve's refusal of an operator attempt, if one is seeded. */
-        refusal?: { programErrorCode: number; programErrorName: string; refusedDaysAgo: number };
-      } & SeedOfferReview);
+    // Signed after its hold lapsed, then short of reserve capacity at approval.
+    | ({ status: typeof REVIEW_STATUS.AWAITING_CAPACITY } & SeedSignedReview)
+    // Signed, approved and activated in the same step (the spec is `active`).
+    | ({ status: typeof REVIEW_STATUS.SIGNED } & SeedSignedReview);
 };
 
-/**
- * The coverage ratio `c` seeded offer holds are sized with. The live value is
- * read from the reserve when staff send a contract; the seed has no chain to
- * read, so its holds use this demo figure.
- */
-const SEED_COVERAGE_RATIO_BPS = 2_500;
-
-/** A syntactically valid (base58, 88 chars) stand-in for a refused transaction. */
-const SEED_REFUSED_TX_SIGNATURE = "5".repeat(44) + "J".repeat(44);
+const SEED_COVERAGE_RATIO_BPS = COVERAGE_RATIO_BPS_DEFAULT;
 
 /**
- * Walk seeded drafts through Mutav's review the way the review mutations
- * would: the agency asked, compliance decided (re-pricing at its own rate),
- * sent the contract (holding reserve capital for the offer) and, for a
- * pending registration, approved the signed contract. Each step leaves the
- * history row the mutation writes.
+ * Walk seeded drafts through Mutav's review the way the review and activation
+ * mutations would: the agency asked, compliance decided (re-pricing at its
+ * own rate), sent the contract (holding reserve capital for the offer) and,
+ * for a signed one, approved the signed contract — which either activated it
+ * (hold released, activation fee pending) or left it waiting for reserve
+ * capacity (its hold had lapsed before the tenant signed). Each step leaves
+ * the history row the mutation writes. The capacity figures are written
+ * afterwards by `seedReserveCapacity`, once the whole book is in place.
  */
 async function applyAprovadaReviews(
   ctx: MutationCtx,
@@ -646,8 +647,9 @@ async function applyAprovadaReviews(
       continue;
     }
 
-    const decidedAt = daysAgo(row.review.decidedDaysAgo, "10:00");
-    const sentAt = daysAgo(row.review.sentDaysAgo, "11:00");
+    const review = row.review;
+    const decidedAt = daysAgo(review.decidedDaysAgo, "10:00");
+    const sentAt = daysAgo(review.sentDaysAgo, "11:00");
     const repriced = priceGuarantee(
       {
         rentCents: row.terms.rentCents,
@@ -655,81 +657,161 @@ async function applyAprovadaReviews(
         plan: row.terms.plan,
         productSlug: product.slug,
         appliedAt: decidedAt,
-        staffFeeRateBps: row.review.feeRateBps,
+        staffFeeRateBps: review.feeRateBps,
       },
       product.terms,
     );
+    const signedAt =
+      review.status === REVIEW_STATUS.AWAITING_SIGNATURE
+        ? null
+        : daysAgo(review.signedDaysAgo, "16:00");
     // Only the fee moves with the rate; the ceiling and exit-cost cap the
     // aggregates read are rent-driven, so no aggregate rewrite is needed.
     await ctx.db.patch(guarantee._id, {
       terms: repriced.terms,
       underwriting: {
         ...guarantee.underwriting,
-        review: row.review.status,
+        review: review.status,
         analysisRequest,
         decision: {
           outcome: "accepted",
-          feeRateBps: row.review.feeRateBps,
-          note: row.review.note,
+          feeRateBps: review.feeRateBps,
+          note: review.note,
           decidedAt,
           decidedBy: staffUserId,
         },
         signatureRequest: { sentAt, sentBy: staffUserId },
+        ...(signedAt === null ? {} : { signedAt }),
       },
+      ...(review.status === REVIEW_STATUS.SIGNED && repriced.terms.oneTimeActivationFeeCents > 0
+        ? { activationFee: { status: ACTIVATION_FEE_STATUS.PENDING } }
+        : {}),
     });
     await history(decidedAt, staff.name, "Análise Mutav aprovada");
     await history(sentAt, staff.name, "Contrato enviado para assinatura");
 
     const sentAtMs = Date.parse(sentAt);
-    const signedAt =
-      row.review.status === REVIEW_STATUS.PENDING_REGISTRATION
-        ? daysAgo(row.review.signedDaysAgo, "16:00")
-        : null;
-    await ctx.db.insert("offerHolds", {
-      guaranteeId: guarantee._id,
-      agencyId: guarantee.agencyId,
-      amountBaseUnits: holdAmountBaseUnits({
-        covers: computeCovers(repriced.terms),
-        coverageRatioBps: SEED_COVERAGE_RATIO_BPS,
-      }),
-      holdDays: OFFER_HOLD_DAYS_DEFAULT,
-      createdAt: sentAtMs,
-      expiresAt: offerHoldExpiresAt({ sentAt: sentAtMs, holdDays: OFFER_HOLD_DAYS_DEFAULT }),
-      ...(signedAt === null ? {} : { signedAt: Date.parse(signedAt) }),
+    const expiresAt = offerHoldExpiresAt({ sentAt: sentAtMs, holdDays: OFFER_HOLD_DAYS_DEFAULT });
+    const amountCents = coverRequirementCents({
+      terms: repriced.terms,
+      coverageRatioBps: SEED_COVERAGE_RATIO_BPS,
     });
-    if (row.review.status !== REVIEW_STATUS.PENDING_REGISTRATION || signedAt === null) continue;
-
-    const signed = await ctx.db.get(guarantee._id);
-    if (!signed) throw new Error(`Seed review lost guarantee ${row.publicId}`);
-    await ctx.db.patch(guarantee._id, {
-      underwriting: { ...signed.underwriting, signedAt },
+    const hold = { guaranteeId: guarantee._id, agencyId: guarantee.agencyId, amountCents };
+    const holdTiming = { holdDays: OFFER_HOLD_DAYS_DEFAULT, createdAt: sentAtMs, expiresAt };
+    if (review.status === REVIEW_STATUS.AWAITING_SIGNATURE) {
+      await ctx.db.insert("offerHolds", { ...hold, ...holdTiming });
+      continue;
+    }
+    if (signedAt === null) continue;
+    if (review.status === REVIEW_STATUS.AWAITING_CAPACITY) {
+      await ctx.db.insert("offerHolds", {
+        ...hold,
+        ...holdTiming,
+        releasedAt: expiresAt,
+        releaseReason: OFFER_HOLD_RELEASE_REASON.EXPIRED,
+      });
+      await history(signedAt, staff.name, "Contrato assinado registrado");
+      await history(signedAt, staff.name, "Aguardando capacidade da reserva");
+      continue;
+    }
+    const signedAtMs = Date.parse(signedAt);
+    await ctx.db.insert("offerHolds", {
+      ...hold,
+      ...holdTiming,
+      signedAt: signedAtMs,
+      releasedAt: signedAtMs,
+      releaseReason: OFFER_HOLD_RELEASE_REASON.ACTIVATED,
     });
     await history(signedAt, staff.name, "Contrato assinado registrado");
-    await history(signedAt, staff.name, "Aguardando registro na reserva");
-
-    const refusal = row.review.refusal;
-    if (!refusal) continue;
-    const refusedAt = daysAgo(refusal.refusedDaysAgo, "17:00");
-    await ctx.db.patch(guarantee._id, {
-      registrationRefusal: {
-        programErrorCode: refusal.programErrorCode,
-        programErrorName: refusal.programErrorName,
-        txSignature: SEED_REFUSED_TX_SIGNATURE,
-        refusedAt,
-        recordedBy: staffUserId,
-      },
-    });
-    await history(
-      refusedAt,
-      staff.name,
-      `Registro recusado pela reserva (${refusal.programErrorName})`,
-    );
+    await history(signedAt, staff.name, "Garantia ativada");
   }
 }
 
 /**
- * Seeded drafts waiting for their registration carry the approved signed
- * rental contract that put them there. A mutation cannot write file storage,
+ * Seed the reserve the Aprovada book is gated by: one fresh vault balance and
+ * the capacity checks behind the review rows. The balance is sized off the
+ * live book so the demo plays out — the awaiting-signature offer fits when
+ * its signed contract is approved (its own requirement plus half of the
+ * waiting guarantee's), and the waiting guarantee stays short by half its
+ * requirement. The balance row is fresh for `RESERVE_BALANCE_MAX_AGE_MS`
+ * after the seed; past that every check fails closed until the reserve
+ * reader (issue #428) or `reserve/balance:recordReserveBalance` writes one.
+ */
+async function seedReserveCapacity(
+  ctx: MutationCtx,
+  { rows }: { rows: SeedReviewRow[] },
+): Promise<void> {
+  const loaded = await Promise.all(
+    rows.map(async (row) => {
+      const guarantee = await ctx.db.get(row.guaranteeId);
+      if (!guarantee) throw new Error(`Seed capacity lost guarantee ${row.publicId}`);
+      return { status: row.review.status, guarantee };
+    }),
+  );
+  const coverageRatioBps = SEED_COVERAGE_RATIO_BPS;
+  const requirementOf = (status: SeedReviewRow["review"]["status"]) =>
+    loaded
+      .filter((row) => row.status === status)
+      .reduce(
+        (sum, row) => sum + coverRequirementCents({ terms: row.guarantee.terms, coverageRatioBps }),
+        0,
+      );
+  const offeredCents = requirementOf(REVIEW_STATUS.AWAITING_SIGNATURE);
+  const waitingCents = requirementOf(REVIEW_STATUS.AWAITING_CAPACITY);
+  const onRiskCoverCents = await sumInsuredExposure(ctx);
+  const required = requiredCoverageCents({ onRiskCoverCents, coverageRatioBps });
+  const balanceCents = required + offeredCents + Math.floor(waitingCents / 2);
+  const takenAt = Date.now();
+  await ctx.db.insert("reserveBalanceSnapshots", {
+    balanceCents,
+    takenAt,
+    source: "squads_vault",
+  });
+
+  for (const { status, guarantee } of loaded) {
+    if (status !== REVIEW_STATUS.AWAITING_CAPACITY && status !== REVIEW_STATUS.SIGNED) continue;
+    const ownRequirementCents = coverRequirementCents({ terms: guarantee.terms, coverageRatioBps });
+    const ownCoverCents = guarantee.terms.coverageCeilingCents + guarantee.terms.exitCostCapCents;
+    // An activated guarantee was measured before it joined the on-risk book.
+    const requiredAtCheck =
+      status === REVIEW_STATUS.SIGNED
+        ? requiredCoverageCents({
+            onRiskCoverCents: onRiskCoverCents - ownCoverCents,
+            coverageRatioBps,
+          })
+        : required;
+    const figures = {
+      snapshotTakenAt: takenAt,
+      balanceCents,
+      coverageRatioBps,
+      requiredCoverageCents: requiredAtCheck,
+      activeHoldsCents: offeredCents,
+      freeCapitalCents: freeCapitalCents({
+        balanceCents,
+        requiredCoverageCents: requiredAtCheck,
+        activeHoldsCents: offeredCents,
+      }),
+      ownRequirementCents,
+    };
+    const fits = checkReserveCapacity(figures);
+    const passed = status === REVIEW_STATUS.SIGNED;
+    if (fits.success !== passed) {
+      throw new Error(`Seed capacity for ${guarantee.publicId} does not tell the intended story`);
+    }
+    await ctx.db.patch(guarantee._id, {
+      activationCheck: {
+        outcome: passed ? "passed" : "insufficient_capacity",
+        checkedAt: new Date(takenAt).toISOString(),
+        ...figures,
+        shortfallCents: fits.success ? 0 : fits.error.shortfallCents,
+      },
+    });
+  }
+}
+
+/**
+ * Seeded signed guarantees carry the approved signed rental contract that
+ * put them there. A mutation cannot write file storage,
  * so `seedReset` schedules this action to store a stand-in PDF per draft.
  */
 export const attachSeedSignedContracts = internalAction({
@@ -3467,15 +3549,15 @@ async function populateAprovadaBook(
         },
       },
     },
-    // Signed and approved: waiting for the operator's register_guarantee.
-    // Not active yet — activation is the confirmed registration (ADR 0010).
+    // Signed and approved yesterday, and the reserve had room: approving the
+    // signed contract put it on risk (phase-1 rule, issue #427).
     {
       n: 13,
-      state: GUARANTEE_STATE.DRAFTED,
-      activatedAt: null,
+      state: GUARANTEE_STATE.ACTIVE,
+      activatedAt: daysAgo(1, "16:00"),
       nextRenewalDate: dateDaysAgo(-730),
       review: {
-        status: REVIEW_STATUS.PENDING_REGISTRATION,
+        status: REVIEW_STATUS.SIGNED,
         requestedDaysAgo: 6,
         decidedDaysAgo: 5,
         sentDaysAgo: 4,
@@ -3503,26 +3585,21 @@ async function populateAprovadaBook(
         },
       },
     },
-    // The operator tried to register it and the reserve refused: it stays
-    // pending, the agency sees it waiting for reserve capacity.
+    // The tenant signed after the offer's hold lapsed, and at approval the
+    // reserve was short: it waits for reserve capacity, still a draft.
     {
       n: 14,
       state: GUARANTEE_STATE.DRAFTED,
       activatedAt: null,
       nextRenewalDate: dateDaysAgo(-730),
       review: {
-        status: REVIEW_STATUS.PENDING_REGISTRATION,
-        requestedDaysAgo: 9,
-        decidedDaysAgo: 8,
-        sentDaysAgo: 7,
+        status: REVIEW_STATUS.AWAITING_CAPACITY,
+        requestedDaysAgo: 14,
+        decidedDaysAgo: 13,
+        sentDaysAgo: 12,
         signedDaysAgo: 3,
         feeRateBps: 1_400,
         note: "Aluguel alto para a renda declarada; taxa acima da tabela.",
-        refusal: {
-          programErrorCode: 6008,
-          programErrorName: "InsufficientFreeCapital",
-          refusedDaysAgo: 2,
-        },
       },
       lease: {
         rentCents: 498_000,
@@ -3612,14 +3689,14 @@ async function populateAprovadaBook(
     inserted.push({ spec, lease, ...row });
   }
 
-  await applyAprovadaReviews(ctx, {
-    product,
-    ownerUserId,
-    staffUserId,
-    rows: inserted.flatMap((row) => (row.spec.review ? [{ ...row, review: row.spec.review }] : [])),
-  });
-  const signedContracts = inserted.flatMap((row) =>
-    row.spec.review?.status === REVIEW_STATUS.PENDING_REGISTRATION
+  const reviewRows = inserted.flatMap((row) =>
+    row.spec.review ? [{ ...row, review: row.spec.review }] : [],
+  );
+  await applyAprovadaReviews(ctx, { product, ownerUserId, staffUserId, rows: reviewRows });
+  await seedReserveCapacity(ctx, { rows: reviewRows });
+  const signedContracts = reviewRows.flatMap((row) =>
+    row.review.status === REVIEW_STATUS.SIGNED ||
+    row.review.status === REVIEW_STATUS.AWAITING_CAPACITY
       ? [{ guaranteeId: row.guaranteeId, agencyId, uploadedBy: ownerUserId }]
       : [],
   );
@@ -3629,8 +3706,12 @@ async function populateAprovadaBook(
     });
   }
 
-  // Every in-force guarantee bills its fee, arrears or not.
-  const insuredRows = inserted.filter((r) => isInsured({ status: r.spec.state }));
+  // Every in-force guarantee bills its fee, arrears or not — except the one
+  // activated yesterday through its review, whose first fee (and activation
+  // fee, marked pending) belongs to the next monthly run.
+  const insuredRows = inserted.filter(
+    (r) => isInsured({ status: r.spec.state }) && r.spec.review === undefined,
+  );
 
   // Two paid months and the current one due.
   const APROVADA_BILLING_MONTHS = 3;

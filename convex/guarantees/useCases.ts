@@ -1221,10 +1221,7 @@ function shapeLease(lease: Lease) {
  * message to the agency. The refusal reason is shown: the agency is the one
  * that has to tell the tenant why.
  */
-export function shapeGuaranteeReview({
-  underwriting,
-  registrationRefusal,
-}: Pick<Guarantee, "underwriting" | "registrationRefusal">) {
+export function shapeGuaranteeReview({ underwriting }: Pick<Guarantee, "underwriting">) {
   const decision = underwriting.decision;
   return {
     status: underwriting.review,
@@ -1234,9 +1231,6 @@ export function shapeGuaranteeReview({
     refusalReason: decision?.outcome === "refused" ? decision.reason : null,
     sentForSignatureAt: underwriting.signatureRequest?.sentAt ?? null,
     signedAt: underwriting.signedAt ?? null,
-    // The agency learns only that the reserve has no room yet ("waiting for
-    // reserve capacity"); the program's error code is a staff concern.
-    reserveRefusedAt: registrationRefusal?.refusedAt ?? null,
   };
 }
 

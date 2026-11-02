@@ -29,14 +29,14 @@ type ActivationQueuePreload = Preloaded<
 >;
 
 export function ActivationQueue({
-  pendingRegistration,
+  awaitingCapacity,
   awaitingSignature,
 }: {
-  pendingRegistration: ActivationQueuePreload;
+  awaitingCapacity: ActivationQueuePreload;
   awaitingSignature: ActivationQueuePreload;
 }) {
   const t = useTranslations("staffGuarantees");
-  const view = useActivationQueue({ pendingRegistration, awaitingSignature });
+  const view = useActivationQueue({ awaitingCapacity, awaitingSignature });
 
   return (
     <PageShell>
@@ -117,12 +117,14 @@ function QueueTable({ rows }: { rows: readonly ActivationQueueRow[] }) {
               </StatusTag>
             </TableCell>
             <TableCell>
-              {row.registrationRefusal ? (
-                <StatusTag tone="error">
-                  {t("registration.refusedTag", {
-                    error: row.registrationRefusal.programErrorName,
+              {row.activationCheck?.outcome === "insufficient_capacity" ? (
+                <StatusTag tone="expiring">
+                  {t("capacity.shortfallTag", {
+                    amount: formatBRLCents(row.activationCheck.shortfallCents),
                   })}
                 </StatusTag>
+              ) : row.activationCheck?.outcome === "reserve_unavailable" ? (
+                <StatusTag tone="error">{t("capacity.outcomes.reserve_unavailable")}</StatusTag>
               ) : (
                 <StatusTag tone={OFFER_HOLD_TONE[row.offerHold]}>
                   {t(`offerHold.status.${row.offerHold}`)}

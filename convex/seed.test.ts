@@ -41,7 +41,7 @@ const SEED_NOW = "2026-09-28T15:00:00.000Z";
 
 // Worst-case exposure over the in-force book and its verified-default slice,
 // in BRL centavos: available rent-coverage + exit-cost cap per guarantee.
-const SUM_INSURED_CENTS = 689_806_900;
+const SUM_INSURED_CENTS = 698_662_900;
 const VERIFIED_DEFAULT_EXPOSURE_CENTS = 72_078_600;
 
 beforeEach(() => {
@@ -149,19 +149,20 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     });
 
     // active: 21 fictional + 26 filler + Aprovada's performing and renewed
-    // lives. default_verified: Aprovada ×2 + Paulista. cover_committed:
-    // Aprovada ×2 + Atlântica. in_eviction: Horizonte + Aprovada. drafted:
-    // 5 pendente + 5 Aprovada (editing, analysis_requested, awaiting_signature,
-    // 2× pending_registration). closed: 2 encerrado + Aprovada's first term →
+    // lives + the one activated through its review. default_verified:
+    // Aprovada ×2 + Paulista. cover_committed: Aprovada ×2 + Atlântica.
+    // in_eviction: Horizonte + Aprovada. drafted: 5 pendente + 4 Aprovada
+    // (editing, analysis_requested, awaiting_signature, awaiting_capacity).
+    // closed: 2 encerrado + Aprovada's first term →
     // end_of_lease, 1 cancelado → canceled_pre_activation, and Aprovada's
     // reversed cover → dispute_reversal.
     expect(byState.counts).toEqual({
-      active: 49,
+      active: 50,
       in_arrears: 1,
       default_verified: 3,
       cover_committed: 3,
       in_eviction: 2,
-      drafted: 10,
+      drafted: 9,
       closed: 5,
     });
     expect(byState.closedReasons).toEqual([
@@ -343,7 +344,7 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     expect(probe.sample.underwriting).toEqual({
       score: 750,
       tier: "regular",
-      review: "pending_registration",
+      review: "signed",
     });
     expect(probe.leaseRentCents).toBe(320_000);
     // Literal expectations: the product's parameters applied to a R$ 3.200,00
@@ -426,8 +427,8 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     expect(audit.total).toBe(73);
     expect(audit.activatedWithoutTimestamp).toEqual([]);
     expect(audit.neverActivatedWithTimestamp).toEqual([]);
-    // 10 drafts + the one canceled_pre_activation.
-    expect(audit.neverActivatedCount).toBe(11);
+    // 9 drafts + the one canceled_pre_activation.
+    expect(audit.neverActivatedCount).toBe(10);
   });
 
   test("capacity holds available + reserved = ceiling on every row, and the reserved leg matches the cover applied on the guarantee's resolved notice", async () => {
@@ -698,7 +699,7 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     ]);
   });
 
-  test("the agencyowner book walks drafts from Mutav's queue to a pending registration; every other draft is editing", async () => {
+  test("the agencyowner book walks drafts from Mutav's queue to activation or reserve capacity; every other draft is editing", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
     const aprovadaId = await agencyIdByName(t, "Imobiliária Aprovada");
@@ -752,17 +753,8 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
         sent: true,
       },
       {
-        publicId: "1000044",
-        review: "pending_registration",
-        tier: "regular",
-        requested: true,
-        decision: "accepted",
-        feeRateBps: 1_100,
-        sent: true,
-      },
-      {
         publicId: "1000045",
-        review: "pending_registration",
+        review: "awaiting_capacity",
         tier: "regular",
         requested: true,
         decision: "accepted",
@@ -774,9 +766,7 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     const offers = await t.run(async (ctx) => {
       const rows = await ctx.db
         .query("guarantees")
-        .withIndex("by_agency_status", (q) =>
-          q.eq("agencyId", aprovadaId).eq("status", GUARANTEE_STATE.DRAFTED),
-        )
+        .withIndex("by_agency_status", (q) => q.eq("agencyId", aprovadaId))
         .collect();
       const offered = rows.filter((row) => row.underwriting.signatureRequest !== undefined);
       return Promise.all(
@@ -787,13 +777,16 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
             .collect();
           return {
             publicId: row.publicId,
+            status: row.status,
+            review: row.underwriting.review,
             holds: holds.map((hold) => ({
               holdDays: hold.holdDays,
               pinned: hold.signedAt !== undefined,
-              released: hold.releasedAt !== undefined,
+              releaseReason: hold.releaseReason ?? null,
             })),
             signed: row.underwriting.signedAt !== undefined,
-            refusal: row.registrationRefusal?.programErrorName ?? null,
+            check: row.activationCheck?.outcome ?? null,
+            activationFee: row.activationFee?.status ?? null,
           };
         }),
       );
@@ -801,23 +794,55 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     expect(offers.sort((a, b) => a.publicId.localeCompare(b.publicId))).toEqual([
       {
         publicId: "1000043",
-        holds: [{ holdDays: 7, pinned: false, released: false }],
+        status: "drafted",
+        review: "awaiting_signature",
+        holds: [{ holdDays: 7, pinned: false, releaseReason: null }],
         signed: false,
-        refusal: null,
+        check: null,
+        activationFee: null,
       },
       {
         publicId: "1000044",
-        holds: [{ holdDays: 7, pinned: true, released: false }],
+        status: "active",
+        review: "signed",
+        holds: [{ holdDays: 7, pinned: true, releaseReason: "activated" }],
         signed: true,
-        refusal: null,
+        check: "passed",
+        activationFee: "pending",
       },
       {
         publicId: "1000045",
-        holds: [{ holdDays: 7, pinned: true, released: false }],
+        status: "drafted",
+        review: "awaiting_capacity",
+        holds: [{ holdDays: 7, pinned: false, releaseReason: "expired" }],
         signed: true,
-        refusal: "InsufficientFreeCapital",
+        check: "insufficient_capacity",
+        activationFee: null,
       },
     ]);
+
+    // A fresh vault balance sized so the demo plays out: the waiting one is
+    // short by half its requirement; the offer out for signature would fit.
+    const reserve = await t.run(async (ctx) => {
+      const snapshot = await ctx.db
+        .query("reserveBalanceSnapshots")
+        .withIndex("by_takenAt")
+        .order("desc")
+        .first();
+      const waiting = await ctx.db
+        .query("guarantees")
+        .withIndex("by_publicId", (q) => q.eq("publicId", "1000045"))
+        .unique();
+      return { snapshot, check: waiting?.activationCheck };
+    });
+    expect(reserve.snapshot?.source).toBe("squads_vault");
+    expect(Date.now() - (reserve.snapshot?.takenAt ?? 0)).toBeLessThan(60_000);
+    if (reserve.check?.outcome !== "insufficient_capacity") throw new Error("no capacity check");
+    expect(reserve.check.balanceCents).toBe(reserve.snapshot?.balanceCents);
+    expect(reserve.check.shortfallCents).toBe(
+      reserve.check.ownRequirementCents - reserve.check.freeCapitalCents,
+    );
+    expect(reserve.check.shortfallCents).toBeGreaterThan(0);
 
     const otherDrafts = await t.run(async (ctx) => {
       const rows = await ctx.db
@@ -1199,8 +1224,8 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     // Same formula as `getGuaranteeAggregates`: (default_verified +
     // cover_committed) / in-force.
     expect(figures.verifiedDefault).toBe(6);
-    expect(figures.insured).toBe(58);
-    expect(figures.verifiedDefault / figures.insured).toBeCloseTo(0.1034, 3);
+    expect(figures.insured).toBe(59);
+    expect(figures.verifiedDefault / figures.insured).toBeCloseTo(0.1017, 3);
     expect(figures.sumInsuredCents).toBe(SUM_INSURED_CENTS);
     expect(figures.verifiedDefaultExposureCents).toBe(VERIFIED_DEFAULT_EXPOSURE_CENTS);
   });

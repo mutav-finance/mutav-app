@@ -14,17 +14,17 @@ import {
   OFFER_HOLD_ERROR_CODE,
   OFFER_HOLD_RELEASE_REASON,
   type OfferHoldReleaseReason,
-} from "./registration";
+} from "./capacity";
 
 /**
  * Offer holds: Convex's off-chain reservation of the reserve's free capital
- * for a contract out for signature (ADR 0010).
+ * for a contract out for signature (ADR 0010, phase-1 rule of issue #427).
  *
- * SINGLE-REGISTRANT ASSUMPTION. Convex sees every consumer of free capital
- * only because MUTAV's operator is the sole caller of `register_guarantee`.
- * If a second operator or a second platform ever registers against the same
- * reserve, these holds stop being sound and must move on chain (a reservation
- * instruction with an expiry — a protocol ADR in mutav-protocol-solana).
+ * SINGLE-PLATFORM ASSUMPTION. In phase 1 the guarantee registry is off-chain
+ * and Convex is the only thing that puts guarantees on risk against the
+ * Squads vault, so it sees every consumer of free capital. If a second
+ * platform ever underwrites against the same reserve, these holds stop being
+ * sound and must move on chain with the registry (phase 3).
  *
  * The helpers here are plain functions composed inside the caller's
  * transaction; the Convex functions are the expiry sweep and the
@@ -43,11 +43,11 @@ const SETTINGS_SOURCE = "internal_offer_hold_settings";
 
 type SumActiveHoldsError = { code: typeof OFFER_HOLD_ERROR_CODE.TOO_MANY_OPEN_HOLDS };
 
-/** Total base units held by active offers, optionally ignoring one guarantee's holds. */
+/** Total cents held by active offers, optionally ignoring one guarantee's holds. */
 export async function sumActiveOfferHolds(
   ctx: QueryCtx | MutationCtx,
   { now, excludeGuaranteeId }: { now: number; excludeGuaranteeId?: GuaranteeId },
-): Promise<Result<{ totalBaseUnits: bigint }, SumActiveHoldsError>> {
+): Promise<Result<{ totalCents: number }, SumActiveHoldsError>> {
   const open = await ctx.db
     .query("offerHolds")
     .withIndex("by_releasedAt_expiresAt", (q) => q.eq("releasedAt", undefined))
@@ -59,11 +59,11 @@ export async function sumActiveOfferHolds(
       message: `More than ${MAX_OPEN_OFFER_HOLDS} unreleased offer holds; refusing to sum a partial page`,
     };
   }
-  const totalBaseUnits = open
+  const totalCents = open
     .filter((hold) => hold.guaranteeId !== excludeGuaranteeId)
     .filter((hold) => isOfferHoldActive(hold, now))
-    .reduce((sum, hold) => sum + hold.amountBaseUnits, BigInt(0));
-  return { success: true, data: { totalBaseUnits }, message: "Active offer holds summed" };
+    .reduce((sum, hold) => sum + hold.amountCents, 0);
+  return { success: true, data: { totalCents }, message: "Active offer holds summed" };
 }
 
 /** The guarantee's latest hold, released or not — what the admin console shows. */
@@ -104,9 +104,11 @@ export async function releaseOfferHolds(
 
 /**
  * The signed contract was approved: an unreleased hold still inside its
- * period now belongs to the pending registration and stops lapsing. A hold
- * that already lapsed is left for the sweep — the chain is the final check.
- * Returns whether a live hold was pinned.
+ * period now belongs to the guarantee and stops lapsing — it stays pinned
+ * while the guarantee waits for reserve capacity and is released when it
+ * goes active. A hold that already lapsed is left for the sweep; the
+ * capacity check at approval is the final word. Returns whether a live hold
+ * was pinned.
  */
 export async function pinOfferHoldOnSignature(
   ctx: MutationCtx,
@@ -147,7 +149,7 @@ export const sweepExpiredOfferHolds = internalMutation({
         payload: {
           guaranteeId: hold.guaranteeId,
           agencyId: hold.agencyId,
-          amountBaseUnits: hold.amountBaseUnits.toString(),
+          amountCents: hold.amountCents,
           expiresAt: hold.expiresAt,
           releaseReason: OFFER_HOLD_RELEASE_REASON.EXPIRED,
           at: now,

@@ -18,24 +18,29 @@ describe("reviewStepper", () => {
         { step: "accepted", state: "current" },
         { step: "awaiting_signature", state: "upcoming" },
         { step: "signed", state: "upcoming" },
-        { step: "pending_registration", state: "upcoming" },
         { step: "active", state: "upcoming" },
       ],
       refused: false,
     });
   });
 
-  it("ends Signed → Waiting for reserve → Active", () => {
-    expect(reviewStepper("pending_registration").steps.slice(-3)).toEqual([
+  it("ends Signed → Active when the reserve had room", () => {
+    expect(reviewStepper("signed").steps.slice(-2)).toEqual([
+      { step: "signed", state: "current" },
+      { step: "active", state: "upcoming" },
+    ]);
+  });
+
+  it("shows Signed → Waiting for reserve → Active while it waits for capacity", () => {
+    expect(reviewStepper("awaiting_capacity").steps.slice(-3)).toEqual([
       { step: "signed", state: "done" },
-      { step: "pending_registration", state: "current" },
+      { step: "awaiting_capacity", state: "current" },
       { step: "active", state: "upcoming" },
     ]);
   });
 
   it("an activated guarantee ends the road at active", () => {
     expect(reviewStepper("active").steps.map((step) => step.state)).toEqual([
-      "done",
       "done",
       "done",
       "done",
@@ -57,7 +62,6 @@ describe("reviewStepper", () => {
         { step: "accepted", state: "upcoming" },
         { step: "awaiting_signature", state: "upcoming" },
         { step: "signed", state: "upcoming" },
-        { step: "pending_registration", state: "upcoming" },
         { step: "active", state: "upcoming" },
       ],
       refused: true,
@@ -68,8 +72,8 @@ describe("reviewStepper", () => {
 describe("currentReviewStep", () => {
   it.each([
     ["drafted", "awaiting_signature", "awaiting_signature"],
-    ["drafted", "pending_registration", "pending_registration"],
-    ["active", "pending_registration", "active"],
+    ["drafted", "awaiting_capacity", "awaiting_capacity"],
+    ["active", "signed", "active"],
     ["closed", "refused", "refused"],
   ] as const)("%s + %s → %s", (status, review, expected) => {
     expect(currentReviewStep({ status, review })).toBe(expected);
@@ -116,11 +120,11 @@ describe("requestAnalysisErrorKey", () => {
 
 describe("isWaitingForReserveCapacity", () => {
   it.each([
-    ["drafted", "pending_registration", "2026-10-20T12:00:00.000Z", true],
-    ["drafted", "pending_registration", null, false],
-    ["drafted", "awaiting_signature", "2026-10-20T12:00:00.000Z", false],
-    ["active", "pending_registration", "2026-10-20T12:00:00.000Z", false],
-  ] as const)("%s + %s + refusedAt %s → %s", (status, review, reserveRefusedAt, expected) => {
-    expect(isWaitingForReserveCapacity({ status, review, reserveRefusedAt })).toBe(expected);
+    ["drafted", "awaiting_capacity", true],
+    ["drafted", "signed", false],
+    ["drafted", "awaiting_signature", false],
+    ["active", "signed", false],
+  ] as const)("%s + %s → %s", (status, review, expected) => {
+    expect(isWaitingForReserveCapacity({ status, review })).toBe(expected);
   });
 });

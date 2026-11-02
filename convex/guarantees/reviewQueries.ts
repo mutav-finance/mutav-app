@@ -5,7 +5,7 @@ import { queryWithMutavRole } from "../lib/auth";
 import { MOCK_CREDIT_PROVIDER } from "../creditAnalysis/domain";
 import type { CreditAnalysisAssessment } from "../creditAnalysis/domain";
 import { latestOfferHold } from "../reserve/offerHolds";
-import { offerHoldStatus } from "../reserve/registration";
+import { offerHoldStatus } from "../reserve/capacity";
 import { agencySubmittedTenant } from "./tenantIdentity";
 import { shapeGuaranteeReview } from "./useCases";
 import { GUARANTEE_STATE, type Guarantee, type ScoreTier } from "./domain";

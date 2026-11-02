@@ -711,13 +711,15 @@ describe("guarantees.reviewQueries", () => {
     expect(rows.map((row) => [row.publicId, row.provisionalFeeRateBps])).toEqual([
       [publicId, 1_300],
     ]);
-    // The send itself reads the reserve (registration.test.ts covers it);
-    // here its write half runs directly with a reading that fits.
-    await asStaff.mutation(internal.guarantees.registration.sendForSignatureWithHold, {
-      publicId,
-      freeCapitalBaseUnits: BigInt(10) ** BigInt(15),
-      coverageRatioBps: 2_500,
+    // The send measures the reserve (activation.test.ts covers it); here a
+    // fresh vault balance with plenty of room is recorded first.
+    await w.t.mutation(internal.reserve.balance.recordReserveBalance, {
+      balanceCents: 10 ** 15,
+      takenAt: Date.now(),
     });
+    expect(
+      await asStaff.mutation(api.guarantees.activation.sendForSignature, { publicId }),
+    ).toMatchObject({ success: true });
     expect(await asStaff.query(api.guarantees.reviewQueries.listAwaitingDispatch, {})).toEqual([]);
   });
 
@@ -816,7 +818,6 @@ describe("guarantees.reviewQueries", () => {
       refusalReason: null,
       sentForSignatureAt: null,
       signedAt: null,
-      reserveRefusedAt: null,
     });
     const refusedView = await asOwner.query(api.guarantees.useCases.getByPublicId, {
       publicId: refused,

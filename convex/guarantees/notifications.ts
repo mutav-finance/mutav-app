@@ -2,8 +2,9 @@
  * Tenant-facing proposal notices, sent once, when MUTAV has accepted the draft
  * and the contract is first sent for signature (`sendForSignature`) — never at
  * draft creation, when nothing has been decided yet. Informational only: the
- * guarantee becomes active when its on-chain registration is confirmed (ADR
- * 0010), so there is no step the tenant takes in the app — and no link, since
+ * guarantee becomes active when Mutav approves the signed contract and the
+ * reserve capacity check passes (issue #427), so there is no step the tenant
+ * takes in the app — and no link, since
  * every guarantee page lives in the login-gated agency app. A tenant-facing
  * page arrives with #57.
  *

@@ -4,6 +4,7 @@ import type { Result } from "../lib/result";
 import { mutationWithActiveAgency, mutationWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
 import type { AgencyId } from "../agencies/domain";
+import type { UserId } from "../users/domain";
 import { ufFromCityUF } from "../leases/domain";
 import { PRODUCT_ERROR_CODE } from "../products/domain";
 import { resolveProduct } from "../products/useCases";
@@ -34,9 +35,11 @@ import {
  * patches `status` itself.
  *
  * Wrappers follow the authority model: an agency may close the guarantee it
- * sold when its lease ends; every other terminal or adversarial move (an arbitrary close reason, eviction, a new price) is Mutav
- * compliance staff. Activation is not here at all: a guarantee goes on risk
- * when its on-chain registration is confirmed (`registration.ts`, ADR 0010).
+ * sold when its lease ends; every other terminal or adversarial move (an
+ * arbitrary close reason, eviction, a new price) is Mutav compliance staff.
+ * Activation is not here at all: a guarantee goes on risk when compliance
+ * approves its signed contract and the reserve capacity check passes
+ * (`activation.ts`, phase-1 rule of issue #427).
  * `cancelDraft` stays in `useCases.ts` — the agency UI binds to it
  * there — and composes the same helper.
  */
@@ -251,7 +254,7 @@ function isCalendarDate(value: string): boolean {
  * Money rule: `capacity` is not touched at all. The coverage a guarantee runs
  * on is the one it was activated under, and a reajuste must not silently move
  * how much Mutav is on risk for on an in-force guarantee. The new ceiling lives
- * in `terms.coverageCeilingCents`; `confirmRegistration` reads it from there, so a
+ * in `terms.coverageCeilingCents`; activation reads it from there, so a
  * draft repriced before it goes on risk still starts on the new figure.
  */
 export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
@@ -374,6 +377,6 @@ export const reprice = mutationWithMutavRole({ minRole: "compliance" })({
   },
 });
 
-function actorFrom(user: { _id: GuaranteeActor["userId"]; name: string }): GuaranteeActor {
+function actorFrom(user: { _id: UserId; name: string }): GuaranteeActor {
   return { userId: user._id, username: user.name };
 }

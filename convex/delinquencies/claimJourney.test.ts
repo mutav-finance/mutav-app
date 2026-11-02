@@ -30,9 +30,7 @@ const RENT_CENTS = 300_000;
 const DUE_DAY = 5;
 const STAFF_SUBJECT = "auth0|journey-compliance";
 const FEE_RATE_BPS = 1_200;
-const FREE_CAPITAL_BASE_UNITS = BigInt(1_000_000_000_000_000);
-const COVERAGE_RATIO_BPS = 10_000;
-const REGISTRATION_TX_SIGNATURE = "5".repeat(88);
+const RESERVE_BALANCE_CENTS = 1_000_000_000_000;
 
 function brazilMonthsAgo(months: number): string {
   const today = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -121,10 +119,10 @@ describe("claim journey: late rent to payout", () => {
         },
       }),
     );
-    // Mutav underwrites the draft, sends the offer against reserve capital,
-    // approves the signed contract and records the on-chain registration
-    // (ADR 0010). The reserve reader ships fail-closed, so the journey drives
-    // the internal mutations the two staff actions call once the chain is read.
+    // Mutav underwrites the draft, sends the offer against reserve capital and
+    // approves the signed contract; with room in the reserve that approval
+    // puts the guarantee on risk (phase-1 rule, issue #427). The vault balance
+    // the reserve reader would record is written directly.
     unwrap(
       await agency.mutation(api.guarantees.reviewMutations.requestAnalysis, {
         agencyId,
@@ -138,15 +136,19 @@ describe("claim journey: late rent to payout", () => {
       }),
     );
     unwrap(
-      await staff.mutation(internal.guarantees.registration.sendForSignatureWithHold, {
+      await t.mutation(internal.reserve.balance.recordReserveBalance, {
+        balanceCents: RESERVE_BALANCE_CENTS,
+        takenAt: Date.now(),
+      }),
+    );
+    unwrap(
+      await staff.mutation(api.guarantees.activation.sendForSignature, {
         publicId: guaranteePublicId,
-        freeCapitalBaseUnits: FREE_CAPITAL_BASE_UNITS,
-        coverageRatioBps: COVERAGE_RATIO_BPS,
       }),
     );
 
     // The signed contract is approved — the claim's one precondition on the
-    // guarantee, and the step that queues the draft for registration.
+    // guarantee, and the step that activates it.
     const contract = unwrap(
       await agency.mutation(api.guarantees.documents.attachGuaranteeDocument, {
         agencyId,
@@ -161,15 +163,10 @@ describe("claim journey: late rent to payout", () => {
         documentId: contract.documentId,
       }),
     );
-    expect(approval.reviewSigned).toBe(true);
-    unwrap(
-      await staff.mutation(internal.guarantees.registration.recordRegistrationConfirmed, {
-        publicId: guaranteePublicId,
-        txSignature: REGISTRATION_TX_SIGNATURE,
-        slot: 1,
-        registeredAt: "2025-01-01T00:00:00.000Z",
-      }),
-    );
+    expect(approval).toMatchObject({
+      reviewSigned: true,
+      activation: { outcome: "activated" },
+    });
     // The guarantee has been in force for a while before the rent goes unpaid.
     await t.run(async (ctx) => {
       const guarantee = await ctx.db

@@ -14,27 +14,26 @@ type ActivationQueuePreload = Preloaded<
 >;
 
 type UseActivationQueueArgs = {
-  pendingRegistration: ActivationQueuePreload;
+  awaitingCapacity: ActivationQueuePreload;
   awaitingSignature: ActivationQueuePreload;
 };
 
 /**
- * View model for the staff guarantees list. Read-only: the registration is
- * recorded on the detail page, where compliance sees the expected on-chain id
- * and covers first. Both tabs are preloaded so switching never flashes an
- * empty table.
+ * View model for the staff guarantees list. Read-only: a retry runs from the
+ * detail page, where compliance sees the capacity check first. Both tabs are
+ * preloaded so switching never flashes an empty table.
  */
 export function useActivationQueue({
-  pendingRegistration,
+  awaitingCapacity,
   awaitingSignature,
 }: UseActivationQueueArgs) {
-  const pendingQueue = usePreloadedQuery(pendingRegistration);
-  const awaitingQueue = usePreloadedQuery(awaitingSignature);
-  const [tab, setTab] = useState<ActivationTab>(ACTIVATION_TAB.PENDING_REGISTRATION);
+  const capacityQueue = usePreloadedQuery(awaitingCapacity);
+  const signatureQueue = usePreloadedQuery(awaitingSignature);
+  const [tab, setTab] = useState<ActivationTab>(ACTIVATION_TAB.AWAITING_CAPACITY);
 
   const queues = {
-    [ACTIVATION_TAB.PENDING_REGISTRATION]: pendingQueue,
-    [ACTIVATION_TAB.AWAITING_SIGNATURE]: awaitingQueue,
+    [ACTIVATION_TAB.AWAITING_CAPACITY]: capacityQueue,
+    [ACTIVATION_TAB.AWAITING_SIGNATURE]: signatureQueue,
   } as const;
 
   return {
@@ -43,8 +42,8 @@ export function useActivationQueue({
       if (isActivationTab(value)) setTab(value);
     },
     counts: {
-      [ACTIVATION_TAB.PENDING_REGISTRATION]: pendingQueue.rows.length,
-      [ACTIVATION_TAB.AWAITING_SIGNATURE]: awaitingQueue.rows.length,
+      [ACTIVATION_TAB.AWAITING_CAPACITY]: capacityQueue.rows.length,
+      [ACTIVATION_TAB.AWAITING_SIGNATURE]: signatureQueue.rows.length,
     },
     rows: queues[tab].rows,
     hasMore: queues[tab].hasMore,

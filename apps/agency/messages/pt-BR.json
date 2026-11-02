@@ -549,7 +549,7 @@
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
         "signed": "Assinada",
-        "pending_registration": "Aguardando reserva",
+        "awaiting_capacity": "Aguardando reserva",
         "active": "Ativa"
       },
       "status": {
@@ -558,7 +558,7 @@
         "accepted": "Aprovada",
         "awaiting_signature": "Aguardando assinatura",
         "signed": "Assinada",
-        "pending_registration": "Aguardando reserva",
+        "awaiting_capacity": "Aguardando reserva",
         "refused": "Recusada",
         "active": "Ativa"
       },
@@ -567,16 +567,16 @@
         "editing": "Revise o rascunho e solicite a análise da Mutav quando estiver pronto. A Mutav decide se assume este contrato e com qual taxa.",
         "analysis_requested": "A Mutav está analisando o inquilino. Você será avisado por e-mail quando houver uma decisão.",
         "accepted": "A Mutav aprovou este contrato. O contrato será enviado ao inquilino para assinatura.",
-        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Quando o contrato assinado for aprovado, a garantia é registrada na reserva da Mutav.",
-        "signed": "O contrato assinado foi aprovado pela Mutav. A garantia está sendo registrada na reserva da Mutav.",
-        "pending_registration": "O contrato assinado foi aprovado. A garantia fica ativa assim que o registro na reserva da Mutav for confirmado.",
+        "awaiting_signature": "O contrato foi enviado ao inquilino para assinatura. Quando a Mutav aprovar o contrato assinado, a garantia fica ativa se a reserva da Mutav tiver espaço para ela.",
+        "signed": "O contrato assinado foi aprovado pela Mutav. A garantia fica ativa assim que a ativação for confirmada.",
+        "awaiting_capacity": "O contrato assinado foi aprovado. A garantia fica ativa assim que a reserva da Mutav tiver espaço para ela.",
         "refused": "A Mutav não aceitou este contrato e a proposta foi encerrada.",
-        "active": "Esta garantia está registrada na reserva da Mutav e em vigor. A taxa de ativação entra na próxima fatura mensal."
+        "active": "Esta garantia está em vigor. A taxa de ativação é cobrada na próxima fatura mensal."
       },
       "requestedOn": "Solicitada em {date}",
       "refusalReason": "Motivo informado pela Mutav",
       "refusedNextStep": "Você pode iniciar uma nova proposta para este inquilino a qualquer momento.",
-      "waitingForReserveCapacity": "Aguardando capacidade da reserva: a reserva ainda não pôde receber esta garantia. A Mutav fará o registro assim que houver capacidade — nada é necessário da sua parte.",
+      "waitingForReserveCapacity": "Aguardando capacidade da reserva: a reserva da Mutav ainda não pôde receber esta garantia. Ela fica ativa automaticamente assim que houver capacidade — nada é necessário da sua parte.",
       "scoreLabel": "Score do bureau",
       "scoreHint": "Insumo da análise Mutav — não é uma decisão",
       "staffRateLabel": "Taxa definida pela Mutav",

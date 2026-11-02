@@ -6,6 +6,7 @@ import {
   DOCUMENT_ERROR_CODES,
   FORBIDDEN_MESSAGE_KEY,
   UNEXPECTED_MESSAGE_KEY,
+  approvalMessageKey,
   canSubmitRejection,
   errorMessageKey,
   formatFileSize,
@@ -54,6 +55,20 @@ describe("thrownMessageKey", () => {
 
   it("falls back otherwise", () => {
     expect(thrownMessageKey(new Error("network"))).toBe(UNEXPECTED_MESSAGE_KEY);
+  });
+});
+
+describe("approvalMessageKey", () => {
+  it.each([
+    [{ reviewSigned: false, activation: null }, "toast.approved"],
+    [{ reviewSigned: true, activation: null }, "toast.approvedAndSigned"],
+    [{ reviewSigned: true, activation: { outcome: "activated" } }, "toast.approvedAndActivated"],
+    [
+      { reviewSigned: true, activation: { outcome: "awaiting_capacity" } },
+      "toast.approvedAndWaiting",
+    ],
+  ] as const)("%o → %s", (approval, key) => {
+    expect(approvalMessageKey(approval)).toBe(key);
   });
 });
 

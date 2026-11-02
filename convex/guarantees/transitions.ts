@@ -1,10 +1,10 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Result } from "../lib/result";
 import type { UserId } from "../users/domain";
-import { AUDIT_ACTION } from "../audit/domain";
+import { AUDIT_ACTION, type AuditActor } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
 import { NOTICE_RESOLUTION_KIND } from "../delinquencies/domain";
-import { OFFER_HOLD_RELEASE_REASON } from "../reserve/registration";
+import { OFFER_HOLD_RELEASE_REASON } from "../reserve/capacity";
 import { releaseOfferHolds } from "../reserve/offerHolds";
 import { replaceGuaranteeAggregates } from "./aggregateWrites";
 import {
@@ -34,7 +34,19 @@ import {
  * write has happened, a failure throws and the whole transaction rolls back.
  */
 
-export type GuaranteeActor = { userId: UserId; username: string };
+/**
+ * Who moved the guarantee: a user, or — for the activation sweep that runs
+ * when a new reserve balance lands — the system, named by its source.
+ */
+export type GuaranteeActor =
+  | { userId: UserId; username: string }
+  | { systemSource: string; username: string };
+
+function auditActorFor(actor: GuaranteeActor): AuditActor {
+  return "userId" in actor
+    ? { kind: "user", userId: actor.userId }
+    : { kind: "system", source: actor.systemSource };
+}
 
 /** The `closed` payload, minus the timestamp the helper stamps itself. */
 export type GuaranteeClosureInput = { reason: CloseReason; note?: string };
@@ -44,7 +56,7 @@ export type ApplyGuaranteeTransitionInput = {
   to: GuaranteeState;
   /** Required when `to` is `closed`, rejected otherwise. */
   closure?: GuaranteeClosureInput;
-  /** Included in the same patch as the status — used by `confirmRegistration`. */
+  /** Included in the same patch as the status — used by activation. */
   capacity?: GuaranteeCapacity;
   actor: GuaranteeActor;
   /** Human sentence for the history timeline; the structured twin is derived. */
@@ -159,7 +171,7 @@ export async function applyGuaranteeTransition(
   });
 
   await appendAuditEntry(ctx, {
-    actor: { kind: "user", userId: actor.userId },
+    actor: auditActorFor(actor),
     action: AUDIT_ACTION.GUARANTEE_TRANSITIONED,
     resourceType: "guarantees",
     resourceId: guarantee.publicId,
@@ -175,7 +187,7 @@ export async function applyGuaranteeTransition(
     },
   });
 
-  // A draft closed before registration gives back any reserve capital its
+  // A draft closed before activation gives back any reserve capital its
   // offer still holds (ADR 0010) — whichever path closed it.
   if (isClosing && guarantee.status === GUARANTEE_STATE.DRAFTED) {
     await releaseOfferHolds(ctx, {
@@ -253,7 +265,7 @@ export async function reserveCoverCapacity(
 
   const after = await writeCapacity(ctx, guarantee, capacity);
   await appendAuditEntry(ctx, {
-    actor: { kind: "user", userId: actor.userId },
+    actor: auditActorFor(actor),
     action: AUDIT_ACTION.GUARANTEE_CAPACITY_RESERVED,
     resourceType: "guarantees",
     resourceId: guarantee.publicId,
@@ -322,7 +334,7 @@ export async function releaseCoverCapacity(
 
   const after = await writeCapacity(ctx, guarantee, capacity);
   await appendAuditEntry(ctx, {
-    actor: { kind: "user", userId: actor.userId },
+    actor: auditActorFor(actor),
     action: AUDIT_ACTION.GUARANTEE_CAPACITY_RELEASED,
     resourceType: "guarantees",
     resourceId: guarantee.publicId,
@@ -351,7 +363,7 @@ export type DisputeReversalError = {
 /**
  * Every cent a committed cover reserved on this guarantee, read back from the
  * notices that drew it. Nothing moves a guarantee out of `cover_committed`
- * except a close or eviction, and `confirmRegistration` starts every life at zero, so on
+ * except a close or eviction, and activation starts every life at zero, so on
  * a sound row this sum IS `reservedCents` — the caller refuses when it is not.
  */
 async function sumAppliedCover(ctx: MutationCtx, guaranteeId: GuaranteeId): Promise<number> {

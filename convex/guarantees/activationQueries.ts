@@ -4,12 +4,7 @@ import { queryWithMutavRole } from "../lib/auth";
 import { ONBOARDING_STATE } from "../agencies/domain";
 import type { OfferHold } from "../reserve/domain";
 import { latestOfferHold } from "../reserve/offerHolds";
-import {
-  computeCovers,
-  offerHoldStatus,
-  onchainGuaranteeIdHex,
-  type OfferHoldStatus,
-} from "../reserve/registration";
+import { offerHoldStatus, type OfferHoldStatus } from "../reserve/capacity";
 import { agencySubmittedTenant } from "./tenantIdentity";
 import { shapeGuaranteeReview } from "./useCases";
 import {
@@ -19,21 +14,21 @@ import {
   type Guarantee,
   type SignedContractStatus,
 } from "./domain";
-import { registrationBlockers, REVIEW_STATUS, type RegistrationBlocker } from "./review";
+import { activationBlockers, REVIEW_STATUS, type ActivationBlocker } from "./review";
 
 /**
  * Staff reads behind the admin activation screens: the drafts out for
- * signature or waiting for their on-chain registration, and everything
- * compliance and the operator need on one page — the expected on-chain id and
- * covers, the offer hold, the reserve's latest refusal. Gated at
- * `compliance`, the rung `confirmRegistration` itself requires.
+ * signature or waiting for reserve capacity, and everything compliance needs
+ * on one page — the offer hold, and the capacity check that activated the
+ * guarantee or keeps it waiting (balance, required coverage, free capital,
+ * snapshot time). Gated at `compliance`, the rung `retryActivation` requires.
  */
 
 const MAX_ACTIVATION_QUEUE_ROWS = 100;
 const MAX_ACTIVATION_HISTORY_ROWS = 50;
 
 export const activationQueueReviewValidator = v.union(
-  v.literal(REVIEW_STATUS.PENDING_REGISTRATION),
+  v.literal(REVIEW_STATUS.AWAITING_CAPACITY),
   v.literal(REVIEW_STATUS.AWAITING_SIGNATURE),
 );
 
@@ -53,7 +48,7 @@ async function rentalContractStatus(
 
 export type OfferHoldView = {
   status: OfferHoldStatus;
-  amountBaseUnits: string;
+  amountCents: number;
   holdDays: number;
   createdAt: number;
   expiresAt: number;
@@ -66,7 +61,7 @@ function shapeOfferHold(hold: OfferHold | null, now: number): OfferHoldView | nu
   if (!hold) return null;
   return {
     status: offerHoldStatus(hold, now),
-    amountBaseUnits: hold.amountBaseUnits.toString(),
+    amountCents: hold.amountCents,
     holdDays: hold.holdDays,
     createdAt: hold.createdAt,
     expiresAt: hold.expiresAt,
@@ -76,16 +71,7 @@ function shapeOfferHold(hold: OfferHold | null, now: number): OfferHoldView | nu
   };
 }
 
-function shapeRegistrationRefusal(guarantee: Guarantee) {
-  const refusal = guarantee.registrationRefusal;
-  if (!refusal) return null;
-  return {
-    programErrorCode: refusal.programErrorCode,
-    programErrorName: refusal.programErrorName,
-    txSignature: refusal.txSignature,
-    refusedAt: refusal.refusedAt,
-  };
-}
+export type ActivationCheckView = NonNullable<Guarantee["activationCheck"]> | null;
 
 export type ActivationQueueRow = {
   publicId: string;
@@ -98,8 +84,8 @@ export type ActivationQueueRow = {
   sentForSignatureAt: string | null;
   signedContract: SignedContractStatus;
   offerHold: OfferHoldStatus;
-  registrationRefusal: ReturnType<typeof shapeRegistrationRefusal>;
-  blockers: RegistrationBlocker[];
+  activationCheck: ActivationCheckView;
+  blockers: ActivationBlocker[];
 };
 
 async function shapeActivationQueueRow(
@@ -122,8 +108,8 @@ async function shapeActivationQueueRow(
     sentForSignatureAt: guarantee.underwriting.signatureRequest?.sentAt ?? null,
     signedContract,
     offerHold: offerHoldStatus(await latestOfferHold(ctx, guarantee._id), now),
-    registrationRefusal: shapeRegistrationRefusal(guarantee),
-    blockers: registrationBlockers({
+    activationCheck: guarantee.activationCheck ?? null,
+    blockers: activationBlockers({
       status: guarantee.status,
       review: guarantee.underwriting.review,
       signedContractApproved: signedContract === "approved",
@@ -132,41 +118,52 @@ async function shapeActivationQueueRow(
   };
 }
 
+async function draftsAtReview(
+  ctx: QueryCtx,
+  review: Guarantee["underwriting"]["review"],
+): Promise<Guarantee[]> {
+  return ctx.db
+    .query("guarantees")
+    .withIndex("by_review_status_requestedAt", (q) =>
+      q.eq("underwriting.review", review).eq("status", GUARANTEE_STATE.DRAFTED),
+    )
+    .order("asc")
+    .take(MAX_ACTIVATION_QUEUE_ROWS + 1);
+}
+
 /**
- * Drafts across every agency at one late review stage: `pending_registration`
- * (signed, waiting for the operator's `register_guarantee`) or
+ * Drafts across every agency at one late review stage, oldest analysis
+ * request first: `awaiting_capacity` (signed, waiting for reserve capacity —
+ * plus any `signed` draft a blocker such as an inactive agency held back) or
  * `awaiting_signature` (contract out with the tenant, its offer holding
- * reserve capital — or lapsed, flagged for a re-send). Reuses the
- * underwriting queue's index, pinned to `drafted`, so an activated or
- * canceled guarantee drops out.
+ * reserve capital — or lapsed, flagged for a re-send). Pinned to `drafted`,
+ * so an activated or canceled guarantee drops out.
  */
 export const listActivationQueue = queryWithMutavRole({ minRole: "compliance" })({
   args: { review: activationQueueReviewValidator },
   handler: async (ctx, args): Promise<{ rows: ActivationQueueRow[]; hasMore: boolean }> => {
-    const page = await ctx.db
-      .query("guarantees")
-      .withIndex("by_review_status_requestedAt", (q) =>
-        q.eq("underwriting.review", args.review).eq("status", GUARANTEE_STATE.DRAFTED),
-      )
-      .order("asc")
-      .take(MAX_ACTIVATION_QUEUE_ROWS + 1);
-    const rows = page.slice(0, MAX_ACTIVATION_QUEUE_ROWS);
+    const drafts =
+      args.review === REVIEW_STATUS.AWAITING_CAPACITY
+        ? [
+            ...(await draftsAtReview(ctx, REVIEW_STATUS.AWAITING_CAPACITY)),
+            ...(await draftsAtReview(ctx, REVIEW_STATUS.SIGNED)),
+          ]
+        : await draftsAtReview(ctx, args.review);
+    const rows = drafts.slice(0, MAX_ACTIVATION_QUEUE_ROWS);
     const now = Date.now();
     return {
       rows: await Promise.all(
         rows.map((guarantee) => shapeActivationQueueRow(ctx, { guarantee, now })),
       ),
-      hasMore: page.length > MAX_ACTIVATION_QUEUE_ROWS,
+      hasMore: drafts.length > MAX_ACTIVATION_QUEUE_ROWS,
     };
   },
 });
 
 /**
  * One guarantee as the activation page shows it. `null` for an unknown or
- * ambiguous publicId. `blockers` is the same list `confirmRegistration`
- * checks before it reads the chain; `registration.expected` is what the
- * operator's `register_guarantee` must carry — the 32-byte id as hex and both
- * covers in base units, as decimal strings.
+ * ambiguous publicId. `blockers` is the same list an activation checks before
+ * it measures the reserve; `activationCheck` is the latest measurement.
  */
 export const getActivationDetail = queryWithMutavRole({ minRole: "compliance" })({
   args: { publicId: v.string() },
@@ -174,7 +171,7 @@ export const getActivationDetail = queryWithMutavRole({ minRole: "compliance" })
     const candidates = await ctx.db
       .query("guarantees")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
-      .collect();
+      .take(2);
     if (candidates.length !== 1) return null;
     const guarantee = candidates[0];
 
@@ -185,7 +182,6 @@ export const getActivationDetail = queryWithMutavRole({ minRole: "compliance" })
     const tenant = await agencySubmittedTenant(ctx, guarantee);
     const signedContract = await rentalContractStatus(ctx, guarantee);
     const agencyActive = agency.onboardingState === ONBOARDING_STATE.ACTIVE;
-    const covers = computeCovers(guarantee.terms);
 
     const history = await ctx.db
       .query("guaranteeHistory")
@@ -208,23 +204,8 @@ export const getActivationDetail = queryWithMutavRole({ minRole: "compliance" })
       review: shapeGuaranteeReview(guarantee),
       signedContract,
       offerHold: shapeOfferHold(await latestOfferHold(ctx, guarantee._id), Date.now()),
-      registration: {
-        expected: {
-          onchainIdHex: await onchainGuaranteeIdHex(guarantee.publicId),
-          defaultCoverBaseUnits: covers.defaultCoverBaseUnits.toString(),
-          exitCoverBaseUnits: covers.exitCoverBaseUnits.toString(),
-        },
-        confirmed: guarantee.registration
-          ? {
-              txSignature: guarantee.registration.txSignature,
-              slot: guarantee.registration.slot,
-              registeredAt: guarantee.registration.registeredAt,
-              confirmedAt: guarantee.registration.confirmedAt,
-            }
-          : null,
-        refusal: shapeRegistrationRefusal(guarantee),
-      },
-      blockers: registrationBlockers({
+      activationCheck: guarantee.activationCheck ?? null,
+      blockers: activationBlockers({
         status: guarantee.status,
         review: guarantee.underwriting.review,
         signedContractApproved: signedContract === "approved",

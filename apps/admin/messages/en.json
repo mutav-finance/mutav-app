@@ -420,6 +420,7 @@
       "accepted": "Accepted",
       "awaiting_signature": "Awaiting signature",
       "signed": "Signed",
+      "awaiting_capacity": "Waiting for reserve capacity",
       "refused": "Refused"
     },
     "guaranteeState": {
@@ -533,11 +534,10 @@
       "CLOSURE_REQUIRED": "Closing a guarantee needs a close reason.",
       "CLOSURE_NOT_ALLOWED": "A close reason was supplied for a move that does not close the guarantee.",
       "INVALID_HOLD_DAYS": "The hold period must be a whole number of days between 1 and 90.",
-      "INSUFFICIENT_FREE_CAPITAL": "The reserve's free capital, after the offers already holding it, does not cover this offer. Nothing was sent.",
+      "INSUFFICIENT_FREE_CAPITAL": "The reserve's free capital, after required coverage and the offers already holding it, does not cover this offer. Nothing was sent.",
       "TOO_MANY_OPEN_HOLDS": "Too many offers are holding reserve capital to check this one safely. Escalate.",
       "OFFER_STILL_HELD": "This offer still holds reserve capital; re-send once the hold lapses.",
-      "INVALID_RESERVE_READING": "The reserve reading was out of range. Nothing was sent.",
-      "RESERVE_READER_UNAVAILABLE": "Mutav cannot read the reserve yet, so the offer cannot be checked. Nothing was sent.",
+      "RESERVE_BALANCE_UNAVAILABLE": "No recent reserve balance is available, so the offer cannot be checked. Nothing was sent.",
       "FORBIDDEN": "Your staff role cannot perform this action.",
       "unexpected": "Something went wrong. Please try again."
     },
@@ -703,7 +703,9 @@
       "approved": "Document approved.",
       "rejected": "Document rejected; the agency was notified.",
       "uploaded": "Document attached and queued for review.",
-      "approvedAndSigned": "Signed contract approved. The guarantee is now waiting for its registration in the reserve."
+      "approvedAndSigned": "Signed contract approved. The guarantee could not be activated yet — open it to see why.",
+      "approvedAndActivated": "Signed contract approved. The reserve had room: the guarantee is active and the agency was notified.",
+      "approvedAndWaiting": "Signed contract approved. The guarantee is waiting for reserve capacity."
     },
     "errors": {
       "GUARANTEE_NOT_FOUND": "Guarantee not found.",
@@ -725,15 +727,15 @@
   },
   "staffGuarantees": {
     "title": "Guarantees",
-    "subtitle": "Drafts on the road to activation. A guarantee becomes active when its on-chain registration in the reserve is confirmed — nobody clicks Activate.",
+    "subtitle": "Drafts on the road to activation. A guarantee becomes active when Mutav approves its signed contract and the reserve has room for it — gated by required coverage. Nobody clicks Activate.",
     "notAvailable": "—",
     "moreAvailable": "More guarantees are waiting beyond this page.",
     "tabs": {
-      "pending_registration": "Waiting for registration",
+      "awaiting_capacity": "Waiting for reserve capacity",
       "awaiting_signature": "Awaiting signature"
     },
     "empty": {
-      "pending_registration": "No signed draft is waiting for its registration.",
+      "awaiting_capacity": "No signed draft is waiting for reserve capacity.",
       "awaiting_signature": "No contract is out for signature."
     },
     "columns": {
@@ -753,7 +755,7 @@
       "accepted": "Accepted",
       "awaiting_signature": "Awaiting signature",
       "signed": "Signed",
-      "pending_registration": "Waiting for registration",
+      "awaiting_capacity": "Waiting for reserve capacity",
       "refused": "Refused"
     },
     "signedContract": {
@@ -785,7 +787,7 @@
       "retry": "Try again",
       "openUnderwriting": "Open underwriting case file",
       "openGuarantee": "Open guarantee",
-      "recordRegistration": "Record registration"
+      "retryActivation": "Retry activation"
     },
     "stepper": {
       "progressLabel": "Road to activation",
@@ -797,7 +799,7 @@
         "accepted": "Accepted",
         "awaiting_signature": "Out for signature",
         "signed": "Signed",
-        "pending_registration": "Waiting for reserve",
+        "awaiting_capacity": "Waiting for reserve",
         "active": "Active"
       }
     },
@@ -805,13 +807,13 @@
       "title": "Guarantee {id}",
       "back": "← Guarantees",
       "notFound": "Guarantee not found",
-      "activation": "Registration",
+      "activation": "Activation",
       "summary": "Summary",
       "lease": "Lease",
       "terms": "Terms",
       "history": "History",
-      "blockedHeading": "A registration cannot be recorded yet:",
-      "activatedOn": "Registered and active since {date}",
+      "blockedHeading": "This guarantee cannot be activated yet:",
+      "activatedOn": "Active since {date}",
       "fields": {
         "agency": "Agency",
         "tenant": "Tenant",
@@ -834,48 +836,52 @@
     },
     "blockers": {
       "NOT_DRAFTED": "The guarantee is no longer a draft.",
-      "REVIEW_NOT_PENDING_REGISTRATION": "The review is not waiting for registration — approve the signed rental contract once the contract is out for signature.",
+      "REVIEW_NOT_SIGNED": "The signed rental contract has not been approved yet — approve it once the contract is out for signature.",
       "SIGNED_CONTRACT_NOT_APPROVED": "No signed rental contract has been approved yet.",
       "AGENCY_NOT_ACTIVE": "The agency's onboarding is not active."
     },
     "toast": {
-      "registered": "Registration verified. The guarantee is active and the agency was notified.",
-      "registrationRefused": "The reserve refused the registration ({error}). The guarantee stays waiting for registration."
+      "activated": "The guarantee is active and the agency was notified.",
+      "stillWaiting": "Still waiting for reserve capacity: {shortfall} short.",
+      "reserveUnavailable": "No recent reserve balance to check against. The guarantee keeps waiting."
     },
     "errors": {
       "NOT_FOUND": "That guarantee no longer exists.",
       "NOT_DRAFTED": "The guarantee is no longer a draft.",
-      "REVIEW_NOT_PENDING_REGISTRATION": "The guarantee is not waiting for registration.",
+      "REVIEW_NOT_SIGNED": "The guarantee is not waiting for activation.",
       "SIGNED_CONTRACT_NOT_APPROVED": "Approve the signed rental contract first.",
       "AGENCY_NOT_ACTIVE": "The agency is not active; it cannot take a new guarantee.",
-      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures are inconsistent. Escalate before registering.",
+      "CAPACITY_INVARIANT_BROKEN": "The guarantee's coverage figures are inconsistent. Escalate before activating.",
       "SELF_TRANSITION": "The guarantee is already in that state.",
       "TERMINAL_STATE": "The guarantee is closed.",
       "ILLEGAL_TRANSITION": "This guarantee cannot go active from its current state.",
-      "INVALID_TX_SIGNATURE": "That is not a Solana transaction signature.",
-      "RESERVE_READER_UNAVAILABLE": "Mutav cannot read the reserve yet, so the registration cannot be verified. Nothing was changed.",
-      "TX_NOT_FOUND": "No finalized transaction with that signature was found. Check it and try again once it is confirmed.",
-      "NOT_REGISTER_GUARANTEE": "That transaction is not a register_guarantee on the reserve program.",
-      "ARGS_MISMATCH": "That transaction registered a different id or different covers than this guarantee expects.",
-      "FORBIDDEN": "Recording a registration needs the compliance role.",
+      "FORBIDDEN": "Retrying an activation needs the compliance role.",
       "unexpected": "Something went wrong. Try again."
     },
-    "registration": {
-      "explainer": "The operator registers this guarantee in the reserve (register_guarantee) with exactly the values below, then you paste the transaction signature here. Mutav verifies it on chain before the guarantee goes active and its activation fee is billed.",
-      "fields": {
-        "onchainId": "On-chain guarantee id",
-        "defaultCover": "default_cover (base units)",
-        "exitCover": "exit_cover (base units)"
+    "activation": {
+      "explainer": "A guarantee goes active when the signed rental contract is approved and its required coverage (cover × c) fits the reserve's free capital. If it does not fit, it waits for reserve capacity and is retried whenever a new reserve balance arrives.",
+      "waitingHeading": "Waiting for reserve capacity",
+      "shortfall": "The reserve is {amount} short of this guarantee's required coverage.",
+      "reserveUnavailable": "No recent reserve balance was available, so capacity could not be checked.",
+      "waitingNextStep": "It is retried automatically with each new reserve balance. Retry now once the reserve has room, or cancel the draft.",
+      "retrying": "Checking the reserve…"
+    },
+    "capacity": {
+      "explainer": "The capacity check behind the latest activation attempt, gated by required coverage.",
+      "outcome": "Capacity check",
+      "outcomes": {
+        "passed": "Fits the reserve",
+        "insufficient_capacity": "Short of reserve capacity",
+        "reserve_unavailable": "Reserve balance unavailable"
       },
-      "txLabel": "register_guarantee transaction signature",
-      "txPlaceholder": "Base58 signature from the operator console",
-      "txInvalid": "That is not a Solana transaction signature.",
-      "verifying": "Verifying on chain…",
-      "confirmedTx": "Registration transaction:",
-      "refusedHeading": "The reserve refused the registration: {error} ({code})",
-      "refusedOn": "Recorded on {date}",
-      "refusedNextStep": "The guarantee stays waiting for registration. Wait for reserve capacity and register again, or cancel the draft.",
-      "refusedTag": "Refused: {error}"
+      "balance": "Reserve balance",
+      "requiredCoverage": "Required coverage (on-risk book)",
+      "activeHolds": "Held by other offers",
+      "freeCapital": "Free capital",
+      "ownRequirement": "This guarantee's required coverage",
+      "snapshotTakenAt": "Balance read at (BRT)",
+      "checkedAt": "Checked at (BRT)",
+      "shortfallTag": "Waiting for reserve capacity — {amount} short"
     },
     "offerHold": {
       "label": "Offer hold",

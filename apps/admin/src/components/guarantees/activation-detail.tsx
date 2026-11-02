@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import type { Preloaded } from "convex/react";
 import type { api } from "@convex/_generated/api";
-import { formatBRLCents, formatDateBR } from "@mutav/i18n/brazil";
+import { formatBRLCents, formatDateBR, formatDateTimeBRT } from "@mutav/i18n/brazil";
 import { Link } from "@mutav/i18n/navigation";
 import { Button } from "@mutav/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
@@ -14,13 +14,8 @@ import { PageContent } from "@mutav/ui/page/page-content";
 import { PageHeader } from "@mutav/ui/page/page-header";
 import { PageShell } from "@mutav/ui/page/page-shell";
 import { StepIndicator } from "@mutav/ui/step-indicator";
-import { Input } from "@mutav/ui/input";
-import { Label } from "@mutav/ui/label";
-import { Mono } from "@mutav/ui/mono";
 import { GuaranteeDocumentsPanel } from "@/components/guarantees/guarantee-documents-panel";
 import {
-  ACTIVATION_STEPS,
-  baseUnitsToCents,
   OFFER_HOLD_TONE,
   REVIEW_STATUS_TONE,
   SIGNED_CONTRACT_TONE,
@@ -70,7 +65,7 @@ export function ActivationDetail({
         }
       />
       <PageContent variant="narrow">
-        <RegistrationCard view={view} />
+        <ActivationCard view={view} />
         <SummaryCard view={view} />
         <GuaranteeDocumentsPanel publicId={detail.publicId} />
         <LeaseCard view={view} />
@@ -124,101 +119,105 @@ function usePercent() {
     format.number(bps / BASIS_POINTS_PER_UNIT, { style: "percent", maximumFractionDigits: 2 });
 }
 
-function RegistrationCard({ view }: { view: ActivationDetailViewModel }) {
+function ActivationCard({ view }: { view: ActivationDetailViewModel }) {
   const t = useTranslations("staffGuarantees");
   const detail = view.detail;
   if (!detail) return null;
-  const { registration } = detail;
 
   return (
     <Section title={t("detail.activation")}>
       <div className="flex flex-col gap-4">
         <StepIndicator
           current={view.stepPosition}
-          labels={ACTIVATION_STEPS.map((step) => t(`stepper.steps.${step}`))}
+          labels={view.steps.map((step) => t(`stepper.steps.${step}`))}
           progressLabel={t("stepper.progressLabel")}
           doneSuffix={t("stepper.doneSuffix")}
           currentSuffix={t("stepper.currentSuffix")}
         />
         {view.isActive && detail.activatedAt !== null ? (
-          <div className="flex flex-col gap-1">
-            <p>{t("detail.activatedOn", { date: formatDateBR(detail.activatedAt) })}</p>
-            {registration.confirmed && (
-              <p className="text-muted-foreground break-all">
-                {t("registration.confirmedTx")} <Mono>{registration.confirmed.txSignature}</Mono>
-              </p>
-            )}
-          </div>
+          <p>{t("detail.activatedOn", { date: formatDateBR(detail.activatedAt) })}</p>
         ) : (
-          <>
-            <p className="text-muted-foreground">{t("registration.explainer")}</p>
-            <ExpectedRegistration view={view} />
-            <OfferHoldRows view={view} />
-            {registration.refusal && (
-              <div className="border-destructive/40 flex flex-col gap-1 rounded-md border p-3">
-                <p className="font-medium">
-                  {t("registration.refusedHeading", {
-                    error: registration.refusal.programErrorName,
-                    code: registration.refusal.programErrorCode,
-                  })}
-                </p>
-                <p className="text-muted-foreground">
-                  {t("registration.refusedOn", {
-                    date: formatDateBR(registration.refusal.refusedAt),
-                  })}
-                </p>
-                <p className="text-muted-foreground break-all">
-                  <Mono>{registration.refusal.txSignature}</Mono>
-                </p>
-                <p className="text-muted-foreground">{t("registration.refusedNextStep")}</p>
-              </div>
-            )}
-            {view.canRegister ? (
-              <RecordRegistrationForm view={view} />
-            ) : (
-              <div className="flex flex-col gap-2">
-                <p className="font-medium">{t("detail.blockedHeading")}</p>
-                <ul className="text-muted-foreground flex list-disc flex-col gap-1 pl-5">
-                  {view.blockers.map((blocker) => (
-                    <li key={blocker}>{t(`blockers.${blocker}`)}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
+          <p className="text-muted-foreground">{t("activation.explainer")}</p>
         )}
+        {view.isWaitingForCapacity && <WaitingNotice view={view} />}
+        <CapacityCheckRows view={view} />
+        {!view.isActive && <OfferHoldRows view={view} />}
+        {detail.status === "drafted" &&
+          (view.canRetry ? (
+            <div>
+              <Button onClick={() => void view.retry()} disabled={view.busy}>
+                {view.busy ? t("activation.retrying") : t("actions.retryActivation")}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="font-medium">{t("detail.blockedHeading")}</p>
+              <ul className="text-muted-foreground flex list-disc flex-col gap-1 pl-5">
+                {view.blockers.map((blocker) => (
+                  <li key={blocker}>{t(`blockers.${blocker}`)}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
       </div>
     </Section>
   );
 }
 
-function ExpectedRegistration({ view }: { view: ActivationDetailViewModel }) {
+function WaitingNotice({ view }: { view: ActivationDetailViewModel }) {
   const t = useTranslations("staffGuarantees");
-  const detail = view.detail;
-  if (!detail) return null;
-  const { expected } = detail.registration;
-  const cover = (baseUnits: string) => (
-    <span className="flex flex-col">
-      <Mono>{baseUnits}</Mono>
-      <span className="text-muted-foreground text-xs">
-        {formatBRLCents(baseUnitsToCents(baseUnits))}
-      </span>
-    </span>
+  const check = view.detail?.activationCheck;
+  return (
+    <div className="border-destructive/40 flex flex-col gap-1 rounded-md border p-3">
+      <p className="font-medium">{t("activation.waitingHeading")}</p>
+      {check?.outcome === "insufficient_capacity" && (
+        <p>{t("activation.shortfall", { amount: formatBRLCents(check.shortfallCents) })}</p>
+      )}
+      {check?.outcome === "reserve_unavailable" && <p>{t("activation.reserveUnavailable")}</p>}
+      <p className="text-muted-foreground">{t("activation.waitingNextStep")}</p>
+    </div>
   );
+}
+
+function CapacityCheckRows({ view }: { view: ActivationDetailViewModel }) {
+  const t = useTranslations("staffGuarantees");
+  const check = view.detail?.activationCheck;
+  if (!check) return null;
+  if (check.outcome === "reserve_unavailable") {
+    return (
+      <Rows
+        rows={[
+          [t("capacity.checkedAt"), formatDateTimeBRT(check.checkedAt)],
+          [t("capacity.outcome"), t("capacity.outcomes.reserve_unavailable")],
+        ]}
+      />
+    );
+  }
 
   return (
-    <Rows
-      rows={[
-        [
-          t("registration.fields.onchainId"),
-          <Mono key="id" className="break-all">
-            {expected.onchainIdHex}
-          </Mono>,
-        ],
-        [t("registration.fields.defaultCover"), cover(expected.defaultCoverBaseUnits)],
-        [t("registration.fields.exitCover"), cover(expected.exitCoverBaseUnits)],
-      ]}
-    />
+    <div className="flex flex-col gap-2">
+      <p className="text-muted-foreground">{t("capacity.explainer")}</p>
+      <Rows
+        rows={[
+          [
+            t("capacity.outcome"),
+            <StatusTag key="outcome" tone={check.outcome === "passed" ? "success" : "expiring"}>
+              {t(`capacity.outcomes.${check.outcome}`)}
+            </StatusTag>,
+          ],
+          [t("capacity.balance"), formatBRLCents(check.balanceCents)],
+          [t("capacity.requiredCoverage"), formatBRLCents(check.requiredCoverageCents)],
+          [t("capacity.activeHolds"), formatBRLCents(check.activeHoldsCents)],
+          [t("capacity.freeCapital"), formatBRLCents(check.freeCapitalCents)],
+          [t("capacity.ownRequirement"), formatBRLCents(check.ownRequirementCents)],
+          [
+            t("capacity.snapshotTakenAt"),
+            formatDateTimeBRT(new Date(check.snapshotTakenAt).toISOString()),
+          ],
+          [t("capacity.checkedAt"), formatDateTimeBRT(check.checkedAt)],
+        ]}
+      />
+    </div>
   );
 }
 
@@ -237,7 +236,7 @@ function OfferHoldRows({ view }: { view: ActivationDetailViewModel }) {
               {t(`offerHold.status.${hold.status}`)}
             </StatusTag>,
           ],
-          [t("offerHold.amount"), formatBRLCents(baseUnitsToCents(hold.amountBaseUnits))],
+          [t("offerHold.amount"), formatBRLCents(hold.amountCents)],
           [
             t("offerHold.period"),
             t("offerHold.periodValue", {
@@ -249,39 +248,6 @@ function OfferHoldRows({ view }: { view: ActivationDetailViewModel }) {
       />
       {hold.status === "lapsed" && <p className="text-destructive">{t("offerHold.lapsedHint")}</p>}
     </div>
-  );
-}
-
-function RecordRegistrationForm({ view }: { view: ActivationDetailViewModel }) {
-  const t = useTranslations("staffGuarantees");
-  const form = view.registration;
-  const showInvalid = form.txSignature.trim().length > 0 && !form.signatureIsValid;
-
-  return (
-    <form
-      className="flex flex-col gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void form.submit();
-      }}
-    >
-      <Label htmlFor="registration-tx">{t("registration.txLabel")}</Label>
-      <Input
-        id="registration-tx"
-        value={form.txSignature}
-        onChange={(event) => form.setTxSignature(event.target.value)}
-        placeholder={t("registration.txPlaceholder")}
-        autoComplete="off"
-        spellCheck={false}
-        aria-invalid={showInvalid}
-      />
-      {showInvalid && <p className="text-destructive text-xs">{t("registration.txInvalid")}</p>}
-      <div>
-        <Button type="submit" disabled={view.busy || !form.signatureIsValid}>
-          {view.busy ? t("registration.verifying") : t("actions.recordRegistration")}
-        </Button>
-      </div>
-    </form>
   );
 }
 

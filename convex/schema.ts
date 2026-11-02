@@ -45,13 +45,13 @@ const reviewStatus = v.union(
   v.literal("accepted"),
   v.literal("awaiting_signature"),
   v.literal("signed"),
-  v.literal("pending_registration"),
+  v.literal("awaiting_capacity"),
   v.literal("refused"),
 );
 
-// Canonical `OFFER_HOLD_RELEASE_REASON` lives in `convex/reserve/registration.ts`.
+// Canonical `OFFER_HOLD_RELEASE_REASON` lives in `convex/reserve/capacity.ts`.
 const offerHoldReleaseReason = v.union(
-  v.literal("registered"),
+  v.literal("activated"),
   v.literal("expired"),
   v.literal("canceled"),
   v.literal("refused"),
@@ -564,33 +564,34 @@ export default defineSchema(
             sentBy: v.id("users"),
           }),
         ),
-        // When compliance approved the signed rental contract. The review
-        // passes through `signed` and lands in `pending_registration` in the
-        // same transaction, so this is where the signed moment is kept.
+        // When compliance approved the signed rental contract — the moment
+        // the review became `signed` and the capacity check first ran.
         signedAt: v.optional(v.string()),
       }),
-      // The confirmed on-chain `register_guarantee` (ADR 0010): written in the
-      // same transaction that moves the guarantee drafted → active.
-      registration: v.optional(
-        v.object({
-          onchainIdHex: v.string(),
-          txSignature: v.string(),
-          slot: v.number(),
-          registeredAt: v.string(),
-          confirmedAt: v.string(),
-          confirmedBy: v.id("users"),
-        }),
-      ),
-      // The reserve's latest refusal of this guarantee's registration. The
-      // guarantee stays `pending_registration`; cleared once one succeeds.
-      registrationRefusal: v.optional(
-        v.object({
-          programErrorCode: v.number(),
-          programErrorName: v.string(),
-          txSignature: v.string(),
-          refusedAt: v.string(),
-          recordedBy: v.id("users"),
-        }),
+      // The latest reserve capacity check of the activation (phase-1 rule,
+      // issue #427): every figure it used, in BRL cents, so staff see why a
+      // draft went active or is waiting for reserve capacity. Canonical shape:
+      // `convex/guarantees/activation.ts`.
+      activationCheck: v.optional(
+        v.union(
+          v.object({
+            outcome: v.union(v.literal("passed"), v.literal("insufficient_capacity")),
+            checkedAt: v.string(),
+            snapshotTakenAt: v.number(),
+            balanceCents: v.number(),
+            coverageRatioBps: v.number(),
+            requiredCoverageCents: v.number(),
+            activeHoldsCents: v.number(),
+            freeCapitalCents: v.number(),
+            ownRequirementCents: v.number(),
+            shortfallCents: v.number(),
+          }),
+          // No fresh vault balance to measure against: the gate failed closed.
+          v.object({
+            outcome: v.literal("reserve_unavailable"),
+            checkedAt: v.string(),
+          }),
+        ),
       ),
       // Per-guarantee relationship state — approval belongs to a guarantee,
       // not to the person.
@@ -625,7 +626,7 @@ export default defineSchema(
         availableCents: v.number(),
         reservedCents: v.number(),
       }),
-      // The one-time activation fee's billing marker. `confirmRegistration` sets it
+      // The one-time activation fee's billing marker. Activation sets it
       // `pending`; the first monthly billing run after activation puts the fee
       // on that invoice and flips it to `invoiced`, so the fee is billed once
       // whatever day of the month the guarantee went on risk. Absent on a
@@ -1235,20 +1236,20 @@ export default defineSchema(
       .index("by_periodEnd", ["periodEnd"]),
 
     // Off-chain hold of reserve free capital for an offer out for signature
-    // (ADR 0010). Sending a contract for signature holds cover × c for the
-    // hold period fixed here; the preflight measures free capital minus every
-    // active hold. Valid only while MUTAV's operator is the sole caller of
-    // `register_guarantee` — a second registrant moves the hold on chain.
-    // Amounts are BRS base units (6 decimals), exact as int64.
+    // (ADR 0010, phase-1 rule of issue #427). Sending a contract for signature
+    // holds cover × c for the hold period fixed here; free capital is the
+    // vault balance minus required coverage minus every active hold. Valid
+    // while Convex is the only platform putting guarantees on risk against
+    // the reserve. Amounts are BRL cents (BRS is 1:1 BRL).
     offerHolds: defineTable({
       guaranteeId: v.id("guarantees"),
       agencyId: v.id("agencies"),
-      amountBaseUnits: v.int64(),
+      amountCents: v.number(),
       holdDays: v.number(),
       createdAt: v.number(),
       expiresAt: v.number(),
       // Set when the signed contract is approved within the period: the held
-      // allocation then belongs to the pending registration and no longer lapses.
+      // capital then belongs to the guarantee and no longer lapses.
       signedAt: v.optional(v.number()),
       releasedAt: v.optional(v.number()),
       releaseReason: v.optional(offerHoldReleaseReason),
@@ -1263,7 +1264,20 @@ export default defineSchema(
       // Platform default of the offer hold period (ADR 0010); falls back to
       // `OFFER_HOLD_DAYS_DEFAULT` when unset.
       offerHoldDays: v.optional(v.number()),
+      // The coverage ratio `c` in basis points (issue #427); falls back to
+      // `COVERAGE_RATIO_BPS_DEFAULT` (2500, the pilot 25%) when unset.
+      coverageRatioBps: v.optional(v.number()),
     }).index("by_key", ["key"]),
+
+    // Cached readings of the phase-1 reserve: the Squads vault's BRS balance in
+    // BRL cents (issue #428). Written by `reserve/balance:recordReserveBalance`
+    // from the 15-minute reserve cron; activation reads the newest row and
+    // fails closed when it is older than `RESERVE_BALANCE_MAX_AGE_MS`.
+    reserveBalanceSnapshots: defineTable({
+      balanceCents: v.number(),
+      takenAt: v.number(),
+      source: v.literal("squads_vault"),
+    }).index("by_takenAt", ["takenAt"]),
 
     // The asset object mirrors reserveAssetValidator in convex/reserve/domain.ts (including valueCents) — kept inline here because importing an entity file into schema.ts would create a circular dependency through _generated/dataModel (same reason as agencyDocumentKind above).
     reserveSnapshots: defineTable({

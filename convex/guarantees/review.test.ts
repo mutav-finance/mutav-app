@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  activationBlockers,
   ALLOWED_REVIEW_TRANSITIONS,
   assertReviewTransition,
   isValidStaffFeeRateBps,
@@ -18,7 +19,7 @@ describe("review status value object", () => {
       "accepted",
       "awaiting_signature",
       "signed",
-      "pending_registration",
+      "awaiting_capacity",
       "refused",
     ]);
   });
@@ -35,10 +36,11 @@ describe("assertReviewTransition — exhaustive 7×7 matrix", () => {
     ["analysis_requested", "refused"],
     ["accepted", "awaiting_signature"],
     ["awaiting_signature", "signed"],
-    ["signed", "pending_registration"],
+    ["signed", "awaiting_capacity"],
+    ["awaiting_capacity", "signed"],
   ];
   const legalKeys = new Set(legal.map(([from, to]) => `${from}|${to}`));
-  const terminal: ReadonlySet<ReviewStatus> = new Set(["pending_registration", "refused"]);
+  const terminal: ReadonlySet<ReviewStatus> = new Set(["refused"]);
 
   const matrix = REVIEW_STATUSES.flatMap((from) =>
     REVIEW_STATUSES.map((to): [ReviewStatus, ReviewStatus] => [from, to]),
@@ -127,12 +129,44 @@ describe("provisionalPricingTier", () => {
 describe("reviewStatusForInsertedState", () => {
   test.each([
     [{ state: "drafted" as const }, "editing"],
-    [{ state: "active" as const }, "pending_registration"],
-    [{ state: "in_eviction" as const }, "pending_registration"],
-    [{ state: "closed" as const, closeReason: "end_of_lease" as const }, "pending_registration"],
+    [{ state: "active" as const }, "signed"],
+    [{ state: "in_eviction" as const }, "signed"],
+    [{ state: "closed" as const, closeReason: "end_of_lease" as const }, "signed"],
     [{ state: "closed" as const, closeReason: "canceled_pre_activation" as const }, "editing"],
     [{ state: "closed" as const, closeReason: "underwriting_refused" as const }, "refused"],
   ])("%o → %s", (input, expected) => {
     expect(reviewStatusForInsertedState(input)).toBe(expected);
+  });
+});
+
+describe("activationBlockers", () => {
+  const ready = {
+    status: "drafted" as const,
+    review: "signed" as const,
+    signedContractApproved: true,
+    agencyActive: true,
+  };
+
+  test.each(["signed", "awaiting_capacity"] as const)(
+    "a %s draft with an approved contract and an active agency has none",
+    (review) => {
+      expect(activationBlockers({ ...ready, review })).toEqual([]);
+    },
+  );
+
+  test("lists every blocker in check order", () => {
+    expect(
+      activationBlockers({
+        status: "active",
+        review: "awaiting_signature",
+        signedContractApproved: false,
+        agencyActive: false,
+      }),
+    ).toEqual([
+      "NOT_DRAFTED",
+      "REVIEW_NOT_SIGNED",
+      "SIGNED_CONTRACT_NOT_APPROVED",
+      "AGENCY_NOT_ACTIVE",
+    ]);
   });
 });

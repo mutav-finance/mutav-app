@@ -58,6 +58,27 @@ export const ACCEPTED_FILE_TYPES = "application/pdf,image/jpeg,image/png";
 
 export const DOCUMENT_SLOTS = ["rentalContract", "inspection", "policy"] as const;
 
+export type ApprovalOutcome =
+  | { reviewSigned: false; activation: null }
+  | {
+      reviewSigned: true;
+      activation: { outcome: "activated" } | { outcome: "awaiting_capacity" } | null;
+    };
+
+/**
+ * Which toast an approval earns. Approving the signed rental contract of a
+ * draft out for signature also runs the activation (issue #427): it goes
+ * active, waits for reserve capacity, or — when a blocker such as an
+ * inactive agency holds it back — stays signed.
+ */
+export function approvalMessageKey(approval: ApprovalOutcome): string {
+  if (!approval.reviewSigned) return "toast.approved";
+  if (approval.activation === null) return "toast.approvedAndSigned";
+  return approval.activation.outcome === "activated"
+    ? "toast.approvedAndActivated"
+    : "toast.approvedAndWaiting";
+}
+
 /** A rejection without a reason tells the agency nothing; the server enforces it too. */
 export function canSubmitRejection(reason: string): boolean {
   return reason.trim().length > 0;

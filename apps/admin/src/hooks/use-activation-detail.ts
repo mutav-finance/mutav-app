@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useAction, usePreloadedQuery, type Preloaded } from "convex/react";
+import { useMutation, usePreloadedQuery, type Preloaded } from "convex/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { api } from "@convex/_generated/api";
+import { formatBRLCents } from "@mutav/i18n/brazil";
 import {
   activationStepPosition,
-  isTxSignatureInput,
-  outcomeForRegistration,
-  outcomeForThrownRegistration,
-  type RegistrationOutcome,
+  activationSteps,
+  outcomeForRetry,
+  outcomeForThrownRetry,
+  type ActivationOutcome,
 } from "@/components/guarantees/view-model";
 
 type UseActivationDetailArgs = {
@@ -18,46 +19,43 @@ type UseActivationDetailArgs = {
 };
 
 /**
- * View model for one guarantee's activation page. Nobody clicks Activate
- * (ADR 0010): staff paste the operator's `register_guarantee` transaction
- * signature and Convex verifies it on chain. Whether the form is on offer
- * follows the blockers the server reports — the same list
- * `confirmRegistration` checks — never local state. Owns the signature
- * input, the in-flight flag and the toasts.
+ * View model for one guarantee's activation page. Nobody clicks Activate: a
+ * guarantee goes active when compliance approves its signed contract and the
+ * reserve capacity check passes (issue #427). While it waits for reserve
+ * capacity compliance may retry; whether the retry is on offer follows the
+ * blockers the server reports — never local state. Owns the in-flight flag
+ * and the toasts.
  */
 export function useActivationDetail({ preloaded }: UseActivationDetailArgs) {
   const t = useTranslations("staffGuarantees");
   const detail = usePreloadedQuery(preloaded);
-  const confirmRegistration = useAction(api.guarantees.registration.confirmRegistration);
+  const retryActivation = useMutation(api.guarantees.activation.retryActivation);
 
   const [busy, setBusy] = useState(false);
-  const [txSignature, setTxSignature] = useState("");
 
   const blockers = detail?.blockers ?? [];
-  const canRegister = detail !== null && blockers.length === 0;
-  const signatureIsValid = isTxSignatureInput(txSignature);
-  const stepPosition = detail
-    ? activationStepPosition({ status: detail.status, review: detail.review.status })
-    : 1;
+  const isDraft = detail !== null && detail.status === "drafted";
+  const canRetry = isDraft && blockers.length === 0;
+  const isWaitingForCapacity = isDraft && detail.review.status === "awaiting_capacity";
+  const stepInput = detail ? { status: detail.status, review: detail.review.status } : null;
 
-  function report(outcome: RegistrationOutcome) {
-    if (outcome.kind === "success") toast.success(t(outcome.messageKey));
-    else if (outcome.kind === "refused") {
-      toast.error(t(outcome.messageKey, { error: outcome.programErrorName }));
+  function report(outcome: ActivationOutcome) {
+    if (outcome.kind === "activated") toast.success(t(outcome.messageKey));
+    else if (outcome.kind === "waiting") {
+      toast.warning(
+        t(outcome.messageKey, { shortfall: formatBRLCents(outcome.shortfallCents ?? 0) }),
+      );
     } else toast.error(t(outcome.messageKey));
   }
 
-  async function submit() {
-    if (!detail || !canRegister || !signatureIsValid) return;
+  async function retry() {
+    if (!detail || !canRetry) return;
     const publicId = detail.publicId;
     setBusy(true);
     try {
-      const result = await confirmRegistration({ publicId, txSignature: txSignature.trim() });
-      const outcome = outcomeForRegistration(result);
-      report(outcome);
-      if (outcome.kind !== "error") setTxSignature("");
+      report(outcomeForRetry(await retryActivation({ publicId })));
     } catch (error) {
-      report(outcomeForThrownRegistration(error));
+      report(outcomeForThrownRetry(error));
     } finally {
       setBusy(false);
     }
@@ -67,15 +65,12 @@ export function useActivationDetail({ preloaded }: UseActivationDetailArgs) {
     detail,
     busy,
     blockers,
-    canRegister,
+    canRetry,
+    isWaitingForCapacity,
     isActive: detail !== null && detail.status !== "drafted" && detail.activatedAt !== null,
-    stepPosition,
-    registration: {
-      txSignature,
-      setTxSignature,
-      signatureIsValid,
-      submit,
-    },
+    steps: stepInput ? activationSteps(stepInput) : [],
+    stepPosition: stepInput ? activationStepPosition(stepInput) : 1,
+    retry,
   };
 }
 

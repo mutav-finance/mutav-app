@@ -10,11 +10,12 @@ import { GUARANTEE_ERROR_CODE, SCORE_TIER, type PriceableTier, type ScoreTier } 
  * to go on risk". Keeping them apart leaves the seven-state machine, its
  * aggregates and every insured-state read untouched.
  *
- * Approving the signed rental contract of an `awaiting_signature` draft walks
- * the review through `signed` into `pending_registration` in one transaction
- * (ADR 0010): signed is not active. The draft then waits for the operator's
- * `register_guarantee`; only `confirmRegistration`, once the transaction is
- * verified on chain, moves the lifecycle drafted → active.
+ * Phase-1 activation rule (issue #427, ADR amendment pending): approving the
+ * signed rental contract of an `awaiting_signature` draft marks the review
+ * `signed` and, in the same transaction, runs the reserve capacity check.
+ * Pass → the lifecycle moves drafted → active and the review stays `signed`.
+ * Fail → the review moves to `awaiting_capacity` and the draft waits; a retry
+ * that passes moves it back to `signed` as the guarantee goes active.
  */
 export const REVIEW_STATUS = {
   EDITING: "editing",
@@ -22,7 +23,7 @@ export const REVIEW_STATUS = {
   ACCEPTED: "accepted",
   AWAITING_SIGNATURE: "awaiting_signature",
   SIGNED: "signed",
-  PENDING_REGISTRATION: "pending_registration",
+  AWAITING_CAPACITY: "awaiting_capacity",
   REFUSED: "refused",
 } as const;
 
@@ -34,7 +35,7 @@ export const REVIEW_STATUSES: readonly ReviewStatus[] = [
   REVIEW_STATUS.ACCEPTED,
   REVIEW_STATUS.AWAITING_SIGNATURE,
   REVIEW_STATUS.SIGNED,
-  REVIEW_STATUS.PENDING_REGISTRATION,
+  REVIEW_STATUS.AWAITING_CAPACITY,
   REVIEW_STATUS.REFUSED,
 ] as const;
 
@@ -44,28 +45,32 @@ export const reviewStatusValidator = v.union(
   v.literal(REVIEW_STATUS.ACCEPTED),
   v.literal(REVIEW_STATUS.AWAITING_SIGNATURE),
   v.literal(REVIEW_STATUS.SIGNED),
-  v.literal(REVIEW_STATUS.PENDING_REGISTRATION),
+  v.literal(REVIEW_STATUS.AWAITING_CAPACITY),
   v.literal(REVIEW_STATUS.REFUSED),
 );
 
-export const TERMINAL_REVIEW_STATUSES: ReadonlySet<ReviewStatus> = new Set([
-  REVIEW_STATUS.PENDING_REGISTRATION,
-  REVIEW_STATUS.REFUSED,
-]);
+export const TERMINAL_REVIEW_STATUSES: ReadonlySet<ReviewStatus> = new Set([REVIEW_STATUS.REFUSED]);
+
+/** Where a signed draft stands while it is not yet on risk. */
+export const ACTIVATION_PENDING_REVIEW_STATUSES: readonly ReviewStatus[] = [
+  REVIEW_STATUS.SIGNED,
+  REVIEW_STATUS.AWAITING_CAPACITY,
+];
 
 /**
  * Every legal review move, keyed by the FROM status. A refusal is final for
  * that draft — the agency starts a new draft rather than reopening a refused
  * one — and an accepted draft cannot go back to editing: the terms Mutav
- * accepted are the terms that get signed.
+ * accepted are the terms that get signed. `signed ⇄ awaiting_capacity` is the
+ * capacity gate: out when a check fails, back when a retry passes.
  */
 export const ALLOWED_REVIEW_TRANSITIONS: Readonly<Record<ReviewStatus, readonly ReviewStatus[]>> = {
   editing: [REVIEW_STATUS.ANALYSIS_REQUESTED],
   analysis_requested: [REVIEW_STATUS.ACCEPTED, REVIEW_STATUS.REFUSED],
   accepted: [REVIEW_STATUS.AWAITING_SIGNATURE],
   awaiting_signature: [REVIEW_STATUS.SIGNED],
-  signed: [REVIEW_STATUS.PENDING_REGISTRATION],
-  pending_registration: [],
+  signed: [REVIEW_STATUS.AWAITING_CAPACITY],
+  awaiting_capacity: [REVIEW_STATUS.SIGNED],
   refused: [],
 } as const;
 
@@ -109,8 +114,8 @@ export const assertReviewTransition = (
  * The review status a row inserted directly in `state` carries — for the seed
  * and test fixtures, which insert guarantees in their target state rather
  * than walking them there. An activated guarantee has, by construction, been
- * through the whole review and its registration; a draft closed before
- * activation never left it, unless Mutav refused it.
+ * through the whole review and its contract was signed; a draft closed
+ * before activation never left it, unless Mutav refused it.
  */
 export function reviewStatusForInsertedState({
   state,
@@ -122,7 +127,7 @@ export function reviewStatusForInsertedState({
   if (state === GUARANTEE_STATE.DRAFTED) return REVIEW_STATUS.EDITING;
   if (closeReason === CLOSE_REASON.UNDERWRITING_REFUSED) return REVIEW_STATUS.REFUSED;
   if (closeReason === CLOSE_REASON.CANCELED_PRE_ACTIVATION) return REVIEW_STATUS.EDITING;
-  return REVIEW_STATUS.PENDING_REGISTRATION;
+  return REVIEW_STATUS.SIGNED;
 }
 
 /**
@@ -169,21 +174,21 @@ export const REVIEW_ERROR_CODE = {
 } as const satisfies Record<string, string>;
 
 /**
- * Why a registration cannot be recorded for a draft yet. Each is a distinct
- * refusal code of `confirmRegistration` and a distinct reason the admin
- * console shows next to the disabled "Record registration" form.
+ * Why a signed draft cannot be activated, before the capacity check runs.
+ * Each is a distinct refusal code of `retryActivation` and a distinct reason
+ * the admin app shows next to the guarantee.
  */
-export const REGISTRATION_ERROR_CODE = {
-  REVIEW_NOT_PENDING_REGISTRATION: "REVIEW_NOT_PENDING_REGISTRATION",
+export const ACTIVATION_ERROR_CODE = {
+  REVIEW_NOT_SIGNED: "REVIEW_NOT_SIGNED",
   SIGNED_CONTRACT_NOT_APPROVED: "SIGNED_CONTRACT_NOT_APPROVED",
   AGENCY_NOT_ACTIVE: "AGENCY_NOT_ACTIVE",
 } as const satisfies Record<string, string>;
 
-export type RegistrationBlocker =
+export type ActivationBlocker =
   | typeof GUARANTEE_ERROR_CODE.NOT_DRAFTED
-  | (typeof REGISTRATION_ERROR_CODE)[keyof typeof REGISTRATION_ERROR_CODE];
+  | (typeof ACTIVATION_ERROR_CODE)[keyof typeof ACTIVATION_ERROR_CODE];
 
-export type RegistrationReadiness = {
+export type ActivationReadiness = {
   status: GuaranteeState;
   review: ReviewStatus;
   signedContractApproved: boolean;
@@ -191,20 +196,20 @@ export type RegistrationReadiness = {
 };
 
 /**
- * Every precondition `confirmRegistration` checks before it reads the chain,
- * in the order it checks them. An empty list means the draft is waiting for
- * the operator's `register_guarantee`. The action refuses with the first
- * entry; the console lists them all.
+ * Every precondition an activation checks before it measures the reserve, in
+ * the order it checks them. An empty list means only reserve capacity stands
+ * between the draft and `active`. The mutations refuse with the first entry;
+ * the admin app lists them all.
  */
-export function registrationBlockers(readiness: RegistrationReadiness): RegistrationBlocker[] {
-  const blockers: RegistrationBlocker[] = [];
+export function activationBlockers(readiness: ActivationReadiness): ActivationBlocker[] {
+  const blockers: ActivationBlocker[] = [];
   if (readiness.status !== GUARANTEE_STATE.DRAFTED) blockers.push(GUARANTEE_ERROR_CODE.NOT_DRAFTED);
-  if (readiness.review !== REVIEW_STATUS.PENDING_REGISTRATION) {
-    blockers.push(REGISTRATION_ERROR_CODE.REVIEW_NOT_PENDING_REGISTRATION);
+  if (!ACTIVATION_PENDING_REVIEW_STATUSES.includes(readiness.review)) {
+    blockers.push(ACTIVATION_ERROR_CODE.REVIEW_NOT_SIGNED);
   }
   if (!readiness.signedContractApproved) {
-    blockers.push(REGISTRATION_ERROR_CODE.SIGNED_CONTRACT_NOT_APPROVED);
+    blockers.push(ACTIVATION_ERROR_CODE.SIGNED_CONTRACT_NOT_APPROVED);
   }
-  if (!readiness.agencyActive) blockers.push(REGISTRATION_ERROR_CODE.AGENCY_NOT_ACTIVE);
+  if (!readiness.agencyActive) blockers.push(ACTIVATION_ERROR_CODE.AGENCY_NOT_ACTIVE);
   return blockers;
 }

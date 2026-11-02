@@ -3,12 +3,13 @@ import { REVIEW_STATUS, type ReviewStatus } from "@convex/guarantees/review";
 
 /**
  * The agency-facing stepper for the road to activation: Mutav's underwriting
- * review, then the guarantee going on risk. It ends Signed → Waiting for
- * reserve → Active: a signed contract waits for its on-chain registration in
- * the reserve, and `active` — the lifecycle state the confirmed registration
- * puts it in, not a review status — closes the stepper (ADR 0010). `refused` is not a step on the happy path — it replaces
- * everything after the request — so it is reported as a flag beside the steps
- * rather than as one of them.
+ * review, then the guarantee going on risk. It ends Signed → Active: under the
+ * phase-1 rule (issue #427) approving the signed contract activates the
+ * guarantee when the reserve has room for it. When it does not, a "Waiting
+ * for reserve" step appears between the two until it fits. `active` is the
+ * lifecycle state, not a review status. `refused` is not a step on the happy
+ * path — it replaces everything after the request — so it is reported as a
+ * flag beside the steps rather than as one of them.
  */
 export const ACTIVE_STEP = GUARANTEE_STATE.ACTIVE;
 
@@ -18,7 +19,7 @@ export const REVIEW_STEPS = [
   REVIEW_STATUS.ACCEPTED,
   REVIEW_STATUS.AWAITING_SIGNATURE,
   REVIEW_STATUS.SIGNED,
-  REVIEW_STATUS.PENDING_REGISTRATION,
+  REVIEW_STATUS.AWAITING_CAPACITY,
   ACTIVE_STEP,
 ] as const;
 
@@ -45,20 +46,29 @@ export function currentReviewStep({
     : ACTIVE_STEP;
 }
 
+/** The steps drawn: the reserve wait only while the guarantee is in it. */
+function visibleSteps(current: ReviewStep | typeof REVIEW_STATUS.REFUSED): readonly ReviewStep[] {
+  return REVIEW_STEPS.filter(
+    (step) =>
+      step !== REVIEW_STATUS.AWAITING_CAPACITY || current === REVIEW_STATUS.AWAITING_CAPACITY,
+  );
+}
+
 export function reviewStepper(status: ReviewStep | typeof REVIEW_STATUS.REFUSED): ReviewStepper {
+  const steps = visibleSteps(status);
   if (status === REVIEW_STATUS.REFUSED) {
-    const lastDone = REVIEW_STEPS.indexOf(REFUSED_AFTER_STEP);
+    const lastDone = steps.indexOf(REFUSED_AFTER_STEP);
     return {
-      steps: REVIEW_STEPS.map((step, index) => ({
+      steps: steps.map((step, index) => ({
         step,
         state: index <= lastDone ? "done" : "upcoming",
       })),
       refused: true,
     };
   }
-  const current = REVIEW_STEPS.indexOf(status);
+  const current = steps.indexOf(status);
   return {
-    steps: REVIEW_STEPS.map((step, index) => ({
+    steps: steps.map((step, index) => ({
       step,
       state: index < current ? "done" : index === current ? "current" : "upcoming",
     })),
@@ -99,24 +109,18 @@ export function showsReviewCard({
 }
 
 /**
- * The reserve refused the latest registration attempt: the draft keeps
- * waiting, and the agency is told it waits for reserve capacity. The program's
- * error stays a staff concern.
+ * The signed contract was approved but the reserve had no room for the
+ * guarantee yet: the draft keeps waiting and is activated as soon as capacity
+ * frees up. The figures behind it are a staff concern.
  */
 export function isWaitingForReserveCapacity({
   status,
   review,
-  reserveRefusedAt,
 }: {
   status: GuaranteeState;
   review: ReviewStatus;
-  reserveRefusedAt: string | null;
 }): boolean {
-  return (
-    status === GUARANTEE_STATE.DRAFTED &&
-    review === REVIEW_STATUS.PENDING_REGISTRATION &&
-    reserveRefusedAt !== null
-  );
+  return status === GUARANTEE_STATE.DRAFTED && review === REVIEW_STATUS.AWAITING_CAPACITY;
 }
 
 const BASIS_POINTS_PER_PERCENT = 100;

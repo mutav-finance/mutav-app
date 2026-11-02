@@ -54,21 +54,21 @@ export const AUDIT_ACTION = {
   GUARANTEE_ANALYSIS_REFUSED: "guarantee.analysis_refused",
   GUARANTEE_SENT_FOR_SIGNATURE: "guarantee.sent_for_signature",
   // Emitted by convex/guarantees/staffDocuments.ts when approving the signed
-  // rental contract moves the review awaiting_signature → signed, and right
-  // after it `registration_queued` for signed → pending_registration (ADR 0010).
+  // rental contract moves the review awaiting_signature → signed.
   GUARANTEE_SIGNED: "guarantee.signed",
-  GUARANTEE_REGISTRATION_QUEUED: "guarantee.registration_queued",
-  // Emitted by convex/guarantees/registration.ts `confirmRegistration`, next to
-  // the drafted → active `guarantee.transitioned` entry, once the operator's
-  // `register_guarantee` is verified on chain.
+  // Emitted by convex/guarantees/activation.ts, next to the drafted → active
+  // `guarantee.transitioned` entry, when a signed draft passes the reserve
+  // capacity check (phase-1 rule, issue #427).
   GUARANTEE_ACTIVATED: "guarantee.activated",
-  // Emitted by convex/guarantees/registration.ts when the reserve program
-  // refused the registration; the guarantee stays pending_registration.
-  GUARANTEE_REGISTRATION_REFUSED: "guarantee.registration_refused",
+  // Emitted by convex/guarantees/activation.ts when a capacity check fails:
+  // the review moves to awaiting_capacity and the draft waits.
+  GUARANTEE_AWAITING_CAPACITY: "guarantee.awaiting_capacity",
   // reserve/ offer holds (emitted by convex/reserve/offerHolds.ts — the expiry
   // sweep, and the platform / product / agency hold-period settings).
   OFFER_HOLD_RELEASED: "offer_hold.released",
   OFFER_HOLD_SETTING_UPDATED: "offer_hold.setting_updated",
+  // Emitted by convex/reserve/balance.ts when the coverage ratio `c` setting changes.
+  COVERAGE_RATIO_UPDATED: "reserve.coverage_ratio_updated",
   // guarantees/ documents (emitted by convex/guarantees/documents.ts and
   // convex/guarantees/staffDocuments.ts).
   GUARANTEE_DOCUMENT_ATTACHED: "guarantee.document_attached",
@@ -150,11 +150,11 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.GUARANTEE_ANALYSIS_REFUSED),
   v.literal(AUDIT_ACTION.GUARANTEE_SENT_FOR_SIGNATURE),
   v.literal(AUDIT_ACTION.GUARANTEE_SIGNED),
-  v.literal(AUDIT_ACTION.GUARANTEE_REGISTRATION_QUEUED),
   v.literal(AUDIT_ACTION.GUARANTEE_ACTIVATED),
-  v.literal(AUDIT_ACTION.GUARANTEE_REGISTRATION_REFUSED),
+  v.literal(AUDIT_ACTION.GUARANTEE_AWAITING_CAPACITY),
   v.literal(AUDIT_ACTION.OFFER_HOLD_RELEASED),
   v.literal(AUDIT_ACTION.OFFER_HOLD_SETTING_UPDATED),
+  v.literal(AUDIT_ACTION.COVERAGE_RATIO_UPDATED),
   v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_ATTACHED),
   v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_APPROVED),
   v.literal(AUDIT_ACTION.GUARANTEE_DOCUMENT_REJECTED),

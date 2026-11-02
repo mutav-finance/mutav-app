@@ -46,12 +46,12 @@ import {
  *   editing ──requestAnalysis──▶ analysis_requested ──acceptAnalysis──▶ accepted
  *      ▲ updateDraft                    │                                  │
  *      └────────────                    └─refuseAnalysis─▶ refused        sendForSignature
- *                                          (guarantee closed,              ▼ (registration.ts)
+ *                                          (guarantee closed,              ▼ (activation.ts)
  *                                           underwriting_refused)   awaiting_signature
  *
  * The agency drafts, adjusts and asks; Mutav compliance decides. Sending for
- * signature reads the reserve (a preflight and an offer hold), so it lives
- * with the registration actions in `registration.ts` (ADR 0010).
+ * signature measures the reserve (a preflight and an offer hold), so it lives
+ * with the activation in `activation.ts` (ADR 0010, issue #427).
  * Every move is gated by `assertReviewTransition` before the first write and
  * is recorded twice: a `guaranteeHistory` row for the agency timeline and a
  * hash-chained audit entry. None of these moves the lifecycle state except a
@@ -138,7 +138,7 @@ type RepriceDraftSuccess = {
 /**
  * Re-snapshot a draft's `terms` through the same product resolution and
  * pricing `create` and `reprice` use. A draft has nothing reserved, so its
- * capacity is re-initialised from the new ceiling; `confirmRegistration` reads the
+ * capacity is re-initialised from the new ceiling; activation reads the
  * ceiling from `terms` again when it goes on risk.
  */
 async function repriceDraft(

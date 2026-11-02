@@ -62,7 +62,6 @@ export function useGuaranteeReviewCard({ guarantee }: { guarantee: Guarantee }) 
     waitingForReserveCapacity: isWaitingForReserveCapacity({
       status: guarantee.status,
       review: review.status,
-      reserveRefusedAt: review.reserveRefusedAt,
     }),
     isRequesting,
     request,
