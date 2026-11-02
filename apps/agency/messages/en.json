@@ -3,7 +3,7 @@
     "toAdmin": "Staff console"
   },
   "meta": {
-    "title": "Mutav — Registered Guarantee System",
+    "title": "MUTAV — Rental guarantee",
     "description": "Dashboard for managing rental guarantees registered onchain.",
     "descriptor": "Rental guarantee"
   },
@@ -37,7 +37,7 @@
   },
   "commission": {
     "meta": {
-      "title": "Commission — MUTAV",
+      "title": "Commission · MUTAV",
       "description": "Track your agency's monthly commission balance and active guarantee history."
     },
     "heading": "Commission",
@@ -70,7 +70,7 @@
   },
   "delinquencies": {
     "meta": {
-      "title": "Claims — MUTAV",
+      "title": "Claims · MUTAV",
       "description": "Track late rent and cover requests for your agency's guarantees."
     },
     "heading": "Claims",
@@ -411,8 +411,8 @@
     },
     "overdueInvoices": {
       "label": "Overdue invoices",
-      "footerNone": "All Mutav invoices are up to date",
-      "footerSome": "{count, plural, one {# Mutav invoice past its due date} other {# Mutav invoices past their due date}}"
+      "footerNone": "All MUTAV invoices are up to date",
+      "footerSome": "{count, plural, one {# MUTAV invoice past its due date} other {# MUTAV invoices past their due date}}"
     }
   },
   "dataTable": {
@@ -616,8 +616,8 @@
         "exitCostCap": "Exit cost cap"
       },
       "plan": {
-        "basic": "Mutav Fiança",
-        "plus": "Mutav Fiança +"
+        "basic": "MUTAV Fiança",
+        "plus": "MUTAV Fiança +"
       }
     },
     "documents": {
@@ -628,11 +628,11 @@
       "chooseFile": "Choose a file for {document}",
       "loading": "Loading…",
       "empty": "No file uploaded yet.",
-      "uploaded": "Document sent to Mutav for review.",
-      "acceptedFormats": "PDF, JPG or PNG, up to 15 MB. Every file is reviewed by the Mutav team.",
+      "uploaded": "Document sent to MUTAV for review.",
+      "acceptedFormats": "PDF, JPG or PNG, up to 15 MB. Every file is reviewed by the MUTAV team.",
       "closedGuarantee": "Guarantee closed — it no longer accepts documents.",
       "uploadedBy": "Uploaded by {name} on {date}",
-      "uploadedByMutav": "Mutav",
+      "uploadedByMutav": "MUTAV",
       "unknownUser": "removed user",
       "rejectionReason": "Rejection reason: {reason}",
       "labels": {
@@ -697,7 +697,7 @@
   },
   "guaranteeList": {
     "meta": {
-      "title": "Guarantees | Mutav",
+      "title": "Guarantees · MUTAV",
       "description": "Real estate agency guarantees list"
     },
     "heading": "Guarantees",
@@ -759,7 +759,7 @@
   },
   "invoiceList": {
     "meta": {
-      "title": "Invoices | Mutav",
+      "title": "Invoices · MUTAV",
       "description": "Monthly invoices for the agency"
     },
     "heading": "Invoices",
@@ -806,8 +806,8 @@
     },
     "picker": {
       "meta": {
-        "title": "Pay invoice {publicId} | Mutav",
-        "description": "Choose how to pay your Mutav invoice."
+        "title": "Pay invoice {publicId} · MUTAV",
+        "description": "Choose how to pay your MUTAV invoice."
       },
       "heading": "How do you want to pay?",
       "pix": {
@@ -828,13 +828,13 @@
     },
     "stellar": {
       "meta": {
-        "title": "Pay with Stellar — {publicId} | Mutav",
-        "description": "Pay your Mutav invoice via Stellar (XLM or USDC)."
+        "title": "Pay with Stellar — {publicId} · MUTAV",
+        "description": "Pay your MUTAV invoice via Stellar (XLM or USDC)."
       }
     },
     "anchortest": {
       "meta": {
-        "title": "AnchorTest — {publicId} | Mutav",
+        "title": "AnchorTest — {publicId} · MUTAV",
         "description": "Pay via the anchor's hosted UI (SEP-24 — demo)."
       },
       "orderId": "Order",
@@ -875,8 +875,8 @@
     },
     "pix": {
       "meta": {
-        "title": "Pay with PIX — {publicId} | Mutav",
-        "description": "Pay your Mutav invoice via PIX."
+        "title": "Pay with PIX — {publicId} · MUTAV",
+        "description": "Pay your MUTAV invoice via PIX."
       },
       "copyCode": "PIX copy & paste",
       "orderId": "Order",
@@ -922,8 +922,8 @@
     },
     "pago": {
       "meta": {
-        "title": "Paid — {publicId} | Mutav",
-        "description": "Mutav payment receipt."
+        "title": "Paid — {publicId} · MUTAV",
+        "description": "MUTAV payment receipt."
       },
       "badge": {
         "paid": "Paid",
@@ -946,7 +946,7 @@
   },
   "invoiceDetails": {
     "meta": {
-      "title": "Invoice {id} | Mutav",
+      "title": "Invoice {id} · MUTAV",
       "description": "Invoice details"
     },
     "breadcrumb": "Invoice Details",
@@ -1035,7 +1035,7 @@
   },
   "guaranteeNew": {
     "meta": {
-      "title": "New Guarantee | Mutav"
+      "title": "New Guarantee · MUTAV"
     },
     "heading": "New Guarantee",
     "subheading": "Fill in the details to create a new guarantee",
@@ -1104,8 +1104,8 @@
       "exitCoverage": "Exit coverage",
       "feeRate": "Monthly fee rate",
       "planLabel": "Coverage Plan",
-      "planBasic": "Mutav Fiança",
-      "planPlus": "Mutav Fiança +",
+      "planBasic": "MUTAV Fiança",
+      "planPlus": "MUTAV Fiança +",
       "rentCoverageFull": "Complete rent coverage",
       "rentCoverageIncludes": "Includes water, electricity, condo fee, property tax and garbage fee",
       "prestamistaLabel": "Payment Protection Insurance",
@@ -1153,7 +1153,7 @@
         "TENANT_DENIED": "The tenant's credit score was denied. The guarantee cannot be created.",
         "INVALID_RENT": "Invalid amounts. Rent must be greater than zero.",
         "CREDIT_ASSESSMENT_REQUIRED": "The credit assessment for this tenant has expired. Run the credit check again before creating the guarantee.",
-        "PRODUCT_UNAVAILABLE": "No guarantee product is available for this agency. Contact Mutav."
+        "PRODUCT_UNAVAILABLE": "No guarantee product is available for this agency. Contact MUTAV."
       },
       "editBlock": "Edit",
       "saveBlock": "Save",
@@ -1194,12 +1194,12 @@
   "paymentFlow": {
     "meta": {
       "title": "Pay with Stellar — {publicId}",
-      "description": "Pay your Mutav invoice via the Stellar network."
+      "description": "Pay your MUTAV invoice via the Stellar network."
     },
     "shell": {
       "brand": "mutav",
       "paymentLabel": "Invoice",
-      "footerBrand": "Mutav · Rental Guarantee Protocol"
+      "footerBrand": "MUTAV · Rental guarantee"
     },
     "summary": {
       "dueLabel": "Due",
@@ -1337,7 +1337,7 @@
       "title": "Application under review",
       "subtitle": "Our team is reviewing your information. You will receive an email with the result within 2 business days.",
       "stateSubmitted": "Submitted — awaiting review",
-      "stateUnderReview": "Under review by Mutav team",
+      "stateUnderReview": "Under review by MUTAV team",
       "backLabel": "Have questions?",
       "backLink": "Contact us",
       "homeButton": "Back"
@@ -1456,7 +1456,7 @@
       "REPRESENTANTE_NAME_REQUIRED": "Representative name is required for agencies.",
       "REPRESENTANTE_CPF_REQUIRED": "Representative CPF is required for agencies.",
       "REPRESENTANTE_CPF_INVALID": "Invalid representative CPF.",
-      "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with Mutav.",
+      "ALREADY_REGISTERED": "This CNPJ or CPF is already registered with MUTAV.",
       "AGENCY_TYPE_CONFLICT": "You already have an in-progress registration with a different type. Complete it or contact support: contato@mutav.finance.",
       "INCOMPLETE_PROFILE": "Profile data is incomplete. Go back to step 1 and fill in all fields.",
       "AGENCY_TYPE_REQUIRED": "Select an account type to continue.",
@@ -1501,7 +1501,7 @@
         "cnpj": "Invalid CNPJ.",
         "representanteName": "Representative name is required.",
         "representanteCpf": "Invalid representative CPF.",
-        "alreadyRegistered": "Already registered with Mutav."
+        "alreadyRegistered": "Already registered with MUTAV."
       },
       "backButton": "Back"
     }
@@ -1509,7 +1509,7 @@
   "transparency": {
     "meta": {
       "title": "Transparency",
-      "description": "Mutav risk position and onchain treasury."
+      "description": "MUTAV risk position and onchain treasury."
     },
     "heading": "Transparency",
     "subheading": "Risk position transparency and onchain treasury.",
@@ -1591,7 +1591,7 @@
   },
   "members": {
     "meta": {
-      "title": "Members — MUTAV",
+      "title": "Members · MUTAV",
       "description": "Manage who has access to your agency and their roles."
     },
     "heading": "Members",

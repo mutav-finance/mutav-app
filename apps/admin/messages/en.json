@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Mutav Admin",
-    "description": "Mutav-internal staff console."
+    "title": "MUTAV Admin",
+    "description": "MUTAV-internal staff console."
   },
   "common": {
     "a11y": {
@@ -43,16 +43,16 @@
   "accessDenied": {
     "eyebrow": "Restricted access",
     "title": "You don't have access to the admin console",
-    "subtitle": "Your account is authenticated but isn't part of the Mutav team. If you manage a rental agency, the Agencies console is yours.",
+    "subtitle": "Your account is authenticated but isn't part of the MUTAV team. If you manage a rental agency, the Agencies console is yours.",
     "anonymousEyebrow": "Authentication required",
     "anonymousTitle": "Sign in to access the admin console",
-    "anonymousSubtitle": "The admin console is restricted to the Mutav team. Sign in so we can check your access.",
+    "anonymousSubtitle": "The admin console is restricted to the MUTAV team. Sign in so we can check your access.",
     "staffEyebrow": "Access granted",
     "staffTitle": "You have access to the admin console",
-    "staffSubtitle": "Your account is part of the Mutav team. This page is shown to people without access.",
+    "staffSubtitle": "Your account is part of the MUTAV team. This page is shown to people without access.",
     "unavailableEyebrow": "Service unavailable",
     "unavailableTitle": "We couldn't check your access",
-    "unavailableSubtitle": "Your session is active, but we couldn't reach the Mutav team records right now. Try again in a moment.",
+    "unavailableSubtitle": "Your session is active, but we couldn't reach the MUTAV team records right now. Try again in a moment.",
     "goToAgency": "Go to Agencies",
     "goToAdmin": "Back to the admin console",
     "signIn": "Sign in",
@@ -61,7 +61,7 @@
   },
   "staff": {
     "title": "Staff",
-    "subtitle": "Grant or revoke Mutav-internal capabilities.",
+    "subtitle": "Grant or revoke MUTAV-internal capabilities.",
     "empty": "No staff members yet.",
     "columns": {
       "auth0Sub": "Auth0 subject",
@@ -90,7 +90,7 @@
       "roleLabel": "Role",
       "submit": "Grant role",
       "removeTitle": "Revoke staff role",
-      "removeDescription": "This removes the capability immediately. The user keeps their Auth0 identity but loses this Mutav power."
+      "removeDescription": "This removes the capability immediately. The user keeps their Auth0 identity but loses this MUTAV power."
     },
     "toast": {
       "createSuccess": "Staff role granted.",
@@ -111,7 +111,7 @@
   },
   "adminShell": {
     "placeholder": {
-      "title": "Mutav admin",
+      "title": "MUTAV Admin",
       "subtitle": "A1–A6 pillars pending — this is the empty staff shell.",
       "pillarPending": "Not built yet — coming in a later milestone."
     }
@@ -510,11 +510,11 @@
     },
     "uploaderKind": {
       "agency_user": "Agency · {name}",
-      "staff": "Mutav · {name}"
+      "staff": "MUTAV · {name}"
     },
     "uploadedBy": {
       "agency_user": "Uploaded by {name} (agency) on {date} · {size}",
-      "staff": "Uploaded by {name} (Mutav) on {date} · {size}"
+      "staff": "Uploaded by {name} (MUTAV) on {date} · {size}"
     },
     "reviewedBy": "Reviewed by {name} on {date}",
     "rejectionReason": "Rejection reason: {reason}",
