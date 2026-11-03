@@ -13,6 +13,7 @@ import type { GuaranteeDocumentStatus, GuaranteeState } from "@convex/guarantees
 import {
   ACCEPTED_FILE_TYPES,
   DOCUMENT_SLOTS,
+  REQUIRED_SLOTS,
   SLOTS_WITH_TEMPLATE,
   useGuaranteeDocumentsCard,
   type GuaranteeDocumentRow,
@@ -59,6 +60,9 @@ export function GuaranteeDocumentsCard({
                     aria-hidden
                   />
                   <span className="text-base-sm font-medium">{tLabels(key)}</span>
+                  <StatusTag tone={REQUIRED_SLOTS.has(key) ? "accent" : "muted"}>
+                    {t(REQUIRED_SLOTS.has(key) ? "requirement.required" : "requirement.optional")}
+                  </StatusTag>
                 </div>
                 <div className="flex items-center gap-2">
                   <input

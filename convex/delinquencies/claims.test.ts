@@ -90,7 +90,7 @@ async function makeFixture(
       await ctx.db.insert("guaranteeDocuments", {
         guaranteeId,
         agencyId,
-        key: "rentalContract",
+        key: "guaranteeContract",
         storageId,
         fileName: "contrato.pdf",
         contentType: "application/pdf",
