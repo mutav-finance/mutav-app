@@ -35,6 +35,8 @@ import {
 } from "@mutav/ui/alert-dialog";
 import { DownloadIcon } from "lucide-react";
 import { maskCNPJ, maskCPF, maskPhone } from "@mutav/i18n/brazil";
+import { KybChecklist } from "./onboarding-review/kyb-checklist";
+import { canApprove, reviewErrorMessageKey } from "./onboarding-review/view-model";
 
 type PendingAgency = FunctionReturnType<typeof api.mutavStaff.useCases.listPendingReviews>[number];
 
@@ -135,6 +137,7 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
   const taxIdLabel = agency.cnpj ? maskCNPJ(agency.cnpj) : agency.cpf ? maskCPF(agency.cpf) : null;
   const isUnderReview = agency.onboardingState === "under_review";
   const trimmedReason = reason.trim();
+  const approvable = canApprove(agency.kybChecks);
 
   async function openDocument(kind: AgencyDocumentKind) {
     const url = await convex.query(api.mutavStaff.useCases.getDocumentDownloadUrl, {
@@ -153,7 +156,7 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
     try {
       const result = await startOnboardingReview({ agencyId: agency._id });
       if (!result.success) {
-        toast.error(t(`errors.${result.error.code}`));
+        toast.error(t(reviewErrorMessageKey(result.error.code)));
         return;
       }
       toast.success(t("reviewStarted"));
@@ -173,7 +176,7 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
     try {
       const result = await reviewOnboarding(args);
       if (!result.success) {
-        toast.error(t(`errors.${result.error.code}`));
+        toast.error(t(reviewErrorMessageKey(result.error.code)));
         return;
       }
       toast.success(args.decision === "approved" ? t("approved") : t("rejected"));
@@ -229,50 +232,78 @@ function ReviewCard({ agency }: { agency: PendingAgency }) {
         </div>
 
         {isUnderReview ? (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              disabled={busy}
-              onClick={() => review({ agencyId: agency._id, decision: "approved" })}
-            >
-              {t("approve")}
-            </Button>
+          <>
+            <KybChecklist agency={agency} />
+            <div className="flex flex-col items-start gap-2">
+              <div className="flex flex-wrap gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button disabled={busy || !approvable}>{t("approve")}</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("approveDialogTitle")}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("approveDialogDescription", {
+                          name: agency.name,
+                          taxId: taxIdLabel ?? "",
+                        })}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => review({ agencyId: agency._id, decision: "approved" })}
+                      >
+                        {t("confirmApprove")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
-            <AlertDialog onOpenChange={(open) => !open && setReason("")}>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={busy}>
-                  {t("reject")}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t("rejectDialogTitle")}</AlertDialogTitle>
-                  <AlertDialogDescription>{t("rejectDialogDescription")}</AlertDialogDescription>
-                </AlertDialogHeader>
-                <Input
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder={t("rejectReasonPlaceholder")}
-                  aria-label={t("rejectReasonPlaceholder")}
-                  required
-                />
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-                  <AlertDialogAction
-                    disabled={!trimmedReason}
-                    onClick={() =>
-                      review({
-                        agencyId: agency._id,
-                        decision: "rejected",
-                        rejectionReason: trimmedReason,
-                      })
-                    }
-                  >
-                    {t("confirmReject")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+                <AlertDialog onOpenChange={(open) => !open && setReason("")}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={busy}>
+                      {t("reject")}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("rejectDialogTitle")}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("rejectDialogDescription")}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Input
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      placeholder={t("rejectReasonPlaceholder")}
+                      aria-label={t("rejectReasonPlaceholder")}
+                      required
+                    />
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={!trimmedReason}
+                        onClick={() =>
+                          review({
+                            agencyId: agency._id,
+                            decision: "rejected",
+                            rejectionReason: trimmedReason,
+                          })
+                        }
+                      >
+                        {t("confirmReject")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+              {!approvable && (
+                <p className="text-muted-foreground text-base-sm">{t("approveBlockedHint")}</p>
+              )}
+            </div>
+          </>
         ) : (
           <div className="flex flex-col items-start gap-2">
             <Button disabled={busy} onClick={startReview}>

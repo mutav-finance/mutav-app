@@ -172,7 +172,47 @@
       "NOT_REVIEWABLE": "Submissão não está em estado revisável.",
       "REJECTION_REASON_REQUIRED": "Informe o motivo da rejeição.",
       "documentUnavailable": "Documento indisponível.",
-      "unexpected": "Algo deu errado. Tente novamente."
+      "unexpected": "Algo deu errado. Tente novamente.",
+      "KYB_CHECKLIST_INCOMPLETE": "Marque todos os itens do checklist KYB antes de aprovar."
+    },
+    "approveDialogTitle": "Aprovar esta imobiliária?",
+    "approveDialogDescription": "{name} ({taxId}) passa a ficar ativa e pode emitir garantias. A imobiliária recebe a decisão por e-mail.",
+    "confirmApprove": "Confirmar aprovação",
+    "approveBlockedHint": "Marque todos os itens do checklist KYB para liberar a aprovação. Reprovar está sempre disponível.",
+    "kyb": {
+      "title": "Checklist KYB",
+      "hint": "Confira cada item na fonte antes de aprovar. Cada marcação fica registrada com quem e quando.",
+      "checkedBy": "Conferido por {name} em {date}",
+      "unknownReviewer": "revisor desconhecido",
+      "items": {
+        "tax_id_active": {
+          "empresa": "CNPJ ativo na Receita Federal",
+          "autonomo": "CPF regular na Receita Federal"
+        },
+        "creci_active": {
+          "empresa": "CRECI ativo no conselho regional",
+          "autonomo": "CRECI ativo no conselho regional"
+        },
+        "sanctions_pep": {
+          "empresa": "Representante e sócios sem sanções nem PEP",
+          "autonomo": "Corretor sem sanções nem PEP"
+        },
+        "bank_account_owner": {
+          "empresa": "Conta bancária em nome da empresa",
+          "autonomo": "Conta bancária em nome do corretor"
+        },
+        "reputation": {
+          "empresa": "Reputação conferida (Reclame Aqui, Google)",
+          "autonomo": "Reputação conferida (Reclame Aqui, Google)"
+        }
+      },
+      "lookups": {
+        "receitaCnpj": "Consultar CNPJ",
+        "receitaCpf": "Consultar CPF",
+        "sanctions": "Cadastro de sanções (CEIS)",
+        "reclameAqui": "Reclame Aqui",
+        "google": "Google"
+      }
     }
   },
   "defaults": {

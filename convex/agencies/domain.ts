@@ -31,6 +31,66 @@ export const AGENCY_DOCUMENT_KIND = {
   RESPONSAVEL_ID: "responsavel_id",
 } as const satisfies Record<Uppercase<AgencyDocumentKind>, AgencyDocumentKind>;
 
+export type KybCheck = NonNullable<Agency["kybChecks"]>[number];
+export type KybCheckItem = KybCheck["item"];
+
+export const KYB_CHECK_ITEM = {
+  TAX_ID_ACTIVE: "tax_id_active",
+  CRECI_ACTIVE: "creci_active",
+  SANCTIONS_PEP: "sanctions_pep",
+  BANK_ACCOUNT_OWNER: "bank_account_owner",
+  REPUTATION: "reputation",
+} as const satisfies Record<Uppercase<KybCheckItem>, KybCheckItem>;
+
+/** Display order of the Phase-0 manual KYB checklist. Approval needs every item ticked. */
+export const KYB_CHECK_ITEMS: readonly KybCheckItem[] = [
+  KYB_CHECK_ITEM.TAX_ID_ACTIVE,
+  KYB_CHECK_ITEM.CRECI_ACTIVE,
+  KYB_CHECK_ITEM.SANCTIONS_PEP,
+  KYB_CHECK_ITEM.BANK_ACCOUNT_OWNER,
+  KYB_CHECK_ITEM.REPUTATION,
+];
+
+export const kybCheckItemValidator = v.union(
+  v.literal(KYB_CHECK_ITEM.TAX_ID_ACTIVE),
+  v.literal(KYB_CHECK_ITEM.CRECI_ACTIVE),
+  v.literal(KYB_CHECK_ITEM.SANCTIONS_PEP),
+  v.literal(KYB_CHECK_ITEM.BANK_ACCOUNT_OWNER),
+  v.literal(KYB_CHECK_ITEM.REPUTATION),
+);
+
+export function isKybChecklistComplete(
+  checks: readonly Pick<KybCheck, "item">[] | undefined,
+): boolean {
+  const ticked = new Set((checks ?? []).map((check) => check.item));
+  return KYB_CHECK_ITEMS.every((item) => ticked.has(item));
+}
+
+/**
+ * The checklist after ticking or unticking one item, or `null` when the
+ * request changes nothing (ticking a ticked item keeps its original
+ * who/when; unticking an unticked item is a no-op).
+ */
+export function nextKybChecks<TReviewer = KybCheck["checkedBy"]>({
+  checks,
+  item,
+  checked,
+  checkedBy,
+  checkedAt,
+}: {
+  checks: readonly { item: KybCheckItem; checkedBy: TReviewer; checkedAt: string }[] | undefined;
+  item: KybCheckItem;
+  checked: boolean;
+  checkedBy: TReviewer;
+  checkedAt: string;
+}): { item: KybCheckItem; checkedBy: TReviewer; checkedAt: string }[] | null {
+  const current = checks ?? [];
+  const isTicked = current.some((check) => check.item === item);
+  if (checked === isTicked) return null;
+  if (!checked) return current.filter((check) => check.item !== item);
+  return [...current, { item, checkedBy, checkedAt }];
+}
+
 export const agencyTypeValidator = v.union(
   v.literal(AGENCY_TYPE.AUTONOMO),
   v.literal(AGENCY_TYPE.EMPRESA),

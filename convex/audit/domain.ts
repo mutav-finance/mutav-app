@@ -71,6 +71,8 @@ export const AUDIT_ACTION = {
   ONBOARDING_REVIEWED: "onboarding.reviewed",
   // mutavStaff/ (a staff member picks a submission up — submitted → under_review).
   ONBOARDING_REVIEW_STARTED: "onboarding.review_started",
+  // mutavStaff/ (a reviewer ticks or unticks one Phase-0 KYB checklist item).
+  ONBOARDING_KYB_CHECK_SET: "onboarding.kyb_check_set",
   // agencies/ (the owner reopens a rejected submission to fix and resubmit).
   ONBOARDING_REOPENED: "onboarding.reopened",
   // mutavStaff/ (admin staff-role provisioning — emitted by convex/mutavStaff/useCases.ts).
@@ -138,6 +140,7 @@ export const auditActionValidator = v.union(
   v.literal(AUDIT_ACTION.INVOICE_ACCESS_ROTATED),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEWED),
   v.literal(AUDIT_ACTION.ONBOARDING_REVIEW_STARTED),
+  v.literal(AUDIT_ACTION.ONBOARDING_KYB_CHECK_SET),
   v.literal(AUDIT_ACTION.ONBOARDING_REOPENED),
   v.literal(AUDIT_ACTION.STAFF_CREATED),
   v.literal(AUDIT_ACTION.STAFF_DELETED),

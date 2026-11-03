@@ -9,9 +9,19 @@ import {
   MEMBER_ROLE,
   ONBOARDING_STATE,
   canTransitionOnboarding,
+  isKybChecklistComplete,
+  nextKybChecks,
   onboardingDecisionValidator,
 } from "./domain";
-import type { AgencyDocumentKind, AgencyId, OnboardingDecision } from "./domain";
+import type {
+  AgencyDocumentKind,
+  AgencyId,
+  KybCheck,
+  KybCheckItem,
+  OnboardingDecision,
+  OnboardingState,
+} from "./domain";
+import type { UserId } from "../users/domain";
 
 // ─── KYC / KYB review ─────────────────────────────────────────────────────────
 //
@@ -47,7 +57,18 @@ export async function collectPendingReviews(ctx: QueryCtx) {
         .query("agencyDocuments")
         .withIndex("by_agency", (q) => q.eq("agencyId", agency._id))
         .collect();
-      return { ...agency, documents };
+      const kybChecks = await shapeKybChecks(ctx, agency.kybChecks);
+      return { ...agency, documents, kybChecks };
+    }),
+  );
+}
+
+/** Each ticked KYB check with the reviewer's display name, so the card can say who ticked it. */
+async function shapeKybChecks(ctx: QueryCtx, checks: readonly KybCheck[] | undefined) {
+  return Promise.all(
+    (checks ?? []).map(async (check) => {
+      const reviewer = await ctx.db.get(check.checkedBy);
+      return { ...check, checkedByName: reviewer?.name ?? null };
     }),
   );
 }
@@ -91,7 +112,7 @@ type ReviewOnboardingSuccessResult = {
   reviewedAt: string;
 };
 type ReviewOnboardingErrorResult = {
-  code: "NOT_FOUND" | "NOT_REVIEWABLE" | "REJECTION_REASON_REQUIRED";
+  code: "NOT_FOUND" | "NOT_REVIEWABLE" | "REJECTION_REASON_REQUIRED" | "KYB_CHECKLIST_INCOMPLETE";
 };
 export type ReviewOnboardingResult = Result<
   ReviewOnboardingSuccessResult,
@@ -103,6 +124,8 @@ export type ReviewOnboardingResult = Result<
  * the public wrapper. Accepts agencies in `submitted` or `under_review`. A
  * rejection must carry a reason: it is what the agency reads on the rejected
  * page and in the decision email, and what they fix before resubmitting.
+ * An approval needs every Phase-0 KYB check ticked; a rejection never does,
+ * and clears the ticks so a resubmission is checked afresh.
  * Schedules the decision email on success.
  */
 export async function applyOnboardingReview(
@@ -137,6 +160,14 @@ export async function applyOnboardingReview(
     };
   }
 
+  if (decision === "approved" && !isKybChecklistComplete(agency.kybChecks)) {
+    return {
+      success: false,
+      error: { code: "KYB_CHECKLIST_INCOMPLETE" },
+      message: "Every KYB check must be ticked before approval",
+    };
+  }
+
   const reviewedAt = new Date().toISOString();
 
   if (decision === "approved") {
@@ -163,6 +194,7 @@ export async function applyOnboardingReview(
     await ctx.db.patch(agencyId, {
       onboardingState: ONBOARDING_STATE.REJECTED,
       onboardingRejectionReason: trimmedReason,
+      kybChecks: undefined,
     });
   }
 
@@ -186,6 +218,62 @@ export const reviewOnboarding = internalMutation({
   },
   handler: async (ctx, args) => applyOnboardingReview(ctx, args),
 });
+
+const KYB_CHECKABLE_STATES: readonly OnboardingState[] = [
+  ONBOARDING_STATE.SUBMITTED,
+  ONBOARDING_STATE.UNDER_REVIEW,
+];
+
+type SetKybCheckSuccessResult = { agencyId: AgencyId; item: KybCheckItem; changed: boolean };
+type SetKybCheckErrorResult = { code: "NOT_FOUND" | "NOT_REVIEWABLE" };
+export type SetKybCheckResult = Result<SetKybCheckSuccessResult, SetKybCheckErrorResult>;
+
+/**
+ * Tick or untick one KYB check on a submission awaiting review, recording who
+ * ticked it and when. Idempotent: a request that changes nothing returns
+ * `changed: false` and writes nothing, so the caller audits only real changes.
+ */
+export async function applySetKybCheck(
+  ctx: MutationCtx,
+  {
+    agencyId,
+    item,
+    checked,
+    reviewerId,
+  }: { agencyId: AgencyId; item: KybCheckItem; checked: boolean; reviewerId: UserId },
+): Promise<SetKybCheckResult> {
+  const agency = await ctx.db.get(agencyId);
+  if (!agency) {
+    return { success: false, error: { code: "NOT_FOUND" }, message: "Agency not found" };
+  }
+
+  const state = agency.onboardingState ?? ONBOARDING_STATE.NOT_STARTED;
+  if (!KYB_CHECKABLE_STATES.includes(state)) {
+    return {
+      success: false,
+      error: { code: "NOT_REVIEWABLE" },
+      message: `Onboarding in state '${state}' has no checklist to edit`,
+    };
+  }
+
+  const kybChecks = nextKybChecks({
+    checks: agency.kybChecks,
+    item,
+    checked,
+    checkedBy: reviewerId,
+    checkedAt: new Date().toISOString(),
+  });
+  if (!kybChecks) {
+    return {
+      success: true,
+      data: { agencyId, item, changed: false },
+      message: "Checklist unchanged",
+    };
+  }
+
+  await ctx.db.patch(agencyId, { kybChecks });
+  return { success: true, data: { agencyId, item, changed: true }, message: "Checklist updated" };
+}
 
 type StartOnboardingReviewSuccessResult = { agencyId: AgencyId; alreadyUnderReview: boolean };
 type StartOnboardingReviewErrorResult = { code: "NOT_FOUND" | "NOT_REVIEWABLE" };

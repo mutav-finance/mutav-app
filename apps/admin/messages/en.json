@@ -172,7 +172,47 @@
       "NOT_REVIEWABLE": "Submission is not in a reviewable state.",
       "REJECTION_REASON_REQUIRED": "Enter a rejection reason.",
       "documentUnavailable": "Document unavailable.",
-      "unexpected": "Something went wrong. Please try again."
+      "unexpected": "Something went wrong. Please try again.",
+      "KYB_CHECKLIST_INCOMPLETE": "Tick every KYB check before approving."
+    },
+    "approveDialogTitle": "Approve this agency?",
+    "approveDialogDescription": "{name} ({taxId}) becomes active and can start issuing guarantees. The agency is emailed the decision.",
+    "confirmApprove": "Confirm approval",
+    "approveBlockedHint": "Tick every KYB check to enable approval. Rejecting is always available.",
+    "kyb": {
+      "title": "KYB checklist",
+      "hint": "Check each item at its source before approving. Every tick is recorded with who and when.",
+      "checkedBy": "Checked by {name} on {date}",
+      "unknownReviewer": "unknown reviewer",
+      "items": {
+        "tax_id_active": {
+          "empresa": "CNPJ active at the Receita Federal",
+          "autonomo": "CPF in good standing at the Receita Federal"
+        },
+        "creci_active": {
+          "empresa": "CRECI active at the regional council",
+          "autonomo": "CRECI active at the regional council"
+        },
+        "sanctions_pep": {
+          "empresa": "Representative and partners clear of sanctions and PEP lists",
+          "autonomo": "Broker clear of sanctions and PEP lists"
+        },
+        "bank_account_owner": {
+          "empresa": "Bank account held in the company's name",
+          "autonomo": "Bank account held in the broker's name"
+        },
+        "reputation": {
+          "empresa": "Reputation checked (Reclame Aqui, Google)",
+          "autonomo": "Reputation checked (Reclame Aqui, Google)"
+        }
+      },
+      "lookups": {
+        "receitaCnpj": "Look up CNPJ",
+        "receitaCpf": "Look up CPF",
+        "sanctions": "Sanctions register (CEIS)",
+        "reclameAqui": "Reclame Aqui",
+        "google": "Google"
+      }
     }
   },
   "defaults": {

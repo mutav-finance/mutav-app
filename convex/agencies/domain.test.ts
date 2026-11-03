@@ -8,6 +8,8 @@ import {
   decideRoleChange,
   isInviteExpired,
   isInviteOpen,
+  isKybChecklistComplete,
+  nextKybChecks,
   isValidEmail,
   normalizeEmail,
 } from "./domain";
@@ -253,5 +255,85 @@ describe("canTransitionOnboarding", () => {
     for (const to of STATES) {
       expect(canTransitionOnboarding({ from: "active", to })).toBe(false);
     }
+  });
+});
+
+describe("isKybChecklistComplete", () => {
+  const ALL = [
+    "tax_id_active",
+    "creci_active",
+    "sanctions_pep",
+    "bank_account_owner",
+    "reputation",
+  ] as const;
+
+  test("true only when all five items are ticked", () => {
+    expect(isKybChecklistComplete(ALL.map((item) => ({ item })))).toBe(true);
+  });
+
+  test.each(ALL)("false when %s is missing", (missing) => {
+    const checks = ALL.filter((item) => item !== missing).map((item) => ({ item }));
+    expect(isKybChecklistComplete(checks)).toBe(false);
+  });
+
+  test("false for an absent checklist", () => {
+    expect(isKybChecklistComplete(undefined)).toBe(false);
+  });
+});
+
+describe("nextKybChecks", () => {
+  const TICK = {
+    item: "creci_active",
+    checkedBy: ALICE,
+    checkedAt: "2026-11-01T00:00:00Z",
+  } as const;
+
+  test("ticking an unticked item appends it with who and when", () => {
+    expect(
+      nextKybChecks({
+        checks: undefined,
+        item: "creci_active",
+        checked: true,
+        checkedBy: ALICE,
+        checkedAt: "2026-11-01T00:00:00Z",
+      }),
+    ).toEqual([TICK]);
+  });
+
+  test("ticking a ticked item changes nothing and keeps the original reviewer", () => {
+    expect(
+      nextKybChecks({
+        checks: [TICK],
+        item: "creci_active",
+        checked: true,
+        checkedBy: BOB,
+        checkedAt: "2026-11-02T00:00:00Z",
+      }),
+    ).toBeNull();
+  });
+
+  test("unticking removes only that item", () => {
+    const other = { ...TICK, item: "reputation" } as const;
+    expect(
+      nextKybChecks({
+        checks: [TICK, other],
+        item: "creci_active",
+        checked: false,
+        checkedBy: BOB,
+        checkedAt: "2026-11-02T00:00:00Z",
+      }),
+    ).toEqual([other]);
+  });
+
+  test("unticking an unticked item changes nothing", () => {
+    expect(
+      nextKybChecks({
+        checks: [],
+        item: "creci_active",
+        checked: false,
+        checkedBy: BOB,
+        checkedAt: "2026-11-02T00:00:00Z",
+      }),
+    ).toBeNull();
   });
 });

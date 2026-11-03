@@ -6,6 +6,7 @@ import { hashPii } from "../lib/pii";
 import {
   seedAuthenticatedUser,
   setupAuthenticatedUser,
+  tickAllKybChecks,
   type SeededUserId,
 } from "../lib/testFixtures";
 import schema from "../schema";
@@ -428,6 +429,7 @@ describe("reviewOnboarding (claim lifecycle)", () => {
 
     const agencyA = await seedReadyAutonomoAgency(t, userId, VALID_CPF, "Agency A");
     await asUser.mutation(api.agencies.useCases.submitOnboarding, { agencyId: agencyA });
+    await tickAllKybChecks(t, { agencyId: agencyA, checkedBy: userId });
     const approve = await asUser.mutation(internal.agencies.adminUseCases.reviewOnboarding, {
       agencyId: agencyA,
       decision: "approved",

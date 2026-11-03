@@ -144,6 +144,16 @@ const onboardingState = v.union(
   v.literal("rejected"),
 );
 
+// Phase-0 manual KYB checks a compliance reviewer ticks before approving an
+// onboarding submission. Mirrors `KYB_CHECK_ITEM` in convex/agencies/domain.ts.
+const kybCheckItem = v.union(
+  v.literal("tax_id_active"),
+  v.literal("creci_active"),
+  v.literal("sanctions_pep"),
+  v.literal("bank_account_owner"),
+  v.literal("reputation"),
+);
+
 const bankingInfo = v.object({
   bank: v.string(),
   agency: v.optional(v.string()),
@@ -293,6 +303,12 @@ export default defineSchema(
       consentMarketing: v.optional(v.boolean()),
       representanteName: v.optional(v.string()),
       representanteCpf: v.optional(v.string()),
+      // Ticked KYB checks for the submission under review, one entry per item.
+      // Cleared on rejection so a resubmission is checked afresh; the audit log
+      // keeps every tick and untick.
+      kybChecks: v.optional(
+        v.array(v.object({ item: kybCheckItem, checkedBy: v.id("users"), checkedAt: v.string() })),
+      ),
       // Auth0 Organization id (e.g. `org_xxx`). Populated when the agency
       // is provisioned through the Auth0 Orgs path (see #121). Legacy
       // agencies stay Convex-only with this field absent — wrappers MUST
