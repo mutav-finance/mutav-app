@@ -7,6 +7,7 @@ import {
   formatMonthYear,
   formatWallClockDateTimeBR,
   maskBRLAmount,
+  periodMonthInBrazil,
 } from "./brazil";
 
 // Intl emits a non-breaking space between "R$" and the figure.
@@ -68,5 +69,18 @@ describe("Brazil money and date formatters", () => {
     );
     expect(formatMonthYear("2026-01-31", "en", { month: "long" })).toBe("January 2026");
     expect(formatMonthYear("garbage", "pt-BR", { month: "short" })).toBe("garbage");
+  });
+});
+
+describe("periodMonthInBrazil", () => {
+  it("keeps the previous month until midnight in São Paulo, not UTC", () => {
+    // 02:59 UTC on Nov 1 is 23:59 on Oct 31 in São Paulo (UTC−3).
+    expect(periodMonthInBrazil(new Date("2026-11-01T02:59:00Z"))).toBe("2026-10");
+    expect(periodMonthInBrazil(new Date("2026-11-01T03:00:00Z"))).toBe("2026-11");
+  });
+
+  it("rolls the year over in São Paulo time", () => {
+    expect(periodMonthInBrazil(new Date("2027-01-01T01:00:00Z"))).toBe("2026-12");
+    expect(periodMonthInBrazil(new Date("2027-01-01T03:00:00Z"))).toBe("2027-01");
   });
 });

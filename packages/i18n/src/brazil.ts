@@ -126,6 +126,25 @@ export function formatDateTimeBR(iso: string): string {
   }).format(date);
 }
 
+/** Brazil's civil time zone (no DST since 2019, so a fixed UTC−3). */
+export const BRAZIL_TIME_ZONE = "America/Sao_Paulo";
+
+/**
+ * The `YYYY-MM` month that `instant` falls in, in São Paulo time. Use it for
+ * "this month" on any surface: the browser's local zone and the server's UTC
+ * both disagree with Brazil for the last hours of a month.
+ */
+export function periodMonthInBrazil(instant: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    timeZone: BRAZIL_TIME_ZONE,
+  }).formatToParts(instant);
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  return `${year}-${month}`;
+}
+
 /**
  * Like {@link formatDateTimeBR} but pinned to São Paulo time (BRT), so the
  * server render (UTC) and the browser render agree. Label the result "(BRT)".
@@ -139,7 +158,7 @@ export function formatDateTimeBRT(iso: string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
+    timeZone: BRAZIL_TIME_ZONE,
   }).format(date);
 }
 
