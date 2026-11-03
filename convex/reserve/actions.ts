@@ -14,7 +14,6 @@ import {
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import {
-  getBcbPtaxBaseUrl,
   getReserveBrlPeggedSymbols,
   getReserveContractId,
   getReservePolicyContractId,
@@ -24,6 +23,7 @@ import {
   getStellarRpcUrl,
 } from "../lib/env";
 import { logError } from "../lib/logger";
+import { fetchPtaxUsdBrl } from "./ptax";
 import {
   RESERVE_POSITION_KIND,
   findCoverageRatioBps,
@@ -34,33 +34,6 @@ import {
   type ReserveReadResult,
   type ReserveSolvencySnapshot,
 } from "./domain";
-
-type PtaxQuote = { cotacaoCompra?: number; cotacaoVenda?: number; dataHoraCotacao?: string };
-type PtaxResponse = { value?: PtaxQuote[] };
-
-// BCB PTAX OData requires the US month-day-year order in the date filter.
-function ptaxDate(d: Date): string {
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${mm}-${dd}-${d.getUTCFullYear()}`;
-}
-
-async function fetchPtaxUsdBrl(): Promise<{ rate: number; source: string; quotedAt: string }> {
-  const now = new Date();
-  const start = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-  const url =
-    `${getBcbPtaxBaseUrl()}/CotacaoDolarPeriodo(dataInicial=@di,dataFinalCotacao=@df)` +
-    `?@di='${ptaxDate(start)}'&@df='${ptaxDate(now)}'&$top=1&$orderby=dataHoraCotacao%20desc&$format=json`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`PTAX ${res.status} ${res.statusText}`);
-  const data = (await res.json()) as PtaxResponse; // hook-ok: external BCB PTAX API response
-  const quote = data.value?.[0];
-  const rate = quote?.cotacaoVenda;
-  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0)
-    throw new Error("PTAX: invalid venda rate");
-  const quotedAt = (quote?.dataHoraCotacao ?? "").slice(0, 19);
-  return { rate, source: "BCB_PTAX_VENDA", quotedAt };
-}
 
 // Canonical all-zero account — valid for read-only simulation (never signed).
 // Derived rather than hand-typed so the strkey checksum is always correct.

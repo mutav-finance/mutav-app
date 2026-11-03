@@ -5,35 +5,33 @@ import { usePreloadedQuery } from "convex/react";
 import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { StateTimelineBucket } from "@convex/guarantees/domain";
-import type { GuaranteeAggregates, ReserveCoverage } from "@convex/transparency/domain";
-import { CapacityPanel } from "@mutav/ui/transparency/capacity-panel";
-import { ReserveBreakdown } from "@mutav/ui/transparency/reserve-breakdown";
-import { ReservePanel } from "@mutav/ui/transparency/reserve-panel";
+import type { GuaranteeAggregates, ReserveHealthReading } from "@convex/transparency/domain";
 import { GuaranteeExposurePanel, GuaranteesPanel } from "./guarantees-panel";
 import { PlatformStateChart } from "./platform-state-chart";
+import { ReserveSection } from "./reserve-section";
 
 type Props = {
   preloadedAggregates: Preloaded<typeof api.transparency.useCases.getGuaranteeAggregates> | null;
   preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getStateTimelineByPeriod> | null;
-  preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage> | null;
+  preloadedReserve: Preloaded<typeof api.transparency.useCases.getReserveHealth> | null;
   initialAggregates: GuaranteeAggregates | null;
   initialTimeline: StateTimelineBucket[] | null;
-  initialCoverage: ReserveCoverage | null;
+  initialReserve: ReserveHealthReading | null;
 };
 
 type LiveProps = {
   preloadedAggregates: Preloaded<typeof api.transparency.useCases.getGuaranteeAggregates>;
   preloadedTimeline: Preloaded<typeof api.guarantees.useCases.getStateTimelineByPeriod>;
-  preloadedCoverage: Preloaded<typeof api.transparency.useCases.getReserveCoverage>;
+  preloadedReserve: Preloaded<typeof api.transparency.useCases.getReserveHealth>;
 };
 
 type LayoutProps = {
   aggregates: GuaranteeAggregates | null | undefined;
   timeline: StateTimelineBucket[] | null | undefined;
-  coverage: ReserveCoverage | null | undefined;
+  reserve: ReserveHealthReading | null | undefined;
 };
 
-function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps) {
+function TransparencyPageLayout({ aggregates, timeline, reserve }: LayoutProps) {
   const t = useTranslations("transparency");
 
   const agg = aggregates ?? null;
@@ -49,12 +47,7 @@ function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps)
         <GuaranteeExposurePanel aggregates={agg} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ReservePanel coverage={coverage} />
-        <CapacityPanel coverage={coverage} />
-      </div>
-
-      <ReserveBreakdown coverage={coverage} />
+      <ReserveSection reading={reserve} />
 
       <PlatformStateChart timeline={tl} counts={agg?.countByState} />
 
@@ -66,28 +59,28 @@ function TransparencyPageLayout({ aggregates, timeline, coverage }: LayoutProps)
 function TransparencyPageLive({
   preloadedAggregates,
   preloadedTimeline,
-  preloadedCoverage,
+  preloadedReserve,
 }: LiveProps) {
   const aggregates = usePreloadedQuery(preloadedAggregates);
   const timeline = usePreloadedQuery(preloadedTimeline);
-  const coverage = usePreloadedQuery(preloadedCoverage);
-  return <TransparencyPageLayout aggregates={aggregates} timeline={timeline} coverage={coverage} />;
+  const reserve = usePreloadedQuery(preloadedReserve);
+  return <TransparencyPageLayout aggregates={aggregates} timeline={timeline} reserve={reserve} />;
 }
 
 export function TransparencyPage({
   preloadedAggregates,
   preloadedTimeline,
-  preloadedCoverage,
+  preloadedReserve,
   initialAggregates,
   initialTimeline,
-  initialCoverage,
+  initialReserve,
 }: Props) {
-  if (preloadedAggregates && preloadedTimeline && preloadedCoverage) {
+  if (preloadedAggregates && preloadedTimeline && preloadedReserve) {
     return (
       <TransparencyPageLive
         preloadedAggregates={preloadedAggregates}
         preloadedTimeline={preloadedTimeline}
-        preloadedCoverage={preloadedCoverage}
+        preloadedReserve={preloadedReserve}
       />
     );
   }
@@ -96,7 +89,7 @@ export function TransparencyPage({
     <TransparencyPageLayout
       aggregates={initialAggregates}
       timeline={initialTimeline}
-      coverage={initialCoverage}
+      reserve={initialReserve}
     />
   );
 }

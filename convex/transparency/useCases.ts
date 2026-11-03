@@ -5,7 +5,7 @@ import {
   sumInsuredExposure,
   sumVerifiedDefaultExposure,
 } from "../guarantees/aggregate";
-import { getReserveContractId, getStellarNetwork } from "../lib/env";
+import { getReserveContractId, getReserveSquadsVaultAddress, getStellarNetwork } from "../lib/env";
 import { VERIFIED_DEFAULT_STATES, type GuaranteeState } from "../guarantees/domain";
 import { deriveSolvencyFigures, type ReserveSolvencySnapshot } from "../reserve/domain";
 import { computeReserveHealth } from "../reserve/health";
@@ -139,16 +139,30 @@ export const getReserveCoverage = queryWithAuth({
   },
 });
 
+const SOLANA_EXPLORER_ADDRESS_URL = "https://explorer.solana.com/address";
+
+function solanaVaultExplorerUrl(vaultAddress: string): string {
+  return `${SOLANA_EXPLORER_ADDRESS_URL}/${vaultAddress}`;
+}
+
 // Platform-wide BY DESIGN — every viewer sees the same phase-1 reserve health.
 export const getReserveHealth = queryWithAuth({
   args: {},
   handler: async (ctx): Promise<ReserveHealthReading> => {
     const snap = await latestHealthSnapshot(ctx);
-    if (!snap) return { available: false };
+    if (!snap) {
+      const vault = getReserveSquadsVaultAddress();
+      return { available: false, vaultExplorerUrl: vault ? solanaVaultExplorerUrl(vault) : null };
+    }
     return {
       available: true,
       capturedAt: snap.capturedAt,
       source: snap.source,
+      // From the snapshot, not env: the link names the vault the figures were read from.
+      vaultExplorerUrl: solanaVaultExplorerUrl(snap.source.vaultAddress),
+      holdings: snap.holdings,
+      prices: snap.prices,
+      usdStablesUncounted: snap.usdStablesUncounted,
       ...computeReserveHealth({
         balanceCents: snap.balanceCents,
         insuredCoverCents: snap.insuredCoverCents,

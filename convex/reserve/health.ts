@@ -1,6 +1,7 @@
 /**
- * Phase-1 reserve health (ADR 0012): pure math over the Squads vault's BRS
- * balance and the off-chain book. The chain supplies only the balance; the
+ * Phase-1 reserve health (ADR 0012): pure math over the Squads vault's counted
+ * balance (BRS + USD stablecoins, in BRL — see `./valuation.ts`) and the
+ * off-chain book. The chain supplies only the balance; the
  * coverage the book requires is computed here, because a multisig keeps no
  * registry of guarantees. Copy built on these figures says the book is
  * "gated by required coverage" — never "solvency".
@@ -19,8 +20,8 @@ export const BPS_DENOMINATOR = 10_000;
 export const BRS_DECIMALS = 6;
 /**
  * 1 BRS = R$1. BRS is a BRL stablecoin and the reader does not price it: a
- * depeg would overstate the balance. Revisit if BRS stops trading at par or
- * the reserve holds a second asset.
+ * depeg would overstate the balance. Revisit if BRS stops trading at par.
+ * The counted balance is expressed in BRS base units whatever it holds.
  */
 export const BRS_CENTS_PER_UNIT = 100;
 /** 10^6 base units per BRS ÷ 100 cents per BRS. */

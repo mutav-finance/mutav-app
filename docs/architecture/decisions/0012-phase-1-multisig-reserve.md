@@ -55,9 +55,15 @@ passes             ⇔ this guarantee's hold (cover × c) ≤ free capital
 
 ## Assumptions
 
-- **1 BRS = R$1.** BRS is a BRL stablecoin; the conversion is the named constant `BRS_CENTS_PER_UNIT` in `convex/reserve/health.ts`. A depeg would overstate the balance — the reader does not price BRS. Revisit if BRS stops trading at par or the reserve holds a second asset.
+- **1 BRS = R$1.** BRS is a BRL stablecoin; the conversion is the named constant `BRS_CENTS_PER_UNIT` in `convex/reserve/health.ts`. A depeg would overstate the balance — the reader does not price BRS. Revisit if BRS stops trading at par. (Other assets: see the amendment below.)
 - **BRS has 6 decimals** (`BRS_DECIMALS`), the same base unit #377's offer holds use. The reader refuses a token account reporting other decimals.
 - **`c` is an off-chain constant** in phase 1 (`PILOT_COVERAGE_RATIO_BPS = 2_500` in `convex/reserve/health.ts`), since no program stores it. In phase 3 the program's `c` replaces it.
+
+## Amendment (2026-11-02): multi-asset vault ([#441](https://github.com/mutav-finance/mutav-app/issues/441))
+
+The vault (`925hnJ7MrnAHqkvhRNBB3zYLsSACWQhHeDUB3Q4V9zvC`, mainnet) can hold more than BRS. The reader now returns **every holding**: native SOL plus each token account under SPL Token and Token-2022, labelled by a registry (`convex/reserve/assets.ts`). The **balance** in the capacity check becomes the **counted balance**: BRS at 1:1 plus USD stablecoins (USDC, USDT) at the BCB PTAX rate, still in BRS base units. SOL is valued for display only and never counted; unknown mints are listed, never counted.
+
+This changes decision 2: an empty vault or a missing token account is now a **balance of 0**, not unavailable — the capacity check then simply fails. RPC errors, malformed responses and a known mint with the wrong decimals still fail closed. A missing PTAX rate does not fail the read: USD stablecoins drop out of the counted balance and the snapshot flags it.
 
 ## Revisit trigger
 

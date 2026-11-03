@@ -1,7 +1,9 @@
 import type { GuaranteeState } from "../guarantees/domain";
 import type { SolvencyFigures, SolvencyPositionFigures } from "../reserve/domain";
 import type { ReserveHealth } from "../reserve/health";
+import type { ReservePrices } from "../reserve/prices";
 import type { ReserveSource } from "../reserve/reader";
+import type { ValuedReserveHolding } from "../reserve/valuation";
 
 /**
  * Platform-wide guarantee figures for the transparency dashboard. One count
@@ -56,10 +58,22 @@ export type ReserveCoverage = { explorerUrl: string } & (
 );
 
 /**
- * Phase-1 reserve health (ADR 0012), read from the latest snapshot: the Squads
- * vault's BRS balance against the coverage the in-force book requires. All
- * amounts in BRL cents (1 BRS = R$1). Copy: "gated by required coverage".
+ * Phase-1 reserve health (ADR 0012), read from the latest snapshot: every
+ * holding of the Squads vault, and the counted balance (BRS + USD stablecoins,
+ * in BRL) against the coverage the in-force book requires. All amounts in BRL
+ * cents. Copy: "gated by required coverage".
+ *
+ * `vaultExplorerUrl` links the vault on a Solana explorer so anyone can check
+ * the balances; it is null only when the vault is not configured.
  */
 export type ReserveHealthReading =
-  | ({ available: true; capturedAt: number; source: ReserveSource } & ReserveHealth)
-  | { available: false };
+  | ({
+      available: true;
+      capturedAt: number;
+      source: ReserveSource;
+      vaultExplorerUrl: string;
+      holdings: ValuedReserveHolding[];
+      prices: ReservePrices;
+      usdStablesUncounted: boolean;
+    } & ReserveHealth)
+  | { available: false; vaultExplorerUrl: string | null };

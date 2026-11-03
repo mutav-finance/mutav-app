@@ -265,7 +265,7 @@ export const OUT_OF_SCOPE_TABLES = {
   reserveSnapshots:
     "Reserve valuation snapshots — token contract addresses, balances, an FX rate and a total. §2.3 excludes aggregate outputs where no individual is identifiable, and no column here is keyed to a person.",
   reserveHealthSnapshots:
-    "Phase-1 reserve health snapshots — the Squads vault and BRS mint addresses (MUTAV's own accounts), a slot, a balance, the platform-wide in-force cover total and the coverage ratio. §2.3 excludes aggregate outputs where no individual is identifiable, and no column here is keyed to a person.",
+    "Phase-1 reserve health snapshots — the Squads vault address (MUTAV's own account), a slot, the vault's per-asset holdings (token mints and balances), the prices used to value them, a counted balance, the platform-wide in-force cover total and the coverage ratio. §2.3 excludes aggregate outputs where no individual is identifiable, and no column here is keyed to a person.",
   products:
     "The guarantee product catalog — pricing parameters (rate table, multipliers, fees, commission), an eligibility rule and an effective window. Every column describes what Mutav sells, not to whom; the per-person copy of these numbers is the `guarantees.terms` snapshot, which is classified. `eligibility.agencyIds` names agencies (legal entities, already covered on `agencies`), never a natural person.",
 } as const;

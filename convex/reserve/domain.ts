@@ -1,9 +1,47 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
+import { RESERVE_ASSET_KIND, RESERVE_TOKEN_PROGRAM } from "./assets";
+import { RESERVE_SOURCE_KIND } from "./health";
 
 export type ReserveSnapshot = Doc<"reserveSnapshots">;
 export type ReserveSnapshotId = Id<"reserveSnapshots">;
 export type ReserveHealthSnapshot = Doc<"reserveHealthSnapshots">;
+
+// ── Phase-1 Squads reserve (ADR 0012) — validators mirrored in schema.ts ──
+
+export const reserveSourceValidator = v.object({
+  kind: v.literal(RESERVE_SOURCE_KIND.SQUADS_MULTISIG),
+  vaultAddress: v.string(),
+  slot: v.number(),
+});
+
+export const reserveHoldingValidator = v.object({
+  mint: v.string(),
+  symbol: v.union(v.string(), v.null()),
+  kind: v.union(
+    v.literal(RESERVE_ASSET_KIND.SOL),
+    v.literal(RESERVE_ASSET_KIND.BRL_STABLE),
+    v.literal(RESERVE_ASSET_KIND.USD_STABLE),
+    v.literal(RESERVE_ASSET_KIND.UNKNOWN),
+  ),
+  tokenProgram: v.union(
+    v.literal(RESERVE_TOKEN_PROGRAM.NATIVE),
+    v.literal(RESERVE_TOKEN_PROGRAM.SPL_TOKEN),
+    v.literal(RESERVE_TOKEN_PROGRAM.SPL_TOKEN_2022),
+  ),
+  decimals: v.number(),
+  amountBaseUnits: v.string(),
+  valueCents: v.union(v.number(), v.null()),
+  counted: v.boolean(),
+});
+
+export const reservePricesValidator = v.object({
+  usdBrl: v.union(
+    v.object({ rate: v.number(), source: v.string(), quotedAt: v.string() }),
+    v.null(),
+  ),
+  solUsd: v.union(v.object({ price: v.number(), source: v.string() }), v.null()),
+});
 
 /** One approved asset held by the reserve vault, as read from chain. */
 export type ReserveAsset = {
