@@ -10,6 +10,7 @@ import {
   resolveSessionErrorView,
   type SessionErrorTone,
 } from "@/components/session-error/view-model";
+import { getLogoutHref } from "@/lib/logout";
 
 const toneIcon: Record<SessionErrorTone, typeof CloudOffIcon> = {
   notProvisioned: UserRoundXIcon,
@@ -80,11 +81,9 @@ export default async function SessionErrorPage({
             )}
           </Button>
           <Button asChild variant="outline">
-            {/* The Auth0 SDK mounts /auth/logout at the root, outside [locale],
-                and needs a full navigation so the proxy can clear the session
-                cookie — a plain <a>, never next/link. */}
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/auth/logout">{t("logOut")}</a>
+            {/* The logout route lives outside [locale] and needs a full
+                navigation — a plain <a>, never next/link. */}
+            <a href={getLogoutHref()}>{t("logOut")}</a>
           </Button>
         </div>
       </div>

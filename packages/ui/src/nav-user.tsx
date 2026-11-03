@@ -58,16 +58,16 @@ export type NavUserProps = {
     avatar?: string;
   };
   /**
-   * URL the log-out item navigates to. Defaults to `/auth/logout` (Auth0
-   * SDK convention — the nextjs-auth0 v4 mounted route handler clears the
-   * encrypted session cookie). The link is a plain `<a>` so the browser
-   * actually hits that route; next/link's client routing would skip it
-   * and leave the cookie intact.
+   * URL the log-out item navigates to. Required: each app passes its
+   * cross-app logout href, which signs the user out of every app, not only
+   * this one. The link is a plain `<a>` so the browser actually hits that
+   * route; next/link's client routing would skip it and leave the cookie
+   * intact.
    */
-  logoutHref?: string;
+  logoutHref: string;
 };
 
-export function NavUser({ user, logoutHref = "/auth/logout" }: NavUserProps) {
+export function NavUser({ user, logoutHref }: NavUserProps) {
   const isMobile = useIsMobile();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const ThemeTriggerIcon = resolvedTheme === "dark" ? MoonIcon : SunIcon;

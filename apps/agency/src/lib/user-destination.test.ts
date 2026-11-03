@@ -1,52 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  resolveUserDestinationWith,
-  shouldRouteStaffToAdmin,
-  type UserDestinationDeps,
-} from "./user-destination";
-
-describe("shouldRouteStaffToAdmin", () => {
-  it("routes a staff user with no active agency to admin", () => {
-    expect(shouldRouteStaffToAdmin({ isStaff: true, agencies: [] })).toBe(true);
-    expect(
-      shouldRouteStaffToAdmin({
-        isStaff: true,
-        agencies: [{ onboardingState: "under_review" }],
-      }),
-    ).toBe(true);
-  });
-
-  it("keeps a staff user WITH an active agency on the dashboard (Phase E shell-switcher)", () => {
-    expect(
-      shouldRouteStaffToAdmin({
-        isStaff: true,
-        agencies: [{ onboardingState: "active" }],
-      }),
-    ).toBe(false);
-    expect(
-      shouldRouteStaffToAdmin({
-        isStaff: true,
-        agencies: [{ onboardingState: "under_review" }, { onboardingState: "active" }],
-      }),
-    ).toBe(false);
-  });
-
-  it("never routes a non-staff user to admin, regardless of agency state", () => {
-    expect(shouldRouteStaffToAdmin({ isStaff: false, agencies: [] })).toBe(false);
-    expect(
-      shouldRouteStaffToAdmin({
-        isStaff: false,
-        agencies: [{ onboardingState: "active" }],
-      }),
-    ).toBe(false);
-    expect(
-      shouldRouteStaffToAdmin({
-        isStaff: false,
-        agencies: [{ onboardingState: "under_review" }],
-      }),
-    ).toBe(false);
-  });
-});
+import { resolveUserDestinationWith, type UserDestinationDeps } from "./user-destination";
 
 type Agencies = ReadonlyArray<{ onboardingState?: string }>;
 
@@ -69,7 +22,6 @@ function depsWith(overrides: Partial<UserDestinationDeps> = {}) {
     fetchMe: async () => ME,
     provision,
     fetchAgencies: async (): Promise<Agencies> => [{ onboardingState: "active" }],
-    fetchStaff: async () => false,
     log,
     ...overrides,
   };
@@ -181,7 +133,7 @@ describe("resolveUserDestinationWith", () => {
     });
   });
 
-  describe("agencies and staff", () => {
+  describe("agencies", () => {
     it("maps an agencies fetch throw to backend-unavailable", async () => {
       const { deps } = depsWith({
         fetchAgencies: async () => {
@@ -189,23 +141,6 @@ describe("resolveUserDestinationWith", () => {
         },
       });
       expect(await resolveUserDestinationWith(deps)).toEqual({ kind: "backend-unavailable" });
-    });
-
-    it("never yields dashboard when the staff fetch fails, even with an active agency", async () => {
-      const { deps } = depsWith({
-        fetchAgencies: async () => [{ onboardingState: "active" }],
-        fetchStaff: async () => {
-          throw transportError();
-        },
-      });
-      const destination = await resolveUserDestinationWith(deps);
-      expect(destination.kind).not.toBe("dashboard");
-      expect(destination).toEqual({ kind: "backend-unavailable" });
-    });
-
-    it("routes staff with no active agency to the admin app", async () => {
-      const { deps } = depsWith({ fetchAgencies: async () => [], fetchStaff: async () => true });
-      expect(await resolveUserDestinationWith(deps)).toEqual({ kind: "staff" });
     });
 
     it.each([

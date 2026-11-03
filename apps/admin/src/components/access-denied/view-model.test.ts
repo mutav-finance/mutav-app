@@ -4,6 +4,7 @@ import type { StaffGateResult } from "@/lib/auth";
 import { resolveAccessDeniedView } from "./view-model";
 
 const AGENCY_URL = "https://app.mutav.finance";
+const LOGOUT_HREF = "https://app.mutav.finance/auth/clear-session";
 
 function sessionWith(user: { email?: string }): SessionData {
   return {
@@ -19,6 +20,7 @@ describe("resolveAccessDeniedView", () => {
       gate: { kind: "anonymous" },
       locale: "pt-BR",
       agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
     });
 
     it("offers sign-in rather than sign-out", () => {
@@ -52,6 +54,7 @@ describe("resolveAccessDeniedView", () => {
       gate: { kind: "unavailable" },
       locale: "en",
       agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
     });
 
     it("does not claim a denial, because staff status could not be read", () => {
@@ -66,7 +69,7 @@ describe("resolveAccessDeniedView", () => {
     });
 
     it("offers sign-out, not sign-in, since the session is fine", () => {
-      expect(view.secondary).toEqual({ href: "/auth/logout", labelKey: "signOut" });
+      expect(view.secondary).toEqual({ href: LOGOUT_HREF, labelKey: "signOut" });
     });
 
     it("carries no email, because the gate returned no session", () => {
@@ -79,6 +82,7 @@ describe("resolveAccessDeniedView", () => {
       gate: { kind: "not-staff", session: sessionWith({ email: "someone@example.com" }) },
       locale: "pt-BR",
       agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
     });
 
     it("sends the user to the agency app", () => {
@@ -88,8 +92,8 @@ describe("resolveAccessDeniedView", () => {
       });
     });
 
-    it("offers sign-out so a wrong-account login is recoverable", () => {
-      expect(view.secondary).toEqual({ href: "/auth/logout", labelKey: "signOut" });
+    it("offers switch-account through the cross-app logout, so a wrong login is recoverable", () => {
+      expect(view.secondary).toEqual({ href: LOGOUT_HREF, labelKey: "switchAccount" });
     });
 
     it("shows which account is signed in", () => {
@@ -111,6 +115,7 @@ describe("resolveAccessDeniedView", () => {
         gate: { kind: "not-staff", session: sessionWith({ email: "someone@example.com" }) },
         locale: "en",
         agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
       });
       expect(en.primary.href).toBe("https://app.mutav.finance/en");
     });
@@ -129,6 +134,7 @@ describe("resolveAccessDeniedView", () => {
         gate: staffGate,
         locale: "pt-BR",
         agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
       });
       expect(view.primary).toEqual({ href: "/", labelKey: "goToAdmin" });
     });
@@ -138,6 +144,7 @@ describe("resolveAccessDeniedView", () => {
         gate: staffGate,
         locale: "en",
         agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
       });
       expect(en.primary.href).toBe("/en");
     });
@@ -147,6 +154,7 @@ describe("resolveAccessDeniedView", () => {
         gate: staffGate,
         locale: "pt-BR",
         agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
       });
       expect(view.titleKey).toBe("staffTitle");
       expect(view.subtitleKey).toBe("staffSubtitle");
@@ -161,6 +169,7 @@ describe("resolveAccessDeniedView", () => {
         gate: { kind: "not-staff", session: sessionWith({ email: "  spaced@example.com  " }) },
         locale: "pt-BR",
         agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
       });
       expect(view.email).toBe("spaced@example.com");
     });
@@ -170,6 +179,7 @@ describe("resolveAccessDeniedView", () => {
         gate: { kind: "not-staff", session: sessionWith({ email: "   " }) },
         locale: "pt-BR",
         agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
       });
       expect(view.email).toBe("");
     });
@@ -179,6 +189,7 @@ describe("resolveAccessDeniedView", () => {
         gate: { kind: "not-staff", session: sessionWith({}) },
         locale: "pt-BR",
         agencyUrl: AGENCY_URL,
+      logoutHref: LOGOUT_HREF,
       });
       expect(view.email).toBe("");
     });
