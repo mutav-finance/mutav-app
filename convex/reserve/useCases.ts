@@ -1,6 +1,13 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
-import { reserveAssetValidator, reserveSolvencyValidator, type ReserveSnapshot } from "./domain";
+import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import { sumInsuredExposure } from "../guarantees/aggregate";
+import {
+  reserveAssetValidator,
+  reserveSolvencyValidator,
+  type ReserveHealthSnapshot,
+  type ReserveSnapshot,
+} from "./domain";
+import { brsBaseUnitsToCents, RESERVE_SOURCE_KIND } from "./health";
 
 export const writeSnapshot = internalMutation({
   args: {
@@ -35,3 +42,44 @@ export const latestSnapshot = internalQuery({
     return await ctx.db.query("reserveSnapshots").withIndex("by_capturedAt").order("desc").first();
   },
 });
+
+const DIGITS_ONLY = /^\d+$/;
+
+/**
+ * Persist one phase-1 health reading (ADR 0012). The balance comes from the
+ * reader; the in-force cover is summed here, inside the same transaction as
+ * the insert, so the stored inputs describe one moment of the book.
+ */
+export const writeHealthSnapshot = internalMutation({
+  args: {
+    capturedAt: v.number(),
+    source: v.object({
+      kind: v.literal(RESERVE_SOURCE_KIND.SQUADS_MULTISIG),
+      vaultAddress: v.string(),
+      mint: v.string(),
+      slot: v.number(),
+    }),
+    balanceBaseUnits: v.string(),
+    coverageRatioBps: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (!DIGITS_ONLY.test(args.balanceBaseUnits)) {
+      throw new Error("balanceBaseUnits must be an unsigned base-10 integer");
+    }
+    // Seam for the offer-hold ledger: once it lands, sum the active holds here
+    // and store them as `activeOfferHoldsCents`. Until then the field is absent.
+    await ctx.db.insert("reserveHealthSnapshots", {
+      ...args,
+      balanceCents: brsBaseUnitsToCents(BigInt(args.balanceBaseUnits)),
+      insuredCoverCents: await sumInsuredExposure(ctx),
+    });
+  },
+});
+
+export async function latestHealthSnapshot(ctx: QueryCtx): Promise<ReserveHealthSnapshot | null> {
+  return await ctx.db
+    .query("reserveHealthSnapshots")
+    .withIndex("by_capturedAt")
+    .order("desc")
+    .first();
+}

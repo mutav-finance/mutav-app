@@ -8,9 +8,12 @@ import {
 import { getReserveContractId, getStellarNetwork } from "../lib/env";
 import { VERIFIED_DEFAULT_STATES, type GuaranteeState } from "../guarantees/domain";
 import { deriveSolvencyFigures, type ReserveSolvencySnapshot } from "../reserve/domain";
+import { computeReserveHealth } from "../reserve/health";
+import { latestHealthSnapshot } from "../reserve/useCases";
 import type {
   GuaranteeAggregates,
   ReserveCoverage,
+  ReserveHealthReading,
   ReserveSolvency,
   StellarNetworkName,
 } from "./domain";
@@ -132,6 +135,26 @@ export const getReserveCoverage = queryWithAuth({
       capturedAt: snap.capturedAt,
       assetCount: snap.assets.length,
       solvency: snap.solvency ? shapeReserveSolvency(snap.solvency) : null,
+    };
+  },
+});
+
+// Platform-wide BY DESIGN — every viewer sees the same phase-1 reserve health.
+export const getReserveHealth = queryWithAuth({
+  args: {},
+  handler: async (ctx): Promise<ReserveHealthReading> => {
+    const snap = await latestHealthSnapshot(ctx);
+    if (!snap) return { available: false };
+    return {
+      available: true,
+      capturedAt: snap.capturedAt,
+      source: snap.source,
+      ...computeReserveHealth({
+        balanceCents: snap.balanceCents,
+        insuredCoverCents: snap.insuredCoverCents,
+        coverageRatioBps: snap.coverageRatioBps,
+        activeOfferHoldsCents: snap.activeOfferHoldsCents ?? 0,
+      }),
     };
   },
 });
