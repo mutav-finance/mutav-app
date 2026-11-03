@@ -1,6 +1,6 @@
 import type { convexTest, TestConvex } from "convex-test";
 import type schema from "../schema";
-import type { AgencyId } from "../agencies/domain";
+import { KYB_CHECK_ITEMS, type AgencyId } from "../agencies/domain";
 import {
   CLOSE_REASON,
   DEFAULT_GUARANTEE_PLAN,
@@ -124,6 +124,19 @@ export async function seedAgencyWithMembership(
     });
     return agencyId;
   });
+}
+
+/** Ticks every Phase-0 KYB check directly, so a test can approve without the per-item audit trail. */
+export async function tickAllKybChecks(
+  t: ReturnType<typeof convexTest>,
+  { agencyId, checkedBy }: { agencyId: AgencyId; checkedBy: UserId },
+): Promise<void> {
+  const checkedAt = new Date().toISOString();
+  await t.run((ctx) =>
+    ctx.db.patch(agencyId, {
+      kybChecks: KYB_CHECK_ITEMS.map((item) => ({ item, checkedBy, checkedAt })),
+    }),
+  );
 }
 
 export async function seedForeignAgency(t: ReturnType<typeof convexTest>) {

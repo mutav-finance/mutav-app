@@ -80,8 +80,13 @@ describe("mutavStaff/useCases staff-gate guard", () => {
     }
   });
 
-  test("the three known staff capabilities are detected as aud-bound", () => {
-    const capabilities = ["listPendingReviews", "getDocumentDownloadUrl", "reviewOnboarding"];
+  test("the known staff capabilities are detected as aud-bound", () => {
+    const capabilities = [
+      "listPendingReviews",
+      "getDocumentDownloadUrl",
+      "reviewOnboarding",
+      "setKybCheck",
+    ];
     for (const name of capabilities) {
       const found = exports.find((e) => e.name === name);
       expect(found, `Capability "${name}" not found in useCases.ts`).toBeDefined();

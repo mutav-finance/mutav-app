@@ -3,15 +3,21 @@ import { internalMutation } from "../_generated/server";
 import { mutationWithMutavRole, queryWithAuth, queryWithMutavRole } from "../lib/auth";
 import { AUDIT_ACTION } from "../audit/domain";
 import { appendAuditEntry } from "../audit/useCases";
-import { agencyDocumentKindValidator, onboardingDecisionValidator } from "../agencies/domain";
+import {
+  agencyDocumentKindValidator,
+  kybCheckItemValidator,
+  onboardingDecisionValidator,
+} from "../agencies/domain";
 import {
   applyOnboardingReview,
+  applySetKybCheck,
   applyStartOnboardingReview,
   collectPendingReviews,
   resolveDocumentDownloadUrl,
 } from "../agencies/adminUseCases";
 import type {
   ReviewOnboardingResult,
+  SetKybCheckResult,
   StartOnboardingReviewResult,
 } from "../agencies/adminUseCases";
 import type { Result } from "../lib/result";
@@ -313,11 +319,40 @@ export const startOnboardingReview = mutationWithMutavRole({ minRole: "complianc
 });
 
 /**
- * Approve/reject an onboarding submission (from `submitted` or
- * `under_review`). Admin only; writes a hash-chained audit entry and
- * schedules the decision email to the agency.
+ * Tick or untick one Phase-0 KYB check on a submission awaiting review.
+ * Compliance and above. Each real change writes a hash-chained audit entry,
+ * so the log answers "who ticked what, when" even after a rejection clears
+ * the ticks.
  */
-export const reviewOnboarding = mutationWithMutavRole({ minRole: "admin" })({
+export const setKybCheck = mutationWithMutavRole({ minRole: "compliance" })({
+  args: { agencyId: v.id("agencies"), item: kybCheckItemValidator, checked: v.boolean() },
+  handler: async (ctx, { agencyId, item, checked }): Promise<SetKybCheckResult> => {
+    const result = await applySetKybCheck(ctx, {
+      agencyId,
+      item,
+      checked,
+      reviewerId: ctx.user._id,
+    });
+    if (result.success && result.data.changed) {
+      await ctx.appendStaffAudit({
+        action: AUDIT_ACTION.ONBOARDING_KYB_CHECK_SET,
+        resourceType: "agency",
+        resourceId: agencyId,
+        payload: { item, checked },
+      });
+    }
+    return result;
+  },
+});
+
+/**
+ * Approve/reject an onboarding submission (from `submitted` or
+ * `under_review`). Compliance and above — the role that works the queue
+ * (docs/architecture/admin.md, A2). Approval needs the KYB checklist complete;
+ * rejection does not. Writes a hash-chained audit entry and schedules the
+ * decision email to the agency.
+ */
+export const reviewOnboarding = mutationWithMutavRole({ minRole: "compliance" })({
   args: {
     agencyId: v.id("agencies"),
     decision: onboardingDecisionValidator,

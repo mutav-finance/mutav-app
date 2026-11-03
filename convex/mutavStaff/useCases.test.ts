@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
 import schema from "../schema";
 import type { AgencyId } from "../agencies/domain";
+import { tickAllKybChecks } from "../lib/testFixtures";
 import type { MutavStaffRole } from "./domain";
 
 // Opaque identity values for withIdentity. The aud-bind was removed (Convex
@@ -49,8 +50,9 @@ async function seedSubmittedAgency(t: T, cnpj = "00000000000123") {
 describe("staff gate (Tier-1 panel access)", () => {
   test("a staff member with a mutavStaff row is allowed", async () => {
     const t = convexTest(schema);
-    await seedStaff(t, "auth0|staff", ["admin"]);
+    const staffUserId = await seedStaff(t, "auth0|staff", ["admin"]);
     const agencyId = await seedSubmittedAgency(t);
+    await tickAllKybChecks(t, { agencyId, checkedBy: staffUserId });
 
     const asStaff = t.withIdentity({ subject: "auth0|staff" });
     const result = await asStaff.mutation(api.mutavStaff.useCases.reviewOnboarding, {
@@ -101,22 +103,42 @@ describe("role hierarchy", () => {
     await expect(asSupport.query(api.mutavStaff.useCases.listPendingReviews, {})).rejects.toThrow();
   });
 
-  test("compliance can list but cannot approve (approve needs admin)", async () => {
+  test("compliance can list and approve (docs/architecture/admin.md, A2)", async () => {
     const t = convexTest(schema);
-    await seedStaff(t, "auth0|compliance", ["compliance"]);
+    const complianceUserId = await seedStaff(t, "auth0|compliance", ["compliance"]);
     const agencyId = await seedSubmittedAgency(t);
+    await tickAllKybChecks(t, { agencyId, checkedBy: complianceUserId });
     const asCompliance = t.withIdentity({ subject: "auth0|compliance", aud: ADMIN_AUD });
 
     const queue = await asCompliance.query(api.mutavStaff.useCases.listPendingReviews, {});
     expect(queue.length).toBe(1);
 
-    await expect(
-      asCompliance.mutation(api.mutavStaff.useCases.reviewOnboarding, {
-        agencyId,
-        decision: "approved",
-      }),
-    ).rejects.toThrow();
+    const result = await asCompliance.mutation(api.mutavStaff.useCases.reviewOnboarding, {
+      agencyId,
+      decision: "approved",
+    });
+    expect(result.success).toBe(true);
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.onboardingState).toBe("active");
   });
+
+  test.each([["support"], ["treasury"]] as const)(
+    "%s cannot review (needs compliance)",
+    async (role) => {
+      const t = convexTest(schema);
+      const userId = await seedStaff(t, `auth0|${role}`, [role]);
+      const agencyId = await seedSubmittedAgency(t);
+      await tickAllKybChecks(t, { agencyId, checkedBy: userId });
+
+      await expect(
+        t
+          .withIdentity({ subject: `auth0|${role}` })
+          .mutation(api.mutavStaff.useCases.reviewOnboarding, { agencyId, decision: "approved" }),
+      ).rejects.toThrow();
+      const agency = await t.run((ctx) => ctx.db.get(agencyId));
+      expect(agency?.onboardingState).toBe("submitted");
+    },
+  );
 
   test("treasury (off-ladder) never satisfies an operational gate", async () => {
     const t = convexTest(schema);
@@ -169,6 +191,7 @@ describe("audit trail", () => {
     const t = convexTest(schema);
     const staffUserId = await seedStaff(t, "auth0|admin", ["admin"]);
     const agencyId = await seedSubmittedAgency(t);
+    await tickAllKybChecks(t, { agencyId, checkedBy: staffUserId });
 
     const asAdmin = t.withIdentity({ subject: "auth0|admin", aud: ADMIN_AUD });
     await asAdmin.mutation(api.mutavStaff.useCases.reviewOnboarding, {
@@ -324,8 +347,9 @@ describe("reviewOnboarding — source states, reason and decision email", () => 
     "%s from under_review succeeds",
     async (decision) => {
       const t = convexTest(schema);
-      await seedStaff(t, "auth0|admin", ["admin"]);
+      const staffUserId = await seedStaff(t, "auth0|admin", ["admin"]);
       const agencyId = await seedSubmittedAgency(t);
+      await tickAllKybChecks(t, { agencyId, checkedBy: staffUserId });
       const asAdmin = t.withIdentity({ subject: "auth0|admin" });
       await asAdmin.mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
 
@@ -421,8 +445,9 @@ describe("reviewOnboarding — source states, reason and decision email", () => 
     "%s schedules the decision email by agency id, with no address in the args",
     async (decision) => {
       const t = convexTest(schema);
-      await seedStaff(t, "auth0|admin", ["admin"]);
+      const staffUserId = await seedStaff(t, "auth0|admin", ["admin"]);
       const agencyId = await seedSubmittedAgency(t);
+      await tickAllKybChecks(t, { agencyId, checkedBy: staffUserId });
 
       await t
         .withIdentity({ subject: "auth0|admin" })
@@ -455,6 +480,220 @@ describe("reviewOnboarding — source states, reason and decision email", () => 
 
     const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
     expect(scheduled).toHaveLength(0);
+  });
+});
+
+describe("KYB checklist", () => {
+  beforeAll(() => {
+    process.env.PII_ENCRYPTION_KEY = Buffer.from(new Uint8Array(32).fill(0xaa)).toString("base64");
+    process.env.PII_HMAC_KEY = Buffer.from(new Uint8Array(32).fill(0xbb)).toString("base64");
+  });
+
+  const ALL_ITEMS = [
+    "tax_id_active",
+    "creci_active",
+    "sanctions_pep",
+    "bank_account_owner",
+    "reputation",
+  ] as const;
+
+  async function underReview(t: T) {
+    const reviewerId = await seedStaff(t, "auth0|compliance", ["compliance"]);
+    const agencyId = await seedSubmittedAgency(t);
+    const asCompliance = t.withIdentity({ subject: "auth0|compliance" });
+    await asCompliance.mutation(api.mutavStaff.useCases.startOnboardingReview, { agencyId });
+    return { reviewerId, agencyId, asCompliance };
+  }
+
+  test("a tick persists who and when, and writes one audit entry", async () => {
+    const t = convexTest(schema);
+    const { reviewerId, agencyId, asCompliance } = await underReview(t);
+
+    const result = await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+      agencyId,
+      item: "tax_id_active",
+      checked: true,
+    });
+
+    expect(result).toEqual({
+      success: true,
+      data: { agencyId, item: "tax_id_active", changed: true },
+      message: "Checklist updated",
+    });
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.kybChecks).toHaveLength(1);
+    expect(agency?.kybChecks?.[0]).toMatchObject({
+      item: "tax_id_active",
+      checkedBy: reviewerId,
+    });
+    const entries = await auditEntriesFor(t, agencyId);
+    expect(entries.map((entry) => entry.action)).toEqual([
+      "onboarding.review_started",
+      "onboarding.kyb_check_set",
+    ]);
+    expect(entries[1].actor).toEqual({ kind: "user", userId: reviewerId });
+  });
+
+  test("a repeated tick is a no-op with no second audit entry", async () => {
+    const t = convexTest(schema);
+    const { agencyId, asCompliance } = await underReview(t);
+    const args = { agencyId, item: "creci_active", checked: true } as const;
+
+    await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, args);
+    const second = await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, args);
+
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+    expect(second.data.changed).toBe(false);
+    expect(await auditEntriesFor(t, agencyId)).toHaveLength(2);
+  });
+
+  test("an untick removes the item and is audited", async () => {
+    const t = convexTest(schema);
+    const { agencyId, asCompliance } = await underReview(t);
+
+    await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+      agencyId,
+      item: "reputation",
+      checked: true,
+    });
+    await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+      agencyId,
+      item: "reputation",
+      checked: false,
+    });
+
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.kybChecks).toEqual([]);
+    const entries = await auditEntriesFor(t, agencyId);
+    const [tick, untick] = entries.slice(-2);
+    expect([tick.action, untick.action]).toEqual([
+      "onboarding.kyb_check_set",
+      "onboarding.kyb_check_set",
+    ]);
+    // The payload ({ item, checked }) is committed by hash; tick and untick differ.
+    expect(tick.payloadHash).not.toBe(untick.payloadHash);
+  });
+
+  test("the queue returns each tick with the reviewer's name", async () => {
+    const t = convexTest(schema);
+    const { agencyId, asCompliance } = await underReview(t);
+    await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+      agencyId,
+      item: "sanctions_pep",
+      checked: true,
+    });
+
+    const queue = await asCompliance.query(api.mutavStaff.useCases.listPendingReviews, {});
+
+    expect(queue[0].kybChecks).toHaveLength(1);
+    expect(queue[0].kybChecks[0]).toMatchObject({ item: "sanctions_pep", checkedByName: "Staff" });
+  });
+
+  test("approval is blocked until every item is ticked", async () => {
+    const t = convexTest(schema);
+    const { agencyId, asCompliance } = await underReview(t);
+    for (const item of ALL_ITEMS.slice(0, -1)) {
+      await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+        agencyId,
+        item,
+        checked: true,
+      });
+    }
+
+    const blocked = await asCompliance.mutation(api.mutavStaff.useCases.reviewOnboarding, {
+      agencyId,
+      decision: "approved",
+    });
+    expect(blocked.success).toBe(false);
+    if (blocked.success) return;
+    expect(blocked.error.code).toBe("KYB_CHECKLIST_INCOMPLETE");
+    expect((await t.run((ctx) => ctx.db.get(agencyId)))?.onboardingState).toBe("under_review");
+    const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(scheduled).toHaveLength(0);
+
+    await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+      agencyId,
+      item: "reputation",
+      checked: true,
+    });
+    const approved = await asCompliance.mutation(api.mutavStaff.useCases.reviewOnboarding, {
+      agencyId,
+      decision: "approved",
+    });
+    expect(approved.success).toBe(true);
+    expect((await t.run((ctx) => ctx.db.get(agencyId)))?.onboardingState).toBe("active");
+  });
+
+  test("rejection is allowed with nothing ticked and clears any ticks", async () => {
+    const t = convexTest(schema);
+    const { agencyId, asCompliance } = await underReview(t);
+    await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+      agencyId,
+      item: "tax_id_active",
+      checked: true,
+    });
+
+    const result = await asCompliance.mutation(api.mutavStaff.useCases.reviewOnboarding, {
+      agencyId,
+      decision: "rejected",
+      rejectionReason: "CNPJ inapto",
+    });
+
+    expect(result.success).toBe(true);
+    const agency = await t.run((ctx) => ctx.db.get(agencyId));
+    expect(agency?.onboardingState).toBe("rejected");
+    expect(agency?.kybChecks).toBeUndefined();
+  });
+
+  test.each(["in_progress", "active", "rejected"] as const)(
+    "NOT_REVIEWABLE from %s",
+    async (state) => {
+      const t = convexTest(schema);
+      const { agencyId, asCompliance } = await underReview(t);
+      await t.run((ctx) => ctx.db.patch(agencyId, { onboardingState: state }));
+
+      const result = await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+        agencyId,
+        item: "tax_id_active",
+        checked: true,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.code).toBe("NOT_REVIEWABLE");
+      expect(await auditEntriesFor(t, agencyId)).toHaveLength(1);
+    },
+  );
+
+  test("NOT_FOUND for a deleted agency", async () => {
+    const t = convexTest(schema);
+    const { agencyId, asCompliance } = await underReview(t);
+    await t.run((ctx) => ctx.db.delete(agencyId));
+
+    const result = await asCompliance.mutation(api.mutavStaff.useCases.setKybCheck, {
+      agencyId,
+      item: "tax_id_active",
+      checked: true,
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.code).toBe("NOT_FOUND");
+  });
+
+  test.each([["support"], ["treasury"]] as const)("%s cannot tick", async (role) => {
+    const t = convexTest(schema);
+    await seedStaff(t, `auth0|${role}`, [role]);
+    const agencyId = await seedSubmittedAgency(t);
+
+    await expect(
+      t.withIdentity({ subject: `auth0|${role}` }).mutation(api.mutavStaff.useCases.setKybCheck, {
+        agencyId,
+        item: "tax_id_active",
+        checked: true,
+      }),
+    ).rejects.toThrow();
   });
 });
 
