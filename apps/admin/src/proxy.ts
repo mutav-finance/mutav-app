@@ -1,7 +1,7 @@
 import createMiddleware from "next-intl/middleware";
 import type { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import { getIdTokenRefreshWindowSeconds } from "@/lib/env";
+import { getAgencyUrl, getIdTokenRefreshWindowSeconds } from "@/lib/env";
 import { routing } from "@mutav/i18n/routing";
 import { createAuthProxy } from "@mutav/app-shell/auth-proxy";
 
@@ -9,6 +9,7 @@ const authProxy = createAuthProxy({
   auth0,
   handleI18nRouting: createMiddleware(routing),
   getRefreshWindowSeconds: getIdTokenRefreshWindowSeconds,
+  getSiblingAppUrl: getAgencyUrl,
 });
 
 /**

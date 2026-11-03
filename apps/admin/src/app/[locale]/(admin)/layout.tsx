@@ -8,6 +8,7 @@ import { getPathname, redirect as localeRedirect } from "@mutav/i18n/navigation"
 import { NavUser } from "@mutav/ui/nav-user";
 import { AppShell } from "@mutav/ui/shell/app-shell";
 import { getStaffMember } from "@/lib/auth";
+import { getLogoutHref } from "@/lib/logout";
 
 /**
  * `(admin)` route-group layout — the staff gate + shell.
@@ -78,7 +79,7 @@ export default async function AdminLayout({
     <AppShell
       sidebarHeader={<AdminSidebarHeader />}
       nav={<AdminNav />}
-      identity={<NavUser user={user} />}
+      identity={<NavUser user={user} logoutHref={getLogoutHref()} />}
       headerEnd={<AdminHeaderActions />}
       dataFront="mutav-staff"
       skipToMainLabel={tA11y("skipToMain")}

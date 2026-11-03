@@ -11,7 +11,7 @@ All four personas share the password **`MutavDev2026!`**.
 
 | Persona                       | Email                       | Auth0 subject                     | Convex seeded state                  | Expected landing on login                                                  |
 | ----------------------------- | --------------------------- | --------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
-| **System admin (Mutav team)** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | `mutavStaff` role `admin`, no agency | agency app routes to the admin app; admin console on `admin.mutav.finance` |
+| **System admin (Mutav team)** | `systemadmin@mutav.finance` | `auth0\|6a150df6a100fbf318f393c0` | `mutavStaff` role `admin`, no agency | `/onboarding` with an "Open admin" link; console on `admin.mutav.finance`  |
 | **Agency owner**              | `agencyowner@mutav.finance` | `auth0\|6a150df7def07da7a5297480` | active agency                        | `/` (dashboard)                                                            |
 | **Pending user**              | `pendinguser@mutav.finance` | `auth0\|6a150df8d2051b0ac866a3b6` | under_review agency                  | `/onboarding/status?state=under_review`                                    |
 | **New user**                  | `newuser@mutav.finance`     | `auth0\|6a150df9a100fbf318f393c3` | none                                 | `/onboarding`                                                              |

@@ -11,6 +11,7 @@ import {
 } from "@/components/access-denied/view-model";
 import { getStaffMember } from "@/lib/auth";
 import { getAgencyUrl } from "@/lib/env";
+import { getLogoutHref } from "@/lib/logout";
 
 const toneIcon: Record<AccessDeniedTone, typeof LockIcon> = {
   denied: LockIcon,
@@ -47,6 +48,7 @@ export default async function AccessDeniedPage({
     gate: await getStaffMember(),
     locale,
     agencyUrl: getAgencyUrl(),
+    logoutHref: getLogoutHref(),
   });
   const ToneIcon = toneIcon[view.tone];
 

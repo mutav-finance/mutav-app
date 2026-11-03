@@ -16,6 +16,7 @@ import type { SessionLike } from "./fresh-id-token";
 import { idTokenExpiringAt } from "./jwt-fixture";
 
 const BASE = "https://app.example.test";
+const SIBLING = "https://admin.example.test";
 const NOW = 1_900_000_000;
 const WINDOW = 300;
 const NO_STORE = "private, no-cache, no-store, must-revalidate, max-age=0";
@@ -83,6 +84,7 @@ function proxyWith({
     auth0,
     handleI18nRouting: intl,
     getRefreshWindowSeconds: () => WINDOW,
+    getSiblingAppUrl: () => SIBLING,
     now: () => NOW,
   });
 }
@@ -103,6 +105,21 @@ afterEach(() => {
 describe("createAuthProxy", () => {
   test("the SDK client satisfies the proxy's interface", () => {
     expectTypeOf<Auth0Client>().toExtend<AuthProxyAuth>();
+  });
+
+  test("clear-session drops the session cookie and hands off to the sibling's logout", async () => {
+    const auth0 = fakeAuth0({ session: sessionExpiringAt(NOW + 3600) });
+    const request = new NextRequest(`${BASE}/auth/clear-session`, {
+      headers: { cookie: "__session=old; NEXT_LOCALE=en" },
+    });
+    const res = await proxyWith({ auth0 })(request);
+
+    expect(auth0.middleware).not.toHaveBeenCalled();
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("https://admin.example.test/auth/logout");
+    expect(res.headers.getSetCookie()).toEqual([
+      "__session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    ]);
   });
 
   test("outside the window it does not refresh and carries the rolled cookie", async () => {
