@@ -202,22 +202,33 @@ export const guaranteePlanValidator = v.union(
 
 export const DEFAULT_GUARANTEE_PLAN: GuaranteePlan = GUARANTEE_PLAN.BASIC;
 
+/**
+ * The files an agency attaches to a guarantee. The signed guarantee contract
+ * (the MUTAV fiança signed by the tenant) is the one MUTAV needs: staff
+ * approval of it gates activation. The signed lease contract and the
+ * vistoria are optional supporting files.
+ */
 export const DOCUMENT_KEY = {
+  GUARANTEE_CONTRACT: "guaranteeContract",
   RENTAL_CONTRACT: "rentalContract",
   INSPECTION: "inspection",
-  POLICY: "policy",
 } as const satisfies Record<string, DocumentKey>;
 
+/** Slot order: the required signed guarantee contract leads. */
 export const DOCUMENT_KEYS = [
+  DOCUMENT_KEY.GUARANTEE_CONTRACT,
   DOCUMENT_KEY.RENTAL_CONTRACT,
   DOCUMENT_KEY.INSPECTION,
-  DOCUMENT_KEY.POLICY,
 ] as const satisfies readonly DocumentKey[];
 
+export const REQUIRED_DOCUMENT_KEYS: ReadonlySet<DocumentKey> = new Set([
+  DOCUMENT_KEY.GUARANTEE_CONTRACT,
+]);
+
 export const documentKeyValidator = v.union(
+  v.literal(DOCUMENT_KEY.GUARANTEE_CONTRACT),
   v.literal(DOCUMENT_KEY.RENTAL_CONTRACT),
   v.literal(DOCUMENT_KEY.INSPECTION),
-  v.literal(DOCUMENT_KEY.POLICY),
 );
 
 /**
@@ -338,7 +349,7 @@ export function checkUploadedFile({
 }
 
 /**
- * True when staff approved at least one signed rental contract for the
+ * True when staff approved at least one signed guarantee contract for the
  * guarantee. The gate staff activation reads: a later upload for the same
  * slot does not revoke an approval already given, and a rejection of a newer
  * file does not either — only an approved file counts, and one is enough.
@@ -348,7 +359,7 @@ export function isSignedContractApproved(
 ): boolean {
   return documents.some(
     (document) =>
-      document.key === DOCUMENT_KEY.RENTAL_CONTRACT &&
+      document.key === DOCUMENT_KEY.GUARANTEE_CONTRACT &&
       document.status === GUARANTEE_DOCUMENT_STATUS.APPROVED,
   );
 }

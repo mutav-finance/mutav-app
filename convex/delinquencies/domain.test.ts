@@ -186,15 +186,15 @@ describe("toAgencyCaseStatus", () => {
 
 describe("signedContractState", () => {
   const contract = (status: GuaranteeDocumentStatus, day: string) => ({
-    key: DOCUMENT_KEY.RENTAL_CONTRACT,
+    key: DOCUMENT_KEY.GUARANTEE_CONTRACT,
     status,
     uploadedAt: `2026-10-${day}T12:00:00.000Z`,
   });
 
-  test("no rental contract on file reads as not uploaded", () => {
+  test("no guarantee contract on file reads as not uploaded", () => {
     expect(signedContractState([])).toBe(SIGNED_CONTRACT_STATE.NOT_UPLOADED);
     expect(
-      signedContractState([{ ...contract("approved", "01"), key: DOCUMENT_KEY.INSPECTION }]),
+      signedContractState([{ ...contract("approved", "01"), key: DOCUMENT_KEY.RENTAL_CONTRACT }]),
     ).toBe(SIGNED_CONTRACT_STATE.NOT_UPLOADED);
   });
 

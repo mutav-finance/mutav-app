@@ -11,6 +11,7 @@ import {
   ACCEPTED_FILE_TYPES,
   DOCUMENT_SLOTS,
   DOCUMENT_STATUS_TONE,
+  REQUIRED_DOCUMENT_SLOTS,
   formatFileSize,
 } from "@/components/documents/view-model";
 import { RejectDocumentDialog } from "@/components/documents/reject-document-dialog";
@@ -53,6 +54,13 @@ export function GuaranteeDocumentsPanel({ publicId }: { publicId: string }) {
                       aria-hidden
                     />
                     <span className="text-base-sm font-medium">{t(`labels.${key}`)}</span>
+                    <StatusTag tone={REQUIRED_DOCUMENT_SLOTS.has(key) ? "accent" : "muted"}>
+                      {t(
+                        REQUIRED_DOCUMENT_SLOTS.has(key)
+                          ? "requirement.required"
+                          : "requirement.optional",
+                      )}
+                    </StatusTag>
                   </div>
                   <input
                     ref={view.setInputRef(key)}

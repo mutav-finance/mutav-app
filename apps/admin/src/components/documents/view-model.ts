@@ -1,4 +1,8 @@
-import type { GuaranteeDocumentStatus } from "@convex/guarantees/domain";
+import {
+  DOCUMENT_KEYS,
+  REQUIRED_DOCUMENT_KEYS,
+  type GuaranteeDocumentStatus,
+} from "@convex/guarantees/domain";
 import type { Tone } from "@mutav/ui/guarantee-state-tag";
 
 /**
@@ -56,7 +60,10 @@ export const DOCUMENT_STATUS_TONE: Record<GuaranteeDocumentStatus, Tone> = {
 /** Mirrors the server allowlist; the server re-checks against storage metadata. */
 export const ACCEPTED_FILE_TYPES = "application/pdf,image/jpeg,image/png";
 
-export const DOCUMENT_SLOTS = ["rentalContract", "inspection", "policy"] as const;
+/** The signed guarantee contract (required, gates activation) leads; the rest are optional. */
+export const DOCUMENT_SLOTS = DOCUMENT_KEYS;
+
+export const REQUIRED_DOCUMENT_SLOTS = REQUIRED_DOCUMENT_KEYS;
 
 /** A rejection without a reason tells the agency nothing; the server enforces it too. */
 export function canSubmitRejection(reason: string): boolean {

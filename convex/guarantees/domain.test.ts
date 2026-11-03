@@ -209,26 +209,26 @@ describe("isSignedContractApproved", () => {
   });
 
   test.each(["pending_review", "rejected", "superseded"] as const)(
-    "false when the rental contract is only %s",
+    "false when the guarantee contract is only %s",
     (status) => {
-      expect(isSignedContractApproved([{ key: "rentalContract", status }])).toBe(false);
+      expect(isSignedContractApproved([{ key: "guaranteeContract", status }])).toBe(false);
     },
   );
 
-  test("false when only another key is approved", () => {
+  test("false when only an optional document is approved", () => {
     expect(
       isSignedContractApproved([
+        { key: "rentalContract", status: "approved" },
         { key: "inspection", status: "approved" },
-        { key: "policy", status: "approved" },
       ]),
     ).toBe(false);
   });
 
-  test("true once any rental contract is approved, even beside a newer pending one", () => {
+  test("true once any guarantee contract is approved, even beside a newer pending one", () => {
     expect(
       isSignedContractApproved([
-        { key: "rentalContract", status: "pending_review" },
-        { key: "rentalContract", status: "approved" },
+        { key: "guaranteeContract", status: "pending_review" },
+        { key: "guaranteeContract", status: "approved" },
       ]),
     ).toBe(true);
   });

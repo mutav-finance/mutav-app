@@ -48,9 +48,9 @@ const guaranteeDocumentStatus = v.union(
 );
 
 const documentKey = v.union(
+  v.literal("guaranteeContract"),
   v.literal("rentalContract"),
   v.literal("inspection"),
-  v.literal("policy"),
 );
 
 const propertyKind = v.union(v.literal("residential"), v.literal("commercial"));

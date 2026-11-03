@@ -198,20 +198,20 @@ export async function listDocumentRowsForGuarantee(
 }
 
 /**
- * The activation gate in one call: has staff approved a signed rental contract
- * for this guarantee? See `isSignedContractApproved` for the rule.
+ * The activation gate in one call: has staff approved a signed guarantee
+ * contract for this guarantee? See `isSignedContractApproved` for the rule.
  */
 export async function hasApprovedSignedContract(
   ctx: QueryCtx,
   guaranteeId: GuaranteeId,
 ): Promise<boolean> {
-  const rentalContracts = await ctx.db
+  const guaranteeContracts = await ctx.db
     .query("guaranteeDocuments")
     .withIndex("by_guarantee_key", (q) =>
-      q.eq("guaranteeId", guaranteeId).eq("key", DOCUMENT_KEY.RENTAL_CONTRACT),
+      q.eq("guaranteeId", guaranteeId).eq("key", DOCUMENT_KEY.GUARANTEE_CONTRACT),
     )
     .collect();
-  return isSignedContractApproved(rentalContracts);
+  return isSignedContractApproved(guaranteeContracts);
 }
 
 export async function userNamesById(

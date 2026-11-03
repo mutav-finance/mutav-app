@@ -9,6 +9,7 @@
  */
 
 import { escapeHtml } from "../lib/email/escape";
+import type { DocumentKey } from "./domain";
 import {
   EMAIL_NOTE_STYLE,
   EMAIL_PARAGRAPH_STYLE,
@@ -93,12 +94,12 @@ export function buildProposalEmail(
 
 // ─── Guarantee document review ────────────────────────────────────────────────
 
-export type RejectedDocumentKey = "rentalContract" | "inspection" | "policy";
+export type RejectedDocumentKey = DocumentKey;
 
 const DOCUMENT_LABEL_PT: Record<RejectedDocumentKey, string> = {
+  guaranteeContract: "Contrato de garantia assinado",
   rentalContract: "Contrato de locação assinado",
   inspection: "Vistoria",
-  policy: "Apólice",
 };
 
 export type DocumentRejectedNotice = {

@@ -68,7 +68,7 @@ export function GuaranteeDetailsPage({
             </Eyebrow>
           </Breadcrumb>
         }
-        title={t(`heroTitle.${guarantee.status}`)}
+        title={t("heroTitle", { id: guarantee.id })}
       />
       <PageContent variant="narrow">
         <GuaranteeSummaryCard guarantee={guarantee} />

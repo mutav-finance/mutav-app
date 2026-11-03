@@ -156,11 +156,11 @@ Statuses `open, verified, resolved, canceled` (`:18-23`); terminal = `resolved, 
 
 ### 6.5 Guarantee documents — `convex/guarantees/documents.ts`, `staffDocuments.ts`
 
-Files attached to a guarantee live in the `guaranteeDocuments` table, one row per uploaded file (slot `key` ∈ `rentalContract` — the signed rental contract — `inspection`, `policy`). They do not move the guarantee's state.
+Files attached to a guarantee live in the `guaranteeDocuments` table, one row per uploaded file (slot `key` ∈ `guaranteeContract` — the signed MUTAV guarantee contract, required — and the optional `rentalContract` (signed lease contract) and `inspection` (vistoria)). They do not move the guarantee's state.
 
 - **Upload.** The agency (`attachGuaranteeDocument`, `mutationWithActiveAgency`) or staff on its behalf (`staffAttachGuaranteeDocument`, `support`+) record a file already POSTed to File Storage. The file is judged by the `_storage` system row, not the client: PDF/JPEG/PNG only, 1 byte – 15 MB (`checkUploadedFile` in `guarantees/domain.ts`). Refused on a `closed` guarantee and when the blob is already attached anywhere. Audit `guarantee.document_attached`.
 - **Review statuses** — `pending_review → approved | rejected`, decided only by `compliance`+ (`approveGuaranteeDocument`, `rejectGuaranteeDocument`; a reason is required and is emailed to the agency). A new upload marks earlier `pending_review` files of the same slot `superseded`; approved and rejected rows are final and stay as history. Audit `guarantee.document_approved` / `guarantee.document_rejected` (the reason stays on the row, out of the chain).
-- **Activation gate.** `isSignedContractApproved(docs)` (pure, `guarantees/domain.ts`) and `hasApprovedSignedContract(ctx, guaranteeId)` (`guarantees/documents.ts`) answer "has staff approved a signed rental contract?" — one approved `rentalContract` row is enough, and a later upload does not revoke it.
+- **Activation gate.** `isSignedContractApproved(docs)` (pure, `guarantees/domain.ts`) and `hasApprovedSignedContract(ctx, guaranteeId)` (`guarantees/documents.ts`) answer "has staff approved a signed guarantee contract?" — one approved `guaranteeContract` row is enough, and a later upload does not revoke it.
 
 ## 7. Capacity policy
 
