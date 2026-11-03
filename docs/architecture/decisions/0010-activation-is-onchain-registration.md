@@ -1,5 +1,7 @@
 # ADR 0010 — Activation is the on-chain registration, not a click
 
+> **Amended by [ADR 0012](0012-phase-1-multisig-reserve.md) for phase 1** (Squads multisig reserve): a guarantee activates on compliance approval + capacity; `pending_registration` / `confirmRegistration` return with the MUTAV vault.
+
 **Status:** Accepted (2026-10-25) · **Decided by:** Julia (CTO) · **Phase:** First agency onboarding ([#378](https://github.com/mutav-finance/mutav-app/issues/378)) · **Supersedes:** the 2026-10-19/20 rule in #378 that the agency activates · **Related:** [ADR 0007](0007-lease-guarantee-split.md) (lease ↔ guarantee), [#369](https://github.com/mutav-finance/mutav-app/issues/369) Task 14 (operator actions), mutav-protocol-solana `register_guarantee` (spec §5.2), [security baseline](https://github.com/mutav-finance/mutav-protocol-solana/blob/main/docs/security/baseline.md) (ADR 0031, proposed)
 
 ## Context

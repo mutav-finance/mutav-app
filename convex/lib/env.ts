@@ -505,3 +505,23 @@ export function getPiiHmacKey(): Uint8Array {
   }
   return key;
 }
+
+// ── Phase-1 reserve: a Squads multisig vault on Solana holding BRS (ADR 0012) ──
+// All three are optional and have no default: until each is set, the Squads
+// reader reports RESERVE_READER_UNAVAILABLE and nothing activates against a
+// guessed address. None of them is a key — the reader only reads.
+
+/** Solana JSON-RPC endpoint the reserve reader queries (finalized commitment). */
+export function getSolanaRpcUrl(): string | null {
+  return process.env.SOLANA_RPC_URL || null; // hook-ok: env module boundary
+}
+
+/** The Squads vault address (the vault PDA that owns the BRS token account). */
+export function getReserveSquadsVaultAddress(): string | null {
+  return process.env.RESERVE_SQUADS_VAULT_ADDRESS || null; // hook-ok: env module boundary
+}
+
+/** The BRS SPL token mint the reserve counts. */
+export function getReserveBrsMint(): string | null {
+  return process.env.RESERVE_BRS_MINT || null; // hook-ok: env module boundary
+}

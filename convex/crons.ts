@@ -78,4 +78,17 @@ crons.interval(
   {},
 );
 
+/**
+ * Every 15 minutes, same cadence as the snapshot above. Reads the phase-1
+ * reserve (the Squads vault's BRS balance, ADR 0012) and writes a
+ * `reserveHealthSnapshots` row with the in-force cover at that moment. On a
+ * failed or unconfigured read it writes nothing.
+ */
+crons.interval(
+  "refresh reserve health",
+  { minutes: 15 },
+  internal.reserve.healthActions.refreshReserveHealth,
+  {},
+);
+
 export default crons;
