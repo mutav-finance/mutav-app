@@ -1,5 +1,7 @@
 import type { GuaranteeState } from "../guarantees/domain";
 import type { SolvencyFigures, SolvencyPositionFigures } from "../reserve/domain";
+import type { ReserveHealth } from "../reserve/health";
+import type { ReserveSource } from "../reserve/reader";
 
 /**
  * Platform-wide guarantee figures for the transparency dashboard. One count
@@ -52,3 +54,12 @@ export type ReserveCoverage = { explorerUrl: string } & (
     }
   | { available: false }
 );
+
+/**
+ * Phase-1 reserve health (ADR 0012), read from the latest snapshot: the Squads
+ * vault's BRS balance against the coverage the in-force book requires. All
+ * amounts in BRL cents (1 BRS = R$1). Copy: "gated by required coverage".
+ */
+export type ReserveHealthReading =
+  | ({ available: true; capturedAt: number; source: ReserveSource } & ReserveHealth)
+  | { available: false };

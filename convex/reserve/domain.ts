@@ -3,6 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 
 export type ReserveSnapshot = Doc<"reserveSnapshots">;
 export type ReserveSnapshotId = Id<"reserveSnapshots">;
+export type ReserveHealthSnapshot = Doc<"reserveHealthSnapshots">;
 
 /** One approved asset held by the reserve vault, as read from chain. */
 export type ReserveAsset = {

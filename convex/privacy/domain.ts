@@ -264,6 +264,8 @@ export const OUT_OF_SCOPE_TABLES = {
     "Merkle roots and their submission metadata. §4.2 records `rootHash` as T4 and states plainly that it is not personal data; §2.3 puts published on-chain records out of scope. Every column here is an integrity commitment or a submission outcome about a transaction, not about a person.",
   reserveSnapshots:
     "Reserve valuation snapshots — token contract addresses, balances, an FX rate and a total. §2.3 excludes aggregate outputs where no individual is identifiable, and no column here is keyed to a person.",
+  reserveHealthSnapshots:
+    "Phase-1 reserve health snapshots — the Squads vault and BRS mint addresses (MUTAV's own accounts), a slot, a balance, the platform-wide in-force cover total and the coverage ratio. §2.3 excludes aggregate outputs where no individual is identifiable, and no column here is keyed to a person.",
   products:
     "The guarantee product catalog — pricing parameters (rate table, multipliers, fees, commission), an eligibility rule and an effective window. Every column describes what Mutav sells, not to whom; the per-person copy of these numbers is the `guarantees.terms` snapshot, which is classified. `eligibility.agencyIds` names agencies (legal entities, already covered on `agencies`), never a natural person.",
 } as const;

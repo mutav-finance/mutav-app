@@ -1162,6 +1162,31 @@ export default defineSchema(
       ),
     }).index("by_capturedAt", ["capturedAt"]),
 
+    // Phase-1 reserve health (ADR 0012): the Squads vault's BRS balance plus the
+    // off-chain book's inputs at the same moment. A separate table rather than
+    // optional fields on reserveSnapshots, whose required FX/asset fields describe
+    // the Stellar pulse read and have no phase-1 meaning. Derived figures
+    // (required coverage, ratio, free capital) are computed at read time by
+    // computeReserveHealth in convex/reserve/health.ts. Operational, not demo
+    // data: never in DEMO_TABLES.
+    reserveHealthSnapshots: defineTable({
+      capturedAt: v.number(),
+      // Mirrors ReserveSource in convex/reserve/reader.ts.
+      source: v.object({
+        kind: v.literal("squads_multisig"),
+        vaultAddress: v.string(),
+        mint: v.string(),
+        slot: v.number(),
+      }),
+      // Unscaled BRS base units as a base-10 string — the audit-trail figure.
+      balanceBaseUnits: v.string(),
+      balanceCents: v.number(),
+      insuredCoverCents: v.number(),
+      coverageRatioBps: v.number(),
+      // Absent until the offer-hold ledger lands; read as 0.
+      activeOfferHoldsCents: v.optional(v.number()),
+    }).index("by_capturedAt", ["capturedAt"]),
+
     // Anonymous public waitlist for the marketing site (mutav-website).
     // One row per (audience, email). Dedup is enforced in the `join` mutation
     // via the `by_email_audience` index — the table itself has no unique
