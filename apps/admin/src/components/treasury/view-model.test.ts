@@ -127,7 +127,8 @@ describe("bookCapacity", () => {
 
 /**
  * The shared `@mutav/ui/transparency/*` panels read these namespaces from the
- * app's own catalog. Agency's copy is the reference; a key missing from admin
+ * app's own catalog. Admin is their only consumer since agency's
+ * `/transparency` moved to the Squads reserve; a key missing from one locale
  * would render the raw key on /treasury.
  */
 describe("shared transparency namespaces", () => {
@@ -140,23 +141,20 @@ describe("shared transparency namespaces", () => {
     );
   }
 
-  function transparency(app: string, locale: string): unknown {
+  function transparency(locale: string): unknown {
     const parsed: unknown = JSON.parse(
-      readFileSync(join(REPO_ROOT, "apps", app, "messages", `${locale}.json`), "utf8"),
+      readFileSync(join(REPO_ROOT, "apps", "admin", "messages", `${locale}.json`), "utf8"),
     );
     if (typeof parsed !== "object" || parsed === null || !("transparency" in parsed)) {
-      throw new Error(`apps/${app} ${locale}.json has no "transparency" namespace`);
+      throw new Error(`apps/admin ${locale}.json has no "transparency" namespace`);
     }
     return parsed.transparency;
   }
 
-  it.each(["en", "pt-BR"])("admin %s carries every agency key", (locale) => {
-    const agency = transparency("agency", locale);
-    const admin = transparency("admin", locale);
-    for (const namespace of SHARED) {
-      expect(leafKeys(Reflect.get(Object(admin), namespace)).sort()).toEqual(
-        leafKeys(Reflect.get(Object(agency), namespace)).sort(),
-      );
-    }
+  it.each(SHARED)("admin en and pt-BR carry the same %s keys", (namespace) => {
+    const en = leafKeys(Reflect.get(Object(transparency("en")), namespace));
+    const ptBR = leafKeys(Reflect.get(Object(transparency("pt-BR")), namespace));
+    expect(en).not.toEqual([""]);
+    expect(en.sort()).toEqual(ptBR.sort());
   });
 });

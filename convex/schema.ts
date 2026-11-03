@@ -1191,12 +1191,47 @@ export default defineSchema(
       source: v.object({
         kind: v.literal("squads_multisig"),
         vaultAddress: v.string(),
-        mint: v.string(),
         slot: v.number(),
       }),
-      // Unscaled BRS base units as a base-10 string — the audit-trail figure.
+      // The counted reserve (BRS + USD stablecoins valued in BRL), in BRS base
+      // units as a base-10 string — the audit-trail figure. SOL and unknown
+      // mints are never in it; they are in `holdings` with `counted: false`.
       balanceBaseUnits: v.string(),
       balanceCents: v.number(),
+      // Every holding the vault reported. Mirrors reserveHoldingValidator in
+      // convex/reserve/domain.ts.
+      holdings: v.array(
+        v.object({
+          mint: v.string(),
+          symbol: v.union(v.string(), v.null()),
+          kind: v.union(
+            v.literal("sol"),
+            v.literal("brl_stable"),
+            v.literal("usd_stable"),
+            v.literal("unknown"),
+          ),
+          tokenProgram: v.union(
+            v.literal("native"),
+            v.literal("spl-token"),
+            v.literal("spl-token-2022"),
+          ),
+          decimals: v.number(),
+          amountBaseUnits: v.string(),
+          valueCents: v.union(v.number(), v.null()),
+          counted: v.boolean(),
+        }),
+      ),
+      // The prices the valuation used; null where a feed was unavailable.
+      // Mirrors reservePricesValidator in convex/reserve/domain.ts.
+      prices: v.object({
+        usdBrl: v.union(
+          v.object({ rate: v.number(), source: v.string(), quotedAt: v.string() }),
+          v.null(),
+        ),
+        solUsd: v.union(v.object({ price: v.number(), source: v.string() }), v.null()),
+      }),
+      // USD stablecoins were held but PTAX was unavailable, so they are not counted.
+      usdStablesUncounted: v.boolean(),
       insuredCoverCents: v.number(),
       coverageRatioBps: v.number(),
       // Absent until the offer-hold ledger lands; read as 0.

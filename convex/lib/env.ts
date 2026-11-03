@@ -506,22 +506,30 @@ export function getPiiHmacKey(): Uint8Array {
   return key;
 }
 
-// ── Phase-1 reserve: a Squads multisig vault on Solana holding BRS (ADR 0012) ──
-// All three are optional and have no default: until each is set, the Squads
+// ── Phase-1 reserve: a Squads multisig vault on Solana (ADR 0012) ──
+// The RPC URL and the vault have no default: until both are set, the Squads
 // reader reports RESERVE_READER_UNAVAILABLE and nothing activates against a
 // guessed address. None of them is a key — the reader only reads.
 
-/** Solana JSON-RPC endpoint the reserve reader queries (finalized commitment). */
+/**
+ * Solana JSON-RPC endpoint the reserve reader queries (finalized commitment).
+ * A SECRET: the provider URL embeds an API key. Convex env var only — never
+ * `NEXT_PUBLIC_*`, never logged (log the host), never stored on a snapshot.
+ */
 export function getSolanaRpcUrl(): string | null {
   return process.env.SOLANA_RPC_URL || null; // hook-ok: env module boundary
 }
 
-/** The Squads vault address (the vault PDA that owns the BRS token account). */
+/** The Squads vault address — the System-owned vault PDA that holds the reserve's funds. */
 export function getReserveSquadsVaultAddress(): string | null {
   return process.env.RESERVE_SQUADS_VAULT_ADDRESS || null; // hook-ok: env module boundary
 }
 
-/** The BRS SPL token mint the reserve counts. */
+/**
+ * Override for the BRS mint in the reserve's asset registry. Unset means the
+ * mainnet mint (`BRS_MINT_MAINNET` in `convex/reserve/assets.ts`); a devnet
+ * deployment sets the devnet mint here.
+ */
 export function getReserveBrsMint(): string | null {
   return process.env.RESERVE_BRS_MINT || null; // hook-ok: env module boundary
 }

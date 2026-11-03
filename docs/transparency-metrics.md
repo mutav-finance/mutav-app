@@ -1,15 +1,56 @@
 # Transparency metrics — definitions
 
-Every figure on the agency `/transparency` page (and the shared reserve / capacity
-panels the admin `/treasury` screen reuses), with its formula, source and refresh
-cadence. The code is the source of truth; this page must change in the same PR as
-any formula below.
+Every figure on the agency `/transparency` page and the admin `/treasury` screen,
+with its formula, source and refresh cadence. The code is the source of truth;
+this page must change in the same PR as any formula below.
 
 - **Guarantee figures** are computed by `convex/transparency/useCases.ts`
   (`getGuaranteeAggregates`) from the Convex guarantee book.
-- **Reserve and capacity figures** are computed by `convex/reserve/domain.ts`
-  (`deriveSolvencyFigures`) from the latest `reserveSnapshots` row, served by
-  `getReserveCoverage`.
+- **Phase-1 reserve figures** (agency `/transparency`) are computed by
+  `convex/reserve/health.ts` from the latest `reserveHealthSnapshots` row, served
+  by `getReserveHealth` — see [Phase-1 reserve](#phase-1-reserve-agency-transparency).
+- **Stellar reserve and capacity figures** (admin `/treasury` only) are computed by
+  `convex/reserve/domain.ts` (`deriveSolvencyFigures`) from the latest
+  `reserveSnapshots` row, served by `getReserveCoverage`. Every section from
+  [Two sources, two units](#two-sources-two-units) down to
+  [Availability](#availability) describes these.
+
+## Phase-1 reserve (agency `/transparency`)
+
+The reserve is a Squads multisig vault on Solana mainnet (ADR 0012), configured by
+`RESERVE_SQUADS_VAULT_ADDRESS` (today `925hnJ7MrnAHqkvhRNBB3zYLsSACWQhHeDUB3Q4V9zvC`)
+and read through `SOLANA_RPC_URL` — a secret: the provider URL embeds an API key,
+so it is never logged (only its host), stored or sent to a client.
+
+Every **15 minutes** (`refresh reserve health` cron) the reader takes, at finalized
+commitment, the vault's native SOL (`getBalance`) and every token account it owns
+under both SPL Token and Token-2022 (`getTokenAccountsByOwner` by program id). An
+empty vault, or one with no token accounts, is a balance of **0**. An RPC error, a
+malformed response, an account owned by someone else or a known mint reporting
+the wrong decimals writes **nothing**; the page keeps the last snapshot and its
+time.
+
+| Asset (registry: `convex/reserve/assets.ts`)        | BRL value                                                     | Counts toward coverage      |
+| --------------------------------------------------- | ------------------------------------------------------------- | --------------------------- |
+| BRS (`RESERVE_BRS_MINT` overrides the mainnet mint) | 1 BRS = R$ 1                                                  | Yes                         |
+| USDC, USDT                                          | × BCB PTAX (venda), the same reader the Stellar snapshot uses | Yes, when PTAX is available |
+| SOL (native and wrapped)                            | × Jupiter price API (USD) × PTAX — display only               | No                          |
+| Any other mint                                      | none — listed by mint as "unrecognized"                       | No                          |
+
+Prices fail soft. Without PTAX, USD stablecoins are listed but not counted, and the
+snapshot sets `usdStablesUncounted` (the page says so); without a SOL price, SOL is
+listed without a BRL value. Every value rounds down.
+
+| Figure            | Formula                                                  | Notes                                                                                    |
+| ----------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Counted balance   | Σ BRL value of counted holdings                          | The same figure the activation capacity check uses (`balanceBaseUnits`, BRS base units). |
+| Required coverage | ⌈ Σ in-force cover × c ⌉, c = 0.25                       | In-force cover = `sumInsuredExposure`, summed in the snapshot's transaction.             |
+| Coverage ratio    | counted balance ÷ required coverage                      | OK ≥ 1.2×; attention 1×–1.2×; below target < 1×. Null ("no guarantees in force") at 0.   |
+| Free capacity     | counted balance − required coverage − active offer holds | Negative when the book is over-committed.                                                |
+
+The page links the vault on `explorer.solana.com` so anyone can check the balances,
+and discloses that BRS's issuer (Nora) can freeze any BRS account, the reserve's
+included. Copy says the book is **gated by required coverage**, never "solvency".
 
 ## Two sources, two units
 

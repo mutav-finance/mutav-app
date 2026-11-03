@@ -3,11 +3,14 @@ import { internalMutation, internalQuery, type QueryCtx } from "../_generated/se
 import { sumInsuredExposure } from "../guarantees/aggregate";
 import {
   reserveAssetValidator,
+  reserveHoldingValidator,
+  reservePricesValidator,
   reserveSolvencyValidator,
+  reserveSourceValidator,
   type ReserveHealthSnapshot,
   type ReserveSnapshot,
 } from "./domain";
-import { brsBaseUnitsToCents, RESERVE_SOURCE_KIND } from "./health";
+import { brsBaseUnitsToCents } from "./health";
 
 export const writeSnapshot = internalMutation({
   args: {
@@ -46,25 +49,29 @@ export const latestSnapshot = internalQuery({
 const DIGITS_ONLY = /^\d+$/;
 
 /**
- * Persist one phase-1 health reading (ADR 0012). The balance comes from the
- * reader; the in-force cover is summed here, inside the same transaction as
- * the insert, so the stored inputs describe one moment of the book.
+ * Persist one phase-1 health reading (ADR 0012). The holdings, the counted
+ * balance and the prices come from the reader; the in-force cover is summed
+ * here, inside the same transaction as the insert, so the stored inputs
+ * describe one moment of the book.
  */
 export const writeHealthSnapshot = internalMutation({
   args: {
     capturedAt: v.number(),
-    source: v.object({
-      kind: v.literal(RESERVE_SOURCE_KIND.SQUADS_MULTISIG),
-      vaultAddress: v.string(),
-      mint: v.string(),
-      slot: v.number(),
-    }),
+    source: reserveSourceValidator,
     balanceBaseUnits: v.string(),
     coverageRatioBps: v.number(),
+    holdings: v.array(reserveHoldingValidator),
+    prices: reservePricesValidator,
+    usdStablesUncounted: v.boolean(),
   },
   handler: async (ctx, args) => {
     if (!DIGITS_ONLY.test(args.balanceBaseUnits)) {
       throw new Error("balanceBaseUnits must be an unsigned base-10 integer");
+    }
+    for (const holding of args.holdings) {
+      if (!DIGITS_ONLY.test(holding.amountBaseUnits)) {
+        throw new Error("holding amountBaseUnits must be an unsigned base-10 integer");
+      }
     }
     // Seam for the offer-hold ledger: once it lands, sum the active holds here
     // and store them as `activeOfferHoldsCents`. Until then the field is absent.

@@ -1,13 +1,15 @@
 import type { Result } from "../lib/result";
 import type { RESERVE_SOURCE_KIND } from "./health";
+import type { ReservePrices } from "./prices";
 import { squadsReserveReader } from "./squadsReader";
+import type { ValuedReserveHolding } from "./valuation";
 
 /**
  * The port between Convex and the reserve on chain. Every chain read the
  * activation flow needs goes through `reserveReader`, so the adapter is the
  * only thing that changes as the reserve moves through its phases (ADR 0012):
  *
- *   1. Squads multisig holding BRS  → `squadsReserveReader` (today)
+ *   1. Squads multisig (BRS, USD stables, SOL) → `squadsReserveReader` (today)
  *   2. simple vault                 → its own adapter
  *   3. MUTAV vault                  → the program client (`register_guarantee`, ADR 0010)
  *
@@ -20,22 +22,28 @@ import { squadsReserveReader } from "./squadsReader";
 export type ReserveSource = {
   kind: typeof RESERVE_SOURCE_KIND.SQUADS_MULTISIG;
   vaultAddress: string;
-  mint: string;
-  /** The finalized slot the balance was read at. */
+  /** The oldest finalized slot among the reads that make up this reading. */
   slot: number;
 };
 
 export type ReserveCapacity = {
   /**
-   * What the reserve holds, in BRS base units (6 decimals). Deliberately NOT
-   * free capital: in phase 1 the chain keeps no registry of guarantees, so the
-   * coverage the book already requires is subtracted in Convex — see
-   * `phase1FreeCapitalBaseUnits` in `./health.ts`.
+   * The counted reserve — BRS plus USD stablecoins valued in BRL — in BRS base
+   * units (BRL at 6 decimals). SOL and unknown mints are never in it.
+   * Deliberately NOT free capital: in phase 1 the chain keeps no registry of
+   * guarantees, so the coverage the book already requires is subtracted in
+   * Convex — see `phase1FreeCapitalBaseUnits` in `./health.ts`.
    */
   balanceBaseUnits: bigint;
   /** The coverage ratio `c`, in basis points. Phase 1: an off-chain constant. */
   coverageRatioBps: number;
   source: ReserveSource;
+  /** Every holding the vault reports, valued and marked counted or not. */
+  holdings: ValuedReserveHolding[];
+  /** The prices the valuation used; null where a feed was unavailable. */
+  prices: ReservePrices;
+  /** USD stablecoins are held but PTAX was unavailable, so they are not in `balanceBaseUnits`. */
+  usdStablesUncounted: boolean;
 };
 
 export type ReadCapacityError = { code: typeof RESERVE_READER_ERROR_CODE.UNAVAILABLE };

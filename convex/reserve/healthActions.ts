@@ -18,6 +18,9 @@ export const refreshReserveHealth = internalAction({
       source: capacity.data.source,
       balanceBaseUnits: capacity.data.balanceBaseUnits.toString(),
       coverageRatioBps: capacity.data.coverageRatioBps,
+      holdings: capacity.data.holdings,
+      prices: capacity.data.prices,
+      usdStablesUncounted: capacity.data.usdStablesUncounted,
     });
   },
 });

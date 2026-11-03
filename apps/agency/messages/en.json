@@ -1516,11 +1516,11 @@
   "transparency": {
     "meta": {
       "title": "Transparency",
-      "description": "MUTAV risk position and onchain treasury."
+      "description": "MUTAV risk position and onchain reserve."
     },
     "heading": "Transparency",
-    "subheading": "Risk position transparency and onchain treasury.",
-    "footer": "Guarantee data in real time. Reserve and capacity read onchain from the mutav-pulse contracts and refreshed every 15 minutes.",
+    "subheading": "Risk position transparency and the onchain reserve.",
+    "footer": "Guarantee data in real time. Reserve read on the Solana network and refreshed every 15 minutes.",
     "guarantees": {
       "insured": "Guarantees in force",
       "drafted": "Drafts",
@@ -1531,51 +1531,49 @@
       "verifiedDefaultExposure": "Exposure in verified default",
       "verifiedDefaultExposureHint": "{count, plural, =0 {No guarantee in verified default or committed cover.} one {# guarantee in verified default or committed cover.} other {# guarantees in verified default or committed cover.}}"
     },
-    "capacity": {
-      "label": "Remaining guarantee capacity",
+    "reserveHealth": {
+      "title": "Reserve",
+      "description": "The MUTAV reserve sits in a Squads multisig vault on the Solana network. New guarantees are gated by required coverage.",
+      "countedBalance": "Counted balance",
+      "countedBalanceHint": "BRS and USD stablecoins, in reais. SOL and unrecognized assets do not count.",
+      "requiredCoverage": "Required coverage",
+      "requiredCoverageHint": "{ratio} of the exposure of guarantees in force.",
+      "coverageIndex": "Coverage ratio",
+      "coverageIndexHint": "Counted balance divided by required coverage.",
+      "coverageState": {
+        "noRequirement": "No guarantees in force",
+        "ok": "OK",
+        "attention": "Attention",
+        "belowTarget": "Below target"
+      },
+      "freeCapacity": "Free capacity",
+      "freeCapacityHint": "Counted balance minus required coverage and the holds of offers in progress.",
+      "usdStablesUncountedTag": "PTAX unavailable",
+      "usdStablesUncounted": "Without the BCB PTAX rate, USD stablecoins are listed but do not count toward coverage until the next reading.",
+      "holdings": {
+        "title": "Reserve holdings",
+        "description": "Everything the vault holds, read onchain. Only BRS and USD stablecoins count toward coverage.",
+        "columns": {
+          "asset": "Asset",
+          "amount": "Amount",
+          "value": "Value in reais",
+          "counts": "Counts toward coverage"
+        },
+        "counted": "Yes",
+        "notCounted": "No",
+        "unpriced": "No price",
+        "unknownAsset": "Unrecognized asset"
+      },
+      "valuation": "BRS is worth R$ 1. USD stablecoins at the BCB PTAX (ask) rate. SOL at its market price, for display only.",
+      "asOf": "Read {datetime} (BRT)",
+      "vault": "Vault:",
+      "verify": "Verify the vault on Solana Explorer",
       "unavailable": "Unavailable",
-      "utilization": "Utilization",
-      "ceiling": "Capacity ceiling",
-      "ceilingUnbounded": "Unbounded (c = 0)",
-      "requiredRatio": "Required coverage ratio (c)",
-      "rule": "Capacity is solvency: remaining capacity is the reserve's free capital, and the ceiling is stable assets divided by c. No configured cap."
-    },
-    "reserve": {
-      "label": "Coverage reserve",
-      "unavailable": "Unavailable",
-      "testnet": "Testnet",
-      "asOf": "As of {datetime} (BRT)",
-      "brlIndicative": "≈ {amount} at BCB PTAX (ask) {rate} — indicative only; {symbol} is a testnet mock asset",
-      "fxQuotedAt": "PTAX quoted {datetime} (BRT)",
-      "coverageRatio": "Coverage ratio",
-      "coverageRatioNone": "No coverage reserved",
-      "coverageRequired": "Coverage required",
-      "coverageRatioHint": "Stable assets divided by the coverage the contracts reserve behind the onchain book.",
-      "contracts": {
-        "vault": "Vault",
-        "policy": "Policy",
-        "registry": "Registry"
-      },
-      "viewExplorer": "Verify on the Stellar network"
-    },
-    "breakdown": {
-      "title": "Reserve breakdown",
-      "description": "Where the reserve's capital sits, read onchain. Only stable positions count toward solvency.",
-      "testnet": "Testnet",
-      "unavailable": "The reserve breakdown is unavailable right now.",
-      "columns": {
-        "position": "Position",
-        "contract": "Contract",
-        "solvency": "Solvency",
-        "balance": "Balance",
-        "share": "Share"
-      },
-      "kind": {
-        "idle": "{symbol} held in the vault",
-        "strategy": "Yield strategy"
-      },
-      "stable": "Stable",
-      "volatile": "Volatile"
+      "unavailableHint": "The reserve reading is unavailable right now. The figures return with the next valid reading.",
+      "disclosure": {
+        "title": "BRS issuer risk",
+        "body": "BRS is issued by Nora, and Nora can freeze any BRS account, the reserve's included. A freeze stops every outflow, claim payments included."
+      }
     },
     "timeline": {
       "title": "Platform book in force",
