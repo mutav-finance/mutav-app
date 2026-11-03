@@ -1,8 +1,6 @@
 "use client";
 
-import * as React from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useQuery } from "convex/react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -11,71 +9,54 @@ import {
   FileTextIcon,
   DownloadIcon,
 } from "lucide-react";
-import { api } from "@convex/_generated/api";
 import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Input } from "@mutav/ui/input";
 import { Mono } from "@mutav/ui/mono";
+import { Skeleton } from "@mutav/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
 import { Link } from "@mutav/i18n/navigation";
 import { formatBRLCents, formatDateBR, formatMonthYear } from "@mutav/i18n/brazil";
-import { useWorkspace } from "@/providers/workspace";
+import { useCommissionPage } from "./use-commission-page";
 
-function toPeriodMonth(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
+const SKELETON_ROW_COUNT = 5;
+const TABLE_COLUMN_COUNT = 6;
 
 export function CommissionPage() {
   const t = useTranslations("commission");
   const locale = useLocale();
-  const { selectedAgency } = useWorkspace();
-  const agencyId = selectedAgency?._id;
-  const [month, setMonth] = React.useState(() => new Date());
-  const [search, setSearch] = React.useState("");
-
-  const rows = useQuery(
-    api.guarantees.useCases.listForCommissionByMonth,
-    agencyId ? { agencyId, periodMonth: toPeriodMonth(month) } : "skip",
-  );
-
-  const term = search.toLowerCase();
-  const filtered = (rows ?? []).filter(
-    (r) => r.guaranteeId.toLowerCase().includes(term) || r.tenantName.toLowerCase().includes(term),
-  );
-
-  const totalCommissionCents = filtered.reduce((sum, r) => sum + r.commissionCents, 0);
-  const guaranteeCount = filtered.length;
-
-  function prevMonth() {
-    setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1));
-  }
-
-  function nextMonth() {
-    setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1));
-  }
+  const {
+    periodMonth,
+    isCurrentMonth,
+    goToPreviousMonth,
+    goToNextMonth,
+    search,
+    setSearch,
+    isLoading,
+    totalCommissionCents,
+    guaranteeCount,
+    filteredRows,
+  } = useCommissionPage();
 
   function handleExport() {
     window.print();
   }
 
-  const isCurrentMonth =
-    month.getMonth() === new Date().getMonth() && month.getFullYear() === new Date().getFullYear();
-
   return (
     <div className="flex flex-col gap-6 px-4 py-4 lg:px-6">
       {/* Month navigation */}
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon-sm" onClick={prevMonth} aria-label={t("prevMonth")}>
+        <Button variant="outline" size="icon-sm" onClick={goToPreviousMonth} aria-label={t("prevMonth")}>
           <ChevronLeftIcon className="size-4" strokeWidth={1.5} />
         </Button>
         <span className="text-base-sm min-w-40 text-center font-mono font-medium">
-          {formatMonthYear(toPeriodMonth(month), locale, { month: "long", capitalize: true })}
+          {formatMonthYear(periodMonth, locale, { month: "long", capitalize: true })}
         </span>
         <Button
           variant="outline"
           size="icon-sm"
-          onClick={nextMonth}
+          onClick={goToNextMonth}
           disabled={isCurrentMonth}
           aria-label={t("nextMonth")}
         >
@@ -96,14 +77,21 @@ export function CommissionPage() {
               <div className="bg-secondary text-muted-foreground flex shrink-0 items-center justify-center rounded px-2">
                 <TrendingUpIcon className="size-6" strokeWidth={1.25} />
               </div>
-              <div className="flex flex-col gap-1">
-                <Mono className="text-foreground text-2xl font-semibold">
-                  {formatBRLCents(totalCommissionCents)}
-                </Mono>
-                <span className="text-muted-foreground text-sm">
-                  {t("kpi.guarantees", { count: guaranteeCount })}
-                </span>
-              </div>
+              {isLoading ? (
+                <div className="flex flex-col gap-2" aria-busy="true" aria-label={t("loading")}>
+                  <Skeleton className="h-8 w-36" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <Mono className="text-foreground text-2xl font-semibold">
+                    {formatBRLCents(totalCommissionCents)}
+                  </Mono>
+                  <span className="text-muted-foreground text-sm">
+                    {t("kpi.guarantees", { count: guaranteeCount })}
+                  </span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -174,17 +162,27 @@ export function CommissionPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: SKELETON_ROW_COUNT }).map((_, i) => (
+                  <TableRow key={i} aria-hidden="true">
+                    {Array.from({ length: TABLE_COLUMN_COUNT }).map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : filteredRows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={TABLE_COLUMN_COUNT}
                     className="text-muted-foreground py-10 text-center text-sm"
                   >
                     {t("table.empty")}
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((row) => (
+                filteredRows.map((row) => (
                   <TableRow key={row.guaranteeId}>
                     <TableCell>
                       <Link

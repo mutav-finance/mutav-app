@@ -44,9 +44,16 @@
     "subheading": "Valores liberados para sua imobiliária no período selecionado",
     "prevMonth": "Mês anterior",
     "nextMonth": "Próximo mês",
+    "loading": "Carregando comissão…",
+    "errors": {
+      "title": "Não foi possível carregar a comissão",
+      "body": "Não conseguimos carregar o detalhamento do mês. Tente novamente.",
+      "retry": "Tentar novamente",
+      "backToDashboard": "Voltar ao painel"
+    },
     "kpi": {
       "monthCommission": "Comissão do mês",
-      "guarantees": "{count} garantias ativas",
+      "guarantees": "{count, plural, one {# garantia ativa} other {# garantias ativas}}",
       "invoice": "Nota fiscal",
       "invoiceEmpty": "Nenhuma nota emitida",
       "invoiceEmptyHint": "A nota fiscal será habilitada quando a comissão do mês for fechada.",
@@ -57,7 +64,7 @@
       "export": "Exportar como PDF",
       "search": "Buscar garantia ou inquilino",
       "empty": "Nenhum resultado encontrado.",
-      "total": "{count} garantias",
+      "total": "{count, plural, one {# garantia} other {# garantias}}",
       "col": {
         "guarantee": "Garantia",
         "tenant": "Inquilino",

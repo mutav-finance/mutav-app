@@ -44,9 +44,16 @@
     "subheading": "Amounts released to your agency for the selected period",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
+    "loading": "Loading commission…",
+    "errors": {
+      "title": "Could not load commission",
+      "body": "We couldn't load the month breakdown. Please try again.",
+      "retry": "Try again",
+      "backToDashboard": "Back to dashboard"
+    },
     "kpi": {
       "monthCommission": "Month commission",
-      "guarantees": "{count} active guarantees",
+      "guarantees": "{count, plural, one {# active guarantee} other {# active guarantees}}",
       "invoice": "Invoice",
       "invoiceEmpty": "No invoice issued",
       "invoiceEmptyHint": "The invoice will be available once the monthly commission is closed.",
@@ -57,7 +64,7 @@
       "export": "Export as PDF",
       "search": "Search guarantee or tenant",
       "empty": "No results found.",
-      "total": "{count} guarantees",
+      "total": "{count, plural, one {# guarantee} other {# guarantees}}",
       "col": {
         "guarantee": "Guarantee",
         "tenant": "Tenant",
