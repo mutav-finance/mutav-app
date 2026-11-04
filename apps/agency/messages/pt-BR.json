@@ -525,11 +525,11 @@
       "currentStatus": "Situação atual:",
       "closureReason": "Motivo do encerramento:",
       "nextRenewal": "Próxima Renovação estimada:",
-      "availableGuarantee": "Fiança disponível:",
+      "availableGuarantee": "Cobertura:",
       "guaranteeTooltip": "Este valor já desconta as coberturas aprovadas e pagas desta garantia.",
       "cancelProposal": "Cancelar proposta",
       "idLabel": "ID da garantia",
-      "guaranteeTooltipLabel": "Detalhes da fiança disponível",
+      "guaranteeTooltipLabel": "Detalhes da cobertura",
       "cancelDialog": {
         "title": "Cancelar proposta?",
         "description": "A garantia será marcada como cancelada. O histórico será preservado.",
@@ -725,7 +725,7 @@
       "urgency": "Urgência",
       "status": "Status",
       "tenant": "Locatário",
-      "availableGuarantee": "Garantia disponível",
+      "availableGuarantee": "Cobertura",
       "nextRenewalDate": "Próxima renovação",
       "creationTime": "Criado em",
       "open": "Abrir"
