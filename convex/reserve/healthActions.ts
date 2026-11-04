@@ -17,7 +17,7 @@ export const refreshReserveHealth = internalAction({
       capturedAt: Date.now(),
       source: capacity.data.source,
       balanceBaseUnits: capacity.data.balanceBaseUnits.toString(),
-      coverageRatioBps: capacity.data.coverageRatioBps,
+      requiredCoverageRatioBps: capacity.data.requiredCoverageRatioBps,
       holdings: capacity.data.holdings,
       prices: capacity.data.prices,
       usdStablesUncounted: capacity.data.usdStablesUncounted,

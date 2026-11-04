@@ -1,4 +1,5 @@
-import type { ReserveHealthReading } from "@convex/transparency/domain";
+import type { ReserveAccount, ReserveHealthReading } from "@convex/transparency/domain";
+import { RESERVE_SOURCE_KIND, type ReserveSourceKind } from "@convex/reserve/health";
 import type { ValuedReserveHolding } from "@convex/reserve/valuation";
 
 /**
@@ -25,26 +26,61 @@ export const COVERAGE_STATE = {
 export type CoverageState = (typeof COVERAGE_STATE)[keyof typeof COVERAGE_STATE];
 
 export function coverageState({
-  coverageRatio,
+  achievedCoverageRatio,
   meetsRequiredCoverage,
 }: {
-  coverageRatio: number | null;
+  achievedCoverageRatio: number | null;
   meetsRequiredCoverage: boolean;
 }): CoverageState {
-  if (coverageRatio === null) return COVERAGE_STATE.NO_REQUIREMENT;
+  if (achievedCoverageRatio === null) return COVERAGE_STATE.NO_REQUIREMENT;
   if (!meetsRequiredCoverage) return COVERAGE_STATE.BELOW_TARGET;
-  if (coverageRatio < COVERAGE_ATTENTION_MULTIPLE) return COVERAGE_STATE.ATTENTION;
+  if (achievedCoverageRatio < COVERAGE_ATTENTION_MULTIPLE) return COVERAGE_STATE.ATTENTION;
   return COVERAGE_STATE.OK;
 }
 
-const SHORT_MINT_EDGE = 4;
+const SHORT_ADDRESS_EDGE = 4;
+
+/** `925h…9zvC` — the first and last four characters of a base58 address. */
+export function shortenAddress(address: string): string {
+  if (address.length <= SHORT_ADDRESS_EDGE * 2) return address;
+  return `${address.slice(0, SHORT_ADDRESS_EDGE)}…${address.slice(-SHORT_ADDRESS_EDGE)}`;
+}
 
 /** The registry symbol, or a shortened mint for an asset the registry does not know. */
 export function holdingLabel(holding: Pick<ValuedReserveHolding, "symbol" | "mint">): string {
   if (holding.symbol) return holding.symbol;
-  const { mint } = holding;
-  if (mint.length <= SHORT_MINT_EDGE * 2) return mint;
-  return `${mint.slice(0, SHORT_MINT_EDGE)}…${mint.slice(-SHORT_MINT_EDGE)}`;
+  return shortenAddress(holding.mint);
+}
+
+/**
+ * Account kinds that hold the reserve only until the audited MUTAV vault goes
+ * live (ADR 0012). The page adds the interim note for these.
+ */
+const INTERIM_RESERVE_KINDS: ReadonlySet<ReserveSourceKind> = new Set([
+  RESERVE_SOURCE_KIND.SQUADS_MULTISIG,
+]);
+
+export function isInterimReserve(kind: ReserveSourceKind): boolean {
+  return INTERIM_RESERVE_KINDS.has(kind);
+}
+
+export type ReserveAccountView = {
+  /** Picks the type tag: `transparency.reserveHealth.account.kind.<kind>`. */
+  kind: ReserveSourceKind;
+  address: string;
+  shortAddress: string;
+  explorerUrl: string;
+  interim: boolean;
+};
+
+export function reserveAccountView(account: ReserveAccount): ReserveAccountView {
+  return {
+    kind: account.kind,
+    address: account.address,
+    shortAddress: shortenAddress(account.address),
+    explorerUrl: account.explorerUrl,
+    interim: isInterimReserve(account.kind),
+  };
 }
 
 const SOL_DISPLAY_DECIMALS = 4;
@@ -68,10 +104,11 @@ export function formatHoldingAmount(
 
 export type ReserveSectionView =
   | { status: "loading" }
-  | { status: "unavailable"; vaultExplorerUrl: string | null }
+  | { status: "unavailable"; account: ReserveAccountView | null }
   | {
       status: "available";
       reading: Extract<ReserveHealthReading, { available: true }>;
+      account: ReserveAccountView;
       coverageState: CoverageState;
     };
 
@@ -81,7 +118,15 @@ export function reserveSectionView(
 ): ReserveSectionView {
   if (reading === null || reading === undefined) return { status: "loading" };
   if (!reading.available) {
-    return { status: "unavailable", vaultExplorerUrl: reading.vaultExplorerUrl };
+    return {
+      status: "unavailable",
+      account: reading.account ? reserveAccountView(reading.account) : null,
+    };
   }
-  return { status: "available", reading, coverageState: coverageState(reading) };
+  return {
+    status: "available",
+    reading,
+    account: reserveAccountView(reading.account),
+    coverageState: coverageState(reading),
+  };
 }

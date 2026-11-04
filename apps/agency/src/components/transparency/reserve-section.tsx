@@ -1,14 +1,24 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ExternalLinkIcon, GaugeIcon, LandmarkIcon, ScaleIcon, WalletIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  GaugeIcon,
+  LandmarkIcon,
+  ScaleIcon,
+  WalletIcon,
+} from "lucide-react";
 import type { ReserveHealthReading } from "@convex/transparency/domain";
+import { Button } from "@mutav/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
-import { COVERAGE_STATE, type CoverageState } from "./reserve-view-model";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { COVERAGE_STATE, type CoverageState, type ReserveAccountView } from "./reserve-view-model";
 import { useReserveSection, type ReserveHoldingRow } from "./use-reserve-section";
 
 const COVERAGE_TONE: Record<CoverageState, StatusTagTone> = {
@@ -62,6 +72,55 @@ function VaultLink({ href }: { href: string }) {
       {t("verify")}
       <ExternalLinkIcon className="size-3" />
     </a>
+  );
+}
+
+function CopyAddressButton({ address }: { address: string }) {
+  const t = useTranslations("transparency.reserveHealth.account");
+  const { copied, copy } = useCopyToClipboard(t("copied"));
+  return (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      onClick={() => copy(address)}
+      aria-label={t("copy")}
+      title={t("copy")}
+    >
+      {copied ? <CheckIcon /> : <CopyIcon />}
+    </Button>
+  );
+}
+
+/**
+ * The account that holds the reserve funds. Its type tag and the interim note
+ * come from the account kind, so moving the reserve to the MUTAV vault changes
+ * the reader binding, not this copy.
+ */
+function ReserveAccountCard({ account }: { account: ReserveAccountView }) {
+  const t = useTranslations("transparency.reserveHealth.account");
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          {t("title")}
+          <StatusTag tone={account.interim ? "warning" : "neutral"}>
+            {t(`kind.${account.kind}`)}
+          </StatusTag>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Mono className="text-sm" title={account.address}>
+            {account.shortAddress}
+          </Mono>
+          <CopyAddressButton address={account.address} />
+          <VaultLink href={account.explorerUrl} />
+        </div>
+        {account.interim ? (
+          <p className="text-muted-foreground text-sm">{t("interimNote")}</p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -121,7 +180,7 @@ function IssuerDisclosure() {
 }
 
 /**
- * The phase-1 reserve (ADR 0012): what the Squads vault holds, what counts
+ * The phase-1 reserve (ADR 0012): the account that holds the funds, what it holds, what counts
  * toward required coverage, and how the book stands against it. Platform-wide;
  * every viewer sees the same figures.
  */
@@ -142,11 +201,11 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
             </CardDescription>
             <CardTitle className="text-muted-foreground text-base">{t("unavailable")}</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2">
+          <CardContent>
             <p className="text-muted-foreground text-xs">{t("unavailableHint")}</p>
-            {model.vaultExplorerUrl ? <VaultLink href={model.vaultExplorerUrl} /> : null}
           </CardContent>
         </Card>
+        {model.account ? <ReserveAccountCard account={model.account} /> : null}
         <IssuerDisclosure />
       </section>
     );
@@ -177,7 +236,7 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
         <ReserveMetric
           icon={<GaugeIcon className="size-3.5" />}
           label={t("coverageIndex")}
-          value={model.coverageRatio ?? "—"}
+          value={model.achievedCoverageRatio ?? "—"}
           hint={t("coverageIndexHint")}
           tag={
             <StatusTag tone={COVERAGE_TONE[model.coverageState]}>
@@ -199,6 +258,8 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
           {t("usdStablesUncounted")}
         </p>
       ) : null}
+
+      <ReserveAccountCard account={model.account} />
 
       <Card>
         <CardHeader className="pb-2">
@@ -224,11 +285,7 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
           <div className="text-muted-foreground flex flex-col gap-1 text-xs">
             <span>{t("valuation")}</span>
             <span>{t("asOf", { datetime: model.capturedAt })}</span>
-            <span>
-              {t("vault")} <Mono className="break-all">{model.vaultAddress}</Mono>
-            </span>
           </div>
-          <VaultLink href={model.vaultExplorerUrl} />
         </CardContent>
       </Card>
 

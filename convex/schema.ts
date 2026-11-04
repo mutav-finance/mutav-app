@@ -1233,7 +1233,7 @@ export default defineSchema(
       // USD stablecoins were held but PTAX was unavailable, so they are not counted.
       usdStablesUncounted: v.boolean(),
       insuredCoverCents: v.number(),
-      coverageRatioBps: v.number(),
+      requiredCoverageRatioBps: v.number(),
       // Absent until the offer-hold ledger lands; read as 0.
       activeOfferHoldsCents: v.optional(v.number()),
     }).index("by_capturedAt", ["capturedAt"]),

@@ -16,7 +16,12 @@ import { PILOT_COVERAGE_RATIO_BPS, RESERVE_SOURCE_KIND } from "./health";
 import { readReservePrices } from "./prices";
 import { valueReserveHoldings, type ReserveHolding } from "./valuation";
 // Type-only: `./reader` imports this adapter as a value, so a value import back would be a cycle.
-import type { ReadCapacityError, ReserveCapacity, ReserveReader } from "./reader";
+import type {
+  ReadCapacityError,
+  ReserveAccountRef,
+  ReserveCapacity,
+  ReserveReader,
+} from "./reader";
 
 /**
  * Phase-1 reserve adapter (ADR 0012): every holding of a Squads multisig
@@ -334,7 +339,7 @@ export async function readSquadsCapacity(
     success: true,
     data: {
       balanceBaseUnits: valuation.countedBaseUnits,
-      coverageRatioBps: PILOT_COVERAGE_RATIO_BPS,
+      requiredCoverageRatioBps: PILOT_COVERAGE_RATIO_BPS,
       source: {
         kind: RESERVE_SOURCE_KIND.SQUADS_MULTISIG,
         vaultAddress: config.vaultAddress,
@@ -354,6 +359,12 @@ export function squadsReserveConfig(): SquadsReserveConfig | null {
   const vaultAddress = getReserveSquadsVaultAddress();
   if (!rpcUrl || !vaultAddress) return null;
   return { rpcUrl, vaultAddress, brsMint: getReserveBrsMint() ?? BRS_MINT_MAINNET };
+}
+
+/** The configured Squads vault, without reading the chain. Null when the vault is not configured. */
+export function squadsReserveAccount(): ReserveAccountRef | null {
+  const address = getReserveSquadsVaultAddress();
+  return address ? { kind: RESERVE_SOURCE_KIND.SQUADS_MULTISIG, address } : null;
 }
 
 export const squadsReserveReader: ReserveReader = {

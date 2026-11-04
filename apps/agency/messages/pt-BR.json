@@ -1533,7 +1533,7 @@
     },
     "reserveHealth": {
       "title": "Reserva",
-      "description": "A reserva da MUTAV fica em um cofre multisig Squads na rede Solana. Novas garantias são limitadas pela cobertura exigida.",
+      "description": "A reserva da MUTAV fica em uma conta na rede Solana, com saldo público. Novas garantias são limitadas pela cobertura exigida.",
       "countedBalance": "Saldo considerado",
       "countedBalanceHint": "BRS e stablecoins em dólar, em reais. SOL e ativos não reconhecidos não contam.",
       "requiredCoverage": "Cobertura exigida",
@@ -1550,9 +1550,19 @@
       "freeCapacityHint": "Saldo considerado menos a cobertura exigida e as reservas de propostas em andamento.",
       "usdStablesUncountedTag": "PTAX indisponível",
       "usdStablesUncounted": "Sem a cotação PTAX do BCB, as stablecoins em dólar aparecem na tabela, mas não contam para a cobertura até a próxima leitura.",
+      "account": {
+        "title": "Conta da reserva",
+        "kind": {
+          "squads_multisig": "Multisig Squads · provisória",
+          "mutav_vault": "Cofre MUTAV"
+        },
+        "interimNote": "Reserva provisória: enquanto o protocolo MUTAV passa por auditoria e piloto, a reserva fica nesta conta, com saldo público e verificável on-chain. A reserva definitiva será um cofre auditado.",
+        "copy": "Copiar endereço",
+        "copied": "Endereço copiado"
+      },
       "holdings": {
         "title": "Ativos da reserva",
-        "description": "Tudo o que o cofre guarda, lido onchain. Só BRS e stablecoins em dólar contam para a cobertura.",
+        "description": "Tudo o que a conta da reserva guarda, lido onchain. Só BRS e stablecoins em dólar contam para a cobertura.",
         "columns": {
           "asset": "Ativo",
           "amount": "Quantidade",
@@ -1566,8 +1576,7 @@
       },
       "valuation": "BRS vale R$ 1. Stablecoins em dólar pela PTAX do BCB (venda). SOL pelo preço de mercado, apenas para exibição.",
       "asOf": "Leitura de {datetime} (BRT)",
-      "vault": "Cofre:",
-      "verify": "Verificar o cofre no Solana Explorer",
+      "verify": "Ver no Solana Explorer",
       "unavailable": "Indisponível",
       "unavailableHint": "A leitura da reserva está indisponível no momento. Os números voltam assim que houver uma leitura válida.",
       "disclosure": {

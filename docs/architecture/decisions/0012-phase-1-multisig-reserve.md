@@ -10,6 +10,8 @@ The reserve rolls out in three phases:
 2. **Simple vault.** A vault program that holds the reserve but still keeps no registry of guarantees.
 3. **MUTAV vault.** The MUTAV reserve program, with `register_guarantee` (mutav-protocol-solana spec §5.2).
 
+Phase 1 is the interim reserve while the protocol goes through litepaper → audit → pilot; its exit criterion is the audited MUTAV vault going live.
+
 ADR 0010 makes a guarantee `active` when its `register_guarantee` is confirmed on-chain. In phase 1 there is no MUTAV program, so nothing on-chain records individual guarantees and that confirmation can never happen. Without a phase-1 rule the first real guarantee cannot start.
 
 What the chain _can_ tell us in phase 1 is the vault's BRS balance. Everything else the reserve program would compute — the book of guarantees, the coverage they require, the free capital left — has to be computed in Convex from the off-chain registry.

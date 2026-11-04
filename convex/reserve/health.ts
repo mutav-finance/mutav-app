@@ -28,9 +28,19 @@ export const BRS_CENTS_PER_UNIT = 100;
 export const BRS_BASE_UNITS_PER_CENT =
   BigInt(10) ** BigInt(BRS_DECIMALS) / BigInt(BRS_CENTS_PER_UNIT);
 
+/**
+ * The kind of account that holds the reserve funds. `squads_multisig` is the
+ * interim reserve (phase 1, ADR 0012); `mutav_vault` is the audited MUTAV
+ * vault that replaces it. Only the Squads kind has a reader today, so the
+ * snapshot validator accepts only it; the vault joins the validator with its
+ * reader.
+ */
 export const RESERVE_SOURCE_KIND = {
   SQUADS_MULTISIG: "squads_multisig",
+  MUTAV_VAULT: "mutav_vault",
 } as const satisfies Record<string, string>;
+
+export type ReserveSourceKind = (typeof RESERVE_SOURCE_KIND)[keyof typeof RESERVE_SOURCE_KIND];
 
 /** BRS base units → BRL cents, rounded down so a balance is never overstated. */
 export function brsBaseUnitsToCents(baseUnits: bigint): number {
@@ -48,27 +58,31 @@ function ceilDiv(numerator: bigint, denominator: bigint): bigint {
  */
 export function requiredCoverageCents({
   insuredCoverCents,
-  coverageRatioBps,
+  requiredCoverageRatioBps,
 }: {
   insuredCoverCents: number;
-  coverageRatioBps: number;
+  requiredCoverageRatioBps: number;
 }): number {
-  const numerator = BigInt(insuredCoverCents) * BigInt(coverageRatioBps);
+  const numerator = BigInt(insuredCoverCents) * BigInt(requiredCoverageRatioBps);
   return Number(ceilDiv(numerator, BigInt(BPS_DENOMINATOR)));
 }
 
 export type ReserveHealthInputs = {
   balanceCents: number;
   insuredCoverCents: number;
-  coverageRatioBps: number;
+  requiredCoverageRatioBps: number;
   /** Offer holds still active (ADR 0010 §4). Zero until the offer-hold ledger lands. */
   activeOfferHoldsCents: number;
 };
 
 export type ReserveHealth = ReserveHealthInputs & {
   requiredCoverageCents: number;
-  /** balance ÷ required coverage — how many times the requirement is met. Null when nothing is required. */
-  coverageRatio: number | null;
+  /**
+   * The achieved ratio: balance ÷ required coverage — how many times the
+   * requirement is met. Not the required ratio `c` (`requiredCoverageRatioBps`).
+   * Null when nothing is required.
+   */
+  achievedCoverageRatio: number | null;
   /** balance − required coverage − active offer holds. Negative when the book is over-committed. */
   freeCapitalCents: number;
   /** balance ≥ required coverage. */
@@ -80,7 +94,7 @@ export function computeReserveHealth(inputs: ReserveHealthInputs): ReserveHealth
   return {
     ...inputs,
     requiredCoverageCents: required,
-    coverageRatio: required > 0 ? inputs.balanceCents / required : null,
+    achievedCoverageRatio: required > 0 ? inputs.balanceCents / required : null,
     freeCapitalCents: inputs.balanceCents - required - inputs.activeOfferHoldsCents,
     meetsRequiredCoverage: inputs.balanceCents >= required,
   };
@@ -96,13 +110,16 @@ export function computeReserveHealth(inputs: ReserveHealthInputs): ReserveHealth
 export function phase1FreeCapitalBaseUnits({
   balanceBaseUnits,
   insuredCoverCents,
-  coverageRatioBps,
+  requiredCoverageRatioBps,
 }: {
   balanceBaseUnits: bigint;
   insuredCoverCents: number;
-  coverageRatioBps: number;
+  requiredCoverageRatioBps: number;
 }): bigint {
   const insuredBaseUnits = BigInt(insuredCoverCents) * BRS_BASE_UNITS_PER_CENT;
-  const required = ceilDiv(insuredBaseUnits * BigInt(coverageRatioBps), BigInt(BPS_DENOMINATOR));
+  const required = ceilDiv(
+    insuredBaseUnits * BigInt(requiredCoverageRatioBps),
+    BigInt(BPS_DENOMINATOR),
+  );
   return balanceBaseUnits - required;
 }

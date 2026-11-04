@@ -87,7 +87,7 @@ describe("writeHealthSnapshot", () => {
       capturedAt: 1_000,
       source: SOURCE,
       balanceBaseUnits: "12345670000", // 12_345.67 BRS
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       ...READING,
     });
     const [row] = await listSnapshots(t);
@@ -97,7 +97,7 @@ describe("writeHealthSnapshot", () => {
       balanceBaseUnits: "12345670000",
       balanceCents: 1_234_567,
       insuredCoverCents: 3_000_000 + 2 * EXIT_CAP_CENTS,
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       ...READING,
     });
     expect(row?.activeOfferHoldsCents).toBeUndefined();
@@ -110,7 +110,7 @@ describe("writeHealthSnapshot", () => {
         capturedAt: 1,
         source: SOURCE,
         balanceBaseUnits: "-5",
-        coverageRatioBps: 2_500,
+        requiredCoverageRatioBps: 2_500,
         ...READING,
       }),
     ).rejects.toThrow(/unsigned/);
@@ -190,7 +190,7 @@ describe("refreshReserveHealth (mocked RPC)", () => {
       balanceBaseUnits: "50000000000",
       balanceCents: 5_000_000,
       insuredCoverCents: 400_000 + EXIT_CAP_CENTS,
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       holdings: [
         { ...SOL_HOLDING, valueCents: 152 },
         { ...BRS_HOLDING, amountBaseUnits: "50000000000", valueCents: 5_000_000 },
@@ -232,7 +232,7 @@ describe("transparency.getReserveHealth", () => {
     const { asUser } = await bookWithActiveCover([]);
     expect(await asUser.query(api.transparency.useCases.getReserveHealth, {})).toEqual({
       available: false,
-      vaultExplorerUrl: null,
+      account: null,
     });
   });
 
@@ -243,7 +243,11 @@ describe("transparency.getReserveHealth", () => {
     try {
       expect(await asUser.query(api.transparency.useCases.getReserveHealth, {})).toEqual({
         available: false,
-        vaultExplorerUrl: `https://explorer.solana.com/address/${VAULT}`,
+        account: {
+          kind: "squads_multisig",
+          address: VAULT,
+          explorerUrl: `https://explorer.solana.com/address/${VAULT}`,
+        },
       });
     } finally {
       if (saved === undefined) delete process.env.RESERVE_SQUADS_VAULT_ADDRESS;
@@ -261,7 +265,7 @@ describe("transparency.getReserveHealth", () => {
           balanceBaseUnits: String(balanceCents * 10_000),
           balanceCents,
           insuredCoverCents: 4_000_000,
-          coverageRatioBps: 2_500,
+          requiredCoverageRatioBps: 2_500,
           ...READING,
           usdStablesUncounted: capturedAt === 2_000,
         }),
@@ -272,16 +276,20 @@ describe("transparency.getReserveHealth", () => {
       available: true,
       capturedAt: 2_000,
       source: SOURCE,
-      vaultExplorerUrl: `https://explorer.solana.com/address/${VAULT}`,
+      account: {
+        kind: "squads_multisig",
+        address: VAULT,
+        explorerUrl: `https://explorer.solana.com/address/${VAULT}`,
+      },
       holdings: [SOL_HOLDING, BRS_HOLDING],
       prices: PRICES,
       usdStablesUncounted: true,
       balanceCents: 3_000_000,
       insuredCoverCents: 4_000_000,
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       activeOfferHoldsCents: 0,
       requiredCoverageCents: 1_000_000,
-      coverageRatio: 3,
+      achievedCoverageRatio: 3,
       freeCapitalCents: 2_000_000,
       meetsRequiredCoverage: true,
     });

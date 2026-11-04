@@ -36,17 +36,21 @@ describe("requiredCoverageCents", () => {
   });
 
   test("is in-force cover × c", () => {
-    expect(requiredCoverageCents({ insuredCoverCents: 4_000_000, coverageRatioBps: 2_500 })).toBe(
-      1_000_000,
-    );
+    expect(
+      requiredCoverageCents({ insuredCoverCents: 4_000_000, requiredCoverageRatioBps: 2_500 }),
+    ).toBe(1_000_000);
   });
 
   test("rounds up so the requirement is never understated", () => {
-    expect(requiredCoverageCents({ insuredCoverCents: 3, coverageRatioBps: 2_500 })).toBe(1);
+    expect(requiredCoverageCents({ insuredCoverCents: 3, requiredCoverageRatioBps: 2_500 })).toBe(
+      1,
+    );
   });
 
   test("is zero on an empty book", () => {
-    expect(requiredCoverageCents({ insuredCoverCents: 0, coverageRatioBps: 2_500 })).toBe(0);
+    expect(requiredCoverageCents({ insuredCoverCents: 0, requiredCoverageRatioBps: 2_500 })).toBe(
+      0,
+    );
   });
 });
 
@@ -55,11 +59,11 @@ describe("computeReserveHealth", () => {
     const health = computeReserveHealth({
       balanceCents: 30_000_000, // R$ 300k
       insuredCoverCents: 40_000_000, // R$ 400k in force → R$ 100k required at c = 0.25
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       activeOfferHoldsCents: 500_000,
     });
     expect(health.requiredCoverageCents).toBe(10_000_000);
-    expect(health.coverageRatio).toBe(3);
+    expect(health.achievedCoverageRatio).toBe(3);
     expect(health.freeCapitalCents).toBe(19_500_000);
     expect(health.meetsRequiredCoverage).toBe(true);
   });
@@ -68,11 +72,11 @@ describe("computeReserveHealth", () => {
     const health = computeReserveHealth({
       balanceCents: 1_000_000,
       insuredCoverCents: 0,
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       activeOfferHoldsCents: 0,
     });
     expect(health.requiredCoverageCents).toBe(0);
-    expect(health.coverageRatio).toBeNull();
+    expect(health.achievedCoverageRatio).toBeNull();
     expect(health.freeCapitalCents).toBe(1_000_000);
     expect(health.meetsRequiredCoverage).toBe(true);
   });
@@ -81,10 +85,10 @@ describe("computeReserveHealth", () => {
     const health = computeReserveHealth({
       balanceCents: 500_000,
       insuredCoverCents: 4_000_000, // 1_000_000 required
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       activeOfferHoldsCents: 100_000,
     });
-    expect(health.coverageRatio).toBe(0.5);
+    expect(health.achievedCoverageRatio).toBe(0.5);
     expect(health.freeCapitalCents).toBe(-600_000);
     expect(health.meetsRequiredCoverage).toBe(false);
   });
@@ -93,10 +97,10 @@ describe("computeReserveHealth", () => {
     const health = computeReserveHealth({
       balanceCents: 0,
       insuredCoverCents: 0,
-      coverageRatioBps: 2_500,
+      requiredCoverageRatioBps: 2_500,
       activeOfferHoldsCents: 0,
     });
-    expect(health.coverageRatio).toBeNull();
+    expect(health.achievedCoverageRatio).toBeNull();
     expect(health.freeCapitalCents).toBe(0);
     expect(health.meetsRequiredCoverage).toBe(true);
   });
@@ -109,7 +113,7 @@ describe("phase1FreeCapitalBaseUnits", () => {
       phase1FreeCapitalBaseUnits({
         balanceBaseUnits: BigInt("300000000000"),
         insuredCoverCents: 40_000_000,
-        coverageRatioBps: 2_500,
+        requiredCoverageRatioBps: 2_500,
       }),
     ).toBe(BigInt("200000000000"));
   });
@@ -119,7 +123,7 @@ describe("phase1FreeCapitalBaseUnits", () => {
       phase1FreeCapitalBaseUnits({
         balanceBaseUnits: BigInt(0),
         insuredCoverCents: 400,
-        coverageRatioBps: 2_500,
+        requiredCoverageRatioBps: 2_500,
       }),
     ).toBe(BigInt(-1_000_000));
   });
