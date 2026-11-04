@@ -1533,7 +1533,7 @@
     },
     "reserveHealth": {
       "title": "Reserve",
-      "description": "The MUTAV reserve sits in a Squads multisig vault on the Solana network. New guarantees are gated by required coverage.",
+      "description": "The MUTAV reserve is held in an account on the Solana network, with a public balance. New guarantees are gated by required coverage.",
       "countedBalance": "Counted balance",
       "countedBalanceHint": "BRS and USD stablecoins, in reais. SOL and unrecognized assets do not count.",
       "requiredCoverage": "Required coverage",
@@ -1550,9 +1550,19 @@
       "freeCapacityHint": "Counted balance minus required coverage and the holds of offers in progress.",
       "usdStablesUncountedTag": "PTAX unavailable",
       "usdStablesUncounted": "Without the BCB PTAX rate, USD stablecoins are listed but do not count toward coverage until the next reading.",
+      "account": {
+        "title": "Reserve account",
+        "kind": {
+          "squads_multisig": "Squads multisig · interim",
+          "mutav_vault": "MUTAV vault"
+        },
+        "interimNote": "Interim reserve: while the MUTAV protocol goes through audit and pilot, the reserve is held in this account, with a public balance verifiable on-chain. The final reserve will be an audited vault.",
+        "copy": "Copy address",
+        "copied": "Address copied"
+      },
       "holdings": {
         "title": "Reserve holdings",
-        "description": "Everything the vault holds, read onchain. Only BRS and USD stablecoins count toward coverage.",
+        "description": "Everything the reserve account holds, read onchain. Only BRS and USD stablecoins count toward coverage.",
         "columns": {
           "asset": "Asset",
           "amount": "Amount",
@@ -1566,8 +1576,7 @@
       },
       "valuation": "BRS is worth R$ 1. USD stablecoins at the BCB PTAX (ask) rate. SOL at its market price, for display only.",
       "asOf": "Read {datetime} (BRT)",
-      "vault": "Vault:",
-      "verify": "Verify the vault on Solana Explorer",
+      "verify": "View on Solana Explorer",
       "unavailable": "Unavailable",
       "unavailableHint": "The reserve reading is unavailable right now. The figures return with the next valid reading.",
       "disclosure": {

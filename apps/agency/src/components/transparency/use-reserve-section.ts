@@ -9,6 +9,7 @@ import {
   holdingLabel,
   reserveSectionView,
   type CoverageState,
+  type ReserveAccountView,
 } from "./reserve-view-model";
 
 const BPS_DENOMINATOR = 10_000;
@@ -28,19 +29,18 @@ export type ReserveHoldingRow = {
 
 export type ReserveSectionModel =
   | { status: "loading" }
-  | { status: "unavailable"; vaultExplorerUrl: string | null }
+  | { status: "unavailable"; account: ReserveAccountView | null }
   | {
       status: "available";
       countedBalance: string;
       requiredCoverage: string;
       /** The pilot coverage ratio `c` as a percent, e.g. "25,0%". */
       requiredRatio: string;
-      coverageRatio: string | null;
+      achievedCoverageRatio: string | null;
       coverageState: CoverageState;
       freeCapital: string;
       capturedAt: string;
-      vaultExplorerUrl: string;
-      vaultAddress: string;
+      account: ReserveAccountView;
       rows: ReserveHoldingRow[];
       usdStablesUncounted: boolean;
     };
@@ -56,14 +56,15 @@ export function useReserveSection(
     status: "available",
     countedBalance: formatBRLCents(health.balanceCents),
     requiredCoverage: formatBRLCents(health.requiredCoverageCents),
-    requiredRatio: formatPercent(locale, health.coverageRatioBps / BPS_DENOMINATOR),
-    coverageRatio:
-      health.coverageRatio === null ? null : formatMultiple(locale, health.coverageRatio),
+    requiredRatio: formatPercent(locale, health.requiredCoverageRatioBps / BPS_DENOMINATOR),
+    achievedCoverageRatio:
+      health.achievedCoverageRatio === null
+        ? null
+        : formatMultiple(locale, health.achievedCoverageRatio),
     coverageState: view.coverageState,
     freeCapital: formatBRLCents(health.freeCapitalCents),
     capturedAt: formatDateTimeBRT(new Date(health.capturedAt).toISOString()),
-    vaultExplorerUrl: health.vaultExplorerUrl,
-    vaultAddress: health.source.vaultAddress,
+    account: view.account,
     rows: health.holdings.map((holding) => ({
       key: `${holding.tokenProgram}:${holding.mint}`,
       label: holdingLabel(holding),

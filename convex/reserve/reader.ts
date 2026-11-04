@@ -1,7 +1,7 @@
 import type { Result } from "../lib/result";
-import type { RESERVE_SOURCE_KIND } from "./health";
+import type { RESERVE_SOURCE_KIND, ReserveSourceKind } from "./health";
 import type { ReservePrices } from "./prices";
-import { squadsReserveReader } from "./squadsReader";
+import { squadsReserveAccount, squadsReserveReader } from "./squadsReader";
 import type { ValuedReserveHolding } from "./valuation";
 
 /**
@@ -26,6 +26,9 @@ export type ReserveSource = {
   slot: number;
 };
 
+/** The account that holds the reserve funds, as configured — known before any read. */
+export type ReserveAccountRef = { kind: ReserveSourceKind; address: string };
+
 export type ReserveCapacity = {
   /**
    * The counted reserve — BRS plus USD stablecoins valued in BRL — in BRS base
@@ -35,8 +38,8 @@ export type ReserveCapacity = {
    * Convex — see `phase1FreeCapitalBaseUnits` in `./health.ts`.
    */
   balanceBaseUnits: bigint;
-  /** The coverage ratio `c`, in basis points. Phase 1: an off-chain constant. */
-  coverageRatioBps: number;
+  /** The required coverage ratio `c`, in basis points. Phase 1: an off-chain constant. */
+  requiredCoverageRatioBps: number;
   source: ReserveSource;
   /** Every holding the vault reports, valued and marked counted or not. */
   holdings: ValuedReserveHolding[];
@@ -115,3 +118,9 @@ export const unavailableReserveReader: ReserveReader = {
 
 /** The adapter every Convex function uses. Phase 1: the Squads multisig (ADR 0012). */
 export const reserveReader: ReserveReader = squadsReserveReader;
+
+/**
+ * The funds-holding account the bound adapter reads, named on the
+ * transparency page before the first snapshot. Moves with `reserveReader`.
+ */
+export const configuredReserveAccount: () => ReserveAccountRef | null = squadsReserveAccount;

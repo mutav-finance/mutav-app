@@ -290,7 +290,7 @@ describe("readSquadsCapacity (mocked network)", () => {
       success: true,
       data: {
         balanceBaseUnits: BigInt(0),
-        coverageRatioBps: 2_500,
+        requiredCoverageRatioBps: 2_500,
         source: { kind: "squads_multisig", vaultAddress: VAULT, slot: 4242 },
         holdings: [
           {

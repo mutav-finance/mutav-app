@@ -2,7 +2,7 @@ import type { GuaranteeState } from "../guarantees/domain";
 import type { SolvencyFigures, SolvencyPositionFigures } from "../reserve/domain";
 import type { ReserveHealth } from "../reserve/health";
 import type { ReservePrices } from "../reserve/prices";
-import type { ReserveSource } from "../reserve/reader";
+import type { ReserveAccountRef, ReserveSource } from "../reserve/reader";
 import type { ValuedReserveHolding } from "../reserve/valuation";
 
 /**
@@ -57,23 +57,27 @@ export type ReserveCoverage = { explorerUrl: string } & (
   | { available: false }
 );
 
+/** The account that holds the reserve funds, with its Solana Explorer link so anyone can check the balance. */
+export type ReserveAccount = ReserveAccountRef & { explorerUrl: string };
+
 /**
  * Phase-1 reserve health (ADR 0012), read from the latest snapshot: every
- * holding of the Squads vault, and the counted balance (BRS + USD stablecoins,
- * in BRL) against the coverage the in-force book requires. All amounts in BRL
- * cents. Copy: "gated by required coverage".
+ * holding of the reserve account, and the counted balance (BRS + USD
+ * stablecoins, in BRL) against the coverage the in-force book requires. All
+ * amounts in BRL cents. Copy: "gated by required coverage".
  *
- * `vaultExplorerUrl` links the vault on a Solana explorer so anyone can check
- * the balances; it is null only when the vault is not configured.
+ * `account` is the funds-holding account the figures were read from; before
+ * the first snapshot it is the configured one, and null only when none is
+ * configured.
  */
 export type ReserveHealthReading =
   | ({
       available: true;
       capturedAt: number;
       source: ReserveSource;
-      vaultExplorerUrl: string;
+      account: ReserveAccount;
       holdings: ValuedReserveHolding[];
       prices: ReservePrices;
       usdStablesUncounted: boolean;
     } & ReserveHealth)
-  | { available: false; vaultExplorerUrl: string | null };
+  | { available: false; account: ReserveAccount | null };

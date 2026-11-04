@@ -59,7 +59,7 @@ export const writeHealthSnapshot = internalMutation({
     capturedAt: v.number(),
     source: reserveSourceValidator,
     balanceBaseUnits: v.string(),
-    coverageRatioBps: v.number(),
+    requiredCoverageRatioBps: v.number(),
     holdings: v.array(reserveHoldingValidator),
     prices: reservePricesValidator,
     usdStablesUncounted: v.boolean(),
