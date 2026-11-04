@@ -165,19 +165,6 @@ function ReserveSectionSkeleton() {
   );
 }
 
-function IssuerDisclosure() {
-  const t = useTranslations("transparency.reserveHealth.disclosure");
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{t("title")}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground text-sm">{t("body")}</p>
-      </CardContent>
-    </Card>
-  );
-}
 
 /**
  * The phase-1 reserve (ADR 0012): the account that holds the funds, what it holds, what counts
@@ -206,7 +193,6 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
           </CardContent>
         </Card>
         {model.account ? <ReserveAccountCard account={model.account} /> : null}
-        <IssuerDisclosure />
       </section>
     );
   }
@@ -289,7 +275,6 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
         </CardContent>
       </Card>
 
-      <IssuerDisclosure />
     </section>
   );
 }
