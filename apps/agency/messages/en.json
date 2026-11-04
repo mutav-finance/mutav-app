@@ -525,11 +525,11 @@
       "currentStatus": "Current status:",
       "closureReason": "Closure reason:",
       "nextRenewal": "Estimated next renewal:",
-      "availableGuarantee": "Available guarantee:",
+      "availableGuarantee": "Coverage:",
       "guaranteeTooltip": "This amount already subtracts the approved and paid covers on this guarantee.",
       "cancelProposal": "Cancel proposal",
       "idLabel": "Guarantee ID",
-      "guaranteeTooltipLabel": "Available guarantee details",
+      "guaranteeTooltipLabel": "Coverage details",
       "cancelDialog": {
         "title": "Cancel proposal?",
         "description": "The guarantee will be marked as canceled. History will be preserved.",
@@ -725,7 +725,7 @@
       "urgency": "Urgency",
       "status": "Status",
       "tenant": "Tenant",
-      "availableGuarantee": "Available guarantee",
+      "availableGuarantee": "Coverage",
       "nextRenewalDate": "Next renewal",
       "creationTime": "Created",
       "open": "Open"
