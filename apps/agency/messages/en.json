@@ -1578,11 +1578,7 @@
       "asOf": "Read {datetime} (BRT)",
       "verify": "View on Solana Explorer",
       "unavailable": "Unavailable",
-      "unavailableHint": "The reserve reading is unavailable right now. The figures return with the next valid reading.",
-      "disclosure": {
-        "title": "BRS issuer risk",
-        "body": "BRS is issued by Nora, and Nora can freeze any BRS account, the reserve's included. A freeze stops every outflow, claim payments included."
-      }
+      "unavailableHint": "The reserve reading is unavailable right now. The figures return with the next valid reading."
     },
     "timeline": {
       "title": "Platform book in force",

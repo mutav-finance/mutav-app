@@ -1578,11 +1578,7 @@
       "asOf": "Leitura de {datetime} (BRT)",
       "verify": "Ver no Solana Explorer",
       "unavailable": "Indisponível",
-      "unavailableHint": "A leitura da reserva está indisponível no momento. Os números voltam assim que houver uma leitura válida.",
-      "disclosure": {
-        "title": "Risco do emissor do BRS",
-        "body": "O BRS é emitido pela Nora, que pode congelar qualquer conta de BRS, inclusive a da reserva. Um congelamento interrompe todas as saídas, incluindo o pagamento de coberturas."
-      }
+      "unavailableHint": "A leitura da reserva está indisponível no momento. Os números voltam assim que houver uma leitura válida."
     },
     "timeline": {
       "title": "Carteira vigente da plataforma",
