@@ -130,8 +130,6 @@ export const SUBJECT_TYPE = {
   AGENCY_STAFF: "agency_staff",
   /** A human holding a Mutav-internal capability grant. */
   MUTAV_STAFF: "mutav_staff",
-  /** A waitlist signup from the marketing site. */
-  LEAD: "lead",
   /** Whoever settles an invoice — not necessarily the tenant or the agency. */
   PAYER: "payer",
   /** A fund investor. Not modelled in Convex yet; the schema already names the category. */
@@ -243,7 +241,6 @@ export const PERSONAL_DATA_TABLES = [
   "guaranteeDocuments",
   "claimedDocuments",
   "mutavAuditLog",
-  "waitlist",
   "tenantCreditReports",
   "creditAnalysisSignals",
   "creditAnalysisAssessments",
@@ -2783,55 +2780,6 @@ export const PII_FIELD_REGISTRY = {
       subjectType: SUBJECT.PLATFORM_USER,
       legalNormRef: null,
       note: "Not in §4.2.",
-    },
-  },
-
-  waitlist: {
-    email: {
-      ...COUNSEL_PENDING,
-      tier: TIER.T2,
-      dataClass: CLASS.CONTACT,
-      subjectType: SUBJECT.LEAD,
-      legalNormRef: "LGPD art. 7 I",
-      note: "Plaintext-indexed. Egresses to Resend with no deletion propagation. Consent-based, so this is the only data reachable by an art. 18 VI erasure request.",
-    },
-    audience: {
-      ...COUNSEL_PENDING,
-      tier: TIER.T3,
-      dataClass: CLASS.OPERATIONAL_REFERENCE,
-      subjectType: SUBJECT.LEAD,
-      legalNormRef: null,
-    },
-    ts: {
-      ...COUNSEL_PENDING,
-      tier: TIER.T3,
-      dataClass: CLASS.OPERATIONAL_REFERENCE,
-      subjectType: SUBJECT.LEAD,
-      legalNormRef: null,
-    },
-    ip: {
-      ...COUNSEL_PENDING,
-      tier: TIER.T2,
-      dataClass: CLASS.ONLINE_IDENTIFIER,
-      subjectType: SUBJECT.LEAD,
-      legalNormRef: "LGPD art. 5 I",
-      note: "An online identifier is personal data. Collected, never read — which violates art. 6 III necessidade. Delete the column (E-11).",
-    },
-    ua: {
-      ...COUNSEL_PENDING,
-      tier: TIER.T3,
-      dataClass: CLASS.ONLINE_IDENTIFIER,
-      subjectType: SUBJECT.LEAD,
-      legalNormRef: null,
-      note: "Collected, never read (E-11).",
-    },
-    referer: {
-      ...COUNSEL_PENDING,
-      tier: TIER.T3,
-      dataClass: CLASS.ONLINE_IDENTIFIER,
-      subjectType: SUBJECT.LEAD,
-      legalNormRef: null,
-      note: "Collected, never read (E-11).",
     },
   },
 

@@ -258,7 +258,7 @@ The `domain.ts` rule: never use raw `Doc<'tableName'>` or `Id<'tableName'>` outs
 **The app is pre-production: there is no real data. So schema changes ship as wipe + reseed, NOT in-place migrations.** When you change the schema:
 
 - **Do NOT write a data migration.** Update `convex/schema.ts` and update `convex/seed.ts` so `seed:seedReset` produces data in the new shape. Reshape the seed, not the data at rest.
-- **The reseed wipe is app-demo-only — never touch marketing or other real data.** `seedReset` clears only `DEMO_TABLES` (agencies, users, memberships, leases, guarantees, guaranteeHistory, guaranteeDelinquencyNotices, products, tenants, invoices, payments, providerOrders). It must **never** wipe the **`waitlist`** table (marketing leads synced to Resend audiences), nor `mutavAuditLog`/`mutavAuditAnchors`, `mutavStaff`, `reserveSnapshots`, `creditAnalysis*`, or `contractApplications` (the Lei 12.414 bureau-consult relationship record `creditAnalysisSignals` points at). These hold real/operational data, are deliberately excluded from `DEMO_TABLES`, and a `convex/seed.test.ts` test asserts a `waitlist` row survives a reseed. Never add them to the wipe.
+- **The reseed wipe is app-demo-only — never touch real data.** `seedReset` clears only `DEMO_TABLES` (agencies, users, memberships, leases, guarantees, guaranteeHistory, guaranteeDelinquencyNotices, products, tenants, invoices, payments, providerOrders). It must **never** wipe `mutavAuditLog`/`mutavAuditAnchors`, `mutavStaff`, `reserveSnapshots`, `creditAnalysis*`, or `contractApplications` (the Lei 12.414 bureau-consult relationship record `creditAnalysisSignals` points at). These hold real/operational data, are deliberately excluded from `DEMO_TABLES`, and `convex/seed.test.ts` asserts the signal → application attribution survives a reseed. Never add them to the wipe. (Marketing leads are not here at all: the website's waitlist writes straight to Resend.)
 - `convex/migrations.ts` stays a **no-op runner** (`runAll = [noop]`); leave the migration infrastructure in place but empty. Operational backfills (aggregate rebuild, Resend audience sync, reserve snapshot clear) are **not** migrations and stay out of the runner.
 - `schemaValidation: false` is intentional for this window — a deploy tolerates older data at rest until a developer reseeds (`bun run seed`). Don't flip it to `true` yet.
 - Deploy runbook: `convex deploy` → `bun run seed`. Never assume in-place data preservation.
@@ -492,7 +492,7 @@ Runner: **Vitest** everywhere. Two flavors of test file per convex domain:
 - Expected values as literals in the test, not derived from the code under test (a broken implementation shouldn't produce a "correct" derived value that satisfies the test).
 - Every Result-returning function gets both the happy-path and every distinct error `code` covered.
 - Pure tests must run in **&lt;200ms per file**; if you're near that ceiling you're probably reaching for a db-backed test — move it to a `useCases.test.ts`.
-- Seed tests must assert the `waitlist` row survives a reseed (existing regression guard in `convex/seed.test.ts`) — never wipe `waitlist`, `mutavAuditLog`, or `mutavStaff` in `DEMO_TABLES`.
+- Seed tests must keep asserting that real data survives a reseed (the signal → application guard in `convex/seed.test.ts`) — never wipe `mutavAuditLog`, `mutavStaff` or `contractApplications` in `DEMO_TABLES`.
 
 ### Domain-surface workflows
 

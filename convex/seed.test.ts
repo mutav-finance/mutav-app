@@ -912,25 +912,6 @@ describe("seedReset", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     expect(await tenantCount(t)).toBeGreaterThan(0);
   });
 
-  test("preserves the waitlist (marketing leads) — the wipe is app-demo-only", async () => {
-    const t = setup();
-    // A real marketing lead present before a reseed must survive it.
-    await t.run(async (ctx) => {
-      await ctx.db.insert("waitlist", {
-        email: "lead@example.com",
-        audience: "imobiliaria",
-        ts: 1_700_000_000_000,
-      });
-    });
-
-    await t.mutation(internal.seed.seedReset, {});
-
-    const surviving = await t.run(async (ctx) => ctx.db.query("waitlist").collect());
-    expect(surviving.map((r) => r.email)).toContain("lead@example.com");
-    // And the reseed still produced the app data (wipe ran).
-    expect(await tenantCount(t)).toBeGreaterThan(0);
-  });
-
   test("reseeding twice leaves one product and one Aprovada book — the wipe covers the new tables", async () => {
     const t = setup();
     await t.mutation(internal.seed.seedReset, {});
@@ -1222,23 +1203,12 @@ describe("lockForRealData", { timeout: SEED_TEST_TIMEOUT_MS }, () => {
     });
   });
 
-  test("keeps the waitlist and writes an audit entry", async () => {
+  test("writes an audit entry", async () => {
     const t = setup();
-    await t.run((ctx) =>
-      ctx.db.insert("waitlist", {
-        email: "lead@example.com",
-        audience: "imobiliaria",
-        ts: Date.parse(SEED_NOW),
-      }),
-    );
 
     await t.mutation(internal.seed.lockForRealData, { confirm: "LOCK" });
 
-    const { waitlist, audit } = await t.run(async (ctx) => ({
-      waitlist: await ctx.db.query("waitlist").collect(),
-      audit: await ctx.db.query("mutavAuditLog").collect(),
-    }));
-    expect(waitlist).toHaveLength(1);
+    const audit = await t.run((ctx) => ctx.db.query("mutavAuditLog").collect());
     expect(audit.map((entry) => entry.action)).toContain("deployment.locked_for_real_data");
   });
 

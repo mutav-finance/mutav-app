@@ -38,8 +38,6 @@ SRC_GLOB=(apps/agency/src convex)
 #      returning null on missing JWT (UI needs to distinguish loading vs
 #      signed-out); getOrCreateByIdentity reads identity from
 #      ctx.auth.getUserIdentity() and throws on miss.
-#    - convex/waitlist/useCases.ts: anonymous public submission endpoint
-#      called from the marketing site — no JWT, no agency.
 #    - convex/payments/providers/bankAccountUseCases.ts: listBanksForInvoice
 #      is the tenant-checkout bearer query — no JWT and no client-supplied
 #      agencyId; it resolves the owning agency from the invoice publicId
@@ -56,9 +54,6 @@ bare_violations=0
 for file in $files_with_bare; do
   # Allowlists — see header above for rationale.
   if [[ "$file" == "convex/users/useCases.ts" ]]; then
-    continue
-  fi
-  if [[ "$file" == "convex/waitlist/useCases.ts" ]]; then
     continue
   fi
   if [[ "$file" == "convex/payments/providers/bankAccountUseCases.ts" ]]; then

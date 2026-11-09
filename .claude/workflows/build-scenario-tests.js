@@ -68,7 +68,7 @@ ${SCENARIOS_DOC ? `Scenarios doc: ${SCENARIOS_DOC}` : 'No external scenarios doc
   * Expected values as literals in the test — never derived from the code under test.
   * Every Result-returning function gets happy-path + every distinct error \`code\` covered.
   * Pure tests <200ms/file. If you're near that, it belongs in scenarios.test.ts anyway (db-backed).
-  * Never wipe \`waitlist\`, \`mutavAuditLog\`, or \`mutavStaff\` in DEMO_TABLES.
+  * Never wipe \`mutavAuditLog\`, \`mutavStaff\` or \`contractApplications\` in DEMO_TABLES.
 
 ## What this test file covers vs the pure tests
 

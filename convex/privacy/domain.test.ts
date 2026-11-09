@@ -93,16 +93,13 @@ describe("the CI gate — synthetic drift", () => {
     const drifted = {
       tables: {
         ...schema.tables,
-        waitlist: table(
+        claimedDocuments: table(
           obj({
-            email: leaf("string"),
-            audience: leaf("string"),
-            ts: leaf("float64"),
-            ip: leaf("string"),
-            ua: leaf("string"),
-            referer: leaf("string"),
-            // The synthetic drift: a new marketing column nobody classified.
-            utmCampaign: leaf("string"),
+            documentHash: leaf("string"),
+            agencyId: leaf("id"),
+            claimedAt: leaf("string"),
+            // The synthetic drift: a new column nobody classified.
+            claimedFromIp: leaf("string"),
           }),
         ),
       },
@@ -113,11 +110,11 @@ describe("the CI gate — synthetic drift", () => {
     expect(findings).toContainEqual(
       expect.objectContaining({
         kind: PII_REGISTRY_FINDING.UNCLASSIFIED_FIELD,
-        table: "waitlist",
-        fieldPath: "utmCampaign",
+        table: "claimedDocuments",
+        fieldPath: "claimedFromIp",
       }),
     );
-    expect(formatFindings(findings)).toContain("waitlist.utmCampaign");
+    expect(formatFindings(findings)).toContain("claimedDocuments.claimedFromIp");
   });
 
   it("fires UNCLASSIFIED_FIELD for a field that exists on only one arm of a union table", () => {
@@ -380,9 +377,6 @@ describe("tier assignments agree with POL-SEC-004 §4.2", () => {
     ["mutavAuditLog", "actor.userId", PII_TIER.T3],
     ["mutavAuditLog", "entryHash", PII_TIER.T4],
     ["mutavAuditLog", "prevHash", PII_TIER.T4],
-    ["waitlist", "email", PII_TIER.T2],
-    ["waitlist", "ip", PII_TIER.T2],
-    ["waitlist", "ua", PII_TIER.T3],
     ["creditAnalysisSignals", "normalized.score", PII_TIER.T1],
     ["creditAnalysisSignals", "subjectHash", PII_TIER.T2],
     ["creditAnalysisSignals", "correlationId", PII_TIER.T2],
