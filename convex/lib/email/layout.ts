@@ -8,11 +8,12 @@ export const EMAIL_SUPPORT_ADDRESS = "contato@mutav.finance";
 export const EMAIL_DESCRIPTOR = "Garantia locatícia";
 
 // Served from the agency app's public dir (apps/agency/public/email/). Email
-// clients strip inline SVG and block data: images, so the mark loads by URL.
-const LOGO_PATH = "/email/mutav-logo.png";
-// The PNG is 172×144; shown at 40px tall, keeping its aspect ratio.
-const LOGO_WIDTH = 48;
-const LOGO_HEIGHT = 40;
+// clients strip inline SVG and block data: images, so the lockup loads by URL.
+// The old mark-only `mutav-logo.png` stays in public/ for emails already sent.
+const LOGO_PATH = "/email/mutav-lockup.png";
+// The PNG is 768×128 (6:1, from brand/kit); shown at 32px tall for 4× density.
+const LOGO_WIDTH = 192;
+const LOGO_HEIGHT = 32;
 
 const COLOR = {
   canvas: "#f7f6f3",
@@ -25,8 +26,7 @@ const COLOR = {
   rule: "#d9d7d2",
 } as const;
 
-const FONT_STACK =
-  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const FONT_STACK = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 export type EmailCta = { label: string; url: string };
 
@@ -66,8 +66,8 @@ function renderLogoUrl(appUrl: string): string {
 }
 
 /**
- * The branded shell every MUTAV transactional email renders in: M-mark plus
- * lowercase "mutav" lockup, a body slot, an optional button, and a footer with
+ * The branded shell every MUTAV transactional email renders in: the MUTAV
+ * lockup image, a body slot, an optional button, and a footer with
  * the descriptor, the support address and why the email was sent.
  * Table-based and inline-styled — the lowest common denominator email clients
  * render reliably. Pure: no env, no Node APIs.
@@ -121,9 +121,6 @@ export function renderEmailLayout({
                   <tr>
                     <td style="vertical-align:middle;">
                       <img src="${escapeHtml(renderLogoUrl(appUrl))}" width="${LOGO_WIDTH}" height="${LOGO_HEIGHT}" alt="MUTAV" style="display:block;border:0;outline:none;text-decoration:none;width:${LOGO_WIDTH}px;height:${LOGO_HEIGHT}px;" />
-                    </td>
-                    <td style="padding-left:10px;vertical-align:middle;">
-                      <span style="font-size:24px;font-weight:700;letter-spacing:-0.02em;color:${COLOR.amber};">mutav</span>
                     </td>
                   </tr>
                 </table>

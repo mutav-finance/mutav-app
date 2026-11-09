@@ -345,10 +345,10 @@ fi
 # 11. Brand name casing in user-facing copy — every app under apps/
 #
 #     In prose, titles, aria-labels and emails the name is "MUTAV". The
-#     lowercase "mutav" is the logo lockup (Wordmark) and also appears in
-#     URLs and addresses (contato@mutav.finance); both are allowed. Title
-#     case "Mutav" is never correct in a message value. Keys are not checked
-#     (uploadedByMutav is a key, not copy).
+#     lowercase "mutav" appears only in URLs and addresses
+#     (contato@mutav.finance), which are allowed. Title case "Mutav" is never
+#     correct in a message value. Keys are not checked (uploadedByMutav is a
+#     key, not copy).
 # ─────────────────────────────────────────────────────────────────────────────
 section "11. brand name casing in messages (MUTAV, never Mutav)"
 
@@ -356,10 +356,35 @@ mutav_casing_hits=$(rg -n --with-filename --no-heading '":\s*"[^"]*\bMutav\b' ap
 
 if [[ -n "$mutav_casing_hits" ]]; then
   while IFS= read -r line; do
-    fail "$line — write the name as MUTAV in copy (lowercase mutav is the Wordmark only)"
+    fail "$line — write the name as MUTAV in copy"
   done <<< "$mutav_casing_hits"
 else
   pass "no message value spells the brand as Mutav"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. No hand-rolled wordmark — apps, packages and convex
+#
+#     The logo is the lockup: M-mark + "MUTAV" in Outfit 800 outlined to
+#     paths, shipped by @mutav/brand (Lockup, LockupImage) and rendered in
+#     the apps through @mutav/ui Wordmark; emails use the lockup PNG. A
+#     lowercase "mutav" set as live text is the retired Geist wordmark coming
+#     back. Catches JSX text and HTML-string elements whose whole content is
+#     "mutav"; prose "<strong>MUTAV</strong>" is copy and is allowed. Tests are
+#     excluded (they assert its absence).
+# ─────────────────────────────────────────────────────────────────────────────
+section "12. no hand-rolled wordmark (use @mutav/brand Lockup / @mutav/ui Wordmark)"
+
+wordmark_hits=$(rg -n --with-filename --no-heading '>\s*mutav\s*<' \
+  apps/*/src packages/*/src convex \
+  -g '*.{ts,tsx}' -g '!*.test.*' -g '!**/_generated/**' 2>/dev/null || true)
+
+if [[ -n "$wordmark_hits" ]]; then
+  while IFS= read -r line; do
+    fail "$line — render the logo with Wordmark / Lockup, not live text"
+  done <<< "$wordmark_hits"
+else
+  pass "no live-text mutav wordmark"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

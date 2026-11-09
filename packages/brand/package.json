@@ -8,7 +8,10 @@
   "exports": {
     "./logo-mark": "./src/logo-mark.tsx",
     "./link-preview-card": "./src/link-preview-card.tsx",
-    "./logo-mark-image": "./src/logo-mark-image.tsx"
+    "./logo-mark-image": "./src/logo-mark-image.tsx",
+    "./lockup": "./src/lockup.tsx",
+    "./lockup-image": "./src/lockup-image.tsx",
+    "./lockup-geometry": "./src/lockup-geometry.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

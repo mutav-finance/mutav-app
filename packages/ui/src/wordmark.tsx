@@ -1,16 +1,11 @@
-import { LogoMark } from "@mutav/brand/logo-mark";
+import { Lockup } from "@mutav/brand/lockup";
 import { cn } from "./cn";
 
 export type WordmarkSize = "sm" | "md";
 
-const MARK_ICON_CLASS: Record<WordmarkSize, string> = {
+const LOCKUP_HEIGHT_CLASS: Record<WordmarkSize, string> = {
   sm: "h-5",
   md: "h-6",
-};
-
-const MARK_TEXT_CLASS: Record<WordmarkSize, string> = {
-  sm: "text-base",
-  md: "text-lg",
 };
 
 export type WordmarkProps = {
@@ -19,23 +14,15 @@ export type WordmarkProps = {
 };
 
 /**
- * The brand text is hardcoded, not read from messages — brand names are not
- * localized. The visible text is the accessible name, so there is no
- * `aria-label` and the M-mark is decorative (`aria-hidden`);
- * where the lockup is a link, the app owns the wrapper and names it.
+ * The MUTAV lockup (M-mark + outlined "MUTAV") from `@mutav/brand`. Brand
+ * names are not localized. The SVG names itself "MUTAV", so a link wrapping
+ * the wordmark gets that name; where the app sets its own `aria-label` on the
+ * wrapper, that label wins.
  */
 export function Wordmark({ size = "sm", className }: WordmarkProps) {
   return (
-    <span className={cn("text-text flex items-center gap-2", className)}>
-      <LogoMark className={cn("w-auto shrink-0", MARK_ICON_CLASS[size])} />
-      <span
-        className={cn(
-          "font-display text-accent leading-none font-bold tracking-[-0.03em] select-none",
-          MARK_TEXT_CLASS[size],
-        )}
-      >
-        mutav
-      </span>
+    <span className={cn("text-text flex items-center", className)}>
+      <Lockup className={cn("w-auto shrink-0 select-none", LOCKUP_HEIGHT_CLASS[size])} />
     </span>
   );
 }

@@ -26,19 +26,19 @@ describe("renderEmailLayout", () => {
     expect(html).toContain("<title>Assunto — MUTAV</title>");
   });
 
-  test("header shows the M-mark served from the app origin, alt MUTAV", () => {
-    expect(html).toContain('src="https://app.mutav.test/email/mutav-logo.png"');
+  test("header shows the lockup image served from the app origin, alt MUTAV", () => {
+    expect(html).toContain('src="https://app.mutav.test/email/mutav-lockup.png"');
     expect(html).toContain('alt="MUTAV"');
-    expect(html).toContain('width="48" height="40"');
+    expect(html).toContain('width="192" height="32"');
   });
 
   test("tolerates a trailing slash on the app origin", () => {
     const withSlash = renderEmailLayout({ ...BASE, appUrl: "https://app.mutav.test/" });
-    expect(withSlash).toContain('src="https://app.mutav.test/email/mutav-logo.png"');
+    expect(withSlash).toContain('src="https://app.mutav.test/email/mutav-lockup.png"');
   });
 
-  test("header lockup is lowercase mutav in amber", () => {
-    expect(html).toMatch(/<span style="[^"]*color:#c47e10;">mutav<\/span>/);
+  test("header carries no live-text wordmark next to the lockup image", () => {
+    expect(html).not.toMatch(/>mutav<\/span>/i);
   });
 
   test("renders the body slot as given", () => {
