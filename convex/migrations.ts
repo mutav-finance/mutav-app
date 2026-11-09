@@ -20,8 +20,8 @@ import type { DataModel } from "./_generated/dataModel";
  * migrations take effect automatically from that point on.
  *
  * NOTE: the operational backfills (`guarantees/backfill.ts` aggregate rebuild,
- * `waitlist` Resend audience sync, `reserve` snapshot clear) are NOT migrations —
- * they're on-demand tools and deliberately stay out of this runner.
+ * `reserve` snapshot clear) are NOT migrations — they're on-demand tools and
+ * deliberately stay out of this runner.
  */
 export const migrations = new Migrations<DataModel>(components.migrations);
 

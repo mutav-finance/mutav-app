@@ -108,9 +108,6 @@ import type * as transparency_domain from "../transparency/domain.js";
 import type * as transparency_useCases from "../transparency/useCases.js";
 import type * as users_domain from "../users/domain.js";
 import type * as users_useCases from "../users/useCases.js";
-import type * as waitlist_actions from "../waitlist/actions.js";
-import type * as waitlist_domain from "../waitlist/domain.js";
-import type * as waitlist_useCases from "../waitlist/useCases.js";
 
 import type {
   ApiFromModules,
@@ -219,9 +216,6 @@ declare const fullApi: ApiFromModules<{
   "transparency/useCases": typeof transparency_useCases;
   "users/domain": typeof users_domain;
   "users/useCases": typeof users_useCases;
-  "waitlist/actions": typeof waitlist_actions;
-  "waitlist/domain": typeof waitlist_domain;
-  "waitlist/useCases": typeof waitlist_useCases;
 }>;
 
 /**

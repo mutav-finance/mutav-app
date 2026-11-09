@@ -295,15 +295,14 @@ const recordedBatchRecordedAt = () => daysAgo(2, "18:10");
  * dangling pointers mid-wipe.
  *
  * DELIBERATELY EXCLUDED — real/operational data the seed must never destroy:
- *   - `waitlist`            marketing leads (synced to Resend audiences)
  *   - `mutavAuditLog` / `mutavAuditAnchors`  hash-chained audit trail
  *   - `mutavStaff`          Mutav staff role grants
  *   - `reserveSnapshots`    coverage/transparency history
  *   - `creditAnalysis*`     bureau signals + assessments
  *   - `contractApplications` the art. 15 declarations those signals cite
  *   - anchor/stellar index state, webhook events
- * Do NOT add any of these here. `seed.test.ts` guards `waitlist` survival and
- * the signal → application attribution.
+ * Do NOT add any of these here. `seed.test.ts` guards the signal → application
+ * attribution.
  *
  * `contractApplications` is retained for the same reason as the signals it
  * authorises: a `creditAnalysisSignals` row names the declaration that made
@@ -1120,8 +1119,8 @@ type SeedFictionalResult = {
  *
  * For dev/preview deployments, and for the production demo environment
  * only before any real agency data exists, via `seedReset` — which wipes the
- * demo tables first and keeps `waitlist`, `contractApplications`, the audit
- * chain and the staff tables (see `DEMO_TABLES`).
+ * demo tables first and keeps `contractApplications`, the audit chain and the
+ * staff tables (see `DEMO_TABLES`).
  */
 async function seedFictional(
   ctx: MutationCtx,
@@ -3903,7 +3902,7 @@ async function attachGuaranteeTransitionHistory(ctx: MutationCtx): Promise<numbe
  *
  * For dev/preview deployments, and for the production demo environment
  * only before any real agency data exists. It wipes the demo tables and keeps
- * `waitlist`, `contractApplications`, the audit chain and the staff tables
+ * `contractApplications`, the audit chain and the staff tables
  * (see `DEMO_TABLES`).
  */
 export const seedReset = internalMutation({
@@ -3989,8 +3988,8 @@ async function assertDeploymentUnlocked(ctx: MutationCtx): Promise<void> {
  *
  *   bunx convex run --prod seed:lockForRealData '{"confirm":"LOCK"}'
  *
- * Clears the demo dataset (same `DEMO_TABLES` as `seedReset`, so `waitlist`,
- * the audit chain and credit records survive), drops every staff grant whose
+ * Clears the demo dataset (same `DEMO_TABLES` as `seedReset`, so the audit
+ * chain and credit records survive), drops every staff grant whose
  * user the wipe removed — which is how the seeded `systemadmin` persona loses
  * its admin role — keeps the default product the guarantee wizard prices from,
  * then writes the lock. From then on `seedReset` and `seedTestPersonas` throw.
