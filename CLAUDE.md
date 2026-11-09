@@ -164,7 +164,7 @@ mutav-app/
 │   ├── i18n/        # @mutav/i18n   — next-intl routing/navigation, cross-app URLs, Brazil formatters
 │   ├── app-shell/   # @mutav/app-shell — shared Convex providers (Auth0-backed + public)
 │   ├── wallet/      # @mutav/wallet — Stellar Wallets Kit v2 connect/sign/ownership proof
-│   ├── brand/       # @mutav/brand  — brand marks (M-mark SVG); pure React, no Tailwind classes
+│   ├── brand/       # @mutav/brand  — brand marks (M-mark + MUTAV lockup SVGs); pure React, no Tailwind classes
 │   └── tsconfig/    # @mutav/tsconfig — shared TS base configs
 └── convex/          # Mutav API — shared backend (functions, schema, generated types)
 ```

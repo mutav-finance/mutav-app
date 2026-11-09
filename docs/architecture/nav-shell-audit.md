@@ -146,7 +146,7 @@ Follows from D1. Every app gains **two** BareShell 404s: `[locale]/not-found.tsx
 
 ## 5. Scope that follows — shipped
 
-Shipped: the three shells + `Wordmark` in `@mutav/ui`, chrome migrated onto them, both BareShell 404s in all four apps, the Flow identity slot in `agency/(onboarding)`, i18n `InvestorNav` with its wallet slot, and enforcement (§ 8).
+Shipped: the three shells + `Wordmark` in `@mutav/ui` (since 2026-11 it renders `@mutav/brand` `Lockup`: the M-mark plus "MUTAV" in Outfit 800 outlined to paths, replacing the lowercase Geist "mutav"), chrome migrated onto them, both BareShell 404s in all four apps, the Flow identity slot in `agency/(onboarding)`, i18n `InvestorNav` with its wallet slot, and enforcement (§ 8).
 
 Two rulings taken during implementation, recorded so they are not re-opened by omission:
 

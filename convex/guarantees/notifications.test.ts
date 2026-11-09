@@ -9,14 +9,13 @@ import {
 const APP_URL = "https://app.mutav.test";
 
 function expectBrandedShell(html: string) {
-  expect(html).toContain('src="https://app.mutav.test/email/mutav-logo.png"');
+  expect(html).toContain('src="https://app.mutav.test/email/mutav-lockup.png"');
   expect(html).toContain('alt="MUTAV"');
-  expect(html).toMatch(/>mutav<\/span>/);
+  expect(html).not.toMatch(/>mutav<\/span>/i);
   expect(html).toContain("MUTAV · Garantia locatícia");
   expect(html).toContain('href="mailto:contato@mutav.finance"');
   expect(html).toContain("Você recebeu este e-mail porque");
 }
-
 
 const NOTICE: ProposalNotice = {
   publicId: "1000042",
