@@ -8,6 +8,7 @@ import { Skeleton } from "@mutav/ui/skeleton";
 import type { GuaranteeAggregates } from "@convex/transparency/domain";
 import { formatPercent } from "@mutav/ui/transparency/format";
 import { InfoHint } from "./info-hint";
+import { KPI_CARD_CLASS } from "./kpi-card";
 
 type Props = { aggregates: GuaranteeAggregates | null };
 
@@ -27,7 +28,7 @@ function MetricCard({
   secondary?: boolean;
 }) {
   return (
-    <Card className={cn(secondary && "bg-transparent shadow-none")}>
+    <Card className={KPI_CARD_CLASS}>
       <CardHeader>
         <CardDescription className="flex items-center gap-1.5">
           {icon}
@@ -49,7 +50,8 @@ function MetricCard({
 
 /**
  * The risk read of the book: what is in force and the default rate. Drafts
- * trail as a secondary figure — they carry no risk until activated.
+ * trail as a secondary figure, muted value on the same card — they carry no
+ * risk until activated.
  */
 export function GuaranteesPanel({ aggregates }: Props) {
   const t = useTranslations("transparency.guarantees");

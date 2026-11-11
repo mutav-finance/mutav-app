@@ -9,6 +9,7 @@ import { cn } from "@mutav/ui/cn";
 import { Skeleton } from "@mutav/ui/skeleton";
 import { StatusTag } from "@mutav/ui/status-tag";
 import { InfoHint } from "./info-hint";
+import { KPI_CARD_CLASS } from "./kpi-card";
 import { TransparencySection } from "./transparency-section";
 import { COVERAGE_TONE } from "./coverage-tone";
 import type { ReserveSectionModel } from "./use-reserve-section";
@@ -34,7 +35,12 @@ function SummaryFigure({
   emphasis?: boolean;
 }) {
   return (
-    <Card className={cn("min-w-0", emphasis && "bg-accent/40 ring-primary/60")}>
+    <Card
+      className={cn(
+        "min-w-0",
+        emphasis ? "bg-accent/40 ring-primary/60 shadow-xs" : KPI_CARD_CLASS,
+      )}
+    >
       <CardHeader className="h-full">
         <CardDescription className="flex flex-wrap items-center justify-between gap-2">
           <span className="flex items-center gap-1.5">
@@ -51,6 +57,10 @@ function SummaryFigure({
 }
 
 /**
+ * Values stay at `text-2xl` rather than the KPI cards' `@[250px]/card:text-3xl`
+ * step: at three columns a card clears 250px while a seven-digit BRL value at
+ * 3xl no longer fits inside it.
+ *
  * Five figures need ~76rem to sit on one line without the BRL values
  * overflowing, so the grid steps by the section's own width (5 → 3 → 2 → 1), not
  * the viewport's — the sidebar takes a varying share of the screen. Every
