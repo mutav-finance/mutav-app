@@ -1521,6 +1521,19 @@
     "heading": "Transparency",
     "subheading": "Risk position transparency and the onchain reserve.",
     "footer": "Guarantee data in real time. Reserve read on the Solana network and refreshed every 15 minutes.",
+    "hintAriaLabel": "About: {label}",
+    "summary": {
+      "title": "Book coverage",
+      "description": "How much of the exposure of guarantees in force the reserve covers, right now."
+    },
+    "book": {
+      "title": "Guarantee book",
+      "description": "The state of every guarantee on the platform, in real time."
+    },
+    "claims": {
+      "title": "Claims funnel",
+      "description": "Guarantees at each stage of a claim, right now."
+    },
     "guarantees": {
       "insured": "Guarantees in force",
       "drafted": "Drafts",
@@ -1567,12 +1580,15 @@
           "asset": "Asset",
           "amount": "Amount",
           "value": "Value in reais",
+          "share": "% of reserve",
           "counts": "Counts toward coverage"
         },
         "counted": "Yes",
         "notCounted": "No",
         "unpriced": "No price",
-        "unknownAsset": "Unrecognized asset"
+        "unknownAsset": "Unrecognized asset",
+        "total": "Total",
+        "countedTotal": "Counted: {value}"
       },
       "valuation": "BRS is worth R$ 1. USD stablecoins at the BCB PTAX (ask) rate. SOL at its market price, for display only.",
       "asOf": "Read {datetime} (BRT)",

@@ -6,9 +6,13 @@ import type { Preloaded } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { StateTimelineBucket } from "@convex/guarantees/domain";
 import type { GuaranteeAggregates, ReserveHealthReading } from "@convex/transparency/domain";
-import { GuaranteeExposurePanel, GuaranteesPanel } from "./guarantees-panel";
+import { ClaimsFunnel } from "./claims-funnel";
+import { CoverageSummary } from "./coverage-summary";
+import { GuaranteesPanel } from "./guarantees-panel";
+import { TransparencySection } from "./transparency-section";
 import { PlatformStateChart } from "./platform-state-chart";
 import { ReserveSection } from "./reserve-section";
+import { useReserveSection } from "./use-reserve-section";
 
 type Props = {
   preloadedAggregates: Preloaded<typeof api.transparency.useCases.getGuaranteeAggregates> | null;
@@ -33,23 +37,26 @@ type LayoutProps = {
 
 function TransparencyPageLayout({ aggregates, timeline, reserve }: LayoutProps) {
   const t = useTranslations("transparency");
+  const reserveModel = useReserveSection(reserve);
 
   const agg = aggregates ?? null;
   const tl = timeline ?? null;
 
   return (
-    <div className="flex flex-col gap-4 px-4 lg:px-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="flex flex-col gap-8 px-4 lg:px-6">
+      <CoverageSummary aggregates={agg} reserve={reserveModel} />
+
+      <TransparencySection
+        id="book-heading"
+        title={t("book.title")}
+        description={t("book.description")}
+      >
         <GuaranteesPanel aggregates={agg} />
-      </div>
+        <ClaimsFunnel aggregates={agg} />
+        <PlatformStateChart timeline={tl} counts={agg?.countByState} />
+      </TransparencySection>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <GuaranteeExposurePanel aggregates={agg} />
-      </div>
-
-      <ReserveSection reading={reserve} />
-
-      <PlatformStateChart timeline={tl} counts={agg?.countByState} />
+      <ReserveSection model={reserveModel} />
 
       <p className="text-muted-foreground text-xs">{t("footer")}</p>
     </div>

@@ -11,24 +11,22 @@ export default async function TransparencyLoading() {
     <PageShell>
       <PageHeader title={t("heading")} subtitle={t("subheading")} />
       <PageContent variant="wide">
-        <div className="flex flex-col gap-4 px-4 lg:px-6">
+        <div className="flex flex-col gap-8 px-4 lg:px-6">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Skeleton className="h-36 rounded-xl" />
-            <Skeleton className="h-36 rounded-xl" />
-            <Skeleton className="h-36 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Skeleton className="h-36 rounded-xl" />
-            <Skeleton className="h-36 rounded-xl" />
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Skeleton className="h-36 rounded-xl" />
-            <Skeleton className="h-36 rounded-xl" />
-            <Skeleton className="h-36 rounded-xl" />
-            <Skeleton className="h-36 rounded-xl" />
-          </div>
-          <Skeleton className="h-56 w-full rounded-xl" />
+          <Skeleton className="h-36 w-full rounded-xl" />
           <Skeleton className="h-[340px] w-full rounded-xl" />
+          <Skeleton className="h-56 w-full rounded-xl" />
         </div>
       </PageContent>
     </PageShell>

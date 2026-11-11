@@ -1,18 +1,14 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import {
-  AlertTriangleIcon,
-  BanknoteIcon,
-  ClockIcon,
-  FileTextIcon,
-  ShieldAlertIcon,
-} from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
+import { AlertTriangleIcon, ClockIcon, FileTextIcon } from "lucide-react";
+import { Card, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
+import { cn } from "@mutav/ui/cn";
 import { Skeleton } from "@mutav/ui/skeleton";
 import type { GuaranteeAggregates } from "@convex/transparency/domain";
-import { formatBRLCents } from "@mutav/i18n/brazil";
 import { formatPercent } from "@mutav/ui/transparency/format";
+import { InfoHint } from "./info-hint";
+import { KPI_CARD_CLASS } from "./kpi-card";
 
 type Props = { aggregates: GuaranteeAggregates | null };
 
@@ -22,33 +18,41 @@ function MetricCard({
   value,
   loading,
   hint,
+  secondary = false,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   loading: boolean;
   hint?: string;
+  secondary?: boolean;
 }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card className={KPI_CARD_CLASS}>
+      <CardHeader>
         <CardDescription className="flex items-center gap-1.5">
           {icon}
           {label}
+          {hint ? <InfoHint label={label} hint={hint} /> : null}
         </CardDescription>
-        <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+        <CardTitle
+          className={cn(
+            "font-semibold tabular-nums",
+            secondary ? "text-muted-foreground text-xl" : "text-2xl @[250px]/card:text-3xl",
+          )}
+        >
           {loading ? <Skeleton className="h-8 w-16" /> : value}
         </CardTitle>
       </CardHeader>
-      {hint ? (
-        <CardContent>
-          <p className="text-muted-foreground text-xs">{hint}</p>
-        </CardContent>
-      ) : null}
     </Card>
   );
 }
 
+/**
+ * The risk read of the book: what is in force and the default rate. Drafts
+ * trail as a secondary figure, muted value on the same card — they carry no
+ * risk until activated.
+ */
 export function GuaranteesPanel({ aggregates }: Props) {
   const t = useTranslations("transparency.guarantees");
   const locale = useLocale();
@@ -60,17 +64,11 @@ export function GuaranteesPanel({ aggregates }: Props) {
       : "—";
 
   return (
-    <>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <MetricCard
         icon={<FileTextIcon className="size-3.5" />}
         label={t("insured")}
         value={String(aggregates?.countInsured ?? "—")}
-        loading={loading}
-      />
-      <MetricCard
-        icon={<ClockIcon className="size-3.5" />}
-        label={t("drafted")}
-        value={String(aggregates?.countByState.drafted ?? "—")}
         loading={loading}
       />
       <MetricCard
@@ -80,31 +78,13 @@ export function GuaranteesPanel({ aggregates }: Props) {
         loading={loading}
         hint={t("defaultRateHint")}
       />
-    </>
-  );
-}
-
-/** The BRL side of the book: total guaranteed and the slice in verified default. */
-export function GuaranteeExposurePanel({ aggregates }: Props) {
-  const t = useTranslations("transparency.guarantees");
-  const loading = aggregates === null;
-
-  return (
-    <>
       <MetricCard
-        icon={<BanknoteIcon className="size-3.5" />}
-        label={t("totalGuaranteed")}
-        value={aggregates ? formatBRLCents(aggregates.sumInsuredCents) : "—"}
+        secondary
+        icon={<ClockIcon className="size-3.5" />}
+        label={t("drafted")}
+        value={String(aggregates?.countByState.drafted ?? "—")}
         loading={loading}
-        hint={t("totalGuaranteedHint")}
       />
-      <MetricCard
-        icon={<ShieldAlertIcon className="size-3.5" />}
-        label={t("verifiedDefaultExposure")}
-        value={aggregates ? formatBRLCents(aggregates.verifiedDefaultExposureCents) : "—"}
-        loading={loading}
-        hint={t("verifiedDefaultExposureHint", { count: aggregates?.countVerifiedDefault ?? 0 })}
-      />
-    </>
+    </div>
   );
 }

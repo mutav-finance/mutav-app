@@ -12,6 +12,8 @@ import {
   reserveAccountView,
   reserveSectionView,
   shortenAddress,
+  holdingShare,
+  totalHoldingsValueCents,
 } from "./reserve-view-model";
 
 const VAULT = "925hnJ7MrnAHqkvhRNBB3zYLsSACWQhHeDUB3Q4V9zvC";
@@ -160,5 +162,33 @@ describe("reserve account messages", () => {
   ] as const)("%s labels every account kind", (_locale, messages) => {
     const labels = messages.transparency.reserveHealth.account.kind;
     expect(Object.keys(labels).sort()).toEqual(Object.values(RESERVE_SOURCE_KIND).sort());
+  });
+});
+
+describe("holding shares", () => {
+  it("totals only the priced holdings", () => {
+    expect(
+      totalHoldingsValueCents([
+        { valueCents: 80_000 },
+        { valueCents: null },
+        { valueCents: 20_000 },
+      ]),
+    ).toBe(100_000);
+  });
+
+  it("is zero with nothing priced", () => {
+    expect(totalHoldingsValueCents([{ valueCents: null }])).toBe(0);
+  });
+
+  it("gives each priced holding its slice of the total", () => {
+    expect(holdingShare({ valueCents: 25_000, totalCents: 100_000 })).toBe(0.25);
+  });
+
+  it("has no share for an unpriced holding", () => {
+    expect(holdingShare({ valueCents: null, totalCents: 100_000 })).toBeNull();
+  });
+
+  it("has no share when nothing is priced", () => {
+    expect(holdingShare({ valueCents: 0, totalCents: 0 })).toBeNull();
   });
 });

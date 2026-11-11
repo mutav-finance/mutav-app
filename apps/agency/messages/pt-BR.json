@@ -1521,6 +1521,19 @@
     "heading": "Transparência",
     "subheading": "Transparência da posição de risco e da reserva onchain.",
     "footer": "Dados de garantias em tempo real. Reserva lida na rede Solana e atualizada a cada 15 minutos.",
+    "hintAriaLabel": "Sobre: {label}",
+    "summary": {
+      "title": "Cobertura da carteira",
+      "description": "Quanto da exposição das garantias em vigor a reserva cobre, no momento."
+    },
+    "book": {
+      "title": "Carteira de garantias",
+      "description": "Situação de todas as garantias da plataforma, em tempo real."
+    },
+    "claims": {
+      "title": "Funil de sinistros",
+      "description": "Garantias em cada etapa de um sinistro, no momento."
+    },
     "guarantees": {
       "insured": "Garantias em vigor",
       "drafted": "Rascunhos",
@@ -1567,12 +1580,15 @@
           "asset": "Ativo",
           "amount": "Quantidade",
           "value": "Valor em reais",
+          "share": "% da reserva",
           "counts": "Conta para a cobertura"
         },
         "counted": "Sim",
         "notCounted": "Não",
         "unpriced": "Sem cotação",
-        "unknownAsset": "Ativo não reconhecido"
+        "unknownAsset": "Ativo não reconhecido",
+        "total": "Total",
+        "countedTotal": "Considerado: {value}"
       },
       "valuation": "BRS vale R$ 1. Stablecoins em dólar pela PTAX do BCB (venda). SOL pelo preço de mercado, apenas para exibição.",
       "asOf": "Leitura de {datetime} (BRT)",
