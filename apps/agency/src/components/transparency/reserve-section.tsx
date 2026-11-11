@@ -1,64 +1,25 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import {
-  CheckIcon,
-  CopyIcon,
-  ExternalLinkIcon,
-  GaugeIcon,
-  LandmarkIcon,
-  ScaleIcon,
-  WalletIcon,
-} from "lucide-react";
-import type { ReserveHealthReading } from "@convex/transparency/domain";
+import { CheckIcon, CopyIcon, ExternalLinkIcon, LandmarkIcon } from "lucide-react";
 import { Button } from "@mutav/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mutav/ui/card";
 import { Mono } from "@mutav/ui/mono";
 import { Skeleton } from "@mutav/ui/skeleton";
-import { StatusTag, type StatusTagTone } from "@mutav/ui/status-tag";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mutav/ui/table";
+import { StatusTag } from "@mutav/ui/status-tag";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@mutav/ui/table";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { COVERAGE_STATE, type CoverageState, type ReserveAccountView } from "./reserve-view-model";
-import { useReserveSection, type ReserveHoldingRow } from "./use-reserve-section";
-
-const COVERAGE_TONE: Record<CoverageState, StatusTagTone> = {
-  [COVERAGE_STATE.NO_REQUIREMENT]: "neutral",
-  [COVERAGE_STATE.OK]: "positive",
-  [COVERAGE_STATE.ATTENTION]: "warning",
-  [COVERAGE_STATE.BELOW_TARGET]: "critical",
-};
-
-function ReserveMetric({
-  icon,
-  label,
-  value,
-  hint,
-  tag,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  hint: string;
-  tag?: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardDescription className="flex items-center gap-1.5">
-          {icon}
-          {label}
-        </CardDescription>
-        <CardTitle className="flex flex-wrap items-center gap-2 text-2xl font-semibold tabular-nums">
-          {value}
-          {tag}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground text-xs">{hint}</p>
-      </CardContent>
-    </Card>
-  );
-}
+import { TransparencySection } from "./transparency-section";
+import type { ReserveAccountView } from "./reserve-view-model";
+import type { ReserveHoldingRow, ReserveSectionModel } from "./use-reserve-section";
 
 function VaultLink({ href }: { href: string }) {
   const t = useTranslations("transparency.reserveHealth");
@@ -143,6 +104,25 @@ function HoldingRow({ row }: { row: ReserveHoldingRow }) {
         {row.value ?? <span className="text-muted-foreground">{t("unpriced")}</span>}
       </TableCell>
       <TableCell>
+        {row.share === null ? (
+          <span className="text-muted-foreground block text-right">—</span>
+        ) : (
+          <div className="flex items-center justify-end gap-2">
+            <span className="tabular-nums">{row.share}</span>
+            <span aria-hidden className="bg-muted relative h-1.5 w-16 overflow-hidden rounded-full">
+              <span
+                className={
+                  row.counted
+                    ? "bg-primary absolute inset-y-0 left-0"
+                    : "bg-muted-foreground/40 absolute inset-y-0 left-0"
+                }
+                style={{ width: `${row.shareFraction * 100}%` }}
+              />
+            </span>
+          </div>
+        )}
+      </TableCell>
+      <TableCell>
         <StatusTag tone={row.counted ? "positive" : "neutral"}>
           {row.counted ? t("counted") : t("notCounted")}
         </StatusTag>
@@ -154,26 +134,19 @@ function HoldingRow({ row }: { row: ReserveHoldingRow }) {
 function ReserveSectionSkeleton() {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Skeleton className="h-36 rounded-xl" />
-        <Skeleton className="h-36 rounded-xl" />
-        <Skeleton className="h-36 rounded-xl" />
-        <Skeleton className="h-36 rounded-xl" />
-      </div>
+      <Skeleton className="h-24 w-full rounded-xl" />
       <Skeleton className="h-56 w-full rounded-xl" />
     </div>
   );
 }
-
 
 /**
  * The phase-1 reserve (ADR 0012): the account that holds the funds, what it holds, what counts
  * toward required coverage, and how the book stands against it. Platform-wide;
  * every viewer sees the same figures.
  */
-export function ReserveSection({ reading }: { reading: ReserveHealthReading | null | undefined }) {
+export function ReserveSection({ model }: { model: ReserveSectionModel }) {
   const t = useTranslations("transparency.reserveHealth");
-  const model = useReserveSection(reading);
 
   if (model.status === "loading") return <ReserveSectionSkeleton />;
 
@@ -198,54 +171,13 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
   }
 
   return (
-    <section aria-labelledby="reserve-heading" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id="reserve-heading" className="text-base font-semibold">
-          {t("title")}
-        </h2>
-        <p className="text-muted-foreground text-sm">{t("description")}</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <ReserveMetric
-          icon={<WalletIcon className="size-3.5" />}
-          label={t("countedBalance")}
-          value={model.countedBalance}
-          hint={t("countedBalanceHint")}
-        />
-        <ReserveMetric
-          icon={<ScaleIcon className="size-3.5" />}
-          label={t("requiredCoverage")}
-          value={model.requiredCoverage}
-          hint={t("requiredCoverageHint", { ratio: model.requiredRatio })}
-        />
-        <ReserveMetric
-          icon={<GaugeIcon className="size-3.5" />}
-          label={t("coverageIndex")}
-          value={model.achievedCoverageRatio ?? "—"}
-          hint={t("coverageIndexHint")}
-          tag={
-            <StatusTag tone={COVERAGE_TONE[model.coverageState]}>
-              {t(`coverageState.${model.coverageState}`)}
-            </StatusTag>
-          }
-        />
-        <ReserveMetric
-          icon={<LandmarkIcon className="size-3.5" />}
-          label={t("freeCapacity")}
-          value={model.freeCapital}
-          hint={t("freeCapacityHint")}
-        />
-      </div>
-
+    <TransparencySection id="reserve-heading" title={t("title")} description={t("description")}>
       {model.usdStablesUncounted ? (
         <p role="status" className="text-muted-foreground text-sm">
           <StatusTag tone="warning">{t("usdStablesUncountedTag")}</StatusTag>{" "}
           {t("usdStablesUncounted")}
         </p>
       ) : null}
-
-      <ReserveAccountCard account={model.account} />
 
       <Card>
         <CardHeader className="pb-2">
@@ -259,6 +191,7 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
                 <TableHead>{t("holdings.columns.asset")}</TableHead>
                 <TableHead className="text-right">{t("holdings.columns.amount")}</TableHead>
                 <TableHead className="text-right">{t("holdings.columns.value")}</TableHead>
+                <TableHead className="text-right">{t("holdings.columns.share")}</TableHead>
                 <TableHead>{t("holdings.columns.counts")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -267,6 +200,19 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
                 <HoldingRow key={row.key} row={row} />
               ))}
             </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell className="font-medium">{t("holdings.total")}</TableCell>
+                <TableCell />
+                <TableCell className="text-right font-medium tabular-nums">
+                  {model.holdingsTotal}
+                </TableCell>
+                <TableCell className="text-right font-medium tabular-nums">100%</TableCell>
+                <TableCell className="text-muted-foreground font-normal">
+                  {t("holdings.countedTotal", { value: model.countedBalance })}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
           </Table>
           <div className="text-muted-foreground flex flex-col gap-1 text-xs">
             <span>{t("valuation")}</span>
@@ -275,6 +221,7 @@ export function ReserveSection({ reading }: { reading: ReserveHealthReading | nu
         </CardContent>
       </Card>
 
-    </section>
+      <ReserveAccountCard account={model.account} />
+    </TransparencySection>
   );
 }

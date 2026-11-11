@@ -130,3 +130,22 @@ export function reserveSectionView(
     coverageState: coverageState(reading),
   };
 }
+
+/** Σ BRL value of every priced holding — the table's total, counted or not. */
+export function totalHoldingsValueCents(
+  holdings: readonly Pick<ValuedReserveHolding, "valueCents">[],
+): number {
+  return holdings.reduce((sum, holding) => sum + (holding.valueCents ?? 0), 0);
+}
+
+/** A holding's slice of the priced total, 0..1. Null when it is unpriced or nothing is priced. */
+export function holdingShare({
+  valueCents,
+  totalCents,
+}: {
+  valueCents: number | null;
+  totalCents: number;
+}): number | null {
+  if (valueCents === null || totalCents <= 0) return null;
+  return valueCents / totalCents;
+}
