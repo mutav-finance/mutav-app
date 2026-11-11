@@ -207,7 +207,9 @@ export function ReserveSection({ model }: { model: ReserveSectionModel }) {
                 <TableCell className="text-right font-medium tabular-nums">
                   {model.holdingsTotal}
                 </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">100%</TableCell>
+                <TableCell className="text-right font-medium tabular-nums">
+                  {model.holdingsShare ?? "—"}
+                </TableCell>
                 <TableCell className="text-muted-foreground font-normal">
                   {t("holdings.countedTotal", { value: model.countedBalance })}
                 </TableCell>

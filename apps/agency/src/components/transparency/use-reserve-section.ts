@@ -50,6 +50,8 @@ export type ReserveSectionModel =
       rows: ReserveHoldingRow[];
       /** Σ priced holdings, counted or not. */
       holdingsTotal: string;
+      /** "100%" in the locale's format, or null when nothing is priced (an empty or unpriced vault). */
+      holdingsShare: string | null;
       usdStablesUncounted: boolean;
     };
 
@@ -90,6 +92,7 @@ export function useReserveSection(
       };
     }),
     holdingsTotal: formatBRLCents(totalCents),
+    holdingsShare: totalCents > 0 ? formatPercent(locale, 1) : null,
     usdStablesUncounted: health.usdStablesUncounted,
   };
 }
