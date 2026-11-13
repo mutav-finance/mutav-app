@@ -409,7 +409,7 @@ export type SignedContractState =
   (typeof SIGNED_CONTRACT_STATE)[keyof typeof SIGNED_CONTRACT_STATE];
 
 /**
- * Where the guarantee's signed rental contract stands, so the claim screen can
+ * Where the guarantee's signed guarantee contract stands, so the claim screen can
  * say what to do about the precondition. Approval follows
  * `isSignedContractApproved` (one approved file is enough); otherwise the
  * newest live upload decides between in review and rejected.
@@ -421,7 +421,7 @@ export function signedContractState(
   const newest = documents
     .filter(
       (document) =>
-        document.key === DOCUMENT_KEY.RENTAL_CONTRACT &&
+        document.key === DOCUMENT_KEY.GUARANTEE_CONTRACT &&
         document.status !== GUARANTEE_DOCUMENT_STATUS.SUPERSEDED,
     )
     .reduce<

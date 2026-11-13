@@ -8,7 +8,7 @@ import type { StorageId } from "../lib/storage";
 import type { AgencyId } from "../agencies/domain";
 import type { MutavStaffRole } from "../mutavStaff/domain";
 import type { UserId } from "../users/domain";
-import type { GuaranteeDocumentId, GuaranteeId, GuaranteeState } from "./domain";
+import type { DocumentKey, GuaranteeDocumentId, GuaranteeId, GuaranteeState } from "./domain";
 import { hasApprovedSignedContract } from "./documents";
 
 function setup() {
@@ -122,11 +122,11 @@ async function agencyAttach(
   t: T,
   fx: Fixture,
   {
-    key = "rentalContract",
+    key = "guaranteeContract",
     storageId,
     fileName = "contrato.pdf",
   }: {
-    key?: "rentalContract" | "inspection" | "policy";
+    key?: DocumentKey;
     storageId: StorageId;
     fileName?: string;
   },
@@ -145,7 +145,7 @@ async function agencyAttach(
 async function attachOk(
   t: T,
   fx: Fixture,
-  key: "rentalContract" | "inspection" | "policy" = "rentalContract",
+  key: DocumentKey = "guaranteeContract",
 ): Promise<GuaranteeDocumentId> {
   const result = await agencyAttach(t, fx, { key, storageId: await storeFile(t) });
   if (!result.success) throw new Error(`attach failed: ${result.error.code}`);
@@ -234,7 +234,7 @@ describe("attachGuaranteeDocument", () => {
     expect(row).toMatchObject({
       guaranteeId: fx.guaranteeId,
       agencyId: fx.agencyId,
-      key: "rentalContract",
+      key: "guaranteeContract",
       storageId,
       fileName: "contrato.pdf",
       contentType: "application/pdf",
@@ -248,7 +248,7 @@ describe("attachGuaranteeDocument", () => {
   test("a new upload supersedes earlier pending files for the same key only", async () => {
     const t = setup();
     const fx = await makeFixture(t);
-    const first = await attachOk(t, fx, "rentalContract");
+    const first = await attachOk(t, fx, "guaranteeContract");
     const inspection = await attachOk(t, fx, "inspection");
     const second = await agencyAttach(t, fx, { storageId: await storeFile(t) });
     if (!second.success) throw new Error(second.error.code);
@@ -396,9 +396,9 @@ describe("listGuaranteeDocuments", () => {
       .withIdentity(support)
       .mutation(api.guarantees.staffDocuments.staffAttachGuaranteeDocument, {
         publicId: fx.publicId,
-        key: "policy",
+        key: "inspection",
         storageId: await storeFile(t),
-        fileName: "apolice.pdf",
+        fileName: "vistoria.pdf",
       });
     expect(staffUpload.success).toBe(true);
 
@@ -406,7 +406,7 @@ describe("listGuaranteeDocuments", () => {
       .withIdentity({ subject: fx.subject })
       .query(api.guarantees.documents.listGuaranteeDocuments, { publicId: fx.publicId });
     expect(rows?.map((row) => [row.key, row.uploadedBy])).toEqual([
-      ["policy", { kind: "staff", name: null }],
+      ["inspection", { kind: "staff", name: null }],
       ["rentalContract", { kind: "agency_user", name: "Agency User 1" }],
     ]);
     expect(rows?.[0]).not.toHaveProperty("storageId");
@@ -778,7 +778,7 @@ describe("staff reads", () => {
     const compliance = await makeStaff(t, "compliance");
     const first = await attachOk(t, a, "rentalContract");
     await attachOk(t, b, "inspection");
-    const decided = await attachOk(t, a, "policy");
+    const decided = await attachOk(t, a, "guaranteeContract");
     await t
       .withIdentity(compliance)
       .mutation(api.guarantees.staffDocuments.approveGuaranteeDocument, { documentId: decided });
@@ -824,7 +824,7 @@ describe("staff reads", () => {
 });
 
 describe("hasApprovedSignedContract", () => {
-  test("false until compliance approves a rental contract, then true", async () => {
+  test("false until compliance approves a guarantee contract, then true", async () => {
     const t = setup();
     const fx = await makeFixture(t);
     const compliance = await makeStaff(t, "compliance");
@@ -834,7 +834,13 @@ describe("hasApprovedSignedContract", () => {
       .mutation(api.guarantees.staffDocuments.approveGuaranteeDocument, {
         documentId: inspection,
       });
-    const contract = await attachOk(t, fx, "rentalContract");
+    const leaseContract = await attachOk(t, fx, "rentalContract");
+    await t
+      .withIdentity(compliance)
+      .mutation(api.guarantees.staffDocuments.approveGuaranteeDocument, {
+        documentId: leaseContract,
+      });
+    const contract = await attachOk(t, fx, "guaranteeContract");
     expect(await t.run((ctx) => hasApprovedSignedContract(ctx, fx.guaranteeId))).toBe(false);
     await t
       .withIdentity(compliance)

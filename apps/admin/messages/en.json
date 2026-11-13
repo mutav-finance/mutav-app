@@ -538,9 +538,13 @@
       "actions": "Actions"
     },
     "labels": {
-      "rentalContract": "Signed rental contract",
-      "inspection": "Inspection",
-      "policy": "Policy"
+      "guaranteeContract": "Signed guarantee contract",
+      "rentalContract": "Signed lease contract",
+      "inspection": "Inspection report"
+    },
+    "requirement": {
+      "required": "Required",
+      "optional": "Optional"
     },
     "status": {
       "pending_review": "Under review",

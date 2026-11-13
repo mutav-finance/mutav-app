@@ -538,9 +538,13 @@
       "actions": "Ações"
     },
     "labels": {
+      "guaranteeContract": "Contrato de garantia assinado",
       "rentalContract": "Contrato de locação assinado",
-      "inspection": "Vistoria",
-      "policy": "Apólice"
+      "inspection": "Vistoria"
+    },
+    "requirement": {
+      "required": "Obrigatório",
+      "optional": "Opcional"
     },
     "status": {
       "pending_review": "Em análise",

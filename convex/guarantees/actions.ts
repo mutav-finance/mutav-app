@@ -11,6 +11,7 @@ import {
   getWhatsAppApiKey,
 } from "../lib/env";
 import { logError, logWarn } from "../lib/logger";
+import { documentKeyValidator } from "./domain";
 import {
   buildDocumentRejectedEmail,
   buildProposalEmail,
@@ -89,7 +90,7 @@ export const sendDocumentRejectedEmail = internalAction({
   args: {
     to: v.string(),
     guaranteePublicId: v.string(),
-    documentKey: v.union(v.literal("rentalContract"), v.literal("inspection"), v.literal("policy")),
+    documentKey: documentKeyValidator,
     rejectionReason: v.string(),
   },
   handler: async (_ctx, args) => {

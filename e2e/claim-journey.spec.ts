@@ -48,7 +48,7 @@ test("late rent to payout across the agency and admin apps", async ({ browser })
 
   // 2. The signed contract is a precondition: upload it on the guarantee page…
   await sheet(agency).getByRole("link", { name: "Ver documentos da garantia" }).click();
-  await agency.getByLabel("Escolher arquivo para Contrato de locação assinado").setInputFiles(PDF);
+  await agency.getByLabel("Escolher arquivo para Contrato de garantia assinado").setInputFiles(PDF);
   await expect(agency.getByText("Documento enviado para análise da MUTAV.")).toBeVisible();
   const guaranteeUrl = agency.url();
 

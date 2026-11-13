@@ -138,7 +138,7 @@ describe("claim journey: late rent to payout", () => {
       await agency.mutation(api.guarantees.documents.attachGuaranteeDocument, {
         agencyId,
         publicId: guaranteePublicId,
-        key: "rentalContract",
+        key: "guaranteeContract",
         storageId: await storePdf(t),
         fileName: "contrato-assinado.pdf",
       }),

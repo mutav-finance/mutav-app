@@ -257,7 +257,7 @@
       "precondition": {
         "title": "Before claiming",
         "signedContract": {
-          "not_uploaded": "The signed rental contract has not been uploaded yet. Upload it in the guarantee's documents; you can upload the evidence now, and the claim opens once MUTAV approves the contract.",
+          "not_uploaded": "The signed guarantee contract has not been uploaded yet. Upload it in the guarantee's documents; you can upload the evidence now, and the claim opens once MUTAV approves the contract.",
           "in_review": "MUTAV has not approved the signed contract yet. You can upload the evidence now; the claim opens once the contract is approved.",
           "rejected": "MUTAV rejected the signed contract you uploaded. Upload a new file in the guarantee's documents; the claim opens once the contract is approved."
         },
@@ -511,15 +511,7 @@
     }
   },
   "guaranteeDetails": {
-    "heroTitle": {
-      "drafted": "Draft guarantee",
-      "active": "Active guarantee",
-      "in_arrears": "Guarantee in arrears",
-      "default_verified": "Guarantee with verified default",
-      "cover_committed": "Guarantee with committed cover",
-      "in_eviction": "Guarantee in eviction",
-      "closed": "Closed guarantee"
-    },
+    "heroTitle": "Guarantee #{id}",
     "summary": {
       "heading": "Request",
       "currentStatus": "Current status:",
@@ -527,18 +519,18 @@
       "nextRenewal": "Estimated next renewal:",
       "availableGuarantee": "Coverage:",
       "guaranteeTooltip": "This amount already subtracts the approved and paid covers on this guarantee.",
-      "cancelProposal": "Cancel proposal",
+      "cancelProposal": "Cancel guarantee",
       "idLabel": "Guarantee ID",
       "guaranteeTooltipLabel": "Coverage details",
       "cancelDialog": {
-        "title": "Cancel proposal?",
+        "title": "Cancel guarantee?",
         "description": "The guarantee will be marked as canceled. History will be preserved.",
         "confirm": "Yes, cancel",
         "canceling": "Canceling…",
         "back": "Go back"
       },
       "errors": {
-        "NOT_FOUND": "Proposal not found.",
+        "NOT_FOUND": "Guarantee not found.",
         "NOT_DRAFTED": "Only drafted guarantees can be canceled.",
         "UNEXPECTED": "Unexpected error. Please try again."
       },
@@ -636,16 +628,20 @@
       "loading": "Loading…",
       "empty": "No file uploaded yet.",
       "uploaded": "Document sent to MUTAV for review.",
-      "acceptedFormats": "PDF, JPG or PNG, up to 15 MB. Every file is reviewed by the MUTAV team.",
+      "acceptedFormats": "PDF, JPG or PNG, up to 15 MB. The guarantee is activated after MUTAV approves the signed guarantee contract; the lease contract and the inspection report are optional. Every file is reviewed by the MUTAV team.",
       "closedGuarantee": "Guarantee closed — it no longer accepts documents.",
       "uploadedBy": "Uploaded by {name} on {date}",
       "uploadedByMutav": "MUTAV",
       "unknownUser": "removed user",
       "rejectionReason": "Rejection reason: {reason}",
       "labels": {
-        "rentalContract": "Signed rental contract",
-        "inspection": "Inspection",
-        "policy": "Policy"
+        "guaranteeContract": "Signed guarantee contract",
+        "rentalContract": "Signed lease contract",
+        "inspection": "Inspection report"
+      },
+      "requirement": {
+        "required": "Required",
+        "optional": "Optional"
       },
       "status": {
         "pending_review": "Under review",
@@ -1167,9 +1163,9 @@
       "cancelBlock": "Cancel"
     },
     "success": {
-      "heading": "GUARANTEE PROPOSAL CREATED",
-      "subtitle": "The guarantee is created and awaits the signed contract.",
-      "description": "Collect the signed guarantee contract from the tenant and upload the PDF on the guarantee page. MUTAV reviews the contract and registers the guarantee with the reserve; it becomes active once the registration is confirmed. The tenant received an informational notice that the agency will contact them to sign.",
+      "heading": "GUARANTEE CREATED",
+      "subtitle": "The guarantee is created and awaits the signed guarantee contract.",
+      "description": "Collect the signed guarantee contract from the tenant and upload the file (PDF, JPG or PNG) on the guarantee page. MUTAV reviews the contract and registers the guarantee with the reserve; it becomes active once the registration is confirmed. The tenant received an informational notice that the agency will contact them to sign.",
       "viewGuarantee": "View guarantee",
       "createAnother": "Create another guarantee"
     },

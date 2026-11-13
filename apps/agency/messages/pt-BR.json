@@ -257,7 +257,7 @@
       "precondition": {
         "title": "Antes de acionar",
         "signedContract": {
-          "not_uploaded": "O contrato de locação assinado ainda não foi enviado. Envie-o nos documentos da garantia; você pode enviar as provas agora, e o acionamento libera quando a MUTAV aprovar o contrato.",
+          "not_uploaded": "O contrato de garantia assinado ainda não foi enviado. Envie-o nos documentos da garantia; você pode enviar as provas agora, e o acionamento libera quando a MUTAV aprovar o contrato.",
           "in_review": "O contrato assinado ainda não foi aprovado pela MUTAV. Você pode enviar as provas agora; o acionamento libera quando o contrato for aprovado.",
           "rejected": "A MUTAV recusou o contrato assinado enviado. Envie um novo arquivo nos documentos da garantia; o acionamento libera quando o contrato for aprovado."
         },
@@ -511,15 +511,7 @@
     }
   },
   "guaranteeDetails": {
-    "heroTitle": {
-      "drafted": "Garantia em rascunho",
-      "active": "Garantia ativa",
-      "in_arrears": "Garantia em atraso",
-      "default_verified": "Garantia com inadimplência verificada",
-      "cover_committed": "Garantia com cobertura registrada",
-      "in_eviction": "Garantia em despejo",
-      "closed": "Garantia encerrada"
-    },
+    "heroTitle": "Garantia #{id}",
     "summary": {
       "heading": "Solicitação",
       "currentStatus": "Situação atual:",
@@ -527,18 +519,18 @@
       "nextRenewal": "Próxima Renovação estimada:",
       "availableGuarantee": "Cobertura:",
       "guaranteeTooltip": "Este valor já desconta as coberturas aprovadas e pagas desta garantia.",
-      "cancelProposal": "Cancelar proposta",
+      "cancelProposal": "Cancelar garantia",
       "idLabel": "ID da garantia",
       "guaranteeTooltipLabel": "Detalhes da cobertura",
       "cancelDialog": {
-        "title": "Cancelar proposta?",
+        "title": "Cancelar garantia?",
         "description": "A garantia será marcada como cancelada. O histórico será preservado.",
         "confirm": "Sim, cancelar",
         "canceling": "Cancelando…",
         "back": "Voltar"
       },
       "errors": {
-        "NOT_FOUND": "Proposta não encontrada.",
+        "NOT_FOUND": "Garantia não encontrada.",
         "NOT_DRAFTED": "Apenas garantias em rascunho podem ser canceladas.",
         "UNEXPECTED": "Erro inesperado. Tente novamente."
       },
@@ -636,16 +628,20 @@
       "loading": "Carregando…",
       "empty": "Nenhum arquivo enviado.",
       "uploaded": "Documento enviado para análise da MUTAV.",
-      "acceptedFormats": "PDF, JPG ou PNG, até 15 MB. Cada arquivo é analisado pela equipe MUTAV.",
+      "acceptedFormats": "PDF, JPG ou PNG, até 15 MB. A garantia é ativada depois que a MUTAV aprova o contrato de garantia assinado; o contrato de locação e a vistoria são opcionais. Cada arquivo é analisado pela equipe MUTAV.",
       "closedGuarantee": "Garantia encerrada — não aceita novos documentos.",
       "uploadedBy": "Enviado por {name} em {date}",
       "uploadedByMutav": "MUTAV",
       "unknownUser": "usuário removido",
       "rejectionReason": "Motivo da recusa: {reason}",
       "labels": {
+        "guaranteeContract": "Contrato de garantia assinado",
         "rentalContract": "Contrato de locação assinado",
-        "inspection": "Vistoria",
-        "policy": "Apólice"
+        "inspection": "Vistoria"
+      },
+      "requirement": {
+        "required": "Obrigatório",
+        "optional": "Opcional"
       },
       "status": {
         "pending_review": "Em análise",
@@ -1167,9 +1163,9 @@
       "cancelBlock": "Cancelar"
     },
     "success": {
-      "heading": "PROPOSTA DE GARANTIA CRIADA",
-      "subtitle": "A garantia foi criada e aguarda o contrato assinado.",
-      "description": "Colete com o inquilino o contrato de garantia assinado e envie o PDF na página da garantia. A MUTAV revisa o contrato e registra a garantia na reserva; ela fica ativa quando o registro é confirmado. O inquilino recebeu um aviso informativo de que a imobiliária entrará em contato para a assinatura.",
+      "heading": "GARANTIA CRIADA",
+      "subtitle": "A garantia foi criada e aguarda o contrato de garantia assinado.",
+      "description": "Colete com o inquilino o contrato de garantia assinado e envie o arquivo (PDF, JPG ou PNG) na página da garantia. A MUTAV revisa o contrato e registra a garantia na reserva; ela fica ativa quando o registro é confirmado. O inquilino recebeu um aviso informativo de que a imobiliária entrará em contato para a assinatura.",
       "viewGuarantee": "Ver garantia",
       "createAnother": "Criar outra garantia"
     },

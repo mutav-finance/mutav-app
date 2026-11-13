@@ -7,7 +7,14 @@ import type { FunctionReturnType } from "convex/server";
 import { toast } from "sonner";
 import { api } from "@convex/_generated/api";
 import type { AgencyId } from "@convex/agencies/domain";
-import type { DocumentKey, GuaranteeDocumentId, GuaranteeState } from "@convex/guarantees/domain";
+import {
+  DOCUMENT_KEY,
+  DOCUMENT_KEYS,
+  REQUIRED_DOCUMENT_KEYS,
+  type DocumentKey,
+  type GuaranteeDocumentId,
+  type GuaranteeState,
+} from "@convex/guarantees/domain";
 import type { StorageId } from "@convex/lib/storage";
 import { postFileToStorage } from "@mutav/app-shell/storage-upload";
 
@@ -15,16 +22,17 @@ export type GuaranteeDocumentRow = NonNullable<
   FunctionReturnType<typeof api.guarantees.documents.listGuaranteeDocuments>
 >[number];
 
-/** Slot order on the card: the signed contract gates activation, so it leads. */
-export const DOCUMENT_SLOTS = [
-  "rentalContract",
-  "inspection",
-  "policy",
-] as const satisfies readonly DocumentKey[];
+/**
+ * Slot order on the card: the signed guarantee contract gates activation, so
+ * it leads; the lease contract and the vistoria are optional.
+ */
+export const DOCUMENT_SLOTS = DOCUMENT_KEYS;
 
+export const REQUIRED_SLOTS = REQUIRED_DOCUMENT_KEYS;
+
+/** MUTAV publishes a standard template only for its own guarantee contract. */
 export const SLOTS_WITH_TEMPLATE: ReadonlySet<DocumentKey> = new Set([
-  "rentalContract",
-  "inspection",
+  DOCUMENT_KEY.GUARANTEE_CONTRACT,
 ]);
 
 /** Mirrors the server-side allowlist; the server re-checks against storage metadata. */
