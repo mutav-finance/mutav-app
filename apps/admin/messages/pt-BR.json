@@ -57,6 +57,7 @@
     "goToAdmin": "Voltar ao painel administrativo",
     "signIn": "Entrar",
     "signOut": "Sair",
+    "switchAccount": "Trocar de conta",
     "signedInAs": "Conectado como <mono>{email}</mono>"
   },
   "staff": {

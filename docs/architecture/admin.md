@@ -65,9 +65,7 @@ The shells are visually distinct on purpose. A Mutav-admin inside `(admin)` shou
 
 ### Shell-switcher in user menu
 
-A Mutav-admin who also has agency memberships flips between shells via a single link in `nav-user.tsx`:
-
-- Inside `(app)` user menu: "Switch to Mutav admin →" → `/admin`
+Staff flip between the apps with a cross-origin link: "Open admin" (`apps/agency/src/components/shell-switcher.tsx`) in the agency header and onboarding header, and "Back to agencies" in the admin header. The agency app never redirects staff on its own: it routes everyone by agency state, so a staff member who also runs an agency can onboard it. Logout is cross-app, so switching user never leaves the other app signed in as someone else (see [`../auth0.md`](../auth0.md) "Cross-app logout").
 - Inside `(admin)` user menu: "Switch to agency view →" → `/` (lands on the last selected agency)
 
 Same component, two render modes. Visible only when the current user has at least one `mutavStaff` row.

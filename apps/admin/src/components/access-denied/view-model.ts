@@ -6,7 +6,7 @@ type TitleKey = "title" | "anonymousTitle" | "staffTitle" | "unavailableTitle";
 type SubtitleKey = "subtitle" | "anonymousSubtitle" | "staffSubtitle" | "unavailableSubtitle";
 type EyebrowKey = "eyebrow" | "anonymousEyebrow" | "staffEyebrow" | "unavailableEyebrow";
 type PrimaryLabelKey = "goToAgency" | "goToAdmin";
-type SecondaryLabelKey = "signIn" | "signOut";
+type SecondaryLabelKey = "signIn" | "signOut" | "switchAccount";
 
 /** Drives the marker icon. The page owns the icon components; this stays pure. */
 export type AccessDeniedTone = "denied" | "signedOut" | "granted" | "unavailable";
@@ -32,15 +32,18 @@ export function resolveAccessDeniedView({
   gate,
   locale,
   agencyUrl,
+  logoutHref,
 }: {
   gate: StaffGateResult;
   locale: string;
   agencyUrl: string;
+  /** The cross-app logout, so leaving here signs the user out of both apps. */
+  logoutHref: string;
 }): AccessDeniedView {
   // `/auth/*` is mounted by the Auth0 SDK outside the `[locale]` tree, so
-  // these two are never locale-prefixed.
+  // these are never locale-prefixed.
   const signIn = { href: "/auth/login", labelKey: "signIn" } as const;
-  const signOut = { href: "/auth/logout", labelKey: "signOut" } as const;
+  const signOut = { href: logoutHref, labelKey: "signOut" } as const;
 
   if (gate.kind === "anonymous") {
     // Not a denial: a signed-out visitor may well be staff. Claiming they lack
@@ -95,7 +98,9 @@ export function resolveAccessDeniedView({
     titleKey: "title",
     subtitleKey: "subtitle",
     primary: { href: buildCrossAppUrl(agencyUrl, locale), labelKey: "goToAgency" },
-    secondary: signOut,
+    // Signed in, but not as staff: most often the wrong account, so offer the
+    // way to sign in as someone else rather than a bare log out.
+    secondary: { href: logoutHref, labelKey: "switchAccount" },
     email,
   };
 }

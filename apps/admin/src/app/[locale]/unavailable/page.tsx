@@ -5,6 +5,7 @@ import { Button } from "@mutav/ui/button";
 import { Eyebrow } from "@mutav/ui/eyebrow";
 import { BareShell } from "@mutav/ui/shell/bare-shell";
 import { Wordmark } from "@mutav/ui/wordmark";
+import { getLogoutHref } from "@/lib/logout";
 
 /**
  * Terminal page for a signed-in user whose staff status could not be read
@@ -44,11 +45,9 @@ export default async function UnavailablePage({ params }: { params: Promise<{ lo
             <Link href="/">{t("tryAgain")}</Link>
           </Button>
           <Button asChild variant="outline">
-            {/* The Auth0 SDK mounts /auth/logout at the root, outside [locale],
-                and needs a full navigation so the proxy can clear the session
-                cookie — a plain <a>, never next/link. */}
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/auth/logout">{t("logOut")}</a>
+            {/* The logout route lives outside [locale] and needs a full
+                navigation — a plain <a>, never next/link. */}
+            <a href={getLogoutHref()}>{t("logOut")}</a>
           </Button>
         </div>
       </div>

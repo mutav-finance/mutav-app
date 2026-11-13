@@ -32,6 +32,7 @@ const PLAIN_KEYS = [
   "goToAdmin",
   "signIn",
   "signOut",
+  "switchAccount",
 ] as const;
 
 describe("accessDenied messages", () => {

@@ -57,6 +57,7 @@
     "goToAdmin": "Back to the admin console",
     "signIn": "Sign in",
     "signOut": "Sign out",
+    "switchAccount": "Switch account",
     "signedInAs": "Signed in as <mono>{email}</mono>"
   },
   "staff": {

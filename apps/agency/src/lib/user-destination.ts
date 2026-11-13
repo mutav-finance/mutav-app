@@ -16,7 +16,6 @@ export type UserDestination =
   | { kind: "session-expired" }
   | { kind: "not-provisioned"; reason?: ProvisionRefusalReason }
   | { kind: "backend-unavailable" }
-  | { kind: "staff" }
   | { kind: "onboarding-welcome" }
   | { kind: "onboarding-status"; state: "submitted" | "under_review" }
   | { kind: "onboarding-rejected" }
@@ -48,8 +47,7 @@ export type UserDestinationStep =
   | "getMe"
   | "provision"
   | "getMeAfterProvision"
-  | "fetchAgencies"
-  | "fetchStaff";
+  | "fetchAgencies";
 
 /**
  * Every Convex read throws on failure; the core classifies the throw. Injected
@@ -61,7 +59,6 @@ export type UserDestinationDeps = {
   fetchMe: (token: string) => Promise<unknown>;
   provision: (token: string) => Promise<ProvisionResult>;
   fetchAgencies: (token: string) => Promise<ReadonlyArray<{ onboardingState?: string }>>;
-  fetchStaff: (token: string) => Promise<boolean>;
   log: (step: UserDestinationStep, fields: UserDestinationLogFields) => void;
 };
 
@@ -97,40 +94,22 @@ function isTransportError(error: unknown): boolean {
 }
 
 /**
- * Pure routing decision: a Mutav-org user (staff) with no active agency
- * belongs on the admin app, not the agency dashboard. Staff WITH an active
- * agency fall through to the dashboard and cross via the shell-switcher
- * (Phase E). Active-agency predicate mirrors the dashboard branch below.
- */
-export function shouldRouteStaffToAdmin({
-  isStaff,
-  agencies,
-}: {
-  isStaff: boolean;
-  // ReadonlyArray makes the element type covariant, so callers can pass a
-  // list whose `onboardingState` is a narrower union literal than `string`.
-  // Optional because the resolved agency doc has it as `v.optional(...)`.
-  agencies: ReadonlyArray<{ onboardingState?: string }>;
-}): boolean {
-  return isStaff && !agencies.some((a) => a.onboardingState === "active");
-}
-
-/**
  * The destination state machine with its I/O injected. Order matters:
  *
  * 1. No usable token → `session-expired` (the only path back to Auth0).
  * 2. `getMe` throws → `backend-unavailable`. `getMe` returns `null` → one
  *    provisioning attempt, then `getMe` again; still `null`, or a non-transport
  *    provisioning error → `not-provisioned`. A provisioning refusal (Result
- *    `success: false`) → `not-provisioned` with the reason the user can act on. `listAgenciesForUser` and
- *    `amIStaff` are `queryWithAuth` and throw without a row, so this step is
- *    what keeps a missing row from looking like an outage.
+ *    `success: false`) → `not-provisioned` with the reason the user can act on.
+ *    `listAgenciesForUser` is `queryWithAuth` and throws without a row, so this
+ *    step is what keeps a missing row from looking like an outage.
  *    Every throw is logged with its `classifyConvexError` kind, but routing
  *    stays on the error page: sending `auth_rejected` to login would loop on a
  *    misconfigured deployment.
- * 3. Agencies, then staff. Staff fails closed: a failed staff read never
- *    yields `dashboard`, so a possibly-staff user is never dropped into the
- *    agency dashboard on a Convex blip.
+ * 3. Agencies only. Staff status never routes: this app serves whoever
+ *    signed in to it by their agency state, and staff reach admin through the
+ *    shell switcher. Redirecting staff away trapped anyone who is both staff
+ *    and an agency member in onboarding.
  */
 export async function resolveUserDestinationWith(
   deps: UserDestinationDeps,
@@ -172,15 +151,6 @@ export async function resolveUserDestinationWith(
     return { kind: "backend-unavailable" };
   }
   const agencies = agenciesResult.value;
-
-  // Staff branch runs before the onboarding/dashboard branches: a Mutav-org
-  // user with no active agency routes to the admin app.
-  const staff = await attempt(() => deps.fetchStaff(token));
-  if (!staff.ok) {
-    deps.log("fetchStaff", errorFields(staff.error));
-    return { kind: "backend-unavailable" };
-  }
-  if (shouldRouteStaffToAdmin({ isStaff: staff.value, agencies })) return { kind: "staff" };
 
   if (agencies.length === 0) return { kind: "onboarding-welcome" };
 
@@ -225,7 +195,6 @@ export function resolveUserDestination(): Promise<UserDestination> {
     fetchMe: (token) => fetchQuery(api.users.useCases.getMe, {}, { token }),
     provision: (token) => fetchMutation(api.users.useCases.getOrCreateByIdentity, {}, { token }),
     fetchAgencies: (token) => fetchQuery(api.agencies.useCases.listAgenciesForUser, {}, { token }),
-    fetchStaff: (token) => fetchQuery(api.mutavStaff.useCases.amIStaff, {}, { token }),
     log: (step, fields) => console.error(`[agency] user-destination ${step} failed`, fields),
   });
 }

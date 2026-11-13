@@ -2,6 +2,7 @@ import { NextRequest, type NextResponse } from "next/server";
 import { errorCode, errorCodeOrName, errorName } from "./error-fields";
 import { nowInSeconds, type SessionLike } from "./fresh-id-token";
 import { idTokenExpiresAt } from "./id-token";
+import { CLEAR_SESSION_PATH, clearSessionResponse } from "./cross-app-logout";
 import { carryAuthHeaders } from "./proxy-headers";
 import { RETURN_TO_HEADER } from "./return-to";
 
@@ -41,14 +42,25 @@ export function createAuthProxy({
   auth0,
   handleI18nRouting,
   getRefreshWindowSeconds,
+  getSiblingAppUrl,
   now = nowInSeconds,
 }: {
   auth0: AuthProxyAuth;
   handleI18nRouting: (request: NextRequest) => NextResponse;
   getRefreshWindowSeconds: () => number;
+  /**
+   * Base URL of the other signed-in app. Serves `CLEAR_SESSION_PATH`, the first
+   * hop of the cross-app logout (see `cross-app-logout.ts`). Read per request,
+   * so a missing production env var fails the request, not the module load.
+   */
+  getSiblingAppUrl: () => string;
   now?: () => number;
 }): (request: NextRequest) => Promise<NextResponse> {
   return async function proxy(request) {
+    if (request.nextUrl.pathname === CLEAR_SESSION_PATH) {
+      return clearSessionResponse(request, getSiblingAppUrl());
+    }
+
     const authRes = await auth0.middleware(request);
     if (isAuthOrApiPath(request.nextUrl.pathname)) return authRes;
 
